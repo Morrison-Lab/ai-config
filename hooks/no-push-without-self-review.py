@@ -152,13 +152,62 @@ SHORT_OPTS_WITH_VALUE = "o"
 PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
                            "--follow-tags"}
 
-# git accepts any UNAMBIGUOUS abbreviation of a long option, so `--rep` is
-# `--repo`. Measured on git 2.43.0: `--rep=beta` pushes to beta, while `--re`
-# and `--rec` are refused as ambiguous with `--receive-pack` and
-# `--recurse-submodules`. Recognising only the full spelling let `--rep=other`
-# through where `--repo=other` was denied, under identical config.
-REPO_SPELLINGS = {"--rep", "--repo"}
-NO_REPO_SPELLINGS = {"--no-rep", "--no-repo"}
+# git's parse-options accepts any UNAMBIGUOUS abbreviation of a long option, so
+# every table below has to be matched through a resolver rather than by string
+# equality. An earlier revision hardened only `--repo` and left the rest exact,
+# which was a fix to one site rather than to the class. Measured on git 2.43.0,
+# with no `remote.<name>.push` configured so only the indeterminate table could
+# refuse them:
+#
+#   git push --all up   -> refused        git push --al up   -> ALLOWED
+#   git push --mirror up-> refused        git push --mir up  -> ALLOWED
+#   git push --tags up  -> refused        git push --ta up   -> ALLOWED
+#
+# and, defeating the value-aware parsing the walk below depends on:
+#
+#   git push -o --repo=other   -> refused
+#   git push --pu --repo=other -> ALLOWED   (`--pu` IS `--push-option`)
+#
+# `--al` ships every ref. So an unresolved abbreviation is not a cosmetic gap.
+PUSH_LONG_OPTS = frozenset({
+    "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
+    "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
+    "--mirror", "--no-verify", "--porcelain", "--progress", "--prune",
+    "--push-option", "--quiet", "--receive-pack", "--recurse-submodules",
+    "--repo", "--set-upstream", "--signed", "--tags", "--thin", "--verbose",
+    "--verify",
+})
+
+# Ambiguity is the reason this returns a sentinel rather than just resolving.
+# `--re` matches --receive-pack and --recurse-submodules and git REFUSES it, so
+# the guard must not silently pick one; AMBIGUOUS makes the caller bail to
+# indeterminate, which is the fail-closed direction.
+AMBIGUOUS = object()
+
+
+def resolve_long_opt(head: str):
+    """`head` resolved to the option git would read it as.
+
+    Returns the full option name, AMBIGUOUS when several match (git refuses
+    those outright), or `head` unchanged when nothing matches -- an option this
+    table does not know, left to be handled as it was before.
+
+    `--no-<x>` is resolved against `<x>` and returned in its `--no-` form, since
+    git accepts abbreviations there too (`--no-rep` is `--no-repo`).
+    """
+    if head in PUSH_LONG_OPTS:
+        return head
+    negated = head.startswith("--no-") and head != "--no-verify"
+    stem = "--" + head[len("--no-"):] if negated else head
+    if stem in PUSH_LONG_OPTS:
+        return head
+    matches = {o for o in PUSH_LONG_OPTS if o.startswith(stem) and stem != "--"}
+    if len(matches) > 1:
+        return AMBIGUOUS
+    if not matches:
+        return head
+    full = matches.pop()
+    return "--no-" + full[2:] if negated else full
 
 
 # `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
@@ -452,8 +501,11 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
                                            option; git pushes to alpha
 
     Both turned a correctly-refused push into an allowed one. This walk already
-    knows which tokens are option values and which are options, so resolving
-    `--repo` inside it cannot disagree with it. `--no-repo` clears the value,
+    classifies option values, so resolving `--repo` inside it cannot disagree
+    with that classification -- but only for the spellings its tables know,
+    which is why every long option is put through `resolve_long_opt` first. An
+    earlier revision skipped that and `--pu --repo=X` walked straight back into
+    the same hole, `--pu` being `--push-option`. `--no-repo` clears the value,
     as it does for git, and the last occurrence wins.
     """
     try:
@@ -467,23 +519,27 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
         tok = argv[i]
         if tok.startswith("-") and tok != "-":
             head, _, value = tok.partition("=")
+            if head.startswith("--"):
+                head = resolve_long_opt(head)
+                if head is AMBIGUOUS:
+                    return None
             if head in PUSH_OPTS_INDETERMINATE:
                 return None
             if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
                 return None
-            if head in NO_REPO_SPELLINGS:
+            if head == "--no-repo":
                 repo = None
                 i += 1
                 continue
-            if head in REPO_SPELLINGS and _:
+            if head == "--repo" and _:
                 repo = value
                 i += 1
                 continue
-            if (head in PUSH_OPTS_WITH_VALUE or head in REPO_SPELLINGS) and not _:
+            if head in PUSH_OPTS_WITH_VALUE and not _:
                 if head == "--recurse-submodules" and i + 1 < len(argv) \
                         and argv[i + 1] in SUBMODULE_PUSH_MODES:
                     return None
-                if head in REPO_SPELLINGS and i + 1 < len(argv):
+                if head == "--repo" and i + 1 < len(argv):
                     repo = argv[i + 1]
                 i += 2
                 continue

@@ -496,7 +496,8 @@ CASES = [
 def raw_cases() -> tuple[int, int]:
     """Payload-level cases the table above cannot express.
 
-    Both check the deliberate fail-open direction documented in the hook: a
+    Two of these check the deliberate fail-open direction documented in the
+    hook (the other two cover payloads that are not a push at all): a
     guard that crashed CLOSED would block every push in the session, which is a
     worse failure than missing one review. The point of testing it is that the
     direction is a choice rather than an accident.
@@ -525,8 +526,15 @@ def raw_cases() -> tuple[int, int]:
 def config_cases() -> tuple[int, int]:
     """What a BARE `git push` ships is a `push.default` question, not a fact.
 
-    Both of these ship refs other than HEAD, so a verdict naming HEAD cannot
-    cover them. Verified against real git rather than asserted.
+    Most rows here ship refs other than HEAD, so a verdict naming HEAD cannot
+    cover them, and they expect a deny; `branch.<name>.pushRemote` is the
+    control that ships nothing extra and expects an allow. Verified against
+    real git rather than asserted.
+
+    Every row states the REASON it must deny for, not only the bit. Three rows
+    added in one session passed while denying through an unrelated config path,
+    and only a mutation control caught them -- the bit alone cannot tell a row
+    that works from a row that is masked.
     """
     failures = 0
     ran = 0
@@ -534,17 +542,21 @@ def config_cases() -> tuple[int, int]:
     # no remote, which is exactly when config decides the destination -- and an
     # earlier revision skipped the `remote.<name>.push` check for that case
     # while passing the explicit-remote one.
-    for label, config, command, should_deny in (
+    for label, config, command, should_deny, expect in (
         ("`push.default = matching` makes a bare push ship more than HEAD",
-         ["push.default", "matching"], f"git -C {REPO} push origin", True),
+         ["push.default", "matching"], f"git -C {REPO} push origin", True,
+         "`push.default` is `matching`"),
         ("`push.default = matching` is caught with no remote named",
-         ["push.default", "matching"], f"git -C {REPO} push", True),
+         ["push.default", "matching"], f"git -C {REPO} push", True,
+         "`push.default` is `matching`"),
         ("a configured remote.<name>.push makes a bare push ship something else",
-         ["remote.origin.push", "refs/heads/*:refs/heads/*"], f"git -C {REPO} push origin", True),
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"], f"git -C {REPO} push origin",
+         True, "`remote.origin.push` is configured"),
         ("remote.<name>.push is caught with no remote named",
-         ["remote.origin.push", "refs/heads/main:refs/heads/other"], f"git -C {REPO} push", True),
+         ["remote.origin.push", "refs/heads/main:refs/heads/other"], f"git -C {REPO} push",
+         True, "`remote.origin.push` is configured"),
         ("branch.<name>.pushRemote is resolved when no remote is named",
-         ["branch.main.pushRemote", "origin"], f"git -C {REPO} push", False),
+         ["branch.main.pushRemote", "origin"], f"git -C {REPO} push", False, None),
         # `--repo` supplies the remote for a push that names no positional one,
         # so reading such a push as bare resolved the WRONG remote (falling
         # through to the pushDefault chain, and ultimately the literal
@@ -561,10 +573,10 @@ def config_cases() -> tuple[int, int]:
         # fallback chain resolves.
         ("remote.<name>.push is caught when the remote came from --repo=",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push --repo=other", True),
+         f"git -C {REPO} push --repo=other", True, "`remote.other.push` is configured"),
         ("remote.<name>.push is caught when the remote came from --repo",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push --repo other", True),
+         f"git -C {REPO} push --repo other", True, "`remote.other.push` is configured"),
         # git honours --no-repo and any unambiguous abbreviation (--rep), and
         # `--repo=X` sitting as another option's VALUE is not an occurrence at
         # all. A raw argv scan for "--repo" got all three wrong in the
@@ -572,27 +584,64 @@ def config_cases() -> tuple[int, int]:
         # cannot. Each row below fails against that scan.
         ("--no-repo clears the remote, so the config chain decides again",
          ["remote.origin.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push --repo=other --no-repo", True),
+         f"git -C {REPO} push --repo=other --no-repo", True, "`remote.origin.push` is configured"),
         ("--repo as another option's value is not a --repo occurrence",
          ["remote.origin.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push -o --repo=other", True),
+         f"git -C {REPO} push -o --repo=other", True, "`remote.origin.push` is configured"),
         ("--rep is an unambiguous abbreviation of --repo",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push --rep=other", True),
+         f"git -C {REPO} push --rep=other", True, "`remote.other.push` is configured"),
+        # Deliberately the ATTACHED form on both. With `--repo=origin --rep
+        # other`, a build that does not know `--rep` reads `other` as the
+        # positional remote and reaches the same answer by the wrong route --
+        # the row could not tell the two apart. `--rep=other` cannot be
+        # mistaken for a positional, so only a build that resolves the
+        # abbreviation lands on `other`.
         ("the last --repo wins, across spellings",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push --repo=origin --rep other", True),
+         f"git -C {REPO} push --repo=origin --rep=other", True, "`remote.other.push` is configured"),
+        # git accepts any unambiguous abbreviation, so every table has to be
+        # matched through the resolver. `--al` ships every ref; recognising
+        # only `--all` let it straight through. `--pu` is `--push-option`, so
+        # an unresolved spelling also re-opened the `-o --repo=X` hole.
+        # These four carry a DELIBERATELY BENIGN config. With
+        # `remote.origin.push` set instead, every one of them denies through
+        # the config path whatever the option table does, and passes against a
+        # build with no resolver at all -- measured, three of four were vacuous
+        # that way. `branch.main.pushRemote` is the row above's own
+        # allow-expecting config, so a deny here can only come from the option
+        # tables.
+        ("an abbreviation of --all is still indeterminate",
+         ["branch.main.pushRemote", "origin"],
+         f"git -C {REPO} push --al origin", True, "does not name a single reviewable head"),
+        ("an abbreviation of --mirror is still indeterminate",
+         ["branch.main.pushRemote", "origin"],
+         f"git -C {REPO} push --mir origin", True, "does not name a single reviewable head"),
+        ("an abbreviation of --push-option still consumes its value",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --pu --repo=other", True, "`remote.origin.push` is configured"),
+        ("an ambiguous abbreviation is refused rather than guessed",
+         ["branch.main.pushRemote", "origin"],
+         f"git -C {REPO} push --re origin", True, "does not name a single reviewable head"),
         ("a positional remote still beats --repo naming a different one",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
-         f"git -C {REPO} push other --repo=origin", True),
+         f"git -C {REPO} push other --repo=origin", True, "`remote.other.push` is configured"),
     ):
         ran += 1
         _git(REPO, "config", *config)
         try:
             rc, out = run_hook(command, reviewed())
-            denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+            spec = out.get("hookSpecificOutput") or {}
+            denied = spec.get("permissionDecision") == "deny"
+            reason = spec.get("permissionDecisionReason", "")
             if rc != 0 or denied != should_deny:
                 print(f"FAIL (deny={denied}, wanted {should_deny}): {label}")
+                failures += 1
+            elif expect and expect not in reason:
+                # The bit alone lets a row pass by the wrong route -- a benign
+                # config plus a deny from somewhere else reads identically.
+                print(f"FAIL (denied, but not for {expect!r}): {label}\n"
+                      f"   reason: {reason[:120]}")
                 failures += 1
             else:
                 print(f"PASS: {label}")

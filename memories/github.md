@@ -529,7 +529,9 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   What had not been recorded is the second half: the absence of a review was then investigated as an **open question**, and `Morrison-Lab/gha#575` was filed asking whether Copilot is licensed for the org --- a question this section had already answered, with a wider denominator, seventeen days earlier.
   The issue was retracted and closed the same day.
   Read that as the more expensive error of the two.
-  A forbidden request wastes one call; treating its predictable silence as a mystery spends a search sweep, a negative-control sweep, and a filed issue, and it publishes a tracker item asserting that Copilot is "one of two cross-vendor reviewers still in service" while a standing directive says it is not.
+  A forbidden request wastes one call.
+  Treating its predictable silence as a mystery spends a search sweep, a negative-control sweep, and a filed issue,
+  and it publishes a tracker item asserting that Copilot is "one of two cross-vendor reviewers still in service" while a standing directive says it is not.
   The rule this violates is already in the corpus and is not Copilot-specific: [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) governs asserting a gap from a search, and the gap here was in the memory file rather than in the repo.
 
   **The moratorium's mechanism is enforced against the HOOK and not against the session, which is why a self-initiated request still gets through.**
@@ -553,7 +555,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 
   - **Do:** run a bogus-value search alongside a login-keyed one, so a `422` versus a quiet zero tells you whether the value resolved.
   - **Do:** re-read this section before investigating a missing Copilot review --- the answer for any date before September 2026 is already here.
-  - **Don't:** treat a moratorium the hook honors as a moratorium the session is prevented from breaking; only the nag is mechanized.
+  - **Don't:** treat a moratorium the hook honors as a moratorium the session is prevented from breaking.
+    Only the nag is mechanized.
   - **Don't:** file an issue asking why Copilot did not review, or whether it is licensed, while the moratorium is live.
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**

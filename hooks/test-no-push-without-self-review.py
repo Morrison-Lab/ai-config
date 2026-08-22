@@ -806,6 +806,114 @@ def valueless_bool_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def alias_cases() -> tuple[int, int]:
+    """A git ALIAS expanding to a push is a push (ai-config#1993).
+
+    The sibling detector matches the literal subcommand, so `alias.p = push`
+    reached neither push guard at all. Unlike every other bypass found on this
+    branch it needs no unusual spelling -- `alias.p` is an ordinary alias, and
+    a guard that never fires is indistinguishable from one that approved.
+
+    Every deny row runs with NO transcript, so an UNDETECTED push allows: the
+    deny bit is the detection, and each of those rows fails outright against a
+    build with no alias resolution. The allow rows are the controls that keep
+    the fix from denying every subcommand it does not recognise -- without
+    them a resolver that returned "indeterminate" for everything would pass
+    the deny rows and be useless.
+
+    The reason is asserted on every row for the same purpose it is asserted in
+    config_cases(): a detected push and an unresolvable alias both deny, and
+    the bit alone cannot tell which one a row exercised.
+    """
+    failures = 0
+    ran = 0
+    for case in (
+        ("an alias expanding to `push` is detected as a push",
+         [("alias.p", "push")], f"git -C {REPO} p origin main", True,
+         "No `adversarial-reviewer` subagent was dispatched"),
+        # The control that makes the row above mean something. Without it a
+        # resolver denying every unrecognised subcommand would pass.
+        ("an unrecognised subcommand with no alias is not a push",
+         [("alias.unrelated", "status")], f"git -C {REPO} p origin main", False, None),
+        # git expands aliases transitively, so following only one hop leaves
+        # the same bypass one level down.
+        ("a transitive alias chain is followed to the push",
+         [("alias.a", "b"), ("alias.b", "push")],
+         f"git -C {REPO} a origin main", True, "No `adversarial-reviewer` subagent was dispatched"),
+        # The expansion has to reach the rest of the machinery, not merely be
+        # recognised: --all ships every ref, so it is refused for a reason no
+        # amount of alias detection alone would produce.
+        # This row supplies a CLEAN verdict, so the no-review deny cannot fire
+        # and the refusal can only come from reading --all out of the
+        # expansion.
+        ("the expansion's own options are read, not just its subcommand",
+         [("alias.pa", "push --all")], f"git -C {REPO} pa origin", True,
+         "does not name a single reviewable head", reviewed()),
+        # The mirror of the row above: an alias expanding to a form that
+        # re-heads nothing is not a push, exactly as the literal spelling is
+        # not. A resolver that stopped at "the expansion says push" would deny.
+        ("an alias expanding to a --dry-run push re-heads nothing",
+         [("alias.p", "push --dry-run")], f"git -C {REPO} p origin main", False, None),
+        # A shell alias expands to an arbitrary command. Refusing every one of
+        # them would deny `git lg`; refusing none re-opens the bypass. The line
+        # is whether the expansion could push.
+        ("a shell alias that could push is refused rather than guessed at",
+         [("alias.x", "!git push origin main")], f"git -C {REPO} x", True,
+         "runs a git alias whose expansion this guard"),
+        ("a shell alias that cannot push is left alone",
+         [("alias.lg", "!git log --oneline")], f"git -C {REPO} lg", False, None),
+        # Measured on git 2.43.0: with `alias.status = push` set, `git status
+        # --short` still runs status, because git resolves an alias only for a
+        # subcommand that is not a builtin. Reading the alias anyway would deny
+        # an ordinary status.
+        ("an alias shadowing a builtin is ignored, as git ignores it",
+         [("alias.status", "push")], f"git -C {REPO} status --short", False, None),
+        # The directory-hint scan is a SECOND parse of the same command, and
+        # its count has to agree with the push list or EVERY hint is discarded.
+        # Resolving aliases in one and not the other breaks that silently.
+        #
+        # It has to `cd` to the OTHER repo, and it has to carry a clean
+        # verdict. Two nearby spellings are vacuous, both measured against a
+        # mutant with this call site reverted to `_argv_push`: the hook runs
+        # with cwd=REPO, so a hint naming REPO is indistinguishable from no
+        # hint at all, and a row with no verdict denies either way. Only a
+        # hint that must survive to reach a DIFFERENT repo separates them.
+        ("an aliased push behind a cd is still counted by the hint scan",
+         [("alias.p", "push")], f"cd {OTHER} && git p origin main", True,
+         "but this push would ship", reviewed()),
+    ):
+        label, config, command, should_deny, expect = case[:5]
+        events = case[5] if len(case) > 5 else []
+        ran += 1
+        for key, value in config:
+            # Both repos, deliberately: this is what a GLOBAL alias looks
+            # like, and it is the realistic case. The hint scan resolves the
+            # alias against the `cd` target while iter_pushes resolves it
+            # against the push's own directory, so a row that sets the alias
+            # in one repo only cannot exercise the two together.
+            _git(REPO, "config", key, value)
+            _git(OTHER, "config", key, value)
+        try:
+            rc, out = run_hook(command, events)
+            spec = out.get("hookSpecificOutput") or {}
+            denied = spec.get("permissionDecision") == "deny"
+            reason = spec.get("permissionDecisionReason", "")
+            if rc != 0 or denied != should_deny:
+                print(f"FAIL (rc={rc}, deny={denied}, wanted {should_deny}): {label}")
+                failures += 1
+            elif expect and expect not in reason:
+                print(f"FAIL (denied, but not for {expect!r}): {label}\n"
+                      f"   reason: {reason[:140]}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+        finally:
+            for key, _value in config:
+                _git(REPO, "config", "--unset", key)
+                _git(OTHER, "config", "--unset", key)
+    return failures, ran
+
+
 def budget_cases() -> tuple[int, int]:
     """The budget must bound EVERY git call, not just the last one.
 
@@ -926,7 +1034,7 @@ def main():
             else:
                 print(f"PASS: {label}")
         for fn in (raw_cases, orphan_cases, config_cases,
-                   valueless_bool_cases, budget_cases):
+                   valueless_bool_cases, alias_cases, budget_cases):
             f, r = fn()
             failed += f
             extra += r

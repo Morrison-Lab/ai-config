@@ -430,6 +430,34 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+GIT_GLOBAL_OPTS_WITH_VALUE = ("-C", "-c", "--git-dir", "--work-tree", "--namespace")
+
+
+def _argv_subcommand(argv):
+    """Index of a git command's subcommand, past git's own global options.
+
+    None when argv is not a git invocation, or carries no subcommand at all.
+
+    Split out of `_argv_push` rather than copied into its callers. A caller
+    resolving a git ALIAS has to find the subcommand by exactly the skip that
+    finds `push`, and a second copy of that skip is how two parsers of one
+    command diverge (ai-config#1920).
+    """
+    if not argv or argv[0] != "git":
+        return None
+    i = 1
+    while i < len(argv):                 # skip git's own global options
+        a = argv[i]
+        if a in GIT_GLOBAL_OPTS_WITH_VALUE:
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        return i
+    return None
+
+
 def _argv_push(argv):
     """True if argv is a `git push` that genuinely re-heads a branch.
 
@@ -443,19 +471,8 @@ def _argv_push(argv):
     branch, so no new head exists to review: `--dry-run`/`-n` performs no push
     at all, and `--delete`/`-d` removes a ref rather than advancing one.
     """
-    if not argv or argv[0] != "git":
-        return False
-    i = 1
-    while i < len(argv):                 # skip git's own global options
-        a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
-            i += 2
-            continue
-        if a.startswith("-"):
-            i += 1
-            continue
-        break
-    if i >= len(argv) or argv[i] != "push":
+    i = _argv_subcommand(argv)
+    if i is None or argv[i] != "push":
         return False
     return not _has_flag(argv[i + 1:], "--dry-run", "-n", "--delete", "-d")
 

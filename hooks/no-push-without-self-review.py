@@ -64,6 +64,11 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   `push_files`) commit straight to a remote branch with no local commit to
   fingerprint, so nothing here can check them. They are an open gap, tracked as
   ai-config#1929, not a decision that they are safe.
+- A git ALIAS expanding to a push is resolved HERE and not in the sibling, so
+  `no-unreviewed-pr.py`'s own `push_ident` still reads `git p origin` as
+  not-a-push. That hook only warns, and resolving an alias costs a subprocess
+  call it has no budget for, so the fix went where the denial lives.
+  ai-config#1993 stays open for that half.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
 the pushing command itself.
@@ -400,7 +405,7 @@ def _depth_segments(command: str):
     return [(d, t.strip()) for d, t in segs if t.strip()]
 
 
-def _hints_by_position(command: str) -> list[str | None]:
+def _hints_by_position(command: str, cache: dict, reads: list) -> list[str | None]:
     """One directory hint per push, in order, or [] when structure is unclear.
 
     A hint is the directory of the last `cd`/`pushd` at or above the push's own
@@ -430,7 +435,12 @@ def _hints_by_position(command: str) -> list[str | None]:
             stack[depth] = arg if (arg and not arg.startswith("-")
                                    and rest[0] != "popd") else None
             continue
-        if rest and _SIBLING and _SIBLING._argv_push(rest):
+        if rest and _SIBLING and _resolve_push_argv(
+                rest, _, stack[depth], cache, reads) is not None:
+            # Alias-expanded through the SAME resolver, so an aliased push is
+            # counted here too. Counting only literal `push` here would make
+            # this list shorter than the push list, and the count-agreement
+            # check below would then discard every hint.
             hints.append(stack[depth])
     return hints
 
@@ -443,6 +453,130 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 
 # Distinct from None, which means "the hook's own cwd" and is a real answer.
 REDIRECTED = object()
+
+# A git ALIAS expanding to a push is a push, and the sibling matches the
+# literal subcommand -- so `git config alias.p push; git p origin` reached
+# neither push guard at all (ai-config#1993). Every other bypass found on this
+# branch needed an unusual spelling; `alias.p` is among the commonest aliases
+# in ordinary use, and a guard that does not fire is indistinguishable from one
+# that approved.
+#
+# git expands aliases transitively and refuses a loop, so the walk is bounded
+# rather than trusting termination. Each expansion costs one budgeted config
+# read, and the total is capped so a long chain cannot spend the whole budget
+# before the call that enforces it.
+ALIAS_DEPTH_MAX = 5
+ALIAS_READS_MAX = 8
+
+# Sentinel `directory`, denied like REDIRECTED: the command runs an alias whose
+# expansion this guard cannot resolve, so what it ships is unknown.
+ALIAS_UNRESOLVED = object()
+
+# A shell alias (`alias.x = !...`) expands to an arbitrary command, which is not
+# realistically parseable. Refusing all of them would deny `git lg` and every
+# other ordinary shell alias, so the refusal is narrowed to the ones that could
+# push. `pushd` does not match; `git-push` does, in the over-denying direction.
+ALIAS_SHELL_PUSH = re.compile(r"\bpush\b")
+
+
+def _scan_directory(env: list[str], argv: list[str]):
+    """The repository a git command runs against: a path, None, or REDIRECTED.
+
+    Read off the RESOLVED argv, since an alias may expand to one carrying its
+    own `-C` or `--git-dir` -- while the alias itself is read from the
+    repository the command started in, which is the pre-expansion answer.
+    """
+    directory = None
+    if any(REDIRECTS_REPO.match(tok) for tok in env):
+        return REDIRECTED
+    i = 1
+    while i < len(argv) - 1:
+        tok = argv[i]
+        if tok == "-C" and i + 1 < len(argv):
+            # Chained: each -C is relative to the accumulated path.
+            directory = os.path.join(directory or "", argv[i + 1]) \
+                if directory not in (None, REDIRECTED) else argv[i + 1]
+            i += 2
+            continue
+        head = tok.partition("=")[0]
+        if head in REPO_REDIRECT_OPTS:
+            return REDIRECTED
+        i += 1
+    return directory
+
+
+def _git_builtins(argv, env, directory, cache):
+    """git's own builtin subcommands, or an empty set when git cannot answer.
+
+    git resolves an alias ONLY for a subcommand that is not already a builtin.
+    Measured on git 2.43.0: with `alias.status = push` configured,
+    `git status --short` still runs status. Without this list the guard would
+    read that alias and deny an ordinary `git status`.
+
+    Asked of git rather than hardcoded, so the answer tracks the git actually
+    installed instead of a table that goes stale (140 entries on 2.43.0). One
+    call per invocation, cached, and it costs nothing on the common path
+    because a literal `git push` is recognised before any of this runs.
+
+    An empty answer -- an old git, or a failed call -- falls through to the
+    alias read, which over-denies rather than under-denies.
+    """
+    if "builtins" not in cache:
+        out = _run_git(directory if directory is not REDIRECTED else None, env,
+                       "--list-cmds=builtins")
+        cache["builtins"] = frozenset((out or "").split())
+    return cache["builtins"]
+
+
+def _resolve_push_argv(argv, env, directory, cache, reads):
+    """The argv a git command really runs, with any alias expanded.
+
+    Returns that argv when the command is a push, None when it is not, and
+    ALIAS_UNRESOLVED when the guard cannot tell.
+
+    The sibling stays authoritative on WHETHER an argv is a push; this only
+    rewrites the argv it is asked about. The subcommand index comes from the
+    sibling too, so the alias name is found by the same option-skip that finds
+    `push`.
+    """
+    if not argv or argv[0] != "git":
+        return None
+    for _ in range(ALIAS_DEPTH_MAX + 1):
+        if _SIBLING._argv_push(argv):
+            return argv
+        idx = _SIBLING._argv_subcommand(argv)
+        if idx is None:
+            return None
+        name = argv[idx]
+        if name == "push":
+            # A real push the sibling excluded on its own merits: --dry-run
+            # pushes nothing and --delete removes a ref rather than advancing
+            # one, so neither produces a head to review.
+            return None
+        if name in _git_builtins(argv, env, directory, cache):
+            return None
+        key = (name, directory if directory is not REDIRECTED else "?",
+               tuple(env), tuple(_config_overrides(argv)))
+        if key not in cache:
+            if reads[0] >= ALIAS_READS_MAX:
+                return ALIAS_UNRESOLVED
+            reads[0] += 1
+            cache[key] = _git_config(
+                directory if directory is not REDIRECTED else None,
+                "--get", "alias." + name, argv, env)
+        expansion = cache[key]
+        if not expansion:
+            return None
+        if expansion.startswith("!"):
+            return ALIAS_UNRESOLVED if ALIAS_SHELL_PUSH.search(expansion) else None
+        try:
+            tokens = shlex.split(expansion)
+        except ValueError:
+            return ALIAS_UNRESOLVED
+        if not tokens:
+            return None
+        argv = argv[:idx] + tokens + argv[idx + 1:]
+    return ALIAS_UNRESOLVED
 
 
 def iter_pushes(command: str):
@@ -483,33 +617,24 @@ def iter_pushes(command: str):
     if not cmds:
         return
     pushes = []
+    cache: dict = {}
+    reads = [0]
     for argv in cmds:
         if not argv:
             continue
         env, rest = _strip_env(argv)
-        if not rest or not _SIBLING._argv_push(rest):
+        if not rest:
             continue
-        directory = None
-        if any(REDIRECTS_REPO.match(tok) for tok in env):
-            directory = REDIRECTED
-        else:
-            i = 1
-            while i < len(rest) - 1:
-                tok = rest[i]
-                if tok == "-C" and i + 1 < len(rest):
-                    # Chained: each -C is relative to the accumulated path.
-                    directory = os.path.join(directory or "", rest[i + 1]) \
-                        if directory not in (None, REDIRECTED) else rest[i + 1]
-                    i += 2
-                    continue
-                head = tok.partition("=")[0]
-                if head in REPO_REDIRECT_OPTS:
-                    directory = REDIRECTED
-                    break
-                i += 1
-        pushes.append((env, rest, directory))
+        resolved = _resolve_push_argv(
+            rest, env, _scan_directory(env, rest), cache, reads)
+        if resolved is None:
+            continue
+        if resolved is ALIAS_UNRESOLVED:
+            pushes.append((env, rest, ALIAS_UNRESOLVED))
+            continue
+        pushes.append((env, resolved, _scan_directory(env, resolved)))
 
-    hints = _hints_by_position(command)
+    hints = _hints_by_position(command, cache, reads)
     if len(hints) != len(pushes):
         hints = [None] * len(pushes)
     for (env, rest, directory), hint in zip(pushes, hints):
@@ -1203,6 +1328,12 @@ def main() -> int:
                 deny("this push carries `--config-env`, whose value comes from "
                      "an environment variable this guard cannot read, so what "
                      "the push ships cannot be determined")
+                return 0
+            if directory is ALIAS_UNRESOLVED:
+                deny("this command runs a git alias whose expansion this guard "
+                     "cannot resolve (a shell alias that could push, or a chain "
+                     "deeper than it will follow), so what it ships cannot be "
+                     "determined")
                 return 0
             if directory is REDIRECTED:
                 deny("this push points git at another repository "

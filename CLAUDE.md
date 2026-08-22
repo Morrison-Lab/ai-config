@@ -149,10 +149,10 @@ Default to archive-and-start-new over a bare `/clear` whenever the session might
 The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
 Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
-## Actively manage quota usage: models and compaction
+## Actively manage quota usage: models, compaction, and workflow structure
 
 Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
-Two levers; when either applies, act on it without waiting to be asked.
+Three levers; when any applies, act on it without waiting to be asked.
 
 **Model tier.**
 For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section.
@@ -178,9 +178,31 @@ The agent has no direct view into it, though --- the usage bar lives in the clie
 So key this off what's actually visible: the user naming or showing usage pressure, or --- inside a `Workflow` run with a stated token target --- `budget.spent()`/`budget.remaining()`.
 Either is reason enough to compress or recommend a lighter model, on the same terms those sections already set out.
 
-When both levers genuinely apply at once, do the self-directed one first.
-Compress or compact before asking the user to act on a model change.
-Only the second one costs them a step.
+**Workflow structure.**
+[`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md)
+
+The two levers above spend less on the work **as shaped**, and their saving expires with the session.
+This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
+So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, an enumerated brief that should have been a query, work at this tier a free CLI could do.
+The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
+`python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
+Its budget is advisory by design, so read an over-budget line as the prompt it is.
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped check.
+And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
+
+Human steps are in scope too --- a merge method, a batching habit, a review-request convention each shape the procedure and each has a price.
+Naming one and stopping there is `no-empty-promises` pointed outward, so every suggestion about human behaviour ships a mechanism in the same reply: a written rule at minimum, then a visible marker at the moment of the action, then a guard, then a setting that removes the option.
+Pick the rung from the cost of the mistake rather than the strength of the opinion, and leave the decision with the user, per `flag-practice-slippage`.
+
+- **Do:** ask what a procedure costs by construction, separately from what this run costs.
+- **Do:** ship a mechanism in the same reply that names a human behaviour change.
+- **Don't:** read a pulled lever as having answered the structural question.
+- **Don't:** name a behaviour change with nothing behind it.
+
+When several levers genuinely apply at once, do the self-directed ones first.
+Compress, compact, or file the structural finding before asking the user to act on a model change.
+Only the model change costs them a step.
 
 ## Keep a running on-disk session lab notebook
 

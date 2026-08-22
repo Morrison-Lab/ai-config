@@ -271,6 +271,133 @@ Only the mutation answers whether the assertion depends on the fix.
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
 
+### A predicate a fix adds needs mutation in both directions, not just reversion
+
+The mutation above proves the fix is needed, by reverting it and watching the
+predicate never fire.
+That is one direction.
+A predicate that decides between two outcomes --- admit or exclude, keep or
+blank --- can also fail by firing on **more** than it should, and reverting
+the fix cannot exercise that side at all: removing the predicate makes it
+fire on *nothing*, never on *too much*.
+
+The near-miss is running the revert-mutation, watching the new test fail,
+and reading that as "mutation-tested."
+It is mutation-tested in one direction.
+The revert answers "does this catch the case it was written for," not "does
+this also spare the cases it wasn't."
+
+Two mutations answer the two questions, and neither substitutes for the
+other:
+
+- **Revert (under-inclusive).**
+  Delete or disable the fix.
+  The predicate should now fail to protect what it protects, and the test
+  that catches the original bug should fail.
+- **Over-broaden (over-inclusive).**
+  Widen the predicate's trigger condition --- loosen a marker list, drop a
+  qualifying clause, relax a proximity check --- and confirm a case that
+  should survive now gets wrongly caught.
+  This needs its own fixture, built to sit in the specific gap the widened
+  predicate opens, not a generic input the narrower, correct predicate was
+  never going to catch either way.
+
+Each mutation catches exactly one side, and "run both directions" is easy
+to over-generalize into a claim about the wrong side --- the version this
+section shipped with the first time, until review caught it:
+
+```
+                        revert (fires on nothing)   over-broaden (fires on everything)
+positive fixture        should now FAIL             should still pass
+(bad input -> caught)
+negative control        still passes                should now FAIL
+(benign -> not caught)
+```
+
+A positive fixture is blind to over-broadening: it already expects to be
+caught, so widening the predicate cannot break it.
+A negative control is blind to revert, the opposite way: with the
+predicate gone, nothing is caught, so a benign case stays correctly
+un-caught whether the control ever sat on the predicate's real boundary or
+not --- a well-targeted control and an inert one look identical under
+revert.
+Only over-broadening can tell them apart.
+A control asserting a property of the fixture rather than of the predicate
+is the extreme case of inert: it proves nothing under either mutation,
+because it never runs the code under test at all.
+That reads as rigor --- the comment above it usually says exactly what
+property it is isolating --- which is what makes it the harder of the two
+gaps to catch by reading rather than by mutating.
+
+The general shape is worth naming past this one paragraph: a quantifier
+over a pair --- both, either, each of --- reads as symmetric and often is
+not, and a sentence asserting it can be wrong in one direction while
+sounding complete in both.
+The table above cannot fail that way, because enumerating the cases forces
+each one to be written down rather than assumed from the other.
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+quantifier section covers checking one you already wrote against its
+population; this is the authoring-side move --- reach for the enumeration
+before the quantifier, for any claim over a pair whose two halves might
+not behave the same way.
+
+- **Do:** run both mutations --- revert, and over-broaden --- on every
+  predicate a fix adds that decides between two outcomes.
+- **Do:** build the over-broaden fixture to sit in the specific gap the
+  wider predicate opens, since that is also the fixture a negative control
+  needs to prove itself against.
+- **Do:** confirm a negative control fails under the over-broaden mutation
+  specifically, not only that the fixture contains what its comment
+  claims.
+- **Don't:** read "the revert-mutation failed" as mutation-tested; it is
+  half of it.
+- **Don't:** expect a negative control to fail under revert --- a benign
+  case stays uncaught whether the predicate exists or not, so that
+  direction cannot distinguish a real control from an inert one.
+- **Don't:** trust a control whose assertion is about the fixture's
+  contents rather than about what the predicate does with them.
+
+(Morrison-Lab/ai-config#1862, 2026-08-21, two review rounds.
+The PR added `is_non_review_notice()` to exclude bot workflow-status
+notices from a review-item set.
+Its precedence guard, meant to protect a genuine review from that
+exclusion, used a 3-marker check while the admission gate it protected
+used 6 --- a fallback self-review wide enough to be admitted was not wide
+enough to be protected, and was silently excluded.
+That is the over-inclusive direction of an exclusion predicate, and the
+suite's own revert-mutation could not have found it: reverting the fix
+removes the exclusion outright, it does not narrow the guard that is
+supposed to spare genuine reviews from it.
+The same round's "negative control" for the marker window substituted an
+unrelated fixture rather than isolating the marker text; over-broadening
+the marker list to absurd values still passed it, proving it was inert.
+Both were reviewer findings.
+
+Morrison-Lab/ai-config#1867: `blank_verdicts_citing_a_comment()` blanked a
+not-clean verdict phrase whenever it sat near any comment permalink, with
+no requirement that the surrounding text say the finding was resolved.
+The suite held a "permalink, resolved" fixture and a "live finding, no
+permalink" fixture --- never the combination, which is exactly what a live
+finding re-raised with its own citation looks like.
+A reviewer built that missing fixture and the phrase was wrongly blanked.)
+
+(Measured 2026-08-21 on `Morrison-Lab/gha#576`, two more instances in
+one review session.
+A suite carried two cases meant to prove a check's fix.
+Both passed with the fix reverted, because a different part of the
+same new logic already made those specific inputs quiet --- the
+Neighbouring-mechanism gap in "Mutate the fix, not only
+the test" above.
+The case that actually discriminated the fix was the opposite
+polarity from what had been written: the suite held negative
+controls, and what the fix needed was a positive fixture --- an input
+that must be flagged and, under revert, was not.
+See
+[`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s
+"When a mutation survives, the first hypothesis is that the mutation
+was wrong" for the general form this instance is one of three of, all
+on the same PR.)
+
 ## When the runtime is available, run the claim instead of reasoning about it
 
 Every check above can be done by reading.

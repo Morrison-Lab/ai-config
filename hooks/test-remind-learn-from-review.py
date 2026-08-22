@@ -21,8 +21,10 @@ the incident verbatim":
 
 Run: python3 hooks/test-remind-learn-from-review.py hooks/remind-learn-from-review.py
 """
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -133,6 +135,28 @@ CASES = [
     # Ordering: a discharge BEFORE the acceptance does not count.
     ([UMS_BASH, REVIEW, ACCEPT], True,
      "a ums pass preceding the acceptance does not count"),
+
+    # ai-config#1965. `\b` treats `-`, `/`, and `.` as boundaries, so
+    # `\bums\b` fired inside a PATH and a mere READ discharged this reminder
+    # too. Both directions are here deliberately: the defect was that a read
+    # of the UMS fragment and a genuine `run ums` were indistinguishable.
+    ([REVIEW, ACCEPT,
+      tool("Bash", {"command": "cat shared/workflow/run-ums-proactively.md"})],
+     True, "reading the UMS rule fragment does not discharge"),
+    ([REVIEW, ACCEPT, tool("Bash", {"command": "ls skills/ums-notes/"})],
+     True, "listing a hyphenated ums-* directory does not discharge"),
+    ([REVIEW, ACCEPT,
+      tool("Bash", {"command": "open memories/record-learnings-policy.md"})],
+     True, "reading a record-learnings-* path does not discharge"),
+    ([REVIEW, ACCEPT,
+      tool("Bash", {"command": "python3 hooks/test-remind-ums-after-error.py"})],
+     True, "running the sibling's test file does not discharge"),
+    ([REVIEW, ACCEPT, tool("Bash", {"command": "grep -n ums README.md"})],
+     False, "bare-word `ums` in a command still discharges"),
+    ([REVIEW, ACCEPT, tool("Task", {"prompt": "Please run ums."})],
+     False, "sentence-final `ums.` still discharges -- a bare dot is not a path"),
+    ([REVIEW, ACCEPT, tool("Task", {"prompt": "memorize this correction"})],
+     False, "bare `memorize` still discharges"),
 ]
 
 
@@ -217,6 +241,40 @@ def main():
         else:
             print("FAIL: remind-ums-after-error now covers this; merge the two")
             failures += 1
+
+    # The cases above all run through `getattr(_ums, "UMS_WORD", ...)`, so
+    # they exercise the SIBLING's pattern and never the literal fallback.
+    # The fallback exists only so this degrades to silence rather than
+    # crashing, and it is free to drift precisely because nothing reaches it
+    # (ai-config#1965). Import a copy with no sibling beside it to pin it.
+    lone = tempfile.mkdtemp()
+    shutil.copy(HOOK, os.path.join(lone, os.path.basename(HOOK)))
+    spec = importlib.util.spec_from_file_location(
+        "_lone", os.path.join(lone, os.path.basename(HOOK)))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    if getattr(mod, "_ums", None) is not None:
+        print("FAIL: sibling still importable -- the fallback was not exercised")
+        failures += 1
+    for cmd, want in [
+        ("cat shared/workflow/run-ums-proactively.md", False),
+        ("ls skills/ums-notes/", False),
+        ("open memories/record-learnings-policy.md", False),
+        ("python3 hooks/test-remind-ums-after-error.py", False),
+        ("grep -n ums README.md", True),
+        ("Please run ums.", True),
+        ("memorize this correction", True),
+        ("run record-learnings on it", True),
+        ("update memories and skills", True),
+    ]:
+        got = bool(mod.UMS_WORD.search(cmd))
+        if got == want:
+            print(f"PASS: fallback UMS_WORD {'matches' if want else 'skips'} {cmd!r}")
+            passes += 1
+        else:
+            print(f"FAIL: fallback UMS_WORD {'missed' if want else 'matched'} {cmd!r}")
+            failures += 1
+    shutil.rmtree(lone, ignore_errors=True)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

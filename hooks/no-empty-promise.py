@@ -441,10 +441,27 @@ BASH_WRITE = re.compile(
     # A redirect, but NOT `2>`/`&>` (an fd-prefixed stderr redirect) and not
     # one aimed at /dev/null -- `cat shared/x.md 2>/dev/null` is a read.
     r"(?<![0-9&])>>?\s*(?!/dev/null)[^\s&|]"
-    r"|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
-    r"|--write\b|\bmkdir\b",
+    # `(?![\w-])` rather than `\b` after a command or flag NAME, for the same
+    # reason `_NOT_PATH_END` exists above: `\b` sits between `write` and `-`,
+    # so `--write\b` matched `curl -s --write-out '%{http_code}' <url>`, a
+    # pure HTTP status check that writes nothing (ai-config#1966). A false
+    # match here is a false DISCHARGE, which is the silent direction.
+    #
+    # `git\s+(?:add|commit|...)\b` likewise matched `git commit-tree` and
+    # `git commit-graph write`. Both of those genuinely write git objects, so
+    # the old classification was not wrong -- it was right by accident, and
+    # the next reader could not tell the coincidence from the intent. Neither
+    # writes a rule surface, which is the question this pattern is asking.
+    # Of the five subcommands only `commit` has hyphenated siblings; the
+    # guard is applied to the whole group so a future `add-*` cannot reopen
+    # this.
+    r"|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
+    r"|--write(?![\w-])|\bmkdir\b",
     re.I,
 )
+# `tee`, `mkdir`, and `sed -i` keep a plain `\b`: none has a hyphenated
+# sibling, so the guard would change nothing. (`sed -i.bak` still matches,
+# since `.` is a non-word character and `-i` is complete before it.)
 # `mv`/`cp` and a bare `patch` are deliberately absent. `cp shared/x.md /tmp/`
 # copies OUT of a rule surface and writes nothing to it, and the destination is
 # not decidable from a substring match -- so they discharged reads. Losing the

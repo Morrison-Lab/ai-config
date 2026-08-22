@@ -176,6 +176,14 @@ TOOL_RESULT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "content": "ok"}]}}
 
 
+# Running a negative control against another revision of the hook: copy that
+# revision AND `remind-ums-after-error.py` into one directory and point this
+# suite at the copy. `no-empty-promise.py` imports `visible_prose` from that
+# sibling and returns 0 unconditionally when the import fails, so a copy
+# placed on its own goes silent on EVERY case -- which reports as a suite-wide
+# failure rather than as the missing dependency it is.
+
+
 def say(text):
     return {"type": "assistant", "message": {"content": [
         {"type": "text", "text": text}]}}
@@ -606,6 +614,53 @@ CASES = [
     ([say("I owe #1937 the ARDI loop."),
       bash("python3 -B -u hooks/monitor-open-prs.py --monitor")],
      False, "several interpreter flags before the script still discharge"),
+
+    # --- ai-config#1966. `BASH_WRITE` decides what counts as a durable
+    # write, so a false match there is a false DISCHARGE -- the silent
+    # direction. `\b` sits between a name and a following `-`, so `--write\b`
+    # matched curl's `--write-out` and `git\s+(?:add|commit|...)\b` matched
+    # `git commit-tree`. Both directions are pinned, because the defect was
+    # precisely that a real write and these were indistinguishable.
+    #
+    # The curl line is verbatim from the issue. It pairs a rule-surface path
+    # (a URL ending in CLAUDE.md) with a flag that writes nothing, so a pure
+    # HTTP status check read as having shipped a mechanism.
+    ([say("Going forward I'll always check this before replying."),
+      bash("curl -s --write-out '%{http_code}' "
+           "https://example.com/CLAUDE.md")],
+     True, "`curl --write-out` writes nothing and does NOT discharge (#1966)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-tree -p HEAD -m 'shared/workflow/fully-clean.md' $TREE")],
+     True, "`git commit-tree` is not `git commit` and does NOT discharge"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-graph write && cat shared/workflow/fully-clean.md")],
+     True, "`git commit-graph write` does NOT discharge"),
+
+    # The true-positive half. Each of these still has to work, or the guard
+    # has been tightened past the defect into the behaviour itself.
+    ([say("Going forward I'll always check this before replying."),
+      bash("python3 scripts/semantic-line-breaks.py --write "
+           "shared/workflow/fully-clean.md")],
+     False, "a genuine `--write` flag still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit -m 'record it' shared/workflow/fully-clean.md")],
+     False, "`git commit` still discharges"),
+    ([say("Going forward I'll always check this before replying."), bash("git add shared/workflow/fully-clean.md")],
+     False, "`git add` still discharges"),
+    ([say("Going forward I'll always check this before replying."), bash("git rm shared/workflow/fully-clean.md")],
+     False, "`git rm` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git mv shared/workflow/fully-clean.md shared/workflow/fc.md")],
+     False, "`git mv` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i` still discharges (no hyphenated sibling to guard)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i.bak 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i.bak` still discharges -- `.` is already a non-word char"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("tee -a shared/workflow/fully-clean.md < /tmp/note")],
+     False, "`tee` still discharges"),
 ]
 
 

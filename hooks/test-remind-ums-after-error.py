@@ -173,7 +173,46 @@ SILENT = [
      "admission then a ums commit clears it"),
     ([txt("I was wrong about that.", sidechain=True)],
      "a SUBAGENT's admission is not my outgoing message"),
+    # ai-config#1965, the TRUE-positive half. A bare-word use of an action
+    # word still discharges. The defect was that these and the path reads in
+    # PATH_READS below were indistinguishable, so a suite carrying only one
+    # side cannot tell a correct guard from an over-tightened one.
+    ([ADMIT, tool("Bash", {"command": "grep -n ums README.md"})],
+     "bare-word `ums` in a command still discharges"),
+    ([ADMIT, tool("Skill", {"skill": "ums"})],
+     "invoking the ums skill by name still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "Please run ums."})],
+     "sentence-final `ums.` still discharges -- a bare dot is not a path"),
+    ([ADMIT, tool("Task", {"prompt": "update memories and skills for this"})],
+     "the `update memories` phrase still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "memorize this correction"})],
+     "bare `memorize` still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "run record-learnings on it"})],
+     "bare `record-learnings` still discharges"),
 ]
+
+# ai-config#1965, the FALSE-positive half. `\b` treats `-`, `/`, and `.` as
+# boundaries, so `\bums\b` fired inside a PATH and a mere READ discharged the
+# reminder -- silently, since this hook fails open. Reading the fragment that
+# states the UMS rule was enough, so the sessions most likely to be consulting
+# the rule were exactly the ones the hook stopped nagging.
+PATH_READS = [
+    ([ADMIT, tool("Bash", {"command": "cat shared/workflow/run-ums-proactively.md"})],
+     "reading the UMS rule fragment does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "ls skills/ums-notes/"})],
+     "listing a hyphenated ums-* directory does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "open memories/record-learnings-policy.md"})],
+     "reading a record-learnings-* path does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "git show HEAD:docs/memorize-rules.md"})],
+     "reading a memorize-* path does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "python3 hooks/test-remind-ums-after-error.py"})],
+     "running this hook's own test file does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "cat memories/ums-cases.md"})],
+     "reading a ums-* memory file does not discharge"),
+    ([ADMIT, tool("Task", {"prompt": "Read shared/workflow/run-ums-proactively.md"})],
+     "a dispatch that only names the fragment does not discharge"),
+]
+REMIND += PATH_READS
 
 
 def run(recs, sentinel_dir=None):

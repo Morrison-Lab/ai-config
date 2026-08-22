@@ -114,7 +114,30 @@ UMS_PATH = re.compile(
     r"(memories?/|MEMORY\.md|CLAUDE\.md|/skills/|^skills/|/shared/|^shared/)",
     re.I,
 )
-UMS_WORD = re.compile(r"\bums\b|update\s+memories|record[- ]learnings|memorize", re.I)
+# `\b` is the wrong boundary for a bare action word here: this pattern is
+# applied to Bash COMMAND TEXT, and `-`, `/`, and `.` are all non-word
+# characters, so `\bums\b` matched inside
+# `cat shared/workflow/run-ums-proactively.md` -- reading the fragment that
+# states the UMS rule discharged the reminder to follow it (ai-config#1965).
+# The hook fails open, so that discharge was silent.
+#
+# `.` is deliberately NOT excluded on its own. Rejecting a bare dot would also
+# reject a sentence-final period, so `run ums.` -- the commonest phrasing in a
+# dispatch prompt -- would stop matching. What marks a path is a dot with a
+# word character AFTER it (`ums.md`), not a dot at a full stop.
+#
+# Same idiom as hooks/no-empty-promise.py's SKILL_WORD, which diagnosed this
+# first; keep the two spellings identical.
+_NOT_PATH = r"(?<![\w/-])"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+
+UMS_WORD = re.compile(
+    _NOT_PATH + r"ums" + _NOT_PATH_END +
+    r"|update\s+memories"
+    r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
+    re.I,
+)
 
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(r"^\s*>.*$", re.M)

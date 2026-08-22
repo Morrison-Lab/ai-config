@@ -110,9 +110,22 @@ _ums = _sibling("remind-ums-after-error.py")
 # sibling's UMS_PATH (a plain corpus-file write) is deliberately NOT reused as
 # a discharge here -- see the docstring, "the fix itself does not discharge".
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
+# The fallback must stay byte-identical in behaviour to the sibling's own
+# UMS_WORD, including its path guard: `\b` matched inside
+# `cat shared/workflow/run-ums-proactively.md`, so a READ discharged this
+# reminder too (ai-config#1965). See that sibling for why `.` is excluded only
+# when a word character follows it.
+_NOT_PATH = r"(?<![\w/-])"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+
 UMS_WORD = getattr(
     _ums, "UMS_WORD",
-    re.compile(r"\bums\b|update\s+memories|record[- ]learnings|memorize", re.I))
+    re.compile(
+        _NOT_PATH + r"ums" + _NOT_PATH_END +
+        r"|update\s+memories"
+        r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
+        r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
+        re.I))
 
 # Accepting a reviewer's finding. Deliberately the AGREEMENT vocabulary only: a
 # Rebut ("the review is wrong") is the opposite disposition and must never fire

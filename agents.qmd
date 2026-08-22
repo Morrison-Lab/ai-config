@@ -47,8 +47,11 @@ Every agent except `community-demand-scout` keeps `Bash` for read-only checks
 write-capable shell command (`renv::update()` without `check = TRUE`,
 `pre-commit autoupdate`) is instruction-level discipline for those, not a
 harness-enforced restriction the way the missing `Edit`/`Write` is.
-Each such agent's own persona file says so in as many words, so the discipline
-is instructed where it is relied on rather than only asserted here.
+Each such agent's file under `.claude/agents/` says so in as many words, so the
+discipline is instructed where it is relied on rather than only asserted here.
+The `.opencode/` mirrors are not all the same: opencode's own permission block
+can deny `bash` outright, in which case the restriction is harness-enforced
+there and the persona says that instead.
 
 ## How they're invoked
 

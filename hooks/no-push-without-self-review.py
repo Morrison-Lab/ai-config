@@ -438,12 +438,19 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     taking the fingerprint from anywhere lets a fingerprint quoted in the
     findings stand in for the report's own.
     """
-    matches = list(VERDICT_LINE.finditer(_blank_fences(text)))
+    # BOTH searches run against the blanked text. Blanking only the verdict
+    # search left the asymmetry that mattered: a fenced example whose
+    # illustrative fingerprint happened to name the current HEAD was found
+    # first and stood in for the report's real one, which named the older
+    # commit actually reviewed -- so the push of an unreviewed commit was
+    # allowed by the very comparison this guard is built around.
+    blanked = _blank_fences(text)
+    matches = list(VERDICT_LINE.finditer(blanked))
     if not matches:
         return None, None
     last = matches[-1]
     verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
-    sha = REVIEWED_COMMIT.search(text, last.end())
+    sha = REVIEWED_COMMIT.search(blanked, last.end())
     return verdict, (sha.group(1).lower() if sha else None)
 
 

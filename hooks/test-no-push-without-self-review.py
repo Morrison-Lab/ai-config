@@ -302,6 +302,21 @@ CASES = [
      "a fingerprint quoted in the findings does not displace the report's own"),
     (PUSH, reviewed(f"Reviewed-Commit: {HEAD}\n\n### Verdict: Ready for merge"), True,
      "a fingerprint BEFORE the verdict does not count -- that ordering is the truncation check"),
+    # The verdict search was fence-aware and the fingerprint search was not, so
+    # a fenced example naming the CURRENT head was found before the report's own
+    # fingerprint naming the older commit it actually read -- and the push of an
+    # unreviewed commit passed the comparison built to stop exactly that.
+    (PUSH, reviewed(
+        "### Verdict: Ready for merge\n\n"
+        "For reference, the fingerprint line looks like this:\n\n"
+        f"```text\nReviewed-Commit: {HEAD}\n```\n\n"
+        f"Reviewed-Commit: {PREV}"), True,
+     "a fenced example fingerprint does not stand in for the report's own"),
+    (PUSH, reviewed(
+        "### Verdict: Ready for merge\n\n"
+        f"```text\nReviewed-Commit: {PREV}\n```\n\n"
+        f"Reviewed-Commit: {HEAD}"), False,
+     "blanking the fence still leaves the report's real fingerprint readable"),
 
     # --- how git was invoked ---
     (f"env git -C {REPO} push origin feature", reviewed(), True,

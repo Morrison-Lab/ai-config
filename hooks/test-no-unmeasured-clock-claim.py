@@ -90,8 +90,53 @@ def say(text):
 NEXT_TURN = {"type": "user", "content": "and what about the other one?"}
 
 
+# The harness's injected reading as it ACTUALLY arrives, copied from a live
+# transcript (2026-08-22). It is not a user turn: it is its own record, type
+# "attachment", carrying the text under `attachment.content` /
+# `attachment.stdout`, with neither a `message` nor a top-level `content`. It
+# is emitted AFTER the prompt record it belongs to.
+#
+# The earlier fixtures modelled it as a bare-string user turn, which is why
+# the carve-out looked covered while being inert in practice: `measured`
+# stayed None however recently the harness had supplied a real value.
+def attach_clock(stamp, date="2026-08-21", zone="PDT"):
+    line = (f"Current time -- local: {date} {stamp} {zone} | "
+            f"UTC: 2026-08-22T04:30:36Z")
+    return {"type": "attachment", "attachment": {
+        "hookEvent": "UserPromptSubmit",
+        "hookName": "inject-local-time.sh",
+        "content": line + "\nUse the local value verbatim in recaps.",
+        "stdout": line + "\n",
+        "exitCode": 0}}
+
+
+# A real prompt record, and the assorted non-user records a transcript
+# interleaves around it. None of these may advance the turn boundary past the
+# reading that arrives beside them.
+PROMPT = {"type": "user", "message": {"content": "is this intended behavior?"}}
+TRANSCRIPT_NOISE = [
+    {"type": "last-prompt", "content": "is this intended behavior?"},
+    {"type": "custom-title", "content": "session title"},
+]
+
+
 # (events, should_fire, label)
 CASES = [
+    # --- ai-config#1917, part two: the injected reading is an ATTACHMENT ---
+    #     Verified against a live transcript. Reading only user turns made the
+    #     carve-out inert, so the guard fired on precisely the case the rule
+    #     tells you to trust. The noise records are included because they sit
+    #     between the reading and the recap in a real transcript.
+    ([PROMPT, attach_clock("21:30:00")] + TRANSCRIPT_NOISE +
+     [say("Looking into it."), GIT_LOG, say("Recap: 21:30 PDT")], False,
+     "#1917: an attached reading discharges, with narration and noise after it"),
+    ([PROMPT, attach_clock("21:30:00")] + TRANSCRIPT_NOISE +
+     [say("Recap: 23:59 PDT")], True,
+     "#1917: a claim ahead of the ATTACHED reading still fires"),
+    ([PROMPT, attach_clock("21:30:00"), say("first recap"), NEXT_TURN,
+      say("Recap: 21:30 PDT")], True,
+     "#1917: an attached reading from an earlier turn has still expired"),
+
     # --- ai-config#1917: the window must start where the USER spoke ---
     #     An assistant turn emits narration, then tool calls, then the recap.
     #     Keying the window on the previous assistant TEXT BLOCK put the

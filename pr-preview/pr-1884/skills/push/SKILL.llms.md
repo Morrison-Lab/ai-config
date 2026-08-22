@@ -84,7 +84,7 @@ git push --force-with-lease --force-if-includes
 
 `--force-if-includes` (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: `--force-with-lease` compares against your *remote-tracking ref*, so any background fetch — a poller, another tool in the same checkout, a `--recurse-submodules` fetch — silently refreshes that ref and the lease then passes over the very commits it existed to protect. `--force-if-includes` closes that by checking the remote-tracking tip against the local branch’s reflog. It is an *ancillary* option, so it only does anything alongside a bare `--force-with-lease`.
 
-The one case that needs bare `--force` is a lease that is **unsatisfiable** rather than violated: a `stale info` failure after a squash-merge with auto-delete removed the branch your ref still names (`memories/git.md`). Prefix that with `ALLOW_FORCE_PUSH=1`.
+A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary and there is nothing to race. `git ls-remote --heads origin <branch>` settles it — empty output means the next push *creates* the branch, so a plain push is the fix (or `git fetch --prune` and a retry). `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee. Say what the lease refused and why forcing is right when you use it.
 
 `hooks/no-clobbering-push.py` enforces this half mechanically — it refuses a bare force push and warns on a divergence — so it fires whether or not this skill was invoked.
 

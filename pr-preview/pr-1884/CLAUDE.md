@@ -742,7 +742,9 @@ The branch you cut and whose PR you opened is the one you are *least* likely to 
 An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
-Always pair it with `--force-if-includes` (git 2.30+), and reserve bare `--force` --- behind an `ALLOW_FORCE_PUSH=1` prefix --- for the *unsatisfiable* lease `memories/git.md` records after an auto-deleted branch.
+Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- `git push --help` says `--force` "disables these checks", the lease among them.
+A `stale info` refusal is not a reason to force either: `memories/git.md` records that it means the remote branch is gone, so a plain push is the fix.
+`ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
 `hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
 
 ## Keep PR branches synced with main

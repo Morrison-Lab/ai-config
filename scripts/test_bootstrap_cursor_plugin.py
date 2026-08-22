@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Exercise bootstrap's Cursor skill-install skip when a plugin is present."""
+"""Exercise bootstrap's Cursor skill skip when a plugin or Claude catalog is live.
+
+A full bootstrap always installs ``~/.claude/skills`` first, and Cursor
+discovers that directory, so the Cursor section must not also link
+``~/.cursor/skills`` on top. A marketplace/local Cursor plugin is the other
+skip. The remaining install path is covered by unit tests on
+``skip_reason()`` with empty Claude and Cursor dirs.
+"""
 from __future__ import annotations
 
 import os
@@ -61,10 +68,10 @@ with tempfile.TemporaryDirectory() as raw:
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)
     cursor, output = run_bootstrap(tmp / "no-plugin", with_plugin=False)
-    ardi = cursor / "skills" / "ardi"
-    check("no plugin installs ~/.cursor/skills/ardi", ardi.exists())
-    check("installed Cursor skill targets this checkout",
-          ardi.is_symlink() and ardi.readlink() == ROOT / "skills" / "ardi")
+    check("Claude skill install also skips ~/.cursor/skills",
+          not (cursor / "skills" / "ardi").exists())
+    check("skip names the Claude catalog Cursor already loads",
+          "claude/skills" in output.replace("~/", ""))
     check("no-plugin path does not claim a plugin skip",
           "Cursor plugin is already installed" not in output)
 

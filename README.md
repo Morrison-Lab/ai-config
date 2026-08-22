@@ -1,8 +1,7 @@
 # ai-config
 
-Portable AI agent config — skills, memories, and commands synced across
-machines via git. Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any
-agent that reads markdown instruction files.
+Portable AI agent config — skills, memories, and commands synced across machines via git.
+Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
 Each top-level subdir is symlinked into the appropriate consumer directory
 by `bootstrap.sh`.
@@ -88,24 +87,20 @@ python3 scripts/sync-codex-skill-wrappers.py
 
 Cursor reads this repo as a workspace and as a plugin.
 
-**This repo as a workspace.** Opening the clone in Cursor loads:
+**This repo as a workspace.**
+Opening the clone in Cursor loads:
 
 - `AGENTS.md` (and `CLAUDE.md`, for compatibility)
 - project rules in [`.cursor/rules/`](.cursor/rules/)
-- skills from `skills/` once a Cursor plugin or `~/.claude/skills` install is live
-  (Cursor also discovers `~/.claude/skills` and `.claude/skills/`)
+- skills from `skills/` once a Cursor plugin or `~/.claude/skills` install is live (Cursor also discovers `~/.claude/skills` and `.claude/skills/`)
 
-**User-global rules.** `bootstrap.sh` links [`cursor-rules/`](cursor-rules/)
-into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules
-apply in every other Cursor workspace too. Files that exist in both
-`cursor-rules/` and `.cursor/rules/` must stay identical
-(`scripts/test_cursor_rules_sync.py`).
+**User-global rules.**
+`bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
+Files that exist in both `cursor-rules/` and `.cursor/rules/` must stay identical (`scripts/test_cursor_rules_sync.py`).
 
-**Skills in other workspaces.** Install this repo as a Cursor plugin from
-GitHub (`Morrison-Lab/ai-config`), or let `bootstrap.sh` link each skill into
-`~/.cursor/skills/` when no plugin and no Claude skill install is already
-serving the catalog. The plugin route and the `~/.cursor/skills` links are
-alternatives: stacking them lists every skill twice.
+**Skills in other workspaces.**
+Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`), or let `bootstrap.sh` link each skill into `~/.cursor/skills/` when no plugin and no Claude skill install is already serving the catalog.
+The plugin route and the `~/.cursor/skills` links are alternatives: stacking them lists every skill twice.
 
 To load the plugin from a local checkout without GitHub:
 
@@ -114,12 +109,11 @@ mkdir -p ~/.cursor/plugins/local
 ln -s /path/to/ai-config ~/.cursor/plugins/local/ai-config
 ```
 
-Then reload the Cursor window. On Windows, Git Bash `ln -s` may copy instead
-of linking; prefer the GitHub marketplace install there.
+Then reload the Cursor window.
+On Windows, Git Bash `ln -s` may copy instead of linking; prefer the GitHub marketplace install there.
 
-`.cursor-plugin/plugin.json` is the Cursor Plugin manifest
-(skills, project rules, commands). Claude Code keeps using
-`.claude-plugin/`.
+`.cursor-plugin/plugin.json` is the Cursor Plugin manifest (skills, project rules, commands).
+Claude Code keeps using `.claude-plugin/`.
 
 ### Tool mappings
 

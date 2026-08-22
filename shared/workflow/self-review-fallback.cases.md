@@ -133,3 +133,77 @@ Read the denial count before classifying, and classify the second branch by
 cause rather than by the value observed: a parsed count above the threshold is
 gha#198, while a `999999` sentinel is this defect whatever the real count was,
 because the parse failed and so no count was measured at all.
+
+## A cross-vendor reviewer found seven defects the primary never reached
+
+The cross-vendor preference is argued from theory in
+[`self-review-fallback`](self-review-fallback.md) --- two reviewers sharing a
+vendor share their blind spots, so their agreement measures the blind spot.
+This is the first *measured* instance in this corpus, and it is a stronger case
+than the theory predicts: the primary reviewer never produced a verdict at all,
+and the cross-vendor one found four genuine security-relevant bypasses.
+
+Measured 2026-08-21/22 on
+[ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884), a PR
+adding `hooks/no-clobbering-push.py`.
+
+**The primary reviewer failed three times across two runs**, at
+$14.52 total, producing no `### Verdict` on any attempt:
+
+| run | attempts | denials | retry step |
+| --- | --- | --- | --- |
+| 32545411241 | 2 | 3 | ran (`success`) and also stubbed |
+| 32546034763 | 1 | 11 | refused, gha#198 branch |
+
+The denials were diagnostic rather than random, which is worth reading before
+concluding a reviewer is simply flaky: the blocked calls were an
+`awk`/`grep -nP '[^\x00-\x7F]'` non-ASCII scan of the diff, a scratch `Write`
+to hold it, and `git log origin/main` to fact-check a claim about repo state.
+The reviewer was being denied the checks this corpus tells it to run, and most
+of the 11 denials were it retrying spellings of the same blocked scan.
+Filed as [gha#579](https://github.com/Morrison-Lab/gha/issues/579).
+
+**A `codex` review then found seven defects**, run read-only against the
+checked-out branch with a forced JSON schema and an explicitly adversarial
+prompt.
+Four were force-push bypasses in a guard whose entire purpose is to catch force
+pushes:
+
+- `--force --force-with-lease` was silent, because the guard read the lease as
+  a mitigation.
+  `git push --help` on `-f, --force` says the flag "disables these checks", the
+  lease among them.
+- `--dry-run --no-dry-run --force` was silent, because the scan was
+  positive-only and every `git push` option has a `--[no-]` form.
+- `-fo ci.skip origin HEAD` was silent *and* resolved `ci.skip` as the remote,
+  because `-o` is the one short option taking a value and it was missing from
+  the cluster alphabet.
+- `--repo origin HEAD` checked the wrong remote, because `--repo` was skipped
+  as an option value when its value *is* the remote.
+
+The seventh is the one worth generalizing.
+The diff cited [`memories/git.md`](../../memories/git.md) as authority for
+"a `stale info` refusal is the one case that genuinely needs bare `--force`".
+That file says the reverse in as many words: the lease is unsatisfiable rather
+than violated, "`--force` is unnecessary, and there is nothing to race".
+The citation resolved, so no link checker could see it, and it contradicted the
+diff's *own* neighbouring claim that the lease succeeds trivially when the
+remote ref is absent.
+
+**Two lessons, and the second is the transferable one.**
+
+The value here was not redundancy but a *different reading* of the same diff,
+which is a reason to chase a cross-vendor reviewer beyond mere availability.
+Note the limit of what this case shows, though: the primary produced zero
+verdicts across three attempts, which is "down" rather than "slow" by this
+fragment's own taxonomy, so it is evidence about the value of a second reading
+and not about when to reach for one.
+
+And a self-review is systematically weakest on the *mechanism* of the thing it
+is reviewing.
+The self-review posted on that PR ran the prose fact-check faithfully and found
+two real defects in its own prose, and it did not find a single one of the four
+parser bypasses, because checking a claim about `git push`'s option grammar
+requires re-deriving the grammar rather than re-reading the sentence.
+Where a diff encodes a *tool's* behaviour, read that tool's own documentation as
+the source, not the diff's description of it.

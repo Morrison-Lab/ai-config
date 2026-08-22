@@ -519,6 +519,44 @@ CASES = [
     ([say("I owe #1937 the ARDI loop."),
       bash('bash -c "python3 hooks/monitor-open-prs.py --monitor"')],
      False, "a real arming inside `bash -c` still discharges (#1947 r2)"),
+
+    # --- Review round 3 on #1947. The `_NOT_DASH_C` lookahead was pinned to
+    # the token immediately after the interpreter, so ANY flag between them
+    # walked past it -- as did a versioned interpreter name, since
+    # `\bpython3\b` matches inside `python3.11`. All four are ordinary
+    # commands (`-x` trace, `-u` unbuffered, a side-by-side interpreter), and
+    # each silently discharged a debt with nothing armed.
+    #
+    # The fix is not a fourth lookahead: `POLLER_CMD` is gone and
+    # `_poller_executed()` tokenizes with `shlex` instead, because "is this
+    # token being executed?" is a fact about shell grammar rather than about
+    # character adjacency.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -x -c "cat hooks/monitor-open-prs.py"')],
+     True, "a flag between interpreter and `-c` does NOT discharge (#1947 r3)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3 -u -c "cat hooks/monitor-open-prs.py"')],
+     True, "`python3 -u -c` wrapping a read does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3.11 -c "cat hooks/monitor-open-prs.py"')],
+     True, "a versioned interpreter does NOT discharge a wrapped read"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3.12 -B -u -c "cat hooks/monitor-open-prs.py"')],
+     True, "several flags plus a versioned interpreter does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("head -20 hooks/monitor-open-prs.py")],
+     True, "`head` on the poller does NOT discharge"),
+    # Real armings the lexer must keep accepting, including the shapes the
+    # regex never handled at all.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3.11 hooks/monitor-open-prs.py --monitor")],
+     False, "a versioned interpreter RUNNING the poller discharges (#1947 r3)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("/usr/bin/env python3 hooks/monitor-open-prs.py --monitor")],
+     False, "`/usr/bin/env python3` discharges"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("env PATH=/opt/homebrew/bin:$PATH python3 hooks/monitor-open-prs.py "
+           "--monitor")],
+     False, "an env-prefixed arming discharges (the shape that fixed #1953)"),
 ]
 
 
@@ -569,6 +607,55 @@ def main():
     else:
         print("FAIL: should fail open on an unreadable transcript")
         failures += 1
+
+    # A standing adversarial sweep over flag permutations. Three consecutive
+    # review rounds each found one more way to wrap a READ of the poller in an
+    # interpreter, and each fix covered only the shape that had been reported.
+    # Enumerating the space is what stops the fourth round: this fails on any
+    # combination that discharges, not merely on the ones someone thought of.
+    import importlib.util as _ilu
+    import itertools
+    _spec = _ilu.spec_from_file_location("_nep", HOOK)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    path = "hooks/monitor-open-prs.py"
+    leaks = []
+    for interp in ("sh", "bash", "dash", "python3", "python3.11", "python3.12"):
+        for count in (0, 1, 2):
+            for combo in itertools.permutations(("-x", "-u", "-O", "-e", "-B"),
+                                                count):
+                flags = " ".join(combo)
+                command = f'{interp} {flags} -c "cat {path}"'.replace("  ", " ")
+                if _mod.discharges("Bash", {"command": command}) is not None:
+                    leaks.append(command)
+    if leaks:
+        print(f"FAIL: {len(leaks)} flag permutation(s) discharge a wrapped "
+              f"read, e.g. {leaks[0]}")
+        failures += 1
+    else:
+        print("PASS: no flag permutation discharges a wrapped read of the "
+              "poller")
+        passes += 1
+
+    # The mirror direction: a genuine arming must survive the same wrappers.
+    missed = [
+        c for c in (
+            f"python3 {path}",
+            f"python3.11 {path} --monitor",
+            f"./{path}",
+            f'bash -c "python3 {path} --monitor"',
+            f"nohup python3 ~/.claude/{path} --monitor >/dev/null 2>&1 &",
+            f"/usr/bin/env python3 {path} --monitor",
+        )
+        if _mod.discharges("Bash", {"command": c}) != "scheduled"
+    ]
+    if missed:
+        print(f"FAIL: {len(missed)} genuine arming(s) stopped discharging, "
+              f"e.g. {missed[0]}")
+        failures += 1
+    else:
+        print("PASS: every genuine arming shape still discharges")
+        passes += 1
 
     # Malformed stdin must not crash the Stop event either.
     out = subprocess.run(

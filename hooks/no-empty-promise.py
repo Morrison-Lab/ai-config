@@ -96,6 +96,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -311,34 +312,94 @@ SCHEDULER_SKILLS = {"schedule", "loop", "workaround-watcher"}
 # way FILING_CMD demands the actual `gh issue create` verb rather than the
 # word "issue".
 #
-# An interpreter given `-c` is NOT an anchor, because its argument is a
-# nested command rather than a script path -- so `sh -c "cat
-# hooks/monitor-open-prs.py"` is the same read as a bare `cat`, wearing a
-# wrapper. That idiom is ordinary (building a command from a variable,
-# running under a different shell), which makes it a likelier bypass than
-# the contrived `python3 -c "print(open(...).read())"` an earlier round of
-# this comment accepted as a residual. The lookahead retires both at once.
+# The repo's own detached poller, RUN rather than merely named.
 #
-# Disqualifying the interpreter is deliberately narrower than discarding the
-# whole command: any OTHER exec token still anchors, so
-# `bash -c "python3 hooks/monitor-open-prs.py --monitor"` -- a genuine
-# arming -- keeps discharging. Combined short flags (`sh -ec`) are covered.
+# WHY A LEXER RATHER THAN A REGEX
+# -------------------------------
+# This started as a bare path match and took three consecutive review rounds,
+# each closing one bypass and leaving the next:
 #
-# Where the anchor list is not exhaustive (`eval`, `xargs`, a shell function),
-# the check errs toward NOT discharging. That is the safer direction here: a
-# missed arming is visible to its author and one plainer command from
-# clearing, whereas a false discharge defeats the guard silently, which is the
-# whole failure this regex was rewritten to close.
-_NOT_DASH_C = r"(?!\s+-\w*c\b)"
-POLLER_CMD = re.compile(
-    r"(?:\bpython3?\b" + _NOT_DASH_C +
-    r"|\bbash\b" + _NOT_DASH_C +
-    r"|\bsh\b" + _NOT_DASH_C +
-    r"|(?:^|\s)\./)"
-    r"[^;&|\n]{0,80}?"
-    r"\bhooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py",
-    re.I,
-)
+#   round 1: `cat hooks/monitor-open-prs.py`          -- no execution required
+#   round 2: `sh -c "cat hooks/monitor-open-prs.py"`  -- `-c` wrapping a read
+#   round 3: `bash -x -c "cat ..."`, `python3.11 -c "cat ..."`
+#                                                     -- a flag between the
+#                                                        interpreter and `-c`,
+#                                                        or a versioned name
+#
+# Every one of those is an ordinary command, and every one silently discharged
+# a debt with nothing armed. The pattern across the three is not three
+# oversights: matching a shell command with a regex asks the wrong question,
+# because "is this token being EXECUTED?" is a fact about shell grammar and
+# not about character adjacency. Per
+# shared/coding/least-flexible-tool.md, the least-flexible construct that does
+# this job is a shell lexer, so `shlex` replaces the regex rather than gaining
+# a fourth lookahead.
+#
+# `_poller_executed()` below asks the grammatical question directly: is a
+# whole token equal to a poller path, and is it either the command head or
+# introduced by an interpreter? A `-c` argument is a nested command string, so
+# it is re-tested on its own rather than special-cased -- which is why
+# `bash -c "python3 hooks/monitor-open-prs.py --monitor"`, a genuine arming,
+# still discharges while `sh -c "cat ..."` does not.
+#
+# Where it cannot parse (unbalanced quotes) or cannot see (a shell function,
+# `eval`, a path built from a variable), it returns False. That direction is
+# deliberate: a missed arming is visible to its author and one plainer command
+# from clearing, whereas a false discharge defeats the guard silently, which is
+# what all three rounds above actually cost.
+_POLLER_PATH = re.compile(
+    r"hooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py")
+
+# The whole token must BE a path. Without this, `python3 -c "print(open(
+# 'hooks/monitor-open-prs.py').read())"` recurses into a nested command whose
+# first token merely CONTAINS the path, and a head-position check alone would
+# read that as an execution.
+_POLLER_TOKEN = re.compile(
+    r"^(?:[~.]?/)?[\w.@/-]*"
+    r"hooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py$")
+
+# `python3.11` and `/usr/bin/env python3` are ordinary ways to name an
+# interpreter, so match the basename with an optional version suffix rather
+# than a fixed list of literals.
+_INTERPRETER = re.compile(
+    r"^(?:[\w.@/-]*/)?(?:python[\d.]*|bash|sh|zsh|dash)$", re.I)
+
+# A `-c`-shaped flag hands the NEXT token to the interpreter as a command
+# STRING. Combined short flags (`-ec`) count; `-check` does not.
+_DASH_C_FLAG = re.compile(r"^(?:-[a-z]*c|--command)$", re.I)
+
+# Tokens that may precede the interpreter without changing what runs.
+_EXEC_PREFIX = re.compile(r"^(?:nohup|command|exec|time|env|setsid|stdbuf)$",
+                          re.I)
+
+
+def _poller_executed(command, depth=0):
+    """True when COMMAND actually runs one of the poller scripts."""
+    if depth > 2 or not _POLLER_PATH.search(command):
+        return False
+    try:
+        tokens = shlex.split(command, comments=False)
+    except ValueError:
+        return False  # unbalanced quotes: unparseable, so do not discharge
+
+    for index, token in enumerate(tokens):
+        # A nested command string is re-tested on its own terms.
+        if _DASH_C_FLAG.match(token) and index + 1 < len(tokens):
+            if _poller_executed(tokens[index + 1], depth + 1):
+                return True
+            continue
+        if not _POLLER_TOKEN.match(token):
+            continue
+        if index == 0:
+            return True  # `./hooks/monitor-open-prs.py`
+        # Walk back past `nohup`, `env`, and friends to whatever introduces it.
+        previous = index - 1
+        while previous > 0 and _EXEC_PREFIX.match(tokens[previous]):
+            previous -= 1
+        if _INTERPRETER.match(tokens[previous]):
+            return True
+    return False
+
 
 # Tools that WRITE. Lowercased at the comparison, since the same tool is
 # spelled `Write`/`Edit` by one harness and `create`/`edit` by another.
@@ -561,7 +622,7 @@ def discharges(name, inp):
         # a mention of the poller, the write wins.
         if MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd):
             return "durable"
-        if POLLER_CMD.search(cmd):
+        if _poller_executed(cmd):
             return "scheduled"
         return None
 

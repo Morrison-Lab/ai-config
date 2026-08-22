@@ -730,3 +730,46 @@ message's claim to have "drop[ped] the false boundary claim" was only half
 true: the claim was contradicted, not dropped.
 The eventual fix deleted the overstated sentence outright, and the next
 round's grep for its wording returned nothing.)
+
+## A repro that raised only against a newer signature
+
+Measured 2026-08-22 on
+[ai-config#1992](https://github.com/Morrison-Lab/ai-config/pull/1992).
+
+A review found that making a helper's argument required forbids omission and
+not a wrong value, and demonstrated it with
+`_git_config(directory, "--get", key, [])`.
+Run against the branch head of
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), that
+call raised
+`TypeError: _git_config() missing 1 required positional argument: 'env'`,
+which read as the reviewer having shipped a broken example.
+
+It had not.
+The review named the commit it read, `cf6c47ce`, where the signature was
+`(directory, flag, key, argv, as_bool=False)` --- five parameters, four of
+them required, so the four-argument call binds:
+
+```
+cf6c47ce params: ['directory', 'flag', 'key', 'argv', 'as_bool']
+4-arg call BINDS -> no TypeError
+```
+
+`51be639e` added `env` as a fifth required parameter.
+It was committed at 21:06:09Z, and the review run
+([32598271976](https://github.com/Morrison-Lab/ai-config/actions/runs/32598271976))
+started at 20:59:25Z --- six minutes and forty-four seconds earlier.
+The branch moved under the reviewer.
+
+The finding itself was correct at both commits: `_config_overrides([])`
+returns `[]`, so an empty `argv` derives no overrides and reaches a bare
+`git config` read.
+It was Addressed.
+
+The reply written at the time asserted the reviewer had made an arity slip,
+and a first draft of the rule above was built on that reading.
+An adversarial review of that draft caught it.
+Reproducing at HEAD rather than at the reviewed commit is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a checkout for
+the run" substitution --- the artifact in hand was real, was read carefully,
+and was not the one the claim was about.

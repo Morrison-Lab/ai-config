@@ -403,6 +403,23 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
     `push.default` question rather than a fact about the command, which
     `shipped_commits` asks git rather than assuming.
     """
+    # `positionals[0]` is dropped as the remote even when `--repo` supplied
+    # one. `--repo` does NOT turn the positionals into refspecs -- an explicit
+    # positional repository OVERRIDES it, which is git's documented "if both
+    # are specified, the command-line argument takes precedence". Measured on
+    # git 2.43.0, since a review of this line read it the other way and called
+    # it a bypass:
+    #
+    #   git push --dry-run --repo=origin evil main
+    #     -> fatal: 'evil' does not appear to be a git repository
+    #   git push --dry-run --repo=origin main
+    #     -> fatal: 'main' does not appear to be a git repository
+    #   git push --dry-run --repo=/nonexistent origin main
+    #     -> succeeds, pushing via `origin`; /nonexistent is never contacted
+    #
+    # So `--repo=origin main` is a BARE push to the repository named `main`,
+    # and resolving it through push.default rather than through `main` is
+    # correct. Regression rows live in the table under "--repo".
     positionals = _push_positionals(argv)
     return None if positionals is None else positionals[1:]  # drop the remote
 

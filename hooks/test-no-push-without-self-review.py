@@ -360,6 +360,21 @@ CASES = [
      "`--` before the remote does not turn the refspec into an option"),
     (f"git -C {REPO} push --repo=origin main feature", reviewed(), True,
      "an attached option value does not swallow the following refspec"),
+    # A review read `--repo` as making every positional a refspec, so that
+    # `--repo=origin feature main` would ship the unreviewed `feature`
+    # alongside the reviewed `main` while the guard checked only `main`.
+    # Measured on git 2.43.0, it does not: an explicit positional repository
+    # OVERRIDES --repo, so `feature` is the REPOSITORY, not a ref, and git
+    # ships nothing under it (`fatal: 'feature' does not appear to be a git
+    # repository`). The allow below is therefore correct rather than a bypass
+    # -- this row is the exploit shape the review proposed, asserted to the
+    # guard's reading. See the comment on push_refspecs for the measurements.
+    (f"git -C {REPO} push --repo=origin feature main", reviewed(), False,
+     "an explicit positional repository overrides --repo, so `feature` names "
+     "a repository rather than shipping the unreviewed ref of that name"),
+    (f"git -C {REPO} push --repo=origin main", reviewed(), False,
+     "`--repo=origin main` is a bare push to a repository named `main`, so it "
+     "resolves through push.default rather than through the ref `main`"),
     (f"pushd {OTHER} >/dev/null && git push origin main", reviewed(), True,
      "a `pushd` moves the repo the verdict must cover, exactly as `cd` does"),
     (f"cd {OTHER} && git -C {REPO} push origin main", reviewed(), False,

@@ -591,3 +591,67 @@ For each issue found, state:
 Distinguish blocking correctness issues from optional "there's a better
 approach" suggestions, and don't let a plausible-looking implementation pass
 unchecked just because it runs without error.
+
+## When a fix changes what code COMPUTES, sweep everything that DESCRIBES it
+
+The section above covers a literal and the comment beside it, and mechanizes
+that with a ten-line window in one file.
+The commoner and costlier version is wider on both axes: a fix changes what a
+value *means*, and every place that describes the old meaning survives ---
+docstrings hundreds of lines away, a user-facing message template, a catalog
+row in `README.md`, sibling prose in other directories.
+
+**It recurs across rounds of one review**, which is the tell.
+The description sites are not one set: fixing the ones you remember leaves the
+ones you did not, so each round closes some and reveals more, and each round
+feels like the last one.
+
+Measured on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884),
+2026-08-21, where the same defect was filed three times:
+
+| round | fixed | still describing the old behaviour |
+| --- | --- | --- |
+| 3 | the comparison (`HEAD` -> the pushed ref) | the warning's label, the docstring's classification table, the `README.md` row |
+| 5 | the warning's label | the remediation *commands* in the same message |
+| 6 | the remediation commands | the same-branch test underneath them |
+
+Every intermediate state had correct code, a green suite, and a description
+that contradicted it.
+The reviewer's own summary of round 5 named it exactly: the label was fixed
+"precisely because" of the case at hand, "but the sibling block ... never got
+the same treatment".
+
+**Advice is behaviour when a reader runs it**, which is what raises this above
+tidiness.
+Round 5's stale text was not a comment: it was the remediation the guard printed,
+and following it literally would have merged the wrong branch.
+A description that a reader *acts on* is a second implementation of the same
+logic, and it needs the same fix.
+
+**Derive the sites, do not recall them.**
+The population is every occurrence of the old concept, so grep for it rather
+than revisiting the places you remember writing:
+
+```bash
+git grep -n "HEAD" -- hooks/ shared/ skills/ README.md CLAUDE.md AGENTS.md
+```
+
+Then ask of each hit whether it asserts the behaviour you just changed.
+This is [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+scope claim applied to your own diff: check the population, do not recall it.
+
+**Assert the message, not just the verdict.**
+A suite that checks only *whether* a guard fires cannot see *what it says*, so
+a wrong message survives every green run.
+Where output is advice, pin its content --- ai-config#1884's `LABEL_EXPECT`
+asserts both the label and the emitted commands, and the mutation clauses that
+revert each one flip a case rather than nothing.
+
+- **Do:** grep for the old concept across the whole repo after changing what a
+  value means, and re-read every hit.
+- **Do:** treat a printed remediation as code, and test its content.
+- **Do:** expect several rounds when a reviewer files this once --- the sites
+  you did not fix are the ones you did not remember.
+- **Don't:** read "the computation is right now" as the change being finished.
+- **Don't:** rely on an adjacent-comment guard for this; its window is ten
+  lines and one file, and these sites are neither.

@@ -92,7 +92,7 @@ Worked-example case records for the rules below live in
    finished badly.
    A **passing** duplicated name produces no line at all, so it is never
    annotated, and the manual lookup above is the only thing that resolves it.
-   That is precisely the case in the measurement below: the passing row
+   That is precisely the case this section was written from: the passing row
    belonged to the wrong workflow, and nothing in the script's output would
    have said so.
 

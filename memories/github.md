@@ -525,9 +525,9 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
     The expiry is part of the rule, not a footnote to it.
 
   **Recurrence 2026-08-21 (Morrison-Lab/gha#571), and the new failure is what happened AFTER the request, not the request itself.**
-  Copilot was requested on that PR at `~23:38Z` despite this moratorium, which is the slippage already recorded above.
-  What had not been recorded is the second half: the absence of a review was then investigated as an **open question**, and `Morrison-Lab/gha#575` was filed asking whether Copilot is licensed for the org --- a question this section had already answered, with a wider denominator, seventeen days earlier.
-  The issue was retracted and closed the same day.
+  Copilot was requested on that PR on 2026-08-20 despite this moratorium, which is the slippage already recorded above.
+  What had not been recorded is the second half: the absence of a review was then investigated as an **open question**, and `Morrison-Lab/gha#575` was filed asking whether Copilot is licensed for the org --- a question the 2026-08-06 re-measurement above had already answered, with a wider denominator than the sweep that re-asked it.
+  The issue was retracted and closed within the hour.
   Read that as the more expensive error of the two.
   A forbidden request wastes one call.
   Treating its predictable silence as a mystery spends a search sweep, a negative-control sweep, and a filed issue,

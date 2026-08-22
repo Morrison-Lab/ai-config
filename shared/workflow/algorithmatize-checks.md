@@ -520,6 +520,102 @@ The same sweep showed a pre-existing `github_pat_` pattern --- a second regex,
 distinct from the `gh[pousr]_` one above --- that no fixture reached at all:
 deleting it turned nothing red, and it had been shipped that way.)
 
+**A ninth outcome, and the cheapest one to rule out first: the mutation
+edited the WRONG occurrence of the matched text.**
+
+A non-global substitution --- `perl -0pi -e 's/OLD/NEW/'` with no `g`,
+or a `sed` call missing the `g` flag --- edits the first match in the
+file.
+When the same literal string also appears in a nearby comment or
+docstring, the edit can land there instead of in the code, and the
+file changes exactly as expected while the construct under test never
+moves.
+Outcome four already names the general shape --- "the artifact
+changed" is not "the intended mutation applied" --- and this is the
+specific, easy-to-miss way that gap opens in practice.
+
+- **Do:** print the mutation's own diff and confirm the changed line
+  is the construct you meant, not a comment or a sibling occurrence.
+- **Do:** anchor a mutation on the code's own syntax --- a line
+  number, a unique surrounding token --- rather than on a bare
+  substring the file also carries in nearby prose.
+- **Don't:** trust a `diff -q` or byte-count check that the file
+  changed; that answers a different question than "did the right
+  line change".
+- **Don't:** assume a non-global substitution reaches the occurrence
+  you meant just because the pattern is unique across the file's
+  code --- it may not be unique across the file's text.
+
+(Measured 2026-08-21 on `Morrison-Lab/gha#576`.
+A mutation targeting a check's enforced value used a non-global
+substitution.
+The same literal string also appeared in a prose comment earlier in
+the file, and the substitution rewrote the comment instead of the
+code.
+A `diff -q` guard confirmed the file had changed and did not catch
+the miss.)
+
+**A tenth outcome: the property under test is enforced at more than
+one independent site, and mutating one leaves the others standing
+guard.**
+
+The AND-clause outcome earlier in this list covers one shape of this:
+a single guard whose clauses are ANDed together, where flipping one
+is masked by the rest.
+This is the same failure at a coarser grain.
+Two separate constructs --- two regexes, a check and its fallback, a
+validator and its caller --- can each independently enforce the same
+property.
+Reverting one leaves the property enforced by the other, and the
+suite correctly stays green, which reads as "my mutation did
+nothing" when it means "this property has a second guardian I never
+touched."
+
+- **Do:** before mutating, grep the file or module for every site
+  that could independently enforce the same property, not only the
+  one nearest the line under test.
+- **Do:** mutate every enforcing site together at least once, to
+  confirm the suite depends on the property rather than on any single
+  guardian.
+- **Don't:** conclude a mutation was inert, or a test redundant, from
+  a single-site mutation when the property could plausibly be
+  enforced elsewhere.
+- **Don't:** read "the two constructs look like they check different
+  things" as proof they are independent; confirm it by mutating both.
+
+(Measured 2026-08-21 on `Morrison-Lab/gha#576`.
+A line-length property was enforced by two separately anchored
+regexes, `PIPE_ROW` and `DELIMITER_ROW`.
+Reverting only one left the other still enforcing the limit, and the
+test suite stayed green.)
+
+**When a mutation survives, the first hypothesis is that the mutation
+was wrong --- mis-targeted, incomplete, or vacuous --- not that the
+test coverage is weak.**
+
+The ten outcomes above are what "wrong" actually looks like: a mutant
+that never applied, one that applied to the wrong spot, one that
+applied to only one of several guardians, a fixture a sibling clause
+absorbs.
+Every one of them reads as a coverage gap from the outside, and every
+one of them is a defect in the mutation, not in the suite.
+Doubting the suite first spends the same effort on the wrong side of
+the check and, worse, can end in deleting a test that was fine.
+
+- **Do:** work through the outcomes above before concluding a passed
+  mutation means untested code.
+- **Do:** re-check the mutation itself is what changed --- fully,
+  faithfully, at every enforcing site --- before touching the test.
+- **Don't:** weaken, delete, or "improve" a test on the strength of a
+  mutation that survived and was never itself verified.
+
+(Measured 2026-08-21 on `Morrison-Lab/gha#576`: this exact
+misdiagnosis recurred three times in one review session, on one PR
+--- outcomes nine and ten above, plus a third case recorded in
+[`fact-check-code-logic.md`](../coding/fact-check-code-logic.md)'s
+"A predicate a fix adds needs mutation in both directions" section.
+Each time the mutation, not the test, turned out to be at fault.)
+
 **A component that stops failing under mutation is a question, not a cleanup.**
 
 - **Do:** treat a zero mutation score on an existing component as a missing test

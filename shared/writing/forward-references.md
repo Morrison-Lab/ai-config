@@ -65,6 +65,48 @@ Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
 
+**A pointer aimed the *wrong* way is a different defect, and fixing one can
+leave you applying the wrong test to the rest.**
+The positional test above was inverted once, under the specific sequence
+described here.
+How readily it happens is unmeasured; what follows is the sequence, not a
+frequency.
+
+A reviewer flags `the rule below` where the rule is actually *above*.
+That is a genuine defect --- a broken reference --- so you fix it, and then
+sweep the file's other directional words to be thorough.
+At that point the axis in your head is **direction**, because direction is what
+the finding was about.
+So you check each remaining pointer, find that it aims at something genuinely
+further down, and clear it as correct.
+
+Every one of those is a forward reference.
+Pointing ahead accurately is what *qualifies* a phrase under this rule, not
+what exempts it --- the opening paragraph says so, and the sweep still passes
+over them, because the test being applied came from the finding rather than
+from the rule.
+
+The tell is the verdict "this one points forward correctly, so it stays".
+That sentence restates the definition of the thing being looked for, so it is
+never a reason to keep a pointer.
+The one real defence is different in kind: a deliberate scene-setting overview
+previewing a document's structure, which the reader is not meant to resolve
+immediately.
+Say which of the two is meant, since "it points the right way" and "this is a
+deliberate structural preview" are different claims and only the second one
+excuses a pointer.
+
+- **Do:** re-read the rule before sweeping for more instances of a finding,
+  rather than generalizing from the instance you were handed.
+- **Do:** treat an accurate forward pointer as the central case, not the
+  exception.
+- **Don't:** clear a pointer because it aims where it claims to ---
+  that is the defect, not a defence against it.
+- **Don't:** carry the previous finding's axis into the sweep it prompted.
+
+See [`forward-references.cases.md`](forward-references.cases.md),
+"Direction is not the test".
+
 ## Confirming a hit
 
 For each candidate, check two things:

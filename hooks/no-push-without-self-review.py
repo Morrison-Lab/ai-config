@@ -78,8 +78,8 @@ not the cause; it is deleted because it was undocumented everywhere and
 duplicated a variable that now has one meaning and one placement.
 
 A `:branch` deletion refspec ships nothing, and so passes the commit comparison
--- but it still needs a clean verdict to reach that comparison, unlike the two
-forms below, which are never examined at all.
+-- but it still needs a clean verdict to reach that comparison, unlike
+`--dry-run` and `--delete` in the block above, which are never examined at all.
 """
 from __future__ import annotations
 
@@ -87,6 +87,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -129,6 +130,13 @@ ADVERSARIAL_AGENT_NAME = re.compile(
 AGENT_TOOLS = {"agent", "task", "invoke_subagent"}
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
+
+# Degraded mode only, where the shell parser is unavailable and the strict
+# argv-scoped check cannot run. Deliberately loose: with no parser this guard
+# can only report that it is broken, so a false ALLOW here costs nothing a
+# working guard would have caught, while a false DENY has no escape at all --
+# a PreToolUse deny is not user-overridable.
+DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 
 # Options of `git push` that consume the following token, so a value is never
 # mistaken for a refspec.
@@ -183,10 +191,28 @@ ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 
 # Wrappers that run the command that follows them, so `git` is not argv[0] even
-# though a push is exactly what happens. `env` is the sharpest of these: the
-# earlier revision handled `export`, which never runs a push at all, and not
-# `env`, which does.
-COMMAND_WRAPPERS = {"env", "command", "nohup", "time", "exec", "builtin"}
+# though a push is exactly what happens.
+COMMAND_WRAPPERS = {"env", "command", "nohup", "time", "exec", "builtin",
+                    "sudo", "timeout", "stdbuf", "nice", "ionice", "doas"}
+
+# Shell keywords that can open a simple command. The regex detector this file
+# replaced carried these, and dropping them was a REGRESSION rather than a
+# simplification: `_simple_commands` splits on `;` and `&&`, so the keyword
+# becomes argv[0] of the segment holding the push. `skills/push/SKILL.md`
+# prescribes a retry loop, so `do git push ...` is a shape this corpus asks for
+# by name.
+SHELL_KEYWORDS = {"!", "{", "}", "(", ")", "if", "then", "elif", "else", "fi",
+                  "while", "until", "do", "done", "for", "case", "esac"}
+
+# An unexpanded `$GIT`/`${GIT}` program token. shlex leaves it literal, so
+# without this the command is not a push as far as argv is concerned.
+GIT_VARIABLE = re.compile(r"\A\$\{?GIT\}?\Z")
+
+# A duration argument, so `timeout 5 git push` does not stop the scan at `5`.
+# How far past a wrapper to look for the git token. Six covers
+# `sudo -u name -H git`, and bounds the scan so an unrelated command
+# running git much later on the line is not mistaken for a wrapped push.
+WRAPPER_ARG_WINDOW = 6
 
 
 def _strip_env(argv: list[str]) -> tuple[list[str], list[str]]:
@@ -204,48 +230,142 @@ def _strip_env(argv: list[str]) -> tuple[list[str], list[str]]:
     """
     rest = list(argv)
     env: list[str] = []
+    after_wrapper = False
     while rest:
         tok = rest[0]
         if ENV_ASSIGNMENT.match(tok):
             env.append(tok)
             rest = rest[1:]
+            after_wrapper = False
             continue
-        if tok in COMMAND_WRAPPERS or tok == "export":
+        if tok in COMMAND_WRAPPERS:
+            after_wrapper = True
             rest = rest[1:]
             continue
+        if tok in SHELL_KEYWORDS:
+            after_wrapper = False
+            rest = rest[1:]
+            continue
+        # A wrapper's own arguments, so `env -i`, `env -u FOO`, `timeout 5` and
+        # `sudo -u someone` do not stop the scan before `git`. Enumerating each
+        # wrapper's option grammar would be its own parser, so instead: look
+        # ahead a bounded distance for the git token and drop what precedes it.
+        # Nothing is consumed unless git is actually found, so a wrapper running
+        # something else is left alone.
+        if after_wrapper:
+            window = rest[1:1 + WRAPPER_ARG_WINDOW]
+            hit = next((i for i, t in enumerate(window, start=1)
+                        if GIT_VARIABLE.match(t) or os.path.basename(t) == "git"), None)
+            if hit is not None:
+                rest = rest[hit:]
+                continue
         break
-    if rest and rest[0] != "git" and os.path.basename(rest[0]) == "git":
-        rest = ["git"] + rest[1:]
+    if rest:
+        if GIT_VARIABLE.match(rest[0]) or os.path.basename(rest[0]) == "git":
+            rest = ["git"] + rest[1:]
     return env, rest
+
+
+def _depth_segments(command: str):
+    """[(depth, segment_text)] -- split on operators, tracking PAREN depth.
+
+    `_simple_commands` deliberately models no nesting, so an earlier revision
+    approximated with `nested = "(" in command`, which is wrong twice over: a
+    parenthesis inside a quoted string (a commit message reading "fix (typo)")
+    discarded a legitimate hint, and `(cd elsewhere && git push)` -- where the
+    `cd` DOES apply to the push -- was graded against the wrong repository.
+    Depth is the fact that separates those, and it is not derivable from the
+    sibling's output, so it is computed here rather than duplicating its parser.
+    """
+    segs: list[tuple[int, str]] = []
+    depth = 0
+    cur: list[str] = []
+    in_single = in_double = escaped = False
+    i, n = 0, len(command)
+    while i < n:
+        c = command[i]
+        if escaped:
+            escaped = False
+            cur.append(c)
+        elif c == "\\" and not in_single:
+            escaped = True
+            cur.append(c)
+        elif c == "'" and not in_double:
+            in_single = not in_single
+            cur.append(c)
+        elif c == '"' and not in_single:
+            in_double = not in_double
+            cur.append(c)
+        elif in_single or in_double:
+            cur.append(c)
+        elif c in "()":
+            segs.append((depth, "".join(cur)))
+            cur = []
+            depth += 1 if c == "(" else -1
+            depth = max(depth, 0)
+        elif c in ";&|\n" or command.startswith("&&", i) or command.startswith("||", i):
+            segs.append((depth, "".join(cur)))
+            cur = []
+            if command.startswith(("&&", "||"), i):
+                i += 1
+        else:
+            cur.append(c)
+        i += 1
+    segs.append((depth, "".join(cur)))
+    return [(d, t.strip()) for d, t in segs if t.strip()]
+
+
+def _hints_by_position(command: str) -> list[str | None]:
+    """One directory hint per push, in order, or [] when structure is unclear.
+
+    A hint is the directory of the last `cd`/`pushd` at or above the push's own
+    paren depth. Entering a subshell inherits the enclosing hint; leaving it
+    discards whatever was set inside.
+    """
+    hints: list[str | None] = []
+    stack: list[str | None] = [None]
+    for depth, text in _depth_segments(command):
+        while len(stack) <= depth:
+            stack.append(stack[-1])
+        del stack[depth + 1:]
+        try:
+            argv = shlex.split(text)
+        except ValueError:
+            return []
+        if not argv:
+            continue
+        if argv[0] in ("cd", "pushd", "popd"):
+            arg = argv[1] if len(argv) > 1 else None
+            stack[depth] = arg if (arg and not arg.startswith("-")
+                                   and argv[0] != "popd") else None
+            continue
+        _, rest = _strip_env(argv)
+        if rest and _SIBLING and _SIBLING._argv_push(rest):
+            hints.append(stack[depth])
+    return hints
 
 
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
-    `directory` is the repo the push acts on: the push's own `-C`, else the
-    directory of the last `cd`/`pushd` ahead of it in the same command line,
-    else None (meaning the hook's own cwd). Both were previously read off the
-    FIRST git command in the chain, so `git -C a status && git -C b push`
-    graded the wrong repository.
+    `directory` is the push's own `-C`, else the directory a `cd`/`pushd` put it
+    in (subshell scoping respected), else None -- meaning the hook's own cwd.
+    Both were previously read off the FIRST git command in the chain, so
+    `git -C a status && git -C b push` graded the wrong repository.
+
+    The sibling stays authoritative on WHETHER a command is a push. The
+    positional hint list is used only when it agrees with the sibling on how
+    many pushes there are; disagreement means this module's structural read and
+    the sibling's parse have diverged, and a wrong directory is worse than none.
     """
     if _SIBLING is None:
         return
     cmds = _SIBLING._simple_commands(command)
     if not cmds:
         return
-    # A subshell confines a `cd`, and `_simple_commands` does not model nesting,
-    # so a line containing one gets no hint at all rather than a wrong one:
-    # `(cd elsewhere && git log) && git push` pushes in the ORIGINAL directory.
-    nested = "(" in command or ")" in command
-    cwd_hint = None
+    pushes = []
     for argv in cmds:
         if not argv:
-            continue
-        if argv[0] in ("cd", "pushd", "popd"):
-            # `cd -`, `popd`, and a bare `cd` all move somewhere this cannot
-            # resolve, so they clear the hint rather than leaving a stale one.
-            arg = argv[1] if len(argv) > 1 else None
-            cwd_hint = arg if (arg and not arg.startswith("-") and argv[0] != "popd") else None
             continue
         env, rest = _strip_env(argv)
         if not rest or not _SIBLING._argv_push(rest):
@@ -255,7 +375,13 @@ def iter_pushes(command: str):
             if tok == "-C":
                 directory = rest[i + 1]
                 break
-        yield env, rest, (directory or (None if nested else cwd_hint))
+        pushes.append((env, rest, directory))
+
+    hints = _hints_by_position(command)
+    if len(hints) != len(pushes):
+        hints = [None] * len(pushes)
+    for (env, rest, directory), hint in zip(pushes, hints):
+        yield env, rest, (directory or hint)
 
 
 def has_allow_override(env: list[str]) -> bool:
@@ -272,8 +398,16 @@ def has_allow_override(env: list[str]) -> bool:
 def push_refspecs(argv: list[str]) -> list[str] | None:
     """The refspecs a `git push` argv would ship; None if indeterminate.
 
-    An empty list means "whatever the current branch is", i.e. HEAD.
+    An empty list means the push names no refspec. What THAT ships is a
+    `push.default` question rather than a fact about the command, which
+    `shipped_commits` asks git rather than assuming.
     """
+    positionals = _push_positionals(argv)
+    return None if positionals is None else positionals[1:]  # drop the remote
+
+
+def _push_positionals(argv: list[str]) -> list[str] | None:
+    """The positional arguments after `push` -- remote first; None if indeterminate."""
     try:
         idx = argv.index("push")
     except ValueError:
@@ -303,7 +437,7 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
             continue
         positionals.append(tok)
         i += 1
-    return positionals[1:]  # drop the remote
+    return positionals
 
 
 # This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
@@ -311,7 +445,10 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
 # So the budget is enforced here rather than left to the harness: one call per
 # refspec times a generous per-call timeout would exceed it on a slow repo, and
 # the failure would be a silent allow on the one path this guard exists to hold.
-BUDGET_SECONDS = 6.0
+# Overridable so the timeout path is testable: it is the one branch whose
+# failure direction (allow vs deny) cannot be observed any other way, and a
+# mutation turning its refusal into an allow survived an untested suite.
+BUDGET_SECONDS = float(os.environ.get("NPWSR_BUDGET_SECONDS", "6.0"))
 _DEADLINE = [0.0]
 
 
@@ -333,6 +470,21 @@ def _rev_parse(directory: str | None, rev: str) -> str | None:
     return sha.lower() if re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
+def _git_config(directory: str | None, flag: str, key: str) -> str | None:
+    args = ["git"] + (["-C", directory] if directory else []) + ["config", flag, key]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=3)
+    except Exception:
+        return None
+    return out.stdout.strip() or None
+
+
+def _push_remote(argv: list[str]) -> str | None:
+    """The remote a push names -- the first positional after `push`."""
+    positionals = _push_positionals(argv)
+    return positionals[0] if positionals else None
+
+
 def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | None, str]:
     """(commits this push would ship, reason-if-unknown).
 
@@ -350,6 +502,20 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         which = f" ({', '.join('`' + t + '`' for t in named)})" if named else ""
         return None, ("this push does not name a single reviewable head" + which)
     if not refspecs:
+        # A bare `git push` ships the current branch only under the modern
+        # `push.default`. Under `matching` (git's default before 2.0, and still
+        # present in long-lived global configs) it ships every branch whose name
+        # exists on the remote, and a configured `remote.<name>.push` overrides
+        # the question entirely. Measured on git 2.43.0:
+        # `git -c push.default=matching push --dry-run origin` reports a branch
+        # that is not HEAD. So this is checked rather than assumed.
+        default = _git_config(directory, "--get", "push.default")
+        if default and default.lower() == "matching":
+            return None, "`push.default` is `matching`, so a bare push ships more than HEAD"
+        remote = _push_remote(argv)
+        if remote and _git_config(directory, "--get-all", f"remote.{remote}.push"):
+            return None, (f"`remote.{remote}.push` is configured, so what a bare push "
+                          "ships is not simply the current branch")
         head = _rev_parse(directory, "HEAD")
         if head is None:
             return None, "HEAD could not be resolved for the repository being pushed"
@@ -409,24 +575,50 @@ def _iter_blocks(record: dict):
             yield b
 
 
-def _blank_fences(text: str) -> str:
+def _blank_fences(text: str) -> tuple[str, bool]:
     """Blank the contents of fenced code blocks, preserving offsets.
 
+    A SCANNER rather than positional pairing. `zip(fences[0::2], fences[1::2])`
+    mis-pairs the moment fences nest -- an outer ````` ```` ````` wrapping an inner
+    ````` ``` ````` pairs (outer-open, inner-open) and (inner-close, outer-close),
+    leaving the quoted content between the inner fences UNBLANKED. That is the
+    ordinary shape whenever a reviewer quotes markdown that itself contains a
+    fence, which reviewing this repo requires, and it read a blocking verdict as
+    clean. An odd fence count mis-blanked in the other direction, wiping the
+    report's own closing verdict and letting an earlier one decide it.
+
+    So: a fence opens with three or more backticks or tildes, and closes only on
+    a line of the SAME character that is at least as long.
+
+    An unclosed fence is reported rather than merely blanked, and `parse_report`
+    treats such a report as stating no verdict at all. A report whose fencing
+    does not resolve is one whose structure cannot be read, and the safe answer
+    to "is this clean" is then no. It is also what makes a truncated report
+    fail, since truncation mid-block leaves exactly this state.
+
     Offsets are preserved because `parse_report` searches for the fingerprint
-    forward from the verdict's own position in the ORIGINAL text.
+    forward from the verdict's own position.
     """
     out = list(text)
-    fences = list(FENCE.finditer(text))
-    for opener, closer in zip(fences[0::2], fences[1::2]):
-        for i in range(opener.start(), closer.end()):
+    open_char: str | None = None
+    open_len = 0
+    blank_from = 0
+    for m in FENCE.finditer(text):
+        marker = m.group(1)
+        char, length = marker[0], len(marker)
+        if open_char is None:
+            open_char, open_len, blank_from = char, length, m.start()
+            continue
+        if char == open_char and length >= open_len:
+            for i in range(blank_from, m.end()):
+                if out[i] != "\n":
+                    out[i] = " "
+            open_char = None
+    if open_char is not None:
+        for i in range(blank_from, len(out)):
             if out[i] != "\n":
                 out[i] = " "
-    if len(fences) % 2:  # an unclosed fence swallows the rest
-        last = fences[-1]
-        for i in range(last.start(), len(out)):
-            if out[i] != "\n":
-                out[i] = " "
-    return "".join(out)
+    return "".join(out), open_char is not None
 
 
 def parse_report(text: str) -> tuple[str | None, str | None]:
@@ -444,7 +636,9 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     # first and stood in for the report's real one, which named the older
     # commit actually reviewed -- so the push of an unreviewed commit was
     # allowed by the very comparison this guard is built around.
-    blanked = _blank_fences(text)
+    blanked, unclosed = _blank_fences(text)
+    if unclosed:
+        return None, None
     matches = list(VERDICT_LINE.finditer(blanked))
     if not matches:
         return None, None
@@ -624,6 +818,12 @@ def main() -> int:
             # only whether to SAY the guard is broken, never whether a command
             # is a push. Narrow enough that `git commit -m "push the button"`
             # and `grep push` do not trip it.
+            #
+            # The override is honoured here too: denying a push that carries it,
+            # under a message saying the override works, is a session-wide
+            # lockout with no escape.
+            if DEGRADED_OVERRIDE.search(cmd):
+                return 0
             if re.search(
                 r"(?:^|[;&|`(\s])(?:[\w./-]*/)?git"
                 r"(?:\s+(?:-C\s+\S+|-c\s+\S+|--(?:git-dir|work-tree|namespace)[= ]\S+|-\S+))*"

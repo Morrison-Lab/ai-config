@@ -76,7 +76,8 @@ OTHER = make_repo(("alpha",))
 OTHER_HEAD = _git(OTHER, "rev-parse", "HEAD")
 
 
-def run_hook(cmd: str, transcript_events: list | None = None) -> tuple[int, dict]:
+def run_hook(cmd: str, transcript_events: list | None = None,
+             extra_env: dict | None = None) -> tuple[int, dict]:
     tpath = None
     if transcript_events is not None:
         tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
@@ -88,7 +89,8 @@ def run_hook(cmd: str, transcript_events: list | None = None) -> tuple[int, dict
         payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
                    "transcript_path": tpath or ""}
         res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
-                             capture_output=True, text=True, cwd=REPO)
+                             capture_output=True, text=True, cwd=REPO,
+                             env={**os.environ, **(extra_env or {})})
         data = {}
         if res.stdout.strip():
             try:
@@ -397,6 +399,70 @@ CASES = [
         f"### Verdict: Ready for merge\n\nreviewed-commit: {HEAD}"), False,
      "the fingerprint label is case-insensitive"),
 
+    # --- shell forms the regex detector handled and the argv one did not ---
+    # Every row below was measured ALLOWED at 5af86e2 and blocked by the base
+    # branch it replaced, and the first is the retry loop skills/push prescribes.
+    (f"for i in 1 2 3; do git -C {REPO} push origin feature && break; sleep 2; done",
+     reviewed(), True, "a push inside a `for ... do` retry loop is a push"),
+    (f"if ! git -C {REPO} push origin feature; then echo fail; fi", reviewed(), True,
+     "a push under `if !` is a push"),
+    (f"while ! git -C {REPO} push origin feature; do sleep 2; done", reviewed(), True,
+     "a push under `while !` is a push"),
+    (f"{{ git -C {REPO} push origin feature; }}", reviewed(), True,
+     "a push inside a brace group is a push"),
+    (f"! git -C {REPO} push origin feature", reviewed(), True,
+     "a negated push is a push"),
+    (f"sudo git -C {REPO} push origin feature", reviewed(), True,
+     "`sudo git push` is a push"),
+    (f"env -i git -C {REPO} push origin feature", reviewed(), True,
+     "`env -i` carries an option before git, and is still a push"),
+    (f"env -u FOO git -C {REPO} push origin feature", reviewed(), True,
+     "`env -u FOO` likewise"),
+    (f"timeout 5 git -C {REPO} push origin feature", reviewed(), True,
+     "`timeout 5 git push` takes a duration before git"),
+    (f"exec git -C {REPO} push origin feature", reviewed(), True,
+     "`exec git push` is a push"),
+    (f"builtin git -C {REPO} push origin feature", reviewed(), True,
+     "`builtin git push` is a push"),
+    (f"FOO=ALLOW_UNREVIEWED_PUSH=1 git -C {REPO} push origin feature", reviewed(), True,
+     "the override must BE the assignment, not appear inside another one's value"),
+
+    # --- which directory, with paren depth respected ---
+    (f'cd {OTHER} && git commit --allow-empty -m "fix (typo)" && git push origin main',
+     reviewed(), True,
+     "a parenthesis inside a quoted string does not discard the `cd` hint"),
+    (f"(cd {OTHER} && git push origin main)", reviewed(), True,
+     "a push INSIDE the subshell is covered by that subshell's `cd`"),
+    (f"(cd {OTHER} && git log -1) && git push origin main", reviewed(), False,
+     "a `cd` confined to a subshell does not reach a push outside it"),
+
+    # --- fenced and quoted verdicts ---
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "For reference, a clean report ends like this:\n\n"
+        f"````markdown\n```text\n### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n```\n````"),
+     True, "nested fences do not let a quoted clean verdict decide a blocking report",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Needs more work\nReviewed-Commit: {HEAD}\n\n"
+        "~~~\n### Verdict: Ready for merge\n~~~"), True,
+     "a tilde fence quotes just as a backtick fence does",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n```\nunterminated"),
+     True, "a report whose fencing never closes states no verdict",
+     "no verdict came back"),
+    (PUSH, reviewed(f"### Verdict: **Ready for merge**\n\nReviewed-Commit: {HEAD}"), False,
+     "an emphasised verdict value is still a verdict"),
+    (f"git -C {REPO} push --recurse-submodules=only origin main", reviewed(), True,
+     "`--recurse-submodules=only` ships commits in another repository"),
+
+    # --- the time budget ---
+    (PUSH, reviewed(), True,
+     "an exhausted budget refuses rather than allowing an unverified push",
+     "ran out of time", {"NPWSR_BUDGET_SECONDS": "0"}),
+
     # --- which tool spoke ---
     (PUSH, [{"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": "x1", "name": "Read",
@@ -435,6 +501,33 @@ def raw_cases() -> int:
     return failures
 
 
+def config_cases() -> int:
+    """What a BARE `git push` ships is a `push.default` question, not a fact.
+
+    Both of these ship refs other than HEAD, so a verdict naming HEAD cannot
+    cover them. Verified against real git rather than asserted.
+    """
+    failures = 0
+    for label, config, should_deny in (
+        ("`push.default = matching` makes a bare push ship more than HEAD",
+         ["push.default", "matching"], True),
+        ("a configured remote.<name>.push makes a bare push ship something else",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"], True),
+    ):
+        _git(REPO, "config", *config)
+        try:
+            rc, out = run_hook(f"git -C {REPO} push origin", reviewed())
+            denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+            if rc != 0 or denied != should_deny:
+                print(f"FAIL (deny={denied}, wanted {should_deny}): {label}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+        finally:
+            _git(REPO, "config", "--unset", config[0])
+    return failures
+
+
 def orphan_cases() -> int:
     """The guard with its push detector missing.
 
@@ -455,6 +548,11 @@ def orphan_cases() -> int:
             ("an orphaned guard ignores a commit message mentioning a push",
              'git commit -m "push the button"', False),
             ("an orphaned guard ignores a grep for the word push", "cat f | grep push", False),
+            # A PreToolUse deny is not user-overridable, so denying a push that
+            # carries the override -- under a message saying the override works
+            # -- is a session-wide lockout with no escape.
+            ("an orphaned guard still honours the override",
+             "ALLOW_UNREVIEWED_PUSH=1 git push origin main", False),
         ):
             res = subprocess.run(
                 [sys.executable, orphan],
@@ -478,7 +576,7 @@ def main():
         for case in CASES:
             cmd, events, should_block, label = case[:4]
             expect = case[4] if len(case) > 4 else None
-            rc, out = run_hook(cmd, events)
+            rc, out = run_hook(cmd, events, case[5] if len(case) > 5 else None)
             reason = (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
             blocked = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
             if rc != 0:
@@ -499,11 +597,12 @@ def main():
                 print(f"PASS: {label}")
         failed += raw_cases()
         failed += orphan_cases()
+        failed += config_cases()
     finally:
         shutil.rmtree(REPO, ignore_errors=True)
         shutil.rmtree(OTHER, ignore_errors=True)
 
-    total = len(CASES) + 8
+    total = len(CASES) + 11
     if failed:
         print(f"\n{failed}/{total} cases failed")
         sys.exit(1)

@@ -89,6 +89,8 @@ either page has since changed its ordering or paths, that page wins over this
 skill's restatement — re-fetch it rather than trust this file blindly on a
 stale point.
 
+For the matcher's own syntax and matching mechanics --- how a compound Bash command is checked segment by segment, what a bare tool name matches, the `//` absolute-path prefix, and where `Tool(param:value)` rules apply --- see [`memories/claude-code-permissions.md`](../../memories/claude-code-permissions.md), a sibling satellite covering the matcher rather than the scope/evaluation-order question this skill answers.
+
 ## Procedure
 
 ### 1. Get the exact pattern to diagnose

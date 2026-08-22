@@ -226,6 +226,8 @@ git push -u origin <name>
 - **Don't:** read "the blocked step didn't run" as the scope of the block; nothing in that call ran.
 - **Don't:** reach for `&&` as the remedy --- that governs a *shell* sequencing hazard, and a hook denial never reaches the shell.
 
+For the built-in **permission-rule matcher's** own segment-by-segment behavior (the mechanism the `&&` remedy above actually governs, and a different one from a hook's whole-string decision) see [`claude-code-permissions.md`](claude-code-permissions.md)'s "The matcher is shell-operator aware".
+
 (2026-08-17, `Morrison-Lab/lab-manual`: one call carried `cd ... && git checkout -q -b fix/benchmarking-non-ascii && python3 - <<'EOF' ... EOF`.
 The heredoc was a whole-file punctuation replace, correctly blocked.
 Re-running the python part alone under `ALLOW_WHOLE_FILE_PUNCT=1` edited the file and committed --- onto `main`, because the branch had never been created.

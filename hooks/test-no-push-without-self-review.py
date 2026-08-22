@@ -437,6 +437,18 @@ CASES = [
     (f"git -C {REPO} -c branch.main.pushRemote=alpha "
      f"-c remote.alpha.push=refs/heads/*:refs/heads/* push", reviewed(), True,
      "the sibling pushRemote key redirects the same way"),
+    # git takes config from the ENVIRONMENT as well as from `-c` and from
+    # files: GIT_CONFIG_COUNT with GIT_CONFIG_KEY_<n>/GIT_CONFIG_VALUE_<n> is
+    # a documented override equivalent to `-c`. The hook process does not
+    # carry those, so a subprocess run under its own environment read
+    # different config than the push would. Measured with nothing on disk:
+    # the mirror form ships every branch, including an unreviewed one.
+    (f"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.mirror "
+     f"GIT_CONFIG_VALUE_0=true git -C {REPO} push origin", reviewed(), True,
+     "an env-var config override is applied to the guard's own config reads"),
+    (f"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.default "
+     f"GIT_CONFIG_VALUE_0=matching git -C {REPO} push origin", reviewed(), True,
+     "the same env form reaches push.default, not just the mirror key"),
     (f"git -C {REPO} --config-env=remote.origin.mirror=SNEAKY push origin",
      reviewed(), True,
      "--config-env names an env var this guard cannot read, so it refuses"),

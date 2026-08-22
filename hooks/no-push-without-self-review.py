@@ -653,7 +653,7 @@ PER_CALL_SECONDS = 3.0
 _DEADLINE = [0.0]
 
 
-def _run_git(directory: str | None, *args: str) -> str | None:
+def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
     """Run one git command inside the shared budget; None if it failed.
 
     EVERY git call goes through here, deliberately. An earlier revision budgeted
@@ -667,13 +667,36 @@ def _run_git(directory: str | None, *args: str) -> str | None:
     Sharing one helper is what makes that unrepeatable: a future call site
     cannot forget to check the deadline, because there is nowhere else to run
     git from.
+
+    `env` is the PUSHING command's environment prefix, and it is required for
+    the same reason. git takes config from the environment as well as from
+    `-c` and from files: `GIT_CONFIG_COUNT` with `GIT_CONFIG_KEY_<n>` and
+    `GIT_CONFIG_VALUE_<n>` is a documented override equivalent to `-c`. This
+    process does not carry those, so a subprocess run under the hook's own
+    environment reads different config than the push will. Measured on git
+    2.43.0, with nothing on disk:
+
+        GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.mirror \
+        GIT_CONFIG_VALUE_0=true git push origin
+
+    ships every branch, including an unreviewed one, while the guard allowed
+    it. Enumerating that one variable would have been the fourth patch to the
+    same class, so the overlay is applied wholesale instead: every git call
+    runs under the environment the push will run under, which covers env-based
+    overrides this file does not know about. `GIT_DIR` and friends are refused
+    upstream rather than forwarded, since those redirect the repository.
     """
     remaining = _DEADLINE[0] - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("ran out of time resolving what this push would ship")
     cmd = ["git"] + (["-C", directory] if directory else []) + list(args)
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True,
+        overlay = dict(os.environ)
+        for assignment in env:
+            key, sep, value = assignment.partition("=")
+            if sep:
+                overlay[key] = value
+        out = subprocess.run(cmd, capture_output=True, text=True, env=overlay,
                              timeout=min(PER_CALL_SECONDS, remaining))
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
@@ -682,8 +705,8 @@ def _run_git(directory: str | None, *args: str) -> str | None:
     return out.stdout.strip() if out.returncode == 0 else None
 
 
-def _rev_parse(directory: str | None, rev: str) -> str | None:
-    sha = _run_git(directory, "rev-parse", rev)
+def _rev_parse(directory: str | None, env: list[str], rev: str) -> str | None:
+    sha = _run_git(directory, env, "rev-parse", rev)
     return sha.lower() if sha and re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
@@ -724,7 +747,8 @@ def _has_config_env(argv: list[str]) -> bool:
 
 
 def _git_config(directory: str | None, flag: str, key: str,
-                argv: list[str], as_bool: bool = False) -> str | None:
+                argv: list[str], env: list[str],
+                as_bool: bool = False) -> str | None:
     """A config value as the PUSHING git would see it.
 
     Two ways a plain `git config --get` reads something git does not.
@@ -752,10 +776,11 @@ def _git_config(directory: str | None, flag: str, key: str,
     args = _config_overrides(argv) + ["config"]
     if as_bool:
         args.append("--bool")
-    return _run_git(directory, *args, flag, key) or None
+    return _run_git(directory, env, *args, flag, key) or None
 
 
-def _push_remote(directory: str | None, argv: list[str]) -> str | None:
+def _push_remote(directory: str | None, argv: list[str],
+                 env: list[str]) -> str | None:
     """The remote this push acts on, named or not.
 
     Returning None for a bare `git push` skipped the `remote.<name>.push` check
@@ -786,21 +811,22 @@ def _push_remote(directory: str | None, argv: list[str]) -> str | None:
         return positionals[0]
     if repo:
         return repo
-    branch = _rev_parse_ref(directory, "--abbrev-ref", "HEAD")
+    branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
     for key in ((f"branch.{branch}.pushRemote",) if branch else ()) + (
             "remote.pushDefault",) + ((f"branch.{branch}.remote",) if branch else ()):
-        value = _git_config(directory, "--get", key, argv)
+        value = _git_config(directory, "--get", key, argv, env)
         if value:
             return value
     return "origin"
 
 
-def _rev_parse_ref(directory: str | None, *args: str) -> str | None:
-    name = _run_git(directory, "rev-parse", *args)
+def _rev_parse_ref(directory: str | None, env: list[str], *args: str) -> str | None:
+    name = _run_git(directory, env, "rev-parse", *args)
     return name if name and name != "HEAD" else None
 
 
-def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | None, str]:
+def shipped_commits(directory: str | None, argv: list[str],
+                    env: list[str]) -> tuple[set[str] | None, str]:
     """(commits this push would ship, reason-if-unknown).
 
     None means the guard cannot tell -- `--all`, `--mirror`, an unresolvable
@@ -822,7 +848,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
     # `git push origin main` was ALLOWED while
     # `git push --recurse-submodules=on-demand origin main` was refused, and
     # real git reports `Pushing submodule` for the former.
-    remote_for_config = _push_remote(directory, argv)
+    remote_for_config = _push_remote(directory, argv, env)
     for key, mirrors, verdict, as_bool in CONFIG_LIKE_INDETERMINATE_FLAGS:
         if "{remote}" in key:
             # `--mirror` cannot be combined with refspecs (git refuses it), so
@@ -830,7 +856,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
             if refspecs or not remote_for_config:
                 continue
             key = key.format(remote=remote_for_config)
-        value = _git_config(directory, "--get", key, argv, as_bool)
+        value = _git_config(directory, "--get", key, argv, env, as_bool)
         if value and verdict(value):
             return None, (f"`{key}` is set, which does what `{mirrors}` does "
                           "without naming it on the command line")
@@ -842,15 +868,15 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         # the question entirely. Measured on git 2.43.0:
         # `git -c push.default=matching push --dry-run origin` reports a branch
         # that is not HEAD. So this is checked rather than assumed.
-        default = _git_config(directory, "--get", "push.default", argv)
+        default = _git_config(directory, "--get", "push.default", argv, env)
         if default and default.lower() == "matching":
             return None, "`push.default` is `matching`, so a bare push ships more than HEAD"
         remote = remote_for_config
         if remote and _git_config(directory, "--get-all",
-                                  f"remote.{remote}.push", argv):
+                                  f"remote.{remote}.push", argv, env):
             return None, (f"`remote.{remote}.push` is configured, so what a bare push "
                           "ships is not simply the current branch")
-        head = _rev_parse(directory, "HEAD")
+        head = _rev_parse(directory, env, "HEAD")
         if head is None:
             return None, "HEAD could not be resolved for the repository being pushed"
         return {head}, ""
@@ -860,7 +886,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         src = spec.split(":", 1)[0].lstrip("+")
         if not src:
             continue  # `:branch` deletes a ref and ships nothing
-        sha = _rev_parse(directory, f"{src}^{{commit}}")
+        sha = _rev_parse(directory, env, f"{src}^{{commit}}")
         if sha is None:
             hint = ("; a shell variable cannot be expanded here, so push `HEAD` "
                     "(`git push -u origin HEAD`) when you mean the current branch"
@@ -1038,7 +1064,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
 
 
 def verify_review(transcript_path: str, directory: str | None,
-                  argv: list[str]) -> tuple[bool, str]:
+                  argv: list[str], env: list[str]) -> tuple[bool, str]:
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
     if not transcript_path or not os.path.exists(transcript_path):
         return False, "No transcript available to verify the adversarial self-review."
@@ -1078,7 +1104,7 @@ def verify_review(transcript_path: str, directory: str | None,
         )
 
     try:
-        commits, why = shipped_commits(directory, argv)
+        commits, why = shipped_commits(directory, argv, env)
     except TimeoutError as e:
         return False, (
             f"This guard {e}.\n"
@@ -1184,7 +1210,7 @@ def main() -> int:
                      "so a verdict naming a commit in this one cannot cover it")
                 return 0
             is_clean, reason = verify_review(
-                payload.get("transcript_path") or "", directory, argv
+                payload.get("transcript_path") or "", directory, argv, env
             )
             if not is_clean:
                 deny(reason)

@@ -479,6 +479,8 @@ Three neighbouring rules sit close and none of them reaches this.
 - The same file's "A summary written above the account it summarizes escapes the re-read" keys on **position** --- a quantifier placed above the account it generalizes over.
   A correction is a claim about a population that lives somewhere else entirely, so nothing about where it sits marks it.
 
+So the check to add is not a new kind of scrutiny but the existing one, pointed at a sentence that does not look like it needs any.
+
 - **Do:** run the deriving command for any negative you write while narrowing a claim, and paste the command and its result beside it.
 - **Do:** treat the reply to a review finding as unverified prose, separately from the finding that prompted it.
 - **Don't:** read a hedge as self-evidently safe --- an understated guarantee is a claim about a population, and it can be as false as the overclaim it replaced.
@@ -504,7 +506,18 @@ FAIL (expected blocked=True, got False): the sibling pushRemote key redirects th
 ```
 
 The call site is at line 912 in the revision `a6a0860f` cites and at 817 at that branch head, so take the site from a grep rather than from the line number.
-The mutant has to live in `hooks/`: written to the repo root instead, the same mutation fails 85 of 169 because the hook loads a sibling detector from its own directory, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s sixth mutation outcome --- a mutant failing for a reason other than the mutation --- and an unmutated copy at the same path passing 169 of 169 is what separates the two.)
+The mutant has to live in `hooks/`, and the first run of it did not.
+Written to the repo root, the same mutation fails 85 of 169, because the hook loads a sibling detector from its own directory --- [`algorithmatize-checks`](algorithmatize-checks.md)'s sixth mutation outcome, a mutant failing for a reason other than the mutation.
+What exposes that is running an **unmutated** copy from the mutant's own location, and reading a shared failure as evidence about the location:
+
+```
+$ cp hooks/no-push-without-self-review.py ./ctl-root-copy.py
+$ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
+85/169 cases failed
+```
+
+Identical to the mutant, so the 85 is the path and not the change.
+Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
 
 ## Where this fires
 

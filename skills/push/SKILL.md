@@ -30,21 +30,28 @@ check in that case.
 Run these in order. Stop at the first one that fires and ask the user (see
 [Asking for guidance](#asking-for-guidance)).
 
-### 0. Local adversarial self-review clean verdict
+### 0. A separate subagent reviewed this diff and cleared it
 
-Before pushing changes to a remote branch, run an adversarial self-review on your diff
-(using the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent)
-against `git diff origin/main...HEAD`.
-Confirm that the review output concludes with a clean verdict:
+Before pushing, dispatch the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/<default-branch>...HEAD` and wait for its verdict.
+Dispatch it in the **foreground** --- a background dispatch returns an agent id rather than a report, and you are waiting on the answer anyway.
+Brief it with the base ref, the paths, and the standards that apply.
+Never brief it with your rationale for the change, per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
 
-```text
-### Verdict: Ready for merge
-```
+Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
-All findings must be addressed or rebutted before pushing.
-Pushing code without running a local self-review that achieves a clean verdict is mechanistically
-blocked by `hooks/no-push-without-self-review.py` (unless explicitly overridden with `ALLOW_UNREVIEWED_PUSH=1`,
-such as when pushing an initial empty PR branch under `pr-on-claim`).
+`hooks/no-push-without-self-review.py` gates this.
+It admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
+So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
+Review after committing, therefore, not before.
+
+Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no verdict can exist for the guard to check --- and say in your reply that you used it and why:
+
+- the initial empty PR branch under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), which carries nothing to review;
+- a review delivered by a separate CLI rather than a subagent, whose verdict never becomes an `Agent` call's result;
+- a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
+- an emergency.
+
+The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 
 ### 1. Protected branch
 
@@ -136,8 +143,11 @@ commits ahead) so the user can answer without digging.
 Once every check passes, push with the standard upstream + retry backoff:
 
 ```bash
-git push -u origin "$BRANCH"   # PUSH
+git push -u origin HEAD   # PUSH
 ```
+
+`HEAD` rather than `"$BRANCH"`, deliberately: a shell variable reaches the pre-push guard unexpanded, so it cannot resolve which commits the push would ship and refuses.
+`-u origin HEAD` sets the upstream to the current branch just the same.
 
 If the push fails on a **network** error, retry up to 4 times with exponential
 backoff (2s, 4s, 8s, 16s). Do **not** retry — and do **not** force-push — if it

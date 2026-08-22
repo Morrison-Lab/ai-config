@@ -121,14 +121,10 @@ other roles are legitimate reasons to deviate from it:
   path glob it may touch in the `description`, state what it must NOT touch,
   and have it report back what it changed — the same output-shape discipline
   a scout uses for findings.
-- **Critic** — reviews another agent's (or the coordinator's own) output
-  instead of investigating the repo fresh. No existing agent does this yet; a
-  `Workflow` script's `pipeline()`/`parallel()` verify stage (see
-  [`when-to-orchestrate.md`](../../shared/workflow/when-to-orchestrate.md))
-  is currently how this repo gets adversarial review — an inline prompt, not
-  a named persona. Promote it to a `.claude/agents/*.md` file only once more
-  than one skill wants the same critic behavior — Step 0's reuse-first rule
-  applies here too.
+- **Critic** --- reviews another agent's (or the coordinator's own) output instead of investigating the repo fresh.
+  [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) is this repo's one named critic, and it cleared the promotion bar below because every self-review routes to it --- [`push`](../push/SKILL.md), [`ardi`](../ardi/SKILL.md), and the fallback review in [`self-review-fallback`](../../shared/workflow/self-review-fallback.md) ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+  A `Workflow` script's `pipeline()`/`parallel()` verify stage (see [`when-to-orchestrate.md`](../../shared/workflow/when-to-orchestrate.md)) is the other way this repo gets adversarial review --- an inline prompt, not a named persona.
+  Promote a new critic to a `.claude/agents/*.md` file only once more than one skill wants that same critic behavior --- Step 0's reuse-first rule applies here too.
 - **Paranoid reviewer** — a critic deliberately run at higher cost/effort
   (see `select-model` and `when-to-orchestrate.md`'s model/effort routing
   section) for consequential or subtle work, where a same-family second pass

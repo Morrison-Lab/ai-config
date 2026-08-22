@@ -583,11 +583,15 @@ The strong form of the claim: after claiming an issue you're about to work, open
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
-## Run local adversarial self-review before pushing
+## Every self-review is an adversarial review by a separate subagent
 
-Before pushing any feature branch, execute a local self-review using an adversarial review persona or the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/main...HEAD`.
-Confirm that the review achieves a clean verdict (`### Verdict: Ready for merge`) and that all defects or convention violations are resolved prior to `git push`.
-Pushing without a clean self-review is mechanistically blocked by `hooks/no-push-without-self-review.py`.
+[shared/workflow/adversarial-self-review.md](shared/workflow/adversarial-self-review.md)
+
+Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
+The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
+Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
+`hooks/no-push-without-self-review.py` gates the pre-push case.
+The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
 

@@ -67,9 +67,10 @@ mechanism in brief needs no cross-reference at all.
 
 **A pointer aimed the *wrong* way is a different defect, and fixing one can
 leave you applying the wrong test to the rest.**
-The positional test above is easy to read and easy to invert under a specific
-sequence, observed once and recorded here as a risk rather than a frequency
-claim.
+The positional test above was inverted once, under the specific sequence
+described here.
+How readily it happens is unmeasured; what follows is the sequence, not a
+frequency.
 
 A reviewer flags `the rule below` where the rule is actually *above*.
 That is a genuine defect --- a broken reference --- so you fix it, and then
@@ -86,12 +87,14 @@ over them, because the test being applied came from the finding rather than
 from the rule.
 
 The tell is the verdict "this one points forward correctly, so it stays".
-Outside the roadmap exception this fragment carves out, that sentence is never
-a reason to keep a pointer.
-It restates the definition of the thing being looked for.
-When the roadmap exception *is* what is meant, say so, since "it points the
-right way" and "this is a deliberate structural preview" are different
-defences and only the second one holds.
+That sentence restates the definition of the thing being looked for, so it is
+never a reason to keep a pointer.
+The one real defence is different in kind: a deliberate scene-setting overview
+previewing a document's structure, which the reader is not meant to resolve
+immediately.
+Say which of the two is meant, since "it points the right way" and "this is a
+deliberate structural preview" are different claims and only the second one
+excuses a pointer.
 
 - **Do:** re-read the rule before sweeping for more instances of a finding,
   rather than generalizing from the instance you were handed.

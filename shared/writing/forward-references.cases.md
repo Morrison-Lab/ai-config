@@ -46,15 +46,31 @@ CI was fully green throughout --- no mechanical check sees this.)
 ## "Direction is not the test"
 
 (Morrison-Lab/ai-config#1849, 2026-08-21.
-Round 3 of the review flagged one backwards `below` --- the referent was above
-it --- which is a broken reference rather than a forward one.
-The sweep that followed used the fragment's own grep over the whole file,
-examined each remaining hit, and cleared two of them on the ground that they
-pointed forward *accurately*.
+All four pointers were in `skills/clean-git/SKILL.md`.
+
+Round 3 flagged **"the contradiction rule below"**, whose referent sat about
+seventy lines *above* it.
+That is a broken reference rather than a forward one, and it is what set the
+axis for everything after.
+
+The sweep that followed used the fragment's own grep over the whole file and
+cleared two hits on the ground that they pointed forward *accurately*:
+
+- **"The command below is not `INLINE`"**, referring to the fenced command on
+  the next line.
+- **"the safety rule below applies"**, referring to the `Safety rules` section
+  about thirteen lines further down.
+
 That reasoning was posted to the reviewer, so it is on the record as having
 been applied deliberately rather than carelessly.
-Round 4 flagged one of those two, plus a third that the round-3 fix commit
-`ea91b375` had itself introduced.
-All three were removed in `6e195693`.
+
+Round 4 flagged the second of those, plus a third that the round-3 fix commit
+`ea91b375` had itself introduced: **"which is the failure the next paragraph
+describes"**.
+
+All three were removed in `6e195693` by stating the content instead of pointing
+at it --- the third became a sentence naming the failure (every live worktree's
+branch still present, contradiction rule firing spuriously) rather than
+promising it later.
 The cross-vendor review that caught the overclaiming in the first draft of this
 entry is on [#1874](https://github.com/Morrison-Lab/ai-config/pull/1874).)

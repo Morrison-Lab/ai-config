@@ -192,7 +192,9 @@ Two generators now exist for one value: yours and the tool's.
 While nobody enables the tool's, the hand-written copy looks authoritative and stays correct.
 The moment anything turns the real one on --- a format option, a config inherited from a parent directory, a downstream consumer with different defaults --- both run, and the artifact carries two answers at once.
 
-The measured case: a Quarto document whose 30 headings carried hand-typed numbers while a directory `_metadata.yml` set `number-sections: true`.
+Measured 2026-08-22 on `ucdavis/matt.contracts#2`:
+a Quarto document whose 30 headings carried hand-typed numbers
+while a directory `_metadata.yml` set `number-sections: true`.
 Every heading rendered doubly numbered (`2 1. Objectives and estimands`), and all eight `@sec-` cross-references resolved to the generated scheme while the visible headings showed the hand-typed one --- so each reference named a section number that appeared nowhere in the document.
 None of it was visible in the source, and nine review rounds over a day did not catch it, because every one of them read the `.qmd`.
 

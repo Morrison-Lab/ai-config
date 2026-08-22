@@ -52,6 +52,19 @@ Everything in this step shares a scratch directory, so create it **first**. Seve
 TMP=$(mktemp -d)
 ```
 
+**Snapshot the remote-tracking refs before running either pass.** Both delegates refresh remote-tracking state in their classify steps — [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) step 3 and [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) step 2 each run `git fetch --prune origin`. `--prune` deletes remote-tracking refs whose upstream branch is gone, and such a ref can be the last thing in this clone pointing at those commits.
+
+So “nothing that can lose work happens before confirmation” is **false as an unconditional claim**, and narrowing the wording would keep the same defect in smaller print. Snapshotting makes the statement true instead, but only if it runs **before** the passes that prune — a snapshot taken afterwards records the post-prune state and recovers nothing:
+
+``` bash
+git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin \
+  > "$TMP/pre-prune-refs.txt"
+```
+
+Report the snapshot’s path in the plan. Anything the prune removed is recoverable from it for as long as the objects survive gc, and a reader who knows the file exists can check before confirming.
+
+With that snapshot taken, the invariant the gate protects is: **nothing that can lose work happens before confirmation, and the one pre-gate mutation that could is recorded first.**
+
 Run [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) steps 1 through 3. Run [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) steps 1 through 3.
 
 For the local half, run step 8’s **classification** only. `clean-branches` step 8 has no separately-runnable enumeration sub-step: each of 8a, 8b, and 8c bundles its listing command and its `git branch -d`/`-D` into one fenced block. So name the read half explicitly rather than delegating to a sub-step that does not exist:
@@ -94,19 +107,6 @@ git for-each-ref --format='%(refname:short) %(upstream)' refs/heads \
 **Neither pass touches a live worktree, branch, or remote before the gate — with one exception, and it is worth naming rather than rounding off.** `clean-worktrees` step 2 runs `git worktree prune -v` for real, not `--dry-run`, so a mutation has already happened by the time the plan is presented.
 
 That prune is safe by construction rather than by convention: `git worktree prune` only drops administrative records for worktrees whose directory is **already gone from disk**, so there is no state it can destroy and nothing a confirmation could protect. Say so in the plan anyway, per step 2’s `Pruned stubs` line. A silent mutation under a heading promising none is how a reader stops believing the rest of the guarantees.
-
-**A second pre-gate mutation, and this one is not safe by construction.** Both delegates refresh remote-tracking state in their classify steps — [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) step 3 and [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) step 2 each run `git fetch --prune origin`. `--prune` deletes remote-tracking refs whose upstream branch is gone, and such a ref can be the last thing in this clone pointing at those commits.
-
-So “nothing that can lose work happens before confirmation” is **false as an unconditional claim**, and narrowing it further would keep the same defect in smaller print. Snapshot the refs first instead, which makes the statement true rather than merely careful:
-
-``` bash
-git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin \
-  > "$TMP/pre-prune-refs.txt"
-```
-
-Report the snapshot’s path in the plan. Anything the prune removed is recoverable from it for as long as the objects survive gc, and a reader who knows the file exists can check before confirming.
-
-With that snapshot taken, the invariant the gate protects is: **nothing that can lose work happens before confirmation, and the one pre-gate mutation that could is recorded first.**
 
 Derive the `INLINE` set. This first command produces the raw worktree-to-branch mapping, every worktree included — which is **not** `INLINE`:
 

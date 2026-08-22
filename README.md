@@ -110,7 +110,8 @@ ln -s /path/to/ai-config ~/.cursor/plugins/local/ai-config
 ```
 
 Then reload the Cursor window.
-On Windows, Git Bash `ln -s` may copy instead of linking; prefer the GitHub marketplace install there.
+On Windows, Git Bash `ln -s` may copy instead of linking;
+prefer the GitHub marketplace install there.
 
 `.cursor-plugin/plugin.json` is the Cursor Plugin manifest (skills, project rules, commands).
 Claude Code keeps using `.claude-plugin/`.

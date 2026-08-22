@@ -44,16 +44,32 @@ it and ask whether to branch first.
 
 Another session or the author may have pushed since your last fetch.
 
+**Take this reading immediately before the push**, not at the start of the
+round and not when you last synced. A fetch from earlier in the session is a
+measurement of a moment that has passed, and it stopped being evidence the
+instant somebody else pushed — see
+[`check-before-pushing`](../../shared/workflow/check-before-pushing.md).
+
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git ls-remote --heads origin "$BRANCH"   # LS_REMOTE — read-only; updates no ref
+```
+
+If the tip it reports is not an ancestor of your `HEAD`
+(`git merge-base --is-ancestor <tip> HEAD`), **back off** — another session
+(or the author) is driving this branch right now. Do not push (a plain push will
+be rejected anyway, and you must not force-push over their work). Ask the user.
+
+Fetch to see *what* they pushed, once you already know something is there:
+
+```bash
 git fetch origin "$BRANCH" 2>/dev/null   # FETCH
-# Commits on the remote that you don't have locally:
 git log --oneline HEAD.."origin/$BRANCH" 2>/dev/null
 ```
 
-If `origin/$BRANCH` has commits you didn't push, **back off** — another session
-(or the author) is driving this branch right now. Do not push (a plain push will
-be rejected anyway, and you must not force-push over their work). Ask the user.
+An object you cannot resolve locally is the **stronger** signal, not the
+milder one: the remote moved after your last fetch and you cannot see what is
+there.
 
 ### 3. "Paws off" claim by someone else
 
@@ -99,6 +115,30 @@ gh run list --branch "$BRANCH" --json status,name \
 If a `@claude` / review workflow is `in_progress` or `queued`, wait for it to
 finish, then re-check. If it's stuck, ask the user.
 
+### 6. The push's own form
+
+Never `git push --force` / `-f`. It overwrites the remote tip unconditionally,
+including commits another agent pushed since you last looked.
+
+```bash
+git push --force-with-lease --force-if-includes
+```
+
+`--force-if-includes` (git 2.30+) is the half usually left off, and without it
+the lease is defeatable: `--force-with-lease` compares against your
+*remote-tracking ref*, so any background fetch — a poller, another tool in the
+same checkout, a `--recurse-submodules` fetch — silently refreshes that ref and
+the lease then passes over the very commits it existed to protect.
+
+The one case that needs bare `--force` is a lease that is **unsatisfiable**
+rather than violated: a `stale info` failure after a squash-merge with
+auto-delete removed the branch your ref still names
+(`memories/git.md`). Prefix that with `ALLOW_FORCE_PUSH=1`.
+
+`hooks/no-clobbering-push.py` enforces this half mechanically — it refuses a
+bare force push and warns on a divergence — so it fires whether or not this
+skill was invoked.
+
 ## Asking for guidance
 
 When a check fires, **do not push.** Use `AskUserQuestion` to surface exactly
@@ -143,10 +183,20 @@ review, not a draft).
   ends in a push and should itself honor these checks.
 - **`ardi`** — its push step should run these checks; the "detect an active
   parallel session before pushing" note in `claim-pr` is the same guard.
+- **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** —
+  the standing rule these checks implement, and the home of the immediacy
+  argument and the `--force-if-includes` mechanism. `hooks/no-clobbering-push.py`
+  is its instrument, and it runs on the `git push` itself rather than waiting to
+  be invoked — so it covers the bare push in the middle of an ARDI round that
+  never reaches this skill.
 
 ## Anti-patterns
 
 - ❌ Force-pushing over commits another session added (check #2)
+- ❌ Bare `git push --force` instead of `--force-with-lease --force-if-includes`
+  (check #6)
+- ❌ Reusing an earlier fetch as the check — the reading has to be taken
+  immediately before the push (check #2)
 - ❌ Pushing past a fresh "paws off" claim from someone else (check #3)
 - ❌ Pushing onto a `do-not-merge` / `hold` PR without asking (check #4)
 - ❌ Pushing while a `@claude` run is mid-session on the branch (check #5)

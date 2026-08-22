@@ -282,6 +282,13 @@
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
             "why": "shared/workflow/learn-from-review-findings.md, from ucdavis/bcs#679. Warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clobbering-push.py\"",
+            "timeout": 20,
+            "script": "no-clobbering-push.py",
+            "why": "shared/workflow/check-before-pushing.md. A branch you cut and whose PR you opened is the one you are least likely to check before pushing to, and claim-pr.md records three ways it gains another agent's commits anyway (the @claude agent's main-sync, a second CLI session, a human). Every recovery procedure in claim-pr.md runs AFTER the collision. DENIES a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word and is never the worse command, clearable with an `ALLOW_FORCE_PUSH=1` prefix for the unsatisfiable-lease case memories/git.md records. WARNS on everything else from a live read-only `git ls-remote` reading taken at push time, and stays silent on a fast-forward. Fails open on parse trouble, outside a repo, and on any network timeout. Tracked as #1883."
           }
         ]
       },

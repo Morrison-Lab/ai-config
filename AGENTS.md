@@ -63,6 +63,23 @@ In every session --- at session start, and again periodically during long sessio
 - **Always use a worktree.**
   When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
 
+## Check the remote immediately before every push
+
+See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
+
+- **Read the remote branch fresh, every time.**
+  Run `git ls-remote --heads origin <branch>` immediately before every `git push` --- read-only, so it cannot itself change what it reports.
+  An earlier `git fetch` is a measurement of a moment that has passed.
+  If the remote tip is not an ancestor of your `HEAD`, another agent is driving the branch: fetch and reconcile, never overwrite.
+- **The branch you own is the one to check hardest.**
+  Ownership is what suppresses the check.
+  The `@claude` agent pushes to your branch on PR activity, a second CLI session can claim the same PR, and a human can push at any time --- none of which appears in your conversation.
+- **Never bare `git push --force`.**
+  Use `git push --force-with-lease --force-if-includes`.
+  The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
+  `--force-if-includes` (git 2.30+) closes that.
+  Bare `--force` is for an *unsatisfiable* lease only (a `stale info` failure after the remote branch was auto-deleted), behind an explicit `ALLOW_FORCE_PUSH=1` prefix.
+
 ## Timestamp recaps in local time
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).

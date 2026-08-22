@@ -59,6 +59,14 @@ SHOULD_WARN = [
      "has it -- the first alone is enough to warn"),
     ("W10", "FOO=1 sed -i 's/a/b/' file.txt",
      "a leading env-assignment is skipped before matching the invocation"),
+    ("W12", "perl -0777pi -e 's/a/b/' file.pl",
+     "slurp mode: -0 takes an octal argument, so -0777 is still the "
+     "in-place flag -- and slurp plus non-global is the worst case of "
+     "the bug this hook exists to catch"),
+    ("W13", "sed -i '1s/a/b/' file.txt",
+     "a numeric line address before the `s`; a word boundary never fires "
+     "between a digit and `s`, so this was missed while the equivalent "
+     "regex-addressed form warned"),
     ("W11", "sed -i 's/a#b/c/' file.txt",
      "a pattern containing ANOTHER delimiter character still matches -- the "
      "lookahead is keyed to the delimiter actually in use, so excluding "
@@ -66,6 +74,14 @@ SHOULD_WARN = [
 ]
 
 SHOULD_STAY_SILENT = [
+    ("S11", "mytool -i 's/a/b/' file.txt",
+     "a command that is neither perl nor sed, despite an -i flag and a "
+     "substitution-shaped argument -- the cmd-word gate is the only thing "
+     "keeping this quiet, so it is what makes that gate testable"),
+    ("S10", "perl -pi -e 's/OLD/NEW/g' lib/s/x/y/z.pm",
+     "the only real substitution is GLOBAL; the path merely LOOKS like a "
+     "second one. Scanning the whole argv fabricated `s/x/y/z` here, which "
+     "is a false claim about what the command does"),
     ("S1", "perl -pi -e 's/a/b/g' file.pl",
      "already carries the `g` flag"),
     ("S2", "sed 's/a/b/' file.txt",
@@ -222,7 +238,11 @@ MUTATIONS = {
         "a command whose leading word is not perl/sed must never be "
         "treated as carrying the in-place flag",
         [("    return False", "    return True")],
-        {"S3", "S4"},
+        # S3/S4 (a git/gh command merely MENTIONING the pattern) stopped
+        # discriminating this clause once _script_args landed: a subcommand
+        # name is not script text, so they stay silent even with the gate
+        # reverted. S11 is the case that isolates the gate itself.
+        {"S11"},
     ),
     "M2_perl_real_flag": (
         "perl's -i must be a GENUINE bundled flag, not any perl "
@@ -245,7 +265,7 @@ MUTATIONS = {
         [('        if "g" not in flags and not any(c.isdigit() for c in '
           'flags):\n            out.append((m.group(0), flags))',
           "        out.append((m.group(0), flags))")],
-        {"S1", "S5"},
+        {"S1", "S5", "S10"},
     ),
     "M5_heredoc_blanking": (
         "a heredoc body is blanked before parsing, so a MENTION inside one "
@@ -265,8 +285,28 @@ MUTATIONS = {
     "M7_s_prefix_required": (
         "a substitution must be introduced by a literal `s`, not merely "
         "three delimiter-shaped characters",
-        [(r'r"\bs(?P<delim>["', r'r"(?P<delim>["')],
+        [(r'r"(?<![A-Za-z_])s(?P<delim>["', r'r"(?P<delim>["')],
         {"S9"},
+    ),
+    "M8_script_args_only": (
+        "the substitution scan must see only script text, never a filename "
+        "argument, or a path can fabricate a substitution the command does "
+        "not contain",
+        [('_script_args(rest[1:])', 'rest[1:]')],
+        {"S10"},
+    ),
+    "M10_left_anchor_allows_digit": (
+        "the left anchor must refuse an identifier character but ACCEPT a "
+        "digit, so a numeric sed line address still reads as a substitution",
+        [(r'r"(?<![A-Za-z_])s(?P<delim>["', r'r"\bs(?P<delim>["')],
+        {"W13"},
+    ),
+    "M9_perl_octal_zero_flag": (
+        "perl's -0 takes an optional octal argument, so -0777 must still "
+        "read as carrying the in-place flag",
+        [(r'r"^-(?:[np]|0[0-7]*)*i(?:[npi]|0[0-7]*)*(\.\S*)?$"',
+          r'r"^-[0np]*i[0npi]*(\.\S*)?$"')],
+        {"W12"},
     ),
 }
 

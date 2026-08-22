@@ -115,7 +115,13 @@ def _simple_commands(cmd):
 # Perl's -i (in-place), bundled only among these NO-ARGUMENT flag letters, so
 # an argument-taking flag's ATTACHED value (`-Ilib`, `-e'...'`) is never
 # mistaken for the flag itself. See "What this deliberately does NOT match".
-_PERL_INPLACE_CLUSTER = re.compile(r"^-[0np]*i[0npi]*(\.\S*)?$")
+# `-0` takes an optional OCTAL argument attached to it (`-0777` is the
+# standard slurp-mode idiom), so a digit run after a `0` belongs to that
+# flag rather than being a separate letter. Accepting only a bare `0`
+# missed `perl -0777pi -e 's/a/b/'` entirely -- slurp mode plus a
+# non-global substitution being the worst-case form of the bug this hook
+# exists to catch.
+_PERL_INPLACE_CLUSTER = re.compile(r"^-(?:[np]|0[0-7]*)*i(?:[npi]|0[0-7]*)*(\.\S*)?$")
 
 # sed's -i, optionally bundled with -n (quiet). BSD sed's mandatory backup-
 # extension argument, when given as a separate empty-string token
@@ -150,8 +156,14 @@ _DELIMS = "/|#,~^!@"
 # The lookahead stays keyed to the ACTUAL delimiter rather than excluding
 # every delimiter character. `s/a#b/c/` is a real substitution whose pattern
 # contains a `#`, and a blanket `[^` + _DELIMS + `\\]` would stop matching it.
+# `\b` was too weak on the left: between a digit and `s` there is no word
+# boundary, so a line-addressed `sed -i '1s/a/b/'` was missed while the
+# regex-addressed `/foo/s/a/b/` warned -- inconsistent coverage of the same
+# construct. An explicit "not preceded by an identifier character" refuses
+# the same things `\b` did (`pass/a/b/` is not a substitution) and accepts a
+# numeric address.
 _SUBST_RE = re.compile(
-    r"\bs(?P<delim>[" + _DELIMS + r"])"
+    r"(?<![A-Za-z_])s(?P<delim>[" + _DELIMS + r"])"
     r"(?:\\.|(?!(?P=delim))[^\\])*"
     r"(?P=delim)"
     r"(?:\\.|(?!(?P=delim))[^\\])*"
@@ -175,6 +187,48 @@ def _non_global_matches(text):
     return out
 
 
+def _script_args(args):
+    """The tokens of ARGS that are sed/perl SCRIPT text, never filenames.
+
+    Scanning the whole joined argv fabricates substitutions out of paths: a
+    file named `lib/s/x/y/z.pm` contains the literal `s/x/y/z`, so
+    `perl -pi -e 's/OLD/NEW/g' lib/s/x/y/z.pm` -- whose only real
+    substitution IS global -- was reported as carrying a non-global one.
+    Warning about a substitution the command does not contain is the exact
+    false claim this hook's own contract rules out, so the scan is narrowed
+    to where a script can actually appear:
+
+      * the argument to `-e` / `-E` / `--expression`, attached or separate;
+      * failing any of those, the first remaining non-flag token, which is
+        how `sed -i 's/a/b/' file.txt` supplies its script.
+
+    Under-reading is the safe direction here, matching the rest of the file:
+    a missed exotic invocation costs a warning, a fabricated one costs
+    trust in every warning.
+    """
+    script, saw_e_flag, i = [], False, 0
+    while i < len(args):
+        arg = args[i]
+        if arg in ("-e", "-E", "--expression"):
+            saw_e_flag = True
+            if i + 1 < len(args):
+                script.append(args[i + 1])
+            i += 2
+            continue
+        for prefix in ("-e", "-E", "--expression="):
+            if arg.startswith(prefix) and len(arg) > len(prefix):
+                saw_e_flag = True
+                script.append(arg[len(prefix):])
+                break
+        i += 1
+    if script or saw_e_flag:
+        return script
+    for arg in args:
+        if not arg.startswith("-"):
+            return [arg]
+    return []
+
+
 def find_offenses(command):
     """[(cmd_word, segment_text, matched_subst, flags), ...] for every
     perl/sed -i invocation in COMMAND carrying a non-global substitution."""
@@ -193,7 +247,9 @@ def find_offenses(command):
         cmd_word = rest[0].split("/")[-1]
         if not _has_inplace_flag(cmd_word, rest[1:]):
             continue
-        segment_text = " ".join(rest)
+        segment_text = " ".join(_script_args(rest[1:]))
+        if not segment_text:
+            continue
         for matched, flags in _non_global_matches(segment_text):
             out.append((cmd_word, segment_text, matched, flags))
     return out

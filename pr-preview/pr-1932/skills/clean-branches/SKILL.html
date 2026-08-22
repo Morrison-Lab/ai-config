@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Clean dead or stale Git branches.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#clean-branches-aka-cb-prune" id="toc-clean-branches-aka-cb-prune" class="nav-link active" data-scroll-target="#clean-branches-aka-cb-prune">Clean Branches (aka CB / prune)</a>
+  <ul class="collapse">
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#scope-local-and-remote" id="toc-scope-local-and-remote" class="nav-link" data-scroll-target="#scope-local-and-remote">Scope: local AND remote</a></li>
+  <li><a href="#definitions" id="toc-definitions" class="nav-link" data-scroll-target="#definitions">Definitions</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#detect-the-forge" id="toc-detect-the-forge" class="nav-link" data-scroll-target="#detect-the-forge">1. Detect the forge</a></li>
+  <li><a href="#fetch-and-list-remote-branches" id="toc-fetch-and-list-remote-branches" class="nav-link" data-scroll-target="#fetch-and-list-remote-branches">2. Fetch and list remote branches</a></li>
+  <li><a href="#classify-each-branch" id="toc-classify-each-branch" class="nav-link" data-scroll-target="#classify-each-branch">3. Classify each branch</a></li>
+  <li><a href="#present-the-plan-dry-run" id="toc-present-the-plan-dry-run" class="nav-link" data-scroll-target="#present-the-plan-dry-run">4. Present the plan (dry run)</a></li>
+  <li><a href="#delete-dead-branches" id="toc-delete-dead-branches" class="nav-link" data-scroll-target="#delete-dead-branches">5. Delete dead branches</a></li>
+  <li><a href="#rebase-stale-branches" id="toc-rebase-stale-branches" class="nav-link" data-scroll-target="#rebase-stale-branches">6. Rebase stale branches</a></li>
+  <li><a href="#open-mrs-for-orphaned-stale-branches" id="toc-open-mrs-for-orphaned-stale-branches" class="nav-link" data-scroll-target="#open-mrs-for-orphaned-stale-branches">7. Open MRs for orphaned stale branches</a></li>
+  <li><a href="#prune-local-branches" id="toc-prune-local-branches" class="nav-link" data-scroll-target="#prune-local-branches">8. Prune local branches</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">9. Report</a></li>
+  </ul></li>
+  <li><a href="#safety-rules" id="toc-safety-rules" class="nav-link" data-scroll-target="#safety-rules">Safety rules</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/clean-branches/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/clean-branches/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="clean-branches-aka-cb-prune" class="level1">
+<h1>Clean Branches (aka CB / prune)</h1>
+<p>Audit branches in the current repo — <strong>both your local checkout and the remote</strong>. Delete dead ones, rebase stale ones, open MRs for orphaned work, and sweep up local-only stragglers — all without disrupting active sessions.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>User says “clean branches”, “cb”, “prune”, “prune branches”, “tidy up branches”</li>
+<li>User says “clear dead branches”, “clean up the repo”</li>
+<li>User says “what branches can we delete?”</li>
+</ul>
+</section>
+<section id="scope-local-and-remote" class="level2">
+<h2 class="anchored" data-anchor-id="scope-local-and-remote">Scope: local AND remote</h2>
+<p>Prune in both places — they accumulate junk independently:</p>
+<ul>
+<li><strong>Remote</strong> branches — dead/stale/orphaned remote refs (the bulk of this skill).</li>
+<li><strong>Local</strong> branches — branches that linger in your checkout after their PR merged, or whose upstream remote was deleted (<code>[gone]</code>). The remote pass alone won’t catch a local branch whose remote is already gone, so there’s a dedicated local pass (step 8).</li>
+</ul>
+</section>
+<section id="definitions" class="level2">
+<h2 class="anchored" data-anchor-id="definitions">Definitions</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 35%">
+<col style="width: 35%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Criteria</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Dead</strong></td>
+<td>Purely behind main (no unique commits ahead), no open MR, no linked issue, not created in the last 7 days</td>
+<td>Delete</td>
+</tr>
+<tr class="even">
+<td><strong>Stale</strong></td>
+<td>Has unique commits ahead of main but is behind main, no recent activity (&gt;30 days), not actively being worked on</td>
+<td>Rebase on main, open MR if none exists</td>
+</tr>
+<tr class="odd">
+<td><strong>Active</strong></td>
+<td>Has an open MR, linked issue, recent commits (&lt;30 days), or a claim comment</td>
+<td>Skip — don’t touch</td>
+</tr>
+<tr class="even">
+<td><strong>New</strong></td>
+<td>Created in the last 7 days</td>
+<td>Skip — too fresh to judge</td>
+</tr>
+<tr class="odd">
+<td><strong>Local merged</strong></td>
+<td><em>Local</em> branch fully merged into main, or whose PR merged (upstream <code>[gone]</code>)</td>
+<td>Delete locally (<code>git branch -d</code>) — step 8</td>
+</tr>
+<tr class="even">
+<td><strong>Local-only unpushed</strong></td>
+<td><em>Local</em> branch with unique commits, never pushed, no MR</td>
+<td>Flag — ask before touching (step 8)</td>
+</tr>
+</tbody>
+</table>
+<p>The first four rows apply to <strong>remote</strong> branches (steps 1–7); the last two are the <strong>local</strong> pass (step 8). A branch can need both — e.g.&nbsp;delete the remote ref <em>and</em> the leftover local tracking branch.</p>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="detect-the-forge" class="level3">
+<h3 class="anchored" data-anchor-id="detect-the-forge">1. Detect the forge</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> remote get-url origin</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Determine GitHub (<code>gh</code>) vs GitLab (<code>glab</code>).</p>
+</section>
+<section id="fetch-and-list-remote-branches" class="level3">
+<h3 class="anchored" data-anchor-id="fetch-and-list-remote-branches">2. Fetch and list remote branches</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch <span class="at">--prune</span> origin</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">-r</span> <span class="at">--merged</span> origin/main <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-v</span> <span class="st">'origin/main\|origin/HEAD'</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">-r</span> <span class="at">--no-merged</span> origin/main</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>First separate real remote branches from stray ref namespaces, or the sweep’s scope is wrong from its first command.</strong> A one-off <code>git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'</code> writes refs that no configured refspec matches, so nothing updates them and <code>--prune</code> never touches them — but <code>git branch -r</code> counts them anyway.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> config <span class="at">--get-all</span> remote.origin.fetch                                  <span class="co"># what is tracked</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname)'</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-v</span> <span class="st">'^refs/remotes/origin/'</span>  <span class="co"># what is not</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Anything outside the tracked namespace is local cruft rather than a branch: <code>git push origin --delete</code> cannot touch it, and it belongs in a separate <code>git update-ref --stdin</code> sweep, not in the plan below.</p>
+<p><strong>Write ref patterns with <code>**</code>, because a single <code>*</code> does not cross a slash.</strong> <code>git for-each-ref 'refs/remotes/origin/*'</code> silently omits every slash-named branch — <code>feat/</code>, <code>fix/</code>, <code>claude/</code> — which is every branch anyone named conventionally, including the ones carrying open PRs. Nothing errors; the count merely comes back smaller and entirely plausible. Note this is the <strong>opposite</strong> of pathspec matching, where <code>*</code> does cross a slash; see <code>memories/git.md</code>, “A ref pattern is not a pathspec”.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short)'</span> <span class="st">'refs/remotes/origin/**'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Give the enumeration a control before trusting a total: confirm a known slash-named branch appears in the output. A shortfall here is indistinguishable from a tidy repo.</p>
+</section>
+<section id="classify-each-branch" class="level3">
+<h3 class="anchored" data-anchor-id="classify-each-branch">3. Classify each branch</h3>
+<p>For each remote branch (excluding <code>main</code>, <code>HEAD</code>, protected branches):</p>
+<section id="a.-check-if-its-purely-behind-main-mergeddead" class="level4">
+<h4 class="anchored" data-anchor-id="a.-check-if-its-purely-behind-main-mergeddead">a. Check if it’s purely behind main (merged/dead)</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Commits on branch not on main (ahead count)</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> rev-list <span class="at">--count</span> origin/main..origin/<span class="op">&lt;</span>branch<span class="op">&gt;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># If 0 → branch is purely behind main (already merged or never diverged)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="b.-check-recency" class="level4">
+<h4 class="anchored" data-anchor-id="b.-check-recency">b. Check recency</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="at">-1</span> <span class="at">--format</span><span class="op">=</span><span class="st">'%ci'</span> origin/<span class="op">&lt;</span>branch<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Skip if created/last-committed within the last 7 days (too new).</p>
+</section>
+<section id="c.-check-for-open-mrpr" class="level4">
+<h4 class="anchored" data-anchor-id="c.-check-for-open-mrpr">c.&nbsp;Check for open MR/PR</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr list <span class="at">--source-branch</span><span class="op">=&lt;</span>branch<span class="op">&gt;</span> 2<span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">cat</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--head</span><span class="op">=&lt;</span>branch<span class="op">&gt;</span> --json number,title,state <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If an open MR exists → <strong>Active</strong>, skip.</p>
+<p><strong>Fetch every PR once and match locally, rather than querying per branch.</strong> A sweep of N branches costs N API round-trips this way, which is slow and rate-limit-prone at repo scale; one call answers for all of them, and it also supplies the <em>merged</em> and <em>closed-unmerged</em> states that b and f need.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> all <span class="at">--limit</span> 2000 <span class="dt">\</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,headRefName,state,mergedAt,url,title <span class="op">&gt;</span> /tmp/all-prs.json   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Then index by <code>headRefName</code> and look each branch up in memory. Raise <code>--limit</code> above the repo’s total PR count and check the returned length against it — a silently truncated list marks live branches as having no PR, which is the one error in this sweep that deletes something.</p>
+</section>
+<section id="d.-check-for-linked-issues" class="level4">
+<h4 class="anchored" data-anchor-id="d.-check-for-linked-issues">d.&nbsp;Check for linked issues</h4>
+<p>Look for branch naming patterns that reference issues: - <code>fix/123-*</code>, <code>feat/123-*</code>, <code>issue-123-*</code> → check if issue #123 is open - If the linked issue is open → <strong>Active</strong>, skip</p>
+</section>
+<section id="e.-check-for-active-work-claims" class="level4">
+<h4 class="anchored" data-anchor-id="e.-check-for-active-work-claims">e. Check for active work claims</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Look for recent "working on this" / claim comments on any linked MR/issue</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If a claim comment exists within the last 24 hours → <strong>Active</strong>, skip. This window is deliberately wider than <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>’s 2-hour claim expiration: that rule decides who may <em>start work</em>, where the cost of over-respecting a dead claim is a wait; this check gates branch <em>deletion</em>, which is destructive, so it errs further toward keeping.</p>
+</section>
+<section id="f.-if-the-pr-closed-unmerged-diff-the-branch-against-main-before-believing-it" class="level4">
+<h4 class="anchored" data-anchor-id="f.-if-the-pr-closed-unmerged-diff-the-branch-against-main-before-believing-it">f.&nbsp;If the PR closed unmerged, diff the branch against main before believing it</h4>
+<p>Check c only asks whether an <strong>open</strong> PR exists, so a branch whose PR closed unmerged falls straight through to a delete classification. That is right for an abandoned branch and wrong for a superseded one, because a closure rationale describes the PR’s <strong>stated purpose</strong>, not an inventory of its diff. “Superseded by #260, all review findings addressed” is a claim about the feature; it says nothing about an unrelated fix that happened to share the branch.</p>
+<p>The gap is easy to miss in exactly the case that matters, since the rationale is usually accurate about the thing it names, and the leftover work is by definition the part nobody was talking about. Nothing else flags it either: <code>git branch -d</code> consults the upstream rather than <code>main</code> (see the safety rules below), the superseding PR merged and closed the issue, and the tracker looks clean.</p>
+<p>So for any branch whose PR closed <strong>unmerged</strong>, compare the files rather than reading the closure comment:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--head</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span> --state closed <span class="dt">\</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,title,mergedAt,url <span class="kw">|</span> <span class="fu">cat</span>                     <span class="co"># LIST_PRS</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr diff <span class="op">&lt;</span>N<span class="op">&gt;</span> --name-only                                   <span class="co"># DIFF_PR</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> diff <span class="at">--stat</span> origin/main...origin/<span class="op">&lt;</span>branch<span class="op">&gt;</span>                <span class="co"># what is still unlanded</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>mergedAt: null</code> on a closed PR is the trigger. Then diff each file the branch touched against <code>main</code>; anything still absent is unlanded work, and the branch is <strong>Stale</strong>, not Dead — rebase it and open an MR (steps 6–7), or file an issue for the salvageable part and say so in the plan before deleting.</p>
+<p>Weight the check by how far the branch’s contents stray from its title: a branch carrying commits unrelated to the PR that named it is the shape this catches. <code>rescue-closed</code> is the deliberate, whole-tracker version of the same sweep; this is the minimum owed before a deletion.</p>
+<p>(2026-07-29: a bcs branch closed as superseded still carried an orthogonal out-of-memory fix — <code>geepack::geeglm</code> replaced by <code>glm</code> + <code>sandwich::vcovCL</code> — that the superseding privacy redesign never touched. Deleting on the closure rationale would have discarded it silently; filed instead as <code>ucdavis/bcs#466</code>.)</p>
+<p><strong>Once you have found unlanded work, the deliverable is a tracking issue — not keeping the branch.</strong> On GitHub the branch is not the only copy: <code>refs/pull/N/head</code> is retained permanently and still resolves after the head branch is deleted. So the choice is not “delete or preserve”, it is “record or lose track of”, which is a much easier call and lets the sweep finish.</p>
+<p>Verify rather than assume, since it is one call per PR, then put the recovery command in the issue:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> ls-remote origin <span class="st">'refs/pull/&lt;N&gt;/head'</span>    <span class="co"># should equal the branch tip</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin refs/pull/<span class="op">&lt;</span>N<span class="op">&gt;</span>/head</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout <span class="at">-b</span> recover/<span class="op">&lt;</span>N<span class="op">&gt;</span> FETCH_HEAD</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>An issue naming what was unlanded, how much of it, and that command is strictly more useful than a stale branch nobody will revisit — and unlike the branch, it appears in the tracker. (2026-08-02, <code>Morrison-Lab/ai-config</code>: six closed-unmerged branches carried work absent from <code>main</code>; every <code>refs/pull/N/head</code> resolved and matched its branch tip exactly, so all six were deleted after the two substantial ones were filed as #1062 and #1063.)</p>
+</section>
+</section>
+<section id="present-the-plan-dry-run" class="level3">
+<h3 class="anchored" data-anchor-id="present-the-plan-dry-run">4. Present the plan (dry run)</h3>
+<p>Before taking any action, present a table to the user:</p>
+<pre><code>## Branch Cleanup Plan
+
+| Branch | Last commit | Status | Action |
+|--------|-------------|--------|--------|
+| `old-feature` | 2025-03-15 | Dead (merged) | 🗑️ Delete |
+| `wip-refactor` | 2025-11-20 | Stale (45 days, no MR) | 🔄 Rebase + open MR |
+| `fix/42-typo` | 2026-06-15 | Active (open MR !80) | ⏭️ Skip |
+| `experiment` | 2026-06-12 | New (&lt;7 days) | ⏭️ Skip |
+
+Proceed? (or pick specific branches to act on)</code></pre>
+<p>Wait for user confirmation before proceeding. If user says “just go” or “do it”, proceed with all proposed actions.</p>
+</section>
+<section id="delete-dead-branches" class="level3">
+<h3 class="anchored" data-anchor-id="delete-dead-branches">5. Delete dead branches</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push origin <span class="at">--delete</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span>   <span class="co"># DELETE_REF</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Also clean up local tracking branches:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">-d</span> <span class="op">&lt;</span>local-tracking-branch<span class="op">&gt;</span>  <span class="co"># if it exists locally</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="rebase-stale-branches" class="level3">
+<h3 class="anchored" data-anchor-id="rebase-stale-branches">6. Rebase stale branches</h3>
+<p>For each stale branch:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout <span class="at">-B</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span> origin/<span class="op">&lt;</span>branch<span class="op">&gt;</span>   <span class="co"># -B (not -b) force-resets if the branch already exists locally</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> rebase origin/main</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If rebase has conflicts: - Attempt to resolve automatically (see the <code>resolve-conflicts</code> skill — consolidate both sides, don’t blind-pick) - If conflicts are non-trivial, skip this branch and report it - Don’t force-push a broken rebase</p>
+<p>If rebase succeeds:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">--force-with-lease</span> origin <span class="op">&lt;</span>branch<span class="op">&gt;</span>   <span class="co"># PUSH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="open-mrs-for-orphaned-stale-branches" class="level3">
+<h3 class="anchored" data-anchor-id="open-mrs-for-orphaned-stale-branches">7. Open MRs for orphaned stale branches</h3>
+<p>For stale branches that have no open MR after rebasing:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab — assign to the current glab user (override ASSIGNEE to assign someone else)</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="va">ASSIGNEE</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">glab</span> api user <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">|</span> <span class="ex">python3</span> <span class="at">-c</span> <span class="st">"import json,sys; print(json.load(sys.stdin)['username'])"</span><span class="va">)</span><span class="st">"</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr create <span class="at">--source-branch</span><span class="op">=&lt;</span>branch<span class="op">&gt;</span> --target-branch=main <span class="dt">\</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--title</span> <span class="st">"&lt;inferred title from branch name&gt;"</span> <span class="dt">\</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--description</span> <span class="st">"Orphaned branch rebased onto main. Review or close if no longer needed."</span> <span class="dt">\</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="va">${ASSIGNEE</span><span class="op">:+</span>--assignee <span class="st">"</span><span class="va">$ASSIGNEE</span><span class="st">"</span><span class="va">}</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr create <span class="at">--head</span><span class="op">=&lt;</span>branch<span class="op">&gt;</span> --base=main <span class="dt">\</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--title</span> <span class="st">"&lt;inferred title&gt;"</span> <span class="dt">\</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--body</span> <span class="st">"Orphaned branch rebased onto main. Review or close if no longer needed."</span>   <span class="co"># CREATE_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="prune-local-branches" class="level3">
+<h3 class="anchored" data-anchor-id="prune-local-branches">8. Prune local branches</h3>
+<p>The remote pass doesn’t touch branches that only exist in your checkout. Sweep those too. First refresh remote-tracking state so “merged” and “gone” are accurate:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch <span class="at">--prune</span> origin                       <span class="co"># marks deleted upstreams as [gone]</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">--show-current</span>                      <span class="co"># never delete the branch you're on</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>The <code>--prune</code> is a prerequisite, not a refresh — without it step b finds nothing and reports success.</strong> <code>[gone]</code> is produced <em>by</em> pruning, not by the branch being deleted upstream: until a prune runs, <code>%(upstream:track)</code> is empty for exactly the branches b exists to find, so its <code>grep</code> matches zero rows and the sweep says there is nothing to clean. The “nothing found” and “never ran” paths print the same thing, so never take a zero-row result as clean unless this fetch actually ran in this sweep.</p>
+<p>Recommend the standing setting once, since it makes every other tool’s view correct too — but keep the explicit <code>--prune</code> above regardless, so the sweep does not depend on the user’s config:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> config <span class="at">--global</span> fetch.prune true          <span class="co"># or per-remote:</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> config <span class="at">--global</span> remote.origin.prune true</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That setting only prunes <code>refs/remotes/origin/*</code>. It never deletes a local branch, so it replaces none of the steps below.</p>
+<p>Classify each <strong>local</strong> branch (excluding <code>main</code>/<code>master</code>/protected and the current branch):</p>
+<section id="a.-merged-into-main-delete" class="level4">
+<h4 class="anchored" data-anchor-id="a.-merged-into-main-delete">a. Merged into main → delete</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">--merged</span> origin/main <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-vE</span> <span class="st">'^\s*\*|^\s*main\s*$|^\s*master\s*$'</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Line-anchored so only the literal `main`/`master` lines (and the current `*`</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="co"># branch) are excluded — a branch like `maintain-docs` or `feature-main-menu`</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="co"># is NOT silently filtered out.</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Compare against origin/main (just fetched), NOT local `main` — your local main</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="co"># may be behind, which would hide branches that are actually merged.</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">-d</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span>          <span class="co"># -d refuses if NOT actually merged — a safety net</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>-d</code> (never <code>-D</code>) is deliberate: if git refuses, the branch has unmerged commits — treat it as <strong>stale</strong>, not dead (see b).</p>
+</section>
+<section id="b.-upstream-gone-but-the-pr-merged-delete" class="level4">
+<h4 class="anchored" data-anchor-id="b.-upstream-gone-but-the-pr-merged-delete">b. Upstream gone but the PR merged → delete</h4>
+<p>A branch whose remote was deleted shows <code>[gone]</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short) %(upstream:track)'</span> refs/heads <span class="dt">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="st">'\[gone\]'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>For each, confirm the PR/MR actually merged before deleting (never assume):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--head</span> <span class="op">&lt;</span>branch<span class="op">&gt;</span> --state merged <span class="at">--json</span> number,mergedAt <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># LIST_PRS</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr list <span class="at">--source-branch</span><span class="op">=&lt;</span>branch<span class="op">&gt;</span> --state merged <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">cat</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li>PR merged → <code>git branch -D &lt;branch&gt;</code> is acceptable here (the work landed via squash/rebase merge, so <code>-d</code> may not see it as merged). Confirm the merge first.</li>
+<li>No merged PR and unique commits exist → <strong>stale local work</strong>: don’t delete; offer to push it and open an MR (step 7 mechanics).</li>
+</ul>
+<p><strong>Read the PR, not local ancestry, to decide whether the work landed.</strong> In a repo that squash-merges — <code>ucdavis/bcs</code> and <code>Morrison-Lab/ai-config</code> both do — a branch whose work is already on <code>main</code> still reports a non-zero ahead-count, is not an ancestor of <code>main</code>, is absent from <code>git branch --merged</code>, and is refused by <code>git branch -d</code>. All four say “unmerged” about a branch that merged, because the squash commit is a different commit. So treat a <code>-d</code> refusal as <em>unproven</em>, never as evidence the branch holds unique local work — that is what the merged-PR lookup above is for, and why <code>-D</code> is the right tool once it comes back positive.</p>
+<p>The converse still holds and is what keeps this safe: no merged PR <strong>and</strong> unique commits means the work may exist nowhere else, so it is never deleted without confirmation. When the PR lookup is inconclusive, check content rather than ancestry, since content survives a squash:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> show origin/main:<span class="op">&lt;</span>path<span class="op">&gt;</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="op">&lt;</span>something-the-branch-added<span class="op">&gt;</span>   <span class="co"># did it land?</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="c.-never-pushed-has-unique-commits-keep-but-flag" class="level4">
+<h4 class="anchored" data-anchor-id="c.-never-pushed-has-unique-commits-keep-but-flag">c.&nbsp;Never pushed, has unique commits → keep, but flag</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short) %(upstream)'</span> refs/heads <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'$2=="" {print $1}'</span>      <span class="co"># local branches with no upstream at all</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Report these as “local-only, unpushed” and ask before doing anything — they may be in-progress work that hasn’t been pushed yet. Don’t delete without confirmation.</p>
+<p>Apply the same dry-run discipline to local deletions as step 4 does for remote branches — <strong>no silent local deletions</strong>. If you’re doing a full local+remote sweep, fold these local rows into the step-4 plan and present them together; if you’re running the local pass on its own, present a standalone local plan here and wait for confirmation before deleting anything.</p>
+</section>
+</section>
+<section id="report" class="level3">
+<h3 class="anchored" data-anchor-id="report">9. Report</h3>
+<p>Print a summary covering <strong>both</strong> local and remote:</p>
+<pre><code>## Branch Cleanup Complete — &lt;timestamp&gt;
+
+### Deleted — remote (dead)
+- `old-feature` (last commit 2025-03-15, merged into main)
+
+### Deleted — local (merged / upstream gone)
+- `add-wrap-up-skill` (PR #26 merged; local straggler)
+- `ums-session-learnings` (merged into main)
+
+### Rebased + MR opened (stale)
+- `wip-refactor` → [!85](url) (rebased, 3 commits ahead)
+
+### Skipped (active/new)
+- `fix/42-typo` — open MR !80
+- `experiment` — created 2 days ago
+
+### Flagged — local-only, unpushed (left alone)
+- `scratch-idea` — 4 unpushed commits, no MR; your call
+
+### Failed (conflicts)
+- `ancient-branch` — rebase conflicts, needs manual resolution</code></pre>
+</section>
+</section>
+<section id="safety-rules" class="level2">
+<h2 class="anchored" data-anchor-id="safety-rules">Safety rules</h2>
+<ul>
+<li><strong>A merged PR settles that the work landed — stop measuring there.</strong> The content checks above exist for branches whose fate is <em>unknown</em>. Once <code>gh pr list --state merged</code> names a PR for the branch, residual differences against <code>main</code> are the branch’s pre-review draft versus the post-review text that actually merged, and mean nothing about safety. Measuring anyway invents doubt about the one case that is already certain: in a 2026-08-02 sweep, 47 of 50 local branches had merged PRs and several scored under 90% on a line-presence check purely because review had reworded them.</li>
+<li><strong>A GitHub branch is never the only copy of a PR’s work.</strong> <code>refs/pull/N/head</code> is retained permanently and resolves after the head branch is deleted, so “delete the branch” and “lose the work” are different events on GitHub. This does not weaken the local-only rule below — a branch that was <strong>never pushed</strong> has no PR ref behind it, and that is exactly the case that needs confirmation.</li>
+<li><strong>Never delete <code>main</code>, <code>master</code>, <code>develop</code>, or any protected branch.</strong></li>
+<li><strong>Never force-push to a branch with an open MR</strong> without rebasing cleanly.</li>
+<li><strong>Always present the plan first</strong> — no silent deletions.</li>
+<li><strong>Check for active work</strong> before touching any branch.</li>
+<li><strong>Preserve local branches</strong> the user is currently on (<code>git branch --show-current</code>).</li>
+<li><strong>Don’t delete branches newer than 7 days</strong> — they might be in-progress work that just hasn’t gotten an MR yet.</li>
+<li><strong>Prefer <code>git branch -d</code> over <code>-D</code></strong> for local deletions — <code>-d</code> refuses unless the branch is merged, which catches “I thought this landed but it didn’t.” Only use <code>-D</code> after confirming the PR merged (squash/rebase merges can leave a local branch that <code>-d</code> won’t recognize as merged).</li>
+<li><strong>Don’t read a successful <code>-d</code> as proof the work reached <code>main</code>.</strong> Per <code>git-branch(1)</code>, the branch must be fully merged “in its upstream branch, or in HEAD if no upstream was set”. So a branch still tracking a live <code>origin/&lt;name&gt;</code> passes on the <em>upstream</em> check alone, printing <code>warning: deleting branch 'X' that has been merged to 'refs/remotes/origin/X', but not yet merged to HEAD.</code> Only a <code>[gone]</code> upstream falls back to the HEAD comparison. Both outcomes are routine in one sweep (18 <code>-d</code> / 11 <code>-D</code> across 29 branches in one 2026-07-29 run), so whether <code>-d</code> sufficed or <code>-D</code> was required is not a classification signal — step 3 is.</li>
+<li><strong>Never delete a local-only unpushed branch without confirmation</strong> — if it has unique commits and no remote, that work exists nowhere else.</li>
+</ul>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
+<ul>
+<li><p><strong><code>sync-pr-branch</code></strong> — used internally when rebasing stale branches</p></li>
+<li><p><strong><code>claim-pr</code></strong> — checked to avoid touching claimed branches</p></li>
+<li><p><strong><code>ardi</code></strong> — user may want to ARDI the newly opened MRs afterward</p></li>
+<li><p><strong><code>clean-worktrees</code> / <code>cw</code></strong> — the worktree counterpart. This skill sweeps <em>branches</em>; that one sweeps the <em>worktrees</em> a branch is checked out into. Run both so neither a dead worktree nor an orphaned branch lingers.</p></li>
+<li><p><strong><code>clean-git</code></strong> — the combined sweep. Runs <code>clean-worktrees</code> first, then this skill, because a branch held by a worktree cannot be deleted.</p></li>
+</ul>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<ul>
+<li>❌ Deleting branches without checking for open MRs/issues first</li>
+<li>❌ Force-pushing a broken rebase</li>
+<li>❌ Touching branches that someone is actively working on</li>
+<li>❌ Deleting branches without user confirmation</li>
+<li>❌ Rebasing branches that have open MRs (use merge instead, or skip)</li>
+</ul>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/clean-branches/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/clean-branches/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

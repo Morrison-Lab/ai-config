@@ -302,9 +302,29 @@ other:
   predicate opens, not a generic input the narrower, correct predicate was
   never going to catch either way.
 
-A control asserting a property of the fixture is not a control on the
-predicate, and it survives both mutations for the same reason it proves
-nothing under either: it never runs the code under test at all.
+Each mutation catches exactly one side, and "run both directions" is easy
+to over-generalize into a claim about the wrong side --- the version this
+section shipped with the first time, until review caught it:
+
+```
+                        revert (fires on nothing)   over-broaden (fires on everything)
+positive fixture        should now FAIL             should still pass
+(bad input -> caught)
+negative control        still passes                should now FAIL
+(benign -> not caught)
+```
+
+A positive fixture is blind to over-broadening: it already expects to be
+caught, so widening the predicate cannot break it.
+A negative control is blind to revert, the opposite way: with the
+predicate gone, nothing is caught, so a benign case stays correctly
+un-caught whether the control ever sat on the predicate's real boundary or
+not --- a well-targeted control and an inert one look identical under
+revert.
+Only over-broadening can tell them apart.
+A control asserting a property of the fixture rather than of the predicate
+is the extreme case of inert: it proves nothing under either mutation,
+because it never runs the code under test at all.
 That reads as rigor --- the comment above it usually says exactly what
 property it is isolating --- which is what makes it the harder of the two
 gaps to catch by reading rather than by mutating.
@@ -312,11 +332,16 @@ gaps to catch by reading rather than by mutating.
 - **Do:** run both mutations --- revert, and over-broaden --- on every
   predicate a fix adds that decides between two outcomes.
 - **Do:** build the over-broaden fixture to sit in the specific gap the
-  wider predicate opens.
-- **Do:** confirm a negative control fails when the predicate under test is
-  mutated, not only that the fixture contains what its comment claims.
+  wider predicate opens, since that is also the fixture a negative control
+  needs to prove itself against.
+- **Do:** confirm a negative control fails under the over-broaden mutation
+  specifically, not only that the fixture contains what its comment
+  claims.
 - **Don't:** read "the revert-mutation failed" as mutation-tested; it is
   half of it.
+- **Don't:** expect a negative control to fail under revert --- a benign
+  case stays uncaught whether the predicate exists or not, so that
+  direction cannot distinguish a real control from an inert one.
 - **Don't:** trust a control whose assertion is about the fixture's
   contents rather than about what the predicate does with them.
 

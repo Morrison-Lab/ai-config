@@ -80,6 +80,57 @@ case.)
   parameter or flag for the branch, and that's a judgment call, not an
   automatic win.
 
+## A fix for restated-fact drift can reintroduce it inside its own diff
+
+The checks above are about facts already restated when you read the
+diff.
+This is a narrower trap that surfaces only inside a PR whose whole
+purpose is removing that duplication: the fix itself can restate the
+fact once more, in the copy being fixed, without also updating every
+sibling the fact lives in.
+
+The new sentence does not read as a fresh restatement.
+It reads as an ordinary caveat or clarification added while editing
+one file, so nothing marks it as the same category of defect the PR
+exists to close.
+
+- **Do:** before pushing a fix for restated-fact drift, diff the
+  fixed copy against every sibling the fact appears in, and check
+  whether the fix itself only touched one.
+- **Do:** ask, of any new sentence added to the file being fixed,
+  whether it states a fact that also lives in a sibling copy.
+- **Don't:** trust that fixing the drift you found rules out adding
+  new drift in the same diff.
+- **Don't:** read "this PR is about de-duplication" as evidence the
+  PR's own additions are free of duplication.
+
+**A mechanised guard built to catch this class of drift can only
+prove what its own scope covers, and that scope belongs beside the
+check, not only in the PR that added it.**
+
+A guard comparing a delimited list catches drift inside that list and
+says nothing about free prose sitting next to it.
+A reader who only sees the check passing has no way to tell the
+difference, because a check that exists reads as a check that is
+sufficient.
+
+- **Do:** state a mechanised check's scope in a comment where the
+  check itself lives.
+- **Do:** name what the check does NOT cover --- free prose outside
+  its delimited target, a sibling file it never reads --- rather than
+  leaving the boundary implicit.
+- **Don't:** let a check's mere presence stand in for its coverage;
+  read what it actually compares before trusting a green run.
+
+(Measured 2026-08-21 on `Morrison-Lab/gha#577`, merged.
+The PR's purpose was stopping one fact from being independently
+restated in `README.md` and a website page and drifting apart.
+Review found the PR itself had added a caveat sentence to `README.md`
+and not to the website page --- the identical defect, inside the fix
+meant to close it.
+The guard the PR added could not have caught it: it compares a
+delimited list, and the caveat was free prose outside the markers.)
+
 ## Applies at the scale of what's in front of you
 
 This is a review-time check on the document or diff already being read, not a

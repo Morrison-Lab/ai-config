@@ -259,6 +259,10 @@ _NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
 A path separator carries a word character or a `.` before it.
 A slash-command carries nothing, or whitespace.
 
+The same enumeration finds a third meaning for `/`, and it is worth running on the example itself: a leading separator opens an absolute path.
+The pair does not split that one, and does not need to, because `/usr/ums` is already rejected on the `r` before its separator and only a bare top-level `/ums` stays ambiguous.
+A residual case you have named and sized is a different thing from one you never looked for.
+
 **Nothing in the guard's own tests could see this**, which is the part worth transferring.
 The negative cases an author writes come from the syntax the exclusion clause was aimed at.
 Paths were the frame, so paths were the cases, and every one of them passed in both directions.

@@ -25,7 +25,8 @@ tool access, applies fixes or writes anything, on the user's go-ahead.
 
 `adversarial-reviewer` is the one that is not a fan-out worker but a **critic**
 --- it reviews the calling session's own diff rather than investigating the
-repo fresh. The read-only constraint matters for the same reason and one more:
+repo fresh.
+The read-only constraint matters for the same reason and one more:
 a reviewer that could edit would turn a finding into a silent fix, losing the
 finding and its disposition together.
 

@@ -63,6 +63,27 @@ In every session --- at session start, and again periodically during long sessio
 - **Always use a worktree.**
   When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
 
+## Check the remote immediately before every push
+
+See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
+
+- **Read the remote branch fresh, every time.**
+  Run `git ls-remote --heads origin <branch>` immediately before every `git push` --- read-only, so it cannot itself change what it reports.
+  An earlier `git fetch` is a measurement of a moment that has passed.
+  If the remote tip is not an ancestor of the ref you are **pushing**, another agent is driving the branch: fetch and reconcile, never overwrite.
+  That ref is `HEAD` only when the refspec says so --- `git push origin feature-x` from `main` pushes local `feature-x`, and comparing against `HEAD` goes quiet in exactly the dangerous case.
+- **The branch you own is the one to check hardest.**
+  Ownership is what suppresses the check.
+  The `@claude` agent pushes to your branch on PR activity, a second CLI session can claim the same PR, and a human can push at any time --- none of which appears in your conversation.
+- **Never bare `git push --force`.**
+  Use `git push --force-with-lease --force-if-includes`.
+  The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
+  `--force-if-includes` (git 2.30+) closes that.
+  Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git.md`).
+  `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
+  State the reason when you use it.
+
 ## Timestamp recaps in local time
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).

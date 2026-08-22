@@ -120,7 +120,9 @@ Never force-push over the difference to find out which it was.
   That belief is what the check exists to test.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 - **Don't:** pair `--force` *with* the lease and expect protection.
-  `git push --help` says `--force` "disables these checks", the lease among them, so the two together are a plain force push.
+  Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.
+  (That is upstream `master`'s wording.
+  The man page shipped with git 2.50.1 words it differently and says the same thing.)
 - **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
 
 (Directive from the user, 2026-08-21:

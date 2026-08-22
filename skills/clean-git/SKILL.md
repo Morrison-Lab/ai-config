@@ -99,6 +99,34 @@ to the filesystem root:
 TMP=$(mktemp -d)
 ```
 
+**Snapshot the remote-tracking refs before running either pass.**
+Both delegates refresh remote-tracking state in their classify steps ---
+[`clean-worktrees`](../clean-worktrees/SKILL.md) step 3 and
+[`clean-branches`](../clean-branches/SKILL.md) step 2 each run
+`git fetch --prune origin`.
+`--prune` deletes remote-tracking refs whose upstream branch is gone, and such
+a ref can be the last thing in this clone pointing at those commits.
+
+So "nothing that can lose work happens before confirmation" is **false as an
+unconditional claim**, and narrowing the wording would keep the same defect in
+smaller print.
+Snapshotting makes the statement true instead, but only if it runs **before**
+the passes that prune --- a snapshot taken afterwards records the post-prune
+state and recovers nothing:
+
+```bash
+git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin \
+  > "$TMP/pre-prune-refs.txt"
+```
+
+Report the snapshot's path in the plan.
+Anything the prune removed is recoverable from it for as long as the objects
+survive gc, and a reader who knows the file exists can check before confirming.
+
+With that snapshot taken, the invariant the gate protects is:
+**nothing that can lose work happens before confirmation, and the one pre-gate
+mutation that could is recorded first.**
+
 Run [`clean-worktrees`](../clean-worktrees/SKILL.md) steps 1 through 3.
 Run [`clean-branches`](../clean-branches/SKILL.md) steps 1 through 3.
 
@@ -162,33 +190,6 @@ confirmation could protect.
 Say so in the plan anyway, per step 2's `Pruned stubs` line.
 A silent mutation under a heading promising none is how a reader stops
 believing the rest of the guarantees.
-
-**A second pre-gate mutation, and this one is not safe by construction.**
-Both delegates refresh remote-tracking state in their classify steps ---
-[`clean-worktrees`](../clean-worktrees/SKILL.md) step 3 and
-[`clean-branches`](../clean-branches/SKILL.md) step 2 each run
-`git fetch --prune origin`.
-`--prune` deletes remote-tracking refs whose upstream branch is gone, and such
-a ref can be the last thing in this clone pointing at those commits.
-
-So "nothing that can lose work happens before confirmation" is **false as an
-unconditional claim**, and narrowing it further would keep the same defect in
-smaller print.
-Snapshot the refs first instead, which makes the statement true rather than
-merely careful:
-
-```bash
-git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin \
-  > "$TMP/pre-prune-refs.txt"
-```
-
-Report the snapshot's path in the plan.
-Anything the prune removed is recoverable from it for as long as the objects
-survive gc, and a reader who knows the file exists can check before confirming.
-
-With that snapshot taken, the invariant the gate protects is:
-**nothing that can lose work happens before confirmation, and the one pre-gate
-mutation that could is recorded first.**
 
 Derive the `INLINE` set.
 This first command produces the raw worktree-to-branch mapping, every worktree

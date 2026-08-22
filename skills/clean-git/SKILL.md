@@ -93,9 +93,20 @@ So name the read half explicitly rather than delegating to a sub-step that
 does not exist:
 
 ```bash
-git branch --merged origin/main \
-  | grep -vE '^\s*\*|^\s*main\s*$|^\s*master\s*$'   # 8a, listing only
-git branch -vv | grep '\[gone\]'                        # 8b candidates
+# 8a --- merged into main. `--format` is clean-worktrees step 3c's documented
+# remedy, applied here because THIS skill guarantees worktrees exist: plain
+# `git branch --merged` prefixes a worktree-checked-out branch with `+`, which
+# mangles the name and defeats a column-anchored grep.
+git branch --merged origin/main --format='%(refname:short)' \
+  | grep -vxE 'main|master'
+
+# 8b --- upstream gone. clean-branches' own command, verbatim.
+git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads \
+  | grep '\[gone\]'
+
+# 8c --- never pushed, has unique commits. Kept and flagged, never deleted.
+git for-each-ref --format='%(refname:short) %(upstream)' refs/heads \
+  | awk '$2=="" {print $1}'
 ```
 
 **Do not run the `git branch -d` or `-D` lines that share those blocks.**
@@ -111,7 +122,7 @@ with one exception, and it is worth naming rather than rounding off.**
 `--dry-run`, so a mutation has already happened by the time the plan is
 presented.
 
-It is safe by construction rather than by convention: `git worktree prune`
+That prune is safe by construction rather than by convention: `git worktree prune`
 only drops administrative records for worktrees whose directory is **already
 gone from disk**, so there is no state it can destroy and nothing a
 confirmation could protect.
@@ -124,6 +135,13 @@ mutation", and stating it precisely is what makes it worth anything:
 **nothing that can lose work happens before confirmation.**
 
 Derive the `INLINE` set.
+These commands share a scratch directory, so create one first --- `$TMP` is
+otherwise empty and every redirect below writes to the filesystem root:
+
+```bash
+TMP=$(mktemp -d)
+```
+
 This first command produces the raw worktree-to-branch mapping, every worktree
 included --- which is **not** `INLINE`:
 
@@ -178,6 +196,7 @@ that had nothing wrong with it.
 ### Branches to delete --- local
 ### Branches to rebase + open MR (stale)
 ### Skipped --- active / new / current
+### Branches flagged --- local-only, unpushed (kept, never deleted)
 ### Subtracted from the branch pass LOCAL list (deleted inline by the worktree pass): <N>
 ```
 
@@ -196,7 +215,10 @@ A branch that was in `INLINE` and is still present after the worktree pass has
 **two** possible causes, and they call for opposite responses:
 
 ```bash
-git worktree list --porcelain | grep -Fq "worktree $path" && echo STILL-THERE || echo REMOVED
+# -x is load-bearing: without it, a removed `.../wt/feature` still matches a
+# surviving `worktree .../wt/feature-2` and reports a false STILL-THERE.
+git worktree list --porcelain | grep -Fqx "worktree $path" \
+  && echo STILL-THERE || echo REMOVED
 ```
 
 - **The worktree is gone.**

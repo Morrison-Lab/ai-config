@@ -430,14 +430,14 @@
 - **An uncommitted change in your tree is not evidence that it is new.**
   **Diff it against the base before treating it as precious.**
   The bullet above says a concurrent session's uncommitted work can be silently wiped, so protect it.
-  This is its counterweight.
-  *Protect it* and *it is worth protecting* are different claims, and only the first follows from finding a dirty file.
-  Provenance and value are independent --- "another session wrote this" says nothing about whether that session already landed it.
-  `git diff origin/main -- <path>` settles it.
-  Caution about someone else's work reads as the responsible posture, so the belief never gets tested and later turns inherit it as settled --- and the assumed-precious framing shields the file from being read at all.
-  (Measured 2026-08-21 on ai-config#1884: two `memories/` files went dirty mid-session and were treated for hours as a peer session's in-flight work.
-  Both additions were already on `main` in fuller form, and the diff also rewrote three *correct* relative links into repo-root-relative ones that broke from inside `memories/` --- the `check-links.py` failure being blamed on that session all along.
-  Discarding them lost nothing and fixed three broken links.)
+  This is its counterweight: *protect it* and *it is worth protecting* are different claims, and only the first follows from finding a dirty file.
+  Caution about someone else's work reads as the responsible posture, so the belief never gets tested, and the assumed-precious framing keeps the file from being opened at all.
+  - **Do:** run `git diff origin/main -- <path>` on a dirty file before deciding what it is worth.
+  - **Do:** open a dirty file that a check is failing on, rather than attributing the failure to whoever left it there.
+  - **Don't:** infer value from provenance --- another session having written it says nothing about whether that session already landed it.
+  - **Don't:** leave a file unstaged for hours on an untested belief about who owns it.
+  (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
+  Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
 
 
 - **Don't touch anyone else's branch.**

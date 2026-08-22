@@ -1222,6 +1222,42 @@ def main() -> int:
           len(checker.blank_verdicts_citing_a_comment(confirming_1841))
           == len(confirming_1841))
 
+    # The negative direction, which the first version of this gate missed
+    # entirely: a LIVE finding that links the comment it was first raised in.
+    # Review on #1867 produced both of these by execution. Their absence is
+    # precisely what let a permalink-only gate ship -- the suite had a permalink
+    # without a live finding, and a live finding without a permalink, and never
+    # the combination.
+    live_with_permalink = (
+        "As I noted in [my prior comment](https://github.com/o/r/pull/5#issuecomment-999), "
+        "this is still broken: **Needs more work** -- the null check on line 10 is still missing."
+    )
+    check("a live finding that LINKS a comment stays not-clean",
+          checker.classify_verdict(live_with_permalink) == "not-clean")
+    check("negative control: it really does carry a permalink",
+          checker.RX_COMMENT_PERMALINK.search(live_with_permalink) is not None)
+
+    live_1762_with_permalink = (
+        "The one finding from the previous review round "
+        "([see here](https://github.com/o/r/pull/5#issuecomment-999)) "
+        "(**Needs more work**, reviewed at `53f9acbf`) is still present and unaddressed "
+        "in this diff.\n\n### Verdict\n**Ready for merge** -- no new issues found."
+    )
+    check("the #1762 fixture plus a permalink is still not-clean",
+          checker.classify_verdict(live_1762_with_permalink) == "not-clean")
+
+    # And the veto must not fire on a DIFFERENT item being left open, which is
+    # what #1487's real body says beside the resolved one.
+    check("'left open' about another item does not veto the gate",
+          checker.classify_verdict(
+              "Prior review: [comment](https://github.com/o/r/pull/1487#issuecomment-123), "
+              "verdict **Needs more work**, with the blocking item fixed and one "
+              "non-blocking item left open.\n\n### Verdict\n\n**Ready for merge**") == "clean")
+    check("negative control: bare 'open' is deliberately not live-wording",
+          checker.LIVE_FINDING_WORDING.search("one item left open") is None)
+    check("negative control: 'still open' IS live-wording",
+          checker.LIVE_FINDING_WORDING.search("that item is still open") is not None)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -315,6 +315,31 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
 # top-level comment, `#discussion_r<id>` for a review comment.
 RX_COMMENT_PERMALINK = re.compile(r"#(?:issuecomment-|discussion_r)\d+")
 
+# Wording that asserts the cited finding is STILL LIVE. Its presence vetoes the
+# permalink gate below.
+#
+# A first version gated on the permalink alone, reasoning that a sentence citing
+# a comment is reporting rather than verdicting. Review on ai-config#1867
+# refuted that by execution: a reviewer re-raising a still-open finding across
+# rounds naturally links the comment it was first raised in, so the permalink
+# appears in a live finding too. That is the #1762 regression again with a link
+# swapped in for a SHA, and it fails in the dangerous direction -- a missed
+# not-clean, not an over-flag.
+#
+# Deliberately GENEROUS, because over-matching here is safe: an extra match only
+# declines to blank, leaving the not-clean signal standing. Under-matching is
+# what hides a live finding. Bare "open" is excluded on purpose -- ai-config#1487's
+# real body says a DIFFERENT item was "left open" beside the resolved one, and
+# matching that would break the case this gate exists for.
+LIVE_FINDING_WORDING = re.compile(
+    r"\b(?:still\s+(?:present|unaddressed|unresolved|unfixed|open|broken|missing|stands)"
+    r"|remains?\s+(?:open|unaddressed|unresolved|unfixed)"
+    r"|not\s+(?:yet\s+)?(?:been\s+)?(?:fixed|addressed|resolved)"
+    r"|unaddressed"
+    r"|re-?raising)\b",
+    re.IGNORECASE,
+)
+
 # A bold verdict phrase, the shape a citation of another comment's verdict takes.
 RX_BOLD_VERDICT = re.compile(
     r"\*\*\s*(?:Needs\s+(?:more\s+)?work|Changes\s+requested)\s*[:.]?\s*\*\*",
@@ -364,7 +389,9 @@ def blank_verdicts_citing_a_comment(text: str) -> str:
         end_candidates = [e for e in (text.find(sep, match.end()) for sep in (". ", "! ", "? ", "\n\n"))
                           if e != -1]
         end = min(end_candidates) if end_candidates else len(text)
-        if RX_COMMENT_PERMALINK.search(text[start + 1:end]):
+        sentence = text[start + 1:end]
+        if (RX_COMMENT_PERMALINK.search(sentence)
+                and not LIVE_FINDING_WORDING.search(sentence)):
             out = out[:match.start()] + " " * (match.end() - match.start()) + out[match.end():]
     return out
 

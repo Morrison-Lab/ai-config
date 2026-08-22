@@ -99,7 +99,8 @@ git for-each-ref --format='%(refname:short) %(upstream)' refs/heads \
   | grep -vxE 'main|master' \
   | while read -r b; do
       [ "$(git rev-list --count "origin/main..$b")" -gt 0 ] && echo "$b"
-    done
+    done \
+  | sort -u > "$TMP/no-upstream.txt"   # 8c list; INLINE subtracts this
 ```
 
 **Do not run the `git branch -d` or `-D` lines that share those blocks.** Those deletions belong to this skill’s step 3, after the gate. `clean-branches` is safe on its own here only because of a prose instruction after all three sub-steps (“no silent local deletions … wait for confirmation”), not because the blocks are deletion-free — so an orchestrator that cites the block without that prose inherits none of the protection.
@@ -131,10 +132,17 @@ printf '%s\n' "${DEAD_WORKTREE_PATHS[@]}" | sort -u > "$TMP/dead-worktrees.txt"
 # INLINE: the branch column, kept only where the worktree column is Dead.
 awk -F'\t' 'NR==FNR { dead[$0]; next } $2 in dead { print $1 }' \
   "$TMP/dead-worktrees.txt" "$TMP/wt-branches.tsv" \
-  | sort -u > "$TMP/inline.txt"
+  | sort -u > "$TMP/inline-raw.txt"
+
+# Apply the 8c-wins precedence rule.
+# Stating it in prose is not enough: without this subtraction the PLAN shows
+# such a branch under "deleted inline", the opposite of what 8c promises.
+comm -23 "$TMP/inline-raw.txt" "$TMP/no-upstream.txt" > "$TMP/inline.txt"
 ```
 
-Give it the negative control every filter needs: `wc -l` both files, and confirm `inline.txt` is shorter than `wt-branches.tsv` whenever any live worktree exists. An `INLINE` the same length as the raw mapping means the filter did not run: every live worktree’s branch is still in it, including the main checkout’s, so the contradiction rule fires spuriously on all of them.
+`-d`’s own merge check would very likely refuse on these branches anyway, since 8c is now filtered to branches with unique commits — so the subtraction is not what keeps the work safe. It is what keeps the **plan honest**, and the plan is the artifact the user confirms. A plan that lists a branch under “deleted inline” while the prose promises it is kept is a single-gate skill misreporting the one thing the gate is for.
+
+Give it the negative control every filter needs: `wc -l` both files, and confirm `inline-raw.txt` is shorter than `wt-branches.tsv` whenever any live worktree exists. An `inline-raw.txt` the same length as the raw mapping means the filter did not run: every live worktree’s branch is still in it, including the main checkout’s, so the contradiction rule fires spuriously on all of them.
 
 Using the raw mapping as `INLINE` breaks the sweep immediately rather than subtly, which is worth stating because it looks like a shortcut that would merely over-subtract. Every live worktree appears in it, including the main checkout and the one you are standing in. Their branches are `Active` to the branch pass by construction, so the contradiction rule stated earlier fires on the first one and halts a sweep that had nothing wrong with it.
 

@@ -49,6 +49,25 @@ directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
+## Manage quota, including the structural kind
+
+Treat token cost as a property of a workflow's **shape**, not only of the choices made inside one session.
+Route bounded mechanical work to a cheaper model, a subagent, or a separately-billed CLI rather than the conductor's own tier, and compact or hand off before context bloat forces it.
+
+Those are per-session levers, and their saving expires with the session.
+Ask separately what a procedure costs *by construction*: instructions loaded at launch that only some tasks read, a judgment made twice that wants a deterministic check, a serial loop whose base moves faster than one round, a brief that enumerates a set instead of deriving it.
+The deliverable there is a change to the workflow --- fixed in stride when small, filed with its measurement when not --- never a quieter run of the same procedure.
+
+Human steps count as workflow shape, so say so when one is costly --- and ship a mechanism in the same reply rather than only a suggestion.
+A written rule is the floor.
+A visible marker at the moment of the action, a guard, or a setting that removes the option are the stronger rungs.
+The decision stays the human's.
+
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
+And restructure in its own issue or PR, not inside whatever task happened to notice it.
+See `shared/workflow/restructure-for-efficiency.md`.
+
 ## Keep ai-config and repo checkouts fresh
 
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
@@ -62,6 +81,27 @@ In every session --- at session start, and again periodically during long sessio
 
 - **Always use a worktree.**
   When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
+
+## Check the remote immediately before every push
+
+See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
+
+- **Read the remote branch fresh, every time.**
+  Run `git ls-remote --heads origin <branch>` immediately before every `git push` --- read-only, so it cannot itself change what it reports.
+  An earlier `git fetch` is a measurement of a moment that has passed.
+  If the remote tip is not an ancestor of the ref you are **pushing**, another agent is driving the branch: fetch and reconcile, never overwrite.
+  That ref is `HEAD` only when the refspec says so --- `git push origin feature-x` from `main` pushes local `feature-x`, and comparing against `HEAD` goes quiet in exactly the dangerous case.
+- **The branch you own is the one to check hardest.**
+  Ownership is what suppresses the check.
+  The `@claude` agent pushes to your branch on PR activity, a second CLI session can claim the same PR, and a human can push at any time --- none of which appears in your conversation.
+- **Never bare `git push --force`.**
+  Use `git push --force-with-lease --force-if-includes`.
+  The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
+  `--force-if-includes` (git 2.30+) closes that.
+  Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git.md`).
+  `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
+  State the reason when you use it.
 
 ## Timestamp recaps in local time
 

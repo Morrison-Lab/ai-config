@@ -285,6 +285,20 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clobbering-push.py\"",
+            "timeout": 20,
+            "script": "no-clobbering-push.py",
+            "why": "shared/workflow/check-before-pushing.md. A branch you cut and whose PR you opened is the one you are least likely to check before pushing to, and claim-pr.md records three ways it gains another agent's commits anyway (the @claude agent's main-sync, a second CLI session, a human). Every recovery procedure in claim-pr.md runs AFTER the collision. DENIES a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word and is never the worse command, clearable with an `ALLOW_FORCE_PUSH=1` prefix for the unsatisfiable-lease case memories/git.md records. WARNS on everything else from a live read-only `git ls-remote` reading taken at push time, and stays silent on a fast-forward. Fails open on parse trouble, outside a repo, and on any network timeout. Tracked as #1883."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-nonglobal-substitution.py\"",
+            "timeout": 20,
+            "script": "warn-nonglobal-substitution.py",
+            "why": "shared/workflow/algorithmatize-checks.md. A non-global `s///` changes only the FIRST occurrence, which may not be the one meant. It bites hardest in mutation testing: a mutation that silently failed to apply reads as a surviving mutation, or worse a verified one, because the test stays green from nothing having changed. Measured four times in one session on 2026-08-21, twice where the substitution rewrote a neighbouring comment instead of the code. WARNS, never blocks: it fires only when perl/sed is the segment's leading command AND carries a genuine in-place flag, and scans script text only, never filenames. Tracked as #1900."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",

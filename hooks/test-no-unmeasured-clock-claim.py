@@ -80,14 +80,86 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+# A plain user prompt, carrying no reading. It is what separates one turn from
+# the next, and several cases below need it explicitly: an assistant turn
+# normally emits narration, tool calls, and THEN the recap as separate
+# messages, so consecutive `say()`s are one turn rather than two. Writing "a
+# later message" as two bare `say()`s modelled a turn boundary that is not
+# there, and keying the guard's window on it is what made it fire on ordinary
+# recaps (ai-config#1917). Where a case means "a later turn", it must say so.
+NEXT_TURN = {"type": "user", "content": "and what about the other one?"}
+
+
+# The harness's injected reading as it ACTUALLY arrives, copied from a live
+# transcript (2026-08-22). It is not a user turn: it is its own record, type
+# "attachment", carrying the text under `attachment.content` /
+# `attachment.stdout`, with neither a `message` nor a top-level `content`. It
+# is emitted AFTER the prompt record it belongs to.
+#
+# The earlier fixtures modelled it as a bare-string user turn, which is why
+# the carve-out looked covered while being inert in practice: `measured`
+# stayed None however recently the harness had supplied a real value.
+def attach_clock(stamp, date="2026-08-21", zone="PDT"):
+    line = (f"Current time -- local: {date} {stamp} {zone} | "
+            f"UTC: 2026-08-22T04:30:36Z")
+    return {"type": "attachment", "attachment": {
+        "hookEvent": "UserPromptSubmit",
+        "hookName": "inject-local-time.sh",
+        "content": line + "\nUse the local value verbatim in recaps.",
+        "stdout": line + "\n",
+        "exitCode": 0}}
+
+
+# A real prompt record, and the assorted non-user records a transcript
+# interleaves around it. None of these may advance the turn boundary past the
+# reading that arrives beside them.
+PROMPT = {"type": "user", "message": {"content": "is this intended behavior?"}}
+TRANSCRIPT_NOISE = [
+    {"type": "last-prompt", "content": "is this intended behavior?"},
+    {"type": "custom-title", "content": "session title"},
+]
+
+
 # (events, should_fire, label)
 CASES = [
+    # --- ai-config#1917, part two: the injected reading is an ATTACHMENT ---
+    #     Verified against a live transcript. Reading only user turns made the
+    #     carve-out inert, so the guard fired on precisely the case the rule
+    #     tells you to trust. The noise records are included because they sit
+    #     between the reading and the recap in a real transcript.
+    ([PROMPT, attach_clock("21:30:00")] + TRANSCRIPT_NOISE +
+     [say("Looking into it."), GIT_LOG, say("Recap: 21:30 PDT")], False,
+     "#1917: an attached reading discharges, with narration and noise after it"),
+    ([PROMPT, attach_clock("21:30:00")] + TRANSCRIPT_NOISE +
+     [say("Recap: 23:59 PDT")], True,
+     "#1917: a claim ahead of the ATTACHED reading still fires"),
+    ([PROMPT, attach_clock("21:30:00"), say("first recap"), NEXT_TURN,
+      say("Recap: 21:30 PDT")], True,
+     "#1917: an attached reading from an earlier turn has still expired"),
+
+    # --- ai-config#1917: the window must start where the USER spoke ---
+    #     An assistant turn emits narration, then tool calls, then the recap.
+    #     Keying the window on the previous assistant TEXT BLOCK put the
+    #     boundary inside the current turn, expiring a reading taken at its
+    #     top -- so the guard fired on ordinary recaps, and even on a turn
+    #     that ran `date` itself. Each of these is that shape.
+    ([hook_clock("21:30:00"), say("Looking into it."), GIT_LOG,
+      say("Stopping Point: clean, as of 21:30 PDT")], False,
+     "#1917: narration before the recap must not expire the injected reading"),
+    ([hook_clock("21:30:00"), say("Checking."), GIT_LOG, say("Found it."),
+      GIT_LOG, say("Recap: 21:30 PDT")], False,
+     "#1917: two narrations before the recap, same turn"),
+    ([hook_clock("21:30:00"), DATE, say("Got it."), say("Recap: 21:31 PDT")],
+     False,
+     "#1917: an explicit `date` THIS turn discharges even with narration after"),
+
     # --- the incident, and its shape ---
-    ([DATE, say("first recap"), say("UPDATE -- 19:24 PDT")], True,
+    ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,
      "the incident: measured once, extrapolated in a later message"),
-    ([HOOK_CLOCK, say("first recap"), say("as of 18:52 PDT, three PRs open")], True,
+    ([HOOK_CLOCK, say("first recap"), NEXT_TURN,
+      say("as of 18:52 PDT, three PRs open")], True,
      "session-start hook reading, then an extrapolated time a message later"),
-    ([DATE, say("earlier"), say("Session Summary -- 6:40 PM PT")], True,
+    ([DATE, say("earlier"), NEXT_TURN, say("Session Summary -- 6:40 PM PT")], True,
      "12-hour form with a PT marker"),
     ([say("no clock read at all in this session"), say("now 09:15 PST")], True,
      "no reading anywhere in the transcript"),
@@ -135,12 +207,14 @@ CASES = [
      "a `date` run in this turn discharges even when a stale reading exists"),
     ([HOOK_CLOCK_UNPARSEABLE, say("as of 15:22 PDT")], False,
      "an injected line with no readable value falls back to counting as a read"),
-    ([hook_clock("14:48:23"), say("first recap"), say("as of 15:22 PDT")], True,
+    ([hook_clock("14:48:23"), say("first recap"), NEXT_TURN,
+      say("as of 15:22 PDT")], True,
      "a departing claim fires from a later message too"),
 
     # --- review round 1 on #1850: the three regressions the value
     #     comparison introduced, each traced by the reviewer ---
-    ([hook_clock("14:48:23"), say("first recap"), say("as of 14:48 PDT")], True,
+    ([hook_clock("14:48:23"), say("first recap"), NEXT_TURN,
+      say("as of 14:48 PDT")], True,
      "a STALE reading must not discharge by numeric proximity -- that is the "
      "#1848 bug in a new shape"),
     ([hook_clock("08:18:00"),
@@ -211,7 +285,8 @@ def check_output_shape():
     """
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
-        for e in (DATE, say("earlier"), say("UPDATE -- 19:24 PDT")):
+        for e in (DATE, say("earlier"), NEXT_TURN,
+                  say("UPDATE -- 19:24 PDT")):
             fh.write(json.dumps(e) + "\n")
     for f in os.listdir(tempfile.gettempdir()):
         if f.startswith(".claude-clock-claim-"):

@@ -518,3 +518,59 @@ Mutating the call site to pass the genuinely unmasked segment instead failed
 `Spellcheck` is green on `main`, so every one of those was a false positive with nothing left to judge.
 Shipped as `--audit-corpus` rather than as deletions.
 Its first version queried the table directly and reported 6 collisions where 4 were real, over-reporting every word the wordlist already suppresses; the corrected version calls `scan_line()` with the real wordlist, and the correction was stated on the PR rather than the number quietly substituted.)
+
+## A required-subset assertion is not an inventory-pinning test
+
+(Morrison-Lab/gha#578, 2026-08-21: a regression test asserted
+`rule in --disallowedTools` for each of roughly two dozen entries in a
+hand-written table, with a docstring claiming to pin the production deny list.
+A reviewer deleted six entries the table never named --- `gh pr ready`,
+`gh release`, `gh label`, `gh run cancel`, `gh variable`, and `gh repo edit`
+--- and the suite stayed green.
+Switching to exact set equality in both directions immediately reported 24
+unpinned rules, and seven individual-entry deletions each turned the suite red
+on the next mutation pass.)
+
+## Tailing check-links.py reported clean over three broken links
+
+Measured 2026-08-21 while driving
+[ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+
+`python3 scripts/check-links.py 2>&1 | tail -2` was run as part of a validation
+sweep and its output read as a pass.
+It was not.
+The script was reporting three broken links and exiting non-zero; the two lines
+`tail` showed were the last two **finding bullets**, and the verdict line had
+scrolled past above them:
+
+```
+  - memories/mistake-patterns.md -> shared/workflow/growth-mindset.md
+  - memories/mistake-patterns.md -> shared/workflow/run-ums-proactively.md
+```
+
+Compare the passing shape, whose last two lines are the verdict:
+
+```
+Checked 2054 relative links across 531 markdown files.
+✓ no broken relative links
+```
+
+So the two shapes are distinguishable only by *reading* the lines, and a
+sweep that pipes several checkers in sequence is scanning for the absence of
+alarm rather than reading each one.
+"links OK" was reported to the user twice on that basis.
+
+Two details worth keeping.
+
+**The pipe was added for brevity, not for parsing.**
+Nothing about writing `| tail -2` feels like interpreting a verdict, which is
+why [`fully-clean`](fully-clean.md)'s rule against grepping a checker's prose
+did not fire --- that rule is about extracting a phrase, and this was about
+fitting output on screen.
+
+**The links were real and were not the branch's.**
+They came from another session's *uncommitted* edit in the same worktree, which
+used repo-root-relative paths from inside `memories/`.
+`git diff --name-only origin/main...HEAD | grep -c memories/` returned 0, so the
+PR was unaffected --- but that was established afterwards, by query, and the
+original "links OK" claim had no such basis.

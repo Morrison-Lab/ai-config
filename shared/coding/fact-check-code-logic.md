@@ -237,7 +237,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Six distinct mechanisms can make a test pass against the reverted fix:
+Seven distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -257,19 +257,31 @@ Six distinct mechanisms can make a test pass against the reverted fix:
 - **Misleading label.**
   The test name or comment says one property is under test
   while the assertion checks another.
+- **Rejected payload.**
+  The sharpest form of the earlier-guard case:
+  a parsing or validation layer in front of the code under test
+  refuses the fixture outright, so nothing under test runs at all.
+  It is likeliest when the defect is input-shaped,
+  since the payload has to be malformed to reach the bug,
+  and malformed is what the layer above rejects it for.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all six can still be green,
+A suite with all seven can still be green,
 and coverage can still report the lines as exercised.
 Only the mutation answers whether the assertion depends on the fix.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
+- **Do:** make "the fixture arrived" an assertion in its own right ---
+  a parse step's return value, a counter, a log line ---
+  rather than a thing you satisfied yourself of once by reading the code.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
+- **Don't:** read a green guard as one whose subject ran.
+  A payload rejected upstream and a working fix are the same observable.
 
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 
@@ -574,6 +586,103 @@ A sentence that would still read true with the parameter deleted is explaining t
 Caught as a non-blocking review note.
 Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
+## A rationale can be false while the code it justifies is correct
+
+The section above covers a docstring that is **true and incomplete**.
+This is a related but distinct failure: a comment, docstring, or PR rationale
+that is **explicitly false**, sitting beside code that works.
+The contrast is omitted mechanism versus incorrect explanation, and it is
+worth keeping sharp, because a rationale that merely *understates* how
+something works belongs to that section rather than this one.
+
+The pairing matters because the two are told apart only by checking, and
+nothing about either one feels like a claim while you are writing it.
+A rationale is written in the same breath as the code, from the same
+understanding, and it inherits the code's air of having been verified ---
+the code was tested, so the sentence about the code feels tested too.
+It was not.
+Tests exercise behaviour, and a rationale is a claim about *why* the behaviour
+holds --- so an ordinary behavioural test can pass with the explanation still
+false.
+
+The failure has a signature worth learning:
+
+- **The artifact is right, so nothing fails.**
+  No check goes red and no output is wrong, so the defect is invisible to the
+  behavioural checks a change normally runs.
+- **The claim is checkable in seconds**, and usually by a command adjacent to
+  what you already ran --- reading the function's documented defaults, grepping
+  the file you cited, checking which commit introduced a line.
+- **It survives review** unless a reader independently verifies the claim,
+  because the natural review question is whether the code works.
+
+**A rationale that reasons about defaults is particularly easy to get wrong**,
+because the default is the thing you did not write and therefore did not think
+about.
+"Safe here, because the caller validates the input" is false when the caller
+validates nothing and the safety comes from a filter further upstream ---
+and note that the code is still safe, which is what makes it an instance of
+this pattern rather than of a bug.
+Deleting the sentence would leave a correct program; keeping it teaches the
+next reader to protect the wrong invariant.
+Read the signature and the call site rather than the intent.
+
+The check is one question per justifying sentence:
+**what command would show this false?**
+If a command exists and takes seconds, run it before the sentence ships.
+If none exists, the sentence is not a rationale but a guess, and should be
+written as one.
+
+- **Do:** run the deriving command for a rationale's factual claim --- the
+  documented defaults, the introducing commit, the cited file's text --- and
+  publish it beside the claim where the claim is load-bearing.
+- **Do:** treat a sentence explaining *why* code is correct as unverified until
+  checked, however thoroughly the code itself was tested.
+- **Don't:** let a rationale inherit the code's credibility --- the tests
+  covered the behaviour, never the explanation.
+- **Don't:** reason about a call's semantics from its intent when its
+  **defaults** decide them.
+
+**Not decidable by a guard, though partly checkable by hand.**
+The condition is "a sentence asserting why code behaves as it does is false",
+and deciding it means evaluating the claim against the world, which no
+transcript-scoped trigger can do.
+A cue-word proxy --- `because`, `so that`, `rather than` --- would carry
+unacceptable error in both directions: it fires on correct rationales that use
+those words, and misses false ones that do not.
+That is a claim about a *truth detector*, not about checkability in general.
+The specific checks named above --- reading documented defaults, grepping a
+cited file, finding the commit that introduced a line --- are exactly the
+mechanical steps that settle individual instances, and they are why this is a
+review question and a self-check rather than a guard.
+
+(Measured 2026-08-21, three instances in one session, each caught by a
+reviewer rather than by any check, and in each the artifact itself was
+correct.
+A fragment's prose about a hook attributed an omitted gate to "earlier fixes
+rather than the original design", where `git log -S` put it in the hook's own
+first PR, ai-config#1566 (ai-config#1860).
+The gate was real and the hook was right; only the sentence about where it
+came from was wrong.
+`fully-clean.md` said a checker "annotates duplicated names automatically",
+where it annotates only the lines it reports, never a passing one ---
+which was the very case the passage illustrated (ai-config#1870).
+And a PR rationale justified a reword by saying "the same entry already uses
+the long form", where the entry used the abbreviation (ucdavis/bcs#725).
+
+A fourth candidate was dropped on review, and the reason is instructive.
+An R helper's comment claimed it used R's own regex engine "rather than
+reimplementing the matching and risking a divergence", while calling `grepl()`
+with defaults that are case-sensitive POSIX ERE, against `.Rbuildignore`
+patterns that Writing R Extensions specifies as Perl-like and
+case-insensitive (ucdavis/bcs#720).
+That looks like this section's pattern and is not: the **code** diverged from
+the semantics it was implementing, so the artifact was not correct, and the
+sentence stayed arguably true while omitting which mode was selected ---
+which is the preceding section's failure, not this one's.
+The test of membership is whether the artifact would still be right once the
+sentence were deleted.)
+
 ## What to report
 
 For each issue found, state:
@@ -591,3 +700,67 @@ For each issue found, state:
 Distinguish blocking correctness issues from optional "there's a better
 approach" suggestions, and don't let a plausible-looking implementation pass
 unchecked just because it runs without error.
+
+## When a fix changes what code COMPUTES, sweep everything that DESCRIBES it
+
+The section above covers a literal and the comment beside it, and mechanizes
+that with a ten-line window in one file.
+The commoner and costlier version is wider on both axes: a fix changes what a
+value *means*, and every place that describes the old meaning survives ---
+docstrings hundreds of lines away, a user-facing message template, a catalog
+row in `README.md`, sibling prose in other directories.
+
+**It recurs across rounds of one review**, which is the tell.
+The description sites are not one set: fixing the ones you remember leaves the
+ones you did not, so each round closes some and reveals more, and each round
+feels like the last one.
+
+Measured on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884),
+2026-08-21, where the same defect was filed three times:
+
+| round | fixed | still describing the old behaviour |
+| --- | --- | --- |
+| 3 | the comparison (`HEAD` -> the pushed ref) | the warning's label, the docstring's classification table, the `README.md` row |
+| 5 | the warning's label | the remediation *commands* in the same message |
+| 6 | the remediation commands | the same-branch test underneath them |
+
+Every intermediate state had correct code, a green suite, and a description
+that contradicted it.
+The reviewer's own summary of round 5 named it exactly: the label was fixed
+"precisely because" of the case at hand, "but the sibling block ... never got
+the same treatment".
+
+**Advice is behaviour when a reader runs it**, which is what raises this above
+tidiness.
+Round 5's stale text was not a comment: it was the remediation the guard printed,
+and following it literally would have merged the wrong branch.
+A description that a reader *acts on* is a second implementation of the same
+logic, and it needs the same fix.
+
+**Derive the sites, do not recall them.**
+The population is every occurrence of the old concept, so grep for it rather
+than revisiting the places you remember writing:
+
+```bash
+git grep -n "HEAD" -- hooks/ shared/ skills/ README.md CLAUDE.md AGENTS.md
+```
+
+Then ask of each hit whether it asserts the behaviour you just changed.
+This is [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+scope claim applied to your own diff: check the population, do not recall it.
+
+**Assert the message, not just the verdict.**
+A suite that checks only *whether* a guard fires cannot see *what it says*, so
+a wrong message survives every green run.
+Where output is advice, pin its content --- ai-config#1884's `LABEL_EXPECT`
+asserts both the label and the emitted commands, and the mutation clauses that
+revert each one flip a case rather than nothing.
+
+- **Do:** grep for the old concept across the whole repo after changing what a
+  value means, and re-read every hit.
+- **Do:** treat a printed remediation as code, and test its content.
+- **Do:** expect several rounds when a reviewer files this once --- the sites
+  you did not fix are the ones you did not remember.
+- **Don't:** read "the computation is right now" as the change being finished.
+- **Don't:** rely on an adjacent-comment guard for this; its window is ten
+  lines and one file, and these sites are neither.

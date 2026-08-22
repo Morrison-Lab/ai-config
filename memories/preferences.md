@@ -18,6 +18,12 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- Treat a request to disable AI review as narrowly repository-scoped: it applies only to the repositories the user explicitly names in that request.
+  The invariant is organization-independent --- don't widen a named-repository request into a sibling repository, into the rest of that organization, or into later unrelated PRs, and don't remove review automation anywhere that wasn't named.
+  Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.
+  (User directive / CAI, 2026-08-21: the request named specific `ucdavis` repositories.
+  Read `ucdavis` as the incident rather than as the rule's boundary --- as of 2026-08-21, review still ran everywhere else, `ucdavis/bcs` had the Claude app installed, and no `Morrison-Lab` repository was ever in scope.
+  See [`github.md`](github.md)'s "Verify GitHub App installation per repository" for how to check a given repository.)
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) --- don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known --- rather than repeating it back as fact.
@@ -421,6 +427,19 @@
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
   Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+- **An uncommitted change in your tree is not evidence that it is new.**
+  **Diff it against the base before treating it as precious.**
+  The bullet above says a concurrent session's uncommitted work can be silently wiped, so protect it.
+  This is its counterweight: *protect it* and *it is worth protecting* are different claims, and only the first follows from finding a dirty file.
+  Caution about someone else's work reads as the responsible posture, so the belief never gets tested, and the assumed-precious framing keeps the file from being opened at all.
+  - **Do:** run `git diff origin/main -- <path>` on a dirty file before deciding what it is worth.
+  - **Do:** open a dirty file that a check is failing on, rather than attributing the failure to whoever left it there.
+  - **Don't:** infer value from provenance --- another session having written it says nothing about whether that session already landed it.
+  - **Don't:** leave a file unstaged for hours on an untested belief about who owns it.
+  (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
+  Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
+
+
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.
   **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.

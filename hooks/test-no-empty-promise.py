@@ -12,6 +12,13 @@ Three near-misses are load-bearing:
     same words and commits to nothing;
   * quoting the rule while discussing it, which this corpus does constantly.
 
+The #1946 block below adds the other axis: a promise stated as a DEBT ("I owe
+#1937 the ARDI loop") discharges on an armed FIRING as well as on a durable
+record, while a RULE promise still discharges only on the durable one. The
+near-misses that decide whether that is usable are the arming-shaped calls
+that deliver nothing -- `stop: true`, a cron LIST, an `ardi` run that already
+happened, and the word "schedule" sitting in a read-only brief.
+
 Run: python3 hooks/test-no-empty-promise.py hooks/no-empty-promise.py
 """
 import json
@@ -117,6 +124,52 @@ GREP_RULE = {"type": "assistant", "message": {"content": [
 CAT_RULE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Bash",
      "input": {"command": "cat shared/workflow/ardi.md | head -40"}}]}}
+# --- #1946 fixtures: an owed ACTION discharges on an armed firing.
+# Tool names verified against 232 local transcripts on 2026-08-22 rather than
+# invented: ScheduleWakeup 302 occurrences, Monitor 126, CronCreate 18,
+# CronList 13 -- so the CronList near-miss below is a real shape, not a
+# contrived one.
+ARMED_WAKEUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "ScheduleWakeup",
+     "input": {"delaySeconds": 300, "noop": False,
+               "reason": "Waiting on the re-review verdict for #1937.",
+               "prompt": "Continue the ARDI loop on ai-config #1937."}}]}}
+ARMED_CRON = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "CronCreate",
+     "input": {"schedule": "*/10 * * * *", "prompt": "Check #1937."}}]}}
+ARMED_MCP_TASK = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "mcp__scheduled-tasks__create_scheduled_task",
+     "input": {"prompt": "Re-check #1937's review."}}]}}
+ARMED_SKILL = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Skill",
+     "input": {"skill": "schedule", "args": "check #1937 in 10 minutes"}}]}}
+ARMED_POLLER = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "python3 hooks/monitor-open-prs.py"}}]}}
+# Ending a dynamic loop is the OPPOSITE of arming one.
+STOPPED_WAKEUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "ScheduleWakeup", "input": {"stop": True}}]}}
+# A read of the schedule, not an arming of one.
+LISTED_CRONS = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "CronList", "input": {}}]}}
+# The `ardi` skill runs the round that is ALREADY done by the time the debt
+# sentence is composed; the debt is about the NEXT round.
+RAN_ARDI = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Skill",
+     "input": {"skill": "ardi", "args": "#1937 drive to clean"}}]}}
+# Prose in `args` must not reach SCHEDULER_SKILLS -- only the `skill` field.
+ASKED_ABOUT_SCHEDULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "What does the schedule skill do, and does loop "
+                         "call workaround-watcher?",
+               "description": "read-only lookup"}}]}}
+ARM_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "tu9", "name": "ScheduleWakeup",
+     "input": {"delaySeconds": 300, "prompt": "check #1937"}}]}}
+ARM_DENIED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "tu9", "is_error": True,
+     "content": "Permission to use ScheduleWakeup was denied"}]}}
+
 PROMPT = {"type": "user", "message": {"content": [
     {"type": "text", "text": "next task please"}]}}
 TOOL_RESULT = {"type": "user", "message": {"content": [
@@ -332,6 +385,57 @@ CASES = [
      False, "'owed by' a third party does not block"),
     ([say("I owed you an answer yesterday and gave it.")],
      False, "past-tense 'owed' reports rather than promises"),
+
+    # --- #1946: an owed ACTION owes a firing, not only a record.
+    # The user's own example, verbatim in shape.
+    ([say("Stopping Point: Not a clean stopping point --- #1937 is open "
+          "awaiting re-review at 98d79c81, and I owe it the ARDI loop.")],
+     True, "the owed-ARDI-loop recap blocks with nothing armed (#1946)"),
+    ([say("Stopping Point: #1937 awaits re-review and I owe it the ARDI "
+          "loop."), ARMED_WAKEUP],
+     False, "an armed ScheduleWakeup discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_CRON],
+     False, "CronCreate discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_MCP_TASK],
+     False, "a scheduled task discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_SKILL],
+     False, "the schedule skill discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_POLLER],
+     False, "arming the detached PR poller discharges an owed action"),
+    # The durable floor still clears a debt -- it is the wrong instinct, not
+    # an invalid mechanism, and blocking it would wedge the honest case where
+    # the debt is somebody else's to schedule.
+    ([say("I owe a follow-up entry here."), WROTE_MEMORY],
+     False, "a durable record still discharges an owed action"),
+
+    # Near-misses on the arming side. Each of these LOOKS like a scheduler
+    # call and delivers nothing.
+    ([say("I owe #1937 the ARDI loop."), STOPPED_WAKEUP],
+     True, "`stop: true` ends the loop and does NOT discharge (#1946)"),
+    ([say("I owe #1937 the ARDI loop."), LISTED_CRONS],
+     True, "listing crons is a read and does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), RAN_ARDI],
+     True, "running ardi THIS turn does not discharge the NEXT round"),
+    ([say("I owe #1937 the ARDI loop."), ASKED_ABOUT_SCHEDULE],
+     True, "'the schedule skill' in brief prose does NOT discharge"),
+    ([ARM_ATTEMPT, ARM_DENIED, say("I owe #1937 the ARDI loop.")],
+     True, "a DENIED arming does not discharge"),
+    ([ARM_ATTEMPT, say("I owe #1937 the ARDI loop.")],
+     False, "an arming with no result yet still discharges"),
+
+    # The asymmetry: a timer keeps an owed ACTION and cannot keep a RULE.
+    ([say("Going forward I'll always check the remote first."), ARMED_WAKEUP],
+     True, "a timer does NOT discharge a rule promise (#1946)"),
+    ([say("From now on I won't skip the sweep."), ARMED_CRON],
+     True, "CronCreate does NOT discharge a rule promise"),
+    # A turn carrying one of each is blocked on the STRICTER requirement, and
+    # blocked once rather than twice.
+    ([say("Going forward I'll always check first, and I owe #1937 the ARDI "
+          "loop."), ARMED_WAKEUP],
+     True, "a rule beside a debt is judged on the rule's requirement"),
+    ([say("Going forward I'll always check first, and I owe #1937 the ARDI "
+          "loop."), WROTE_FRAGMENT],
+     False, "a durable write clears both kinds at once"),
 ]
 
 

@@ -30,13 +30,36 @@ Nothing here suppresses a correction. Admitting a mistake, reporting a fact,
 and apologizing all pass untouched; only the forward-looking commitment is
 matched, and only when the same turn produced no durable mechanism.
 
-WHAT DISCHARGES IT
-------------------
-A tool call in the same turn that actually SHIPS something durable: a write to
-a rule surface (`CLAUDE.md`, `AGENTS.md`, `memories/`, `shared/`, `skills/`,
-`hooks/`, `.claude/settings.json`), a filed issue, or a `memorize`/`ums`
-invocation. Order within the turn does not matter -- the mechanism is normally
-built before the closing message that states the rule.
+TWO KINDS OF PROMISE, TWO KINDS OF MECHANISM
+--------------------------------------------
+A RULE promise commits to a class of future occasions -- "going forward I'll
+always X". A DEBT promise commits to one specific outstanding action -- "I owe
+#1937 the ARDI loop", "the UMS pass is owed by me".
+
+They are both promises and they owe different things, which is why the guard
+now asks a different question of each.
+
+A rule is kept by something DURABLE: a write to a rule surface (`CLAUDE.md`,
+`AGENTS.md`, `memories/`, `shared/`, `skills/`, `hooks/`,
+`.claude/settings.json`), a filed issue, or a `memorize`/`ums` invocation.
+
+A debt is kept by something that will FIRE: `ScheduleWakeup`, `CronCreate`, a
+scheduled task, the `schedule`/`loop`/`workaround-watcher` skill, or the
+repo's own detached PR poller. A durable record clears a debt too -- it is the
+always-available floor, and the right answer when the debt is somebody else's
+to schedule -- but it is the wrong instinct when the debt is yours and has a
+next step, because a memory entry documents an outstanding ARDI loop without
+running one. That asymmetry is the whole reason for the split: before it, the
+cheapest way past a blocked "I owe #N the ARDI loop" was to write a memory
+entry and re-send the same sentence, leaving the debt documented and still
+undelivered.
+
+The implication runs one way only. A timer does NOT clear a rule promise: it
+fires once and dies, so admitting it there would let an unrelated wakeup
+launder "going forward I'll always X".
+
+Order within the turn does not matter -- the mechanism is normally built
+before the closing message that states the rule.
 
 Prose does NOT discharge, and neither does a read. Both are the same mistake
 from opposite ends: a check keyed on a rule-surface path merely APPEARING
@@ -61,6 +84,12 @@ know the exact time") are excluded explicitly rather than left to luck.
 
 Fails OPEN and fires at most once per promise per session: a guard that wedges
 a session costs more than the lapse it prevents.
+
+Directive from the user, 2026-08-22 (ai-config#1946): "phrases with 'owe' ...
+should be triggers for our no-empty-promises guards; the models should be
+pushed or forced to create and report a mechanism for delivering on what they
+owe, such as scheduling a timer or other PR-watcher to trigger the next step
+of the ardi loop when it is time".
 """
 import hashlib
 import importlib.util
@@ -107,8 +136,15 @@ _MODAL = (r"(?:" + _APOS + r"ll|\s+will|\s+shall|\s+am\s+going\s+to|"
           + _APOS + r"m\s+going\s+to)")
 _NEG = r"(?:\s+won" + _APOS + r"?t|\s+will\s+not)"
 
-PROMISE = re.compile(
-    r"""(
+# Two kinds of promise, split because they owe DIFFERENT mechanisms.
+#
+# A RULE promise commits to a class of future occasions ("going forward I'll
+# always X"). What keeps it is something durable that outlives the session.
+#
+# A DEBT promise commits to one specific outstanding action ("I owe #1937 the
+# ARDI loop"). What keeps it is something that will actually FIRE -- an armed
+# timer or watcher. See `discharges()` for why the two discharge sets differ.
+_RULE_SRC = r"""(
     # Explicit temporal generalizer anywhere in the same sentence as a
     # first-person modal, in either order.
     #
@@ -141,24 +177,30 @@ PROMISE = re.compile(
 
     # Bare performatives, which need no generalizer to be promises.
     | \b """ + _SUBJ + r"""\s+(?:promise|commit)\s+to\b
+    )"""
 
-    # A promise stated as an outstanding DEBT rather than as a modal.
-    # "The UMS pass is owed by me" commits to future behaviour with no modal
-    # anywhere in it, and it reads as bookkeeping rather than as a
-    # commitment, so it passes self-review more easily than "I'll do X"
-    # does -- which makes it the worse form, not a lesser one.
-    #
-    # Bound to a first-person OWNER deliberately. This corpus discusses owed
-    # work constantly ("an owed UMS pass", "the pass is owed", "a pass is
-    # owed" all appear in shared/workflow/run-ums-proactively.md as ordinary
-    # rule prose), so a bare `owed` would fire on every reply that cites
-    # those rules. That is the trap hooks/no-placeholder-reply.py avoids by
-    # anchoring rather than matching a substring.
-    | \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
+# A promise stated as an outstanding DEBT rather than as a modal.
+# "The UMS pass is owed by me" commits to future behaviour with no modal
+# anywhere in it, and it reads as bookkeeping rather than as a
+# commitment, so it passes self-review more easily than "I'll do X"
+# does -- which makes it the worse form, not a lesser one.
+#
+# Bound to a first-person OWNER deliberately. This corpus discusses owed
+# work constantly ("an owed UMS pass", "the pass is owed", "a pass is
+# owed" all appear in shared/workflow/run-ums-proactively.md as ordinary
+# rule prose), so a bare `owed` would fire on every reply that cites
+# those rules. That is the trap hooks/no-placeholder-reply.py avoids by
+# anchoring rather than matching a substring.
+_DEBT_SRC = r"""(
+      \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
-    )""",
-    re.I | re.X,
-)
+    )"""
+
+RULE = re.compile(_RULE_SRC, re.I | re.X)
+DEBT = re.compile(_DEBT_SRC, re.I | re.X)
+# Kept as the union so any consumer asking "is this a promise at all?" still
+# gets one answer.
+PROMISE = re.compile(_RULE_SRC + r"|" + _DEBT_SRC, re.I | re.X)
 
 # `\b` is the wrong boundary for a bare action word: `-` and `/` are non-word
 # characters, so `\bums\b` matches INSIDE
@@ -215,6 +257,53 @@ SKILL_WORD = re.compile(
     re.I,
 )
 
+# Tools that ARM a later firing -- the delivery mechanism a DEBT owes.
+#
+# Verified against 232 local transcripts on 2026-08-22 rather than assumed:
+# `ScheduleWakeup` appears 302 times as a tool name, `CronCreate` 18. The set
+# otherwise follows hooks/no-unmonitored-pr.py's own `SCHEDULE` regex, which
+# already treats exactly these as "a PR is being watched" -- so reading a
+# scheduler call as a delivery mechanism is precedent in this repo rather
+# than a new claim.
+#
+# Deliberately ABSENT:
+#   * `CronList`, `CronDelete`, `list_scheduled_tasks` -- a read and a
+#     teardown. `CronList` appears 13 times in those same transcripts, so the
+#     near-miss is real, and a `create|update` anchor is what excludes it.
+#   * `Monitor` (126 occurrences). Whether it spans turns or completes inside
+#     the one that called it was not established here, and an in-turn wait
+#     would have already finished by `Stop` -- so admitting it could discharge
+#     a debt about what happens AFTER the wait. A `ScheduleWakeup` beside it
+#     costs one call.
+SCHEDULER_TOOL = re.compile(
+    r"(?:^|__)(?:"
+    r"schedulewakeup"
+    r"|croncreate|cronupdate"
+    r"|(?:create|update)_scheduled_task"
+    r"|(?:create|update)_trigger"
+    r"|send_later"
+    r")$",
+    re.I,
+)
+
+# Skills whose whole purpose is to arm a later firing. Matched against the
+# `skill` FIELD exactly, never against brief prose: the noun/verb ambiguity
+# that defeated three review rounds of `discharges()` ("what does the
+# schedule skill do?") cannot arise against an exact field comparison.
+#
+# `ardi` is deliberately NOT here, and that exclusion is the point of the
+# whole change. A debt sentence is composed in the closing recap AFTER a
+# round has run and is waiting -- so admitting `ardi` would discharge
+# precisely the reply this guard was extended to catch.
+SCHEDULER_SKILLS = {"schedule", "loop", "workaround-watcher"}
+
+# The repo's own detached poller, invoked directly. `no-unmonitored-pr.py`
+# arms it; running either by hand is the same arming.
+POLLER_CMD = re.compile(
+    r"\bhooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py",
+    re.I,
+)
+
 # Tools that WRITE. Lowercased at the comparison, since the same tool is
 # spelled `Write`/`Edit` by one harness and `create`/`edit` by another.
 WRITE_TOOLS = {
@@ -248,7 +337,12 @@ def records(path):
 
 
 def scan(path):
-    """Return (promise_text, mechanism_written) for the CURRENT turn.
+    """Return (rule_txt, debt_txt, durable, scheduled) for the CURRENT turn.
+
+    Both promise kinds are tracked separately, because they discharge on
+    different things and a reply can carry one of each. Resolving them at the
+    call site rather than here keeps this function reporting observations and
+    leaves the policy in `main()`.
 
     Scope resets at each real user prompt, so "the same turn" is what the
     comparison actually tests. A promise left undischarged in an earlier turn
@@ -263,12 +357,12 @@ def scan(path):
     requiring the write to come after the promise would block the correct
     case and pass almost nothing else.
     """
-    promise_txt = None
-    # tool_use ids whose call LOOKED like a mechanism, pending their result.
-    # A call is only evidence once it did not come back an error: permission
-    # denial is an ordinary way for a write to fail, and an attempted write
-    # ships nothing.
-    pending = set()
+    rule_txt = debt_txt = None
+    # tool_use ids whose call LOOKED like a mechanism, pending their result,
+    # keyed by WHICH mechanism it looked like. A call is only evidence once it
+    # did not come back an error: permission denial is an ordinary way for a
+    # write to fail, and an attempted write ships nothing.
+    pending = {"durable": set(), "scheduled": set()}
     failed = set()
 
     for m in records(path):
@@ -297,8 +391,9 @@ def scan(path):
                 if b.get("is_error"):
                     failed.add(b.get("tool_use_id"))
             if not is_tool_result:
-                promise_txt = None
-                pending.clear()
+                rule_txt = debt_txt = None
+                for ids in pending.values():
+                    ids.clear()
                 failed.clear()
             continue
 
@@ -313,22 +408,39 @@ def scan(path):
                 raw = b.get("text") or ""
                 if not raw.strip():
                     continue
-                hit = PROMISE.search(visible_prose(raw))
+                prose = visible_prose(raw)
+                hit = RULE.search(prose)
                 if hit:
-                    promise_txt = hit.group(0).strip()
+                    rule_txt = hit.group(0).strip()
+                hit = DEBT.search(prose)
+                if hit:
+                    debt_txt = hit.group(0).strip()
 
             elif b.get("type") == "tool_use":
-                if discharges(b.get("name") or "", b.get("input") or {}):
-                    pending.add(b.get("id"))
+                kind_of = discharges(b.get("name") or "", b.get("input") or {})
+                if kind_of:
+                    pending[kind_of].add(b.get("id"))
 
     # A call with no result at all still counts: the Stop hook can fire before
     # the result lands, and withholding discharge there would block a turn that
     # did the work. Only an explicit error disqualifies.
-    return promise_txt, bool(pending - failed)
+    durable = bool(pending["durable"] - failed)
+    scheduled = bool(pending["scheduled"] - failed)
+    return rule_txt, debt_txt, durable, scheduled
 
 
 def discharges(name, inp):
-    """Does this tool call actually SHIP a mechanism?
+    """Which kind of mechanism does this tool call SHIP, if any?
+
+    Returns `"durable"`, `"scheduled"`, or `None`.
+
+    The two are not interchangeable, and keeping them apart is the whole
+    point of the distinction. A durable write outlives the session and so
+    keeps a standing rule; a timer fires once and dies, so it can deliver one
+    owed action and encodes no rule at all. Letting a scheduler discharge a
+    RULE promise would let an unrelated wakeup launder "going forward I'll
+    always X" -- which is why `main()`, not this function, decides which
+    kinds satisfy which promise.
 
     Naming a rule surface is not shipping one, in either direction:
 
@@ -359,22 +471,43 @@ def discharges(name, inp):
     positive -- deliberate, named, and one command from clearing.
     """
     if not isinstance(inp, dict):
-        return False
+        return None
     low = name.lower()
+
+    # An arming call, identified by TOOL NAME. Nothing about the scheduled
+    # prompt's wording is read: three review rounds on #1724 defeated exactly
+    # that judgment inside this function, and the name is the decidable part.
+    #
+    # The residual is therefore an arming that carries the wrong work -- a
+    # wakeup scheduled for something else discharges a debt it will never
+    # deliver. That is bounded by the same turn's own reporting duty (state
+    # the fire time and what fires), and it is a far smaller error than the
+    # alternative the guard had before: pushing every owed action toward a
+    # memory entry that delivers nothing at all.
+    if SCHEDULER_TOOL.search(low):
+        # `stop: true` ENDS a dynamic loop rather than arming one, and the
+        # tool's own schema ignores every other field when it is set.
+        if inp.get("stop") is True:
+            return None
+        return "scheduled"
 
     if low in WRITE_TOOLS:
         target = " ".join(
             str(inp.get(k, "")) for k in ("file_path", "path", "notebook_path")
         )
-        return bool(MECHANISM_PATH.search(target))
+        return "durable" if MECHANISM_PATH.search(target) else None
 
     if low == "bash":
         cmd = str(inp.get("command", ""))
         if FILING_CMD.search(cmd):
-            return True
+            return "durable"
+        if POLLER_CMD.search(cmd):
+            return "scheduled"
         # A shell write needs BOTH a rule surface and something that writes to
         # it, so `cat shared/workflow/ardi.md` reads as the read it is.
-        return bool(MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd))
+        if MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd):
+            return "durable"
+        return None
 
     if low in ("task", "agent", "skill"):
         # ONLY an action word. A brief naming a path is not evidence about
@@ -401,11 +534,74 @@ def discharges(name, inp):
         # A delegated build discharges on the parent staging the artifact
         # afterwards, per this function's docstring; scan() cannot see the
         # subagent's own writes, so nothing here tries to.
+        #
+        # The scheduling skills are matched against the `skill` FIELD exactly
+        # rather than against the brief, so that same ambiguity cannot reach
+        # them: "what does the schedule skill do?" is prose in `args`, never
+        # the value of `skill`.
+        if str(inp.get("skill", "")).strip().lower() in SCHEDULER_SKILLS:
+            return "scheduled"
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))
-        return bool(FILING_CMD.search(blob) or SKILL_WORD.search(blob))
+        if FILING_CMD.search(blob) or SKILL_WORD.search(blob):
+            return "durable"
+        return None
 
-    return False
+    return None
+
+
+RULE_REASON = (
+    "Standing rule (shared/workflow/no-empty-promises.md, from the user's "
+    "own `cai`): no empty promises. A commitment about how you will behave "
+    "from now on dies with this conversation unless something durable "
+    "outlives it -- so the promise is the report of the work, never the "
+    "work.\n\n"
+    "Ship one of these in this turn, then say what you shipped:\n"
+    "  * a memory or rule entry (memories/, CLAUDE.md, AGENTS.md, or a "
+    "shared/ fragment) -- the minimum, and always available;\n"
+    "  * a hook, when the condition is decidable from the transcript -- "
+    "model it on hooks/no-offer-to-file.py, add tests, register it in "
+    "hooks/hooks.json, and do NOT activate it before its PR merges "
+    "(README's activation gate);\n"
+    "  * a filed issue, when the mechanism is real work someone must "
+    "schedule.\n\n"
+    "A scheduled timer does NOT clear this one. A wakeup fires once and "
+    "dies, so it can deliver a specific owed action but encodes no standing "
+    "rule -- and a rule is what you just committed to.\n\n"
+    "Delegated the build to a subagent? Its writes are not in this "
+    "transcript (measured: 0 of 126 session transcripts carried a sidechain "
+    "record), so stage or commit the artifact -- `git add <path>` -- and "
+    "this clears.\n\n"
+    "If none of those is worth building, the honest move is to drop the "
+    "promise and state the fact without it -- 'I was wrong about X, and here "
+    "is Y' costs the user nothing and claims nothing."
+)
+
+DEBT_REASON = (
+    "Standing rule (shared/workflow/no-empty-promises.md, from the user's "
+    "own `cai`): no empty promises. An owed action is the sharpest case, "
+    "because naming the debt reads as accountability while closing the item "
+    "on the record -- so nobody, including you, returns to it. The session "
+    "ends and the ARDI round, the re-review, the follow-up never happen.\n\n"
+    "What an owed ACTION needs is something that will actually FIRE. Arm one "
+    "of these now, then say what you armed and at what clock time:\n"
+    "  * `ScheduleWakeup` -- a timer carrying the next step (per CLAUDE.md's "
+    "'State the actual time when reporting a scheduled check-in', report the "
+    "clock time it returns, not the delay);\n"
+    "  * `CronCreate` or a scheduled task, for a check-in that must survive "
+    "this session;\n"
+    "  * the `schedule` / `loop` / `workaround-watcher` skill;\n"
+    "  * the detached poller -- `python3 hooks/monitor-open-prs.py` -- when "
+    "the debt is a PR to watch.\n\n"
+    "A durable record still clears this too (memories/, CLAUDE.md, "
+    "AGENTS.md, a shared/ fragment, or a filed issue), and it is the right "
+    "answer when the debt is somebody else's to schedule. It is the WRONG "
+    "answer when the debt is yours and has a next step: a memory entry "
+    "documents an outstanding ARDI loop, it does not run one.\n\n"
+    "If there is genuinely no next step to arm, drop the debt language and "
+    "state the plain fact instead -- '#N is open awaiting re-review' reports "
+    "the state and claims nothing."
+)
 
 
 def main() -> int:
@@ -422,11 +618,19 @@ def main() -> int:
         return 0
 
     try:
-        promise_txt, mech = scan(path)
+        rule_txt, debt_txt, durable, scheduled = scan(path)
     except Exception:
         return 0  # fail open
 
-    if not promise_txt or mech:
+    # A RULE promise is checked first and against the STRICTER requirement.
+    # A turn can carry one of each, and the rule's mechanism satisfies the
+    # debt as well, so resolving in this order never blocks twice for one
+    # under-discharged turn.
+    if rule_txt and not durable:
+        promise_txt, reason = rule_txt, RULE_REASON
+    elif debt_txt and not (durable or scheduled):
+        promise_txt, reason = debt_txt, DEBT_REASON
+    else:
         return 0
 
     key = hashlib.sha256(
@@ -442,30 +646,9 @@ def main() -> int:
     print(json.dumps({
         "decision": "block",
         "reason": (
-            "[hook: no-empty-promise] Your reply promises future behaviour "
-            f"(\"{promise_txt}\") and this turn wrote no mechanism to keep "
-            "it.\n\n"
-            "Standing rule (shared/workflow/no-empty-promises.md, from the "
-            "user's own `cai`): no empty promises. A commitment about how you "
-            "will behave from now on dies with this conversation unless "
-            "something durable outlives it -- so the promise is the report of "
-            "the work, never the work.\n\n"
-            "Ship one of these in this turn, then say what you shipped:\n"
-            "  * a memory or rule entry (memories/, CLAUDE.md, AGENTS.md, or "
-            "a shared/ fragment) -- the minimum, and always available;\n"
-            "  * a hook, when the condition is decidable from the transcript "
-            "-- model it on hooks/no-offer-to-file.py, add tests, register it "
-            "in hooks/hooks.json, and do NOT activate it before its PR merges "
-            "(README's activation gate);\n"
-            "  * a filed issue, when the mechanism is real work someone must "
-            "schedule.\n\n"
-            "Delegated the build to a subagent? Its writes are not in this "
-            "transcript (measured: 0 of 126 session transcripts carried a "
-            "sidechain record), so stage or commit the artifact -- "
-            "`git add <path>` -- and this clears.\n\n"
-            "If none of those is worth building, the honest move is to drop "
-            "the promise and state the fact without it -- 'I was wrong about "
-            "X, and here is Y' costs the user nothing and claims nothing."
+            "[hook: no-empty-promise] Your reply commits to future behaviour "
+            f"(\"{promise_txt}\") and this turn shipped no mechanism to keep "
+            "it.\n\n" + reason
         ),
     }))
     return 0

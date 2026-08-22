@@ -82,11 +82,18 @@ is to drop the promise and state the plain fact.
 mechanism: a `Stop` guard that blocks a forward-looking commitment when the turn
 wrote nothing durable.
 
+An owed **action** is the case where the mechanism has to *fire* rather than merely record.
+"I owe this PR the ARDI loop" commits to one specific next step, and a memory entry documenting that loop does not run it --- so arm the step (a `ScheduleWakeup` carrying it, a cron or scheduled task, a PR watcher) and report what fires and when.
+A durable record still clears such a debt, and is right when the debt is somebody else's to schedule.
+The implication runs one way only: a timer fires once and dies, so it cannot keep a standing rule.
+
 - **Do:** ship the mechanism in the same turn, and name it in the past tense.
+- **Do:** arm the next step, and report its clock time, when what you owe is an action rather than a rule.
 - **Do:** drop the promise and state the fact when no mechanism is worth
   building.
 - **Don't:** end a turn carrying a promise and no durable artifact.
 - **Don't:** promise the mechanism itself in the future tense.
+- **Don't:** answer an owed action with a written record alone --- documenting an ARDI loop is not running one.
 
 ## Generalize instructions to every AI agent by default
 

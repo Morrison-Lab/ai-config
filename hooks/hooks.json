@@ -399,7 +399,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-empty-promise.py\"",
             "timeout": 10,
             "script": "no-empty-promise.py",
-            "why": "shared/workflow/no-empty-promises.md -- blocks a reply committing to future behaviour when the same turn wrote no durable mechanism; the rule is itself a promise, so prose alone would be an instance of what it forbids."
+            "why": "shared/workflow/no-empty-promises.md -- blocks a reply committing to future behaviour when the same turn shipped no mechanism; a standing rule needs a durable write while an owed action also accepts an armed timer or watcher, since a record documents a debt without delivering it. The rule is itself a promise, so prose alone would be an instance of what it forbids."
           },
           {
             "type": "command",

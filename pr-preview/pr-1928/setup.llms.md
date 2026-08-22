@@ -1,0 +1,71 @@
+# Setup
+
+## Local setup
+
+**Requirements:** git, [Claude Code CLI](https://claude.ai/code), Codex, and/or [Cursor](https://cursor.com).
+
+``` sh
+git clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config
+bash ~/ai-config/bootstrap.sh
+```
+
+`bootstrap.sh` symlinks Claude assets into `~/.claude/`, generated Codex wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`, Cursor user rules into `${CURSOR_HOME:-$HOME/.cursor}/rules`, and — when no Cursor plugin or Claude skill install is already serving the catalog — Cursor skills into `~/.cursor/skills/`. Run it again any time you add a new top-level dir to the repo.
+
+### Verify the install
+
+``` sh
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.cursor/rules
+scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
+```
+
+In a Claude Code session, type `/` and confirm skills appear (e.g. `/ardi`, `/scout-peers`).
+
+In Codex, the wrappers appear as skills from `${CODEX_HOME:-$HOME/.codex}/skills`. Each wrapper reads the matching canonical workflow from `skills/<name>/SKILL.md` and adapts Claude-specific metadata/tools to Codex.
+
+In Cursor, open **Customize -\> Rules** and confirm the `cursor-rules/` files appear as user rules. Skills appear under **Customize -\> Skills** from the plugin, from `~/.claude/skills`, or from `~/.cursor/skills/`.
+
+## Web (cloud) sessions — this repo
+
+In cloud sessions (claude.ai or remote environments), `bootstrap.sh` can’t run at startup because the repo isn’t on disk yet. The committed `SessionStart` hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`) runs `bootstrap.sh` once the repo is checked out, symlinking `skills/` and `commands/` into `~/.claude/`. The hook is a no-op outside remote sessions (`CLAUDE_CODE_REMOTE`) and is idempotent.
+
+The hook also installs **Julia** (via `juliaup`) on first start, if allowed by the environment’s network policy. See [`docs/julia-setup.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/julia-setup.md).
+
+## Plugin marketplace — other repos
+
+To load these skills when a **different** repo is open in a cloud session, add this to that repo’s `.claude/settings.json`:
+
+``` json
+{
+  "extraKnownMarketplaces": {
+    "Morrison-Lab": {
+      "source": { "source": "github", "repo": "Morrison-Lab/ai-config" }
+    }
+  },
+  "enabledPlugins": {
+    "ai-config@Morrison-Lab": true
+  }
+}
+```
+
+Claude Code installs the plugin at session start. Skills are namespaced: `/ai-config:ardi`, `/ai-config:reprexes`, etc.
+
+Or try it interactively in any Claude Code session:
+
+``` text
+/plugin marketplace add Morrison-Lab/ai-config
+/plugin install ai-config@Morrison-Lab
+```
+
+> **WARNING:**
+>
+> The plugin install and the `bootstrap.sh` symlink install are **alternatives, not complements**: both serve the same corpus, so running both lists every skill twice (bare `/ardi` plus prefixed `/ai-config:ardi`) and blows the skill-listing context budget ([ai-config#1409](https://github.com/Morrison-Lab/ai-config/issues/1409)). On a machine that ran `bootstrap.sh`, leave the plugin disabled — including a consumer repo’s checked-in `enabledPlugins` block, which you opt out of with `"ai-config@Morrison-Lab": false` in **`.claude/settings.local.json`**. Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude Code’s five, so a `false` there loses to the repo’s checked-in `true` ([settings docs](https://code.claude.com/docs/en/settings)). Likewise enable the plugin from at most **one** marketplace: `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin, so a second entry is a no-op collision. `bootstrap.sh` warns about both cases via `scripts/check-plugin-overlap.py`.
+
+## `@claude` bot on PRs
+
+The bot that runs `claude-code-action` on this repo’s PRs reads skills from `.claude/skills/`. The `.claude/skills → ../skills` symlink is committed to `main`, so `restoreConfigFromBase` always restores it — even on PR branches. Comment `@claude ardi` (or any skill name) on a PR and the bot can run it.
+
+## Deconflicting parallel local sessions
+
+When several AI sessions share one local checkout, they can clobber each other. The `session-lock` skill (alias `deconflict-sessions`) keeps a machine-local registry of active sessions under `.git/ai-sessions/`. Sessions can refuse to share a working tree and isolate into a `git worktree`. See [`docs/local-session-deconfliction.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md).
+
+Back to top

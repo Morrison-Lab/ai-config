@@ -210,6 +210,36 @@ derive the primitive count to say where it stands.
 If the primitive appears anywhere outside the helper, the fix went to a
 site: one stray call is already an unguarded call site, not a margin.
 
+A helper forbids only what its signature makes unavailable.
+Routing every call through one function does nothing if the function still
+accepts an unguarded call, and an OPTIONAL parameter is a shape a call site
+forgets --- the caller reads as complete without that argument, and nothing
+at the call site says otherwise.
+So put the input the guarded step is derived FROM in a REQUIRED argument,
+and derive the step itself inside.
+That forbids OMISSION and nothing else: a call passing an empty or wrong
+value still reaches the unguarded behaviour, so report that you closed the
+skipping spelling rather than reporting the unsafe call impossible.
+
+Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), at
+commit `cf6c47ce`; at the time of writing that PR's branch carries it and
+`main` does not.
+One commit threaded an optional `overrides=` through the config reads it
+knew about and left one pre-existing read without it, which was a live
+bypass.
+Making the raw `argv` a required argument in place of `overrides=`, and
+deriving the overrides from `argv` inside the helper, removed the spelling
+rather than the instance --- twice over, since the same helper takes the
+pushing command's environment as a second required argument for the same
+reason.
+
+State the residue in those terms rather than as an impossibility.
+A caller passing `argv=[]` derives no overrides and gets the unguarded read
+back, and two end-to-end rows in that guard's own regression suite fail when
+an existing call site passes one --- so the value is asserted everywhere the
+helper is called today, and nothing stops a NEW call site from spelling it.
+
 A choke point narrows the class without closing it, so say which you
 achieved.
 The next author can still bypass the helper unless something asserts they
@@ -281,10 +311,14 @@ The structural count is asserted by nothing at all.
   unfinished fix, instead of counting to two.
 - **Do:** prefer a choke point the next author must go out of their way to
   bypass over a check the next author must remember.
+- **Do:** make the input a required argument and derive the guarded step
+  inside, so the call that SKIPS it cannot be spelled.
 - **Do:** say whether the count is enforced or merely current, and name
   the assertion that would enforce it.
 - **Don't:** patch the sites a reviewer happened to name --- they found
   the instances, not the boundary.
+- **Don't:** take the un-skippable input as an OPTIONAL parameter --- that
+  routes the callers you remembered and leaves the spelling that skips it.
 - **Don't:** claim a bypass is impossible when nothing tests for one.
 - **Don't:** reach for a choke point when the defect genuinely has one
   site.
@@ -308,6 +342,8 @@ Flag these with the same weight as the other principle-level findings:
 - A fix applied to the two or three call sites a reviewer named, where
   routing them through one checked helper would drop the unguarded count
   to zero.
+- A guarding input threaded through call sites as an optional parameter,
+  where making it required would leave the skipping call unspellable.
 
 (Directives from the user, 2026-07-30: "cai: minimize use of generative
 ai in agentic work; maximize use of deterministic, inspectable algorithms

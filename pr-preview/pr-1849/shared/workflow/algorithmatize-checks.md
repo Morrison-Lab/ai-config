@@ -559,6 +559,57 @@ to count the case.**
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A case labelled non-discriminating is a claim about the current clause set".
 
+## Run new scheduled automation once, attended, before its first scheduled run
+
+Every section above is about building the instrument and testing its logic.
+This is about the first time it actually runs, which is a different event and
+usually an unwatched one.
+
+Automation that fires on a schedule has a first run you did not choose.
+It happens whenever the cron says, into a workflow log nobody is reading, and
+its failure mode is silence: the thing it was supposed to produce simply does
+not appear, and nothing is visibly wrong anywhere.
+A monthly job can therefore be broken for a month before anyone notices, and
+the gap between shipping it and learning it never worked is the whole interval.
+
+So trigger it yourself, once, while you are watching.
+A `workflow_dispatch` trigger alongside the schedule costs one line and makes
+this possible; add it if it is missing.
+
+**What this catches is specifically the part unit tests cannot reach.**
+The logic can be perfectly tested and the run still fail on everything the
+tests stubbed: a token without the scope, a branch protection that refuses the
+push, a missing permission, a path that exists only on the runner.
+Those are properties of the environment rather than of the code, so they are
+invisible to a local run and to review, and they are exactly what a first
+attended run surfaces.
+
+**Do it after the change has merged, not from the branch**, when the automation
+mutates shared state.
+A dispatch from a feature branch can open a real PR, write a real commit, or
+consume real inputs, and doing that before the fix is in the default branch
+creates work you then have to undo.
+
+- **Do:** dispatch new scheduled automation manually, once, after it merges,
+  and read its step conclusions rather than only its overall status.
+- **Do:** add `workflow_dispatch` when the schedule is the only trigger, so a
+  first attended run is possible at all.
+- **Don't:** let the cron be the first execution --- that is the one nobody
+  watches, and its failure is silent.
+- **Don't:** dispatch from the branch when the job writes to shared state.
+
+(Measured 2026-08-21 on `ucdavis/bcs`.
+A monthly changelog-assembly workflow was dispatched by hand the day it landed.
+Its collation step succeeded and its commit step failed: the job pushed to
+`main`, which is protected by a ruleset requiring a pull request, so the push
+was rejected with `GH013`.
+The workflow had been adapted from a template whose commit step pushes
+directly, and the assumption that the default branch is pushable transferred
+silently.
+Its only automatic trigger was `cron: '0 9 1 * *'`, so the alternative to
+dispatching was discovering this on the first of the following month, unwatched.
+Tracked as ucdavis/bcs#707.)
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

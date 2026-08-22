@@ -46,17 +46,32 @@ A branch in `INLINE` that the branch pass had classified **active** is a contrad
 
 ### 1. Classify, both passes
 
+Everything in this step shares a scratch directory, so create it **first**. Several commands write into `$TMP`, and an undefined `$TMP` sends each redirect to the filesystem root:
+
+``` bash
+TMP=$(mktemp -d)
+```
+
 Run [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) steps 1 through 3. Run [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) steps 1 through 3.
 
 For the local half, run step 8’s **classification** only. `clean-branches` step 8 has no separately-runnable enumeration sub-step: each of 8a, 8b, and 8c bundles its listing command and its `git branch -d`/`-D` into one fenced block. So name the read half explicitly rather than delegating to a sub-step that does not exist:
 
 ``` bash
+# Branches checked out in ANY worktree cannot be deleted. clean-branches 8a
+# gets this free from the `*` prefix its column-anchored grep filters, but
+# `--format` prints no `*`/`+` marker at all, so switching to it to dodge the
+# `+` mangling ALSO drops that protection. Derive the set explicitly instead.
+git worktree list --porcelain -z | tr '\0' '\n' \
+  | awk '/^branch /{b=substr($0,8); sub("refs/heads/","",b); print b}' \
+  | sort -u > "$TMP/checked-out.txt"
+
 # 8a --- merged into main. `--format` is clean-worktrees step 3c's documented
 # remedy, applied here because THIS skill guarantees worktrees exist: plain
 # `git branch --merged` prefixes a worktree-checked-out branch with `+`, which
 # mangles the name and defeats a column-anchored grep.
 git branch --merged origin/main --format='%(refname:short)' \
-  | grep -vxE 'main|master'
+  | grep -vxF -e main -e master \
+  | grep -vxFf "$TMP/checked-out.txt"
 
 # 8b --- upstream gone. clean-branches' own command, verbatim.
 git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads \
@@ -93,13 +108,7 @@ Report the snapshot’s path in the plan. Anything the prune removed is recovera
 
 With that snapshot taken, the invariant the gate protects is: **nothing that can lose work happens before confirmation, and the one pre-gate mutation that could is recorded first.**
 
-Derive the `INLINE` set. These commands share a scratch directory, so create one first — `$TMP` is otherwise empty and every redirect below writes to the filesystem root:
-
-``` bash
-TMP=$(mktemp -d)
-```
-
-This first command produces the raw worktree-to-branch mapping, every worktree included — which is **not** `INLINE`:
+Derive the `INLINE` set. This first command produces the raw worktree-to-branch mapping, every worktree included — which is **not** `INLINE`:
 
 ``` bash
 # -z plus NUL-safe parsing: a worktree path may contain spaces, and `$2`

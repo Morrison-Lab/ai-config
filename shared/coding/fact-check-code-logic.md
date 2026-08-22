@@ -329,6 +329,18 @@ That reads as rigor --- the comment above it usually says exactly what
 property it is isolating --- which is what makes it the harder of the two
 gaps to catch by reading rather than by mutating.
 
+The general shape is worth naming past this one paragraph: a quantifier
+over a pair --- both, either, each of --- reads as symmetric and often is
+not, and a sentence asserting it can be wrong in one direction while
+sounding complete in both.
+The table above cannot fail that way, because enumerating the cases forces
+each one to be written down rather than assumed from the other.
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+quantifier section covers checking one you already wrote against its
+population; this is the authoring-side move --- reach for the enumeration
+before the quantifier, for any claim over a pair whose two halves might
+not behave the same way.
+
 - **Do:** run both mutations --- revert, and over-broaden --- on every
   predicate a fix adds that decides between two outcomes.
 - **Do:** build the over-broaden fixture to sit in the specific gap the

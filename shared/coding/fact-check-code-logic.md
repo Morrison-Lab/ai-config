@@ -607,9 +607,13 @@ The failure has a signature worth learning:
 **A rationale that reasons about defaults is particularly easy to get wrong**,
 because the default is the thing you did not write and therefore did not think
 about.
-"Uses X's own engine, to avoid diverging" is false when the call's defaults
-select a different engine.
-Read the signature rather than the intent.
+"Safe here, because the caller validates the input" is false when the caller
+validates nothing and the safety comes from a filter further upstream ---
+and note that the code is still safe, which is what makes it an instance of
+this pattern rather than of a bug.
+Deleting the sentence would leave a correct program; keeping it teaches the
+next reader to protect the wrong invariant.
+Read the signature and the call site rather than the intent.
 
 The check is one question per justifying sentence:
 **what command would show this false?**
@@ -643,9 +647,11 @@ review question and a self-check rather than a guard.
 (Measured 2026-08-21, three instances in one session, each caught by a
 reviewer rather than by any check, and in each the artifact itself was
 correct.
-A hook comment attributed an omitted gate to "earlier fixes rather than the
-original design", where `git log -S` put it in the hook's first PR
-(ai-config#1860).
+A fragment's prose about a hook attributed an omitted gate to "earlier fixes
+rather than the original design", where `git log -S` put it in the hook's
+first PR (ai-config#1860).
+The gate was real and the hook was right; only the sentence about where it
+came from was wrong.
 `fully-clean.md` said a checker "annotates duplicated names automatically",
 where it annotates only the lines it reports, never a passing one ---
 which was the very case the passage illustrated (ai-config#1870).

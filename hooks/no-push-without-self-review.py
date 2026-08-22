@@ -146,6 +146,21 @@ PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-opti
 # Short options that take a value, for the clustered form (`-qo ci.skip`).
 SHORT_OPTS_WITH_VALUE = "o"
 
+# The config forms of PUSH_OPTS_INDETERMINATE. Each entry is (key, the flag it
+# mirrors, a predicate on the configured value). `{remote}` is filled from the
+# resolved remote and the entry is skipped when no remote resolves.
+def _is_true(v: str) -> bool:
+    return v.strip().lower() in {"true", "yes", "on", "1"}
+
+
+CONFIG_LIKE_INDETERMINATE_FLAGS = (
+    ("remote.{remote}.mirror", "--mirror", _is_true),
+    ("push.followTags", "--follow-tags", _is_true),
+    ("push.recurseSubmodules", "--recurse-submodules",
+     lambda v: v.strip().lower() in SUBMODULE_PUSH_MODES),
+)
+
+
 # Options after which no single reviewed commit can describe the push.
 # `--branches` is git's own documented alias of `--all` (`git push -h`), so it
 # ships every branch while looking like an ordinary unknown option.
@@ -702,6 +717,28 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         if remote and _git_config(directory, "--get-all", f"remote.{remote}.push"):
             return None, (f"`remote.{remote}.push` is configured, so what a bare push "
                           "ships is not simply the current branch")
+        # Several options in PUSH_OPTS_INDETERMINATE have a CONFIG form that
+        # does the same thing without appearing on the command line, so
+        # refusing the flag and not the config leaves the bypass open on the
+        # path that names nothing. A review found `remote.<name>.mirror`;
+        # deriving the rest of the class from git's own config list turned up
+        # two more. Measured on git 2.43.0, each with a bare `git push origin`:
+        #
+        #   remote.<name>.mirror=true  -> ships every branch AND every tag,
+        #                                 including an unreviewed branch
+        #   push.followTags=true       -> ships tags alongside the branch
+        #   push.recurseSubmodules     -> on-demand/only ship commits in
+        #                                 ANOTHER repository
+        #
+        # Add an entry here rather than a branch when the next one appears.
+        for key, mirrors, verdict in CONFIG_LIKE_INDETERMINATE_FLAGS:
+            key = key.format(remote=remote) if remote else key
+            if "{remote}" in key:
+                continue
+            value = _git_config(directory, "--get", key)
+            if value and verdict(value):
+                return None, (f"`{key}` is set, which does what `{mirrors}` does "
+                              "without naming it on the command line")
         head = _rev_parse(directory, "HEAD")
         if head is None:
             return None, "HEAD could not be resolved for the repository being pushed"

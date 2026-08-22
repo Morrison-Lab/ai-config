@@ -642,6 +642,31 @@ def config_cases() -> tuple[int, int]:
         ("an ambiguous abbreviation is refused rather than guessed",
          ["branch.main.pushRemote", "origin"],
          f"git -C {REPO} push --re origin", True, "does not name a single reviewable head"),
+        # The CONFIG forms of PUSH_OPTS_INDETERMINATE. Refusing the flag and
+        # not the config left the bypass open on the path that names nothing.
+        # A review found the first; the other two came from deriving the class
+        # off git's own config list. Measured on git 2.43.0 with a bare push:
+        # mirror ships every branch and tag including an unreviewed one,
+        # followTags ships tags alongside the branch, and recurseSubmodules
+        # in these modes ships commits in another repository.
+        ("remote.<name>.mirror does what --mirror does, without the flag",
+         ["remote.origin.mirror", "true"],
+         f"git -C {REPO} push origin", True, "`remote.origin.mirror` is set"),
+        ("remote.<name>.mirror is caught with no remote named",
+         ["remote.origin.mirror", "true"],
+         f"git -C {REPO} push", True, "`remote.origin.mirror` is set"),
+        ("push.followTags does what --follow-tags does",
+         ["push.followTags", "true"],
+         f"git -C {REPO} push origin", True, "`push.followTags` is set"),
+        ("push.recurseSubmodules=on-demand ships another repository's commits",
+         ["push.recurseSubmodules", "on-demand"],
+         f"git -C {REPO} push origin", True, "`push.recurseSubmodules` is set"),
+        # The negative side: a falsy value must NOT refuse, or the guard denies
+        # every push in a repo that merely mentions the key.
+        ("a falsy push.followTags is not a reason to refuse",
+         ["push.followTags", "false"], f"git -C {REPO} push origin", False, None),
+        ("push.recurseSubmodules=check ships nothing extra",
+         ["push.recurseSubmodules", "check"], f"git -C {REPO} push origin", False, None),
         ("a positional remote still beats --repo naming a different one",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
          f"git -C {REPO} push other --repo=origin", True, "`remote.other.push` is configured"),

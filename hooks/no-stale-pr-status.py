@@ -40,7 +40,12 @@ RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 # a PR number paragraphs away from an unrelated test count.
 RX_PR_NEARBY = re.compile(
     r"#\d+|/pull/\d+|\bgh pr\b|\bcheck[- ]runs?\b|\bstatusCheckRollup\b"
-    r"|\bCI\b|\bworkflow\b|\bhead SHA\b|\bheadRefOid\b",
+    r"|\bCI\b|\bworkflow\b|\bhead SHA\b|\bheadRefOid\b"
+    # The plain word is the most natural way to reference a PR in prose, and
+    # omitting it classified a message opening "PR checks: ..." as having no
+    # PR reference at all. Erring toward the STRONG wording is the safe
+    # direction, so a loose match here costs nothing.
+    r"|\bPRs?\b|\bpull requests?\b",
     re.I,
 )
 NEARBY_WINDOW = 250
@@ -112,6 +117,24 @@ RX_NEGATION = re.compile(
 # Deliberately coarse -- this only needs to find SOME earlier boundary, not
 # parse prose correctly.
 RX_SENTENCE_BREAK = re.compile(r"[.!?][\"'\)\]*_`]*(?:\s|$)|\n")
+
+
+def all_unnegated_asserts(text):
+    """Every un-negated ASSERT match, in textual order.
+
+    `find_unnegated_assert` returns the FIRST, which is the right answer for
+    "should this fire". It is the wrong answer for "how should this be
+    worded", because the strongest claim in a message is not always the
+    earliest one.
+    """
+    out = []
+    for hit in RX_ASSERT.finditer(text):
+        sentence_start = 0
+        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
+            sentence_start = boundary.end()
+        if not RX_NEGATION.search(text[sentence_start:hit.start()]):
+            out.append(hit)
+    return out
 
 
 def find_unnegated_assert(text):
@@ -223,8 +246,24 @@ def main() -> int:
     # it may well be a local test run, so say what was MATCHED rather than
     # asserting what it MEANS. The staleness finding is unchanged either way --
     # the issue's guidance was to soften the wording, not narrow the trigger.
-    window = text[max(0, hit.start() - NEARBY_WINDOW):hit.end() + NEARBY_WINDOW]
-    if RX_BARE_COUNT.match(hit.group(0).strip()) and not RX_PR_NEARBY.search(window):
+    # Every un-negated assertion in the message votes, not just the first one
+    # `find_unnegated_assert` happened to return. A message can open with a
+    # bare "11 pass" and go on to say "ready to merge"; deciding from the
+    # first match alone then softens a claim that is not soft at all -- the
+    # same misdescription this fix exists to remove, pointing the other way.
+    # Any non-bare-count phrase, or any count with a PR reference near it,
+    # settles it as a check-state claim.
+    soft = True
+    for other in all_unnegated_asserts(text):
+        window = text[max(0, other.start() - NEARBY_WINDOW):
+                      other.end() + NEARBY_WINDOW]
+        if not RX_BARE_COUNT.match(other.group(0).strip()):
+            soft = False
+            break
+        if RX_PR_NEARBY.search(window):
+            soft = False
+            break
+    if soft:
         lead = "Your message states a pass/fail count"
         consequence = (
             "If that count came from a local test run rather than from this "

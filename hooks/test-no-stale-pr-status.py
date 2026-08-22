@@ -30,6 +30,9 @@ MCP_PUSH = {"type": "assistant", "message": {"content": [
                "files": [{"path": "f.py", "content": "x"}]}}]}}
 
 
+SENTINEL_PREFIX = ".claude-stale-status-"
+
+
 def say(text):
     return {"type": "assistant", "message": {"content": [
         {"type": "text", "text": text}]}}
@@ -120,7 +123,7 @@ def run(events):
     # The guard fires once per distinct message; clear sentinels so repeated
     # runs of this suite stay deterministic.
     for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(".claude-stale-status-"):
+        if f.startswith(SENTINEL_PREFIX):
             try:
                 os.remove(os.path.join(tempfile.gettempdir(), f))
             except OSError:
@@ -154,6 +157,19 @@ ATTRIBUTION = [
     ("All checks green.",
      "asserts a PR's check state",
      "an explicit check-state phrase keeps the strong wording"),
+
+    # Review round 1 on #1922. Both were reproduced against the hook by the
+    # reviewer, and both are the SAME defect this PR removes, pointing the
+    # other way: a message that is not soft at all, softened.
+    ("11 pass, 0 fail -- ready to merge.",
+     "asserts a PR's check state",
+     "a later non-count phrase settles it, not just the first match"),
+    ("PR checks: 11 pass, 0 fail.",
+     "asserts a PR's check state",
+     "the plain word PR counts as a nearby reference"),
+    ("The pull request has 11 pass.",
+     "asserts a PR's check state",
+     "so does the spelled-out form"),
 ]
 
 
@@ -166,7 +182,7 @@ def check_attribution():
             for e in (QUERY, PUSH, say(message)):
                 fh.write(json.dumps(e) + "\n")
         for f in os.listdir(tempfile.gettempdir()):
-            if f.startswith(".claude-stale-pr"):
+            if f.startswith(SENTINEL_PREFIX):
                 try:
                     os.remove(os.path.join(tempfile.gettempdir(), f))
                 except OSError:

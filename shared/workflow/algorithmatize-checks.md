@@ -289,7 +289,7 @@ Ask it of the character rather than of the input, since the input you would have
 
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
-This parent section's closing **Don't** governs a comment claiming *what* a matcher matches.
+"Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
 
 **That remedy has a precondition worth naming, because a comment gives no sign
 of which side of it a claim sits on.**

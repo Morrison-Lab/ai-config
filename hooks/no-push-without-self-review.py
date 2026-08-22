@@ -152,6 +152,15 @@ SHORT_OPTS_WITH_VALUE = "o"
 PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
                            "--follow-tags"}
 
+# git accepts any UNAMBIGUOUS abbreviation of a long option, so `--rep` is
+# `--repo`. Measured on git 2.43.0: `--rep=beta` pushes to beta, while `--re`
+# and `--rec` are refused as ambiguous with `--receive-pack` and
+# `--recurse-submodules`. Recognising only the full spelling let `--rep=other`
+# through where `--repo=other` was denied, under identical config.
+REPO_SPELLINGS = {"--rep", "--repo"}
+NO_REPO_SPELLINGS = {"--no-rep", "--no-repo"}
+
+
 # `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
 # which no fingerprint naming a commit in this one can describe.
 SUBMODULE_PUSH_MODES = {"on-demand", "only"}
@@ -426,11 +435,33 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
 
 def _push_positionals(argv: list[str]) -> list[str] | None:
     """The positional arguments after `push` -- remote first; None if indeterminate."""
+    return None if (parsed := _parse_push(argv)) is None else parsed[0]
+
+
+def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
+    """(positionals after `push`, the --repo value); None if indeterminate.
+
+    `--repo` is read HERE rather than by a separate scan of argv, because the
+    guards that make this walk correct are exactly the ones such a scan lacks.
+    An earlier revision scanned raw argv for `--repo` and was permissive twice
+    over, measured on git 2.43.0 against a repo whose `remote.pushDefault` was
+    `alpha` and whose `remote.alpha.push` shipped every branch:
+
+        git push --repo=zzz --no-repo   -> git pushes to alpha; the scan said zzz
+        git push -o --repo=zzz          -> `--repo=zzz` is -o's VALUE, not an
+                                           option; git pushes to alpha
+
+    Both turned a correctly-refused push into an allowed one. This walk already
+    knows which tokens are option values and which are options, so resolving
+    `--repo` inside it cannot disagree with it. `--no-repo` clears the value,
+    as it does for git, and the last occurrence wins.
+    """
     try:
         idx = argv.index("push")
     except ValueError:
         return None
     positionals: list[str] = []
+    repo: str | None = None
     i = idx + 1
     while i < len(argv):
         tok = argv[i]
@@ -440,10 +471,20 @@ def _push_positionals(argv: list[str]) -> list[str] | None:
                 return None
             if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
                 return None
-            if head in PUSH_OPTS_WITH_VALUE and not _:
+            if head in NO_REPO_SPELLINGS:
+                repo = None
+                i += 1
+                continue
+            if head in REPO_SPELLINGS and _:
+                repo = value
+                i += 1
+                continue
+            if (head in PUSH_OPTS_WITH_VALUE or head in REPO_SPELLINGS) and not _:
                 if head == "--recurse-submodules" and i + 1 < len(argv) \
                         and argv[i + 1] in SUBMODULE_PUSH_MODES:
                     return None
+                if head in REPO_SPELLINGS and i + 1 < len(argv):
+                    repo = argv[i + 1]
                 i += 2
                 continue
             # A clustered short form (`-qo ci.skip`) takes its value from the
@@ -455,7 +496,7 @@ def _push_positionals(argv: list[str]) -> list[str] | None:
             continue
         positionals.append(tok)
         i += 1
-    return positionals
+    return positionals, repo
 
 
 # This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
@@ -509,26 +550,6 @@ def _git_config(directory: str | None, flag: str, key: str) -> str | None:
     return _run_git(directory, "config", flag, key) or None
 
 
-def _repo_option(argv: list[str]) -> str | None:
-    """The value of `--repo`, attached or separated; None if absent.
-
-    Read in git's own order: the LAST occurrence wins, matching how git parses
-    a repeated option.
-    """
-    found = None
-    i = 0
-    while i < len(argv):
-        tok = argv[i]
-        if tok == "--repo" and i + 1 < len(argv):
-            found = argv[i + 1]
-            i += 2
-            continue
-        if tok.startswith("--repo="):
-            found = tok[len("--repo="):]
-        i += 1
-    return found or None
-
-
 def _push_remote(directory: str | None, argv: list[str]) -> str | None:
     """The remote this push acts on, named or not.
 
@@ -552,10 +573,12 @@ def _push_remote(directory: str | None, argv: list[str]) -> str | None:
     `--repo` when both appear, which is git's documented precedence and is why
     it is checked first.
     """
-    positionals = _push_positionals(argv)
+    parsed = _parse_push(argv)
+    if parsed is None:
+        return None
+    positionals, repo = parsed
     if positionals:
         return positionals[0]
-    repo = _repo_option(argv)
     if repo:
         return repo
     branch = _rev_parse_ref(directory, "--abbrev-ref", "HEAD")

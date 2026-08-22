@@ -493,7 +493,7 @@ CASES = [
 ]
 
 
-def raw_cases() -> int:
+def raw_cases() -> tuple[int, int]:
     """Payload-level cases the table above cannot express.
 
     Both check the deliberate fail-open direction documented in the hook: a
@@ -502,6 +502,7 @@ def raw_cases() -> int:
     direction is a choice rather than an accident.
     """
     failures = 0
+    ran = 0
     for label, stdin in (
         ("a non-JSON payload fails open rather than blocking every push", "not json at all"),
         ("a JSON payload that is not an object fails open", '["Bash"]'),
@@ -510,6 +511,7 @@ def raw_cases() -> int:
         ("a Bash payload with no command is ignored",
          json.dumps({"tool_name": "Bash", "tool_input": {}})),
     ):
+        ran += 1
         res = subprocess.run([sys.executable, HOOK], input=stdin,
                              capture_output=True, text=True, cwd=REPO)
         if res.returncode != 0 or res.stdout.strip():
@@ -517,16 +519,17 @@ def raw_cases() -> int:
             failures += 1
         else:
             print(f"PASS: {label}")
-    return failures
+    return failures, ran
 
 
-def config_cases() -> int:
+def config_cases() -> tuple[int, int]:
     """What a BARE `git push` ships is a `push.default` question, not a fact.
 
     Both of these ship refs other than HEAD, so a verdict naming HEAD cannot
     cover them. Verified against real git rather than asserted.
     """
     failures = 0
+    ran = 0
     # Both spellings of the command, deliberately. A truly bare `git push` names
     # no remote, which is exactly when config decides the destination -- and an
     # earlier revision skipped the `remote.<name>.push` check for that case
@@ -562,7 +565,28 @@ def config_cases() -> int:
         ("remote.<name>.push is caught when the remote came from --repo",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
          f"git -C {REPO} push --repo other", True),
+        # git honours --no-repo and any unambiguous abbreviation (--rep), and
+        # `--repo=X` sitting as another option's VALUE is not an occurrence at
+        # all. A raw argv scan for "--repo" got all three wrong in the
+        # permissive direction; resolving it inside the option-aware walk
+        # cannot. Each row below fails against that scan.
+        ("--no-repo clears the remote, so the config chain decides again",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --repo=other --no-repo", True),
+        ("--repo as another option's value is not a --repo occurrence",
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push -o --repo=other", True),
+        ("--rep is an unambiguous abbreviation of --repo",
+         ["remote.other.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --rep=other", True),
+        ("the last --repo wins, across spellings",
+         ["remote.other.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --repo=origin --rep other", True),
+        ("a positional remote still beats --repo naming a different one",
+         ["remote.other.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push other --repo=origin", True),
     ):
+        ran += 1
         _git(REPO, "config", *config)
         try:
             rc, out = run_hook(command, reviewed())
@@ -574,10 +598,10 @@ def config_cases() -> int:
                 print(f"PASS: {label}")
         finally:
             _git(REPO, "config", "--unset", config[0])
-    return failures
+    return failures, ran
 
 
-def budget_cases() -> int:
+def budget_cases() -> tuple[int, int]:
     """The budget must bound EVERY git call, not just the last one.
 
     The `NPWSR_BUDGET_SECONDS=0` table case cannot see this: with a zero budget
@@ -592,6 +616,7 @@ def budget_cases() -> int:
     the budget rather than a multiple of it.
     """
     failures = 0
+    ran = 0
     d = tempfile.mkdtemp(prefix="npwsr-slow-")
     try:
         shim = os.path.join(d, "git")
@@ -608,6 +633,7 @@ def budget_cases() -> int:
         denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
         reason = (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
 
+        ran += 1
         label = "a slow git exhausts the budget across ALL calls, and the hook refuses"
         if rc != 0 or not denied or "ran out of time" not in reason:
             print(f"FAIL (rc={rc}, denied={denied}): {label}")
@@ -621,10 +647,10 @@ def budget_cases() -> int:
             print(f"PASS: {label} ({elapsed:.1f}s)")
     finally:
         shutil.rmtree(d, ignore_errors=True)
-    return failures
+    return failures, ran
 
 
-def orphan_cases() -> int:
+def orphan_cases() -> tuple[int, int]:
     """The guard with its push detector missing.
 
     It refuses to grade a push with a worse parser -- the whole DRW argument in
@@ -634,6 +660,7 @@ def orphan_cases() -> int:
     `git commit -m "push the button"`.
     """
     failures = 0
+    ran = 0
     d = tempfile.mkdtemp(prefix="npwsr-orphan-")
     try:
         orphan = os.path.join(d, "no-push-without-self-review.py")
@@ -650,6 +677,7 @@ def orphan_cases() -> int:
             ("an orphaned guard still honours the override",
              "ALLOW_UNREVIEWED_PUSH=1 git push origin main", False),
         ):
+            ran += 1
             res = subprocess.run(
                 [sys.executable, orphan],
                 input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd},
@@ -663,11 +691,12 @@ def orphan_cases() -> int:
                 print(f"PASS: {label}")
     finally:
         shutil.rmtree(d, ignore_errors=True)
-    return failures
+    return failures, ran
 
 
 def main():
     failed = 0
+    extra = 0
     try:
         for case in CASES:
             cmd, events, should_block, label = case[:4]
@@ -691,15 +720,19 @@ def main():
                 failed += 1
             else:
                 print(f"PASS: {label}")
-        failed += raw_cases()
-        failed += orphan_cases()
-        failed += config_cases()
-        failed += budget_cases()
+        for fn in (raw_cases, orphan_cases, config_cases, budget_cases):
+            f, r = fn()
+            failed += f
+            extra += r
     finally:
         shutil.rmtree(REPO, ignore_errors=True)
         shutil.rmtree(OTHER, ignore_errors=True)
 
-    total = len(CASES) + 15
+    # Counted, not hardcoded. An earlier revision said `len(CASES) + 15` and
+    # kept saying it after config_cases() grew, so the summary under-reported
+    # and deleting cases would have restored agreement while hiding the loss.
+    # Each cases() function now reports what it ran, so the total cannot drift.
+    total = len(CASES) + extra
     if failed:
         print(f"\n{failed}/{total} cases failed")
         sys.exit(1)

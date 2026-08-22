@@ -298,15 +298,33 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
         issues.append(f"No check runs found for SHA {sha[:8]}")
         return False, issues
 
+    # A job name is not unique across workflows: two workflows in one repo can
+    # each define a job called `ubuntu-latest (release)`. Naming one alone is
+    # therefore ambiguous exactly when it matters, and the ambiguity is
+    # invisible in the rendered line, so nothing prompts the reader to check.
+    # Disambiguate the duplicated names with the run's own URL, which the
+    # payload already carries -- no extra API call.
+    seen = {}
+    for cr in check_runs:
+        seen[cr["name"]] = seen.get(cr["name"], 0) + 1
+    duplicated = {n for n, count in seen.items() if count > 1}
+
     for cr in check_runs:
         name = cr["name"]
         status = cr["status"]
         conclusion = cr.get("conclusion")
+        where = ""
+        if name in duplicated:
+            url = cr.get("html_url") or cr.get("check_suite", {}).get("id", "")
+            where = f" ({url})" if url else ""
 
         if status != "completed":
-            issues.append(f"Check run '{name}' is still in status '{status}'")
+            issues.append(
+                f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
-            issues.append(f"Check run '{name}' completed with conclusion '{conclusion}'")
+            issues.append(
+                f"Check run '{name}'{where} completed with conclusion "
+                f"'{conclusion}'")
 
     return len(issues) == 0, issues
 

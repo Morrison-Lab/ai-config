@@ -66,6 +66,43 @@ Worked-example case records for the rules below live in
      same empty result as a finished head.
    - **Don't:** offer a reason for the omission --- none was established.
 
+   **A check-run NAME is not unique across workflows, so a name alone does not
+   identify which check passed.**
+   Two workflows in one repo can each define a job with the same name, and
+   `gh pr checks` prints the bare name with no workflow attached --- so a
+   passing row can belong to a workflow you were not asking about.
+   The ambiguity is invisible in the output, which is what makes it dangerous:
+   nothing in a duplicated name looks different from a unique one, so no
+   prompt to check ever arrives.
+
+   Resolve it from the run behind the check rather than from the name:
+
+   ```bash
+   gh api "repos/<owner>/<repo>/commits/<sha>/check-runs" --paginate \
+     --jq '.check_runs[] | select(.name == "<name>") | .html_url'
+   gh run view <run-id> -R <owner>/<repo> --json workflowName --jq .workflowName
+   ```
+
+   Cross-check against the workflow's own job list too.
+   A matrix leg gated on `needs:` may not have started at all, so its absence
+   from a run's jobs contradicts any same-named row reported as passing.
+
+   `check-pr-fully-clean.py` annotates duplicated names with the run URL
+   automatically; this is for reading `gh pr checks` by hand, where nothing does.
+
+   - **Do:** take the workflow from the check run's own URL before attributing
+     a pass or a failure.
+   - **Don't:** read a job name as identifying a workflow --- it identifies a
+     job, and two workflows may define the same one.
+
+   (Measured 2026-08-21 on `ucdavis/bcs`: `ubuntu-latest (release)` exists in
+   both `R-CMD-check.yaml` and `check-readme`.
+   On a PR fixing an `R CMD check` failure, the passing row was
+   `check-readme`, while `R-CMD-check.yaml`'s matrix legs had not started ---
+   they are gated on `needs: [matrix, update-snapshots]`.
+   Reporting the regression fixed on that row would have cited an unrelated
+   workflow.)
+
    **Every subsection above explains a check list that is short for a per-PR
    reason, and a platform outage produces the same shape for a reason none of
    them can reach.**

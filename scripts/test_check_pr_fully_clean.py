@@ -877,6 +877,36 @@ def main() -> int:
         ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
 
+    # A job name is not unique across workflows (#1869). The live case:
+    # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
+    # check-readme, and a passing check-readme job was nearly read as the
+    # R CMD check having passed while its matrix had not started.
+    mock_ci_dupe = json.dumps({
+        "check_runs": [
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "ubuntu-latest (release)", "status": "in_progress",
+             "conclusion": None,
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+            {"name": "unique-job", "status": "in_progress", "conclusion": None,
+             "html_url": "https://github.com/o/r/actions/runs/3/job/3"},
+        ]
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_ci_dupe):
+        dupe_ok, dupe_issues = checker.check_ci_runs("sha123", TEST_REPO)
+    joined = " | ".join(dupe_issues)
+    check(
+        "a duplicated check-run name is disambiguated by its run URL",
+        not dupe_ok
+        and "runs/2/job/2" in joined
+        and "ubuntu-latest (release)" in joined,
+    )
+    check(
+        "a unique check-run name is left unannotated",
+        any(i.startswith("Check run 'unique-job' is still") for i in dupe_issues),
+    )
+
     # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
     #
     # Every case below asserts on the argv the script BUILDS, because that is

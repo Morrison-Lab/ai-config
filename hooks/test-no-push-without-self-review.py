@@ -372,6 +372,9 @@ CASES = [
     (f"git -C {REPO} push --repo=origin feature main", reviewed(), False,
      "an explicit positional repository overrides --repo, so `feature` names "
      "a repository rather than shipping the unreviewed ref of that name"),
+    (f"git -C {REPO} push --repo origin feature main", reviewed(), False,
+     "the separated --repo spelling parses through a different branch and "
+     "reaches the same reading"),
     (f"git -C {REPO} push --repo=origin main", reviewed(), False,
      "`--repo=origin main` is a bare push to a repository named `main`, so it "
      "resolves through push.default rather than through the ref `main`"),
@@ -539,6 +542,26 @@ def config_cases() -> int:
          ["remote.origin.push", "refs/heads/main:refs/heads/other"], f"git -C {REPO} push", True),
         ("branch.<name>.pushRemote is resolved when no remote is named",
          ["branch.main.pushRemote", "origin"], f"git -C {REPO} push", False),
+        # `--repo` supplies the remote for a push that names no positional one,
+        # so reading such a push as bare resolved the WRONG remote (falling
+        # through to the pushDefault chain, and ultimately the literal
+        # "origin") and skipped this very check. Measured on git 2.43.0:
+        # `git push --dry-run --repo=other`, with remote.other.push set to
+        # refs/heads/*:refs/heads/*, ships every branch including an unreviewed
+        # one, while `git push other` was already refused. Both spellings,
+        # because they take different branches of _push_positionals.
+        # NOTE the remote here is `other`, NOT `origin`. With `--repo=origin`
+        # these rows pass even against the unfixed guard, because ignoring
+        # --repo falls through to the literal "origin" fallback and finds the
+        # same config key -- a test that passes for the wrong reason. The
+        # bypass only shows when the --repo remote DIFFERS from what the
+        # fallback chain resolves.
+        ("remote.<name>.push is caught when the remote came from --repo=",
+         ["remote.other.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --repo=other", True),
+        ("remote.<name>.push is caught when the remote came from --repo",
+         ["remote.other.push", "refs/heads/*:refs/heads/*"],
+         f"git -C {REPO} push --repo other", True),
     ):
         _git(REPO, "config", *config)
         try:

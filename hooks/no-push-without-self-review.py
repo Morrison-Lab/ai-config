@@ -419,7 +419,7 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
     #
     # So `--repo=origin main` is a BARE push to the repository named `main`,
     # and resolving it through push.default rather than through `main` is
-    # correct. Regression rows live in the table under "--repo".
+    # correct. Regression rows: grep CASES and config_cases() for --repo.
     positionals = _push_positionals(argv)
     return None if positionals is None else positionals[1:]  # drop the remote
 
@@ -509,6 +509,26 @@ def _git_config(directory: str | None, flag: str, key: str) -> str | None:
     return _run_git(directory, "config", flag, key) or None
 
 
+def _repo_option(argv: list[str]) -> str | None:
+    """The value of `--repo`, attached or separated; None if absent.
+
+    Read in git's own order: the LAST occurrence wins, matching how git parses
+    a repeated option.
+    """
+    found = None
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--repo" and i + 1 < len(argv):
+            found = argv[i + 1]
+            i += 2
+            continue
+        if tok.startswith("--repo="):
+            found = tok[len("--repo="):]
+        i += 1
+    return found or None
+
+
 def _push_remote(directory: str | None, argv: list[str]) -> str | None:
     """The remote this push acts on, named or not.
 
@@ -517,10 +537,27 @@ def _push_remote(directory: str | None, argv: list[str]) -> str | None:
     whose destination is decided entirely by config. So when the command does
     not spell the remote out, resolve the one git would use, in git's own
     precedence order.
+
+    `--repo=<remote>` supplies the remote for a push that names no positional
+    one, so it has to be consulted BEFORE that config chain -- reading it as a
+    bare push resolved the wrong remote and skipped the `remote.<name>.push`
+    check on a command that does ship other refs. Measured on git 2.43.0, in a
+    repo whose `remote.other.push` is `refs/heads/*:refs/heads/*`:
+
+        git push --dry-run --repo=other
+          -> * [new branch]  feature -> feature      (an unreviewed ref)
+             * [new branch]  main -> main
+
+    while `git push other` was already refused. The positional still wins over
+    `--repo` when both appear, which is git's documented precedence and is why
+    it is checked first.
     """
     positionals = _push_positionals(argv)
     if positionals:
         return positionals[0]
+    repo = _repo_option(argv)
+    if repo:
+        return repo
     branch = _rev_parse_ref(directory, "--abbrev-ref", "HEAD")
     for key in ((f"branch.{branch}.pushRemote",) if branch else ()) + (
             "remote.pushDefault",) + ((f"branch.{branch}.remote",) if branch else ()):

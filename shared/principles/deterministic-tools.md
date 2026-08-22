@@ -210,6 +210,19 @@ derive the primitive count to say where it stands.
 If the primitive appears anywhere outside the helper, the fix went to a
 site: one stray call is already an unguarded call site, not a margin.
 
+A helper only closes what its signature makes unavailable.
+Routing the reads through one function does nothing if the function still
+accepts the unsafe call, and an OPTIONAL parameter is exactly the shape a
+call site forgets --- the caller reads as complete without it, and nothing
+at the call site says otherwise.
+So put the thing that must not be skipped in a REQUIRED argument, and
+derive the rest inside.
+Measured 2026-08-22: a guard threaded an optional `overrides=` through the
+config reads it knew about, and the same commit left one read without it,
+which was a live bypass.
+Making the argument required and deriving the overrides inside the helper
+removed the spelling rather than the instance.
+
 A choke point narrows the class without closing it, so say which you
 achieved.
 The next author can still bypass the helper unless something asserts they
@@ -281,6 +294,10 @@ The structural count is asserted by nothing at all.
   unfinished fix, instead of counting to two.
 - **Do:** prefer a choke point the next author must go out of their way to
   bypass over a check the next author must remember.
+- **Do:** make the un-skippable input a required argument and derive the
+  rest inside, so the unsafe call cannot be spelled.
+- **Don't:** add the guarded behaviour as an optional parameter --- that
+  routes the callers you remembered and leaves the spelling that skips it.
 - **Do:** say whether the count is enforced or merely current, and name
   the assertion that would enforce it.
 - **Don't:** patch the sites a reviewer happened to name --- they found

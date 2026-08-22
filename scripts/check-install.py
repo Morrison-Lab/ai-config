@@ -95,7 +95,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Mirrors bootstrap.sh's own exclusions, and must stay in step with them:
 # references/ is example material rather than consumable config,
 # codex-skills/ is installed into ~/.codex, not ~/.claude, cursor-rules/ is
-# installed into ~/.cursor/rules, not ~/.claude, and plugins/ is
+# installed into ~/.cursor/rules, not ~/.claude, .cursor/ is project-native
+# Cursor config (also not ~/.claude), and plugins/ is
 # installed into ~/.gemini/config/plugins, not ~/.claude. Dot-directories are
 # excluded implicitly -- bootstrap's `for src in "$SCRIPT_DIR"/*/` loop runs
 # without dotglob, so .github/ and .claude/ never enter it.

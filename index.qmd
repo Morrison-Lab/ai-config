@@ -2,17 +2,19 @@
 title: "ai-config"
 ---
 
-Portable AI agent config — skills, memories, and commands synced
-across machines via git. Works with Claude Code, Codex, VS Code
+Portable AI agent config --- skills, memories, and commands synced
+across machines via git. Works with Claude Code, Codex, Cursor, VS Code
 Copilot, and any agent that reads markdown instruction files.
 
 ## What's in this repo
 
 | Directory | Purpose |
 |-----------|---------|
-| `skills/` | Reusable workflow skills for Claude Code (`~/.claude/skills/`) and Gemini CLI (`~/.gemini/skills/`) |
+| `skills/` | Reusable workflow skills for Claude Code (`~/.claude/skills/`), Gemini CLI (`~/.gemini/skills/`), and Cursor |
 | `codex-skills/` | Generated Codex wrappers (`~/.codex/skills/`) |
-| `cursor-rules/` | Cursor AI rules in `.mdc` format (`~/.cursor/rules/`) |
+| `cursor-rules/` | User-global Cursor rules (`~/.cursor/rules/`) |
+| `.cursor/rules/` | Project Cursor rules when this repo is the workspace |
+| `.cursor-plugin/` | Cursor Plugin manifest (skills, rules, commands) |
 | `AGENTS.md` | Universal vendor-neutral instruction file for all coding agents |
 | `commands/` | Slash commands (`~/.claude/commands/`) |
 | `.claude/agents/` | Read-only custom subagents (see [Agents](agents.qmd)) |
@@ -23,12 +25,15 @@ Copilot, and any agent that reads markdown instruction files.
 
 **Local CLI** --- clone the repo and run `bootstrap.sh` once.
 It symlinks each directory into `~/.claude/`, `~/.gemini/`,
-`~/.codex/`, and `~/.cursor/rules/`.
-Skills appear in Claude Code and Gemini CLI as `/skill-name`.
+`~/.codex/`, and `~/.cursor/rules/` (and, when no Cursor plugin is already
+installed, `~/.cursor/skills/`).
+Skills appear in Claude Code, Gemini CLI, and Cursor as `/skill-name`.
 
 **Codex & Cursor** --- the same bootstrap links generated wrappers
 from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills`
-and Cursor rules from `cursor-rules/` into `${CURSOR_HOME:-$HOME/.cursor}/rules`.
+and user-global Cursor rules from `cursor-rules/` into
+`${CURSOR_HOME:-$HOME/.cursor}/rules`.
+This repo is also a Cursor plugin (`.cursor-plugin/plugin.json`).
 `AGENTS.md` acts as a universal entrypoint.
 
 **Cloud sessions (other repos)** — this repo is a

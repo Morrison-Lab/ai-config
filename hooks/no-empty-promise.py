@@ -187,7 +187,8 @@ MECHANISM_PATH = re.compile(
     r"|\bhooks\.json"
     r"|\binstall-hooks\.py"
     r"|\.claude/settings(?:\.local)?\.json"
-    r"|\b(?:commands|cursor-rules|codex-skills)/[\w./-]+)",
+    r"|\b(?:commands|cursor-rules|codex-skills)/[\w./-]+"
+    r"|\.cursor(?:-plugin)?/[\w./-]+)",
     re.I,
 )
 

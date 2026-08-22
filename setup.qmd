@@ -4,21 +4,24 @@ title: "Setup"
 
 ## Local setup
 
-**Requirements:** git, [Claude Code CLI](https://claude.ai/code), and/or Codex.
+**Requirements:** git, [Claude Code CLI](https://claude.ai/code), Codex, and/or [Cursor](https://cursor.com).
 
 ```sh
 git clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
-`bootstrap.sh` symlinks Claude assets into `~/.claude/` and generated Codex
-wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`. Run it again any time you
-add a new top-level dir to the repo.
+`bootstrap.sh` symlinks Claude assets into `~/.claude/`, generated Codex
+wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`, Cursor user rules into
+`${CURSOR_HOME:-$HOME/.cursor}/rules`, and --- when no Cursor plugin or
+Claude skill install is already serving the catalog --- Cursor skills into
+`~/.cursor/skills/`. Run it again any time you add a new top-level dir to
+the repo.
 
 ### Verify the install
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.cursor/rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 
@@ -27,6 +30,10 @@ In a Claude Code session, type `/` and confirm skills appear (e.g. `/ardi`, `/sc
 In Codex, the wrappers appear as skills from `${CODEX_HOME:-$HOME/.codex}/skills`.
 Each wrapper reads the matching canonical workflow from `skills/<name>/SKILL.md`
 and adapts Claude-specific metadata/tools to Codex.
+
+In Cursor, open **Customize -> Rules** and confirm the `cursor-rules/` files
+appear as user rules. Skills appear under **Customize -> Skills** from the
+plugin, from `~/.claude/skills`, or from `~/.cursor/skills/`.
 
 ## Web (cloud) sessions — this repo
 

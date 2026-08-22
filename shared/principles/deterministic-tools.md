@@ -12,7 +12,8 @@ Model judgment is the case this fragment was written for and the hardest to disp
 A hand-typed section number is not a decision anyone made;
 it is a value the renderer was already producing,
 kept in a second place by hand.
-The section below covers that case, and it is the easiest of the three to miss precisely because nothing about it feels like deciding.
+It is the easiest of the three cases to miss,
+precisely because nothing about it feels like deciding.
 
 This is one principle with two faces, operating on different timescales.
 They are not alternatives, and neither supersedes the other.

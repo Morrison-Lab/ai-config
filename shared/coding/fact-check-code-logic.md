@@ -381,6 +381,23 @@ permalink" fixture --- never the combination, which is exactly what a live
 finding re-raised with its own citation looks like.
 A reviewer built that missing fixture and the phrase was wrongly blanked.)
 
+(Measured 2026-08-21 on `Morrison-Lab/gha#576`, two more instances in
+one review session.
+A suite carried two cases meant to prove a check's fix.
+Both passed with the fix reverted, because a different part of the
+same new logic already made those specific inputs quiet --- the
+Neighbouring-mechanism gap in "Mutate the fix, not only
+the test" above.
+The case that actually discriminated the fix was the opposite
+polarity from what had been written: the suite held negative
+controls, and what the fix needed was a positive fixture --- an input
+that must be flagged and, under revert, was not.
+See
+[`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md)'s
+"When a mutation survives, the first hypothesis is that the mutation
+was wrong" for the general form this instance is one of three of, all
+on the same PR.)
+
 ## When the runtime is available, run the claim instead of reasoning about it
 
 Every check above can be done by reading.

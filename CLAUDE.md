@@ -1477,18 +1477,32 @@ Build the character rather than typing it:
 ```
 B = chr(92)
 def bs(t): return t.replace("@@", B)
-block = bs(r'RX = re.compile(r"^@@d+@@s+pass$")')
+
+# A NON-RAW literal is where this bites. Expressing one backslash inside one
+# requires typing two, and that doubled form is exactly what collapses -- so
+# the placeholder is doing real work here.
+target = bs('print("done@@n")')
+# -> the 15 characters  print("done\n")  ... with a real backslash,
+#    which is what the file being patched actually contains.
 ```
 
-The same collapse is already described twice, for different transports:
+The same collapse is already described twice.
 [`algorithmatize-checks.rationale.md`](shared/workflow/algorithmatize-checks.rationale.md)
-records `\\b` arriving as `\b` and becoming a **backspace**, and
+records it for **this same transport** --- a shell heredoc feeding Python ---
+where `\\b` arrives as `\b` and becomes a **backspace**; it carries the
+worked table.
 [`address-every-comment.rationale.md`](shared/workflow/address-every-comment.rationale.md)
-carries a worked table.
+records a genuinely different one, backslash quoting collapsing across nested
+shell layers.
 What is new here is the trigger context --- a Bash-tool heredoc whose delimiter
 is quoted, so it should be literal --- and the placeholder remedy.
 Cross-linked because a dupe-check keyed on this section's vocabulary would
 otherwise miss both.
+
+A **raw** string needs none of this: `r"^\d+$"` is single backslashes
+throughout, and those survive.
+The machinery is for the doubled form --- a non-raw literal, or any target that
+must itself contain a backslash escape.
 
 - **Do:** route every literal backslash through `chr(92)` (or a placeholder
   token) when heredoc content must survive verbatim.

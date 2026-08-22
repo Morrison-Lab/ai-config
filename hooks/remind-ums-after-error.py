@@ -131,6 +131,13 @@ UMS_PATH = re.compile(
 _NOT_PATH = r"(?<![\w/-])"
 _NOT_PATH_END = r"(?![\w/-]|\.\w)"
 
+# `update\s+memories` is the one alternative left unguarded, and deliberately.
+# It cannot match a path, because the hyphen form (`update-memories-and-skills`,
+# the skill alias) has no whitespace in it. What it CAN match is
+# `update memories/git.md` in a dispatch prompt -- which is a genuine UMS
+# instruction, so a `_NOT_PATH_END` here would cost a true positive rather
+# than removing a false one. The guard is applied where the word alone is
+# ambiguous, not everywhere it would parse.
 UMS_WORD = re.compile(
     _NOT_PATH + r"ums" + _NOT_PATH_END +
     r"|update\s+memories"

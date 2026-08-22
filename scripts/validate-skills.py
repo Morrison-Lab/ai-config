@@ -14,6 +14,8 @@ Checks:
   * `allowed-tools` (if present) is a list of strings
   * .claude-plugin/marketplace.json and plugin.json are valid JSON with the
     required top-level keys
+  * .cursor-plugin/marketplace.json and plugin.json are valid JSON with the
+    required top-level keys
   * every marketplace plugin `source` resolves to a non-empty directory
     (an uninitialized submodule warns instead of erroring)
 
@@ -525,6 +527,9 @@ def main() -> None:
     check_json(".claude-plugin/marketplace.json", ["name", "owner", "plugins"])
     check_plugin_sources(".claude-plugin/marketplace.json")
     check_json(".claude-plugin/plugin.json", ["name"])
+    check_json(".cursor-plugin/marketplace.json", ["name", "owner", "plugins"])
+    check_plugin_sources(".cursor-plugin/marketplace.json")
+    check_json(".cursor-plugin/plugin.json", ["name"])
 
     for w in warnings:
         print(f"  warning: {w}")

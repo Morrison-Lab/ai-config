@@ -95,7 +95,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Mirrors bootstrap.sh's own exclusions, and must stay in step with them:
 # references/ is example material rather than consumable config,
 # codex-skills/ is installed into ~/.codex, not ~/.claude, cursor-rules/ is
-# installed into ~/.cursor/rules, not ~/.claude, and plugins/ is
+# installed into ~/.cursor/rules, not ~/.claude, .cursor/ is project-native
+# Cursor config (also not ~/.claude), and plugins/ is
 # installed into ~/.gemini/config/plugins, not ~/.claude. Dot-directories are
 # excluded implicitly -- bootstrap's `for src in "$SCRIPT_DIR"/*/` loop runs
 # without dotglob, so .github/ and .claude/ never enter it.
@@ -433,7 +434,7 @@ def summarize(entries: list[Entry], counts: dict[str, int]) -> None:
     for entry in entries:
         by_status.setdefault(entry.status, []).append(entry)
 
-    for status in ("stale", "unlinked", "missing", "misdirected", "foreign"):
+    for status in ("stale", "unlinked", "missing", "misdirected", "foreign", "stacked"):
         matching = by_status.get(status, [])
         if not matching:
             continue
@@ -445,7 +446,7 @@ def summarize(entries: list[Entry], counts: dict[str, int]) -> None:
     total = len(entries)
     parts = ", ".join(f"{counts.get(s, 0)} {s}"
                       for s in ("ok", "stale", "unlinked", "missing",
-                                "misdirected", "foreign"))
+                                "misdirected", "foreign", "stacked"))
     print(f"\nchecked {total} installed entries: {parts}")
 
 

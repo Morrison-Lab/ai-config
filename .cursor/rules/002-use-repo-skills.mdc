@@ -1,0 +1,12 @@
+---
+description: "Load the matching ai-config skill from skills/<name>/SKILL.md before improvising a workflow this repo already encodes."
+alwaysApply: true
+---
+
+# Use repo skills
+
+This repository's workflows live in `skills/<name>/SKILL.md`.
+When a request names a skill, matches a skill description, or is a
+repeatable procedure this repo already ships (PR review, issue-first,
+UMS, wrap-up, merge), read that skill and follow it.
+Do not re-derive a procedure that already has a skill.

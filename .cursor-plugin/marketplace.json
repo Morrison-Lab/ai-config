@@ -1,0 +1,16 @@
+{
+  "name": "morrison-lab",
+  "owner": {
+    "name": "Morrison-Lab"
+  },
+  "metadata": {
+    "description": "Morrison-Lab plugins marketplace."
+  },
+  "plugins": [
+    {
+      "name": "ai-config",
+      "source": "./",
+      "description": "Morrison-Lab AI agent skills (PR/review workflow, grading, reprexes, R-package helpers), rules, and commands."
+    }
+  ]
+}

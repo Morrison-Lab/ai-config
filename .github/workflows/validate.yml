@@ -73,6 +73,12 @@ jobs:
         run: |
           python3 scripts/test_codex_plugin_enabled.py
           python3 scripts/test_bootstrap_codex_plugin.py
+      - name: Run Cursor skill-install tests
+        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
+        run: |
+          python3 scripts/test_cursor_plugin_enabled.py
+          python3 scripts/test_bootstrap_cursor_plugin.py
+          python3 scripts/test_cursor_rules_sync.py
       - name: Run token-rotation tool tests
         # Only the tests run here. rotate-claude-token.py itself mutates
         # repository secrets across the estate, so it is a local operator tool

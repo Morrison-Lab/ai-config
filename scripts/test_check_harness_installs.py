@@ -53,6 +53,46 @@ with tempfile.TemporaryDirectory() as raw:
     check("absent consumer is explicit", hc.collect_flat(repo, "skills", root / "absent", "gemini") == [])
     write(codex / "config.toml", "[plugins.\"ai-config@example\"]\nenabled = true\n")
     check("enabled Codex plugin skips bare wrappers", hc.codex_plugin_enabled(codex / "config.toml"))
+    (cursor / "skills").mkdir(parents=True)
+    write(cursor / "skills" / "alpha" / "SKILL.md", "stale")
+    claude = root / "claude"
+    check(
+        "Cursor stale skill is detected",
+        statuses(hc.collect_flat(repo, "skills", cursor / "skills", "cursor"))
+        == {"cursor/alpha": "stale"},
+    )
+    check(
+        "empty Cursor dirs do not skip skill audit",
+        not hc.cursor_skill_catalog_served(cursor, claude, repo),
+    )
+    (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+    write(repo / "skills" / "beta" / "SKILL.md")
+    check(
+        "Cursor plugin is detected as serving the catalog",
+        hc.cursor_skill_catalog_served(cursor, claude, repo),
+    )
+    check(
+        "Cursor plugin still reports leftover stale skills",
+        statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "skills", cursor / "skills", "cursor")
+        ))
+        == {"cursor/alpha": "stale"},
+    )
+    try:
+        (cursor / "skills" / "beta").symlink_to(repo / "skills" / "beta")
+        linked = True
+    except OSError:
+        linked = False
+    if linked:
+        leftover = statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "skills", cursor / "skills", "cursor")
+        ))
+        check("leftover current symlink is stacked, not ok",
+              leftover.get("cursor/beta") == "stacked")
+        check("leftover stale file stays stale beside a stacked link",
+              leftover.get("cursor/alpha") == "stale")
+    else:
+        print("SKIP: leftover stacked symlink (platform cannot create it)")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

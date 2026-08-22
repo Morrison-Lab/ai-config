@@ -1084,23 +1084,28 @@ bug" for the broader lesson.)
 
 ## Verify GitHub App installation per repository
 
-- With repository-admin browser access, open
-  `https://github.com/<owner>/<repo>/settings/installations` and read the
-  **Installed GitHub Apps** list.
-  This directly distinguishes an installed Claude app from a repository that
-  merely has workflow files or secrets.
-- The organization endpoint
-  `gh api orgs/<org>/installations` returned 404 in this session even though
-  the current classic PAT reports `admin:org`.
-  GitHub documents that the direct repository-installation endpoint requires
-  an app JWT, while the user-installation listing requires a GitHub App user
-  access token; the current classic PAT is therefore not an authoritative
-  browser-free fallback
+- **`gh api orgs/<org>/installations` answers this without a browser, in any org you own.**
+  Measured 2026-08-21 under a classic PAT carrying `admin:org`: `Morrison-Lab` returned `claude`, `google-labs-jules`, and `cursor`.
+
+  ```bash
+  gh api orgs/<org>/installations --jq '.installations[].app_slug'
+  ```
+
+- **A 404 from that endpoint is about the caller's org ROLE, not about token class.**
+  GitHub documents that "the authenticated user must be an organization owner to use this endpoint"
+  ([List app installations for an organization](https://docs.github.com/en/rest/orgs/orgs#list-app-installations-for-an-organization)).
+  So the same PAT that answers for `Morrison-Lab` returned 404 for `ucdavis` on 2026-08-21, where we are not an owner --- the token was fine and the role was missing.
+  Don't generalize that 404 into "a classic PAT cannot check installations";
+  it is a per-org fact rather than a property of the credential.
+  Note the response is a bare `404 Not Found` rather than a `403`, so nothing in it names the missing role --- which is why the 404 invites a token-shaped explanation it does not support.
+- **The two endpoints that genuinely need App credentials are different endpoints, and neither explains the 404 above.**
+  `GET /repos/<owner>/<repo>/installation` needs an app JWT, and `GET /user/installations` needs a GitHub App user access token
   ([GitHub App installation API](https://docs.github.com/en/rest/apps/installations)).
-  Use the per-repository settings page when those App credentials are
-  unavailable.
-- Verified 2026-08-21: `ucdavis/bcs` listed **Claude**, developed by Anthropic,
-  while `ucdavis/hac.it` listed only GitHub Learning Lab.
+  Both are true and neither is the org endpoint, so neither is evidence about it.
+- **Fall back to the browser for an org you don't own.**
+  With repository-admin access, open `https://github.com/<owner>/<repo>/settings/installations` and read the **Installed GitHub Apps** list.
+  This distinguishes an installed Claude app from a repository that merely has workflow files or secrets.
+- Verified 2026-08-21 by that route: `ucdavis/bcs` listed **Claude**, developed by Anthropic, while `ucdavis/hac.it` listed only GitHub Learning Lab.
 
 ## A moving upstream tag can turn a consumer's default branch red with no local change
 

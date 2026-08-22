@@ -314,10 +314,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai" id="toc-config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai" class="nav-link active" data-scroll-target="#config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai">config-ai – route AI-capability requests to the right implementation (ca, cai)</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#step-0-restate-the-capability-not-the-mechanism" id="toc-step-0-restate-the-capability-not-the-mechanism" class="nav-link" data-scroll-target="#step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</a>
-  <ul class="collapse">
-  <li><a href="#scope-review-disable-requests-narrowly" id="toc-scope-review-disable-requests-narrowly" class="nav-link" data-scroll-target="#scope-review-disable-requests-narrowly">Scope review-disable requests narrowly</a></li>
-  </ul></li>
+  <li><a href="#step-0-restate-the-capability-not-the-mechanism" id="toc-step-0-restate-the-capability-not-the-mechanism" class="nav-link" data-scroll-target="#step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</a></li>
   <li><a href="#step-1-pick-the-implementation-form" id="toc-step-1-pick-the-implementation-form" class="nav-link" data-scroll-target="#step-1-pick-the-implementation-form">Step 1 – Pick the implementation form</a></li>
   <li><a href="#step-2-reuse-check-before-building-anything" id="toc-step-2-reuse-check-before-building-anything" class="nav-link" data-scroll-target="#step-2-reuse-check-before-building-anything">Step 2 – Reuse-check before building anything</a></li>
   <li><a href="#step-3-check-push-access-to-the-target-repo-then-ship" id="toc-step-3-check-push-access-to-the-target-repo-then-ship" class="nav-link" data-scroll-target="#step-3-check-push-access-to-the-target-repo-then-ship">Step 3 – Check push access to the target repo, then ship</a></li>
@@ -349,10 +346,7 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="anchored" data-anchor-id="step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</h2>
 <p>State in one sentence what the requester wants Claude (or Codex, or the <code>@claude</code> bot, or a <code>gha</code> consumer’s CI) to be able to do. Don’t presuppose the implementation yet – “add a hook that reminds me to X” is already half an answer the requester may not have meant.</p>
 <p>Then check it’s actually reusable, not a one-off. A single favor for right now doesn’t need infrastructure – just do it. <code>config-ai</code> is for capability that should persist beyond this conversation.</p>
-<section id="scope-review-disable-requests-narrowly" class="level3">
-<h3 class="anchored" data-anchor-id="scope-review-disable-requests-narrowly">Scope review-disable requests narrowly</h3>
-<p>A request to disable AI review applies only to repositories in the <code>ucdavis</code> GitHub organization that the user explicitly names in that request. Do not infer an organization-wide or cross-repository disable, and do not cancel or remove review automation in unrelated repositories. Claude review works outside <code>ucdavis</code> and can also work in older <code>ucdavis</code> repositories such as <code>bcs</code>; verify each named repository independently.</p>
-</section>
+<p>Restate the <em>scope</em> as narrowly as it was given, too. A request to disable a capability – AI review being the recurring one – covers only the repositories the user explicitly named. Don’t widen it into an organization-wide or cross-repository change. The standing rule and the incident behind it live in <a href="../../memories/preferences.md"><code>memories/preferences.md</code></a>. This step is only the reminder to apply it before picking a mechanism.</p>
 </section>
 <section id="step-1-pick-the-implementation-form" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-pick-the-implementation-form">Step 1 – Pick the implementation form</h2>

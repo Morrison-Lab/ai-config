@@ -14,9 +14,7 @@ State in one sentence what the requester wants Claude (or Codex, or the `@claude
 
 Then check it’s actually reusable, not a one-off. A single favor for right now doesn’t need infrastructure – just do it. `config-ai` is for capability that should persist beyond this conversation.
 
-### Scope review-disable requests narrowly
-
-A request to disable AI review applies only to repositories in the `ucdavis` GitHub organization that the user explicitly names in that request. Do not infer an organization-wide or cross-repository disable, and do not cancel or remove review automation in unrelated repositories. Claude review works outside `ucdavis` and can also work in older `ucdavis` repositories such as `bcs`; verify each named repository independently.
+Restate the *scope* as narrowly as it was given, too. A request to disable a capability – AI review being the recurring one – covers only the repositories the user explicitly named. Don’t widen it into an organization-wide or cross-repository change. The standing rule and the incident behind it live in [`memories/preferences.md`](../../memories/preferences.md). This step is only the reminder to apply it before picking a mechanism.
 
 ## Step 1 – Pick the implementation form
 

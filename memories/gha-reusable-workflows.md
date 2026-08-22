@@ -25,9 +25,11 @@ Generic Actions-authoring material stays there.
     `quarto publish gh-pages` adds it automatically; `JamesIves` does not, so `@v2` touches one in before deploy.
   - **Private Pages repositories can receive an opaque `*.pages.github.io` hostname instead of `<owner>.github.io/<repo>`.**
     Read the authoritative URL from `gh api repos/<owner>/<repo>/pages --jq .html_url`.
-    Pass only the bare hostname to `rossjrw/pr-preview-action`'s `pages-base-url`
-    input because the action prepends `https://`; passing a full URL produces
-    `https://https://...` preview links.
+    Strip the `https://` prefix and any trailing slash before passing it as `rossjrw/pr-preview-action`'s `pages-base-url`.
+    The action builds its links as `https://$pages_base_url/$preview_url_path/` (`lib/main.sh`), so a full URL produces `https://https://...` preview links.
+    Stripping the scheme is the whole transformation --- **don't also drop the path**.
+    It leaves a bare hostname only for a private site;
+    for an ordinary one it leaves `<owner>.github.io/<repo>`, which is exactly what the action computes for itself by default (`lib/calculate-pages-base-url.sh`), and dropping that `/<repo>` 404s every preview.
     Quarto's `website.site-url` still takes the complete `https://.../` URL.
   - **The repo's Pages *source* is a manual setting** --- not changeable via the MCP tools or (in scoped sessions) the API.
     Hand the flip to the user,

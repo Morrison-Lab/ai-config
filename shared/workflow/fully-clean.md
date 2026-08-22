@@ -146,11 +146,13 @@ Worked-example case records for the rules below live in
    - **Do:** read the `event` of any run whose verdict you are about to rely on, whenever the same check name appears twice on one head.
    - **Do:** take the verdict from the `pull_request`-triggered run for any check that diffs against a base.
    - **Don't:** read a `pass` as evidence the check examined anything --- ask what population it was given first.
-   - **Don't:** resolve a same-name disagreement by workflow name; on this shape both runs carry the same one.
+   - **Don't:** resolve a same-name disagreement by workflow name.
+     On this shape both runs carry the same one.
 
    (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
    Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
-   The push run was read first and taken as the verdict; the PR run was the one carrying four real findings.)
+   The push run was read first and taken as the verdict.
+   The PR run was the one carrying four real findings.)
 
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
 

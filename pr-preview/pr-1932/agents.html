@@ -407,7 +407,7 @@ ul.task-list li input[type="checkbox"] {
 </tr>
 </tbody>
 </table>
-<p>Every agent except <code>community-demand-scout</code> keeps <code>Bash</code> for read-only checks (<code>grep</code>, <code>gh api</code>, <code>git submodule status</code>, <code>test -e</code>) — avoiding a write-capable shell command (<code>renv::update()</code> without <code>check = TRUE</code>, <code>pre-commit autoupdate</code>) is instruction-level discipline for those, not a harness-enforced restriction the way the missing <code>Edit</code>/<code>Write</code> is. Each such agent’s own persona file says so in as many words, so the discipline is instructed where it is relied on rather than only asserted here.</p>
+<p>Every agent except <code>community-demand-scout</code> keeps <code>Bash</code> for read-only checks (<code>grep</code>, <code>gh api</code>, <code>git submodule status</code>, <code>test -e</code>) — avoiding a write-capable shell command (<code>renv::update()</code> without <code>check = TRUE</code>, <code>pre-commit autoupdate</code>) is instruction-level discipline for those, not a harness-enforced restriction the way the missing <code>Edit</code>/<code>Write</code> is. Each such agent’s file under <code>.claude/agents/</code> says so in as many words, so the discipline is instructed where it is relied on rather than only asserted here. The <code>.opencode/</code> mirrors are not all the same: opencode’s own permission block can deny <code>bash</code> outright, in which case the restriction is harness-enforced there and the persona says that instead.</p>
 </section>
 <section id="how-theyre-invoked" class="level2">
 <h2 class="anchored" data-anchor-id="how-theyre-invoked">How they’re invoked</h2>

@@ -31,7 +31,8 @@ This cuts both ways, and both directions matter:
 **Do NOT confuse this with a `PreToolUse` hook's deny.**
 A hook decides over the whole `tool_input.command` string as one blob --- see [`claude-code-hooks.md`](claude-code-hooks.md)'s "A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either".
 That section's own closing line ("reach for `&&` as the remedy ... governs a *shell* sequencing hazard, and a hook denial never reaches the shell") is correct and does not need revising --- it is about hooks, a different mechanism from the **built-in permission-rule matcher** this entry covers.
-The two coexist: the built-in matcher is segment-aware; a hook you write yourself is not, unless you make it so.
+The two coexist: the built-in matcher is segment-aware;
+a hook you write yourself is not, unless you make it so.
 
 - **Do:** when a reviewer/agent prompt or a settings file grants a command pattern, check whether the actual invocations pipe, redirect, or chain it with something else, and grant (or scope a deny to) every segment that can appear, not just the "main" one.
 - **Do:** read a denial's blocked segment from the execution/log output before assuming the whole compound string was rejected.
@@ -101,7 +102,8 @@ Checking it against the execution file, rather than trusting the earlier assumpt
 A `Write` grant was exactly the missing fix, and the comment's wrong mechanism had argued against making it the whole time (`Morrison-Lab/gha#578`, opened 2026-08-21, not yet merged).
 
 The transferable lesson is not "verify observations" in general --- it's specifically about what a wrong *mechanism* costs once written down: a wrong observation just needs re-checking, but a wrong mechanism actively **argues against the real fix**, because a reader who trusts the stated cause ("hard sandbox block, unfixable by permission config") has no reason to try the very change that would have worked ("grant `Write`").
-The wrong mechanism doesn't just fail to help; it forecloses the correct next step for every later reader who takes it at face value.
+The wrong mechanism doesn't just fail to help;
+it forecloses the correct next step for every later reader who takes it at face value.
 
 - **Do:** when recording why a tool call failed, verify the *layer* it failed at (permission rule vs. `PreToolUse` hook vs. OS-level sandbox) against the actual artifact --- the execution file's `permission_denials` array names which layer refused --- before writing the explanation down.
 - **Do:** treat "I haven't verified the mechanism" as a reason to write "cause unknown" rather than a plausible-sounding guess, when a comment or memory entry will be read later as authoritative.

@@ -129,7 +129,8 @@ A debt is one specific outstanding action, so what keeps it is something that wi
 The durable record still clears a debt, and deliberately so.
 It is the always-available floor this fragment insists on everywhere else, and it is the *right* answer when the debt is somebody else's to schedule --- a filed issue is exactly how you hand work to whoever will do it.
 It is the wrong instinct when the debt is yours and has a next step.
-A memory entry saying "#1937 needs an ARDI round" documents an outstanding loop; it does not run one, and nothing wakes the session when the re-review lands.
+A memory entry saying "#1937 needs an ARDI round" documents an outstanding loop.
+It does not run one, and nothing wakes the session when the re-review lands.
 
 That gap is what made the debt phrasing worth a rule of its own rather than a footnote to the modal one.
 Before it was named, the cheapest way past a blocked "I owe #1937 the ARDI loop" was to write a memory entry and re-send the same sentence --- leaving the debt documented, closed on the record, and still undelivered, which is the exact failure this whole fragment exists to prevent, now wearing the remedy's clothes.
@@ -145,9 +146,10 @@ Per `CLAUDE.md`'s "State the actual time when reporting a scheduled check-in", s
 - **Do:** arm the next step when the debt is yours and has one, and report what you armed and when it fires.
 - **Do:** file the issue instead when the debt is somebody else's to schedule.
 - **Don't:** answer an owed **action** with a written record and call it discharged --- documenting an ARDI loop is not running one.
-- **Don't:** count a timer as keeping a standing rule; it cannot outlive the one firing.
+- **Don't:** count a timer as keeping a standing rule --- it cannot outlive the one firing.
 
-(Directive from the user, 2026-08-22: "phrases with 'owe' ... should be triggers for our no-empty-promises guards; the models should be pushed or forced to create and report a mechanism for delivering on what they owe, such as scheduling a timer or other PR-watcher to trigger the next step of the ardi loop when it is time".
+(Directive from the user, 2026-08-22: "phrases with 'owe' ... should be triggers for our no-empty-promises guards;
+the models should be pushed or forced to create and report a mechanism for delivering on what they owe, such as scheduling a timer or other PR-watcher to trigger the next step of the ardi loop when it is time".
 Tracked as ai-config#1946.)
 
 [`hooks/no-empty-promise.py`](../../hooks/no-empty-promise.py) matches this form too, anchored on a first-person **owner** rather than on the word alone, and applies the debt discharge set above to it rather than the rule one.

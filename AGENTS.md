@@ -33,7 +33,8 @@ Promising the mechanism itself in the future tense ("I'll add a guard for this")
 **An owed *action* needs a mechanism that will fire, not only one that records.**
 "I owe this PR the ARDI loop", "the UMS pass is owed by me", "I still owe that follow-up" each commit to one specific outstanding step, and a written record documents it without doing it.
 So arm the next step --- a scheduled wakeup or timer carrying it, a cron or scheduled task when the check-in must outlive this session, a PR watcher when the debt is a PR --- and report what you armed and the clock time it fires.
-A durable record still clears such a debt and is the right answer when it is somebody else's to schedule; it is the wrong instinct when the debt is yours and has a next step.
+A durable record still clears such a debt and is the right answer when it is somebody else's to schedule.
+It is the wrong instinct when the debt is yours and has a next step.
 The implication runs one way: a timer fires once and dies, so it cannot keep a standing rule.
 
 When no mechanism is worth building, drop the promise and state the plain fact instead.

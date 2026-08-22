@@ -40,6 +40,15 @@ Then check it's actually reusable, not a one-off. A single favor for right
 now doesn't need infrastructure -- just do it. `config-ai` is for capability
 that should persist beyond this conversation.
 
+### Scope review-disable requests narrowly
+
+A request to disable AI review applies only to repositories in the `ucdavis`
+GitHub organization that the user explicitly names in that request.
+Do not infer an organization-wide or cross-repository disable, and do not
+cancel or remove review automation in unrelated repositories.
+Claude review works outside `ucdavis` and can also work in older `ucdavis`
+repositories such as `bcs`; verify each named repository independently.
+
 ## Step 1 -- Pick the implementation form
 
 Work down this table; stop at the first row that fits. Each row hands off to

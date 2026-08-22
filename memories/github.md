@@ -1082,6 +1082,20 @@ See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
 
+## Verify GitHub App installation per repository
+
+- With repository-admin browser access, open
+  `https://github.com/<owner>/<repo>/settings/installations` and read the
+  **Installed GitHub Apps** list.
+  This directly distinguishes an installed Claude app from a repository that
+  merely has workflow files or secrets.
+- The organization endpoint
+  `gh api orgs/<org>/installations` can return a deliberately hidden 404 even
+  when the current classic PAT has `admin:org`; use the per-repository settings
+  page when organization-owner installation visibility is unavailable.
+- Verified 2026-08-21: `ucdavis/bcs` listed **Claude**, developed by Anthropic,
+  while `ucdavis/hac.it` listed only GitHub Learning Lab.
+
 ## A moving upstream tag can turn a consumer's default branch red with no local change
 
 A consumer pinned to a moving major tag (`...@v2`) inherits every change the

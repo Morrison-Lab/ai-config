@@ -18,6 +18,12 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- Treat a request to disable AI review as narrowly repository-scoped.
+  It applies only to repositories in the `ucdavis` GitHub organization that
+  the user specifically names in that request.
+  Do not propagate it to other `ucdavis` repositories, other organizations,
+  or later unrelated PRs; Claude review works outside `ucdavis` and can also
+  work on older `ucdavis` repositories such as `bcs`.
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) --- don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known --- rather than repeating it back as fact.

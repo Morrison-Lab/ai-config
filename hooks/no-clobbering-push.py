@@ -31,11 +31,21 @@ the worse choice, and where the remote ref does not exist the lease succeeds
 trivially. So the refusal is always satisfiable, and being wrong about it
 costs a retype rather than a lost commit.
 
-The escape hatch is real and this corpus documents the case that needs it:
-`memories/git.md` records `--force-with-lease` failing with `stale info` when
-the remote branch was *deleted* (squash-merge with auto-delete), where the
-lease is unsatisfiable rather than violated. Prefix the command with
-`ALLOW_FORCE_PUSH=1` for that.
+`ALLOW_FORCE_PUSH=1` is the escape hatch, and it is deliberately not tied to a
+worked example. The case that looks like it needs one is not: `memories/git.md`
+records `--force-with-lease` failing with `stale info` after a squash-merge with
+auto-delete removed the branch, and says the lease is unsatisfiable rather than
+violated, so a PLAIN push is the fix and `--force` is unnecessary. That is
+consistent with the paragraph above -- where the remote ref does not exist,
+there is nothing for any force to overwrite. So the hatch exists for a case this
+guard did not foresee, not for a known one.
+
+The refusal also does NOT consult `--force-with-lease`. `git push --help` on
+`-f, --force`: "when --force-with-lease option is used, the command refuses to
+update a remote ref whose current value does not match what is expected. This
+flag disables these checks." So `--force --force-with-lease` is a plain force
+push, and treating the lease as clearing the refusal was a bypass rather than a
+nicety.
 
 **It WARNS on everything else** (`additionalContext`, no `permissionDecision`),
 because whether a divergence matters is a judgment this hook cannot make: a
@@ -109,17 +119,40 @@ _SHELL_OPS = set("();|&")
 # same reason: a guard that its own documentation disables is worthless.
 OVERRIDE = "ALLOW_FORCE_PUSH"
 
-# `git push` options that consume the FOLLOWING token, so a value like
-# `origin` sitting after one is not the remote.
-PUSH_VALUE_OPTS = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
-# `git`'s own global options that consume the following token.
+# `git`'s own global options that consume the following token, skipped before
+# `push` is looked for so `git -C /repo push` matches.
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                   "--exec-path"}
 
-# Short-option letters `git push` accepts, none of which is a value-taking
-# flag except `-o` -- so an `f` inside a cluster of these unambiguously means
-# `--force` (`git push -fu origin HEAD` is real, accepted bash).
-SHORT_CLUSTER = re.compile(r"^-[46dfnqutv]+$")
+# `git push` long options that consume the FOLLOWING token when written without
+# `=`. `--repo` is in here AND is read back out in `_target`, because its value
+# IS the remote -- skipping it as a mere value was a defect: `git push --repo
+# origin HEAD` was resolved against the current branch's configured remote
+# rather than against `origin`.
+LONG_VALUE_OPTS = {"--push-option", "--repo", "--receive-pack", "--exec",
+                   "--recurse-submodules"}
+
+# Every `git push` short option, taken from `git push -h` rather than guessed:
+# -4 -6 -d -f -n -o -q -u -v. Only `-o` consumes a value, and that is what makes
+# a cluster like `-fo ci.skip` dangerous: it is accepted bash, it IS a force
+# push, and a matcher that does not know `o` swallows a value both misses the
+# force and mistakes `ci.skip` for the remote.
+SHORT_BOOL = {"4": None, "6": None, "d": "delete", "f": "force",
+              "n": "dry_run", "q": None, "u": None, "v": None}
+SHORT_VALUE = {"o"}
+
+# Long options this guard cares about, and their negations. EVERY `git push`
+# option has a `--[no-]` form, so a positive-only scan is order-blind:
+# `git push --dry-run --no-dry-run --force` really does transfer, and reading
+# only the `--dry-run` made the guard skip a live force push.
+LONG_FLAG = {
+    "--force": "force",
+    "--dry-run": "dry_run",
+    "--delete": "delete",
+    "--mirror": "refset",
+    "--all": "refset",
+    "--branches": "refset",   # `git push -h`: "alias of --all"
+}
 
 
 def _simple_commands(cmd):
@@ -175,35 +208,69 @@ def _push_argv(argv):
     return argv[i + 1:], override
 
 
-def _flags(rest):
-    """`(is_force, has_lease, is_dry_run, is_delete, is_refset)` for a push."""
-    force = lease = dry = delete = refset = False
-    skip = False
-    for tok in rest:
-        if skip:
-            skip = False
+def _parse_push(rest):
+    """Parse a `git push` argument list.
+
+    Returns `(flags, positionals, repo_opt, ok)`.
+
+    `ok` is False when a token could not be classified --- an unrecognized
+    short cluster, whose letters might or might not consume the next word. The
+    force scan still runs on a not-ok parse (erring toward the refusal, which
+    is cheap), while destination resolution does not (erring toward silence,
+    since a wrong remote is worse than no remote).
+    """
+    flags = {"force": False, "lease": False, "dry_run": False,
+             "delete": False, "refset": False}
+    positionals, repo_opt, ok = [], None, True
+    i, end_of_opts = 0, False
+
+    while i < len(rest):
+        tok = rest[i]
+        i += 1
+
+        if end_of_opts or not tok.startswith("-") or tok == "-":
+            positionals.append(tok)
             continue
-        if tok in PUSH_VALUE_OPTS:
-            skip = True
+        if tok == "--":
+            end_of_opts = True
             continue
-        if tok == "--force" or tok == "-f":
-            force = True
-        elif tok.startswith("--force-with-lease"):
-            lease = True
-        elif tok in ("--dry-run", "-n"):
-            dry = True
-        elif tok in ("--delete", "-d"):
-            delete = True
-        elif tok in ("--mirror", "--all"):
-            refset = True
-        elif SHORT_CLUSTER.match(tok):
-            if "f" in tok:
-                force = True
-            if "n" in tok:
-                dry = True
-            if "d" in tok:
-                delete = True
-    return force, lease, dry, delete, refset
+
+        if tok.startswith("--"):
+            name, sep, inline = tok.partition("=")
+            negated = name.startswith("--no-")
+            base = "--" + name[len("--no-"):] if negated else name
+
+            if base == "--force-with-lease" or name.startswith("--force-with-lease"):
+                flags["lease"] = not negated
+                continue
+            if base in LONG_FLAG:
+                flags[LONG_FLAG[base]] = not negated
+                continue
+            if base in LONG_VALUE_OPTS:
+                value = inline if sep else (rest[i] if i < len(rest) else None)
+                if not sep:
+                    i += 1
+                if base == "--repo" and not negated:
+                    repo_opt = value
+                continue
+            continue  # any other long option is a boolean we do not care about
+
+        # A short cluster. Scan left to right; a value-taking letter consumes
+        # the cluster's remainder, or the next word when it is the last letter.
+        letters = tok[1:]
+        for pos, ch in enumerate(letters):
+            if ch in SHORT_VALUE:
+                if pos == len(letters) - 1:
+                    i += 1  # its value is the next word, not the remote
+                break
+            if ch not in SHORT_BOOL:
+                ok = False
+                break
+            field = SHORT_BOOL[ch]
+            if field:
+                flags[field] = True
+
+    return flags, positionals, repo_opt, ok
 
 
 def _git(args, timeout=8):
@@ -218,32 +285,33 @@ def _git(args, timeout=8):
     return out.stdout
 
 
-def _target(rest):
+def _target(positionals, repo_opt):
     """`(remote, branch)` the push is aimed at, or `(None, None)`.
 
-    Handles the shapes that actually occur: a bare `git push`, `git push
-    origin`, `git push origin HEAD`, `git push -u origin HEAD`, `git push
-    origin HEAD:branch`, and a leading `+` on the refspec.
-    """
-    positional = []
-    skip = False
-    for tok in rest:
-        if skip:
-            skip = False
-            continue
-        if tok in PUSH_VALUE_OPTS:
-            skip = True
-            continue
-        if tok.startswith("-"):
-            continue
-        positional.append(tok)
+    Handles the shapes that occur: a bare `git push`, `git push origin`,
+    `git push origin HEAD`, `git push -u origin HEAD`, `git push origin
+    HEAD:branch`, a leading `+`, and `--repo <repository>`.
 
+    Returns `(None, None)` rather than a guess whenever the destination is not
+    a single named branch --- a wildcard refspec, a deletion refspec, or a
+    detached HEAD with nothing to name. A wrong branch here would send
+    `ls-remote` at the wrong ref and report on something the push never
+    touches, which is worse than reporting nothing.
+    """
     head = _git(["rev-parse", "--abbrev-ref", "HEAD"])
     head = head.strip() if head else None
     if head == "HEAD":
         head = None  # detached; no branch to reason about
 
-    remote = positional[0] if positional else None
+    # `--repo <repository>` names the remote when no positional one does, so
+    # the first positional is then the refspec rather than the remote.
+    if repo_opt:
+        remote, specs = repo_opt, positionals
+    elif positionals:
+        remote, specs = positionals[0], positionals[1:]
+    else:
+        remote, specs = None, []
+
     if remote is None:
         remote = "origin"
         if head:
@@ -251,13 +319,20 @@ def _target(rest):
             if up and up.strip():
                 remote = up.strip()
 
-    if len(positional) < 2:
+    if not specs:
         return remote, head
+    if len(specs) > 1:
+        return None, None  # several refspecs; no single branch to report on
 
-    spec = positional[1].lstrip("+")
+    spec = specs[0].lstrip("+")
+    if spec.startswith(":"):
+        return None, None  # `git push origin :main` is a deletion
     dst = spec.split(":", 1)[1] if ":" in spec else spec
-    dst = dst.rsplit("/", 1)[-1] if dst.startswith("refs/heads/") else dst
-    if dst in ("HEAD", ""):
+    if dst.startswith("refs/heads/"):
+        dst = dst[len("refs/heads/"):]
+    if "*" in dst or dst == "":
+        return None, None  # wildcard or empty; not one branch
+    if dst == "HEAD":
         dst = head
     return remote, dst
 
@@ -285,12 +360,17 @@ DENY = (
     "fetch you never saw no longer satisfies the lease.\n\n"
     "Where the remote ref does not exist, the lease succeeds trivially -- so "
     "this is never the worse command.\n\n"
-    "The one case that genuinely needs bare `--force` is a lease that is "
-    "UNSATISFIABLE rather than violated: `memories/git.md` records "
-    "`--force-with-lease` failing with `stale info` after a squash-merge with "
-    "auto-delete removed the branch your ref still names. For that, and for "
-    "any other deliberate override, prefix the command with "
-    "`ALLOW_FORCE_PUSH=1` (a real env assignment, not a mention)."
+    "A `stale info` refusal is NOT a reason to force. `memories/git.md` "
+    "records that case -- a squash-merge with auto-delete removed the branch "
+    "your ref still names -- and states that the lease is unsatisfiable "
+    "rather than violated, so `--force` is unnecessary and there is nothing "
+    "to race. One read settles it: `git ls-remote --heads origin <branch>`, "
+    "where empty output means the next push CREATES the branch, so a plain "
+    "push is the fix (or `git fetch --prune` and a retry).\n\n"
+    "`ALLOW_FORCE_PUSH=1` (a real env assignment, not a mention) is an escape "
+    "valve for a case this guard did not foresee, not a shortcut for a known "
+    "one. If you reach for it, say what the lease refused and why forcing is "
+    "right -- and if the answer is `stale info`, it is not."
 )
 
 WARN_HEAD = (
@@ -353,15 +433,24 @@ def evaluate(command):
         rest, override = _push_argv(argv)
         if rest is None:
             continue
-        force, lease, dry, delete, refset = _flags(rest)
-        if dry or delete or refset:
-            continue
+        flags, positionals, repo_opt, ok = _parse_push(rest)
         segment = " ".join(argv)
 
-        if force and not lease and not override:
+        # The refusal runs FIRST and does not consult the lease. `git push
+        # --help` on `-f, --force`: "when --force-with-lease option is used,
+        # the command refuses to update a remote ref whose current value does
+        # not match what is expected. This flag disables these checks." So
+        # `--force --force-with-lease` is a plain force push, and treating the
+        # lease as clearing the refusal was a bypass rather than a nicety.
+        if flags["force"] and not flags["dry_run"] and not override:
             return "deny", DENY.format(segment=segment)
 
-        remote, branch = _target(rest)
+        # Everything below reports on ONE branch, so anything that is not one
+        # ordinary branch push is out of scope rather than guessed at.
+        if flags["dry_run"] or flags["delete"] or flags["refset"] or not ok:
+            continue
+
+        remote, branch = _target(positionals, repo_opt)
         if not remote or not branch:
             continue
 

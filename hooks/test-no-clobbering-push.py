@@ -95,6 +95,11 @@ def _local_advances(path):
     _commit(path, "mine.txt", "mine\n")
 
 
+def _named_remote(path, bare, name):
+    """Add a second remote under a name that is NOT the config fallback."""
+    _run(path, "remote", "add", name, bare)
+
+
 # --- should DENY ---------------------------------------------------------
 
 def incident_case(path, bare):
@@ -121,6 +126,30 @@ def short_cluster_case(path, bare):
     return "git push -fu origin HEAD"
 
 
+def force_plus_lease_case(path, bare):
+    """`git push --help` on `-f, --force`: "when --force-with-lease option is
+    used, the command refuses ... This flag disables these checks." So the two
+    together are a plain force push, and reading the lease as clearing the
+    refusal was a bypass."""
+    _local_advances(path)
+    return "git push --force --force-with-lease origin HEAD"
+
+
+def negated_dry_run_case(path, bare):
+    """Every `git push` option has a `--[no-]` form, so a positive-only scan is
+    order-blind: this really does transfer."""
+    _local_advances(path)
+    return "git push --dry-run --no-dry-run --force origin HEAD"
+
+
+def force_with_value_cluster_case(path, bare):
+    """`-fo ci.skip` is accepted bash: `f` is force and `o` eats the next word.
+    A matcher that does not know `o` misses the force AND mistakes `ci.skip`
+    for the remote."""
+    _local_advances(path)
+    return "git push -fo ci.skip origin HEAD"
+
+
 # --- should WARN ---------------------------------------------------------
 
 def diverged_known_case(path, bare):
@@ -143,6 +172,25 @@ def diverged_lease_case(path, bare):
     _remote_advances(path, bare, keep_object=False)
     _local_advances(path)
     return "git push --force-with-lease --force-if-includes"
+
+
+def repo_option_case(path, bare):
+    """`--repo <repository>` names the remote. Skipping it as a mere option
+    value resolved the push against the configured remote instead."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    _named_remote(path, bare, "upstream")
+    return "git push --repo upstream HEAD"
+
+
+def value_cluster_remote_case(path, bare):
+    """`-uo ci.skip upstream HEAD`: `o` eats `ci.skip`, so the remote is
+    `upstream`. Without that, `ci.skip` is read as the remote and the reading
+    never happens."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    _named_remote(path, bare, "upstream")
+    return "git push -uo ci.skip upstream HEAD"
 
 
 # --- should STAY SILENT --------------------------------------------------
@@ -213,6 +261,51 @@ def other_subcommand_case(path, bare):
     return "git pull --force origin main"
 
 
+def negated_force_case(path, bare):
+    """`--force --no-force`: the last one wins, so this is not a force push."""
+    _local_advances(path)
+    return "git push --force --no-force origin"
+
+
+def branches_alias_case(path, bare):
+    """`git push -h`: `--branches` is "alias of --all", so it pushes a ref set
+    that a single-branch reading would misdescribe."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push --branches origin"
+
+
+def delete_refspec_case(path, bare):
+    """`git push origin :main` is a deletion written as a refspec, not a push
+    to a branch named `:main`."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push origin :main"
+
+
+def wildcard_refspec_case(path, bare):
+    """A wildcard refspec names no single branch; guessing one would send
+    `ls-remote` at a ref the push never touches."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push origin refs/heads/*:refs/heads/*"
+
+
+def unknown_cluster_case(path, bare):
+    """An unrecognized short cluster might or might not consume the next word,
+    so destination resolution declines rather than guessing."""
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push -Z origin HEAD"
+
+
+def git_global_option_case(path, bare):
+    """`git -C <dir> push` is still a push; the global option must be skipped
+    before `push` is looked for."""
+    _local_advances(path)
+    return f"git -C {path} push --force origin HEAD"
+
+
 # ---------------------------------------------------------------- cases
 
 SHOULD_DENY = [
@@ -221,6 +314,14 @@ SHOULD_DENY = [
     ("D2", bare_force_case, "bare `git push --force` with no refspec"),
     ("D3", short_f_case, "`-f` is the same flag spelled short"),
     ("D4", short_cluster_case, "`f` inside a `-fu` short cluster"),
+    ("D5", force_plus_lease_case,
+     "`--force --force-with-lease` -- `--force` disables the lease check"),
+    ("D6", negated_dry_run_case,
+     "`--dry-run --no-dry-run --force` really does transfer"),
+    ("D7", force_with_value_cluster_case,
+     "`-fo ci.skip` is force, and `o` eats the next word"),
+    ("D8", git_global_option_case,
+     "`git -C <dir> push --force` -- the global option is skipped first"),
 ]
 
 SHOULD_WARN = [
@@ -230,6 +331,10 @@ SHOULD_WARN = [
      "remote tip not an ancestor of HEAD, object absent locally"),
     ("W3", diverged_lease_case,
      "a leased force-push over a diverged remote still gets the reading"),
+    ("W4", repo_option_case,
+     "`--repo upstream` names the remote, not a value to skip"),
+    ("W5", value_cluster_remote_case,
+     "`-uo ci.skip upstream` -- `o` eats `ci.skip`, so `upstream` is the remote"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -244,6 +349,12 @@ SHOULD_STAY_SILENT = [
     ("S8", quoted_mention_case, "a mention inside a quoted string"),
     ("S9", heredoc_mention_case, "a heredoc that mentions the command"),
     ("S10", other_subcommand_case, "a different git subcommand entirely"),
+    ("S11", negated_force_case, "`--force --no-force` -- the last one wins"),
+    ("S12", branches_alias_case, "`--branches` is an alias of `--all`"),
+    ("S13", delete_refspec_case, "`origin :main` is a deletion refspec"),
+    ("S14", wildcard_refspec_case, "a wildcard refspec names no one branch"),
+    ("S15", unknown_cluster_case,
+     "an unrecognized short cluster -- decline rather than guess a remote"),
 ]
 
 
@@ -272,9 +383,24 @@ def verdict(hook_path, repo, command):
     return "WARN" if hso.get("additionalContext") else "silent"
 
 
-def build_and_verdict(hook_path, builder):
-    path, bare = _new_repo()
-    command = builder(path, bare)
+# Fixture repos are built ONCE and reused across every hook variant.
+#
+# This is not a shortcut: the guard is read-only by construction (`ls-remote`,
+# `rev-parse`, `merge-base`, `cat-file`, `log`), so no variant can leave a
+# fixture in a state a later variant would see. Rebuilding per variant cost
+# 28 x 15 = 420 repo-plus-bare-remote constructions and pushed the suite past
+# two minutes; building once costs 28 and loses nothing.
+_BUILT = {}
+
+
+def build_all(cases):
+    for case_id, builder in cases.items():
+        path, bare = _new_repo()
+        _BUILT[case_id] = (path, builder(path, bare))
+
+
+def build_and_verdict(hook_path, case_id):
+    path, command = _BUILT[case_id]
     return verdict(hook_path, path, command)
 
 
@@ -292,6 +418,8 @@ EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
 CASES = {case_id: builder for case_id, builder, _ in
          SHOULD_DENY + SHOULD_WARN + SHOULD_STAY_SILENT}
 
+build_all(CASES)
+
 wrong = 0
 for label, group, want in (("should DENY", SHOULD_DENY, "DENY"),
                            ("should WARN", SHOULD_WARN, "WARN"),
@@ -299,7 +427,7 @@ for label, group, want in (("should DENY", SHOULD_DENY, "DENY"),
                             "silent")):
     print(f"{label}:")
     for case_id, builder, desc in group:
-        got = build_and_verdict(HOOK, builder)
+        got = build_and_verdict(HOOK, case_id)
         wrong += got != want
         print(f"  {got:<6} {case_id:<4} {desc}")
     print()
@@ -312,30 +440,89 @@ print(f"{total - wrong}/{total} correct"
 
 MUTATIONS = {
     "force_deny": (
-        "a bare force push is refused",
-        [('        if force and not lease and not override:\n'
+        "a force push is refused",
+        [('        if flags["force"] and not flags["dry_run"] and not override:\n'
           '            return "deny", DENY.format(segment=segment)',
           "        pass")],
-        {"D1", "D2", "D3", "D4"},
+        {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"},
+    ),
+    "force_ignores_lease": (
+        "the refusal does NOT consult the lease -- `--force` disables it",
+        [('        if flags["force"] and not flags["dry_run"] and not override:',
+          '        if flags["force"] and not flags["lease"] '
+          'and not flags["dry_run"] and not override:')],
+        {"D5"},
     ),
     "force_token_exact": (
-        "`--force` matches as an exact token, so `--force-with-lease` is not "
-        "a force flag",
-        [('        if tok == "--force" or tok == "-f":',
-          '        if tok.startswith("--force") or tok == "-f":')],
+        "`--force` matches as an exact long option, so `--force-with-lease` "
+        "is not one",
+        [('            if base == "--force-with-lease" '
+          'or name.startswith("--force-with-lease"):\n'
+          '                flags["lease"] = not negated\n'
+          "                continue",
+          '            if base == "--force-with-lease" '
+          'or name.startswith("--force-with-lease"):\n'
+          '                flags["lease"] = not negated\n'
+          '                flags["force"] = not negated\n'
+          "                continue")],
         {"S1", "W3"},
+    ),
+    "negation_aware": (
+        "`--no-*` forms are honoured in order, so a later one wins",
+        [("                flags[LONG_FLAG[base]] = not negated",
+          "                flags[LONG_FLAG[base]] = True")],
+        {"D6", "S11"},
+    ),
+    "short_value_letter": (
+        "a value-taking letter in a short cluster (`-o`) eats the next word",
+        [("                if pos == len(letters) - 1:\n"
+          "                    i += 1  # its value is the next word, "
+          "not the remote\n"
+          "                break",
+          "                break")],
+        {"W5"},
+    ),
+    "repo_option": (
+        "`--repo <repository>` supplies the remote",
+        [('                if base == "--repo" and not negated:\n'
+          "                    repo_opt = value",
+          "                pass")],
+        {"W4"},
     ),
     "override": (
         "a real `ALLOW_FORCE_PUSH=1` assignment clears the refusal",
-        [("        if force and not lease and not override:",
-          "        if force and not lease:")],
+        [("and not flags[\"dry_run\"] and not override:",
+          "and not flags[\"dry_run\"]:")],
         {"S2"},
     ),
-    "dry_delete_refset": (
-        "dry-run, delete, and ref-set pushes are out of scope",
-        [("        if dry or delete or refset:\n            continue",
+    "out_of_scope_gate": (
+        "dry-run, delete, ref-set, and unparsed pushes get no reading",
+        [('        if flags["dry_run"] or flags["delete"] or flags["refset"] '
+          "or not ok:\n            continue",
           "        pass")],
-        {"S3", "S4"},
+        # S3 flips too: the deny path already excludes `--dry-run` on its own,
+        # so without this gate a dry run over a diverged remote takes the
+        # reading and warns. The harness caught the set being under-declared.
+        {"S3", "S4", "S12", "S15"},
+    ),
+    "branches_is_all": (
+        "`--branches` is an alias of `--all`",
+        [('    "--branches": "refset",   # `git push -h`: "alias of --all"', "")],
+        {"S12"},
+    ),
+    "deletion_refspec": (
+        "a refspec with an empty source is a deletion",
+        [('    if spec.startswith(":"):\n'
+          "        return None, None  # `git push origin :main` is a deletion",
+          "    pass")],
+        {"S13"},
+    ),
+    "wildcard_refspec": (
+        "a wildcard refspec names no single branch",
+        [('    if "*" in dst or dst == "":\n'
+          "        return None, None  # wildcard or empty; not one branch",
+          "    pass")],
+        {"S14"},
     ),
     "ancestor_gate": (
         "a remote tip that IS an ancestor of HEAD is a fast-forward and "
@@ -343,9 +530,10 @@ MUTATIONS = {
         [("        if anc.returncode == 0:\n            continue  # plain "
           "fast-forward; nothing at risk",
           "        if False:\n            continue")],
-        # S1 and S2 are fast-forward pushes too, so removing the gate makes
-        # all three warn -- the harness caught this set being under-declared.
-        {"S1", "S2", "S5"},
+        # S1, S2 and S11 are fast-forward pushes too, so removing the gate
+        # makes all of them warn -- the harness caught this set being
+        # under-declared the first time.
+        {"S1", "S2", "S5", "S11"},
     ),
     "subcommand": (
         "only `git push` matches, not another git subcommand",
@@ -380,8 +568,8 @@ with tempfile.TemporaryDirectory() as tmp:
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(mutated)
 
-        flipped = {case_id for case_id, builder in CASES.items()
-                   if build_and_verdict(path, builder) != EXPECTED[case_id]}
+        flipped = {cid for cid in CASES
+                   if build_and_verdict(path, cid) != EXPECTED[cid]}
 
         ok = flipped == expected_flips
         mutation_wrong += not ok

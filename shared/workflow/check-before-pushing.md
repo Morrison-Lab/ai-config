@@ -73,9 +73,14 @@ Use both, always:
 git push --force-with-lease --force-if-includes
 ```
 
-The one case that genuinely needs bare `--force` is a lease that is **unsatisfiable** rather than violated.
-[`memories/git.md`](../../memories/git.md) records it: after a squash-merge with auto-delete removed the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race and is not one.
-Prefix the command with `ALLOW_FORCE_PUSH=1` there.
+**The `stale info` failure is not a reason to force, and reaching for one there is the specific reflex [`memories/git.md`](../../memories/git.md) exists to stop.**
+After a squash-merge with auto-delete removes the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race with another session.
+It is not one, and that file says so in as many words: the lease is unsatisfiable rather than violated, "`--force` is unnecessary, and there is nothing to race".
+One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch, so a **plain push** is the fix, or `git fetch --prune` and a retry when you want the remote-tracking ref corrected too.
+That is consistent with the point above: where the remote ref does not exist, there is nothing for any force to overwrite.
+
+So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.
+If you reach for it, say in the same breath what the lease refused and why forcing is right --- and if the answer is `stale info`, it is not.
 
 ## The instrument
 
@@ -103,12 +108,15 @@ Then follow [`claim-pr`](claim-pr.md)'s tree-and-parents comparison, which disti
 Never force-push over the difference to find out which it was.
 
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
-- **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and name `ALLOW_FORCE_PUSH=1` only for an unsatisfiable lease.
+- **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
+- **Don't:** pair `--force` *with* the lease and expect protection.
+  `git push --help` says `--force` "disables these checks", the lease among them, so the two together are a plain force push.
+- **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
 
 (Directive from the user, 2026-08-21:
 "cai: add protections against clobbering commits from other agents on a branch

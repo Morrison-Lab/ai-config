@@ -732,6 +732,21 @@ Whenever starting or working on a Pull Request:
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 
+## Check the remote immediately before every push
+
+[`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
+
+Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
+The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer.
+`claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
+An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
+
+`--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
+Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+A `stale info` refusal is not a reason to force either: `memories/git.md` records that it means the remote branch is gone, so a plain push is the fix.
+`ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
+`hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
+
 ## Keep PR branches synced with main
 
 [`shared/workflow/sync-with-main.md`](shared/workflow/sync-with-main.md)

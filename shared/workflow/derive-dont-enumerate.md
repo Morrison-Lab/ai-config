@@ -260,7 +260,8 @@ The remedy is this fragment's own rule, applied to a smaller population: derive 
 - **Do:** enumerate every ordinal or count-word in a file with one query covering the whole class, before touching any of them.
 - **Do:** read the resulting sequence for collisions and stale back-references across the whole file, not only near the edit.
 - **Don't:** grep for the specific old strings a sweep expects to be stale --- that query cannot match a value it was never told to expect.
-- **Don't:** treat a within-file population as exempt from this fragment's rule merely because it cannot grow while you work; it still needs deriving rather than guessing.
+- **Don't:** treat a within-file population as exempt from this fragment's rule merely because it cannot grow while you work;
+  it still needs deriving rather than guessing.
 
 (Morrison-Lab/ai-config#1864, 2026-08-21, review comment [3834448521](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834448521): a PR bumped `shared/workflow/verify-the-right-artifact.md`'s "interpreter's own defaults" section from "fifth" to "sixth adjacent artifact", correctly, but its own back-reference sweep grepped for `four recognizable shapes` and `a fifth adjacent` --- strings that, by construction, cannot match `sixth` or `The five above`.
 The downstream section "A sixth: the fact that a check ran..." kept its stale ordinal and collided with the newly bumped one.

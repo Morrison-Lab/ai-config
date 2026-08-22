@@ -214,7 +214,8 @@ Stating the search this way matters: writing the search as *the* fix teaches the
 
 **Two independent parties running the same grep did not corroborate anything, because both searches keyed on the same surface.**
 [`algorithmatize-checks.rationale.md`](algorithmatize-checks.rationale.md) already states the general form: "The discriminating question is not whether the second method was run independently, but whether it could have failed differently: a second pass that keys on the same token shape will confirm the first pass's misses as readily as its hits."
-A second grep over the same default-branch tree cannot fail differently from the first; it can only reproduce the first's dead end and make it feel doubly confirmed.
+A second grep over the same default-branch tree cannot fail differently from the first;
+it can only reproduce the first's dead end and make it feel doubly confirmed.
 
 - **Do:** cite the PR, not just the file path, when the cited content lives only in an open PR --- and say the corroborating file is absent until merge.
 - **Do:** search open PRs before concluding a citation is uncorroborated, but read a null result there as narrowing, not settling, the question.
@@ -223,7 +224,8 @@ A second grep over the same default-branch tree cannot fail differently from the
 
 (Morrison-Lab/ai-config#1864, 2026-08-21: `shared/workflow/verify-the-right-artifact.md` cited an incident about `skills/clean-git/SKILL.md` step 2 running a real `git worktree prune`.
 The `claude-review` bot ([review comment 3834449057](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834449057)) and a separate CLI session working the same PR each ran `grep -rn "worktree prune" skills/ shared/ memories/`, and both got the same three unrelated hits.
-The incident was real --- ai-config#1849, [review comment 3834408153](https://github.com/Morrison-Lab/ai-config/pull/1849#discussion_r3834408153) --- but `clean-git` does not exist on the default branch; it ships only in #1849, which was open at review time and remained open when this entry was written.
+The incident was real --- ai-config#1849, [review comment 3834408153](https://github.com/Morrison-Lab/ai-config/pull/1849#discussion_r3834408153) --- but `clean-git` does not exist on the default branch;
+it ships only in #1849, which was open at review time and remained open when this entry was written.
 Resolved in [review comment 3834476527](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834476527): "Your greps finding nothing is itself part of the record...
 `clean-git` does not exist on `main`... so no search of `main` can corroborate the anecdote.")
 

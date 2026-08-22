@@ -187,12 +187,45 @@ def scan(path):
             except Exception:
                 continue
             role = m.get("type")
+
+            # The UserPromptSubmit hook's reading does NOT arrive as a user
+            # turn. It is its own record: type "attachment", carrying the text
+            # under `attachment.content` / `attachment.stdout`, with neither a
+            # `message` nor a top-level `content`. Measured against a live
+            # transcript 2026-08-22 -- the record's own keys are `hookEvent`
+            # and `hookName`, and it is emitted AFTER the prompt record it
+            # belongs to. Reading only user turns made the whole
+            # injected-reading carve-out inert: `measured` stayed None however
+            # recently the harness had supplied a real value, so the guard
+            # fired on exactly the case the rule tells you to trust.
+            if role == "attachment":
+                att = m.get("attachment") or {}
+                if isinstance(att, dict):
+                    blob = ""
+                    for field in ("content", "stdout"):
+                        val = att.get(field)
+                        if isinstance(val, str):
+                            blob += val + "\n"
+                    if RX_HOOK_CLOCK.search(blob):
+                        got = RX_HOOK_CLOCK_VALUE.search(blob)
+                        if got:
+                            measured = (
+                                i, int(got.group(1)) * 60 + int(got.group(2)))
+                        else:
+                            last_clock = i
+                continue
+
             blocks = (m.get("message") or {}).get("content")
             if blocks is None:
                 blocks = m.get("content") or []
             if isinstance(blocks, str):
                 # A bare string is a real user prompt, so it opens a new turn.
-                if role != "assistant":
+                # Restricted to `user` deliberately: a transcript also carries
+                # `attachment`, `last-prompt`, `custom-title` and similar
+                # records, which belong to the turn already open. Advancing
+                # past one of those expires the injected reading that arrives
+                # beside it.
+                if role == "user":
                     turn_start = i
                 # A user/system turn can carry a bare string, which is where
                 # the UserPromptSubmit clock line arrives.
@@ -210,7 +243,7 @@ def scan(path):
             # turn's own tool output, which opens nothing -- that distinction is
             # the whole fix: the window must start where the USER spoke, not
             # wherever the assistant last emitted text.
-            if role != "assistant" and any(
+            if role == "user" and any(
                     isinstance(b, dict) and b.get("type") == "text"
                     for b in blocks):
                 turn_start = i

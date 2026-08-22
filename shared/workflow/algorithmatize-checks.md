@@ -227,9 +227,65 @@ and asserts that no combination discharges,
 alongside a mirror asserting that every genuine arming shape still does.
 Round 3's rewrite had dropped one such shape with nothing to report it.)
 
+### An exclusion clause has a population too, and a character it spends may carry a second meaning
+
+The three rungs above all grow the population of *inputs* a matcher is tested against.
+The reported one, then a corpus of real ones, then a generated product.
+Each takes the author's choice of members further out of the loop.
+
+None of them reaches a dimension the author never conceived, and the **exclusion clause** is where that dimension hides.
+A clause names characters rather than syntaxes.
+It is written against the one syntax the guard must not fire on, and a character it spends there may serve a second syntax that needed the opposite verdict.
+
+The worked example is a guard that must distinguish *reading* a skill's file from *invoking* the skill:
+
+```python
+_NOT_PATH     = r"(?<![\w/-])"      # rejects skills/ums and ./ums-helper
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+```
+
+That is correct about paths, and it is the whole reason the clause exists.
+But the `/` inside the lookbehind is doing two jobs, and only one of them was intended.
+In `skills/ums` it is a path separator, so the word must not match.
+In `/ums` it is a slash-command invocation, so the word must match.
+One character class collapses the two, so the guard silently stops recognizing `/ums`, `/memorize`, and `/record-learnings` as invocations at all.
+
+The discriminator sits one position further out, and splitting the single lookbehind into a pair recovers it:
+
+```python
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
+```
+
+A path separator carries a word character or a `.` before it.
+A slash-command carries nothing, or whitespace.
+
+**Nothing in the guard's own tests could see this**, which is the part worth transferring.
+The negative cases an author writes come from the syntax the exclusion clause was aimed at.
+Paths were the frame, so paths were the cases, and every one of them passed in both directions.
+Slash-commands never entered the frame, so no reported input, no corpus of real ones, and no generated product contained one --- a product is generated over the dimensions you named, which is exactly the limit of the rung above.
+
+**Three fragments now name a population a check silently fails to cover, and they are worth telling apart, because each has a different remedy.**
+
+- [`examples-are-scanned`](../writing/examples-are-scanned.md) --- the **checker's** population: the file it scans contains its own explanatory example.
+- [`grep-is-not-coverage`](grep-is-not-coverage.md) --- the **query's** population: strings are matched, and concepts get claimed.
+- This section --- the **pattern's** population: a character excluded for one syntax is excluded for every syntax that uses it.
+
+The check is cheap and runs at composition time.
+Before spending a character in a class or a lookbehind, ask what else that character means in the text the matcher reads.
+Ask it of the character rather than of the input, since the input you would have thought to try is the one already covered.
+
+- **Do:** enumerate every syntax an excluded character participates in, before spending it in a class or a lookbehind.
+- **Do:** split one exclusion into a pair of narrower ones when a character serves two syntaxes that need opposite verdicts.
+- **Do:** assert a positive case per syntax, so the second one is checked rather than assumed.
+- **Don't:** read a passing negative suite as evidence the exclusion is right --- those cases came from the syntax you were already thinking about.
+- **Don't:** widen the class to admit the missing syntax --- that readmits the one the clause was written to exclude.
+
+(Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
+`(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
-The section above governs a comment claiming *what* a matcher matches.
+This parent section's closing **Don't** governs a comment claiming *what* a matcher matches.
 
 **That remedy has a precondition worth naming, because a comment gives no sign
 of which side of it a claim sits on.**

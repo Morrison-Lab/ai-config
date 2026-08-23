@@ -49,8 +49,14 @@ CASES = [
      "'worth tracking separately' blocks"),
 
     # Third-party deferral: no offer verb, no question mark, and the decision
-    # named as somebody else's. Every one of these was supplied by a reviewer as
-    # a phrasing the pre-widening patterns missed (ai-config#2007).
+    # named as somebody else's.
+    #
+    # The FIRST case below already matched before this PR, via the pre-existing
+    # `warrants a follow-up` alternative -- verified against main's own regex.
+    # It is kept because it is the phrasing that produced the section, not
+    # because it was ever uncovered. The four that follow are the ones a
+    # reviewer supplied as walking straight past the pre-widening patterns
+    # (ai-config#2007), and they are what the widening is actually for.
     ([say("Flagging for the reviewer's call on whether it warrants a follow-up issue.")], True,
      "the original phrasing blocks"),
     ([say("Flagging for the reviewer to judge whether this belongs in the tracker.")], True,
@@ -149,6 +155,15 @@ CASES = [
      "a bare status FLAG defers nothing"),
     ([say("Flagging for the reviewer -- the tracker already has an entry for this.")], False,
      "the same with an em-dash aside"),
+    # Claude review, ai-config#2007 round 7: `call` is the one alternative in
+    # the possessive pattern with a common non-judgment reading, and with the
+    # marker optional an ordinary noun-noun compound satisfied it. That pattern
+    # has no verb and no connector to lean on, so the possessive is the only
+    # thing separating a decision from a meeting.
+    ([say("The team call on Monday will cover the tracker.")], False,
+     "`team call` is a meeting, not a decision handed over"),
+    ([say("The owner call is scheduled before the follow-up.")], False,
+     "the same compound with a different party word"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

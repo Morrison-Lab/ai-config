@@ -115,8 +115,18 @@ ASSERT = [
     r"\b(?:to|for)\b[^.!?]{0,15}?"
     r"\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
+    # `call` takes a MANDATORY possessive; the others do not. It is the one
+    # alternative here with a common non-judgment reading, and with the marker
+    # optional the ordinary noun-noun compound satisfies it: "the team call on
+    # Monday will cover the tracker" is a meeting, not a decision, and the
+    # status-report vocabulary around it supplies the tracking word for free.
+    # Unlike the deferral patterns above, this one has no construction to lean
+    # on -- no verb and no connector -- so the possessive marker is the only
+    # thing separating "the team's call" from "the team call".
+    r"\b(reviewer|maintainer|owner|team)(?:'s|s')\s+call\b[^.!?]{0,80}"
+    r"\b(issue|tracker|tracking|filing|follow-?up)\b",
     r"\b(reviewer|maintainer|owner|team)(?:'s|s')?\s+"
-    r"(call|discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"
+    r"(discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"
     r"\b(issue|tracker|tracking|filing|follow-?up)\b",
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)

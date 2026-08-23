@@ -117,6 +117,18 @@ CASES = [
      "the same shape with a different artifact noun"),
     ([say("Leaving a message for the team about the tracker.")], False,
      "present participle, still an artifact rather than a decision"),
+    # Cursor Bugbot, ai-config#2007 round 5: the named-object allowlist was
+    # itself too tight. `leave it UP TO` takes a particle, and a decision noun
+    # takes premodifiers ("the FILING decision"). The premodifier slot is bound
+    # to the head noun rather than free-standing -- a free one re-admitted the
+    # benefactive, since "a NOTE for" would fill it. Caught by keeping the three
+    # benefactive cases above while widening, which is the point of them.
+    ([say("I'll leave it up to the reviewer whether to open an issue.")], True,
+     "the `up to` particle form blocks"),
+    ([say("Leaving the filing decision to the maintainer about the tracker.")], True,
+     "a premodified decision noun blocks"),
+    ([say("Left the tracking decision to the team on this follow-up.")], True,
+     "past tense plus a premodified decision noun"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

@@ -48,7 +48,7 @@ ASSERT = [
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
 # A removed code region is a BOUNDARY, not a gap.
-BLOCK = re.compile(r"```.*?```|^\s*>.*$", re.S | re.M)
+BLOCK = re.compile(r"```.*?```|^[ \t]*>[^\n]*$", re.S | re.M)
 TICK = re.compile(r"`[^`\n]*`")
 
 

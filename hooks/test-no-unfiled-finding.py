@@ -116,12 +116,14 @@ CASES = [
     ([say("Its alternatives are `worth its own issue` and `needs an issue`.")], False,
      "two quoted alternatives, no claim about filing anything"),
     ([say("A reviewer wrote:\n\n> This warrants a follow-up issue.\n\nNoted.")], False,
-     "the assertion inside a blockquote is someone else's"),
+      "the assertion inside a blockquote is someone else's"),
+    ([say("A reviewer wrote:\n\n> Hi.\n\nThis should be filed separately.")], True,
+      "a genuine unquoted assertion following a blockquote still blocks"),
     ([say("Example:\n```\nworth its own issue\n```\nthat is the pattern.")], False,
-     "the assertion inside a code fence is an illustration"),
+      "the assertion inside a code fence is an illustration"),
     # The boundary: stripping must not swallow a REAL assertion beside a quote.
     ([say("The `warrants` alternative is fine, but this needs a tracking issue.")], True,
-     "a genuine assertion still blocks when a code span sits beside it"),
+      "a genuine assertion still blocks when a code span sits beside it"),
     # The inverse hazard, and the reason a removed block becomes a TERMINATOR
     # rather than a space. `defect` and `file` here are 400 characters apart
     # and cannot satisfy the bounded pattern; collapsing the fence to a space

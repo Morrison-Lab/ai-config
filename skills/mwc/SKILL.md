@@ -235,7 +235,7 @@ Three rules follow, and they hold whatever the block turned out to be:
   The denial and the grant are about different things: one is a guard's state,
   the other is the user's intent, and only the guard's state gates the action.
 
-## Three properties of the guard worth knowing before you trust it
+## Four properties of the guard worth knowing before you trust it
 
 **The denial you hit may not be this guard.**
 `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is
@@ -284,7 +284,9 @@ At 20:25 the fifth merge was refused, and `check-mwc` reported it precisely:
 
 ```
 mwc is NOT active for session <id>: grant recorded, but the session reads unknown.
+  Marker: <git-common-dir>/ai-sessions/<id>.mwc
   Last heartbeat 2026-08-22 19:16; a session goes stale after 1800s.
+  If the session IS live:  ai-session.sh heartbeat --id '<id>'
 ```
 
 One `heartbeat --id <id>` restored it and the merge went through unchanged.
@@ -303,8 +305,10 @@ The section on re-grants above is the relevant discipline here: a block is evide
 **Read `check-mwc`'s exit status from the script, not from the end of a pipe.**
 Its three-way status (0 active, 1 no grant, 2 granted-but-not-honourable) is the whole point of the command.
 Piping it through `tail` and echoing `$?` reports **`tail`'s** status instead, which is `0` whatever the script said.
-That is how the stale grant above first read as "active" when the script had actually exited 2.
-Redirect to a file and echo `$?` on the bare invocation, or test the command directly.
+That is how the stale grant above first read as "active" when the script had actually exited 2, and the misreading survived until the merge was refused a second time.
+
+- **Do:** run the bare invocation and branch on `$?`, or redirect its output to a file and echo `$?` from the unpiped command.
+- **Don't:** read `$?` after a pipe --- it belongs to the last stage, so every three-way status collapses to whatever `tail`, `head` or `grep` returned.
 
 ## Quick Reference
 

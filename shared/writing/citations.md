@@ -517,7 +517,7 @@ When the record lives in the *consumer* repo instead, no amount of grepping here
 - **Do:** write `owner/repo#NNN` for anything outside the repository the text lives in.
 - **Do:** name the backing document and section when the evidence is a file in another repo, not just the forge number.
 - **Don't:** assume a number that resolves for you resolves for the reader -- it resolved because of where you were standing.
-- **Don't:** read "the numbers are real" as a rebuttal; a citation the reader cannot follow is defective whether or not its target exists.
+- **Don't:** read "the numbers are real" as a rebuttal --- a citation the reader cannot follow is defective whether or not its target exists.
 
 (Measured 2026-08-22 on [ai-config#1989](https://github.com/Morrison-Lab/ai-config/pull/1989).
 A hook docstring cited `Lacaedemon/sparta` PRs #794, #861, #866 and #1199 as its dated case record.
@@ -544,4 +544,4 @@ Use a whitespace-tolerant search rather than `grep`, since a quoted title long e
 - **Do:** search the corpus for a section's old title whitespace-tolerantly (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames it, rather than a literal `grep`.
 - **Do:** quote a title you are citing only if you have just read it, since a resolving link is no evidence about the text beside it.
 - **Don't:** read a green `check-links.py` as covering a quoted title --- it discards link text and strips anchors by construction.
-- **Don't:** expect the citing file's own review to catch this; the edit that invalidated it happened somewhere else.
+- **Don't:** expect the citing file's own review to catch this --- the edit that invalidated it happened somewhere else.

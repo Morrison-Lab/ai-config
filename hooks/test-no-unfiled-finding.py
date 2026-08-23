@@ -129,6 +129,26 @@ CASES = [
      "a premodified decision noun blocks"),
     ([say("Left the tracking decision to the team on this follow-up.")], True,
      "past tense plus a premodified decision noun"),
+    # Claude review, ai-config#2007 round 6. Two FALSE POSITIVES, which the
+    # stopping rule above does not license declining -- it governs invented
+    # false NEGATIVES only.
+    #
+    # `question` carried both senses: "the question of whether to file" is a
+    # decision, "I left a question for the reviewer" is the benefactive. A word
+    # that names both cannot discriminate, so it left the list.
+    ([say("I left a question for the reviewer about the tracking issue.")], False,
+     "`question` as an artifact noun, same shape as the note case"),
+    ([say("Leaving a question for the maintainer on the follow-up issue.")], False,
+     "the participle form of the same"),
+    # `flag` needs its object where the other verbs do not: "deferring to the
+    # reviewer" is a complete deferral, "flagging for the reviewer" is ordinary
+    # English for drawing attention. Left optional, it fired on this corpus's
+    # own FLAG status convention -- the class this hook's docstring names as
+    # the one that must never fire.
+    ([say("Flagging for the team: the follow-up issue is stale and nobody owns it.")], False,
+     "a bare status FLAG defers nothing"),
+    ([say("Flagging for the reviewer -- the tracker already has an entry for this.")], False,
+     "the same with an em-dash aside"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

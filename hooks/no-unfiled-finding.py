@@ -50,10 +50,10 @@ ASSERT = [
     # deferral CONSTRUCTION, a named party, and a tracking word in the same
     # sentence.
     #
-    # The construction took five review rounds, and the shape below is the
-    # third distinct ANSWER rather than the fifth tuning of one. Recording both
-    # the rejected shapes and the stopping rule, because the useful part is
-    # which axis was wrong rather than where any bound ended up.
+    # The construction took six review rounds, and the shape below is the third
+    # distinct ANSWER rather than the sixth tuning of one. Recording the
+    # rejected shapes and the stopping rule, because the useful part is which
+    # axis was wrong rather than where any bound ended up.
     #
     # Rejected, all of which treated the words between the verb and the
     # connector as a WILDCARD and tuned its width:
@@ -72,23 +72,46 @@ ASSERT = [
     #      separates them.
     #
     # What separates them is WHAT IS BEING HANDED OVER. You defer a DECISION
-    # and you leave a NOTE, so the object is named rather than matched. An
-    # artifact noun (note, comment, message) is simply absent from the list and
-    # needs no exclusion rule of its own.
+    # and you leave a NOTE, so the object is named rather than matched.
+    #
+    # Two consequences of that principle, each found by a round that applied it
+    # more strictly than the list did:
+    #
+    # - The list admits only UNAMBIGUOUS decision nouns. `question` was in it
+    #   and had to go: "the question of whether to file" is a decision, but "I
+    #   left a question for the reviewer" is the same benefactive the principle
+    #   exists to exclude, so the word carries both senses and cannot
+    #   discriminate.
+    # - `flag` REQUIRES its object, where the other verbs do not. "Deferring to
+    #   the reviewer" is already a complete deferral, while "flagging for the
+    #   reviewer" is ordinary English for bringing something to someone's
+    #   attention and defers nothing. Leaving the object optional there fired
+    #   on this corpus's own `FLAG` status convention, which the docstring at
+    #   the top of this file explicitly names as a class that must not fire.
     #
     # STOPPING RULE, because this is a lexical guard standing in for a semantic
-    # judgment and the supply of unmatched phrasings is endless. The list below
-    # is DELIBERATELY INCOMPLETE. A phrasing it misses is an accepted false
-    # negative, not a defect, and is not worth a round unless it is one people
-    # actually write. The asymmetry that licenses this: a missed nag costs a
-    # finding that was probably filed anyway, while a false nag on ordinary
-    # prose is what gets a guard switched off and takes the real cases with it.
-    # So widen only on a MEASURED miss from real prose, never on an invented
-    # counterexample -- an adversarial reader can always produce one more.
-    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left|flag(?:ging)?)\s+"
+    # judgment and the supply of unmatched phrasings is endless. The list is
+    # DELIBERATELY INCOMPLETE, and a phrasing it misses is an accepted false
+    # negative rather than a defect. The asymmetry that licenses that: a missed
+    # nag costs a finding that was probably filed anyway, while a false nag on
+    # ordinary prose is what gets a guard switched off and takes the real cases
+    # with it.
+    #
+    # Note which direction the rule governs. It licenses declining to chase a
+    # FALSE NEGATIVE invented by an adversarial reader. It says nothing about a
+    # FALSE POSITIVE, which is the failure the asymmetry is built around -- so
+    # a demonstrated over-fire is always in scope, however contrived its
+    # sentence looks.
+    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left)\s+"
     r"(?:(?:it|this|that)\s+)?(?:up\s+)?"
     r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
-    r"(?:(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|question|matter|concern)\s+)?"
+    r"(?:(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|matter|concern)\s+)?"
+    r"\b(?:to|for)\b[^.!?]{0,15}?"
+    r"\b(reviewer|maintainer|owner|team|human)\b"
+    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
+    r"flag(?:ging)?\s+"
+    r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
+    r"(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|matter|concern)\s+"
     r"\b(?:to|for)\b[^.!?]{0,15}?"
     r"\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",

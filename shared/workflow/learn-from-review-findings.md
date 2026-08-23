@@ -231,3 +231,69 @@ The live bypass outside that family was found the same evening by probing rather
 The same probe returned a confirmation as well as a defect, establishing that `GIT_CONFIG_GLOBAL` was already caught by the wholesale environment overlay added in `51be639e`.
 A third family --- the GitHub MCP write tools, which reach a remote branch with no `git push` for the guard to see --- was found by a dispatched `adversarial-reviewer` subagent rather than by `claude-review`, and is filed as [#1929](https://github.com/Morrison-Lab/ai-config/issues/1929).
 That one is worth reading as evidence for the rule rather than against it: a different reviewer searched a different family, which is what makes family coverage a property of who looked rather than of how hard.)
+
+## A later round can find a defect in the FIX rather than in the original code
+
+Every rule above treats a review round as scrutiny of the diff you set out to write.
+A round can instead find that **the previous round's fix was the defect**, and that case reads differently from the inside: the code under review is code you wrote *in response to a finding*, so it arrives already feeling validated.
+
+Two shapes, both measured on Morrison-Lab/ai-config#2007 over three rounds.
+
+**The over-correction.**
+A finding says a pattern matches too much, and the fix narrows it past the target.
+Here a guard's deferral patterns were narrowed twice in one commit -- a `to` requirement was added *and* the verb `left` was dropped -- to kill one false positive.
+The `to` alone was sufficient.
+Dropping `left` on top of it removed a construction the guard was supposed to catch.
+Two changes shipped together, one of them load-bearing and one of them a regression, and the false positive disappeared either way, so nothing in the outcome distinguished them.
+
+The tell is a fix that changes more than one thing in service of one finding.
+Ask which single change is sufficient, and drop the rest.
+
+**It recurred on the same guard, in the commit immediately after this rule was written.**
+Round 2's narrowing was itself over-narrowed: requiring the connector to sit immediately after the deferral verb dropped every phrasing with a real noun-phrase object between them ("leave this decision to the reviewer", "flagging this concern for the maintainer"), which round 3 had to restore.
+Both corrections shared a root the first one did not name: I was testing **adjacency** when the discriminator was **order** -- in a deferral the connector precedes the party, and in the innocent construction the party is the verb's indirect object and arrives first.
+So an over-correction is often a sign that the discriminator itself is wrong rather than merely mis-tuned, and re-tuning a wrong discriminator produces another one.
+
+**The tell is mechanical: consecutive fixes that all adjust the same knob.**
+Three rounds on that guard each changed the width of one wildcard -- connector adjacent to the verb, then a bare pronoun allowed, then a short gap -- and a fourth round found why none could work.
+The two senses being separated had the identical surface shape, so no width of wildcard could ever distinguish them.
+What separated them was the identity of one word, and the fix was to enumerate that word's allowed values rather than to match around it.
+Count the knob rather than the rounds: two fixes turning the same dial is the signal to ask what the test is measuring, and three is the signal to stop tuning and change its shape.
+That the rule was written, and then broken within the hour by its author, is the ordinary case rather than a surprising one: a rule is consulted at read time and violated at composition time.
+
+**The probe that fired for the wrong reason.**
+I checked the over-correction before shipping it, with two sentences of the shape I had just removed.
+One fired and one did not, and I read that as coverage.
+It was not: the one that fired matched a *different alternative* in the same list, incidentally, on a clause the sentence happened to contain.
+So the hole was real and my own probe concealed it.
+
+That is the same failure the mutation rules in [`algorithmatize-checks`](algorithmatize-checks.md) describe, arriving one level out: not a test that never ran, but a test that ran, passed, and proved something other than what it was written to prove.
+A passing probe is evidence only once you know *which* clause made it pass.
+
+**The tests written to prove a narrowing safe must VARY along the axis you narrowed.**
+This is the coverage shape that lets an over-correction ship green, and it is separate from the probe problem above.
+Ten new cases went in with round 2's narrowing, and every one of them used the same sentence shape the narrowing happened to preserve -- a bare pronoun object.
+None used a noun-phrase object, which is precisely what the narrowing broke, so the suite could not see the regression and neither could the cross-vendor reviewer's own run, which passed at that head.
+A suite that grows while staying inside one shape reports coverage and adds none.
+So when a fix restricts what a pattern accepts, ask what the restriction excludes and write a case on the far side of it -- the far side is where the regression lives, by construction.
+
+- **Do:** ask which single change is sufficient for a finding, and ship only that one.
+- **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.
+- **Do:** check *which* alternative made a probe fire before reading it as coverage.
+- **Don't:** treat code written in response to a finding as pre-validated --- it is a new diff and gets a new review.
+- **Don't:** conclude a class is covered because one member of it fired.
+
+## A cosmetic pass over a paragraph is not a read of it
+
+A round whose brief is narrow and mechanical -- a red formatting check, a lint fix, a rename -- edits lines without engaging their content.
+That is efficient and correct as far as it goes, and it produces a specific blind spot: a **carried-over finding living in the very paragraph you just reformatted** survives the round, because the paragraph was processed rather than read.
+
+It is worse than not touching the file at all.
+Editing a paragraph creates a strong impression of having covered it, so the next round's re-raise reads as new rather than as repeated, and the reviewer has to say "carried over, unaddressed" to be believed.
+
+Measured on Morrison-Lab/ai-config#2011: a round fixed CI-red semantic line breaks in a section, and left standing an already-raised finding one line away -- that the section's own worked example cited another repo's PRs as bare `#NNN`, the exact defect the section documents.
+The reformat rewrote that line's neighbours and never engaged it.
+
+- **Do:** re-read a whole paragraph you reformat, and check it against any open finding on that file.
+- **Do:** treat a re-raised finding as evidence that the previous round's brief was too narrow, not that the reviewer is repeating itself.
+- **Don't:** count a mechanical edit as coverage of the lines it touched.

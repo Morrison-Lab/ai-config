@@ -43,3 +43,6 @@ Report, for your one unit only:
 
 Return your verdict as a report; the calling session collects verdicts across
 all units and applies fixes afterward on the user's go-ahead.
+
+Under opencode this agent has no `Bash` access at all --- its frontmatter denies it --- so a rendered artifact has to reach you through the calling session rather than through a local command.
+Say so plainly when that leaves a computed value unverifiable, rather than guessing from the prose.

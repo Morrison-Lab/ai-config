@@ -131,6 +131,35 @@ ASSERT = [
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
+FENCE = re.compile(r"```.*?```", re.S)
+QUOTED = re.compile(r"^\s*>.*$", re.M)
+TICKED = re.compile(r"`[^`\n]*`")
+
+
+def visible_prose(text):
+    """Drop code fences, blockquotes, and inline code before matching.
+
+    Same treatment `remind-ums-after-error.py` applies, and for the same
+    reason it gives: this corpus quotes its own banned strings constantly.
+    A message ABOUT this guard cites its patterns -- `warrants a follow-up`,
+    `worth its own issue` -- and every such citation is an assertion in form
+    and a quotation in fact.
+
+    Measured 2026-08-23: a status recap discussing this file's own regex was
+    blocked on the `warrants a follow-up` alternative appearing inside a code
+    span, in a message that asserted nothing about filing anything. That is
+    the pure false-positive direction, on the population most likely to
+    produce it -- the people editing the guard.
+
+    Fences and blockquotes go too, on the same reasoning that governs them in
+    the sibling hook: quoted tool output and quoted review text are not the
+    model's own voice.
+    """
+    text = FENCE.sub(" ", text)
+    text = QUOTED.sub(" ", text)
+    return TICKED.sub(" ", text)
+
+
 # Already-filed talk. A message reporting an issue that exists is the
 # CORRECT behaviour and must never be blocked.
 RX_ALREADY = re.compile(
@@ -191,7 +220,8 @@ def main() -> int:
 
     if not text:
         return 0
-    hit = RX_ASSERT.search(text)
+    prose = visible_prose(text)
+    hit = RX_ASSERT.search(prose)
     if not hit:
         return 0
     # The message cites an issue, so the finding is already recorded.

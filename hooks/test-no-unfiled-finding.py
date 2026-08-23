@@ -164,6 +164,21 @@ CASES = [
      "`team call` is a meeting, not a decision handed over"),
     ([say("The owner call is scheduled before the follow-up.")], False,
      "the same compound with a different party word"),
+    # Measured 2026-08-23: this guard blocked a status recap that was DISCUSSING
+    # its own regex, because a pattern name sat in a code span. A message about
+    # the guard cites the guard, and every citation is an assertion in form and
+    # a quotation in fact -- the sibling hook strips code spans for exactly this.
+    ([say("The pattern `warrants a follow-up` already matched on main.")], False,
+     "a pattern name in a code span is a quotation, not an assertion"),
+    ([say("Its alternatives are `worth its own issue` and `needs an issue`.")], False,
+     "two quoted alternatives, still no claim about filing anything"),
+    ([say("A reviewer wrote:\n\n> This warrants a follow-up issue.\n\nNoted.")], False,
+     "the assertion inside a blockquote is someone else's"),
+    ([say("Example:\n```\nworth its own issue\n```\nthat is the pattern.")], False,
+     "the assertion inside a code fence is an illustration"),
+    # The boundary: stripping must not swallow a REAL assertion beside a quote.
+    ([say("The `warrants` alternative is fine, but this needs a tracking issue.")], True,
+     "a genuine assertion still blocks when a code span sits beside it"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

@@ -94,6 +94,39 @@ with tempfile.TemporaryDirectory() as raw:
     except OSError:
         print("SKIP: unreadable cache (platform cannot chmod)")
 
+    unreadable_plugins = cursor / "plugins"
+    try:
+        unreadable_plugins.chmod(0o000)
+        crashed = False
+        try:
+            found = mod.plugin_installed(cursor)
+        except OSError:
+            crashed = True
+            found = None
+        finally:
+            unreadable_plugins.chmod(0o755)
+        check("unreadable plugins dir does not crash plugin_installed",
+              (not crashed) and found is False)
+    except OSError:
+        print("SKIP: unreadable plugins dir (platform cannot chmod)")
+
+    unreadable_claude = root / "unreadable_claude"
+    unreadable_claude.mkdir(parents=True)
+    try:
+        unreadable_claude.chmod(0o000)
+        crashed = False
+        try:
+            found = mod.claude_skills_serve_repo(unreadable_claude, repo)
+        except OSError:
+            crashed = True
+            found = None
+        finally:
+            unreadable_claude.chmod(0o755)
+        check("unreadable claude dir does not crash claude_skills_serve_repo",
+              (not crashed) and found is False)
+    except OSError:
+        print("SKIP: unreadable claude dir (platform cannot chmod)")
+
     skills = cursor / "skills"
     sibling = root / "worktree"
     other = root / "other" / "skills" / "ardi"

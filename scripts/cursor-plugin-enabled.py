@@ -48,10 +48,10 @@ def plugin_installed(cursor_dir: Path) -> bool:
     """
     plugins = cursor_dir / "plugins"
     local = plugins / "local" / PLUGIN_DIRNAME
-    if local.exists():
-        return True
     cache = plugins / "cache"
     try:
+        if local.exists():
+            return True
         if cache.is_dir():
             for org in cache.iterdir():
                 if (org / PLUGIN_DIRNAME).exists():
@@ -66,9 +66,9 @@ def claude_skills_serve_repo(claude_dir: Path, repo_root: Path) -> bool:
     skills = claude_dir / "skills"
     repo = repo_root.resolve()
     repo_skills = repo / "skills"
-    if not skills.exists():
-        return False
     try:
+        if not skills.exists():
+            return False
         if skills.is_symlink() or skills.is_dir():
             if _is_relative_to(skills, repo):
                 return True

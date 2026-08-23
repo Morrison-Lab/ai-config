@@ -44,6 +44,19 @@ ASSERT = [
     r"should be (filed|tracked)\b",
     r"(this|that) (is|reads as) a (separate |real )?(bug|defect)[^.]{0,40}\b(file|track)",
     r"\bfile (this|that|it) (as )?(a |an )?(separate |follow-?up )?issue\b",
+    # Third-party deferral: the decision is handed to someone who is not in the
+    # conversation, so no offer verb and no `?` appear and every pattern above
+    # misses it. Two parts, both required, because either alone over-fires -- a
+    # DEFERRAL naming a party, and a TRACKING word inside the same sentence.
+    # The tracking word is what keeps "the reviewer decides whether to act" --
+    # a correct and common sentence -- out of scope: only whether to RECORD is
+    # nobody's call to defer.
+    r"(defer(?:ring|red)?|leav(?:e|ing)|flag(?:ging)?|left)\b[^.!?]{0,80}"
+    r"\b(reviewer|maintainer|owner|team|human)\b[^.!?]{0,80}"
+    r"\b(issue|tracker|tracking|filing|follow-?up|pursuing)\b",
+    r"\b(reviewer|maintainer|owner|team)(?:'s|s')?\s+"
+    r"(call|discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"
+    r"\b(issue|tracker|tracking|filing|follow-?up)\b",
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 

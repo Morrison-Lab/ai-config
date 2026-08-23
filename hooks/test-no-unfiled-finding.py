@@ -48,6 +48,34 @@ CASES = [
     ([say("Worth tracking separately from the current work.")], True,
      "'worth tracking separately' blocks"),
 
+    # Third-party deferral: no offer verb, no question mark, and the decision
+    # named as somebody else's. Every one of these was supplied by a reviewer as
+    # a phrasing the pre-widening patterns missed (ai-config#2007).
+    ([say("Flagging for the reviewer's call on whether it warrants a follow-up issue.")], True,
+     "the original phrasing blocks"),
+    ([say("Flagging for the reviewer to judge whether this belongs in the tracker.")], True,
+     "deferral phrased as belonging in the tracker blocks"),
+    ([say("I'll defer to the reviewer on whether to open an issue for this.")], True,
+     "explicit deferral about opening an issue blocks"),
+    ([say("Leaving it to the reviewer's discretion on whether this is worth pursuing an issue.")], True,
+     "deferral to discretion blocks"),
+    ([say("Deferring to the maintainer on whether this needs tracking.")], True,
+     "a maintainer is as much a third party as a reviewer"),
+
+    # The boundary the widening must not cross. Whether to ACT on a finding IS
+    # genuinely a reviewer's call; only whether to RECORD it is nobody's to
+    # defer, so a tracking word inside the same sentence is required.
+    ([say("Whether to act on this is the reviewer's call.")], False,
+     "deferring the ACTION, not the recording, is correct"),
+    ([say("I'll leave the reviewer to judge whether the approach is right.")], False,
+     "deferring a design judgment names no tracking"),
+    ([say("The team will decide whether to ship this behind a flag.")], False,
+     "an ordinary product decision is not a filing deferral"),
+    ([say("I left the reviewer a note about the benchmark.")], False,
+     "'left the reviewer' with no tracking word is ordinary prose"),
+    ([say("The reviewer decides whether to act on it; I have filed it as #1379.")], False,
+     "already filed, and the deferral is about acting"),
+
     # Discharged, by either route.
     ([say("Worth its own issue."), FILE_CLI, say("Filed it.")], False,
      "filing after the assertion does not block"),

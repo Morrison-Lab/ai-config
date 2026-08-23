@@ -99,6 +99,12 @@ See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
 
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 
+**A self-review is dispatched to a separate subagent, never performed inline.**
+Everything in this fragment governs *when* a self-review is owed and to what standard, and left *who performs it* to the author by default.
+The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
+Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
+See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+
 **Self-review is the immediate fallback so the PR never stalls --
 but declaring the PR clean still requires an external verdict whenever one is reachable.**
 Don't wait to self-review: post it right away, same as above.
@@ -206,9 +212,10 @@ See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
 The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.
 Run the applicable prose-review skills against the diff's own factual claims, not just its shape: [`fact-check-prose`](../writing/fact-check-prose.md), the **cause** claim-type check in [`metacognitive-monitoring`](metacognitive-monitoring.md), and the read-the-cited-source rule in [`address-every-comment`](address-every-comment.md) --- a claim about *why* some mechanism behaves as it does gets asked what else would explain it, and a citation gets read against what the cited source actually says.
+Hand that whole standard to the reviewer rather than applying it yourself: a fallback self-review is dispatched to the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent like any other, per [`adversarial-self-review`](adversarial-self-review.md).
 This is the fallback-specific sharpening of "Apply the same review standards the bot would" above: the standard does not relax because the reviewer it replaces happened to be absent.
 
-- **Do:** run `fact-check-prose`, the **cause** check, and the cited-source check on a fallback self-review, exactly as on any pre-push self-review.
+- **Do:** dispatch the review to `adversarial-reviewer`, briefed to run `fact-check-prose`, the **cause** check, and the cited-source check, exactly as on any pre-push self-review.
 - **Do:** treat the fallback's stopgap feel as the cue to slow down, not as license to skip the semantic checks.
 - **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
 - **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.

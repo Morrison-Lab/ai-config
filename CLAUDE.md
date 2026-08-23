@@ -618,6 +618,16 @@ The strong form of the claim: after claiming an issue you're about to work, open
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
+## Every self-review is an adversarial review by a separate subagent
+
+[shared/workflow/adversarial-self-review.md](shared/workflow/adversarial-self-review.md)
+
+Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
+The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
+Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
+`hooks/no-push-without-self-review.py` gates the pre-push case.
+The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
+
 ## Open a PR for every pushed feature branch
 
 After pushing a feature branch, create its PR
@@ -931,12 +941,20 @@ wants to be an instrument --- see the fragment for the procedure and tells.
 
 [`shared/workflow/algorithmatize-checks.md`](shared/workflow/algorithmatize-checks.md)
 
-## Deterministic tools over model judgment: write yourself out of a job
+## Automate everything: deterministic tools over work done by hand
+
+Never do by hand any work that can be automated.
 
 The section above governs *checks*.
 This is the same instinct over the work itself: prefer deterministic,
 inspectable algorithms to model reasoning wherever one will serve, and where
 none exists, build it.
+Read "work" broadly --- the rule is not about judgment but about doing by hand
+what something else already computes,
+which includes work carrying no judgment at all.
+A hand-typed section number is nobody's decision;
+it is a value the renderer already produces, kept in a second place by hand,
+and it goes wrong the moment anything enables the real generator.
 One principle with two faces, both binding at once --- a **constraint** on the
 task in front of you (use the instrument that exists) and a **goal** over time
 (build the one that does not, so the constraint gets cheap to obey).

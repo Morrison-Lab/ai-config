@@ -60,11 +60,21 @@ Worked-example case records for the rules below live in
      commit statuses, rather than treating either query as sufficient alone.
    - **Do:** report both counts when the endpoint and the rollup disagree, so
      the gap stays visible to whoever reads the status next.
+   - **Do:** re-derive check state from that endpoint on the PR's current
+     head when a completion notification wakes you, having first compared
+     the wake's own `head_sha` against that head.
    - **Don't:** read `0 pending` from `gh pr checks` as evidence that nothing
      is still running.
    - **Don't:** drop `--paginate` --- an unfinished run on page 2 returns the
      same empty result as a finished head.
    - **Don't:** offer a reason for the omission --- none was established.
+   - **Don't:** read a wake reporting check suites finished as an all-clear
+     --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
+     a needless fix, and this is its **green**-sounding mirror, inviting a
+     needless merge.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A `check_suite.completed` wake at a superseded head".
 
    **A check-run NAME is not unique across workflows, so a name alone does not
    identify which check passed.**

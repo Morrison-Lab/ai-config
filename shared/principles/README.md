@@ -263,8 +263,9 @@ Full statement:
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
 (predates this catalog, so it lives in `shared/workflow/`).
 
-## Deterministic tools over model judgment -- and build the missing ones
+## Automate everything -- and build the missing instruments
 
+Never do by hand any work that can be automated.
 Prefer deterministic, inspectable algorithms over model reasoning, and
 where none exists, build one.
 One principle with two faces: a **constraint** binding now (use the
@@ -272,6 +273,21 @@ instrument that exists) and a **goal** over time (build the one that
 does not, so the constraint gets cheap to obey).
 The observable trigger is recurrence -- after doing the same judgment
 task twice, the third time is a tool.
+
+Read "work" broadly.
+Model judgment is the motivating case and the hardest to displace, but
+the rule is about doing by hand what something else already computes,
+which includes work carrying no judgment at all.
+Three instances: model judgment displaced by an algorithm, data with an
+external source of truth
+([`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)),
+and a value the toolchain already derives from the artifact itself --
+generated section numbers, a table of contents, a resolved
+cross-reference.
+The third is the easiest to miss, because nothing about typing a section
+number feels like a decision, and it fails by silent divergence: while
+the tool's generator stays off, the hand-written copy looks
+authoritative.
 
 Extends the entry above on two axes: **scope**, from verification to
 agentic work generally, and **inspectability** -- an algorithm can be

@@ -367,6 +367,158 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
+## A claim that nothing exists owes its deriving command, even when no search ran
+
+Every section above starts from a query that was actually run.
+The commonest version of this failure runs no query at all.
+You assert that nothing else touches a file, that no such sibling exists, that some construction is immune --- and the sentence goes out in confident phrasing that reads as already-checked, because nothing in it announces that the check was skipped rather than performed.
+
+This fragment's own rule stops one step short of it.
+Its opening Do/Don't block says to write "I did not find" rather than "there is no" **when the evidence is a search**, which is a precondition.
+An assertion made with no search never meets that precondition, so the rule is loaded and matches nothing.
+Derived at the time of writing:
+
+```
+$ grep -n "I did not find" shared/workflow/grep-is-not-coverage.md
+39:- **Do:** say "I did not find" rather than "there is no", when the evidence is
+```
+
+It is also distinct from "Searching the wrong corpus is the same error with no grep in it" above, which is the nearest sibling and is narrower.
+There a dupe check genuinely ran, correctly, over the wrong population.
+Here nothing ran, so there is no query to critique and no null result to over-read --- only a sentence and the confidence it was written with.
+
+**The failure is structural rather than a matter of care.**
+That is the part worth stating, because the obvious remedy --- be more careful --- is the one the evidence rules out.
+All four instances below were composed during careful work, and the fourth was committed inside the brief that commissioned this very entry, by someone actively thinking about the failure while writing about it.
+A rule whose remedy is vigilance cannot survive that.
+
+**The observable action is to paste the deriving command beside the claim**, in a brief, an issue body, a PR body, or a review comment --- the same discipline [`challenge-the-assignment`](challenge-the-assignment.md) already requires of a brief that asserts corpus state, extended to every artifact a negative claim gets published in.
+The command is usually one line, and having to write it is the whole cost.
+
+The three that settled these instances are the reusable part:
+
+```
+gh pr diff <N> --name-only     # what else touches this file
+git --list-cmds=main,others    # what commands exist HERE (see the caveat below)
+printf '%s' "$payload" | python3 hooks/<guard>.py   # what this code does
+```
+
+The second one carries a caveat the other two do not, and the case record below is where it came from: its output varies by git build, so it settles what exists on the machine you ran it on and nothing wider.
+
+Note what the third one is for.
+A claim that some code is immune to a bug class is a claim about behaviour, so no amount of reading settles it --- the probe does, and it is two lines.
+[`self-review-fallback`](self-review-fallback.md)'s "Where a diff makes a claim about a TOOL's behaviour" section makes the same point for a diff under review.
+
+- **Do:** run the deriving command before publishing a claim that something does not exist, and paste it beside the claim.
+- **Do:** write what the command returned, so a reader can see which population the negative is about.
+- **Do:** probe behaviour rather than reading it, when the claim is that some code cannot do something.
+- **Do:** record the tool version beside a command whose output is build-dependent, since running it is necessary and not sufficient when the answer differs by environment.
+- **Don't:** publish "nothing else", "no such", "immune", or "disjoint" on recollection --- confident phrasing is what makes such a claim read as checked.
+- **Don't:** read this file's "say 'I did not find' rather than 'there is no'" rule as covering the case, since its precondition is that a search happened.
+
+**No guard covers this, and one was built and measured before being rejected.**
+The candidate was a warn-only hook over `gh issue create` and its siblings, firing on negative-existence phrasing in a body with no deriving query beside it.
+Measured against 1,759 distinct bodies recovered from this machine's transcripts, a tightened matcher fired 40 times, and of 12 distinct fires read by hand 2 were genuine and 10 were not.
+The reason is not tuning.
+An issue body's genre is reporting findings, and a finding is routinely negative, so "the workaround does not exist" and "there was no breadcrumb" are conclusions the author had just derived --- textually identical to a guess, and frequently derived somewhere the body does not show.
+[`remind-brief-premises.py`](../../hooks/remind-brief-premises.py) escapes this because it anchors on a corpus path, a rare token that is nearly always a real assertion, where negation is the ordinary vocabulary of a bug report.
+
+The fourth instance closes the question.
+"`grep-is-not-coverage.md` states this rule for a search result" is grammatically **positive**, so no negation matcher can see it at all, which means the class was never lexically negative to begin with.
+The feature that matters is that the claim was underived, and that is not decidable from the text.
+Building the guard anyway would trade one caught instance for roughly thirty wrong warnings on issue filings, against a corpus that makes filing near-unconditional --- which is [`deterministic-tools`](../principles/deterministic-tools.md)'s own warning that a misfiring guard gets switched off and takes the real cases with it.
+
+(Morrison-Lab/ai-config#1979, 2026-08-22: four claims in one session, each cheap to verify and none verified before publishing.
+"`shared/workflow/learn-from-review-findings.md` is disjoint from every open PR", written into a subagent brief --- false, since [#1911](https://github.com/Morrison-Lab/ai-config/pull/1911) touches it.
+"Hooks that tokenize commands are immune to the entire bug class by construction", published in [#1967](https://github.com/Morrison-Lab/ai-config/issues/1967) --- false, since `sh -c "git push --force origin main"` draws no output at all from `hooks/no-clobbering-push.py`, where the same command unwrapped is denied.
+The gap is filed as [#1973](https://github.com/Morrison-Lab/ai-config/issues/1973).
+"Of `add|commit|apply|mv|rm`, only `commit` has real hyphenated siblings", published in [#1966](https://github.com/Morrison-Lab/ai-config/issues/1966) --- false on the machine it was asserted from, where `git --list-cmds=main,others` reports `add--interactive` under git 2.50.1 (Apple Git-155), whose exec-path still ships a `git-add--interactive`.
+This PR's own review then ran the same command under git 2.55.0 and got no such entry, modern git having rewritten `add -i` in C and dropped the Perl dispatcher.
+Both runs are honest, which makes this the sharpest of the four: the deriving command was necessary and **not sufficient**, because its answer is build-dependent and neither party could see that without running it in both places.
+So pair such a command with the version it was run against, per [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+And the characterization of this file quoted above, written into the brief asking for this section, which `hooks/remind-brief-premises.py` flagged as an unverified corpus assertion.
+It happened to be true.
+Its author did not know that when writing it, which is the whole of the point.)
+
+## The sentence that CORRECTS an overclaim is where the next one gets written
+
+The section above governs a negative existence claim published anywhere.
+This one names the single site where that class is likeliest and least checked: the sentence that answers a review finding by narrowing a claim you already published.
+
+The correcting commit is not a neutral place for a new claim to appear.
+It is the place where a fresh claim draws the least scrutiny it will ever draw, and three separate mechanisms push in that direction at once.
+
+**The corrective mood reads as rigor.**
+Hedging, narrowing, conceding a limit are the opposite of overclaiming, so a sentence performing one of them does not present as an assertion needing evidence.
+It presents as the evidence-respecting move.
+That inversion is the whole difficulty: the check would fire on a confident sentence and does not fire on a modest one, while the modest one can be just as underived.
+
+**The correction inherits the finding's credibility.**
+The finding was checked --- somebody read the artifact and found the claim too strong --- and the answer arrives inside the same thread, minutes later, wearing the same subject matter.
+The scrutiny that landed on the finding reads as covering the reply to it.
+It does not.
+Nobody has read the replacement against anything.
+
+**It fails in the safe-sounding direction.**
+An overclaim invites "prove it".
+An underclaim invites nothing, because understating a guarantee sounds conservative, and a reader who suspects you of underselling your own work has no reason to make you derive it.
+So the one claim shape that reliably attracts a demand for evidence is exactly the shape a correction is written to avoid.
+
+The remedy does not change.
+It is the section above's: run the deriving command, and paste it beside the claim.
+What changes is knowing when to expect to need it, and the trigger is lexical enough to use rather than judge --- a **negative** written while conceding a limit.
+"nothing asserts against it", "no test covers this", "nothing forbids", "only X closes that" are each a claim about a population, and each is one command away from being checked or refuted.
+
+Three neighbouring rules sit close and none of them reaches this.
+
+- [`learn-from-review-findings`](learn-from-review-findings.md)'s "A fix for a defect class is where a fresh instance of that class hides" is the nearest, and its residual-paragraph case runs the other way: there the fix names a residual and thereby **overstates** a survey nobody ran, and the remedy is to enumerate the class.
+  Here the correction **understates** a guarantee, and the remedy is a single command rather than a survey.
+- [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A correction inherits its instrument" governs a replacement figure read off the same gauge as the original.
+  That presupposes a gauge was used.
+  Here none was, in either the claim or its correction.
+- The same file's "A summary written above the account it summarizes escapes the re-read" keys on **position** --- a quantifier placed above the account it generalizes over.
+  A correction is a claim about a population that lives somewhere else entirely, so nothing about where it sits marks it.
+
+So the check to add is not a new kind of scrutiny but the existing one, pointed at a sentence that does not look like it needs any.
+
+- **Do:** run the deriving command for any negative you write while narrowing a claim, and paste the command and its result beside it.
+- **Do:** treat the reply to a review finding as unverified prose, separately from the finding that prompted it.
+- **Don't:** read a hedge as self-evidently safe --- an understated guarantee is a claim about a population, and it can be as false as the overclaim it replaced.
+- **Don't:** let the scrutiny a finding received stand in for scrutiny of the sentence answering it.
+
+(Measured 2026-08-22 on [ai-config#1992](https://github.com/Morrison-Lab/ai-config/pull/1992), merged the same day as `593d25cc`.
+Commit `fd929f52` claimed that making an argument required meant the unsafe call "cannot be spelled".
+The PR's first review found that overclaimed, and commit `97402dea` corrected it --- writing, in the correcting sentence, that a caller passing `argv=[]` reaches the unguarded read "and nothing in that suite asserts against it".
+No command was run for that.
+An adversarial review of the correction ran one, and commit `a6a0860f` replaced the claim with the narrower true statement now on `main`: the value is asserted at every call site that exists, and nothing forbids a **new** call site spelling it.
+
+Reproduced independently against [ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), **unmerged** at the time of writing, at branch head `51be639e`:
+
+```
+$ python3 hooks/test-no-push-without-self-review.py hooks/no-push-without-self-review.py
+All 169 cases passed
+$ sed '817s/key, argv, env)/key, [], env)/' hooks/no-push-without-self-review.py \
+    > hooks/mut-empty-argv.py
+$ python3 hooks/test-no-push-without-self-review.py hooks/mut-empty-argv.py
+FAIL (expected blocked=True, got False): an inline -c redirecting the DEFAULT remote is followed, not ignored
+FAIL (expected blocked=True, got False): the sibling pushRemote key redirects the same way
+2/169 cases failed
+```
+
+The call site is at line 912 in the revision `a6a0860f` cites and at 817 at that branch head, so take the site from a grep rather than from the line number.
+The mutant has to live in `hooks/`, and the first run of it did not.
+Written to the repo root, the same mutation fails 85 of 169, because the hook loads a sibling detector from its own directory --- [`algorithmatize-checks`](algorithmatize-checks.md)'s sixth mutation outcome, a mutant failing for a reason other than the mutation.
+What exposes that is running an **unmutated** copy from the mutant's own location, and reading a shared failure as evidence about the location:
+
+```
+$ cp hooks/no-push-without-self-review.py ./ctl-root-copy.py
+$ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
+85/169 cases failed
+```
+
+Identical to the mutant, so the 85 is the path and not the change.
+Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

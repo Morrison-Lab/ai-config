@@ -1172,3 +1172,24 @@ reintroduced the exact defect that PR's final round fixed.
 A fourth, unstaged file held genuinely new content plus a stale-base reversion
 of a taxonomy that had landed meanwhile; only the new half was carried forward,
 as #1054.)
+
+## Git --- deleting a remote branch returns HTTP 403 in a remote/web session
+
+`git push origin --delete <branch>` (and its `:refs/heads/<branch>` spelling)
+is refused by the agent proxy from a Claude Code remote/web session:
+`error: RPC failed; HTTP 403`, then `fatal: the remote end hung up`.
+It is a policy answer rather than a transient one, so the retry-with-backoff
+path does not apply --- retrying reproduces the identical 403.
+
+The failure also prints a trailing `Everything up-to-date`, which reads as
+success once the error line scrolls away.
+
+- **Do:** delete a remote branch through the forge API or UI here, and confirm
+  with `git ls-remote origin refs/heads/<branch>`.
+- **Do:** leave the branch and say so when neither is available; its closed PR
+  is the record of why it exists.
+- **Don't:** retry the delete with backoff.
+- **Don't:** read `Everything up-to-date` as the delete having succeeded.
+
+(Measured 2026-08-22;
+[ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/1999).)

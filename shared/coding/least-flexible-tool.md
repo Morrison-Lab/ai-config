@@ -179,8 +179,7 @@ The pattern still matches the intended input; it just also matches far more of i
 
 ```python
 re.compile(r"```.*?```|^\s*>.*$", re.S | re.M)          # the > branch eats the whole tail
-re.compile(r"```.*?```|^[ 	]*>[^
-]*$", re.S | re.M)   # bounded, correct
+re.compile(r"```.*?```|^[ \t]*>[^\n]*$", re.S | re.M)   # bounded, correct
 ```
 
 Two properties make it hard to catch by reading.
@@ -199,16 +198,13 @@ The general rule this instantiates:
 `.` and `\s` are the two most flexible character constructs available,
 and reaching for either inside a line-anchored pattern discards the anchor's meaning under `re.S`.
 Use the explicit negated class instead --
-`[^
-]` for "rest of this line", `[ 	]` for "horizontal space" --
+`[^\n]` for "rest of this line", `[ \t]` for "horizontal space" --
 which says what is meant and is immune to the flag.
 
-- **Do:** write `[^
-]*` when you mean "to the end of this line",
+- **Do:** write `[^\n]*` when you mean "to the end of this line",
   in any pattern compiled with `re.S`.
-- **Do:** write `[ 	]` rather than `\s` for leading indentation,
-  since `\s` matches `
-` regardless of flags.
+- **Do:** write `[ \t]` rather than `\s` for leading indentation,
+  since `\s` matches a newline regardless of flags.
 - **Do:** add a negative test whose *removed* region is followed by real content,
   since an over-broad stripper is invisible to positive tests.
 - **Don't:** add `re.S` for one alternative
@@ -219,12 +215,11 @@ which says what is meant and is immune to the flag.
 (Measured on
 [ai-config#2024](https://github.com/Morrison-Lab/ai-config/pull/2024),
 2026-08-23.
-`hooks/no-unfiled-finding.py`'s code-region stripper was written as
-`` r"```.*?```|^\s*>.*$" `` with `re.S | re.M`.
-The blockquote alternative deleted every character after the first `>` line,
+`hooks/no-unfiled-finding.py`'s code-region stripper was written with `re.S | re.M`
+and a blockquote alternative of `^\s*>.*$`.
+It deleted every character after the first `>` line,
 so any real assertion following a quoted one went unexamined.
 Twenty-seven tests passed.
-A reviewer found it and suggested `^[ 	]*>[^
-]*$`;
+A reviewer found it and suggested `^[ \t]*>[^\n]*$`;
 that plus a regression test -- a genuine unquoted assertion following a blockquote --
 is what shipped.)

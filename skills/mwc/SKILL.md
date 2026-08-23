@@ -235,7 +235,7 @@ Three rules follow, and they hold whatever the block turned out to be:
   The denial and the grant are about different things: one is a guard's state,
   the other is the user's intent, and only the guard's state gates the action.
 
-## Two properties of the guard worth knowing before you trust it
+## Four properties of the guard worth knowing before you trust it
 
 **The denial you hit may not be this guard.**
 `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is
@@ -270,13 +270,53 @@ It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
 Run `check-mwc` from the repo you intend to merge in, not merely once per session.
 
+**The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
+This is the property most likely to bite, because the two facts that produce it are individually reassuring.
+
+The marker file is durable: `check-mwc` never prunes it, and the section above says a stale read "cannot silently revoke a grant".
+Both true.
+What neither says is that the guard consults **session liveness** as well as the marker, and liveness goes stale after **1800 seconds** without a `heartbeat`.
+So a session that grants MWC, merges happily for twenty minutes, then works on something else for an hour, finds its next merge refused --- with the marker still sitting on disk exactly where it was written.
+
+Measured 2026-08-22 on `Lacaedemon/sparta`.
+The grant was made at 19:16 and four PRs merged between 19:17 and 19:20 without incident.
+At 20:25 the fifth merge was refused, and `check-mwc` reported it precisely:
+
+```
+mwc is NOT active for session <id>: grant recorded, but the session reads unknown.
+  Marker: <git-common-dir>/ai-sessions/<id>.mwc
+  Last heartbeat 2026-08-22 19:16; a session goes stale after 1800s.
+  If the session IS live:  ai-session.sh heartbeat --id '<id>'
+```
+
+One `heartbeat --id <id>` restored it and the merge went through unchanged.
+
+The refusal is easy to misread, and every natural reading sends you somewhere useless.
+It looks like the grant lapsing (it did not), like the PR failing the Scope Limit (it did not), or like the guard being broken (it is working exactly as designed).
+The section on re-grants above is the relevant discipline here: a block is evidence the grant is not **active**, and the fix is to find out why rather than to retry.
+`check-mwc` answers that question in one read and names the remedy in its own output, which is why it is worth running before diagnosing anything else.
+
+- **Do:** run `check-mwc` first on any merge refusal in a session that has been running a while --- its message distinguishes "never granted" from "granted but stale".
+- **Do:** `heartbeat` on a long session that will merge later, rather than waiting for the refusal.
+- **Don't:** read a refusal after a successful earlier merge as the grant having been revoked --- nothing revoked it, and the marker is still there.
+- **Don't:** re-run `enable-mwc` to fix this.
+  It is not what is missing, and it obscures which of the two states you were in.
+
+**Read `check-mwc`'s exit status from the script, not from the end of a pipe.**
+Its three-way status (0 active, 1 no grant, 2 granted-but-not-honourable) is the whole point of the command.
+Piping it through `tail` and echoing `$?` reports **`tail`'s** status instead, which is `0` whatever the script said.
+That is how the stale grant above first read as "active" when the script had actually exited 2, and the misreading survived until the merge was refused a second time.
+
+- **Do:** run the bare invocation and branch on `$?`, or redirect its output to a file and echo `$?` from the unpiped command.
+- **Don't:** read `$?` after a pipe --- it belongs to the last stage, so every three-way status collapses to whatever `tail`, `head` or `grep` returned.
+
 ## Quick Reference
 
 | Command | Effect |
 | :--- | :--- |
 | `skills/session-lock/scripts/ai-session.sh enable-mwc --id "<id>"` | Enables session-wide merge grant |
 | `skills/session-lock/scripts/ai-session.sh disable-mwc --id "<id>"` | Revokes session-wide merge grant |
-| `skills/session-lock/scripts/ai-session.sh check-mwc --id "<id>"` | Checks the grant; exits 0 / 1 / 2 (see above) |
+| `skills/session-lock/scripts/ai-session.sh check-mwc --id "<id>"` | Checks the grant, exiting 0 / 1 / 2 (see above) |
 
 `--id` is optional only when `AI_SESSION_ID` or `CLAUDE_SESSION_ID` is set in the
 shell, which in a Claude Code session it generally is not.

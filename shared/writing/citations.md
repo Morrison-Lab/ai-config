@@ -491,46 +491,57 @@ includes, so a theorem added above it in any earlier include moves it:
 `15:279:`, whose leading field is the ordinal.
 Fixed in `84d0052de` by naming the result rather than numbering it.)
 
+## A bare `#NNN` is repo-relative, so a cross-repo citation is unresolvable by construction
+
+Every rule above concerns a citation that resolves to the wrong thing.
+This one concerns a citation that resolves to **nothing at all**, and it has a shape a careful author walks straight into: writing `#794` in this repo about a PR in another one.
+
+A bare issue or PR reference is interpreted against whatever repository the reader is standing in.
+In the authoring repo it renders as a link to that repo's own `#794` -- a real, unrelated item -- and in a plain-text read it is just a number.
+Either way the reader cannot reach the thing being cited, and cannot tell a genuine citation from an invented one.
+
+That last part is what makes it worse than an ordinary broken link.
+A reviewer doing exactly the right thing -- grepping this corpus for the cited numbers to find their backing -- comes up empty and reasonably concludes the citation was fabricated.
+So a true, checkable, first-hand incident gets reported as a possible hallucination, and the author has to spend a round proving the numbers were real.
+
+The rule is therefore not "avoid cross-repo citations", which would be absurd in a corpus whose whole subject is work done in other repositories.
+It is that a cross-repo citation has to carry enough to be **followed**:
+
+- the repository, as `owner/repo#NNN` rather than `#NNN`; and
+- where the backing actually lives, when the backing is a document rather than the forge item -- the file, and the section inside it.
+
+The second half matters more than it looks.
+This corpus keeps its case records in `*.cases.md` files, so a reader's instinct is to grep here for any cited incident.
+When the record lives in the *consumer* repo instead, no amount of grepping here will find it, and only naming the file redirects the reader to where it is.
+
+- **Do:** write `owner/repo#NNN` for anything outside the repository the text lives in.
+- **Do:** name the backing document and section when the evidence is a file in another repo, not just the forge number.
+- **Don't:** assume a number that resolves for you resolves for the reader -- it resolved because of where you were standing.
+- **Don't:** read "the numbers are real" as a rebuttal --- a citation the reader cannot follow is defective whether or not its target exists.
+
+(Measured 2026-08-22 on [ai-config#1989](https://github.com/Morrison-Lab/ai-config/pull/1989).
+A hook docstring cited Lacaedemon/sparta#794, Lacaedemon/sparta#861, Lacaedemon/sparta#866 and Lacaedemon/sparta#1199 as its dated case record -- written here in the very form this section prescribes, because the bare numbers autolink to unrelated items of THIS repository wherever the file renders.
+All four are genuine, and all four are backed in that repo's own `.claude/skills/sparta-demos/SKILL.md`.
+The review flagged them as "unverifiable / misattributed (possible hallucination)" after grepping this corpus and finding nothing -- correct reasoning from what was available to it.
+Fixed by naming the source repo, document and section rather than by dropping the numbers.)
+
 ## A quoted section title decays too, and the link resolving is what hides it
 
-The section above ends by prescribing the **name** in place of the number,
-because the name is the stable half.
+The section above ends by prescribing the **name** in place of the number, because the name is the stable half.
 It is stabler, and it is not stable.
-A heading renamed in place leaves the file where it was, so the link still
-resolves, the target still exists, and only the title quoted beside the link
-now describes a section that no longer goes by that name.
+A heading renamed in place leaves the file where it was, so the link still resolves, the target still exists, and only the title quoted beside the link now describes a section that no longer goes by that name.
 
-Nothing in this repo reports it, and that is a property of the instruments
-rather than an oversight.
-`scripts/check-links.py` captures only the link **target**: its
-`\[[^\]]*\]\(([^)]+)\)` never captures the link text, since `[^\]]*` is a
-character class rather than a group and the one capture group holds the target.
-It then splits any `#anchor` off the path before testing
-(`re.split(r"[#?]", target, maxsplit=1)[0]`), so its only assertion is
-`resolved.exists()`.
-So the sweep that would plausibly catch a bad citation passes with the citation
-intact, which is worse than having no check at all: a green link run reads as
-having validated the reference.
+Nothing in this repo reports it, and that is a property of the instruments rather than an oversight.
+`scripts/check-links.py` captures only the link **target**: its `\[[^\]]*\]\(([^)]+)\)` never captures the link text, since `[^\]]*` is a character class rather than a group and the one capture group holds the target.
+It then splits any `#anchor` off the path before testing (`re.split(r"[#?]", target, maxsplit=1)[0]`), so its only assertion is `resolved.exists()`.
+So the sweep that would plausibly catch a bad citation passes with the citation intact, which is worse than having no check at all: a green link run reads as having validated the reference.
 
 Two things follow about where to look.
-The decay is invisible to the **citing** file, since nothing there changed ---
-it is the *renaming* edit that breaks it, one file away, and that edit has no
-reason to grep for its own old heading.
-So the obligation sits with the rename: when you retitle a section, search the
-corpus for the old title as a quoted string before you finish, per
-[`reorganize-prose`](reorganize-prose.md)'s rule that a move is authorship.
-Use a whitespace-tolerant search rather than `grep`, since a quoted title long
-enough to be worth citing is long enough to have been split across a semantic
-line break --- [`memories/debugging.md`](../../memories/debugging.md)'s "An
-empty grep for one spelling is not evidence the concept is absent" owns that
-trap and its remedies.
+The decay is invisible to the **citing** file, since nothing there changed --- it is the *renaming* edit that breaks it, one file away, and that edit has no reason to grep for its own old heading.
+So the obligation sits with the rename: when you retitle a section, search the corpus for the old title as a quoted string before you finish, per [`reorganize-prose`](reorganize-prose.md)'s rule that a move is authorship.
+Use a whitespace-tolerant search rather than `grep`, since a quoted title long enough to be worth citing is long enough to have been split across a semantic line break --- [`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one spelling is not evidence the concept is absent" owns that trap and its remedies.
 
-- **Do:** search the corpus for a section's old title whitespace-tolerantly
-  (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames
-  it, rather than a literal `grep`.
-- **Do:** quote a title you are citing only if you have just read it, since a
-  resolving link is no evidence about the text beside it.
-- **Don't:** read a green `check-links.py` as covering a quoted title --- it
-  discards link text and strips anchors by construction.
-- **Don't:** expect the citing file's own review to catch this; the edit that
-  invalidated it happened somewhere else.
+- **Do:** search the corpus for a section's old title whitespace-tolerantly (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames it, rather than a literal `grep`.
+- **Do:** quote a title you are citing only if you have just read it, since a resolving link is no evidence about the text beside it.
+- **Don't:** read a green `check-links.py` as covering a quoted title --- it discards link text and strips anchors by construction.
+- **Don't:** expect the citing file's own review to catch this --- the edit that invalidated it happened somewhere else.

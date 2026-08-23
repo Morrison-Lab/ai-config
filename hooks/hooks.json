@@ -313,6 +313,13 @@
               "the mirror limit: a session-wide lexical scan establishes that a",
               "query ran and never that its result mattered."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
+            "timeout": 10,
+            "script": "no-push-without-self-review.py",
+            "why": "cai: don't push until you run self-review locally and get a clean verdict, and use an adversarial subagent for the local self-review -- blocks git push in PreToolUse unless an `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship, or the push itself is prefixed with ALLOW_UNREVIEWED_PUSH=1."
           }
         ]
       },

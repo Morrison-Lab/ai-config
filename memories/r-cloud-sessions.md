@@ -377,6 +377,38 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   `testthat::test_file()` on individual files in this kind of sandbox — it
   doesn't run the whole-suite cleanup pass — and always `git status` before
   committing after any `test_dir()` run.
+  **The missing package need not make the tests SKIP -- it can make them ERROR,
+  and the prune is identical.**
+  The bullet above reads as being about a skip (`vdiffr` absent, so the test
+  stands down), which is the tidy case.
+  An uninstalled Suggests dependency can instead make the owning tests error
+  outright.
+  Where the snapshot helper is reached `pkg::`-qualified, that is what happens:
+  the namespace lookup fails before any assertion runs, so the test dies at its
+  first snapshot call and the cleanup sees exactly the unexercised snapshots a
+  skip would have left.
+  The mechanism is the same whichever cause starts it -- an errored test never
+  reaches its `expect_snapshot_*()` calls -- and here it arrives through the
+  missing package rather than through contention.
+  So neither a clean skip report nor a loud pile of errors tells you anything
+  about your snapshots: check `git status` however the run ended.
+  Recovery is unchanged, `git checkout -- tests/testthat/_snaps/`, and it must
+  happen **before** staging -- the prunes are ordinary working-tree deletions
+  that a bare `git add -A` stages silently, committing the removal of real
+  snapshots as though the change had invalidated them.
+  (`ucdavis/bcs#732`, measured 2026-08-23: a full-suite run with the `snapr`
+  package uninstalled pruned committed `tests/testthat/_snaps/**/*.csv` files.
+  How many it pruned was not recorded, so no count is given here.
+  Every `.csv` snapshot in that suite is written by a
+  `snapr::expect_snapshot_data()` call, so each owning test errored on the
+  namespace lookup rather than skipping.
+  A concrete instance of `memories/preferences.md`'s never-`git add -A` rule,
+  in its less obvious direction -- the sweep stages a deletion rather than an
+  unrelated edit.)
+  - **Do:** run `git status --short` after any full-suite run in a sandbox
+    missing Suggests packages, whether the run reported skips or errors.
+  - **Don't:** stage with `git add -A` after such a run -- that commits the
+    prune as an ordinary deletion.
 - **The same deletion fires from a second, likelier trigger: two full suites
   running CONCURRENTLY in one checkout.** The mechanism is identical (the
   end-of-run cleanup prunes snapshots it did not see exercised), but the cause

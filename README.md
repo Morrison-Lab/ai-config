@@ -339,6 +339,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs (not registered -- see ai-config#1717) |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
+| `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI (not registered -- see ai-config#2008) |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
@@ -369,6 +370,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 | `warn-nonglobal-substitution.py` | `PreToolUse` (Bash) | warns, never blocks, on an in-place `perl -i`/`sed -i` substitution whose flags carry neither `g` nor a digit -- the shape that silently changes only the first occurrence, which bit mutation testing four times in one session |
 | `warn-dupe-check-chained-to-create.py` | `PreToolUse` (Bash) | warns, never blocks, when a tracker search and a create of the same object kind share one Bash call, so the check runs at the same instant as the action it gates and gates nothing. Detects one lexical shape only, which means its silence is evidence that two commands were not in one string and never that a dupe-check was consulted |
+| `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a separate `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved), or the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`; a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:

@@ -651,6 +651,38 @@ So `git push --repo=other` was graded against `origin` and allowed, while
 An adversarial review of the rebuttal's own commit found it fifteen minutes
 later.)
 
+**A finding whose own REPRODUCTION does not run is not a finding refuted, and
+the first thing to check is which commit the reviewer read.**
+
+The section above governs your refutation of a reviewer's proposed route.
+This one governs the reviewer's own demonstration, and it is the harder
+failure to see, because here the evidence arrives as an error message rather
+than as an argument.
+A reviewer's example is pinned to the commit it was written against, and a
+branch under active work moves --- so an arity, a signature, a path, or a
+fixture can be right where the reviewer stood and wrong at your HEAD.
+Running it at your HEAD and watching it raise reports your own checkout
+rather than their mistake.
+
+Distinct from
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a reviewer's
+failed reproduction is not a refutation", which governs the opposite roles
+--- a reviewer running YOUR reported case and seeing nothing.
+Here the reviewer supplies the case, and it is the case that errors.
+
+- **Do:** check out the commit the reviewer read before concluding its
+  example is broken --- the review usually names it, and an active branch has
+  probably moved since.
+- **Do:** repair a genuinely broken repro to the smallest form that tests the
+  claim, run that, and say in the reply what you changed.
+- **Don't:** "repair" a repro that ran correctly at the reviewer's commit ---
+  that reports your own stale tree as the reviewer's error.
+- **Don't:** read an exception from a reviewer's example as the finding
+  failing, without first asking which tree it raised on.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A repro that raised only against a newer signature".
+
 **Count a round's findings before pushing its fix, because disposing of one
 correctly generates no evidence about the others.**
 

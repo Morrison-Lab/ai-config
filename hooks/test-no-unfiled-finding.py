@@ -62,6 +62,49 @@ CASES = [
     ([say("Worth an issue; tracked in #897 already.")], False,
      "citing an existing tracking issue does not block"),
 
+    # ORDINARY PROSE THAT MUST NEVER FIRE.
+    #
+    # These twelve are already silent against the patterns above -- they are
+    # here to keep it that way. Every one was produced by a reviewer while
+    # probing a proposed WIDENING of this guard (ai-config#2017, closed
+    # unmerged), and each one that widening made fire.
+    #
+    # That is what makes them worth keeping after the widening was abandoned.
+    # A negative case earns its place by being a sentence someone actually
+    # tried to make the guard swallow, and the cheapest time to collect such
+    # sentences is while somebody is attacking the guard. Discarding them with
+    # the branch would throw away the only durable product of nine review
+    # rounds.
+    #
+    # Two of them are worth reading rather than skimming, because they are
+    # this corpus's own house style rather than contrived English: the FLAG
+    # status line, which the docstring at the top of this file names as the
+    # class that must never fire, and the "the reviewer decides whether to
+    # act" sentence, which is correct behaviour this guard exists to protect.
+    ([say("The reviewer decides whether to act on it; I have filed it as #1379.")], False,
+     "deferring the ACTION while reporting the filing"),
+    ([say("Whether to act on this is the reviewer's call.")], False,
+     "whether to ACT is genuinely the reviewer's call"),
+    ([say("I'll leave the reviewer to judge whether the approach is right.")], False,
+     "a design judgment names no tracking"),
+    ([say("The team will decide whether to ship this behind a flag.")], False,
+     "an ordinary product decision"),
+    ([say("I left the reviewer a note about the tracking issue.")], False,
+     "note-leaving with the party as indirect object"),
+    ([say("I left a note for the reviewer about the tracking issue.")], False,
+     "the dative-shifted form of the same sentence"),
+    ([say("I left a question for the reviewer about the tracking issue.")], False,
+     "`question` reads as an artifact here, not a decision"),
+    ([say("Flagging for the team: the follow-up issue is stale and nobody owns it.")], False,
+     "this corpus's own FLAG status convention"),
+    ([say("The team call on Monday will cover the tracker.")], False,
+     "`team call` is a meeting"),
+    ([say("I asked the maintainer to decide which issue to prioritize next.")], False,
+     "ordinary infinitival English, no deferral of whether to record"),
+    ([say("I left my judgment for the reviewer about the tracking issue.")], False,
+     "a written record of a judgment already made"),
+    ([say("Deferring to the reviewer on whether this is worth pursuing.")], False,
+     "pursuing is an action decision, correctly theirs"),
     # Flags that are not issue-shaped must not trip it.
     ([say("FLAG -- #1038 must merge before #1036; they conflict.")], False,
      "a merge-order flag does not block"),

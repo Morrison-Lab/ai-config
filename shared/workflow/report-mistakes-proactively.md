@@ -117,6 +117,75 @@ protects the machine it was written on and no other.
 Treat it as a backstop for your own setup rather than as a reason to relax the
 rule, since every other session still runs on the prose alone.
 
+## Handing the filing decision to a named third party is the same offer, aimed away from the reader
+
+The two sections above rule out asking the **user** for permission, standalone
+or bundled.
+A third form asks nobody, and that is what makes it survive both: it assigns
+the decision to a person who is not in the conversation.
+
+> Flagging for the reviewer's call on whether it warrants a follow-up issue.
+
+Read that as an offer with the request removed and the recipient replaced.
+It has the declarative form's defect --- nothing durable exists afterwards ---
+plus one the declarative form does not: an offer at least routes the decision
+to someone who is reading the message, while a reviewer named in a PR comment
+may never read that comment, and certainly will not read it as a request.
+
+It is the hardest of the three to catch from the inside, because deferring to
+a reviewer's judgment is a **virtue** nearly everywhere else in this corpus.
+[`address-every-comment`](address-every-comment.md) and
+[`fully-clean`](fully-clean.md) both insist that a reviewer's finding is
+theirs to close rather than yours; escalating a genuine impasse to a human is
+the prescribed move.
+So the sentence pattern-matches to deference at composition time, and the
+question of whether anything got recorded never comes up.
+
+The discriminator is what is being deferred, and it is the same split
+"Filing is not gated on approval" already draws for the user:
+
+- **Whether to act on a finding** is genuinely the reviewer's call, and saying
+  so is correct.
+- **Whether to record it** is not anyone's call, because recording is the
+  reversible half.
+
+Those two live in one sentence and read as one question.
+Separate them: file it, then defer the part that is actually theirs.
+
+> Filed as #1379. Whether it is worth acting on is still open.
+
+Note that the paragraph carrying this is usually *longer* and more careful
+than a bare flag would be --- two readings of the evidence, an argument that
+the data does not distinguish them, an invitation to judge.
+That thoroughness is the camouflage.
+A finding described in that much detail feels handled by the description
+alone, which is precisely the reading
+this fragment exists to refuse.
+
+- **Do:** file first, then hand the reviewer the decision that is theirs ---
+  whether to act.
+- **Do:** treat a sentence that names *anyone* as the decider of whether to
+  track something as an unfiled finding, whoever it names.
+- **Don't:** read deference as discharging this; the deference is real and
+  aimed at the wrong half of the question.
+- **Don't:** let the length of the write-up stand in for the durability of the
+  record.
+
+No new mechanism is owed for this one, which is worth saying because the
+reflex is to build one.
+`hooks/no-unfiled-finding.py`'s existing `(needs|deserves|warrants)` pattern
+already matches this variant lexically, and it fired on the case that produced
+this section --- the gap was in the prose, not in the guard.
+
+(Measured 2026-08-22 on `Lacaedemon/sparta#1348`. A controlled measurement
+surfaced that the line-relief corridor spends 93% of the reliever's
+`misslotted` budget, at `0.2333` against a `0.25` threshold, where the same
+scenario without the corridor reads `0.0`. The observation was written up at
+length, with both readings and the admission that the data did not
+distinguish them, and closed with "flagging for the reviewer's call on whether
+it warrants a follow-up issue". The guard blocked the message; the finding is
+now [sparta#1379](https://github.com/Lacaedemon/sparta/issues/1379).)
+
 ## Offering to hand over work you have already finished
 
 The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers

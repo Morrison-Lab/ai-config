@@ -36,6 +36,14 @@ and `<num>` from the PR URL returned by `gh pr create`.
   `"Review cannot be requested from pull request author"`. Surface this
   explicitly to the user — don't silently swallow the error.
 
+- **Prefer this REST POST over `gh pr edit --add-reviewer`.** The CLI form
+  exits 0 with no error when the reviewer is the PR author and attaches
+  nobody, so the 422 above is invisible on that path (measured on
+  Morrison-Lab/wai#93, 2026-08-22). When the authenticated user *is* the
+  author (`gh api user --jq .login` matches `.author.login`), skip the
+  request entirely — human review cannot be self-requested; report that the
+  PR awaits that person's own review.
+
 - **Other reviewers already requested.** The endpoint adds to the existing
   list rather than replacing it, so this is safe to run alongside
   pre-configured CODEOWNERS or workflow-added reviewers.

@@ -432,6 +432,15 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
     Using `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors.
     (Morrison-Lab/gha#412, 2026-08-05).
 
+- **`gh pr edit --add-reviewer` silently no-ops when the requested reviewer is the PR's author, and the CLI reports success anyway.**
+  GitHub forbids a review request aimed at a PR's author, and [`skills/request-pr-review/SKILL.md`](../skills/request-pr-review/SKILL.md)'s edge case records that the REST POST answers HTTP **422** --- but the `gh pr edit <N> --add-reviewer <login>` wrapper swallows it: exit 0, no error, no warning.
+  Observed on `Morrison-Lab/wai#93`, 2026-08-22 --- session authenticated as `d-morrison`, PR author `d-morrison`; two runs of `gh pr edit 93 --add-reviewer d-morrison` both exited clean, and `GET /repos/Morrison-Lab/wai/pulls/93/requested_reviewers` returned no users after each.
+  Unlike the Copilot empty-pending-list case below, here the emptiness **is** decisive negative evidence: the request was refused at creation, not accepted-and-hidden.
+  Consequence for the skill's own step: on a self-authored PR human review cannot be requested at all --- when the authenticated user and the author are the same person, "request human review" degenerates to reporting the PR to that person in chat.
+
+  - **Do:** compare `gh api user --jq .login` against `gh pr view --json author --jq .author.login` before requesting review, and skip the request when they match, saying the PR awaits the user's own review.
+  - **Don't:** read exit code 0 or the printed URL from `--add-reviewer` as proof a reviewer was attached; use the REST POST (whose 422 is visible) or confirm with one `GET .../requested_reviewers`.
+
 - **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
   `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.
   So the login spelling is not what decides the outcome, and a `422` seen elsewhere is likelier to be about whether Copilot review is enabled for that repo at all -- untested here, since bcs has it enabled.

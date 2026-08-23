@@ -365,17 +365,49 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   `libudunits2-dev` for the `units` package's C bindings). Slow but gets a
   real, verifiable R toolchain instead of guessing at doc/roxygen output.
   (serocalculator PR-393-extraction session, 2026-07-08.)
-- **`testthat::test_dir()` run without every snapshot-consuming package installed can DELETE committed snapshot files.** testthat's own end-of-run "Deleting unused snapshots" cleanup treats any snapshot it didn't see exercised (e.g. an `expect_snapshot_file()` an `svglite`/`vdiffr`-dependent test skipped because `vdiffr` wasn't installed in a stripped-down sandbox) as orphaned and removes it from `tests/testthat/_snaps/` — silently, with no confirmation prompt.
-  Caught only via `git status --short` before staging anything (21 legitimate `.svg` snapshots had vanished from the working tree);
-  restored with `git checkout -- <paths>`.
-  Prefer `testthat::test_file()` on individual files in this kind of sandbox — it doesn't run the whole-suite cleanup pass — and always `git status` before committing after any `test_dir()` run.
-  **The missing package need not make the tests SKIP -- it can make them ERROR, and the prune is identical.**
-  The bullet above reads as being about a skip (`vdiffr` absent, so the test stands down), which is the tidy case.
-  An uninstalled Suggests dependency more often makes the owning tests error outright, and an errored test never reaches its `expect_snapshot_*()` calls, so the cleanup treats those snapshots as orphaned on exactly the same reasoning -- this is the second trigger's mechanism below arriving through the first trigger's cause.
-  So neither a clean skip report nor a loud pile of errors is a signal about your snapshots either way: check `git status` regardless of how the run ended.
-  Recovery is unchanged, `git checkout -- tests/testthat/_snaps/`, and it must happen **before** staging: the prunes are ordinary working-tree deletions that a bare `git add -A` stages silently, committing the removal of real snapshots as though the change had invalidated them.
-  (`ucdavis/bcs#732`, measured 2026-08-23: a full-suite run with the `snapr` package uninstalled deleted 24 committed `tests/testthat/_snaps/**/*.csv` files.
-  A concrete instance of `memories/preferences.md`'s never-`git add -A` rule, in its less obvious direction -- the sweep stages a deletion rather than an unrelated edit.)
+- **`testthat::test_dir()` run without every snapshot-consuming package
+  installed can DELETE committed snapshot files.** testthat's own end-of-run
+  "Deleting unused snapshots" cleanup treats any snapshot it didn't see
+  exercised (e.g. an `expect_snapshot_file()` an `svglite`/`vdiffr`-dependent
+  test skipped because `vdiffr` wasn't installed in a stripped-down sandbox)
+  as orphaned and removes it from `tests/testthat/_snaps/` — silently, with no
+  confirmation prompt. Caught only via `git status --short` before staging
+  anything (21 legitimate `.svg` snapshots had vanished from the working
+  tree); restored with `git checkout -- <paths>`. Prefer
+  `testthat::test_file()` on individual files in this kind of sandbox — it
+  doesn't run the whole-suite cleanup pass — and always `git status` before
+  committing after any `test_dir()` run.
+  **The missing package need not make the tests SKIP -- it can make them ERROR,
+  and the prune is identical.**
+  The bullet above reads as being about a skip (`vdiffr` absent, so the test
+  stands down), which is the tidy case.
+  An uninstalled Suggests dependency can instead make the owning tests error
+  outright.
+  Where the snapshot helper is reached `pkg::`-qualified, that is what happens:
+  the namespace lookup fails before any assertion runs, so the test dies at its
+  first snapshot call and the cleanup sees exactly the unexercised snapshots a
+  skip would have left.
+  That is the concurrency trigger's mechanism -- an errored test never reaching
+  its `expect_snapshot_*()` calls -- arriving through the missing-package cause.
+  So neither a clean skip report nor a loud pile of errors tells you anything
+  about your snapshots: check `git status` however the run ended.
+  Recovery is unchanged, `git checkout -- tests/testthat/_snaps/`, and it must
+  happen **before** staging -- the prunes are ordinary working-tree deletions
+  that a bare `git add -A` stages silently, committing the removal of real
+  snapshots as though the change had invalidated them.
+  (`ucdavis/bcs#732`, measured 2026-08-23: a full-suite run with the `snapr`
+  package uninstalled pruned committed `tests/testthat/_snaps/**/*.csv` files.
+  How many it pruned was not recorded, so no count is given here.
+  Every `.csv` snapshot in that suite is written by a
+  `snapr::expect_snapshot_data()` call, so each owning test errored on the
+  namespace lookup rather than skipping.
+  A concrete instance of `memories/preferences.md`'s never-`git add -A` rule,
+  in its less obvious direction -- the sweep stages a deletion rather than an
+  unrelated edit.)
+  - **Do:** run `git status --short` after any full-suite run in a sandbox
+    missing Suggests packages, whether the run reported skips or errors.
+  - **Don't:** stage with `git add -A` after such a run -- that commits the
+    prune as an ordinary deletion.
 - **The same deletion fires from a second, likelier trigger: two full suites
   running CONCURRENTLY in one checkout.** The mechanism is identical (the
   end-of-run cleanup prunes snapshots it did not see exercised), but the cause

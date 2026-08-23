@@ -130,7 +130,8 @@ checkable by a reader, and a resolution to be thoughtful is not.
   measurer never saw.
 
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
-"A supplied measurement carried a status-code confound".
+"A supplied measurement carried a status-code confound" and
+"A run-level conclusion stood in for a job-level one".
 
 ## When the work itself settles the premise, run it before writing anything
 
@@ -249,12 +250,18 @@ written and rots nothing.
   into a brief, and paste that query beside the claim.
 - **Do:** instruct the agent to verify a premise you could not derive, and say
   which claim you mean.
+- **Do:** paste the query's *output* as well as the query, and check that the
+  claim you wrote is the one that output settles rather than one inferential
+  step past it.
 - **Don't:** state a file's contents, a rule's location, or a site count from
   recollection because the sentence is an instruction rather than an
   assertion.
 - **Don't:** rely on the recipient's premise check to catch it --- that check
   is discretionary, and your brief carries the authority that argues against
   running it.
+- **Don't:** hand over the conclusion in place of the measurement --- the
+  recipient cannot re-derive a number you did not supply, so the check this
+  fragment prescribes for a supplied measurement has nothing to run on.
 
 **A claim about the recipient's *environment* is worse than one about corpus
 state, and the remedy above cannot reach it.**

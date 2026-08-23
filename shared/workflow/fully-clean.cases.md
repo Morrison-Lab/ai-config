@@ -1024,67 +1024,19 @@ derive is not a count.
 Re-fetch on every wake, and treat a later wake as evidence that the earlier
 fetch was incomplete rather than as a duplicate.)
 
-## Four cancelled runs left R-CMD-check with no result for 1h50m
-
-(`ucdavis/bcs#732`, measured 2026-08-23.
-`R-CMD-check.yaml` was triggered five times on the PR branch.
-Runs `32610472088`, `32611901748`, `32611957837` and `32613062007` all concluded `cancelled`, each superseded by the next push under the workflow's concurrency group.
-The fifth run was the first to reach a conclusion, about 1 hour 50 minutes after the PR opened.
-
-Nothing on the PR said so.
-A cancelled run's check runs hang off the commit they were attached to, and each of those commits had already been superseded, so the current head's check list carried no row for `R-CMD-check` at all --- not red, not pending, absent.
-The list read as though there were nothing left to wait for, which is indistinguishable from every check having finished.
-
-What settles it is a branch-scoped enumeration rather than a head-scoped one:
-
-```bash
-gh run list --workflow R-CMD-check.yaml --branch <branch> \
-  --json databaseId,conclusion,createdAt
-```
-
-Any run whose `conclusion` is non-null answers the question;
-four `cancelled` entries and no others is the state this record is about.
-
-Note how the rapid-push rhythm produces it.
-The same batching argument [`efficient-pr-babysitting`](efficient-pr-babysitting.md) makes on CI cost applies here with a correctness consequence attached: each push cancelled the run that would have told the session whether the package still checked.)
-
 ## A `check_suite.completed` wake at a superseded head
 
 (`ucdavis/bcs#732`, measured 2026-08-23.
-Two `check_suite.completed` wakes arrived, each carrying the same "no suite is still running or failed, continue with the next step" wording, and each wrong for a different reason.
+Two wakes arrived reporting that no check suite was still running.
+Each was true of a population that was not the one the session needed.
 
-The first named suite head `4176bd5` while the PR's live head was `ab40071` --- so the suites it reported on belonged to a commit that had already been superseded.
-The second named the live head, and a matrix leg was still `in_progress` at the time it arrived.
+The first named suite head `4176bd5`.
+That commit's own `R-CMD-check.yaml` run, `32613062007`, was cancelled at 02:40:52Z, ten seconds after the successor run `32613455542` was created against the new head `ab40071`.
+That successor did not conclude until 03:20:15Z.
+So the wake reported on a commit the PR had already left, while the live head's `R CMD check` still had most of forty minutes to run.
 
-The notice is candid about its own scope, in the body of the wake itself: cancelled suites, suites with no runs, the App's own suites, and legacy commit statuses are not covered.
-Read alongside the record above, that exclusion list is the whole problem --- the suites this PR most needed counted were exactly the cancelled ones.
+The second wake named the live head, and still arrived inside that window.
 
-So the wake establishes nothing about criterion 1 in either direction.
-Comparing its `head_sha` against the PR head disposes of the first case, and a fresh paginated check-runs read on the current head disposes of the second.)
-
-## Both same-named check runs finished green, 28 minutes apart
-
-(`ucdavis/bcs#732`, measured 2026-08-23.
-A dated confirmation of "A check-run NAME is not unique across workflows" in [`fully-clean.md`](fully-clean.md), which was written on this same repo on 2026-08-21 and predicted this exactly.
-
-On one head, `ubuntu-latest (release)` existed twice:
-
-| job | workflow | concluded |
-|---|---|---|
-| `97130097307` | `check-readme.yaml` | 02:44, green |
-| `97132046031` | `R-CMD-check.yaml` | 03:12, green |
-
-The wrinkle the earlier case did not have is that **both** runs finished, both green, about 28 minutes apart.
-The 2026-07-29 collision recorded above under "The check-run name collision" had a still-running counterpart and a check count that grew, so something was visibly outstanding.
-The 2026-08-21 case had matrix legs that had not started.
-Here, for those 28 minutes, the head carried one green row under that name and nothing pending, and reading the name off the check list would have credited `R CMD check` with a pass it had not yet produced.
-
-That is the configuration in which the name is least recoverable, because every signal that flagged the earlier two --- a pending row, a rising count, a gated matrix --- is absent by construction.
-Only the run behind the check answers it:
-
-```bash
-gh api "repos/ucdavis/bcs/commits/<sha>/check-runs" --paginate \
-  --jq '.check_runs[] | select(.name == "ubuntu-latest (release)") | .html_url'
-```
-
-Note also that `check-pr-fully-clean.py` annotates a duplicated name only on lines it reports, and a passing duplicated name produces no line --- so with both runs green the script is silent about the ambiguity, which is the condition `fully-clean.md` already warns of, met in full.)
+What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
+What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
+Compare the first, then run the second.)

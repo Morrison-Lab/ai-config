@@ -94,5 +94,29 @@ with tempfile.TemporaryDirectory() as raw:
     except OSError:
         print("SKIP: unreadable cache (platform cannot chmod)")
 
+    skills = cursor / "skills"
+    sibling = root / "worktree"
+    other = root / "other" / "skills" / "ardi"
+    (sibling / "skills" / "ardi").mkdir(parents=True, exist_ok=True)
+    other.mkdir(parents=True)
+    skills.mkdir(parents=True)
+    try:
+        (skills / "ardi").symlink_to(sibling / "skills" / "ardi")
+        (skills / "foreign").symlink_to(other)
+        stacked_ok = True
+    except OSError:
+        stacked_ok = False
+    if stacked_ok:
+        names = {
+            path.name
+            for path in mod.stacked_cursor_skill_paths(
+                cursor, repo, {repo.resolve(), sibling.resolve()}
+            )
+        }
+        check("sibling-worktree skill link is stacked", "ardi" in names)
+        check("foreign skill link is not stacked", "foreign" not in names)
+    else:
+        print("SKIP: stacked_cursor_skill_paths (platform cannot create symlink)")
+
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

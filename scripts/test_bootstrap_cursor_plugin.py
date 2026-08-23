@@ -29,7 +29,11 @@ def check(name: str, condition: bool) -> None:
     failures += not condition
 
 
-def run_bootstrap(tmp: Path, with_plugin: bool, stale_link: bool = False) -> tuple[Path, str]:
+def run_bootstrap(
+    tmp: Path,
+    with_plugin: bool,
+    stale_link: bool | str = False,
+) -> tuple[Path, str]:
     cursor = tmp / "cursor"
     cursor.mkdir(parents=True)
     if with_plugin:
@@ -37,7 +41,8 @@ def run_bootstrap(tmp: Path, with_plugin: bool, stale_link: bool = False) -> tup
     if stale_link:
         dest = cursor / "skills" / "ardi"
         dest.parent.mkdir(parents=True)
-        dest.symlink_to(ROOT / "skills" / "ardi")
+        target = ROOT / "README.md" if stale_link == "repo-file" else ROOT / "skills" / "ardi"
+        dest.symlink_to(target)
     bin_dir = tmp / "bin"
     bin_dir.mkdir()
     scontrol = bin_dir / "scontrol"
@@ -84,6 +89,15 @@ if can_link:
         check("plugin skip removes this checkout's stale skill link",
               not (cursor / "skills" / "ardi").exists())
         check("skip reports stale-link removal", "stale skill link" in output)
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        cursor, output = run_bootstrap(
+            tmp / "repo-file-link", with_plugin=True, stale_link="repo-file"
+        )
+        check(
+            "plugin skip removes a repo link that is not skills/<name>",
+            not (cursor / "skills" / "ardi").exists(),
+        )
 else:
     print("SKIP: stale-link removal (platform cannot create symlink)")
 

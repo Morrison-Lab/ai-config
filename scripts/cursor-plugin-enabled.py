@@ -93,6 +93,42 @@ def _repo_worktrees(repo_root: Path) -> set[Path]:
     return module.repo_worktrees(repo_root)
 
 
+def stacked_cursor_skill_paths(
+    cursor_dir: Path,
+    repo_root: Path,
+    repo_roots: set[Path] | None = None,
+) -> list[Path]:
+    """``~/.cursor/skills`` symlinks whose target sits in this repo.
+
+    The skip-path cleanup used to require ``readlink`` to equal this
+    checkout's ``skills/<name>``. A leftover link into a sibling worktree
+    then survived bootstrap while ``check-harness-installs.py`` still
+    reported it as ``stacked`` (ai-config#1729).
+    """
+    skills_dir = cursor_dir / "skills"
+    if repo_roots is None:
+        repo_roots = {repo_root.resolve()} | _repo_worktrees(repo_root)
+    else:
+        repo_roots = {Path(root).resolve() for root in repo_roots}
+    if not skills_dir.is_dir():
+        return []
+    try:
+        children = list(skills_dir.iterdir())
+    except OSError:
+        return []
+    stacked: list[Path] = []
+    for child in children:
+        try:
+            if not child.is_symlink():
+                continue
+            target = child.resolve()
+        except OSError:
+            continue
+        if any(_is_relative_to(target, root) for root in repo_roots):
+            stacked.append(child)
+    return stacked
+
+
 def skip_reason(
     cursor_dir: Path,
     claude_dir: Path,
@@ -129,9 +165,20 @@ def main() -> int:
         "--repo-root",
         default=str(Path(__file__).resolve().parent.parent),
     )
+    parser.add_argument(
+        "--print-stacked",
+        action="store_true",
+        help="print leftover ~/.cursor/skills links that resolve into this repo",
+    )
     args = parser.parse_args()
+    cursor_dir = Path(args.cursor_dir)
+    repo_root = Path(args.repo_root)
+    if args.print_stacked:
+        for path in stacked_cursor_skill_paths(cursor_dir, repo_root):
+            print(path)
+        return 0
     reason = skip_reason(
-        Path(args.cursor_dir), Path(args.claude_dir), Path(args.repo_root)
+        cursor_dir, Path(args.claude_dir), repo_root
     )
     if reason is None:
         return 1

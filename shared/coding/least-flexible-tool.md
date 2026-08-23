@@ -175,7 +175,8 @@ and the disagreement is silent:
 Together, `.*` consumes the rest of the string and `$` is satisfied at the final position,
 so the "one line" alternative matches **everything from the prefix onward**.
 Nothing errors.
-The pattern still matches the intended input; it just also matches far more of it.
+The pattern still matches the intended input.
+It just also matches far more of it.
 
 ```python
 re.compile(r"```.*?```|^\s*>.*$", re.S | re.M)          # the > branch eats the whole tail

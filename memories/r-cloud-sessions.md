@@ -387,8 +387,9 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   the namespace lookup fails before any assertion runs, so the test dies at its
   first snapshot call and the cleanup sees exactly the unexercised snapshots a
   skip would have left.
-  That is the concurrency trigger's mechanism -- an errored test never reaching
-  its `expect_snapshot_*()` calls -- arriving through the missing-package cause.
+  The mechanism is the same whichever cause starts it -- an errored test never
+  reaches its `expect_snapshot_*()` calls -- and here it arrives through the
+  missing package rather than through contention.
   So neither a clean skip report nor a loud pile of errors tells you anything
   about your snapshots: check `git status` however the run ended.
   Recovery is unchanged, `git checkout -- tests/testthat/_snaps/`, and it must

@@ -127,11 +127,13 @@ A third form asks nobody, and that is what makes it survive both: it assigns the
 Read that as an offer with the request removed and the recipient replaced.
 It shares the declarative form's defect exactly -- nothing durable exists afterwards -- and adds a distinct one of its own.
 The declarative form names no recipient at all, so nobody is left holding anything.
-This form names one, which reads as having routed the decision somewhere; but a reviewer named in a PR comment may never read that comment, and will not read it as a request if they do.
+This form names one, which reads as having routed the decision somewhere.
+But a reviewer named in a PR comment may never read that comment, and will not read it as a request if they do.
 An unrouted decision at least looks unrouted.
 
 It is the hardest of the three to catch from the inside, because deferring to a reviewer's judgment is a **virtue** nearly everywhere else in this corpus.
-[`address-every-comment`](address-every-comment.md) and [`fully-clean`](fully-clean.md) both insist that a reviewer's finding is theirs to close rather than yours; escalating a genuine impasse to a human is the prescribed move.
+[`address-every-comment`](address-every-comment.md) and [`fully-clean`](fully-clean.md) both insist that a reviewer's finding is theirs to close rather than yours.
+Escalating a genuine impasse to a human is the prescribed move.
 So the sentence pattern-matches to deference at composition time, and the question of whether anything got recorded never comes up.
 
 The discriminator is what is being deferred, and it is the same split "Filing is not gated on approval" already draws for the user:
@@ -151,7 +153,7 @@ A finding described in that much detail feels handled by the description alone, 
 
 - **Do:** file first, then hand the reviewer the decision that is theirs -- whether to act.
 - **Do:** treat a sentence that names *anyone* as the decider of whether to track something as an unfiled finding, whoever it names.
-- **Don't:** read deference as discharging this; the deference is real and aimed at the wrong half of the question.
+- **Don't:** read deference as discharging this --- the deference is real, and aimed at the wrong half of the question.
 - **Don't:** let the length of the write-up stand in for the durability of the record.
 
 `hooks/no-unfiled-finding.py` covers this, but only after being widened here, and the gap is worth recording because it was invisible from the one case that produced the section.

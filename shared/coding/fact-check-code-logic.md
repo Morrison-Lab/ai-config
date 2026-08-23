@@ -730,10 +730,11 @@ The relation is exactly derivable ---
 `((1-p)/(2-p)) * (rho + (1-rho)/m)`, which is `0.0037234 + 0.1452128*rho` at
 the parameters in use --- and three published figures were wrong against it:
 0.032 for 0.032766, and ratios of 4.5 and 6.2 for 4.552 and 6.104.
-The ICC estimate behind the first of those had a Monte Carlo standard error of
-0.0009 on 12 replicates, and its distance from the derived value was 0.0007 ---
-so the estimate was consistent with 0.033 and simply could not resolve the
-thousandths digit either way.
+The ICC estimate behind the first of those was `0.032131` on 12 replicates,
+with a Monte Carlo standard error of `0.00087`, against a derived `0.032766`.
+The estimate therefore sat 0.73 standard errors from the derived value ---
+squarely inside its own noise, and unable to discriminate 0.032 from 0.033 in
+either direction.
 The two ratios are functions of that same estimate and inherit the problem.
 The standard error was in the same table the estimate was read from.
 Tracked as

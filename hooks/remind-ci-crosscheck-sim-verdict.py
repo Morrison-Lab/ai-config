@@ -164,22 +164,50 @@ def simple_commands(cmd):
     return cmds
 
 
+# Words that may precede the command itself, matching the sibling hooks'
+# `LEAD_WORDS`. Kept alongside ASSIGNMENT so `GH_PAGER=cat gh run view ...` --
+# the form `memories/github.md` mandates -- reaches the `gh` test below.
+LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
+              "nohup", "env"}
+
+
 def _is_ci_read(argv):
     """True when this simple command actually READS CI state.
 
-    Structural rather than textual: the CI markers are looked for at fixed
-    argument positions of a `gh` command, so they cannot be matched inside a
+    Structural rather than textual: the markers are looked for among a `gh`
+    command's own POSITIONAL arguments, so they cannot be matched inside a
     quoted body that a different `gh` subcommand is merely posting.
+
+    Positional rather than fixed-index, which is the correction to a first
+    attempt at this. Reading `argv[1]`/`argv[2]` directly is over-tight in two
+    ways that both fire on the commonest spellings: an env prefix shifts the
+    command word off index 0 (`GH_PAGER=cat gh run view`), and a flag before
+    the path shifts the path off index 2 (`gh api --paginate <path>`). Both are
+    real CI reads, so both failing to discharge nags on the happy path -- the
+    exact false-positive the previous over-loose regex did not have. Trading
+    one failure direction for the other is not a fix; skipping the prefix and
+    the flags is.
     """
     if not argv:
         return False
-    exe = argv[0]
+    i = 0
+    while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
+        i += 1
+    if i >= len(argv):
+        return False
+    exe = argv[i]
     if exe != "gh" and not exe.endswith("/gh"):
         return False
-    if len(argv) >= 3 and argv[1] == "run" and argv[2] == "view":
+    rest = argv[i + 1:]
+    if len(rest) >= 2 and rest[0] == "run" and rest[1] == "view":
         return True
-    if len(argv) >= 3 and argv[1] == "api":
-        return bool(CI_API_PATH.search(argv[2]))
+    # Scanned rather than read at a fixed index: `gh api --paginate <path>` and
+    # `gh api <path> --paginate` are the same read, and the path is at a
+    # different offset in each. A flag-stripping pass was tried here first and
+    # removed -- no test could make it bite, since this scan already finds the
+    # path wherever it sits, and a clause no test justifies is one to drop.
+    if rest and rest[0] == "api":
+        return any(CI_API_PATH.search(t) for t in rest[1:])
     return False
 
 

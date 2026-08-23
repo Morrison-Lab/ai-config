@@ -164,6 +164,31 @@ CASES = [
      "`team call` is a meeting, not a decision handed over"),
     ([say("The owner call is scheduled before the follow-up.")], False,
      "the same compound with a different party word"),
+    # Claude review, ai-config#2007 round 8. Round 6 dropped `question` for
+    # carrying both a decision and an artifact sense. The generalization it
+    # stopped short of: with `for` as the connector, EVERY noun in the list
+    # reads as an artifact -- "I left my judgment for the reviewer" is a written
+    # record of a judgment already made, not a decision handed over.
+    #
+    # So the deferral branch takes `to` only. Nothing was lost: no phrasing that
+    # must fire uses defer/leave/left with `for`. The two that look like they
+    # might -- "Flagging this concern for ..." and "Flagging for the reviewer's
+    # call ..." -- go through the flag branch and the possessive branch instead.
+    #
+    # One case per remaining noun, which is the standard this PR set for itself
+    # after a widening shipped green because every new case shared one shape.
+    ([say("I left my judgment for the reviewer about the tracking issue.")], False,
+     "benefactive `for` + judgment is a written record, not a deferral"),
+    ([say("I left the choice for the reviewer about the tracking issue.")], False,
+     "benefactive `for` + choice"),
+    ([say("I left a matter for the reviewer about the tracking issue.")], False,
+     "benefactive `for` + matter"),
+    ([say("I left a concern for the reviewer about the tracking issue.")], False,
+     "benefactive `for` + concern"),
+    ([say("I left the call for the reviewer about the tracking issue.")], False,
+     "benefactive `for` + call, which the possessive branch also must not catch"),
+    ([say("Leaving the decision for the maintainer on the follow-up issue.")], False,
+     "benefactive `for` + decision, the head noun of the whole list"),
     # Measured 2026-08-23: this guard blocked a status recap that was DISCUSSING
     # its own regex, because a pattern name sat in a code span. A message about
     # the guard cites the guard, and every citation is an assertion in form and

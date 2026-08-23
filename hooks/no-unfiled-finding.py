@@ -107,7 +107,7 @@ ASSERT = [
     r"(?:(?:it|this|that)\s+)?(?:up\s+)?"
     r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
     r"(?:(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|matter|concern)\s+)?"
-    r"\b(?:to|for)\b[^.!?]{0,15}?"
+    r"\bto\b[^.!?]{0,15}?"
     r"\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
     r"flag(?:ging)?\s+"

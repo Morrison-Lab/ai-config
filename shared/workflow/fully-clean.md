@@ -109,74 +109,40 @@ Worked-example case records for the rules below live in
    Reporting the regression fixed on that row would have cited an unrelated
    workflow.)
 
-   **A check CANCELLED by a later push leaves no row at all, so a run of rapid
-   pushes can leave a critical check having never produced a result --- and the
-   head's check list reports that as nothing to wait for.**
+   **A check CANCELLED by a later push leaves no row at all, so a run of rapid pushes can leave a critical check having never produced a result --- and the head's check list reports that as nothing to wait for.**
    Every subsection above describes an enumeration that is short at one head.
-   This one is short across the PR's whole history: each cancelled run is
-   superseded by the next push, drops off the head it was attached to, and
-   leaves nothing anywhere saying the check has yet to run even once.
+   This one is short across the PR's whole history: each cancelled run is superseded by the next push, drops off the head it was attached to, and leaves nothing anywhere saying the check has yet to run even once.
    A pending row would at least be visible; a cancelled run is not a row.
 
-   The head's check runs cannot answer it, because the question is about the
-   branch rather than about a commit.
-   Enumerate the workflow's own run history on the branch instead
-   (`mcp__github__actions_list` `list_workflow_runs`, filtered by branch, or
-   `gh run list --workflow <file> --branch <branch>`), and ask whether **any**
-   run reached a conclusion.
+   The head's check runs cannot answer it, because the question is about the branch rather than about a commit.
+   Enumerate the workflow's own run history on the branch instead (`mcp__github__actions_list` `list_workflow_runs`, filtered by branch, or `gh run list --workflow <file> --branch <branch>`), and ask whether **any** run reached a conclusion.
 
-   Distinct from the step-list rule above, which governs one job you have
-   already found and are waiting on.
-   Here there is no job to poll: the runs that would have carried it were
-   cancelled, and the current head's list never named them.
-   Distinct too from [`ardi`](ardi.md)'s cancelled-run rules, which govern the
-   **review** gate being cancelled and assume a newer run supersedes it.
-   The case here is an ordinary CI workflow with no completed run at all.
+   Distinct from the step-list rule above, which governs a job you have already found: here there is no job to poll, because the runs that would have carried it were cancelled and the head's list never named them.
+   Distinct too from [`ardi`](ardi.md)'s cancelled-run rules, which govern the **review** gate and assume a newer run supersedes the cancelled one.
+   This is an ordinary CI workflow with no completed run at all.
 
-   - **Do:** enumerate a critical workflow's run history on the branch, and
-     confirm at least one run reached a conclusion, whenever the PR has taken
-     several rapid pushes.
-   - **Do:** report "has never completed on this branch" as its own state,
-     separate from "passing" and from "failing".
-   - **Don't:** read the absence of a pending row as evidence that everything
-     has finished --- a cancelled run leaves no row to be pending.
-   - **Don't:** infer from a green head that a workflow ran on it; ask which
-     runs concluded, not which rows are red.
+   - **Do:** enumerate a critical workflow's run history on the branch, and confirm at least one run reached a conclusion, whenever the PR has taken several rapid pushes.
+   - **Do:** report "has never completed on this branch" as its own state, separate from "passing" and from "failing".
+   - **Don't:** read the absence of a pending row as evidence that everything has finished --- a cancelled run leaves no row to be pending.
+   - **Don't:** infer from a green head that a workflow ran on it;
+     ask which runs concluded, not which rows are red.
 
-   See [`fully-clean.cases.md`](fully-clean.cases.md),
-   "Four cancelled runs left R-CMD-check with no result for 1h50m".
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "Four cancelled runs left R-CMD-check with no result for 1h50m".
 
-   **A `check_suite.completed` wake saying no suite is still running is not an
-   all-clear for criterion 1, and by its own terms excludes cancelled suites.**
-   The wake arrives worded as a go-ahead --- "continue with the next step" ---
-   which is what makes it substitute for the check it does not perform.
-   Two things break it.
-   It can name a **superseded** head, so the suites it cleared belong to a
-   commit that is no longer the PR's.
-   And its own body states the exclusions: cancelled suites, suites with no
-   runs, the App's own suites, and legacy commit statuses are outside what it
-   reports on --- which is precisely the population the subsection above is
-   about.
+   **A `check_suite.completed` wake saying no suite is still running is not an all-clear for criterion 1, and by its own terms excludes cancelled suites.**
+   The wake arrives worded as a go-ahead --- "continue with the next step" --- which is what makes it substitute for the check it does not perform.
+   It can name a **superseded** head, so the suites it cleared belong to a commit that is no longer the PR's.
+   And its own body states the exclusions: cancelled suites, suites with no runs, the App's own suites, and legacy commit statuses are outside what it reports on --- which is precisely the population the subsection above is about.
 
-   The remedy is the field [`ardi`](ardi.md) already names for the failure
-   wake: compare the event's `head_sha` against the PR's current head, then
-   re-derive check state from the check-runs endpoint on that head.
-   Note the direction is the mirror of `ardi`'s.
-   There a **red** wake at a superseded head invites a needless fix;
-   here a **green**-sounding wake at a superseded head invites a needless
-   merge, which is the costlier error.
+   The remedy is the field [`ardi`](ardi.md) already names for the failure wake: compare the event's `head_sha` against the PR's current head, then re-derive check state from the check-runs endpoint on that head.
+   The direction is the mirror of `ardi`'s, though: there a **red** wake at a superseded head invites a needless fix, while here a **green**-sounding one invites a needless merge, which is the costlier error.
 
-   - **Do:** re-derive check state from the paginated check-runs endpoint on
-     the current head, on every such wake.
-   - **Do:** compare the wake's own `head_sha` against the PR head before
-     reading anything into it.
-   - **Don't:** treat "continue with the next step" as evidence CI finished
-     --- it is a statement about the suites the sender chose to count.
-   - **Don't:** read it as covering cancelled suites; its own body says it
-     does not.
+   - **Do:** re-derive check state from the paginated check-runs endpoint on the current head, on every such wake.
+   - **Do:** compare the wake's own `head_sha` against the PR head before reading anything into it.
+   - **Don't:** treat "continue with the next step" as evidence CI finished --- it is a statement about the suites the sender chose to count.
+   - **Don't:** read it as covering cancelled suites; its own body says it does not.
 
-   See [`fully-clean.cases.md`](fully-clean.cases.md),
-   "A `check_suite.completed` wake at a superseded head".
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "A `check_suite.completed` wake at a superseded head".
 
    **Every subsection above explains a check list that is short for a per-PR
    reason, and a platform outage produces the same shape for a reason none of

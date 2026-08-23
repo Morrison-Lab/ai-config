@@ -249,6 +249,12 @@ Two changes shipped together, one of them load-bearing and one of them a regress
 The tell is a fix that changes more than one thing in service of one finding.
 Ask which single change is sufficient, and drop the rest.
 
+**It recurred on the same guard, in the commit immediately after this rule was written.**
+Round 2's narrowing was itself over-narrowed: requiring the connector to sit immediately after the deferral verb dropped every phrasing with a real noun-phrase object between them ("leave this decision to the reviewer", "flagging this concern for the maintainer"), which round 3 had to restore.
+Both corrections shared a root the first one did not name: I was testing **adjacency** when the discriminator was **order** -- in a deferral the connector precedes the party, and in the innocent construction the party is the verb's indirect object and arrives first.
+So an over-correction is often a sign that the discriminator itself is wrong rather than merely mis-tuned, and re-tuning a wrong discriminator produces another one.
+That the rule was written, and then broken within the hour by its author, is the ordinary case rather than a surprising one: a rule is consulted at read time and violated at composition time.
+
 **The probe that fired for the wrong reason.**
 I checked the over-correction before shipping it, with two sentences of the shape I had just removed.
 One fired and one did not, and I read that as coverage.

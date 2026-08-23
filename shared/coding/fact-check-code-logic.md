@@ -730,9 +730,12 @@ The relation is exactly derivable ---
 `((1-p)/(2-p)) * (rho + (1-rho)/m)`, which is `0.0037234 + 0.1452128*rho` at
 the parameters in use --- and three published figures were wrong against it:
 0.032 for 0.032766, and ratios of 4.5 and 6.2 for 4.552 and 6.104.
-The MCSE on the third of those was 0.00084, so the estimate could not resolve
-the digit that was printed, and that MCSE was in the same table the estimate
-came from.
+The ICC estimate behind the first of those had a Monte Carlo standard error of
+0.0009 on 12 replicates, and its distance from the derived value was 0.0007 ---
+so the estimate was consistent with 0.033 and simply could not resolve the
+thousandths digit either way.
+The two ratios are functions of that same estimate and inherit the problem.
+The standard error was in the same table the estimate was read from.
 Tracked as
 [ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)
 

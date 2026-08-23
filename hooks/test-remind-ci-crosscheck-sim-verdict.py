@@ -136,6 +136,15 @@ SILENT = [
      "env-prefixed local run still discharges via the CI read after it"),
     ([LOCAL, bash("gh api repos/o/r/actions/runs/123 --jq .event"), CLAIM],
      "an actions/runs api read discharges"),
+    # A fixed-index read of argv is over-tight in two ways that both fire on the
+    # commonest spellings, so the markers are found among POSITIONAL args instead.
+    ([LOCAL, bash("GH_PAGER=cat gh run view 123 -R o/r --log"), CLAIM],
+     "an env prefix shifts the command word off index 0 and must still discharge"),
+    ([LOCAL, bash("gh api --paginate repos/o/r/commits/abc/check-runs"), CLAIM],
+     "a flag BEFORE the path shifts it off index 2 and must still discharge"),
+    ([LOCAL, bash("env GH_PAGER=cat gh api --paginate repos/o/r/actions/jobs/1"),
+      CLAIM],
+     "a lead word plus an env prefix plus a leading flag, all at once"),
     ([LOCAL, txt("The dump finished; nothing to report yet.")],
      "a local run with no verdict figure after it"),
     ([txt("Before dumping: the analyzer reports worst= for each metric."),

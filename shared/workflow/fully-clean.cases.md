@@ -1023,3 +1023,20 @@ surfaces, arriving through the delivery channel instead: a count you did not
 derive is not a count.
 Re-fetch on every wake, and treat a later wake as evidence that the earlier
 fetch was incomplete rather than as a duplicate.)
+
+## A `check_suite.completed` wake at a superseded head
+
+(`ucdavis/bcs#732`, measured 2026-08-23.
+Two wakes arrived reporting that no check suite was still running.
+Each was true of a population that was not the one the session needed.
+
+The first named suite head `4176bd5`.
+That commit's own `R-CMD-check.yaml` run, `32613062007`, was cancelled at 02:40:52Z, ten seconds after the successor run `32613455542` was created against the new head `ab40071`.
+That successor did not conclude until 03:20:15Z.
+So the wake reported on a commit the PR had already left, while the live head's `R CMD check` still had most of forty minutes to run.
+
+The second wake named the live head, and still arrived inside that window.
+
+What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
+What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
+Compare the first, then run the second.)

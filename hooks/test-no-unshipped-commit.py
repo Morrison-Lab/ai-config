@@ -157,6 +157,33 @@ git commit -m real"""
 herestring_bareword = transcript([HERESTRING_BAREWORD])
 herestring_quoted = transcript([HERESTRING_QUOTED])
 
+# --- ai-config#1963: `\b` treats the hyphen as a word boundary ---------------
+# `git\s+commit\b` matched `git commit-tree`, git plumbing that writes a commit
+# object and moves no ref -- so nothing is ever pushed, `pending` was never
+# cleared, and every later Stop blocked on a fully-pushed branch. All three
+# commands below are spelled out in one suite because the defect is exactly
+# that the guard could not tell them apart.
+COMMIT_TREE = 'git commit-tree "$tree" -p "$BASE" -m "synthetic"'
+COMMIT_GRAPH = "git commit-graph write --reachable"
+REAL_COMMIT = "git commit -m real"
+
+# The mirror of the population-shrink trap: the lookahead must not blind the
+# guard to a real commit sharing a command with plumbing. The `git commit-tree`
+# here came from a `git merge-tree` negative control, which is the shape that
+# produced the original report.
+PLUMBING_THEN_REAL = 'git commit-tree "$t" -p "$b" -m x\ngit commit -m real'
+
+# PUSH carries the same lookahead for symmetry. No hyphenated `git push-*`
+# exists today, so this pins the mirror bug rather than a live one: a
+# hypothetical sibling must not DISCHARGE a genuinely pending commit.
+PUSH_SIBLING_DOES_NOT_DISCHARGE = "git push-mirror --all"
+
+commit_tree = transcript([COMMIT_TREE])
+commit_graph = transcript([COMMIT_GRAPH])
+real_commit = transcript([REAL_COMMIT])
+plumbing_then_real = transcript([PLUMBING_THEN_REAL])
+push_sibling = transcript([REAL_COMMIT, PUSH_SIBLING_DOES_NOT_DISCHARGE])
+
 try:
     assert subject.pending_commit(unshipped) == "git commit -m hook"
     assert subject.pending_commit(pushed) is None
@@ -178,6 +205,11 @@ try:
     assert subject.pending_commit(writer_after_separator) is None, "a writer reached through && is still a writer"
     assert subject.pending_commit(herestring_bareword) is not None, "<<< is a herestring, not a heredoc"
     assert subject.pending_commit(herestring_quoted) is not None, "a quoted herestring operand is not a tag"
+    assert subject.pending_commit(commit_tree) is None, "git commit-tree moves no ref, so it cannot arm"
+    assert subject.pending_commit(commit_graph) is None, "git commit-graph write is not a commit"
+    assert subject.pending_commit(real_commit) is not None, "a plain git commit must still arm"
+    assert subject.pending_commit(plumbing_then_real) is not None, "plumbing must not hide a real commit beside it"
+    assert subject.pending_commit(push_sibling) is not None, "a hyphenated push sibling must not discharge"
 finally:
     os.unlink(unshipped)
     os.unlink(pushed)
@@ -199,8 +231,14 @@ finally:
     os.unlink(writer_after_separator)
     os.unlink(herestring_bareword)
     os.unlink(herestring_quoted)
+    os.unlink(commit_tree)
+    os.unlink(commit_graph)
+    os.unlink(real_commit)
+    os.unlink(plumbing_then_real)
+    os.unlink(push_sibling)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")
 print("PASS: WRITER and REDIRECT are scoped to the segment that owns the heredoc")
 print("PASS: a <<< herestring is not mistaken for a heredoc")
+print("PASS: commit-tree and commit-graph are not commits, while a plain commit still arms")

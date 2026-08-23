@@ -73,3 +73,35 @@ Either ordering restores it: commit, open the PR, then amend the comment with
 the number the API returned;
 or cite nothing numeric and name the change and its destination path, which a
 reader can check against the filesystem.)
+
+## "A dupe-check chained into the same call as the create"
+
+(Morrison-Lab/ai-config#1954, 2026-08-22: a duplicate issue was filed because
+the duplicate-search and the create ran in one Bash call, the list and the
+heredoc separated by nothing more than a `;`:
+
+```bash
+gh issue list --repo O/R --state open --search "..." --json number,title --limit 10; cat > /tmp/body.md <<'BODY' ... BODY
+gh issue create -R O/R --title "..." --body-file /tmp/body.md
+```
+
+The search returned the right match --- #1737,
+"semantic-line-breaks.py has no clause-break mode, so it disagrees with
+new-line-breaks CI and reverts manual fixes" --- and #1952 was created anyway.
+The duplicate was then closed and its content moved to a comment on #1737,
+which is the disposition step 2 would have selected had its answer been read.
+
+Two things were checked while writing the rule rather than assumed.
+`hooks/warn-pr-create-without-dupe-check.py` matches `gh pr create`,
+`glab mr create`, and `mcp__github__create_pull_request`, and nothing else.
+`grep -rln 'issue create\|create_issue\|issue_write' hooks/*.py` returns
+eight files: `no-empty-promise.py`, `no-unauthorized-merge.py`,
+`no-unfiled-finding.py`, `no-unshipped-commit.py`, and the four matching
+`test-*.py` counterparts.
+None of the four guards a create against a missing or unread dupe-check ---
+three of them read filing as a *discharge*, and `no-unauthorized-merge.py`
+only mentions the phrase in a comment about heredoc quoting.
+And that hook's `transcript_has_dupe_check()` walks prior `tool_use` blocks
+for a lexical match on `gh pr list`/`view`/`status` or `gh search prs`, with a
+deliberately session-wide discharge, so even on the PR side it establishes
+that a query ran and never that its result was consulted.)

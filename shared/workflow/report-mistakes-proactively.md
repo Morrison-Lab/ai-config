@@ -117,31 +117,77 @@ protects the machine it was written on and no other.
 Treat it as a backstop for your own setup rather than as a reason to relax the
 rule, since every other session still runs on the prose alone.
 
+## Handing the filing decision to a named third party is the same offer, aimed away from the reader
+
+The two sections above rule out asking the **user** for permission, standalone or bundled.
+A third form asks nobody, and that is what makes it survive both: it assigns the decision to a person who is not in the conversation.
+
+> Flagging for the reviewer's call on whether it warrants a follow-up issue.
+
+Read that as an offer with the request removed and the recipient replaced.
+It shares the declarative form's defect exactly -- nothing durable exists afterwards -- and adds a distinct one of its own.
+The declarative form names no recipient at all, so nobody is left holding anything.
+This form names one, which reads as having routed the decision somewhere.
+But a reviewer named in a PR comment may never read that comment, and will not read it as a request if they do.
+An unrouted decision at least looks unrouted.
+
+It is the hardest of the three to catch from the inside, because deferring to a reviewer's judgment is a **virtue** nearly everywhere else in this corpus.
+[`address-every-comment`](address-every-comment.md) and [`fully-clean`](fully-clean.md) both insist that a reviewer's finding is theirs to close rather than yours.
+Escalating a genuine impasse to a human is the prescribed move.
+So the sentence pattern-matches to deference at composition time, and the question of whether anything got recorded never comes up.
+
+The discriminator is what is being deferred, and it is the same split "Filing is not gated on approval" already draws for the user:
+
+- **Whether to act on a finding** is genuinely the reviewer's call, and saying so is correct.
+- **Whether to record it** is not anyone's call, because recording is the reversible half.
+
+Those two live in one sentence and read as one question.
+Separate them: file it, then defer the part that is actually theirs.
+
+> Filed as #1379.
+> Whether it is worth acting on is still open.
+
+Note that the paragraph carrying this is usually *longer* and more careful than a bare flag would be -- two readings of the evidence, an argument that the data does not distinguish them, an invitation to judge.
+That thoroughness is the camouflage.
+A finding described in that much detail feels handled by the description alone, which is precisely the reading this fragment exists to refuse.
+
+- **Do:** file first, then hand the reviewer the decision that is theirs -- whether to act.
+- **Do:** treat a sentence that names *anyone* as the decider of whether to track something as an unfiled finding, whoever it names.
+- **Don't:** read deference as discharging this --- the deference is real, and aimed at the wrong half of the question.
+- **Don't:** let the length of the write-up stand in for the durability of the record.
+
+`hooks/no-unfiled-finding.py` does **not** yet cover this, and the gap is worth recording because it was invisible from the one case that produced the section.
+Its patterns are keyed on filing-intent vocabulary -- `worth`, `needs`, `deserves`, `warrants` -- which the original phrasing happened to carry.
+Every other spelling of the same structure walks straight past it:
+
+```text
+Flagging for the reviewer to judge whether this belongs in the tracker.
+I'll defer to the reviewer on whether to open an issue for this.
+Leaving it to the reviewer's discretion on whether this is worth pursuing an issue.
+Deferring to the maintainer on whether this needs tracking.
+```
+
+So a guard matching one instance of a class is not a guard on the class, and "the existing hook already catches this" is a claim to test against fresh phrasings rather than against the case in hand.
+
+Widening it is tracked in [ai-config#2017](https://github.com/Morrison-Lab/ai-config/pull/2017), separately and deliberately.
+The rule above stands on its own and does not depend on the guard: a mechanized check is what makes a rule cheap to obey, never what makes it true.
+That separation is worth stating rather than leaving implicit, because the reverse reading -- that an unmechanized rule is somehow provisional -- is what turns a hard guard into a reason to stop writing the rule down.
+
 ## Offering to hand over work you have already finished
 
-The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers
-any offer to do already-authorized work and carries the `Stop` hook this
-section anticipates.
+The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers any offer to do already-authorized work and carries the `Stop` hook this section anticipates.
 This section is the sharpest instance of it: the artifact already exists.
 
-Both sections above concern work not yet done, where the offer at least
-proposes spending something.
-The version that survives them offers an artifact that **already exists**:
-the comment is drafted, the file is written, the diff is staged --- and the
-reply says "say the word and I'll post it" rather than posting it.
+Both sections above concern work not yet done, where the offer at least proposes spending something.
+The version that survives them offers an artifact that **already exists**: the comment is drafted, the file is written, the diff is staged --- and the reply says "say the word and I'll post it" rather than posting it.
 
 It is the most defensible-feeling offer of the three and the emptiest.
-The two asymmetries in "Filing is not gated on approval" both collapse here,
-because the cost side is zero: there is no duplicate work to risk and no
-spend to authorize.
+The two asymmetries in "Filing is not gated on approval" both collapse here, because the cost side is zero: there is no duplicate work to risk and no spend to authorize.
 The only thing the offer purchases is a round trip.
 
 Two things make it feel like courtesy rather than avoidance.
-The work being done drains the urgency --- nothing is outstanding from the
-inside, so holding it reads as consideration for the user's attention rather
-than as withholding.
-And the artifact is usually sitting in a scratch file, which feels like
-*somewhere*, so it does not feel at risk.
+The work being done drains the urgency --- nothing is outstanding from the inside, so holding it reads as consideration for the user's attention rather than as withholding.
+And the artifact is usually sitting in a scratch file, which feels like *somewhere*, so it does not feel at risk.
 It is: a scratch file dies with the container, and the user cannot read it.
 An artifact nobody has been shown has the same value as one never written.
 
@@ -197,6 +243,75 @@ the API actually returned.
 - **Don't:** predict an issue number, however obvious the next one looks.
 - **Don't:** announce "filed as #N" while the dupe-check is still outstanding
   --- that asserts the new-issue outcome before anything has decided it.
+
+## A dupe-check chained into the same call as the create gates nothing
+
+The section above rules out announcing step 2's outcome before step 2 has
+decided it.
+This one rules out the opposite shape, where step 2 genuinely runs and its
+answer is never consulted, because the search and the `gh issue create` it
+gates were placed in **one** Bash call:
+
+```bash
+gh issue list -R O/R --state open --search "..." --json number,title
+gh issue create -R O/R --title "..." --body-file /tmp/body.md
+```
+
+Both commands execute.
+The search returns its match, and the create runs anyway.
+Nothing can branch on a result that arrives at the same instant as the action
+it was supposed to gate, so the check is decorative.
+
+The near-miss is what makes this worth stating, because the check is not
+skipped.
+It is written, it appears in the transcript, and it returns the right answer,
+so a reply asserting that the tracker was searched is true as far as it goes.
+What is missing has no moment attached to it.
+There is no point in the sequence where a step was dropped, only a call
+boundary that was never drawn --- which is why re-reading step 2 does not
+prevent this, and why it reads as compliance from the inside.
+It also defeats review by transcript, since a compliant session and this one
+emit the same two commands in the same order.
+
+**The general form is what to carry away, because filing is only one
+instance.**
+Any rule of the shape "search first, then act" fails identically: the open-PR
+check before `gh pr create`, a reviewer-reachability read before a dispatch,
+the fresh `git ls-remote` that
+[`check-before-pushing`](check-before-pushing.md) requires immediately before
+every push.
+Each becomes decorative the moment it shares a call with what it gates.
+
+[`pr-on-claim`](pr-on-claim.md) already states the structural sibling for one
+command: the Copilot `requested_reviewers` POST must be the sole, or last,
+command in its Bash call, so that a `Stop` hook can tell whether it ran.
+The reason here is different and stronger.
+There the reader is a hook, and separability is enough.
+Here the reader is you, so the query has to **finish in its own call**, with
+its output in front of you, before the gated command is composed at all.
+
+**The existing instrument does not reach this, so do not expect a warning.**
+`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create`,
+`glab mr create`, and `mcp__github__create_pull_request`, and no
+`gh issue create` counterpart exists anywhere in `hooks/`.
+Its discharge is a session-wide lexical scan of the transcript for any earlier
+PR-surfacing command, so it asks whether a query happened rather than whether
+its result was read --- which is the distinction this section is entirely
+about.
+
+- **Do:** run the gating query in its own call, read its result, and only then
+  run the action it gates.
+- **Do:** treat the call boundary as where the decision gets made, since that
+  is the only point at which a result exists to decide on.
+- **Don't:** chain a dupe or precondition check and the action it gates into
+  one Bash call --- the check runs and gates nothing.
+- **Don't:** read "the search is in the transcript" as evidence it was
+  consulted.
+  A compliant session and this one look identical there.
+
+See
+[`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md),
+"A dupe-check chained into the same call as the create".
 
 ## Where to file
 

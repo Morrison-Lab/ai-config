@@ -114,7 +114,46 @@ UMS_PATH = re.compile(
     r"(memories?/|MEMORY\.md|CLAUDE\.md|/skills/|^skills/|/shared/|^shared/)",
     re.I,
 )
-UMS_WORD = re.compile(r"\bums\b|update\s+memories|record[- ]learnings|memorize", re.I)
+# `\b` is the wrong boundary for a bare action word here: this pattern is
+# applied to Bash COMMAND TEXT, and `-`, `/`, and `.` are all non-word
+# characters, so `\bums\b` matched inside
+# `cat shared/workflow/run-ums-proactively.md` -- reading the fragment that
+# states the UMS rule discharged the reminder to follow it (ai-config#1965).
+# The hook fails open, so that discharge was silent.
+#
+# `.` is deliberately NOT excluded on its own. Rejecting a bare dot would also
+# reject a sentence-final period, so `run ums.` -- the commonest phrasing in a
+# dispatch prompt -- would stop matching. What marks a path is a dot with a
+# word character AFTER it (`ums.md`), not a dot at a full stop.
+#
+# Same idiom as hooks/no-empty-promise.py's SKILL_WORD, which diagnosed this
+# first; keep the two spellings identical.
+# A leading `/` needs splitting apart, because it plays two roles. In a
+# PATH (`skills/ums`, `./ums-helper`) it is a separator and must block
+# the match; as a slash-COMMAND (`/ums`, `/memorize`) it is how this
+# corpus spells the invocation, and blocking that loses a real
+# discharge. What separates them is the character BEFORE the slash: a
+# path has a word character or a dot there, an invocation has
+# whitespace or nothing. So reject `/` only in that context.
+# (Review finding on ai-config#1968: the first spelling, `(?<![\\w/-])`,
+# rejected both, silently dropping `/ums` as a discharge.)
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+
+# `update\s+memories` is the one alternative left unguarded, and deliberately.
+# It cannot match a path, because the hyphen form (`update-memories-and-skills`,
+# the skill alias) has no whitespace in it. What it CAN match is
+# `update memories/git.md` in a dispatch prompt -- which is a genuine UMS
+# instruction, so a `_NOT_PATH_END` here would cost a true positive rather
+# than removing a false one. The guard is applied where the word alone is
+# ambiguous, not everywhere it would parse.
+UMS_WORD = re.compile(
+    _NOT_PATH + r"ums" + _NOT_PATH_END +
+    r"|update\s+memories"
+    r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
+    re.I,
+)
 
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(r"^\s*>.*$", re.M)

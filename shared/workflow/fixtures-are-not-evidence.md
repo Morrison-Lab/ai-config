@@ -479,3 +479,151 @@ reach back *to*, and it passed against code that could not reach back at all.
 The reviewer identified it precisely --- "the fixture likely only exercised two
 declarations with nothing substantive before them" --- and the replacement
 fixtures each place a real answer behind the run.)
+
+**A fixture can also reach the expected outcome by a second route, and the
+revert check above is what exposes that one.**
+The section above concerns a fixture too thin to exercise the bug.
+This one concerns a fixture rich enough to exercise it, paired with an
+assertion too coarse to say which route produced the result.
+A row asserting only that an input was refused is satisfied by any refusal, so
+a setup carrying an unrelated reason to refuse scores green against the fix and
+against a mutant with the fix removed.
+
+The confounding setup is the natural one to write, which is why foresight alone
+does not reach it.
+A row testing that a guard resolves `--repo=origin` against that remote's
+configuration invites naming the remote `origin`, which is also the literal the
+unfixed code falls back to.
+Both readings then find the same configuration key and refuse.
+
+**The durable remedy is to assert the reason rather than the outcome bit.**
+Isolating the fixture also works and has to be re-derived by hand for every new
+row, which is
+[`algorithmatize-checks`](algorithmatize-checks.md)'s eighth mutation outcome.
+A row that names the reason it must fail for reports
+`denied, but not for` that reason once a masking setup is restored under a
+mutant, where the bit alone reported a pass.
+
+- **Do:** assert the discriminating detail --- the reason, the message, the
+  resolved value --- on any row whose expected outcome has more than one
+  producer.
+- **Do:** run each new row against a mutant with the fix removed before
+  trusting it, since a realistic setup is the kind most likely to mask.
+- **Don't:** read a green row as coverage when its own setup could have
+  produced that outcome without the code under test.
+- **Don't:** treat isolating the fixture as the whole fix --- it holds only
+  until the next author writes the natural setup again.
+
+(Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911),
+repeatedly within one session on `hooks/test-no-push-without-self-review.py`.
+Regression rows written as `--repo=origin` against `remote.origin.push` passed
+against a mutant with the fix removed, because ignoring `--repo` falls through
+to a literal `origin` and finds the same key.
+Rows for the option abbreviations `--al` and `--re` masked the same way until
+their config was switched to a benign `branch.main.pushRemote`.
+That table now states the reason each row must deny for, and its own docstring
+records that the bit alone cannot tell a working row from a masked one.)
+
+## A row you found vacuous is not fixed by the rewrite that answers it
+
+The section above already requires the mutation run: assert the discriminating detail, and run each new row against a mutant with the fix removed before trusting it.
+Two things it does not say, and they are the two that decide whether that run actually happens.
+
+**The rewrite is the row least likely to get the control, and it is the row that most needs it.**
+Having caught one row scoring green against a mutant, the diagnosis feels like the hard part and the replacement feels like bookkeeping.
+It is the other way round.
+The masking property --- some second route to the same observable --- is a fact about the fixture, not about the spelling that tripped over it, so it survives a rewrite by default.
+And the rewrite is authored by the same understanding that missed it the first time, which is the understanding that just failed on this exact question.
+So a replacement row is unverified until it has failed against the same mutant, and the second spelling failing the control is an ordinary outcome rather than a surprise.
+
+**The forward-looking half is one question: what does the fixture supply for free?**
+The mutation run discovers the masking route afterwards.
+This predicts it, and it costs a sentence.
+A row can only discriminate on a difference the fixture does not already provide by some other path, so name that path before writing the assertion --- a working directory the harness sets, a default the code falls back to, a fallback remote, an environment value the test inherits.
+Where the fixture already supplies the thing the row is trying to vary, the row is asserting a tautology however carefully it is phrased.
+
+Note the interaction with the preceding section's own remedy, since the two are easy to run together and easy to confuse.
+Asserting the **reason** rather than the outcome bit is what makes a row survive a masking setup.
+Asking what the fixture supplies for free is what tells you a masking setup exists, and it can rule out a whole family of spellings before any of them is written.
+Neither replaces the mutation run, which is the only thing that reports on the row you actually wrote.
+
+- **Do:** re-run the mutation control after every rewrite, and treat a replacement row as unverified until it has failed against the mutant.
+- **Do:** name what the fixture supplies for free --- cwd, a default, a fallback, an inherited environment value --- before writing an assertion meant to discriminate on it.
+- **Don't:** read having diagnosed a vacuous row as having fixed it.
+  The diagnosis and the replacement are separate claims, and only the second one ships.
+- **Don't:** vary a quantity the fixture already provides by another path and expect the row to discriminate, however precisely the assertion is worded.
+
+(Measured 2026-08-22 on [ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), **unmerged** at the time of writing, on `hooks/test-no-push-without-self-review.py`.
+A row was written to establish that the guard's directory-hint scan resolves a push the same way its primary parser does, both going through the sibling detector rather than through a literal `git push` prefix match.
+A mutant with that call site reverted made the row pass.
+It was rewritten, and the rewrite was vacuous against the same mutant.
+Only the third spelling discriminated.
+
+What the fixture supplied for free is `cwd`: the harness runs the hook with its working directory set to the fixture repo (`cwd=REPO` in `run_hook`), so a directory hint naming that same repo is indistinguishable from no hint, and a row carrying no verdict denies either way.
+Only a row that changes directory to the harness's *second* repo and carries a clean verdict separates the two builds, because only then does losing the hint change the answer.
+
+At that PR's branch head `51be639e` the suite is still vacuous on this point, measured here rather than recalled:
+
+```
+$ sed '433s/_SIBLING and _SIBLING._argv_push(rest)/_SIBLING and rest[:2] == ["git", "push"]/' \
+    hooks/no-push-without-self-review.py > hooks/mut-hint-naive.py
+$ python3 hooks/test-no-push-without-self-review.py hooks/mut-hint-naive.py
+All 169 cases passed
+```
+
+The mutant is faithful and behaviourally different --- `_hints_by_position("cd /other && git -C /elsewhere push")` returns `['/other']` under the original and `[]` under it --- so the zero is a measurement rather than an inapplicable mutation.
+A discriminating spelling may exist unpushed.
+What is measured here is the pushed head.)
+
+## A fixture that models the wrong record SHAPE makes a carve-out look covered while it is inert
+
+Every case above is about a fixture whose *content* was wrong --- too thin to
+reach a branch, or asserting the buggy output.
+This one is about a fixture whose **shape** was wrong, and it is harder to see
+because the shape is the very thing the fixture exists to stand in for.
+
+A guard reading a transcript needs to know what a record looks like.
+Its fixtures encode that belief.
+So when the belief is wrong, the fixtures are wrong in exactly the way that
+makes them agree with the code: both were written from the same guess, the
+suite is green, and the mechanism the fixtures describe **does not exist**.
+
+Nothing internal can catch it.
+The tests pass, the code is self-consistent, and a reviewer reading both sees a
+covered feature.
+Only the real artifact settles it --- which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s point arriving one
+level down, at the fixture rather than at the claim.
+
+So when a guard consumes a machine-produced artifact, read one **real** artifact
+before trusting any fixture of it, and say in the fixture where the shape came
+from.
+A fixture whose docstring cites a live sample is checkable; one that cites
+nothing is a guess with tests around it.
+
+- **Do:** dump a real record and copy its shape into the fixture, citing the
+  date and source.
+- **Do:** treat "the carve-out has a passing test" as evidence about the
+  fixture until you have seen the real shape.
+- **Don't:** infer a record's shape from how the surrounding code reads it ---
+  that is the same guess twice, and their agreement measures the guess.
+- **Don't:** count a green suite as evidence a carve-out fires; an inert branch
+  and a correct one are both green.
+
+(Measured 2026-08-22 on
+[ai-config#1917](https://github.com/Morrison-Lab/ai-config/issues/1917) /
+[#1925](https://github.com/Morrison-Lab/ai-config/pull/1925).
+`no-unmeasured-clock-claim.py` carried a deliberate carve-out so that quoting
+the harness's just-injected clock reading would not trip it, and a fixture named
+"quoting the harness's just-injected reading is exactly what the rule says to do"
+asserted it.
+Both modelled the reading as a bare-string `user` turn.
+A live transcript shows it is not a user record at all: it is its own record,
+`type: "attachment"`, carrying the text under `attachment.content` /
+`attachment.stdout`, with neither a `message` nor a top-level `content` --- so
+the scan skipped it and the carve-out never fired, while its test passed.
+The reviewer on [#1919](https://github.com/Morrison-Lab/ai-config/pull/1919)
+raised the possibility and explicitly could not settle it from the fixtures,
+which is the shape of the problem in one sentence.)
+

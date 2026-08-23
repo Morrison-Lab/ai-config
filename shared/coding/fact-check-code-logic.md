@@ -237,7 +237,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Six distinct mechanisms can make a test pass against the reverted fix:
+Seven distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -257,19 +257,31 @@ Six distinct mechanisms can make a test pass against the reverted fix:
 - **Misleading label.**
   The test name or comment says one property is under test
   while the assertion checks another.
+- **Rejected payload.**
+  The sharpest form of the earlier-guard case:
+  a parsing or validation layer in front of the code under test
+  refuses the fixture outright, so nothing under test runs at all.
+  It is likeliest when the defect is input-shaped,
+  since the payload has to be malformed to reach the bug,
+  and malformed is what the layer above rejects it for.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all six can still be green,
+A suite with all seven can still be green,
 and coverage can still report the lines as exercised.
 Only the mutation answers whether the assertion depends on the fix.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
+- **Do:** make "the fixture arrived" an assertion in its own right ---
+  a parse step's return value, a counter, a log line ---
+  rather than a thing you satisfied yourself of once by reading the code.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
+- **Don't:** read a green guard as one whose subject ran.
+  A payload rejected upstream and a working fix are the same observable.
 
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 
@@ -574,6 +586,103 @@ A sentence that would still read true with the parameter deleted is explaining t
 Caught as a non-blocking review note.
 Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
+## A rationale can be false while the code it justifies is correct
+
+The section above covers a docstring that is **true and incomplete**.
+This is a related but distinct failure: a comment, docstring, or PR rationale
+that is **explicitly false**, sitting beside code that works.
+The contrast is omitted mechanism versus incorrect explanation, and it is
+worth keeping sharp, because a rationale that merely *understates* how
+something works belongs to that section rather than this one.
+
+The pairing matters because the two are told apart only by checking, and
+nothing about either one feels like a claim while you are writing it.
+A rationale is written in the same breath as the code, from the same
+understanding, and it inherits the code's air of having been verified ---
+the code was tested, so the sentence about the code feels tested too.
+It was not.
+Tests exercise behaviour, and a rationale is a claim about *why* the behaviour
+holds --- so an ordinary behavioural test can pass with the explanation still
+false.
+
+The failure has a signature worth learning:
+
+- **The artifact is right, so nothing fails.**
+  No check goes red and no output is wrong, so the defect is invisible to the
+  behavioural checks a change normally runs.
+- **The claim is checkable in seconds**, and usually by a command adjacent to
+  what you already ran --- reading the function's documented defaults, grepping
+  the file you cited, checking which commit introduced a line.
+- **It survives review** unless a reader independently verifies the claim,
+  because the natural review question is whether the code works.
+
+**A rationale that reasons about defaults is particularly easy to get wrong**,
+because the default is the thing you did not write and therefore did not think
+about.
+"Safe here, because the caller validates the input" is false when the caller
+validates nothing and the safety comes from a filter further upstream ---
+and note that the code is still safe, which is what makes it an instance of
+this pattern rather than of a bug.
+Deleting the sentence would leave a correct program; keeping it teaches the
+next reader to protect the wrong invariant.
+Read the signature and the call site rather than the intent.
+
+The check is one question per justifying sentence:
+**what command would show this false?**
+If a command exists and takes seconds, run it before the sentence ships.
+If none exists, the sentence is not a rationale but a guess, and should be
+written as one.
+
+- **Do:** run the deriving command for a rationale's factual claim --- the
+  documented defaults, the introducing commit, the cited file's text --- and
+  publish it beside the claim where the claim is load-bearing.
+- **Do:** treat a sentence explaining *why* code is correct as unverified until
+  checked, however thoroughly the code itself was tested.
+- **Don't:** let a rationale inherit the code's credibility --- the tests
+  covered the behaviour, never the explanation.
+- **Don't:** reason about a call's semantics from its intent when its
+  **defaults** decide them.
+
+**Not decidable by a guard, though partly checkable by hand.**
+The condition is "a sentence asserting why code behaves as it does is false",
+and deciding it means evaluating the claim against the world, which no
+transcript-scoped trigger can do.
+A cue-word proxy --- `because`, `so that`, `rather than` --- would carry
+unacceptable error in both directions: it fires on correct rationales that use
+those words, and misses false ones that do not.
+That is a claim about a *truth detector*, not about checkability in general.
+The specific checks named above --- reading documented defaults, grepping a
+cited file, finding the commit that introduced a line --- are exactly the
+mechanical steps that settle individual instances, and they are why this is a
+review question and a self-check rather than a guard.
+
+(Measured 2026-08-21, three instances in one session, each caught by a
+reviewer rather than by any check, and in each the artifact itself was
+correct.
+A fragment's prose about a hook attributed an omitted gate to "earlier fixes
+rather than the original design", where `git log -S` put it in the hook's own
+first PR, ai-config#1566 (ai-config#1860).
+The gate was real and the hook was right; only the sentence about where it
+came from was wrong.
+`fully-clean.md` said a checker "annotates duplicated names automatically",
+where it annotates only the lines it reports, never a passing one ---
+which was the very case the passage illustrated (ai-config#1870).
+And a PR rationale justified a reword by saying "the same entry already uses
+the long form", where the entry used the abbreviation (ucdavis/bcs#725).
+
+A fourth candidate was dropped on review, and the reason is instructive.
+An R helper's comment claimed it used R's own regex engine "rather than
+reimplementing the matching and risking a divergence", while calling `grepl()`
+with defaults that are case-sensitive POSIX ERE, against `.Rbuildignore`
+patterns that Writing R Extensions specifies as Perl-like and
+case-insensitive (ucdavis/bcs#720).
+That looks like this section's pattern and is not: the **code** diverged from
+the semantics it was implementing, so the artifact was not correct, and the
+sentence stayed arguably true while omitting which mode was selected ---
+which is the preceding section's failure, not this one's.
+The test of membership is whether the artifact would still be right once the
+sentence were deleted.)
+
 ## What to report
 
 For each issue found, state:
@@ -655,3 +764,50 @@ revert each one flip a case rather than nothing.
 - **Don't:** read "the computation is right now" as the change being finished.
 - **Don't:** rely on an adjacent-comment guard for this; its window is ten
   lines and one file, and these sites are neither.
+
+## Replacing a mechanism: enumerate what the OLD one handled, not what the new one adds
+
+Swapping one implementation for another is not the same review problem as writing one.
+The new code gets read on its own merits and looks better, because it *is* better along the axis that motivated the swap.
+The set of cases the old one handled and the new one does not is absent from the replacement by construction, so reading the new code cannot surface it.
+
+The tell is a justification that enumerates **only the gains**.
+A comment or commit message listing three ways the replacement is superior, with nothing about what it gives up, is not a summary of the trade.
+It is one side of a ledger presented as the whole.
+It reads as thorough precisely because it is specific.
+
+So derive the old one's coverage from the old one's own source and check each case against the new one.
+Where the code being replaced is itself a pattern, that pattern is the enumeration: a regex's alternations, a table's keys, a dispatch dict's entries.
+Turn each entry into a test case, so the coverage claim is asserted and not merely reasoned about.
+
+The enumeration disappears from the working tree when the change lands, which is what makes the loss feel permanent --- but it is still in history.
+`git show <pre-change-commit>:<path>` prints it.
+Finding that sha is the only fiddly part, and it is worth saying plainly that it is **not** always the commit before the PR: a replacement landing mid-PR has its own predecessor inside the same branch.
+Derive it rather than assuming.
+`git log --oneline -- <path>` names the commits that touched the file, and the one before the swap is the one to read --- but check how the repo merges before trusting that list, because a squash-merging repo collapses a PR to a single commit and the mid-PR predecessors never appear in it.
+Where that is the case, reach them by sha through the PR's own ref, which a default clone does not fetch --- and note that fetching it is only half the route.
+`git fetch origin refs/pull/<n>/head` writes `FETCH_HEAD` and no persistent ref, and a bare `git log --oneline -- <path>` still walks `HEAD`, so it lists the same squash it listed before.
+Name the ref you just fetched: `git log --oneline FETCH_HEAD -- <path>`.
+Fetch into a durable ref (`refs/pull/*/head:refs/remotes/pr/*`) if you want it to survive the next fetch.
+
+This is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s "mirror failure" section pointed at a **replacement** rather than at a sibling.
+That one governs a new check written *beside* an existing one, where the guards to mine are still in the tree.
+Here they are in the diff's own deleted lines.
+[`challenge-redundant-content`](../workflow/challenge-redundant-content.md)'s "inverse failure" section is the third case, where consolidation *gains* a trigger rather than losing one.
+
+Measured 2026-08-22 on [ai-config#1932](https://github.com/Morrison-Lab/ai-config/pull/1932).
+A regex push-detector in a `PreToolUse` hook --- at the time of writing on that PR's branch rather than on `main` --- was replaced by the shell-parsed detector from a sibling hook, correctly, on the DRW grounds the replacing comment itself cited.
+That comment block named three cases the new detector handled better --- `git -C <dir> push`, `git -c k=v push`, and excluding the two forms that re-head nothing --- and none of the cases it dropped.
+The deleted `KEYWORD_PREFIX` alternation had covered twelve shell prefixes, and the deleted `GIT_PROG` pattern had covered an unexpanded `$GIT` or `${GIT}` program token.
+The detector stopped recognizing those forms, so a push written that way was not treated as a push at all and passed the guard unexamined --- among them a `for ... do` retry loop, an `if !` or `while !` guard, a brace group, a bare `!`, and a `sudo` prefix.
+Later rounds restored them, and the restoring comment says outright that dropping them "was a REGRESSION rather than a simplification".
+The alternation listing all twelve was in the deleted lines the whole time.
+
+- **Do:** read the replaced code for its case list, and check the replacement against each one.
+- **Do:** add a test per entry in that list, so the recovered cases are asserted and not argued.
+- **Do:** derive the pre-change sha from the file's own history where the repo's merge style preserves it, and from the PR ref where it does not --- never assuming it is the PR's base.
+- **Do:** state what the swap gives up alongside what it gains, even when the answer is nothing --- an explicit "nothing" is checkable and an omission is not.
+- **Don't:** accept a justification that lists only improvements.
+  The cases it is silent about are the ones nobody will look for.
+- **Don't:** read a passing suite as covering the difference.
+  The suite was written against the old behaviour's *intent* rather than its edges, so a dropped case usually has no test until you write one.

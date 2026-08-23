@@ -110,9 +110,38 @@ _ums = _sibling("remind-ums-after-error.py")
 # sibling's UMS_PATH (a plain corpus-file write) is deliberately NOT reused as
 # a discharge here -- see the docstring, "the fix itself does not discharge".
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
+# The fallback must stay byte-identical in behaviour to the sibling's own
+# UMS_WORD, including its path guard: `\b` matched inside
+# `cat shared/workflow/run-ums-proactively.md`, so a READ discharged this
+# reminder too (ai-config#1965). See that sibling for why `.` is excluded only
+# when a word character follows it.
+# A leading `/` needs splitting apart, because it plays two roles. In a
+# PATH (`skills/ums`, `./ums-helper`) it is a separator and must block
+# the match; as a slash-COMMAND (`/ums`, `/memorize`) it is how this
+# corpus spells the invocation, and blocking that loses a real
+# discharge. What separates them is the character BEFORE the slash: a
+# path has a word character or a dot there, an invocation has
+# whitespace or nothing. So reject `/` only in that context.
+# (Review finding on ai-config#1968: the first spelling, `(?<![\\w/-])`,
+# rejected both, silently dropping `/ums` as a discharge.)
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+
+# `update\s+memories` is the one alternative left unguarded, and deliberately.
+# It cannot match a path, because the hyphen form (`update-memories-and-skills`,
+# the skill alias) has no whitespace in it. What it CAN match is
+# `update memories/git.md` in a dispatch prompt -- which is a genuine UMS
+# instruction, so a `_NOT_PATH_END` here would cost a true positive rather
+# than removing a false one. The guard is applied where the word alone is
+# ambiguous, not everywhere it would parse.
 UMS_WORD = getattr(
     _ums, "UMS_WORD",
-    re.compile(r"\bums\b|update\s+memories|record[- ]learnings|memorize", re.I))
+    re.compile(
+        _NOT_PATH + r"ums" + _NOT_PATH_END +
+        r"|update\s+memories"
+        r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
+        r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
+        re.I))
 
 # Accepting a reviewer's finding. Deliberately the AGREEMENT vocabulary only: a
 # Rebut ("the review is wrong") is the opposite disposition and must never fire

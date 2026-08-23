@@ -220,7 +220,7 @@ which says what is meant and is immune to the flag.
 and a blockquote alternative of `^\s*>.*$`.
 It deleted every character after the first `>` line,
 so any real assertion following a quoted one went unexamined.
-Twenty-seven tests passed.
+The suite passed, all thirty-three cases of it.
 A reviewer found it and suggested `^[ \t]*>[^\n]*$`;
 that plus a regression test -- a genuine unquoted assertion following a blockquote --
 is what shipped.)

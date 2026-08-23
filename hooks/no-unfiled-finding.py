@@ -50,30 +50,45 @@ ASSERT = [
     # deferral CONSTRUCTION, a named party, and a tracking word in the same
     # sentence.
     #
-    # The construction is what carries the deferral, not the bare verb. "I left
-    # the reviewer a note about the tracking issue" contains a verb, a party
-    # and a tracking word, and defers nothing.
+    # The construction is the hard part, and three spellings of it were tried
+    # and rejected before this one. Each failed for the same underlying reason:
+    # they treated the words between the verb and the connector as a WILDCARD,
+    # and then tuned its width.
     #
-    # What separates the two is WHERE the connector sits, not whether one
-    # exists. In a deferral the connector precedes the party -- "leave this
-    # decision TO the reviewer" -- while in note-leaving the party is the
-    # verb's own indirect object and arrives first: "leave THE REVIEWER a
-    # note". So the connector is required BETWEEN the verb and the party, and
-    # the gap before it is left open enough for an ordinary noun-phrase object
-    # ("this decision", "the call", "judgment", "that choice", "this concern").
+    #   1. Connector required immediately after the verb. Killed "left the
+    #      reviewer a note" and also every real deferral with a noun-phrase
+    #      object -- "leave THIS DECISION to the maintainer".
+    #   2. Bare pronoun (it/this/that) allowed in the gap. Same failure, one
+    #      noun phrase later.
+    #   3. Any short wildcard gap, with the connector required BEFORE the
+    #      party. That admits the benefactive: `to`/`for` is ambiguous in
+    #      English between the deferral sense ("leave this decision TO the
+    #      reviewer") and the dative/benefactive one ("leave a note FOR the
+    #      reviewer"), which is the same sentence as "leave the reviewer a
+    #      note" with the recipient moved. Both have the identical surface
+    #      shape verb ... to/for ... party ... tracking-word, so no width of
+    #      wildcard separates them.
     #
-    # Two narrower spellings were tried and both dropped true positives:
-    # requiring the connector IMMEDIATELY after the verb, and allowing only a
-    # bare pronoun (it/this/that) in between. Each killed the note-leaving
-    # false positive and each silently stopped matching a natural deferral, so
-    # the ordering test above is what actually discriminates.
+    # What separates them is WHAT IS BEING HANDED OVER. You defer a DECISION
+    # and you leave a NOTE, so the object is named rather than matched: an
+    # explicit allowlist of decision nouns, or nothing, or a bare pronoun.
+    # An artifact noun (note, comment, message) simply is not in it, and needs
+    # no exclusion rule of its own.
+    #
+    # The cost is false NEGATIVES on an unusual phrasing, which is the right
+    # direction for this guard: a missed nag costs a finding that was probably
+    # filed anyway, while a false nag on ordinary prose is what gets a guard
+    # switched off and takes the real cases with it.
     #
     # The tracking word is what keeps "whether to act on this is the reviewer's
     # call" out of scope -- only whether to RECORD is nobody's call to defer.
     # It lists nouns of RECORD only: `pursuing` was tried here and removed,
     # since deferring whether something is worth pursuing is an ACTION decision
     # and is exactly what this section says is correctly theirs.
-    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left|flag(?:ging)?)\b[^.!?]{0,30}?"
+    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left|flag(?:ging)?)\s+"
+    r"(?:(?:it|this|that)\s+)?"
+    r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
+    r"(?:decision|call|judgment|judgement|choice|question|matter|concern)?\s*"
     r"\b(?:to|for)\b[^.!?]{0,15}?"
     r"\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",

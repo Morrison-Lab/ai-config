@@ -106,6 +106,17 @@ CASES = [
     # later in the sentence. The party arrives BEFORE the connector there.
     ([say("I left the reviewer a note pointing to the tracker.")], False,
      "a trailing `to` after the party is not a deferral construction"),
+    # Claude review, ai-config#2007 round 4: `to`/`for` is ambiguous between the
+    # deferral sense ("leave this decision TO the reviewer") and the benefactive
+    # one ("leave a note FOR the reviewer" = "leave the reviewer a note"). Both
+    # have the identical surface shape, so no wildcard width separates them --
+    # what does is WHAT IS HANDED OVER. You defer a decision and you leave a note.
+    ([say("I left a note for the reviewer about the tracking issue.")], False,
+     "benefactive `for`: the dative-shifted form of the note-leaving case"),
+    ([say("I left a comment for the maintainer on the follow-up issue.")], False,
+     "the same shape with a different artifact noun"),
+    ([say("Leaving a message for the team about the tracker.")], False,
+     "present participle, still an artifact rather than a decision"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

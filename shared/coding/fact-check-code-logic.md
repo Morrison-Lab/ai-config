@@ -683,6 +683,59 @@ which is the preceding section's failure, not this one's.
 The test of membership is whether the artifact would still be right once the
 sentence were deleted.)
 
+## A reported digit finer than its Monte Carlo error is a claim about precision
+
+A simulation estimate arrives with a standard error, and the number of digits
+you print asserts that the estimate resolves them.
+It usually does not, and the check is arithmetic: compare each reported digit
+against the MCSE sitting in the same table you read the estimate from.
+
+**Where a closed form exists, it supplies the values and the simulation
+validates it.**
+The two answer different questions.
+The simulation establishes *that* a derivation describes the system; once it
+does, the derivation supplies the numbers, because it carries no Monte Carlo
+error and the estimate does.
+Reporting the estimate at that point throws away precision the derivation
+already gave you, and rounds noise into the last digit as though it were
+signal.
+
+The instinct that produces this is worth naming, because it sounds like
+rigour: a measurement feels more honest than an argument, since it came from
+the system rather than from reasoning about the system.
+That is true of *whether* the relation holds and false of *what its values
+are*.
+
+Look for the closed form before reaching for replicates, too.
+A generator assembled from standard pieces --- a beta-binomial draw, a
+mixture, a deterministic map --- usually has one by construction, and finding
+it is cheaper than the simulation that would estimate it.
+
+- **Do:** compare every reported digit against its own MCSE before publishing.
+- **Do:** report derived values and cite the measurement as corroboration,
+  once a closed form fits.
+- **Do:** ask whether the quantity has a closed form before designing a
+  simulation to estimate it.
+- **Don't:** round a noisy estimate to three digits because it is "what was
+  measured" --- the rounding asserts a precision the estimate does not have.
+- **Don't:** treat a measurement as the more conservative choice; where a
+  derivation is available, it is the less precise one.
+
+(Measured on
+[ucdavis/matt.contracts#2](https://github.com/ucdavis/matt.contracts/pull/2),
+2026-08-23.
+A generator's realized ICC was reported as 0.011 / 0.018 / 0.032 from 12
+replicates.
+The relation is exactly derivable ---
+`((1-p)/(2-p)) * (rho + (1-rho)/m)`, which is `0.0037234 + 0.1452128*rho` at
+the parameters in use --- and three published figures were wrong against it:
+0.032 for 0.032766, and ratios of 4.5 and 6.2 for 4.552 and 6.104.
+The MCSE on the third of those was 0.00084, so the estimate could not resolve
+the digit that was printed, and that MCSE was in the same table the estimate
+came from.
+Tracked as
+[ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)
+
 ## What to report
 
 For each issue found, state:

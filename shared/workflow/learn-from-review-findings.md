@@ -253,6 +253,11 @@ Ask which single change is sufficient, and drop the rest.
 Round 2's narrowing was itself over-narrowed: requiring the connector to sit immediately after the deferral verb dropped every phrasing with a real noun-phrase object between them ("leave this decision to the reviewer", "flagging this concern for the maintainer"), which round 3 had to restore.
 Both corrections shared a root the first one did not name: I was testing **adjacency** when the discriminator was **order** -- in a deferral the connector precedes the party, and in the innocent construction the party is the verb's indirect object and arrives first.
 So an over-correction is often a sign that the discriminator itself is wrong rather than merely mis-tuned, and re-tuning a wrong discriminator produces another one.
+
+**The tell is mechanical: consecutive fixes that all adjust the same knob.**
+Three rounds on that guard each changed the width of one wildcard -- connector adjacent to the verb, then a bare pronoun allowed, then a short gap -- and a fourth round found why none could work.
+The two senses being separated had the identical surface shape, so no width of wildcard could ever distinguish them; what separated them was the identity of one word, and the fix was to enumerate that word's allowed values rather than to match around it.
+Count the knob rather than the rounds: two fixes turning the same dial is the signal to ask what the test is measuring, and three is the signal to stop tuning and change its shape.
 That the rule was written, and then broken within the hour by its author, is the ordinary case rather than a surprising one: a rule is consulted at read time and violated at composition time.
 
 **The probe that fired for the wrong reason.**

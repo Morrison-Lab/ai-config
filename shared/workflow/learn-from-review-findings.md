@@ -264,7 +264,15 @@ So the hole was real and my own probe concealed it.
 That is the same failure the mutation rules in [`algorithmatize-checks`](algorithmatize-checks.md) describe, arriving one level out: not a test that never ran, but a test that ran, passed, and proved something other than what it was written to prove.
 A passing probe is evidence only once you know *which* clause made it pass.
 
+**The tests written to prove a narrowing safe must VARY along the axis you narrowed.**
+This is the coverage shape that lets an over-correction ship green, and it is separate from the probe problem above.
+Ten new cases went in with round 2's narrowing, and every one of them used the same sentence shape the narrowing happened to preserve -- a bare pronoun object.
+None used a noun-phrase object, which is precisely what the narrowing broke, so the suite could not see the regression and neither could the cross-vendor reviewer's own run, which passed at that head.
+A suite that grows while staying inside one shape reports coverage and adds none.
+So when a fix restricts what a pattern accepts, ask what the restriction excludes and write a case on the far side of it -- the far side is where the regression lives, by construction.
+
 - **Do:** ask which single change is sufficient for a finding, and ship only that one.
+- **Do:** write at least one case on the far side of any restriction you add, varying the axis the restriction acts on.
 - **Do:** check *which* alternative made a probe fire before reading it as coverage.
 - **Don't:** treat code written in response to a finding as pre-validated --- it is a new diff and gets a new review.
 - **Don't:** conclude a class is covered because one member of it fired.

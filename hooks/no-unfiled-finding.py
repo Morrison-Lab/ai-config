@@ -52,26 +52,30 @@ ASSERT = [
     #
     # The construction is what carries the deferral, not the bare verb. "I left
     # the reviewer a note about the tracking issue" contains a verb, a party
-    # and a tracking word, and defers nothing; requiring `to` (or `for` after
-    # `flag`) is what separates "leaving it TO the reviewer" from "leaving the
-    # reviewer a note".
+    # and a tracking word, and defers nothing.
     #
-    # Past-tense `left` is therefore KEPT rather than dropped. Dropping it was
-    # the first attempt at the note-leaving false positive, and it was the
-    # wrong lever: once `to` is required, "left it to the maintainer ... needs
-    # tracking" is a real deferral the guard must catch, while "left the
-    # reviewer a note" is already excluded by the missing `to`.
+    # What separates the two is WHERE the connector sits, not whether one
+    # exists. In a deferral the connector precedes the party -- "leave this
+    # decision TO the reviewer" -- while in note-leaving the party is the
+    # verb's own indirect object and arrives first: "leave THE REVIEWER a
+    # note". So the connector is required BETWEEN the verb and the party, and
+    # the gap before it is left open enough for an ordinary noun-phrase object
+    # ("this decision", "the call", "judgment", "that choice", "this concern").
+    #
+    # Two narrower spellings were tried and both dropped true positives:
+    # requiring the connector IMMEDIATELY after the verb, and allowing only a
+    # bare pronoun (it/this/that) in between. Each killed the note-leaving
+    # false positive and each silently stopped matching a natural deferral, so
+    # the ordering test above is what actually discriminates.
     #
     # The tracking word is what keeps "whether to act on this is the reviewer's
     # call" out of scope -- only whether to RECORD is nobody's call to defer.
     # It lists nouns of RECORD only: `pursuing` was tried here and removed,
     # since deferring whether something is worth pursuing is an ACTION decision
     # and is exactly what this section says is correctly theirs.
-    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left)\s+(?:it\s+|this\s+|that\s+)?to\b"
-    r"[^.!?]{0,80}\b(reviewer|maintainer|owner|team|human)\b"
-    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
-    r"flag(?:ging)?\s+(?:it\s+|this\s+|that\s+)?for\b"
-    r"[^.!?]{0,80}\b(reviewer|maintainer|owner|team|human)\b"
+    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left|flag(?:ging)?)\b[^.!?]{0,30}?"
+    r"\b(?:to|for)\b[^.!?]{0,15}?"
+    r"\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
     r"\b(reviewer|maintainer|owner|team)(?:'s|s')?\s+"
     r"(call|discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"

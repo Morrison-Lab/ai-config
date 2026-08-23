@@ -87,6 +87,25 @@ CASES = [
      "past-tense deferral construction blocks"),
     ([say("I left it to the reviewer on whether to file a follow-up.")], True,
      "past-tense with a first-person subject blocks"),
+    # Claude review, ai-config#2007 round 3: a NOUN-PHRASE object between the
+    # verb and the connector is a natural way to phrase this, and requiring the
+    # connector immediately after the verb dropped all of it. What discriminates
+    # is ORDER -- the connector precedes the party in a deferral, and follows it
+    # in note-leaving, where the party is the verb's indirect object.
+    ([say("I'll leave this decision to the maintainer regarding the tracking issue.")], True,
+     "a noun-phrase object before the connector still blocks"),
+    ([say("Leaving the call to the reviewer about opening a follow-up issue.")], True,
+     "'the call' as the object, not a bare pronoun"),
+    ([say("Deferring judgment to the maintainer about the tracker entry.")], True,
+     "a bare noun object with no determiner"),
+    ([say("I'll leave that choice to the team about filing this.")], True,
+     "determiner plus noun as the object"),
+    ([say("Flagging this concern for the reviewer regarding the tracking issue.")], True,
+     "the same shape on the flag/for connector"),
+    # The boundary the widened gap must not cross: note-leaving with a `to`
+    # later in the sentence. The party arrives BEFORE the connector there.
+    ([say("I left the reviewer a note pointing to the tracker.")], False,
+     "a trailing `to` after the party is not a deferral construction"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

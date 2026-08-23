@@ -497,7 +497,7 @@ Every rule above concerns a citation that resolves to the wrong thing.
 This one concerns a citation that resolves to **nothing at all**, and it has a shape a careful author walks straight into: writing `#794` in this repo about a PR in another one.
 
 A bare issue or PR reference is interpreted against whatever repository the reader is standing in.
-In the authoring repo it renders as a link to that repo's #794 -- a real, unrelated item -- and in a plain-text read it is just a number.
+In the authoring repo it renders as a link to that repo's own `#794` -- a real, unrelated item -- and in a plain-text read it is just a number.
 Either way the reader cannot reach the thing being cited, and cannot tell a genuine citation from an invented one.
 
 That last part is what makes it worse than an ordinary broken link.
@@ -520,7 +520,7 @@ When the record lives in the *consumer* repo instead, no amount of grepping here
 - **Don't:** read "the numbers are real" as a rebuttal --- a citation the reader cannot follow is defective whether or not its target exists.
 
 (Measured 2026-08-22 on [ai-config#1989](https://github.com/Morrison-Lab/ai-config/pull/1989).
-A hook docstring cited `Lacaedemon/sparta` PRs #794, #861, #866 and #1199 as its dated case record.
+A hook docstring cited Lacaedemon/sparta#794, Lacaedemon/sparta#861, Lacaedemon/sparta#866 and Lacaedemon/sparta#1199 as its dated case record -- written here in the very form this section prescribes, because the bare numbers autolink to unrelated items of THIS repository wherever the file renders.
 All four are genuine, and all four are backed in that repo's own `.claude/skills/sparta-demos/SKILL.md`.
 The review flagged them as "unverifiable / misattributed (possible hallucination)" after grepping this corpus and finding nothing -- correct reasoning from what was available to it.
 Fixed by naming the source repo, document and section rather than by dropping the numbers.)

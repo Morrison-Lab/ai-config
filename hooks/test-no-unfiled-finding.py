@@ -62,6 +62,30 @@ CASES = [
     ([say("Worth an issue; tracked in #897 already.")], False,
      "citing an existing tracking issue does not block"),
 
+    # QUOTATION IS NOT ASSERTION.
+    #
+    # A message about this guard cites its own patterns, and every citation is
+    # an assertion in form and a quotation in fact. Measured repeatedly: a
+    # recap explaining a fix to one alternative was blocked by that
+    # alternative, because the name sat in a code span.
+    ([say("The pattern `warrants a follow-up` already matched on main.")], False,
+     "a pattern name in a code span is a quotation"),
+    ([say("Its alternatives are `worth its own issue` and `needs an issue`.")], False,
+     "two quoted alternatives, no claim about filing anything"),
+    ([say("A reviewer wrote:\n\n> This warrants a follow-up issue.\n\nNoted.")], False,
+     "the assertion inside a blockquote is someone else's"),
+    ([say("Example:\n```\nworth its own issue\n```\nthat is the pattern.")], False,
+     "the assertion inside a code fence is an illustration"),
+    # The boundary: stripping must not swallow a REAL assertion beside a quote.
+    ([say("The `warrants` alternative is fine, but this needs a tracking issue.")], True,
+     "a genuine assertion still blocks when a code span sits beside it"),
+    # The inverse hazard, and the reason a removed block becomes a TERMINATOR
+    # rather than a space. `defect` and `file` here are 400 characters apart
+    # and cannot satisfy the bounded pattern; collapsing the fence to a space
+    # would delete every `.` between them and CREATE the match.
+    ([say("That is a real defect\n```\n" + "x" * 400 + "\n```\nand we should file it later.")],
+     False,
+     "stripping must not bridge a bounded gap it was never meant to close"),
     # Flags that are not issue-shaped must not trip it.
     ([say("FLAG -- #1038 must merge before #1036; they conflict.")], False,
      "a merge-order flag does not block"),

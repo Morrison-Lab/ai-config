@@ -47,6 +47,49 @@ ASSERT = [
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
+# A removed code region is a BOUNDARY, not a gap.
+BLOCK = re.compile(r"```.*?```|^\s*>.*$", re.S | re.M)
+TICK = re.compile(r"`[^`\n]*`")
+
+
+def visible_prose(text):
+    """Drop code regions before matching, substituting a sentence terminator.
+
+    Why strip at all: a message ABOUT this guard cites its own patterns by
+    name, and every such citation is an assertion in form and a quotation in
+    fact. Measured repeatedly -- a recap explaining a fix to one alternative
+    was blocked by that alternative, because the name sat in a code span.
+
+    WHY THIS IS NOT `remind-ums-after-error.py`'s visible_prose
+    ----------------------------------------------------------
+    The sibling has a function of the same name doing what looks like the same
+    job, and importing it rather than writing this was the obvious move. It is
+    wrong here, and quietly so.
+
+    The sibling substitutes a SPACE. This file has a pattern with a bounded
+    gap (`[^.]{0,40}`), and that class excludes `.` precisely so a match
+    cannot reach across a sentence. Collapse a fence to a space and every `.`
+    inside it vanishes, bringing two mentions that were four hundred
+    characters apart into the same window -- so the sibling's stripping would
+    CREATE matches here, the exact inverse of its purpose. It is safe in the
+    sibling only because that file has no bounded pattern for it to bridge.
+
+    Measured on this file's own patterns: a `defect` mention and a `file`
+    mention separated by a 400-character fence do not match raw, DO match
+    under space-substitution, and do not match under the terminator.
+
+    So the shared name marks a shared shape rather than a shared purpose, and
+    the duplication here is deliberate. See
+    shared/workflow/check-purpose-before-reusing.md.
+
+    Inline code becomes a space rather than a terminator, deliberately: a code
+    span sits inside a sentence, so ending the sentence there would split a
+    clause a bounded pattern is entitled to read across.
+    """
+    text = BLOCK.sub(" . ", text)
+    return TICK.sub(" ", text)
+
+
 # Already-filed talk. A message reporting an issue that exists is the
 # CORRECT behaviour and must never be blocked.
 RX_ALREADY = re.compile(
@@ -107,7 +150,7 @@ def main() -> int:
 
     if not text:
         return 0
-    hit = RX_ASSERT.search(text)
+    hit = RX_ASSERT.search(visible_prose(text))
     if not hit:
         return 0
     # The message cites an issue, so the finding is already recorded.

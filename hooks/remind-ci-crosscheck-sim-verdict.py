@@ -2,29 +2,35 @@
 """UserPromptSubmit reminder: a verdict read off a LOCAL sim run owes a CI cross-check.
 
 A deterministic simulation is deterministic per (seed, platform, renderer
-config) -- not across them. Sparta's own demo notes record this repeatedly: a
-local run and CI's transcript agree exactly for hundreds of ticks and then
-diverge, because hundreds of ticks of floating-point soldier-collision physics
-compound differently on another platform.
+config) -- not across them. Hundreds of ticks of floating-point soldier-
+collision physics compound differently on another platform, so a local run and
+CI's transcript agree exactly for a long while and then diverge.
 
-The corpus already teaches that, and scopes it to CAPTIONS and to precise
-per-tick numbers quoted into comments. What it did not say, and what this hook
-exists for, is that the divergence is large enough to **invert a gating
-verdict**. Measured 2026-08-22 on `demos/inputs/relief-fighting-withdrawal.json`
-at one commit and one seed: `uid0 overlap worst=1.611` locally (a FAIL against
-a 2.25 threshold) and `worst=2.432` on CI (a PASS). A decision was published
-off the local number -- a correction of the user's own stated premise, no less
--- and the local number was the wrong one.
+The consumer repo already teaches that, and scopes it to CAPTIONS and to
+precise per-tick numbers quoted into comments. What no site said is that the
+divergence is large enough to **invert a gating verdict**. Measured 2026-08-22
+on `Lacaedemon/sparta`, one clip (`demos/inputs/relief-fighting-withdrawal.json`),
+one seed, one commit: `uid0 overlap worst=1.611` locally -- a FAIL against a
+2.25 threshold -- and `worst=2.432` on CI, a PASS. A decision was published off
+the local number, and the local number was the wrong one.
 
 WHY THIS IS NOT A ONE-OFF, AND SO IS WORTH MECHANIZING
 ------------------------------------------------------
-`shared/principles/deterministic-tools.md` sets a third-occurrence bar for
-building a tool. This class is well past it, by the consumer repo's own dated
-case record: the same trap is logged on PR #794 (2026-07-12), then twice more
-in one session on #861 and #866 (2026-07-15, both caught by a reviewer rather
-than by the author), then again on #1199 (2026-08-05). Every one of those was
-about prose. The 2026-08-22 recurrence moved it into a gating verdict, which is
-strictly worse: prose gets reviewed, and a verdict gets acted on.
+`shared/principles/deterministic-tools.md` sets a third-occurrence bar. This
+class is past it by the consumer repo's own dated case record, which lives in
+that repo rather than in this one: `Lacaedemon/sparta`'s
+`.claude/skills/sparta-demos/SKILL.md`, section "A precise-tick caption claim
+on a LONG battle: verify against CI's own posted transcript, not a local
+`dump-state.sh` run". It logs PR #794 (2026-07-12), then a recurrence paragraph
+covering #861 and #866 (2026-07-15, both caught by a reviewer rather than by
+the author), then #1199 (2026-08-05).
+
+Those citations are deliberately given with their source document rather than
+as bare PR numbers: this repo carries no case record for another repo's PRs,
+so a reader grepping HERE for them finds nothing and cannot tell a real
+citation from an invented one. Every one of them is about PROSE. The
+2026-08-22 recurrence moved the same trap into a gating verdict, which is
+strictly worse -- prose gets reviewed, a verdict gets acted on.
 
 WHY THIS INJECTS RATHER THAN BLOCKS
 -----------------------------------
@@ -46,15 +52,25 @@ MECHANISM
 ---------
 Fires when all three hold:
 
-  1. the transcript contains a Bash call running one of the LOCAL sim/transcript
-     tools (a state dump, the transcript analyzer, a catalog sweep);
-  2. a LATER assistant message states a verdict-shaped claim (`worst=`,
-     `N/M verdicts`, `PASS uid3`, `nnd_min`, ...);
-  3. no CI-side read (`gh run view`, a `check-runs` / `issues/comments` API
-     call) sits between the two.
+  1. a Bash call ran one of the LOCAL sim/transcript tools;
+  2. a LATER assistant message states a verdict-shaped figure;
+  3. no CI-side read sits between the most recent local run BEFORE that
+     message and the message itself.
 
-Condition 3 is what keeps it quiet on a turn that did the right thing, and it
-is why this cannot simply key on the presence of a number.
+Condition 3 is snapshotted **at the moment the claim is seen**, not read off
+the end of the transcript. Comparing function-final values instead lets a
+later, unrelated local run drag `local_at` past an already-discharged claim
+and re-arm it -- an ordinary sequence (dump, read CI, report the CI figure,
+dump again to keep investigating) that would then nag about a properly
+grounded number.
+
+Commands are split into simple commands with `shlex` before matching, the same
+construction `no-clobbering-push.py` and `flag-reset-hard-uncommitted-work.py`
+use. A free `search()` over the raw string reads inside quoted arguments, so
+`gh pr comment --body "...via gh run view 123..."` would discharge the guard
+without any CI read having happened -- the false-NEGATIVE direction, and the
+one this hook exists to prevent. That is the same failure class README names
+in its `require-gh-repo-flag.py` cautionary tale.
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
 """
@@ -62,40 +78,32 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
-# Local tools that produce sim state or judge it, none of which involve CI.
-# Deliberately specific: a bare `godot` would fire on every unit-test run,
-# and the noise is what gets a guard switched off.
-LOCAL_SIM_TOOL = re.compile(
-    r"""(
-      dump-state\.sh
-    | dump-demo-states\.sh
-    | analyze_transcript\.gd
-    | website-demo-defect-sweep\.sh
-    | website-demo-defect-delta\.sh
-    | check\.sh[^\n|;&]*\bdemo_defects\b
-    | SPARTA_DEMO_STATE
-    )""",
-    re.X,
-)
+RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_SHELL_OPS = set("();|&")
 
-# A read of what CI itself measured. `gh pr checks` is deliberately ABSENT:
-# it reports check STATE, never a verdict's numbers, so treating it as
-# corroboration would discharge the obligation without anyone having looked at
-# a CI-side figure -- the same conflation `fully-clean.md` warns about when it
-# says a green rollup is about CI state rather than review content.
-CI_READ = re.compile(
-    r"""(
-      gh\s+run\s+view
-    | gh\s+api[^\n]*check-runs
-    | gh\s+api[^\n]*actions/(runs|jobs)
-    | gh\s+api[^\n]*issues/comments
-    | gh\s+api[^\n]*issues/\d+/comments
-    | gh\s+api[^\n]*pulls/\d+/comments
-    )""",
-    re.X,
+# Local tools that produce sim state or judge it, none of which involve CI.
+# Matched against a token, so a bare `godot` is deliberately absent -- it would
+# fire on every unit-test run, and noise is what gets a guard switched off.
+LOCAL_TOOL = re.compile(
+    r"(^|/)(dump-state\.sh|dump-demo-states\.sh|analyze_transcript\.gd"
+    r"|website-demo-defect-sweep\.sh|website-demo-defect-delta\.sh)$"
+)
+LOCAL_ENV = "SPARTA_DEMO_STATE"
+
+# `gh api` paths that read what CI itself measured. `gh pr checks` is
+# deliberately absent: it reports check STATE, never a verdict's numbers, so
+# treating it as corroboration would discharge the obligation with nobody
+# having looked at a CI-side figure -- the conflation `fully-clean.md` warns
+# about when it says a green rollup is about CI state rather than review
+# content.
+CI_API_PATH = re.compile(
+    r"check-runs|actions/(runs|jobs)|issues/comments|issues/\d+/comments"
+    r"|pulls/\d+/comments"
 )
 
 # Verdict-shaped claims. Each alternative is a SHAPE the analyzer emits, not a
@@ -119,14 +127,91 @@ def visible_prose(text):
     """Drop code fences and blockquotes.
 
     A verdict table pasted into a fence is raw tool output being shown, not a
-    claim being made in the model's own voice, and quoting CI's own posted
-    table is the very behaviour this hook wants to encourage. Inline code is
-    deliberately KEPT, unlike in `remind-ums-after-error.py`: a verdict quoted
-    in the model's prose is nearly always written as `worst=1.611`, so
-    stripping backticks would blind the hook to its main case.
+    claim made in the model's own voice, and quoting CI's own posted table is
+    the behaviour this hook wants to encourage. Inline code is deliberately
+    KEPT, unlike in `remind-ums-after-error.py`: a verdict quoted in prose is
+    nearly always written as `worst=1.611`, so stripping backticks would blind
+    the hook to its main case.
     """
     text = FENCE.sub(" ", text)
     return QUOTED.sub(" ", text)
+
+
+def simple_commands(cmd):
+    """Split a shell command into simple-command argv lists; None on error.
+
+    Same construction as `no-clobbering-push.py`'s `_simple_commands`.
+    """
+    cmd = re.sub(r"\\\r?\n", " ", cmd)
+    cmd = RX_HEREDOC.sub("<<", cmd)
+    cmd = cmd.replace("\n", ";")
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None
+    cmds, cur = [], []
+    for t in toks:
+        if t and set(t) <= _SHELL_OPS:
+            if cur:
+                cmds.append(cur)
+                cur = []
+        else:
+            cur.append(t)
+    if cur:
+        cmds.append(cur)
+    return cmds
+
+
+def _is_ci_read(argv):
+    """True when this simple command actually READS CI state.
+
+    Structural rather than textual: the CI markers are looked for at fixed
+    argument positions of a `gh` command, so they cannot be matched inside a
+    quoted body that a different `gh` subcommand is merely posting.
+    """
+    if not argv:
+        return False
+    exe = argv[0]
+    if exe != "gh" and not exe.endswith("/gh"):
+        return False
+    if len(argv) >= 3 and argv[1] == "run" and argv[2] == "view":
+        return True
+    if len(argv) >= 3 and argv[1] == "api":
+        return bool(CI_API_PATH.search(argv[2]))
+    return False
+
+
+def _is_local_run(argv):
+    """True when this simple command runs a local sim/transcript tool.
+
+    Scans every token rather than only the command word, so `bash
+    tools/check.sh ...`, `godot ... -s tools/demo/analyze_transcript.gd`, and a
+    leading `SPARTA_DEMO_STATE_FULL=1` all match. A tool name appearing inside
+    a quoted argument would over-arm the guard, which costs one reminder --
+    the safe direction, unlike the CI side where over-matching costs the miss.
+    """
+    if not argv:
+        return False
+    if any(LOCAL_TOOL.search(t) for t in argv):
+        return True
+    if any(t.startswith(LOCAL_ENV) and ASSIGNMENT.match(t) for t in argv):
+        return True
+    return any(t.endswith("check.sh") for t in argv) and "demo_defects" in argv
+
+
+def classify(cmd):
+    """(ran_local_tool, read_ci) for one Bash command."""
+    cmds = simple_commands(cmd)
+    if cmds is None:
+        # Unparseable (unbalanced quotes). Arm the LOCAL side from the raw
+        # text and never discharge from it: an extra reminder is cheap, a
+        # missed one is the failure this hook exists to prevent.
+        return bool(LOCAL_TOOL.search(cmd) or LOCAL_ENV in cmd), False
+    local = any(_is_local_run(a) for a in cmds)
+    ci = any(_is_ci_read(a) for a in cmds)
+    return local, ci
 
 
 def records(path):
@@ -139,11 +224,14 @@ def records(path):
 
 
 def scan(path):
-    """Return (claim_text, claim_at, local_at, ci_at).
+    """Return (claim_text, claim_at, local_at_claim, ci_at_claim).
 
-    Indices are record positions; -1 means never seen.
+    The two index values are snapshotted when the claim is seen, so later
+    activity cannot re-arm an already-discharged claim. -1 means never seen.
     """
-    claim_txt, claim_at, local_at, ci_at = None, -1, -1, -1
+    claim_txt, claim_at = None, -1
+    claim_local, claim_ci = -1, -1
+    local_at, ci_at = -1, -1
 
     for i, m in enumerate(records(path)):
         # A subagent's own turns are not my outgoing message.
@@ -160,13 +248,13 @@ def scan(path):
                 continue
 
             if b.get("type") == "text":
-                # Only count a claim that FOLLOWS a local run. A verdict
-                # quoted before any local tool ran came from somewhere else.
+                # Only a claim that FOLLOWS a local run is this hook's business.
                 if local_at < 0:
                     continue
                 hit = VERDICT_CLAIM.search(visible_prose(b.get("text", "")))
                 if hit:
                     claim_txt, claim_at = hit.group(0).strip(), i
+                    claim_local, claim_ci = local_at, ci_at
 
             elif b.get("type") == "tool_use":
                 if (b.get("name") or "") != "Bash":
@@ -174,13 +262,13 @@ def scan(path):
                 inp = b.get("input") or {}
                 if not isinstance(inp, dict):
                     continue
-                cmd = str(inp.get("command", ""))
-                if LOCAL_SIM_TOOL.search(cmd):
+                is_local, is_ci = classify(str(inp.get("command", "")))
+                if is_local:
                     local_at = i
-                if CI_READ.search(cmd):
+                if is_ci:
                     ci_at = i
 
-    return claim_txt, claim_at, local_at, ci_at
+    return claim_txt, claim_at, claim_local, claim_ci
 
 
 def main() -> int:
@@ -194,14 +282,15 @@ def main() -> int:
         return 0
 
     try:
-        claim_txt, claim_at, local_at, ci_at = scan(path)
+        claim_txt, claim_at, claim_local, claim_ci = scan(path)
     except Exception:
         return 0
 
-    if not claim_txt or local_at < 0:
+    if not claim_txt or claim_local < 0:
         return 0
-    # A CI read between the local run and the claim discharges it.
-    if local_at <= ci_at <= claim_at:
+    # A CI read after the most recent local run and before the claim discharges
+    # it. Both values were snapshotted at the claim, so both are <= claim_at.
+    if claim_ci >= claim_local:
         return 0
 
     key = hashlib.sha256(f"{path}:{claim_txt}:{claim_at}".encode()).hexdigest()[:16]

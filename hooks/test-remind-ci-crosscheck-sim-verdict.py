@@ -67,6 +67,13 @@ ANALYZE = bash(
 )
 CLAIM = txt("Locally this still reports `uid0 overlap worst=1.611`.")
 CI = bash("gh run view 32593819162 -R Lacaedemon/sparta --log")
+# The reviewer-reproduced false NEGATIVE: `gh run view` appears only inside a
+# quoted body being POSTED, not executed. A raw `search()` over the command
+# string discharges on it; a shlex split cannot, because the body is one
+# dequoted argument token of a `gh pr comment`.
+QUOTED_CI = bash(
+    'gh pr comment 1374 --body "Investigated via gh run view 123; still digging."'
+)
 
 REMIND = [
     ([LOCAL, CLAIM], "dump-state then a worst= figure, no CI read"),
@@ -89,6 +96,19 @@ REMIND = [
     # A later local run re-opens the obligation a previous CI read closed.
     ([LOCAL, CI, txt("ok"), LOCAL, CLAIM],
      "a second local run after the CI read re-opens it"),
+    # A CI marker that only appears inside a quoted argument never ran.
+    ([LOCAL, QUOTED_CI, CLAIM],
+     "`gh run view` inside a quoted --body is text being posted, not a CI read"),
+    ([LOCAL, bash('echo "gh api repos/o/r/commits/x/check-runs"'), CLAIM],
+     "a CI api path echoed as a string is not a CI read"),
+    # The CI markers are only meaningful as arguments of `gh`. Another
+    # program that happens to take `run view` as its own subcommand must not
+    # discharge -- without the command-word test, `_is_ci_read`'s positional
+    # checks alone would admit it.
+    ([LOCAL, bash("npm run view"), CLAIM],
+     "`run view` as another program's subcommand is not a gh CI read"),
+    ([LOCAL, bash("pnpm api repos/o/r/commits/x/check-runs"), CLAIM],
+     "an api-shaped path passed to a non-gh program is not a CI read"),
     # `gh pr checks` reports state, never a verdict figure.
     ([LOCAL, bash("gh pr checks 1374 -R Lacaedemon/sparta"), CLAIM],
      "gh pr checks is check STATE, not a CI-side figure"),
@@ -105,6 +125,17 @@ SILENT = [
      "reading the PR's posted comments discharges"),
     ([LOCAL, bash("gh api repos/o/r/actions/jobs/97083575763"), CLAIM],
      "an actions/jobs read discharges"),
+    # The reviewer-reproduced false POSITIVE: a later, unrelated local run must
+    # not re-arm a claim that was already cross-checked when it was made.
+    ([LOCAL, CI, CLAIM, LOCAL],
+     "a local run AFTER a discharged claim does not re-arm it"),
+    ([LOCAL, CI, CLAIM, LOCAL, CI, LOCAL],
+     "further activity after a discharged claim still does not re-arm it"),
+    ([LOCAL, bash("GODOT_BIN=godot tools/demo/dump-state.sh a.json 8 /tmp/t"),
+      CI, CLAIM],
+     "env-prefixed local run still discharges via the CI read after it"),
+    ([LOCAL, bash("gh api repos/o/r/actions/runs/123 --jq .event"), CLAIM],
+     "an actions/runs api read discharges"),
     ([LOCAL, txt("The dump finished; nothing to report yet.")],
      "a local run with no verdict figure after it"),
     ([txt("Before dumping: the analyzer reports worst= for each metric."),

@@ -56,13 +56,6 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ci-crosscheck-sim-verdict.py\"",
-            "timeout": 10,
-            "script": "remind-ci-crosscheck-sim-verdict.py",
-            "why": "A deterministic sim is deterministic per (seed, platform, renderer config), not across them -- a local run and CI's have been measured inverting the same clip's verdict (worst=1.611 FAIL locally, 2.432 PASS on CI). Reminds when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between."
-          },
-          {
-            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
             "timeout": 10,
             "script": "no-mistake-without-a-hook.py",

@@ -73,6 +73,20 @@ CASES = [
      "an ordinary product decision is not a filing deferral"),
     ([say("I left the reviewer a note about the benchmark.")], False,
      "'left the reviewer' with no tracking word is ordinary prose"),
+    # Cursor Bugbot, ai-config#2007: a bare verb plus a party plus a tracking
+    # word is not a deferral. The construction is what defers -- "leaving it TO
+    # the reviewer" versus "leaving the reviewer a note".
+    ([say("I left the reviewer a note about the tracking issue.")], False,
+     "a note ABOUT a tracking issue defers nothing"),
+    ([say("I leave the reviewer a note on the follow-up issue each round.")], False,
+     "the present-tense form of the same ordinary sentence"),
+    # `pursuing` was tried as a tracking word and removed: deferring whether
+    # something is worth PURSUING is an action decision, which this section
+    # says is correctly the reviewer's.
+    ([say("Whether this is worth pursuing is the reviewer's call.")], False,
+     "pursuing is an action word, not a word of record"),
+    ([say("Deferring to the reviewer on whether this is worth pursuing.")], False,
+     "a full deferral construction still passes when the deferred thing is an ACTION"),
     ([say("The reviewer decides whether to act on it; I have filed it as #1379.")], False,
      "already filed, and the deferral is about acting"),
 

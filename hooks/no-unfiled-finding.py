@@ -46,14 +46,27 @@ ASSERT = [
     r"\bfile (this|that|it) (as )?(a |an )?(separate |follow-?up )?issue\b",
     # Third-party deferral: the decision is handed to someone who is not in the
     # conversation, so no offer verb and no `?` appear and every pattern above
-    # misses it. Two parts, both required, because either alone over-fires -- a
-    # DEFERRAL naming a party, and a TRACKING word inside the same sentence.
-    # The tracking word is what keeps "the reviewer decides whether to act" --
-    # a correct and common sentence -- out of scope: only whether to RECORD is
-    # nobody's call to defer.
-    r"(defer(?:ring|red)?|leav(?:e|ing)|flag(?:ging)?|left)\b[^.!?]{0,80}"
-    r"\b(reviewer|maintainer|owner|team|human)\b[^.!?]{0,80}"
-    r"\b(issue|tracker|tracking|filing|follow-?up|pursuing)\b",
+    # misses it. Three parts, all required, because any two over-fire -- a
+    # deferral CONSTRUCTION, a named party, and a tracking word in the same
+    # sentence.
+    #
+    # The construction is what carries the deferral, not the bare verb. "I left
+    # the reviewer a note about the tracking issue" contains a verb, a party
+    # and a tracking word, and defers nothing; requiring `to` (or `for` after
+    # `flag`) is what separates "leaving it TO the reviewer" from "leaving the
+    # reviewer a note".
+    #
+    # The tracking word is what keeps "whether to act on this is the reviewer's
+    # call" out of scope -- only whether to RECORD is nobody's call to defer.
+    # It lists nouns of RECORD only: `pursuing` was tried here and removed,
+    # since deferring whether something is worth pursuing is an ACTION decision
+    # and is exactly what this section says is correctly theirs.
+    r"(?:defer(?:ring|red)?|leav(?:e|ing))\s+(?:it\s+|this\s+|that\s+)?to\b"
+    r"[^.!?]{0,80}\b(reviewer|maintainer|owner|team|human)\b"
+    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
+    r"flag(?:ging)?\s+(?:it\s+|this\s+|that\s+)?for\b"
+    r"[^.!?]{0,80}\b(reviewer|maintainer|owner|team|human)\b"
+    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
     r"\b(reviewer|maintainer|owner|team)(?:'s|s')?\s+"
     r"(call|discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"
     r"\b(issue|tracker|tracking|filing|follow-?up)\b",

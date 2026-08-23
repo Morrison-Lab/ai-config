@@ -27,6 +27,7 @@ duplicate finding to a COMMENT on the existing issue rather than a new one.
 Fails OPEN on any parse trouble, and fires at most once per distinct message.
 """
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -131,33 +132,35 @@ ASSERT = [
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
-FENCE = re.compile(r"```.*?```", re.S)
-QUOTED = re.compile(r"^\s*>.*$", re.M)
-TICKED = re.compile(r"`[^`\n]*`")
+def _sibling(name):
+    """Import a hyphenated sibling module, or None if unavailable."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    try:
+        spec = importlib.util.spec_from_file_location("_sib", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
 
 
-def visible_prose(text):
-    """Drop code fences, blockquotes, and inline code before matching.
+_ums = _sibling("remind-ums-after-error.py")
 
-    Same treatment `remind-ums-after-error.py` applies, and for the same
-    reason it gives: this corpus quotes its own banned strings constantly.
-    A message ABOUT this guard cites its patterns -- `warrants a follow-up`,
-    `worth its own issue` -- and every such citation is an assertion in form
-    and a quotation in fact.
-
-    Measured 2026-08-23: a status recap discussing this file's own regex was
-    blocked on the `warrants a follow-up` alternative appearing inside a code
-    span, in a message that asserted nothing about filing anything. That is
-    the pure false-positive direction, on the population most likely to
-    produce it -- the people editing the guard.
-
-    Fences and blockquotes go too, on the same reasoning that governs them in
-    the sibling hook: quoted tool output and quoted review text are not the
-    model's own voice.
-    """
-    text = FENCE.sub(" ", text)
-    text = QUOTED.sub(" ", text)
-    return TICKED.sub(" ", text)
+# Reuse the sibling's code-region stripping rather than copying it, so the two
+# cannot drift -- the same import `no-empty-promise.py` and
+# `no-mistake-without-a-hook.py` already use, and for the same stated reason.
+#
+# Why this guard needs it at all: a message ABOUT this guard cites its own
+# patterns by name, and every such citation is an assertion in form and a
+# quotation in fact. Measured 2026-08-23 -- a status recap explaining a fix to
+# the `warrants a follow-up` alternative was blocked BY that alternative,
+# because the name sat in a code span. That is the pure false-positive
+# direction, on the population most likely to produce it.
+#
+# The fallback is identity rather than silence: this hook must keep matching if
+# the sibling is missing, since dropping the check entirely would be the
+# false-NEGATIVE direction, which is the failure it exists to prevent.
+visible_prose = getattr(_ums, "visible_prose", None) or (lambda text: text)
 
 
 # Already-filed talk. A message reporting an issue that exists is the

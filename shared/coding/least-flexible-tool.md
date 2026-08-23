@@ -159,3 +159,70 @@ Flag these with the same weight as the other coding rules:
 The last one is a finding in the opposite direction from the others, and
 that is deliberate: this rule is not "use functionals", it is "let the
 construct match the job".
+
+## `re.S` and `re.M` together: `.*$` runs to the end of the string, not the line
+
+A pattern meant to match **one line** is routinely written `^prefix.*$`,
+and the flags are added later, for the sake of some other alternative in the same pattern.
+That is where this bites,
+because the two flags disagree about what a line is,
+and the disagreement is silent:
+
+- `re.M` makes `$` match before *any* newline, which is the reason it was added.
+- `re.S` makes `.` match a newline too,
+  which is usually wanted for a triple-backtick fence alternative sitting beside it.
+
+Together, `.*` consumes the rest of the string and `$` is satisfied at the final position,
+so the "one line" alternative matches **everything from the prefix onward**.
+Nothing errors.
+The pattern still matches the intended input.
+It just also matches far more of it.
+
+```python
+re.compile(r"```.*?```|^\s*>.*$", re.S | re.M)          # the > branch eats the whole tail
+re.compile(r"```.*?```|^[ \t]*>[^\n]*$", re.S | re.M)   # bounded, correct
+```
+
+Two properties make it hard to catch by reading.
+
+**The flags are usually justified by a different alternative than the one they break.**
+`re.S` is there for the fence; the damage lands on the blockquote.
+So the line you would scrutinize and the line that is wrong are not the same line.
+
+**It fails toward silence in a stripper.**
+A function that removes regions before matching gets *more* removal than intended,
+so its consumer simply stops firing --
+which looks like "no findings" rather than like a bug.
+A suite of positive tests passes.
+
+The general rule this instantiates:
+`.` and `\s` are the two most flexible character constructs available,
+and reaching for either inside a line-anchored pattern discards the anchor's meaning under `re.S`.
+Use the explicit negated class instead --
+`[^\n]` for "rest of this line", `[ \t]` for "horizontal space" --
+which says what is meant and is immune to the flag.
+
+- **Do:** write `[^\n]*` when you mean "to the end of this line",
+  in any pattern compiled with `re.S`.
+- **Do:** write `[ \t]` rather than `\s` for leading indentation,
+  since `\s` matches a newline regardless of flags.
+- **Do:** add a negative test whose *removed* region is followed by real content,
+  since an over-broad stripper is invisible to positive tests.
+- **Don't:** add `re.S` for one alternative
+  without re-reading every other alternative in the same pattern for `.` and `$`.
+- **Don't:** trust that a passing suite covers this --
+  over-removal reads as correct silence.
+
+(Measured on
+[ai-config#2024](https://github.com/Morrison-Lab/ai-config/pull/2024),
+2026-08-23.
+`hooks/no-unfiled-finding.py`'s code-region stripper was written with `re.S | re.M`
+and a blockquote alternative of `^\s*>.*$`.
+It deleted every character after the first `>` line,
+so any real assertion following a quoted one went unexamined.
+The whole suite passed --- every case in it, not a subset.
+(The exact figure is method-dependent and so deliberately not quoted here;
+see ai-config#2030.)
+A reviewer found it and suggested `^[ \t]*>[^\n]*$`;
+that plus a regression test -- a genuine unquoted assertion following a blockquote --
+is what shipped.)

@@ -132,6 +132,13 @@
               "check happened; this one asks whether it compared the right two",
               "things."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ci-crosscheck-sim-verdict.py\"",
+            "timeout": 10,
+            "script": "remind-ci-crosscheck-sim-verdict.py",
+            "why": "Lacaedemon/sparta incident of 2026-08-22 -- a local simulation run reading FAIL was used to publish a decision, while CI transcript on the same clip/seed read PASS. Injects a reminder on the prompt following a local sim/transcript check when used to assert a verdict, prompting a CI-side reading."
           }
         ]
       }

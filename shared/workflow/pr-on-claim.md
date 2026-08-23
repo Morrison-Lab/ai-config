@@ -188,7 +188,8 @@ Merging it would have shipped a version of that PR's content which that PR's own
 A duplicate is not always the cheaper of two equivalent paths;
 check what else the branch is carrying before picking one.
 
-- **Do:** run `gh pr list --repo <owner>/<repo> --state open --search "<keywords>"` before creating a PR, not only before claiming an issue.
+- **Do:** run `gh pr list --repo <owner>/<repo> --state all --search "<keywords>"` before creating a PR, not only before claiming an issue.
+  `--state all` rather than `--state open`, per [`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md): a PR that merged minutes ago is invisible to an open-state search and is the likeliest duplicate there is.
 - **Do:** check what a duplicate branch is *based on* before choosing between it and yours --- a branch cut from another PR ships that PR's content too.
 - **Don't:** read "I filed the issue and am opening its PR" as evidence the in-flight check ran;
   those are different steps and only one of them looks at other sessions.
@@ -196,3 +197,39 @@ check what else the branch is carrying before picking one.
 
 `hooks/warn-pr-create-without-dupe-check.py` mechanizes this, per [`algorithmatize-checks`](algorithmatize-checks.md).
 It warns rather than blocks: a duplicate PR is cheap to close, while a blocked `gh pr create` interrupts the one action that makes work visible to other sessions.
+
+[`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md) carries the query rule in full, with the negative control showing that only `--state all` discriminates.
+Read it before opening a PR, not only before scaffolding a new tool.
+It also settles the two absence readings this check turns on: an absent remote branch means merged-and-deleted until a query that can see merged work says otherwise, and searching a *predicted* branch name is the same failure one axis over, since it enumerates a guess instead of deriving the population.
+
+**One reading it does not cover: a `base..branch` commit range cannot answer "is this merged" in a squash-merging repo, at any freshness.**
+`git log <base>..<branch>` lists the branch's commits whenever they are not ancestors of the base, and a squash merge puts the content on the base under a new commit the branch never saw --- so the range reports unmerged work for work that merged.
+Re-fetching does not help, which is the trap: the reading looks like it expired rather than like it was never able to answer.
+
+Measured 2026-08-22, with `origin/main` equal to the remote tip:
+
+```
+origin/main = 8811682d
+range: 2 commits
+content diff empty? exit=0
+is-ancestor exit=1
+```
+
+Two commits listed, and `git diff <base> <branch>` empty.
+So compare trees, or ask the forge, rather than counting commits.
+
+`git merge-tree` answers neither question.
+A branch whose content is already on the base normally merges cleanly, because both sides carry the same change --- so a clean result is compatible with the branch being wholly redundant.
+The converse fails too: a redundant branch conflicts as soon as the base edits the duplicated content afterwards.
+Merge-tree answers "will this apply", never "is this new".
+
+- **Do:** settle whether work is merged from an empty `git diff <base> <branch>`, or from the PR's own state.
+- **Don't:** read a non-empty `<base>..<branch>` range as unmerged work in a squash-merging repo --- it says nothing there, however fresh the base.
+- **Don't:** offer a clean or a conflicting `merge-tree` as evidence either way about novelty.
+
+(Measured 2026-08-22 on `Morrison-Lab/ai-config`.
+A worktree sweep found a local branch with two commits and no remote counterpart, and read it as unpushed work worth rescuing.
+It had merged as [#1995](https://github.com/Morrison-Lab/ai-config/pull/1995) six minutes earlier.
+The duplicate went out as [#1998](https://github.com/Morrison-Lab/ai-config/pull/1998), with [#1997](https://github.com/Morrison-Lab/ai-config/issues/1997) as its tracking issue, and its diff against the post-merge `main` was empty.
+The rule above already existed in the fragment named at the top of this passage, which was linked from six files and not from this one --- so the session that needed it was reading the page that lacked it.
+Tracked as [ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/1999).)

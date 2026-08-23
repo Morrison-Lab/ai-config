@@ -88,6 +88,23 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** treat a merged guard as an active one.
      Merging places a file, and only a binding in `settings.json` makes it fire.
 
+   **The plugin path can be off at the same time, and then the caveat above has no working alternative left.**
+   The paragraphs above treat the plugin as the path that already loads every hook, so `--fix` would double-register.
+   A remote/web container can have neither: no `~/.claude/settings.json`, and no plugin installed.
+   `${CLAUDE_PLUGIN_ROOT}` is what every command string in `hooks/hooks.json` interpolates, so one read settles the plugin half as cheaply as the file test above settles the other:
+   ```bash
+   echo "CLAUDE_PLUGIN_ROOT=[${CLAUDE_PLUGIN_ROOT:-UNSET}]"
+   ```
+   Measured 2026-08-22: `UNSET`, `SKIP_PLUGIN_MARKETPLACE=true`, and `install-hooks.py` reporting `registered=0 missing=41 stale=0`.
+   A repo-local `.claude/settings.json` registering two hooks of its own does not change that, and reads like partial coverage when it is none.
+
+   **The second direction is worse than trusting an absent guard, and nothing above covers it: diagnosing why an absent guard let something through.**
+   A guard that did not warn invites a search for the flaw in its logic, and that search can be careful, reproducible, and about a hook that never ran.
+   Reading the hook's source and its passing test suite is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution --- both are real artifacts, and neither is the registration.
+   So run `install-hooks.py` before diagnosing a miss, not only before relying on a guard.
+   Measured the same day: a real weakness in a guard's discharge logic was reproduced and filed as the cause of a missed warning, while that guard was one of the forty-one.
+   The weakness was genuine; the attribution was not.
+
    **Measured recurrence, 2026-08-20: `registered=15 missing=16 stale=0` against a 31-hook manifest, on a machine where every rule above was already written.**
    That is worth recording as evidence about the *rule* rather than about the machine.
    Each paragraph above is correct and none of them fired, because all of them describe a check somebody has to decide to run, and the drift is silent by construction.

@@ -43,3 +43,6 @@ Report, for your one unit only:
 You have no Edit or Write tool access, so you cannot apply a correction —
 return your verdict as a report; the calling session collects verdicts across
 all units and applies fixes afterward on the user's go-ahead.
+
+This agent keeps `Bash` for read-only checks (a local render, `git show`, `grep`).
+Avoiding a write-capable shell command is instruction-level discipline rather than a harness guarantee, so it is on you: do not run anything that writes, moves, or deletes a file, pushes, or posts.

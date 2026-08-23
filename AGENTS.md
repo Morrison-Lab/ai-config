@@ -126,11 +126,26 @@ Each reading expires immediately: run the command fresh for every recap rather t
 When asked to implement, edit, or write up a change on a feature branch, do
 not stop at an uncommitted worktree.
 Complete the delivery cycle: create the applicable tracking issue when
-issue-first workflow applies, commit the scoped changes, push the branch, open
-or update its Pull Request, request AI review after the final push, and drive
-CI and review findings to a clean result.
+issue-first workflow applies, commit the scoped changes, run local
+adversarial self-review to a clean verdict, push the branch, open or update
+its Pull Request, request AI review after the final push, and drive CI and
+review findings to a clean result.
 This does not grant merge authority; the strict merge policy below still
 applies.
+
+## Every self-review is an adversarial review by a separate subagent
+
+Never push code to a remote branch blind, and never review your own diff in the context that wrote it.
+Whenever reviewing your own work is called for --- before `git push`, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to a separate reviewer agent with an adversarial brief (the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent, or a separate CLI where no subagent tool exists), against `git diff origin/<default-branch>...HEAD`.
+Address, rebut, or defer every finding, and obtain a clean verdict before pushing.
+
+The authoring session cannot perform this itself.
+It knows what the change was meant to say, so it reads the diff and recovers the intent --- confirmation rather than review --- and nothing in the output distinguishes that from a real pass.
+Brief the reviewer with the diff and the standards, never with the rationale for the change.
+
+Pushing without a clean self-review is mechanistically blocked by pre-push
+guards.
+Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
 

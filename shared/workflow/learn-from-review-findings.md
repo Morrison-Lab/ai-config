@@ -256,7 +256,8 @@ So an over-correction is often a sign that the discriminator itself is wrong rat
 
 **The tell is mechanical: consecutive fixes that all adjust the same knob.**
 Three rounds on that guard each changed the width of one wildcard -- connector adjacent to the verb, then a bare pronoun allowed, then a short gap -- and a fourth round found why none could work.
-The two senses being separated had the identical surface shape, so no width of wildcard could ever distinguish them; what separated them was the identity of one word, and the fix was to enumerate that word's allowed values rather than to match around it.
+The two senses being separated had the identical surface shape, so no width of wildcard could ever distinguish them.
+What separated them was the identity of one word, and the fix was to enumerate that word's allowed values rather than to match around it.
 Count the knob rather than the rounds: two fixes turning the same dial is the signal to ask what the test is measuring, and three is the signal to stop tuning and change its shape.
 That the rule was written, and then broken within the hour by its author, is the ordinary case rather than a surprising one: a rule is consulted at read time and violated at composition time.
 

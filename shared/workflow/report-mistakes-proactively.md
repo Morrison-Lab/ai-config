@@ -156,9 +156,9 @@ A finding described in that much detail feels handled by the description alone, 
 - **Don't:** read deference as discharging this --- the deference is real, and aimed at the wrong half of the question.
 - **Don't:** let the length of the write-up stand in for the durability of the record.
 
-`hooks/no-unfiled-finding.py` covers this, but only after being widened here, and the gap is worth recording because it was invisible from the one case that produced the section.
-Its patterns were keyed on filing-intent vocabulary -- `worth`, `needs`, `deserves`, `warrants` -- which the original phrasing happened to carry.
-Every other spelling of the same structure walked straight past it:
+`hooks/no-unfiled-finding.py` does **not** yet cover this, and the gap is worth recording because it was invisible from the one case that produced the section.
+Its patterns are keyed on filing-intent vocabulary -- `worth`, `needs`, `deserves`, `warrants` -- which the original phrasing happened to carry.
+Every other spelling of the same structure walks straight past it:
 
 ```text
 Flagging for the reviewer to judge whether this belongs in the tracker.
@@ -168,7 +168,10 @@ Deferring to the maintainer on whether this needs tracking.
 ```
 
 So a guard matching one instance of a class is not a guard on the class, and "the existing hook already catches this" is a claim to test against fresh phrasings rather than against the case in hand.
-The widened pattern requires two parts in one sentence -- a deferral naming a party, and a tracking word -- because the deferral alone would fire on "whether to act on this is the reviewer's call", which is the correct sentence this section is careful to protect.
+
+Widening it is tracked in [ai-config#2017](https://github.com/Morrison-Lab/ai-config/pull/2017), separately and deliberately.
+The rule above stands on its own and does not depend on the guard: a mechanized check is what makes a rule cheap to obey, never what makes it true.
+That separation is worth stating rather than leaving implicit, because the reverse reading -- that an unmechanized rule is somehow provisional -- is what turns a hard guard into a reason to stop writing the rule down.
 
 ## Offering to hand over work you have already finished
 

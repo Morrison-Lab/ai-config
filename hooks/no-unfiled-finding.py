@@ -27,7 +27,6 @@ duplicate finding to a COMMENT on the existing issue rather than a new one.
 Fails OPEN on any parse trouble, and fires at most once per distinct message.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -45,123 +44,8 @@ ASSERT = [
     r"should be (filed|tracked)\b",
     r"(this|that) (is|reads as) a (separate |real )?(bug|defect)[^.]{0,40}\b(file|track)",
     r"\bfile (this|that|it) (as )?(a |an )?(separate |follow-?up )?issue\b",
-    # Third-party deferral: the decision is handed to someone who is not in the
-    # conversation, so no offer verb and no `?` appear and every pattern above
-    # misses it. Three parts, all required, because any two over-fire -- a
-    # deferral CONSTRUCTION, a named party, and a tracking word in the same
-    # sentence.
-    #
-    # The construction took six review rounds, and the shape below is the third
-    # distinct ANSWER rather than the sixth tuning of one. Recording the
-    # rejected shapes and the stopping rule, because the useful part is which
-    # axis was wrong rather than where any bound ended up.
-    #
-    # Rejected, all of which treated the words between the verb and the
-    # connector as a WILDCARD and tuned its width:
-    #
-    #   1. Connector required immediately after the verb. Killed "left the
-    #      reviewer a note" and also every real deferral with a noun-phrase
-    #      object -- "leave THIS DECISION to the maintainer".
-    #   2. Bare pronoun (it/this/that) allowed in the gap. Same failure, one
-    #      noun phrase later.
-    #   3. Any short wildcard gap, connector required BEFORE the party. That
-    #      admits the benefactive: `to`/`for` is ambiguous in English between
-    #      the deferral sense ("leave this decision TO the reviewer") and the
-    #      dative one ("leave a note FOR the reviewer"), which is the same
-    #      sentence as "leave the reviewer a note" with the recipient moved.
-    #      Both have the identical surface shape, so NO width of wildcard
-    #      separates them.
-    #
-    # What separates them is WHAT IS BEING HANDED OVER. You defer a DECISION
-    # and you leave a NOTE, so the object is named rather than matched.
-    #
-    # Two consequences of that principle, each found by a round that applied it
-    # more strictly than the list did:
-    #
-    # - The list admits only UNAMBIGUOUS decision nouns. `question` was in it
-    #   and had to go: "the question of whether to file" is a decision, but "I
-    #   left a question for the reviewer" is the same benefactive the principle
-    #   exists to exclude, so the word carries both senses and cannot
-    #   discriminate.
-    # - `flag` REQUIRES its object, where the other verbs do not. "Deferring to
-    #   the reviewer" is already a complete deferral, while "flagging for the
-    #   reviewer" is ordinary English for bringing something to someone's
-    #   attention and defers nothing. Leaving the object optional there fired
-    #   on this corpus's own `FLAG` status convention, which the docstring at
-    #   the top of this file explicitly names as a class that must not fire.
-    #
-    # STOPPING RULE, because this is a lexical guard standing in for a semantic
-    # judgment and the supply of unmatched phrasings is endless. The list is
-    # DELIBERATELY INCOMPLETE, and a phrasing it misses is an accepted false
-    # negative rather than a defect. The asymmetry that licenses that: a missed
-    # nag costs a finding that was probably filed anyway, while a false nag on
-    # ordinary prose is what gets a guard switched off and takes the real cases
-    # with it.
-    #
-    # Note which direction the rule governs. It licenses declining to chase a
-    # FALSE NEGATIVE invented by an adversarial reader. It says nothing about a
-    # FALSE POSITIVE, which is the failure the asymmetry is built around -- so
-    # a demonstrated over-fire is always in scope, however contrived its
-    # sentence looks.
-    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left)\s+"
-    r"(?:(?:it|this|that)\s+)?(?:up\s+)?"
-    r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
-    r"(?:(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|matter|concern)\s+)?"
-    r"\bto\b[^.!?]{0,15}?"
-    r"\b(reviewer|maintainer|owner|team|human)\b"
-    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
-    r"flag(?:ging)?\s+"
-    r"(?:(?:the|this|that|a|an|my|our|their|its)\s+)?"
-    r"(?:\w+\s+)?(?:decision|call|judgment|judgement|choice|matter|concern)\s+"
-    r"\b(?:to|for)\b[^.!?]{0,15}?"
-    r"\b(reviewer|maintainer|owner|team|human)\b"
-    r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
-    # `call` takes a MANDATORY possessive; the others do not. It is the one
-    # alternative here with a common non-judgment reading, and with the marker
-    # optional the ordinary noun-noun compound satisfies it: "the team call on
-    # Monday will cover the tracker" is a meeting, not a decision, and the
-    # status-report vocabulary around it supplies the tracking word for free.
-    # Unlike the deferral patterns above, this one has no construction to lean
-    # on -- no verb and no connector -- so the possessive marker is the only
-    # thing separating "the team's call" from "the team call".
-    r"\b(reviewer|maintainer|owner|team)(?:'s|s')\s+call\b[^.!?]{0,80}"
-    r"\b(issue|tracker|tracking|filing|follow-?up)\b",
-    r"\b(reviewer|maintainer|owner|team)(?:'s|s')?\s+"
-    r"(discretion|judgment|judgement|to (?:judge|decide|say))\b[^.!?]{0,80}"
-    r"\b(issue|tracker|tracking|filing|follow-?up)\b",
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
-
-def _sibling(name):
-    """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
-
-
-_ums = _sibling("remind-ums-after-error.py")
-
-# Reuse the sibling's code-region stripping rather than copying it, so the two
-# cannot drift -- the same import `no-empty-promise.py` and
-# `no-mistake-without-a-hook.py` already use, and for the same stated reason.
-#
-# Why this guard needs it at all: a message ABOUT this guard cites its own
-# patterns by name, and every such citation is an assertion in form and a
-# quotation in fact. Measured 2026-08-23 -- a status recap explaining a fix to
-# the `warrants a follow-up` alternative was blocked BY that alternative,
-# because the name sat in a code span. That is the pure false-positive
-# direction, on the population most likely to produce it.
-#
-# The fallback is identity rather than silence: this hook must keep matching if
-# the sibling is missing, since dropping the check entirely would be the
-# false-NEGATIVE direction, which is the failure it exists to prevent.
-visible_prose = getattr(_ums, "visible_prose", None) or (lambda text: text)
-
 
 # Already-filed talk. A message reporting an issue that exists is the
 # CORRECT behaviour and must never be blocked.
@@ -223,8 +107,7 @@ def main() -> int:
 
     if not text:
         return 0
-    prose = visible_prose(text)
-    hit = RX_ASSERT.search(prose)
+    hit = RX_ASSERT.search(text)
     if not hit:
         return 0
     # The message cites an issue, so the finding is already recorded.

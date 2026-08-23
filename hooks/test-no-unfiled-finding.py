@@ -80,6 +80,13 @@ CASES = [
      "a note ABOUT a tracking issue defers nothing"),
     ([say("I leave the reviewer a note on the follow-up issue each round.")], False,
      "the present-tense form of the same ordinary sentence"),
+    # Cursor Bugbot, ai-config#2007 round 2: with `to` required, past-tense
+    # `left it to` is a real deferral and must fire. Dropping `left` to fix the
+    # note-leaving false positive was the wrong lever -- the `to` does that work.
+    ([say("Left it to the maintainer on whether this needs tracking.")], True,
+     "past-tense deferral construction blocks"),
+    ([say("I left it to the reviewer on whether to file a follow-up.")], True,
+     "past-tense with a first-person subject blocks"),
     # `pursuing` was tried as a tracking word and removed: deferring whether
     # something is worth PURSUING is an action decision, which this section
     # says is correctly the reviewer's.

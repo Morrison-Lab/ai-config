@@ -56,12 +56,18 @@ ASSERT = [
     # `flag`) is what separates "leaving it TO the reviewer" from "leaving the
     # reviewer a note".
     #
+    # Past-tense `left` is therefore KEPT rather than dropped. Dropping it was
+    # the first attempt at the note-leaving false positive, and it was the
+    # wrong lever: once `to` is required, "left it to the maintainer ... needs
+    # tracking" is a real deferral the guard must catch, while "left the
+    # reviewer a note" is already excluded by the missing `to`.
+    #
     # The tracking word is what keeps "whether to act on this is the reviewer's
     # call" out of scope -- only whether to RECORD is nobody's call to defer.
     # It lists nouns of RECORD only: `pursuing` was tried here and removed,
     # since deferring whether something is worth pursuing is an ACTION decision
     # and is exactly what this section says is correctly theirs.
-    r"(?:defer(?:ring|red)?|leav(?:e|ing))\s+(?:it\s+|this\s+|that\s+)?to\b"
+    r"(?:defer(?:ring|red)?|leav(?:e|ing)|left)\s+(?:it\s+|this\s+|that\s+)?to\b"
     r"[^.!?]{0,80}\b(reviewer|maintainer|owner|team|human)\b"
     r"[^.!?]{0,80}\b(issue|tracker|tracking|filing|follow-?up)\b",
     r"flag(?:ging)?\s+(?:it\s+|this\s+|that\s+)?for\b"

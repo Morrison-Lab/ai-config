@@ -40,9 +40,8 @@ and `<num>` from the PR URL returned by `gh pr create`.
   The CLI form exits 0 with no error when the reviewer is the PR author and
   attaches nobody, so the 422 above is invisible on that path
   (measured on Morrison-Lab/wai#93, 2026-08-22).
-  When the authenticated user *is* the author (`gh api user --jq .login`
-  matches `.author.login`), skip the request entirely — human review cannot
-  be self-requested.
+  When the target `<reviewer>` is the author (`<reviewer>` matches `.author.login`),
+  skip the request entirely --- human review cannot be requested from the author.
   Report that the PR awaits that person's own review.
 
 - **Other reviewers already requested.** The endpoint adds to the existing

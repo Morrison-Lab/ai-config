@@ -177,10 +177,15 @@ round's finding, every time inside the `pipefail`-scope machinery. That
 recurrence is what `shared/principles/deterministic-tools.md` says to answer
 with an instrument instead of more care, so the suite carries a DIFFERENTIAL
 ORACLE: for each shape it runs bash twice, once plainly and once under
-`set -o pipefail`, and treats a change in the printed status as proof that
-`$?` was reading a pipeline. The guard's verdict is compared against that.
-It reports how many shapes it examined alongside how many agreed, so a run
-that examined nothing is distinguishable from a run that found nothing.
+`set -o pipefail`, and reads a change in the printed status as `$?` having
+reported a pipeline. The guard's verdict is compared against that.
+
+It is a heuristic made sound by its case set rather than a biconditional ---
+`pipefail` can also move a status by changing control flow, which the suite
+documents with a measured counterexample and a rule for adding cases. It
+reports how many shapes it examined alongside how many agreed, and refuses a
+case that prints nothing either way, so a run that examined nothing is
+distinguishable from a run that found nothing.
 
 THE INCIDENT
 ------------
@@ -221,9 +226,14 @@ RX_HEREDOC = re.compile(
 # keeps its `set` inside the PIPELINE's own segment rather than an earlier one.
 # Measured, that subshell gives rc=1, so `pipefail` is genuinely in force and a
 # warning there would be false.
-RX_SET_PIPEFAIL = re.compile(
-    r"^\s*set\b[^;&|\n]*\bpipefail\b" + r"(?!\s*&(?![&>]))"
-)
+# No trailing-background lookahead here, deliberately. A lone `&` cuts a
+# segment, so a backgrounded `set -o pipefail &` can only survive inside a
+# segment body when it sits in parens --- where the `^\s*set` anchor already
+# fails and the paren walker decides instead. Adding the lookahead here was
+# tried and changed no verdict on any shape, including the full oracle set, so
+# it is left out rather than kept as unreachable code implying otherwise.
+# The live copy is RX_TRAILING_BACKGROUND, used by RX_PAREN_PIPEFAIL below.
+RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
 
 # `set -o pipefail` at a command position inside a paren group. A segment-wide
 # search cannot do this job: `(set -o pipefail; make) | tail -20; echo $?`

@@ -670,14 +670,30 @@ if mutant is not None:
 # with an instrument rather than with more care, so the question is decided by
 # running bash rather than by reasoning about it.
 #
-# The oracle: a `$?` read is a MISREAD exactly when prefixing the command with
-# `set -o pipefail` changes the status it prints. If the answer moves, `$?` was
-# reporting a pipeline's last stage; if it does not, `$?` belongs to something
-# else and a warning would assert something false.
+# The oracle: if prefixing the command with `set -o pipefail` changes the
+# status it prints, `$?` was reporting a pipeline's last stage.
 #
-# `grep -q zzz /dev/null` is the producer throughout: it exits 1, reads no
-# input, and cannot SIGPIPE, so `pipefail` is the only thing that can move the
-# answer.
+# This is a HEURISTIC made sound by the case set, not a biconditional, and the
+# distinction matters for whoever extends the list. `pipefail` can move the
+# printed status by changing CONTROL FLOW rather than by changing what `$?`
+# reads. Measured:
+#
+#     (exit 3) | (exit 0) && (exit 5); echo $?                  -> 5
+#     set -o pipefail; (exit 3) | (exit 0) && (exit 5); echo $? -> 3
+#
+# The plain run prints `(exit 5)`'s status, which no pipeline produced; the
+# answer moved because `&&` short-circuited. So a `&&` or `||` shape whose
+# left side is a pipeline can read as a misread here while the guard is
+# correctly silent, and the natural response --- "fix" the guard until the
+# suite is green --- would install a real false positive.
+#
+# Two things keep the shipped set sound. `grep -q zzz /dev/null` is the
+# producer throughout: it exits 1, reads no input, and cannot SIGPIPE, so
+# nothing but `pipefail` moves the answer. And no case places a pipeline on
+# the left of a `&&` that gates the read.
+#
+# ADD A CASE ONLY IF: the read is reached unconditionally, and the only thing
+# `pipefail` can change is the value `$?` holds.
 #
 # EXCEPTIONS are the guard's known limits, listed with the direction of each.
 # The point of naming them here rather than omitting the cases is that the
@@ -688,12 +704,31 @@ PRODUCER = "grep -q zzz /dev/null"
 
 
 def bash_says_misread(command):
-    """True when `set -o pipefail` changes what the command prints."""
-    plain = subprocess.run(["bash", "-c", command],
+    """(moved, informative) for one shape under bash.
+
+    `moved` is True when `set -o pipefail` changes what the command prints.
+
+    `informative` is False when BOTH runs print nothing, which means the shape
+    told us nothing --- a syntax error, or a command that produces no output.
+    Such a case scores as an agreement whichever way the guard votes, so
+    counting it would inflate the tally with a case bash never evaluated.
+    That is this file's own subject one level up: a matcher that fires on
+    nothing and a matcher that never ran leave the same evidence.
+
+    `-O extglob` is passed because extglob is OFF in non-interactive bash, so
+    `ls @(a|b)` is a SYNTAX ERROR rather than a pattern --- which is exactly
+    how one case sat in the "agreed" column for a round without bash ever
+    evaluating it. An inline `shopt -s extglob;` does not help, since bash
+    parses the whole line before running it. Enabling the option adds pattern
+    syntax and changes no other case's behaviour.
+    """
+    plain = subprocess.run(["bash", "-O", "extglob", "-c", command],
                            capture_output=True, text=True, timeout=10)
-    guarded = subprocess.run(["bash", "-c", "set -o pipefail\n" + command],
-                             capture_output=True, text=True, timeout=10)
-    return plain.stdout != guarded.stdout
+    guarded = subprocess.run(
+        ["bash", "-O", "extglob", "-c", "set -o pipefail\n" + command],
+        capture_output=True, text=True, timeout=10)
+    informative = bool(plain.stdout.strip() or guarded.stdout.strip())
+    return plain.stdout != guarded.stdout, informative
 
 
 # (command, why it is exempt). Every entry was measured; each is a case the
@@ -789,9 +824,14 @@ else:
     for command in ORACLE_CASES:
         examined += 1
         try:
-            expected = bash_says_misread(command)
+            expected, informative = bash_says_misread(command)
         except Exception as exc:                      # pragma: no cover
             failures.append(f"ORACLE could not run {command!r}: {exc}")
+            continue
+        if not informative:
+            failures.append(
+                f"ORACLE case produced no output either way, so it tests "
+                f"nothing: {command!r}")
             continue
         got = fires(command)
         if command in KNOWN_LIMITS:

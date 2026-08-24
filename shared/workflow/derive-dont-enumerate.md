@@ -129,6 +129,15 @@ Surface an unowned stalled PR to the human, or claim it per [`claim-pr`](claim-p
 [`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
 This is the cheap standing sweep that says where to point it.
 
+`scripts/pr-overlap.py` is its sibling, deriving the same live set and answering the other set-level question --- which pairs of open PRs share a file:
+
+```bash
+python3 scripts/pr-overlap.py -R Morrison-Lab/ai-config
+```
+
+The split is worth keeping straight, because "stalled" is a property of each PR and "collides" is a property of the **pair**, so no per-PR sweep can reach it however carefully it is run.
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md) owns the collision rule and the boundary: an intersection sees collisions and never dependencies.
+
 ## Asserting the set is EMPTY is the enumeration that skips its own check
 
 Everything above governs a set with members: hand over the query rather than the members, and watch that the query itself is wide enough.

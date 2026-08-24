@@ -92,17 +92,18 @@ issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
 
 **Every detector of a claim matches the OLD wording as well as the new one, and dropping the old alternation is the one edit that fails silently.**
-There were **three** retired wordings, not one, and enumerating them from the file in front of you is how the third was missed for a whole review round.
-Most emitters carried the `paws off` invariant --- `claim-pr`, `gi`, `st`, `gip`, `pr-on-claim`, `post-merge`, `iterate`, `handoff` (as "still claimed, paws off.") and the orchestrator (as "paws off until done").
+There were **two** retired invariants, not one, and enumerating them from the file in front of you is how the second was missed for a whole review round.
+Most emitters carried the `paws off` invariant --- `claim-pr`, `gi`, `st`, `gip`, `pr-on-claim`, `post-merge`, `handoff` (as "still claimed, paws off.") and the orchestrator (as "paws off until done").
 [`ardi`](ardi.md) did not.
 It said "back off until done", and had done since 2026-06-17 --- and it is the corpus's highest-traffic claim emitter, run on every PR in every repo.
-All three now read "please hold off ...".
+Both now read "please hold off ...".
 
-Derive that set from history rather than from the current tree, which no longer contains any of them:
+Derive that set from history rather than from the current tree, which no longer contains any of them.
+Widen the pathspec past `skills/` and match the opening quote only, since `handoff` opens a multi-line body whose closing quote is on another line, and the orchestrator is executable code rather than a skill:
 
 ```bash
-git log -p --all -- 'skills/*/SKILL.md' 'shared/workflow/claim-pr.md' \
-  | grep -oiE '^\+.*--(body|message) "[^"]*(off|claim)[^"]*"' | sort -u
+git log -p --all -- 'skills/**' 'shared/**' 'commands/**' 'scripts/**' \
+  | grep -oiE '^\+.*--(body|message) "[^"]*(off until|claim)' | sort -u
 ```
 Claims posted before that are still sitting on open PRs and issues, and a claim stays live on activity rather than on age --- so a thread claimed under the old wording and pushed to this morning is live right now.
 
@@ -164,8 +165,7 @@ git show -s --format=%P origin/<branch>   # its parents
 
 An identical tree plus identical parents means the two merges are the same merge, so the right action is `git reset --hard origin/<branch>`.
 
-- **Do:** compare trees and parents before deciding what a rejected push
-  means.
+- **Do:** compare trees and parents before deciding what a rejected push means.
 - **Do:** discard your local merge with `git reset --hard origin/<branch>` once both match.
 - **Don't:** re-merge reflexively on a rejected push --- that is what produces the redundant merge commit.
 - **Don't:** force-push over the other session's commit.

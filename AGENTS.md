@@ -85,6 +85,50 @@ In every session --- at session start, and again periodically during long sessio
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 
+## Verify changes before pushing
+
+No compiled app gates this repo.
+CI ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)) and pre-commit run the checks directly:
+
+```sh
+python3 scripts/validate-skills.py    # SKILL.md frontmatter, codex-skills/ sync, manifests
+python3 scripts/check-links.py        # no broken relative markdown links
+npx --yes markdownlint-cli2@0.22.1    # style; config in .markdownlint-cli2.jsonc
+```
+
+Most checks ship their own suite as a standalone script (`scripts/test_<name>.py`, plus `hooks/test-<name>.py` paired with their subjects by `scripts/test_hooks.py`, which fails on an untested hook outside its explicit allowlist), so a focused check is one `python3` invocation.
+Environment quirks that bite here (the `python` shim, pre-commit's PATH, the submodule) are listed under the Cursor Cloud section below and apply to any agent.
+
+## Canonical sources vs generated output
+
+Never hand-edit generated files; CI fails on stale or drifted output.
+
+| Source of truth | Generated (do not edit) | Refresh with |
+|---|---|---|
+| `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
+| `tool-mappings.yml` | `tool-mappings.md` | same script |
+| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+
+After adding or editing a skill, regenerate the wrappers before pushing.
+
+## Shared fragments have two consumers
+
+Fragments under `shared/` are imported by `CLAUDE.md` (`@path`) and transcluded by the UCD-SERG lab manual via its `.ai-config` submodule.
+Edit the fragment, never an inline copy in `CLAUDE.md`.
+Keep fragments ASCII (write `---` for em-dashes, straight quotes) so the lab manual's non-standard-character check passes, and keep them audience-neutral: no first person, no harness-specific framing inside the body.
+
+## Adding an enforcement hook
+
+A hook needs four synchronized pieces: the script in `hooks/`, its `test-<name>.py` beside it, its binding in [`hooks/hooks.json`](hooks/hooks.json), and a row in the README hook table --- `scripts/check-hook-catalog.py` fails when the table and the manifest disagree.
+Warn-only hooks emit `systemMessage`, never a bare `reason`: a `Stop` hook's `reason` is read only alongside `"decision": "block"`, so a warn-by-`reason` hook fires silently.
+Never activate a hook before its PR merges: writing and testing the script is authoring and needs no permission, but do not run `install-hooks.py --fix` for a hook whose PR is still open.
+
+## Context budget
+
+`CLAUDE.md` plus the transitive closure of its `@path` imports loads in full at every session start.
+The root file's character cap and a per-fragment cap gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR.
+Prefer an on-demand memory file under `memories/`.
+
 ## Worktree isolation
 
 - **Always use a worktree.**
@@ -199,6 +243,15 @@ below).
   - *Manual*: Triggered via `@mention` or explicit command.
 - **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
 
+## Default to action without asking
+
+The owner grants standing permission for non-destructive steps --- committing to a branch, pushing, opening or updating PRs against Morrison-Lab repositories, running non-destructive Git and API reads, and editing the shared agent-config memory in this repo.
+Proceed with reasonable non-destructive steps and report them afterwards in the past tense.
+Ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
+This grants no merge authority: the strict merge policy below still applies.
+
+(User directive, 2026-08-23: "always yes".)
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
@@ -236,9 +289,9 @@ present in the environment.
 
 Non-obvious caveats worth knowing:
 
-- **Lint:** `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`,
-  and `npx --yes markdownlint-cli2@0.22.1` (config in
-  `.markdownlint-cli2.jsonc`) are the fast, most-used checks.
+- **Lint:** the three fast checks under
+  [Verify changes before pushing](#verify-changes-before-pushing) cover this;
+  see that section rather than a second pinned command list here.
 - **Test:** the `scripts/test_*.py` suites (each runnable directly with
   `python3`); `validate.yml` lists the full set CI runs.
   `scripts/test_compare_shell_forms.py` spawns a real `bash` that invokes

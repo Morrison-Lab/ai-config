@@ -28,9 +28,10 @@ TARGET = Path.home() / ".config" / "systemd" / "user" / UNIT
 HOOK = ROOT / "hooks" / "monitor-open-prs.py"
 INSTALLED_HOOK = Path.home() / ".local" / "share" / "ai-config" / "hooks" / HOOK.name
 CRON_MARKER = "# ai-config-pr-monitor"
-# A live daemon rewrites checked_at every poll (120 s); a state file older
-# than this proves the recorded pid no longer belongs to the monitor.
-STALE_STATE_SECONDS = 600
+# A live daemon rewrites checked_at every poll; a state file older than this
+# many poll intervals proves the recorded pid no longer belongs to the
+# monitor. The interval itself is read from the hook, not duplicated here.
+STALE_POLLS = 5
 
 
 def resolve_dependencies():
@@ -87,41 +88,50 @@ def install_cron(python3, path):
     return True
 
 
-def monitor_state_path():
+def monitor_module():
     spec = importlib.util.spec_from_file_location("monitor_open_prs", HOOK)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.STATE_PATH
+    return module
 
 
-def stop_stale_daemon(state_path=None):
+def stop_stale_daemon(state_path=None, stale_seconds=None, wait_seconds=5.0):
     """Kill the recorded daemon so the start below runs the fixed code.
 
     Only a recently-refreshed state file proves the recorded pid still
-    belongs to a live monitor; past STALE_STATE_SECONDS the pid may have
+    belongs to a live monitor; past the staleness horizon the pid may have
     been recycled to an unrelated process, and the daemon it named is dead
     anyway, so the file is left alone.  After the SIGTERM, wait for the
     process to disappear so the cron fallback's ensure() cannot observe
-    the dying pid as alive and skip its respawn.
+    the dying pid as alive and skip its respawn --- and say so when the
+    wait exhausts, so a survived SIGTERM is not reported as a stop.
     """
-    if state_path is None:
-        state_path = monitor_state_path()
+    if state_path is None or stale_seconds is None:
+        module = monitor_module()
+        if state_path is None:
+            state_path = module.STATE_PATH
+        if stale_seconds is None:
+            stale_seconds = STALE_POLLS * module.POLL_SECONDS
     try:
         with open(state_path, encoding="utf-8") as stream:
             state = json.load(stream)
         pid = int(state.get("pid"))
-        if time.time() - float(state.get("checked_at") or 0) > STALE_STATE_SECONDS:
+        if time.time() - float(state.get("checked_at") or 0) > stale_seconds:
             return None
         os.kill(pid, signal.SIGTERM)
     except (OSError, ValueError, TypeError):
         return None
-    for _ in range(50):
+    deadline = time.monotonic() + wait_seconds
+    while time.monotonic() < deadline:
         try:
             os.kill(pid, 0)
         except OSError:
-            break
+            print(f"stopped stale monitor daemon (pid {pid})")
+            return pid
         time.sleep(0.1)
-    print(f"stopped stale monitor daemon (pid {pid})")
+    print(f"sent SIGTERM to the recorded daemon (pid {pid}), but it is still "
+          f"observable after {wait_seconds}s; ensure() may see it and delay "
+          "the respawn to the next prompt")
     return pid
 
 

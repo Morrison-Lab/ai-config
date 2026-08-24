@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline regression tests for install-pr-monitor.py's pure helpers."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -79,15 +81,16 @@ check("percent anywhere in the cron line refuses the install",
 
 # stop_stale_daemon kills the recorded pid and reports it; a missing or
 # stale state file is a quiet no-op.
+STALE = 600
 with tempfile.TemporaryDirectory() as d:
     state_path = os.path.join(d, "all-open-prs.json")
     check("missing state file is a no-op",
-          subject.stop_stale_daemon(state_path) is None)
+          subject.stop_stale_daemon(state_path, STALE) is None)
 
     with open(state_path, "w", encoding="utf-8") as stream:
         json.dump({"pid": None}, stream)
     check("state without a pid is a no-op",
-          subject.stop_stale_daemon(state_path) is None)
+          subject.stop_stale_daemon(state_path, STALE) is None)
 
     process = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"])
@@ -96,22 +99,52 @@ with tempfile.TemporaryDirectory() as d:
         # alone: the pid may have been recycled to an unrelated process,
         # and the daemon that wrote the file is dead anyway.
         with open(state_path, "w", encoding="utf-8") as stream:
-            json.dump({"pid": process.pid,
-                       "checked_at": time.time() - 2 * subject.STALE_STATE_SECONDS},
+            json.dump({"pid": process.pid, "checked_at": time.time() - 2 * STALE},
                       stream)
         check("stale state file leaves a live pid alone",
-              subject.stop_stale_daemon(state_path) is None
+              subject.stop_stale_daemon(state_path, STALE) is None
               and process.poll() is None)
 
+        # In this topology the dying pid stays observable (an unreaped
+        # child on POSIX, an open handle on Windows), so the wait exhausts
+        # and must say so rather than claiming a confirmed stop.
         with open(state_path, "w", encoding="utf-8") as stream:
             json.dump({"pid": process.pid, "checked_at": time.time()}, stream)
-        check("live recorded daemon is stopped",
-              subject.stop_stale_daemon(state_path) == process.pid)
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            result = subject.stop_stale_daemon(state_path, STALE, wait_seconds=0.5)
+        check("live recorded daemon is stopped", result == process.pid)
+        check("an exhausted wait reports the pid as still observable",
+              "still observable" in captured.getvalue())
         process.wait(timeout=15)
         check("stopped daemon actually exits", process.poll() is not None)
     finally:
         if process.poll() is None:
             process.kill()
+
+    # When the probe raises, the confirmed-stop path fires without
+    # exhausting the wait; a fake kill makes that branch deterministic in
+    # every topology.
+    with open(state_path, "w", encoding="utf-8") as stream:
+        json.dump({"pid": 4242, "checked_at": time.time()}, stream)
+    real_kill = os.kill
+
+    def fake_kill(pid, sig):
+        if sig == 0:
+            raise OSError("no such process")
+
+    try:
+        os.kill = fake_kill
+        captured = io.StringIO()
+        started = time.monotonic()
+        with contextlib.redirect_stdout(captured):
+            result = subject.stop_stale_daemon(state_path, STALE, wait_seconds=5.0)
+        check("a gone daemon takes the confirmed-stop path",
+              result == 4242 and "stopped stale monitor daemon" in captured.getvalue())
+        check("the confirmed stop does not exhaust the wait",
+              time.monotonic() - started < 2.0)
+    finally:
+        os.kill = real_kill
 
 print(f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

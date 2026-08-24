@@ -60,9 +60,16 @@ def poll_once(state):
         state.pop("error", None)
         state["error_streak"] = 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
+        message = str(error)
+        # The streak counts consecutive polls of the SAME error text, so a
+        # text change starts a fresh streak and earns its own persistent
+        # report downstream; state still holds the previous poll's error here.
+        if "error" in state and state["error"] == message:
+            state["error_streak"] = int(state.get("error_streak") or 0) + 1
+        else:
+            state["error_streak"] = 1
         state.pop("data", None)
-        state["error"] = str(error)
-        state["error_streak"] = int(state.get("error_streak") or 0) + 1
+        state["error"] = message
     write_state(state)
     return state
 

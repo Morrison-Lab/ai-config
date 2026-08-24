@@ -5,9 +5,17 @@ The daemon must survive contexts with a minimal PATH (cron, systemd user
 units), so `gh` and `python3` are resolved absolutely at install time and
 the interactive PATH is persisted for the daemon: into the cron line and a
 systemd drop-in. The checked-in unit stays machine-generic.
+
+Installing also STOPS a daemon already running under the old code: systemd's
+`enable --now` no-ops on an active unit and `ensure()` returns early on a
+live pid, so without an explicit stop the installer would report success
+while the broken daemon kept polling (the #1953 trap).
 """
+import importlib.util
+import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -31,50 +39,97 @@ def resolve_dependencies():
     return python3
 
 
-def write_path_dropin():
+def interactive_path():
+    path = os.environ.get("PATH", "")
+    if '"' in path:
+        sys.exit("FATAL: PATH contains a double quote, which cannot be "
+                 "persisted safely into a crontab line or systemd drop-in; "
+                 "clean PATH and re-run")
+    return path
+
+
+def dropin_text(path):
+    # A literal % must be doubled in a systemd unit: specifier expansion
+    # applies to Environment= values.
+    return '[Service]\nEnvironment="PATH=' + path.replace("%", "%%") + '"\n'
+
+
+def write_path_dropin(path):
     dropin_dir = TARGET.parent / (UNIT + ".d")
     dropin_dir.mkdir(parents=True, exist_ok=True)
-    dropin = dropin_dir / "10-path.conf"
-    dropin.write_text('[Service]\nEnvironment="PATH=' + os.environ.get("PATH", "") + '"\n',
-                      encoding="utf-8")
+    (dropin_dir / "10-path.conf").write_text(dropin_text(path), encoding="utf-8")
 
 
-def install_cron(python3):
+def cron_line(python3, path):
+    line = ('@reboot /usr/bin/env PATH="' + path + '" '
+            + python3 + " " + str(INSTALLED_HOOK) + " --monitor " + CRON_MARKER + "\n")
+    if "%" in line:
+        # cron rewrites an unescaped % in the command field into a newline,
+        # and backslash-escape semantics differ across cron implementations,
+        # so refuse rather than persist a corrupted line.
+        sys.exit("FATAL: the generated crontab line contains '%', which cron "
+                 "would corrupt; install under systemd or clean PATH")
+    return line
+
+
+def install_cron(python3, path):
     existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
     if existing.returncode not in (0, 1):
         return False
     existing_lines = [line for line in existing.stdout.splitlines()
                       if CRON_MARKER not in line]
-    line = ('@reboot /usr/bin/env PATH="' + os.environ.get("PATH", "") + '" '
-            + python3 + " " + str(INSTALLED_HOOK) + " --monitor " + CRON_MARKER + "\n")
-    content = "\n".join(existing_lines).rstrip() + "\n" + line
+    content = "\n".join(existing_lines).rstrip() + "\n" + cron_line(python3, path)
     subprocess.run(["crontab", "-"], input=content, text=True, check=True)
     return True
 
 
+def monitor_state_path():
+    spec = importlib.util.spec_from_file_location("monitor_open_prs", HOOK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.STATE_PATH
+
+
+def stop_stale_daemon(state_path=None):
+    """Kill the recorded daemon so the start below runs the fixed code."""
+    if state_path is None:
+        state_path = monitor_state_path()
+    try:
+        with open(state_path, encoding="utf-8") as stream:
+            pid = int(json.load(stream).get("pid"))
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, ValueError, TypeError):
+        return None
+    print(f"stopped stale monitor daemon (pid {pid})")
+    return pid
+
+
 def main():
     python3 = resolve_dependencies()
+    path = interactive_path()
     if not HOOK.is_file():
         sys.exit(f"FATAL: monitor source is missing at {HOOK}")
     INSTALLED_HOOK.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HOOK, INSTALLED_HOOK)
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(SOURCE, TARGET)
-    write_path_dropin()
+    write_path_dropin(path)
+    stop_stale_daemon()
     try:
         for command in (("systemctl", "--user", "daemon-reload"),
-                        ("systemctl", "--user", "enable", "--now", UNIT)):
+                        ("systemctl", "--user", "enable", UNIT),
+                        ("systemctl", "--user", "restart", UNIT)):
             subprocess.run(command, check=True)
     except (OSError, subprocess.SubprocessError):
         subprocess.run([sys.executable, str(INSTALLED_HOOK)], check=True)
         try:
-            if not install_cron(python3):
+            if not install_cron(python3, path):
                 sys.exit("FATAL: neither systemd nor crontab could persist the PR monitor")
         except (OSError, subprocess.SubprocessError):
             sys.exit("FATAL: neither systemd nor crontab could persist the PR monitor")
         print("started monitor now; installed cron @reboot fallback")
         return
-    print(f"enabled and started {UNIT}")
+    print(f"enabled and restarted {UNIT}")
 
 
 if __name__ == "__main__":

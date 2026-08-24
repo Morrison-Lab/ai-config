@@ -10,6 +10,9 @@ spec.loader.exec_module(subject)
 assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
+# The command must run the absolutely-resolved GH_PATH; the literal "gh"
+# reappearing in open_prs would be a revert of the #1953 fix.
+assert "gh" not in subject.open_prs.__code__.co_consts
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 import tempfile, os
@@ -62,6 +65,19 @@ with tempfile.TemporaryDirectory() as d:
         state = subject.poll_once({})
         assert state["error"].endswith("'gh'")
         assert "data" not in state
+        assert state["error_streak"] == 1
+        state = subject.poll_once(state)
+        assert state["error_streak"] == 2
+
+        # A different error text restarts the streak: the streak counts
+        # consecutive polls of the SAME error, so a new failure mode earns
+        # its own persistent report downstream.
+        def failing_differently():
+            raise OSError("connection timed out")
+
+        subject.open_prs = failing_differently
+        state = subject.poll_once(state)
+        assert state["error"] == "connection timed out"
         assert state["error_streak"] == 1
         state = subject.poll_once(state)
         assert state["error_streak"] == 2

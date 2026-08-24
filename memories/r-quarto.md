@@ -879,6 +879,32 @@ the project `.Rprofile` occupies the user-profile slot and
 the override, loaded without). `Rscript --no-init-file` is an equivalent
 alternative. (rme OOM investigation, 2026-07-17.)
 
+## A project's `_quarto.yml` `format:` block is not the set of formats the project renders
+
+Per-document front matter **overrides** the project-level `format:` key rather than adding to it, so a project declaring `format: html` alone can still render PDF, docx, and revealjs --- and will, on any document whose own front matter says so.
+
+The consequence is a CI toolchain you cannot infer from the config file.
+Dropping TinyTeX because `_quarto.yml` names only `html` is a change that passes every local check, passes review, and breaks the first publish after merge, on a document nobody opened.
+
+This is [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s "a neighbour for the target" shape, and it is a comfortable one to fall into: `_quarto.yml` is the project's configuration, it is the file you would name if asked where a project's formats are declared, and reading it feels like checking rather than assuming.
+The format set is a property of the **document population**, though, so only a sweep over the documents answers it.
+
+```bash
+grep -l '^format:' *.qmd chapters/**/*.qmd 2>/dev/null | while read -r f; do
+  echo "== $f"; sed -n '/^format:/,/^[a-z]/p' "$f" | head -20
+done
+```
+
+Note what the toolchain question actually turns on: a `pdf:` anywhere in that sweep requires TinyTeX, and a `revealjs:` may require Chrome, regardless of what the project file says.
+
+- **Do:** derive the rendered format set from every document's front matter before removing a toolchain from CI.
+- **Do:** read a demo or example document as a likely format outlier --- it exists to exercise a format, which is exactly why its front matter differs from the project's.
+- **Don't:** treat the project-level `format:` block as the format set; it is the default, and a per-document block replaces it.
+- **Don't:** read a green local render as coverage when freeze is on --- `freeze: auto` skips execution for unchanged documents, so the ones you did not touch are the ones you did not test.
+
+(Measured 2026-08-24 on `d-morrison/macros`, whose `_quarto.yml` declares `format: html` only while `demo-shortcode.qmd` and `demo-include-in-header.qmd` each declare their own `pdf:` and `revealjs:` blocks --- demonstrating the macros reaching the LaTeX preamble being the entire point of those two pages.
+Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/83) before the TinyTeX removal merged.)
+
 ## quarto-actions/setup with tinytex — two shared-runner failure signatures (win, 2026-07)
 
 - **`ERROR: Unable to determine latest release for rstudio/tinytex-releases / 403 - Forbidden`**

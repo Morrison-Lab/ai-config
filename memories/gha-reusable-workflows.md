@@ -151,3 +151,23 @@ Generic Actions-authoring material stays there.
   Supports `workflow_dispatch`, `/update-snapshots` PR comment (`pr-mode: true`), and auto-update before R-CMD-check (`ref: github.head_ref`).
   Pass system deps via `apt-packages`.
   Added in gha#103; bcs#226 is the reference caller.
+- **The gha family has THREE different R-dependency mechanisms, with opposite defaults, and picking the wrong one fails only at render time.**
+  A consumer migrating a whole repo touches several of these workflows in one PR, which is exactly when the differences are invisible --- they read as one coherent family, and each caller stub is short enough to look obviously correct.
+  - **`claude.yml`** --- `setup-r` defaults **true**, and with `use-renv` false it runs `setup-r-dependencies` with `extra-packages`, whose default spec includes `local::.`.
+    That resolves against a `DESCRIPTION`.
+    A Quarto site with no `DESCRIPTION` therefore fails on every agent run unless the caller sets `setup-r: false` explicitly.
+  - **`quarto-publish.yml`** --- `setup-r` defaults **false**, and its `r-packages` input reaches `setup-r-dependencies` as `packages:` rather than `extra-packages:`.
+    That *replaces* the default `deps::.` spec instead of adding to it, which is what makes `setup-r: true` work with no `DESCRIPTION` at all.
+  - **`preview.yml`** --- offers neither.
+    It installs R unconditionally and supports only `use-renv` (needs `renv.lock`) or `install-package` (needs the repo to be an R package).
+    A site that is neither has no path, so the preview half of the preview/publish family cannot serve a repo shape the publish half serves fine.
+    Filed as [gha#607](https://github.com/Morrison-Lab/gha/issues/607).
+
+  Read the *composite action*, not the reusable workflow, when the question is which `setup-r-dependencies` argument an input lands in --- the workflow forwards the input by name and the composite decides `packages:` versus `extra-packages:`, so the wrapping file cannot answer it.
+
+  - **Do:** set `setup-r: false` on `claude.yml` for any consumer without a `DESCRIPTION`, and `setup-r: true` plus an explicit `r-packages` on `quarto-publish.yml`.
+  - **Do:** check each workflow's default separately when migrating several at once.
+  - **Don't:** carry a setting across from one gha workflow's caller to another's --- `setup-r` alone defaults opposite ways in two of them.
+  - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block; the composite is where `packages:` versus `extra-packages:` is decided.
+
+  (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)

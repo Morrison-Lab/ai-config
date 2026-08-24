@@ -34,11 +34,10 @@ if this session doesn't have `gh`.
 
 ## Verify the PR is still open first
 
-Before checking CI or review, confirm the PR hasn't merged or closed since
-you last looked:
+Before checking CI or review, confirm the PR hasn't merged or closed since you last looked, and fetch its branch name and draft state:
 
 ```bash
-gh pr view <N> --json state,title --jq '"\(.state): \(.title)"'   # VIEW_PR
+gh pr view <N> --json state,title,isDraft,headRefName --jq '"\(.state): \(.title) (draft: \(.isDraft), branch: \(.headRefName))"'   # VIEW_PR
 ```
 
 - `OPEN` → proceed with CI and review checks below.
@@ -309,6 +308,17 @@ Interpret the output as:
 - A `+`-suffixed string (e.g. `0+ open (totalCount 150; cap reached — may undercount)`) — the 100-thread cap was hit. **Cannot confirm clean**, even if the visible count is 0; treat as unresolved until the cap is lifted or the PR is confirmed clean another way.
 
 (The resolve mutation lives in the `ard` skill, step 4b.)
+
+## Check if the branch is behind main
+
+Compare remote-tracking refs to see if `main` has moved ahead of the branch:
+
+```bash
+git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main
+```
+
+- `0` — up to date with main.
+- `>0` — behind main by that many commits (offer `sync-pr-branch`).
 
 ## Output
 

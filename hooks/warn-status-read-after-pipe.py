@@ -171,13 +171,19 @@ RX_HEREDOC = re.compile(
     re.DOTALL,
 )
 
-# `set -o pipefail`, `set -euo pipefail`, `set -eo pipefail`. Anchored to the
-# START of a segment, so only a real `set` command counts. Merely naming the
+# `set -o pipefail`, `set -euo pipefail`, `set -eo pipefail`. Anchored to a
+# COMMAND POSITION -- start of segment, or just after a separator or an
+# opening paren -- so only a real `set` command counts. Merely naming the
 # option must not disarm the guard, and this corpus names it constantly:
-# `grep -rn pipefail hooks/ | head -20; echo $?` and
-# `echo "remember to set -o pipefail"; cmd | head -20; echo $?` are both
-# genuine misreads, and both were quiet under a looser test.
-RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
+# `grep -rn pipefail hooks/ | head -20; echo $?` carries no `set` token at a
+# command position and stays armed.
+#
+# The paren alternative is load-bearing rather than tidiness. Separators inside
+# a paren group do not cut a segment, so `( set -o pipefail; cmd | head )`
+# keeps its `set` inside the PIPELINE's own segment rather than an earlier one.
+# Measured, that subshell gives rc=1, so `pipefail` is genuinely in force and a
+# warning there would be false.
+RX_SET_PIPEFAIL = re.compile(r"(?:^|[;&|(]\s*)\s*set\b[^;&|\n]*\bpipefail\b")
 
 # A real `${PIPESTATUS[0]}` / `$PIPESTATUS` expansion, not the bare word. The
 # author reading a specific stage by index is taking control of the pipeline's
@@ -236,17 +242,28 @@ def _last_significant(text, upto):
     return text[index] if index >= 0 else ""
 
 
-# `VAR=`, `local VAR=`, `export VAR=` immediately before a `$(`. An assignment
-# takes the substitution's OWN status, so `out=$(cmd | head -1); echo $?` reads
-# the pipeline and is a genuine instance of this bug. Measured:
+# A plain assignment immediately before a `$(`. An assignment takes the
+# substitution's OWN status, so `out=$(cmd | head -1); echo $?` reads the
+# pipeline and is a genuine instance of this bug. Measured:
 #   out=$(grep -q zzz /dev/null | cat); echo $?               -> 0  (cat's)
 #   set -o pipefail; out=$(... | cat); echo $?                -> 1
 # `pipefail` flipping the answer is what proves it is the pipeline's status.
-# Used as an argument instead -- `echo "$(a|b)"` -- the outer command's status
-# wins, so those stay excluded.
+#
+# `local`, `export`, `declare` and `readonly` are deliberately NOT here. They
+# are COMMANDS, so `$?` is the builtin's status and `pipefail` does not flip
+# it --- measured, `export OUT=$(... | cat); echo $?` gives 0 with and without
+# `pipefail`. An earlier version admitted them, which made the guard fire
+# while asserting a mechanism that was not operating and offering two remedies
+# that measurably do not work.
 RX_ASSIGN_PREFIX = re.compile(
-    r"(?:^|[;&|]\s*)\s*(?:local\s+|export\s+|declare\s+|readonly\s+)?"
-    r"[A-Za-z_][A-Za-z0-9_]*=$"
+    r"^\s*[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=$"
+)
+
+# The assignment must be the WHOLE segment. Used as a command PREFIX ---
+# `V=$(echo x | grep -q zzz) true; echo $?` --- the following command's status
+# wins instead, measured at 0 for `true`.
+RX_WHOLE_ASSIGN = re.compile(
+    r"^\s*[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=\$\(.*\)\s*$", re.DOTALL
 )
 
 
@@ -262,10 +279,12 @@ def scan(command):
     so dropping empty segments cannot shift a read onto the wrong one.
     """
     text = command
-    bounds = []          # (start, end, has_pipe) for every raw segment
+    bounds = []          # (start, end, plain_pipe, assign_pipe) per raw segment
     offsets = []         # absolute offset of each expandable `$?`
+    comments = []        # (start, end) of each comment span, blanked later
     start = 0
-    has_pipe = False
+    pipe_plain = False   # a pipe at top level of this segment
+    pipe_assign = False  # a pipe inside an assignment's `$( ... )`
     quote = ""
     # A STACK rather than a counter, so a bare `( ... )` nested inside a
     # `$( ... )` cannot decrement the wrong thing. Entries are "hide" for a
@@ -284,13 +303,13 @@ def scan(command):
         return "hide" in parens
 
     def cut(end, skip):
-        nonlocal start, has_pipe, i, condition
-        bounds.append((start, end, has_pipe))
-        has_pipe = False
+        nonlocal start, pipe_plain, pipe_assign, i, condition
+        bounds.append((start, end, pipe_plain, pipe_assign))
+        pipe_plain = False
+        pipe_assign = False
         # A command separator ends any unterminated `[[`, so a stray one
         # cannot disable pipe detection for the rest of the string.
         condition = 0
-        del parens[:]
         i = end + skip
         start = i
 
@@ -347,7 +366,13 @@ def scan(command):
         # explaining this bug otherwise trips the guard describing it.
         if char == "#" and (i == 0 or text[i - 1] in " \t\n;&|("):
             newline = text.find("\n", i)
-            i = n if newline == -1 else newline
+            end = n if newline == -1 else newline
+            # Recorded so the span can be blanked from the segment body. A
+            # comment is not a command and does not set `$?`, so a
+            # comment-only segment must not become the "immediate
+            # predecessor" and hide a real pipeline behind it.
+            comments.append((i, end))
+            i = end
             continue
 
         if char == "$" and text[i + 1:i + 2] == "(":
@@ -358,14 +383,26 @@ def scan(command):
                 i += 3
                 continue
             assigned = RX_ASSIGN_PREFIX.search(text[start:i]) is not None
-            parens.append("show" if assigned else "hide")
+            parens.append("assign" if assigned else "hide")
             i += 2
             continue
         if char in ("<", ">") and text[i + 1:i + 2] == "(":
             parens.append("hide")
             i += 2
             continue
+        if text[i:i + 2] == "((":
+            # Bare `(( ... ))` arithmetic, where `|` is bitwise OR.
+            parens.append("hide")
+            parens.append("hide")
+            i += 2
+            continue
         if char == "(":
+            # Extglob -- `@(a|b)`, `!(keep|also)`, `?(x|y)`, `*(...)`,
+            # `+(...)` -- where `|` is pattern alternation rather than a pipe.
+            if _last_significant(text, i) in ("@", "!", "?", "*", "+"):
+                parens.append("hide")
+                i += 1
+                continue
             # A bare subshell's status IS its last command's, so a pipeline
             # inside one is read exactly as a top-level pipeline would be.
             parens.append("show")
@@ -419,8 +456,12 @@ def scan(command):
             # A lone `&` BACKGROUNDS what precedes it, so the `$?` that follows
             # is the async launch's status (0) rather than the pipeline's.
             # Measured: `cmd | head -20 & echo $?` prints 0 whatever `cmd` did.
-            # Clearing the flag keeps the guard from asserting something false.
-            has_pipe = False
+            # Clearing the flags keeps the guard from asserting something
+            # false. Both must be cleared -- an earlier version cleared a
+            # single `has_pipe` that a later refactor split in two, which
+            # silently reinstated this false positive until a test caught it.
+            pipe_plain = False
+            pipe_assign = False
             cut(i, 1)
             continue
 
@@ -443,20 +484,36 @@ def scan(command):
                 i += 1
                 continue
             if not hidden() and not condition:
-                has_pipe = True
+                if "assign" in parens:
+                    pipe_assign = True
+                else:
+                    pipe_plain = True
             i += 1
             continue
 
         i += 1
 
-    bounds.append((start, n, has_pipe))
+    bounds.append((start, n, pipe_plain, pipe_assign))
+
+    # Blank comment spans so a comment-only segment reads as empty and gets
+    # dropped, rather than standing between a pipeline and the read of it.
+    body_text = list(text)
+    for begin, end in comments:
+        for position in range(begin, end):
+            body_text[position] = " "
+    body_text = "".join(body_text)
 
     segments = []
     spans = []
-    for begin, end, piped in bounds:
-        body = text[begin:end].strip()
+    for begin, end, plain, assigned in bounds:
+        body = body_text[begin:end].strip()
         if not body:
-            continue  # an empty segment is punctuation, not a command
+            continue  # an empty or comment-only segment is not a command
+        # An assignment's substitution only owns the status when the
+        # assignment IS the segment; used as a command prefix, the following
+        # command's status wins.
+        piped = plain or (assigned
+                          and RX_WHOLE_ASSIGN.match(body) is not None)
         segments.append({"text": body, "has_pipe": piped})
         spans.append((begin, end))
 
@@ -492,10 +549,18 @@ def find_misread(command):
         if not previous["has_pipe"]:
             continue
 
-        # Segments strictly BEFORE the pipeline. The pipeline itself is
-        # excluded on purpose: `grep -rn pipefail hooks/ | head -20; echo $?`
-        # merely mentions the word and is a genuine misread.
-        preceding = segments[:index - 1]
+        # Segments up to AND INCLUDING the pipeline. Including it matters
+        # because separators inside a paren group do not cut, so
+        # `( set -o pipefail; cmd | head -20 ); echo $?` carries its `set`
+        # inside the pipeline's own segment --- and measured, that subshell
+        # really does give rc=1, so warning there would be false.
+        #
+        # Including it is safe only because RX_SET_PIPEFAIL requires `set` at
+        # a command position and the text is quote-stripped first. A bare
+        # mention --- `grep -rn pipefail hooks/ | head -20` --- has no `set`
+        # token, and a quoted one --- `grep -rn "set -o pipefail" hooks/` ---
+        # loses it to the strip.
+        preceding = segments[:index]
         if any(RX_SET_PIPEFAIL.search(RX_QUOTED.sub(" ", s["text"]))
                for s in preceding):
             continue

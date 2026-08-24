@@ -124,14 +124,63 @@ check("an earlier PIPESTATUS read still fires",
 check("the bare word PIPESTATUS still fires",
       fires("echo PIPESTATUS; cmd | head -20; echo $?"), True)
 
+# The two cases above are true but NOT discriminating: each passes against a
+# hook with the relevant guard degraded, because something else already keeps
+# it quiet. Review caught that. These two separate the guards.
+#
+# Needs RX_PIPESTATUS to require a real `$` expansion: with a bare-word
+# matcher the word in the READING segment would suppress.
+check("the word PIPESTATUS in the reading segment still fires",
+      fires('cmd | head -20; echo "$? PIPESTATUS"'), True)
+# Needs the quote strip: `set` IS at a command position here, and only
+# stripping the quoted argument removes the `pipefail` inside it.
+check("set with a quoted pipefail argument still fires",
+      fires('set -- "set -o pipefail"; cmd | head -20; echo $?'), True)
+
+# `local`/`export`/`declare`/`readonly` are COMMANDS, so `$?` is the builtin's
+# status and `pipefail` does not flip it. Measured, `export OUT=$(... | cat);
+# echo $?` gives 0 with and without `pipefail`. Warning here would name a
+# mechanism that is not operating and offer two remedies that do not work.
+for keyword in ("local", "export", "declare", "readonly"):
+    check(f"{keyword} before an assignment does not fire",
+          fires(f"{keyword} OUT=$(cmd | tail -1); echo $?"), False)
+
+# An assignment used as a command PREFIX: the following command's status wins.
+# Measured, `V=$(echo x | grep -q zzz) true; echo $?` gives 0 for `true`.
+check("an assignment used as a command prefix does not fire",
+      fires("V=$(echo x | grep -q zzz) true; echo $?"), False)
+
+# A comment is not a command and does not set `$?`, so a comment sitting
+# between the pipeline and the read must not hide the pipeline. Measured,
+# `cmd | head -20` then a comment line then `echo $?` reports the pipeline's
+# status. The round-2 comment skip introduced this miss.
+check("a comment between the pipeline and the read still fires",
+      fires("cmd | head -20\n# why\necho $?"), True)
+
+# `pipefail` set inside the subshell IS in force -- measured rc=1.
+check("set -o pipefail inside a subshell suppresses",
+      fires("( set -o pipefail; cmd | head -20 ); echo $?"), False)
+
+# Bare `(( ))` arithmetic: `|` is bitwise OR, not a pipe.
+check("bare arithmetic is not a pipe",
+      fires("(( x = a | b )); echo $?"), False)
+
+# Extglob alternation is not a pipe.
+check("extglob alternation is not a pipe",
+      fires("ls @(a|b); echo $?"), False)
+check("negated extglob alternation is not a pipe",
+      fires("rm -- !(keep|also); echo $?"), False)
+
 # A command substitution on the right of an ASSIGNMENT takes the pipeline's
 # own status, so this is the target bug rather than an exclusion. Measured:
 #   out=$(grep -q zzz /dev/null | cat); echo $?              -> 0
 #   set -o pipefail; out=$(grep -q zzz /dev/null | cat)      -> 1
 check("a pipeline assigned from a substitution fires",
       fires("out=$(cmd | head -1); echo $?"), True)
-check("an exported assignment from a substitution fires",
-      fires("export OUT=$(cmd | tail -1); echo $?"), True)
+check("an array-element assignment from a substitution fires",
+      fires("arr[0]=$(cmd | tail -1); echo $?"), True)
+check("an appending assignment from a substitution fires",
+      fires("out+=$(cmd | tail -1); echo $?"), True)
 
 # A bare subshell's status is its last command's, so a pipeline inside one
 # reads exactly as a top-level pipeline does.
@@ -282,8 +331,16 @@ check("command substitution as an argument is not a pipe",
 
 # A nested bare group inside a substitution must not desynchronize the paren
 # stack. Under a counter these fired, naming a pipeline with an unbalanced `)`.
-check("a nested group inside a substitution stays quiet",
+# Label matches the assertion: this one FIRES. The assignment substitution
+# owns the status, so it is a genuine instance; what the nested bare group
+# must not do is desynchronize the paren stack and produce an unbalanced `)`
+# in the diagnostic.
+check("a nested group inside an assignment substitution fires cleanly",
       fires("out=$( (cd /tmp) ; cat f | head -1 ); echo $?"), True)
+check("...and its diagnostic has balanced parens",
+      reported("out=$( (cd /tmp) ; cat f | head -1 ); echo $?")[0].count("(")
+      == reported("out=$( (cd /tmp) ; cat f | head -1 ); echo $?")[0].count(")"),
+      True)
 check("a nested group inside process substitution stays quiet",
       fires("diff <( (cd /tmp); sort a | uniq ) <(sort b); echo $?"), False)
 
@@ -452,10 +509,14 @@ mutant = load_mutant("        if parens:\n"
                      "                continue\n",
                      "")
 if mutant is not None:
-    got = reported("diff <( (cd /tmp); sort a | uniq ) <(sort b); echo $?",
-                   mutant)
-    check("MUTATION paren separator: the diagnostic degrades",
-          got is not None and got[0].endswith(")"), True)
+    # Without the guard, a `;` inside the substitution cuts the outer segment,
+    # so the assignment is split across two segments, the whole-segment
+    # assignment test no longer matches, and a genuine instance is missed.
+    ASSIGN_NESTED = "out=$( (cd /tmp) ; cat f | head -1 ); echo $?"
+    check("MUTATION paren separator: a real instance is missed",
+          fires(ASSIGN_NESTED, mutant), False)
+    check("MUTATION paren separator: the real hook catches it",
+          fires(ASSIGN_NESTED), True)
 
 if failures:
     print("FAILED:")

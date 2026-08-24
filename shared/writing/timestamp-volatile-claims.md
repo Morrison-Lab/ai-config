@@ -98,7 +98,7 @@ even though snapr had since been published to CRAN (0.1.0, 2026-05-22). A
 timestamp on the original --- "not on CRAN as of <date>" --- would have marked
 it as a fact with a vintage, worth re-verifying before repeating.
 
-## A claim inside a PR is read at merge time, not at composition time
+## A claim inside a PR is read at merge time, and a shipped one outlives that
 
 The failure above decays slowly, over however long an undated claim sits
 unchallenged.
@@ -106,11 +106,15 @@ The interval that matters inside a PR is far shorter, and the claim can be
 true, freshly verified, and correctly written and still be false by the time
 anyone reads it.
 
-A PR body, a review comment, and a commit message are each composed once and
-read later --- at review, at merge, and afterwards in the log.
-So a claim about mutable state inside one carries an implicit "as of when I
-wrote this" that no reader ever sees, and a PR's own lifetime is long enough
-for the state to move.
+A PR body, a review comment, a commit message, and a **source-file comment**
+added by the change are each composed once and read later --- at review, at
+merge, and afterwards in the log or the file.
+That fourth class is the one to watch, and the easiest to leave out of the
+list, because the other three are review artifacts that scroll away while a
+YAML or code comment ships and stays.
+So a claim about mutable state inside any of them carries an implicit "as of
+when I wrote this" that a reader has no reason to look for, and a PR's own
+lifetime is long enough for the state to move.
 Anything a human can change while the PR is open qualifies: a repository
 secret, a branch protection rule, an org setting, a dependency's version, a
 sibling PR's status.
@@ -143,10 +147,12 @@ has moved.
 it, on a single occurrence.
 Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
 `WORKFLOW_TOKEN` was measured absent from the repo, and "Not set in this repo"
-went into a PR comment.
+went into a comment in `.github/workflows/claude.yml` --- a shipped source
+file, not a review artifact, which is what makes it the fourth class above.
 The user added the secret org-wide while the work was still in flight, so the
-shipped comment was false by the time it was read.
-A later commit corrected it.
+comment was false before it merged and would have stayed in the tree.
+Commit `a4589dec`, whose message is "Correct the WORKFLOW_TOKEN comment",
+touches only that file.
 Reported by the agent that made it.
 Tracked as ai-config#2149.)
 
@@ -163,6 +169,10 @@ Tracked as ai-config#2149.)
   convert-relative-dates-to-absolute memory rule timestamp *when you acted or
   spoke*; this rule timestamps *when a volatile fact was true* --- a different
   quantity that happens to share the "prefer absolute dates" mechanics.
+- [`ardi.md`](../workflow/ardi.md)'s verification-table rules re-derive a PR
+  body's figures, keyed on a **push**. "A claim inside a PR is read at merge
+  time" above is the complement: it keys on the **merge**, and covers state
+  somebody else owns, which no push of yours disturbs.
 
 ## In review
 
@@ -170,3 +180,7 @@ An undated volatile claim is a review finding, the same weight as an uncited
 one: ask for a timestamp, or a rephrase to something timeless. Apply it to
 your **own** PR descriptions, comments, and commit messages too, not just
 when reviewing someone else's prose.
+
+Where the claim is about mutable state, ask for the re-check as well as the
+timestamp, per "A claim inside a PR is read at merge time" above --- a vintage
+tells a later reader to re-verify, and does not stop the claim shipping false.

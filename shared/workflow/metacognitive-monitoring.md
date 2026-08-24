@@ -393,17 +393,20 @@ where it started.
 
 The cheap discriminator is a **second axis** that the population varies along
 and the sample does not.
-Cost, size, duration, and age all serve, because a gate that silently declines
-an item leaves a different trace than a path that is broken.
+Cost and duration are the two measured below, and they worked because a run
+that exits early spends almost nothing, so the trace it leaves differs in kind
+from a broken path rather than in degree.
 Where every sampled item sits at one end of such an axis, the sample is a
 slice, and the claim that can be supported is about the slice.
 
 **A bounded query prints no denominator, which is the gap in the rule that
 would otherwise cover this.**
 [`deterministic-tools`](../principles/deterministic-tools.md)'s "Read the scope
-an instrument prints" is the standing remedy, and it assumes the instrument
-prints a scope to read.
-`gh run list --limit 5` prints none.
+an instrument prints" is the standing remedy.
+It contemplates the unprinted case --- "a printed denominator nobody checked is
+worth no more than one that was never printed" --- and prescribes nothing for
+it, which is the gap here rather than an oversight there.
+`gh run list --limit 5` prints no denominator at all.
 It returns exactly as many rows as you asked for, so a truncated answer and a
 complete one are the same shape on screen, and the bound was your own choice
 rather than something the output announced.
@@ -414,7 +417,13 @@ The deriving query raises the bound and groups, which manufactures the
 denominator the tool declines to print --- `gh run list --limit 200` with
 `group_by(.conclusion)` reports how many were examined beside how many matched,
 which is what [`fail-fast`](../principles/fail-fast.md) asks of any check.
-State the window whenever you cannot raise it.
+
+Raise it until the total **stops changing**, rather than to a number that
+sounds generous.
+A run that comes back with exactly 200 rows has told you only that the
+population is at least 200, which is the same non-answer `--limit 5` gave,
+one order of magnitude along.
+State the window whenever you cannot raise it far enough to settle it.
 "None of the five most recent" is a claim you measured, and "never" is not.
 
 **The sharpest instance is the one where every sampled item was verified and
@@ -441,12 +450,12 @@ cases the text did not name.
   --- rather than adding a fifth of the same kind.
 - **Do:** scope the claim to what was measured, keeping "these four produced
   none" distinct from "none has ever".
+- **Do:** enumerate the cases a quantified claim did NOT list, since the ones
+  it listed were chosen by whoever wrote the claim.
 - **Don't:** read a query returning exactly `--limit N` rows as a complete
   answer --- that is precisely what a truncated one looks like.
 - **Don't:** read repeated absence as accumulating evidence when a single
   filter would explain every observation at once.
-- **Do:** enumerate the cases a quantified claim did NOT list, since the ones
-  it listed were chosen by whoever wrote the claim.
 - **Don't:** treat a sample you measured as exempt from the Scope check,
   because measuring it is what makes that check feel already performed.
 - **Don't:** read a reviewer's endorsement of a universal as evidence for it
@@ -462,21 +471,48 @@ On `UCD-SERG/ucd-serg.github.io`, PRs 94, 95, 97 and 106 carried no
 `claude-review` comment, and that repo's issue #105 was told "no successful
 claude-review run in this repo has ever posted one".
 A run on PR #111 posted a real review hours later.
-A separate measurement over four `pull_request` runs on one branch, all
-`success` with `is_error: false`, separates the two classes.
-The posting run took 250.4s, 9 turns, $1.0797 and 7 denials, while the three
-silent ones took 27.9s at $0.1733, 14.5s at $0.0520, and 11.5s at $0.0810,
-with one denial each.
+
+The cheap-run signature is what the sample missed.
+Across five `pull_request` runs on the `chore/gha-claude-agent` branch, all
+`success` with `is_error: false`, the one that posted took 250.4s, 9 turns,
+$1.0797 and 7 denials, while three silent ones took 27.9s at $0.1733, 14.5s at
+$0.0520, and 11.5s at $0.0810, with one denial each.
 Duration and cost agree, and either would have served: a run under roughly 30
 seconds or 20 cents examined nothing.
-Every sampled PR was small, which is precisely the class the `code-review`
-plugin's step-1 eligibility gate filters --- it decides the PR does not need
-review and stops without posting, exactly as that step instructs.
-So the posting path was never broken.
+That is the transferable part, and it is a claim about five runs on one branch
+rather than about the repo.
 
-**Two.**
-`gh run list --limit 5` showed no successful run, and "never executed once"
-went into a PR body, a commit message, and a self-review.
+**Why each silent run was silent is a separate question, and the first answer
+reached for was wrong.**
+"Every sampled PR was small, and small is the class the eligibility gate
+filters" is an inferred mechanism, and it fails against this very table: the
+branch above is PR #111 itself, at +172/-33, so three of its runs were silent
+on a PR that is not small.
+The timeline attributes them instead.
+`gh api repos/UCD-SERG/ucd-serg.github.io/issues/111/timeline` shows #111
+created as a **draft** at 16:19:07Z and marked ready for review at 16:38:13Z,
+so the runs at 16:19:10 and 16:37:08 met a draft, and the run at 16:56:56 met a
+PR already carrying the 16:50:49 review.
+Those are two different early exits, neither of them about size.
+The run at 16:38:16, three seconds after ready, stays **unattributed** ---
+recorded as such rather than assigned to whichever branch would round out the
+story.
+A competing exit also goes unexamined by the size explanation: the plugin's
+step 6 drops findings scoring under 80 and says not to proceed when none
+qualify, which produces silence from a run that did examine the diff.
+
+So the correct statement is narrower than the one first written.
+The cheap-run signature separates a full pipeline from an early exit, which
+step-1 branch fires varies per run, several are verifiable from the PR's state
+at run time, and one is not attributable at all.
+The class claim survives untouched, since the original sample was still four
+small PRs read as a universal.
+
+**Two**, on the same repo, and recorded secondhand from the agent that made it
+rather than re-derived here.
+`gh run list --limit 5` over that repo's lint workflow showed no successful
+run, and "never executed once" went into a PR body, a commit message, and a
+self-review.
 The real population was 25 runs, one of them a success.
 
 **Three.**

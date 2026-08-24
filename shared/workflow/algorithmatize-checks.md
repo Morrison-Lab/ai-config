@@ -1060,10 +1060,10 @@ after it, which measure both.
 [`fail-fast.rationale`](../principles/fail-fast.rationale.md)'s "`$?` belongs
 to the last thing evaluated" separates this from the neighbouring case where a
 command substitution misdirects the read and `pipefail` changes nothing.
-Read those for the mechanism.
+Read those two fragments for the mechanism.
 The bullets below restate their remedies rather than replacing them, because a
-bare pointer is invisible to anyone who does not follow it, and they add one
-measurement of their own.
+bare pointer is invisible to anyone who does not follow it, and the bullets add
+one measurement of their own.
 What is local to this fragment is the blind spot in its own tell, and which way
 that blind spot points: the rule's success is what produces the shape, since a
 reader who has internalized "always print the exit status" can satisfy that
@@ -1084,14 +1084,20 @@ under `pipefail` and correct whenever that stage is the one you meant.
 
 - **Do:** take the status before the pipe --- redirect to a file, read `$?`,
   then trim --- which is the remedy that holds whatever the producer does.
-- **Do:** read `${PIPESTATUS[0]}` when you want one specific stage.
+- **Do:** read `${PIPESTATUS[i]}` when you want stage `i` --- index `0` is the
+  leftmost command, which is usually the instrument.
+  `errexit-is-not-uniform` keeps splitting the pipeline as the alternative,
+  and that one needs no array indexing to read correctly.
 - **Don't:** read a printed exit status as evidence that the status was read
   correctly --- the wrong command's prints exactly like the right one's.
 - **Don't:** reach for `set -o pipefail` first on a deliberately truncated
   output.
   A producer piped to `head` is SIGPIPEd once `head` has read enough, which
-  `pipefail` turns into a false failure --- measured,
-  `set -o pipefail; seq 1 200000 | head -20` gives `rc=141`.
+  `pipefail` turns into a false failure --- measured on bash 5.3.15 (Darwin,
+  2026-08-24), `set -o pipefail; seq 1 200000 | head -20` gives `rc=141`,
+  where the same line without `pipefail` gives `0`.
+  It is producer-dependent: `seq 1 5 | head -20` exits `0` either way, since
+  the producer finishes before `head` stops reading.
   `errexit-is-not-uniform` states this caveat where it prefers the
   split-command remedy for an ad-hoc chain.
 

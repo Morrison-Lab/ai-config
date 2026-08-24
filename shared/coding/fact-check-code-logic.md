@@ -466,6 +466,47 @@ grep -rn '\.classify(\|\.collect(' --include='*.py' .
 The session hook and the CI job were both traced and both correct.
 `scripts/check-harness-installs.py` loads the module through `spec_from_file_location` and calls `ci.classify()` and `ci.collect()`, was never searched for, and CI failed with `TypeError: 'PosixPath' object is not iterable`.)
 
+## Changing which exception a function RAISES is a signature change that fails silently
+
+The section above derives a **parameter** change's caller set by grep.
+The exception a function raises belongs to the same interface and needs the same grep, and it is the more dangerous of the two because of how the two fail.
+
+A parameter change fails **loudly**: the arity or type mismatch raises at the call site, which is how the case above was caught at all --- CI stopped with a `TypeError`.
+An exception-type change raises nothing.
+Where any handler upstream already catches the new type, the error is routed into that handler's recovery path, and a recovery path is by construction the code that carries on.
+So the change lands green, and the failure it was meant to report stops being reported.
+
+**The direction is what makes it worth a rule of its own.**
+This edit is almost always made *to improve* error handling --- replacing an incidental `AttributeError` with an explicit `raise RuntimeError("...")` that names the problem.
+It therefore reads as a strict improvement and attracts less scrutiny than a change that looks risky, while its actual effect can be to make the error **quieter** than the incidental one it replaced.
+An unplanned exception at least propagates; a planned one propagates only as far as the nearest handler written for something else.
+
+Derive the handler set before claiming the change makes anything louder:
+
+```bash
+grep -rn 'except RuntimeError' --include='*.py' .
+```
+
+Then read what each hit does with it.
+A handler that re-raises or exits is fine.
+One that returns a default, returns `None`, or appends a message and carries on is the case this rule is about.
+
+**The same question generalizes past exception types, to any dimension of what a guard covers.**
+Which **streams** a guard reads, which **files** hold a sibling copy of the function, which **branches** of a call reach the same operation: each is a population, and each is one grep away.
+See [`fail-fast`](../principles/fail-fast.md)'s partial-guard section for the dimension the fix in the case record below failed to enumerate.
+
+- **Do:** grep for handlers of the NEW exception type before changing what a function raises.
+- **Do:** read each handler's body, since only the ones that swallow matter.
+- **Do:** prefer an exception no upstream handler catches --- `SystemExit` for an environment failure --- when the point of the change is to stop something being swallowed.
+- **Don't:** count an explicit `raise` as louder than the incidental error it replaced; that is a claim about the handlers, not about the raise.
+- **Don't:** read a green suite as evidence, since the swallowing path is the one that does not fail.
+
+(Morrison-Lab/ai-config#2086, 2026-08-23: a fix for a Windows cp1252 decode bug replaced an `AttributeError` from `None.strip()` with an explicit `raise RuntimeError(...)`, to name the decode failure rather than leave it incidental.
+`_resolve_run_head_sha` in `scripts/check-pr-fully-clean.py` wraps its `run_cmd` call in `except RuntimeError: return None`, so the explicit error was swallowed and the caller went on to append `No review comment has been posted evaluating HEAD SHA ...`.
+That is exit 1 **with** a `  - ` finding bullet --- exactly the shape [`fully-clean`](../workflow/fully-clean.md)'s crash test, `rc==1` plus the absence of bullets, cannot tell apart from a genuine verdict.
+The `AttributeError` it replaced had escaped that catch and was at least loud.
+An adversarial self-review caught it before merge; the shipped fix calls `die()`, whose `SystemExit` no `except RuntimeError` intercepts.)
+
 ## A "safe because X never happens" comment needs its own counter-example before it ships
 
 When a fix's safety rests on a claim that some input shape "never" happens or "is not realistic phrasing" --- a live finding won't describe itself this way, a user never types that --- construct the counter-example yourself and run it through the actual code before writing the comment, not after a reviewer does it for you.
@@ -487,6 +528,60 @@ Round 1 refuted the FIRST shipped claim --- "a genuine bold-labeled finding in p
 Round 2 refuted the SECOND shipped claim --- "a live finding does not describe itself that way" (adjacency alone) --- with a live finding re-raised across rounds using the identical citation syntax.
 Only the THIRD version, which added an explicit resolution-wording requirement on top of adjacency, was approved ("Ready for merge"), with one narrow residual gap the reviewer explicitly judged non-blocking.
 Both refuted claims were found by the reviewer executing a constructed counter-example, not by the author testing one first, despite this fragment's own execution-based verification section already existing in the corpus at the time either claim was written.)
+
+## An illustrative example is an assertion, so run it before shipping it
+
+The section above governs a claim a fix's safety **rests on**.
+This one governs the claim nothing rests on: the parenthetical offered to make a rule concrete --- "any non-ASCII byte (a smart quote, an emoji)".
+It is chosen to illustrate something you already believe and have usually already verified, so it inherits that verification in the writing without ever being checked itself.
+
+An example is a factual assertion about a specific input.
+Believing the rule is not evidence for the instance, and the instance can be a **counterexample** to the rule it was picked to demonstrate.
+
+**A wrong example does more than fail to help.**
+It names the wrong failure mode, and the surrounding argument then reasons from the wrong one.
+A reader --- including you, on the next pass --- takes the example as the concrete case and the prose as its generalization, so a false example silently redirects every conclusion drawn nearby.
+
+Run it.
+For a claim about an encoding, a parser, a regex, or an API's behaviour, that is a few lines in a REPL, and it costs less than the review round that catches it.
+
+Three neighbours cover adjacent ground, and none of them reaches this.
+
+**[`examples-are-scanned`](../writing/examples-are-scanned.md)** is the other way a documented example goes wrong.
+There the example's claim is correct and the defect sits in a **token** the prose is discussing, which a mechanical checker scanning the file then matches --- that fragment says so directly, noting that re-reading the passage "confirms the *claim*, which is correct".
+Here the claim is what is wrong, and re-reading is exactly what fails to catch it, because a false example reads as fluently as a true one.
+The remedies differ accordingly: that one runs the checker, this one runs the example.
+
+**[`fact-check-prose`](../writing/fact-check-prose.md)'s** concrete-numbers section governs a figure the document **reports**, and its case-record block governs the parenthetical **evidence** attached to support a rule.
+Both are measurements that were taken and then generalized from.
+An illustration is the opposite: nothing was ever measured, because it was invented to teach.
+
+**[`hypothetical-examples`](../writing/hypothetical-examples.md)** treats an invented example as a missed opportunity to use real data, and says explicitly that such an example "can be internally consistent and still not be a finding" for an accuracy check.
+This rule is the case where it is **not** internally consistent with the claim above it.
+
+`memories/preferences.md`'s "Verify code examples actually demonstrate the claimed idiom" is the closest existing statement, and it asks whether a snippet **uses** the construct the prose names.
+This asks the further question: whether the input behaves the way the example says it does.
+
+- **Do:** execute every illustrative example --- in a comment, a docstring, or prose --- against the real thing before shipping it.
+- **Do:** re-read the surrounding argument after checking an example, since a corrected example can invert the point it was supporting.
+- **Do:** pick the example showing the DOMINANT failure, and say which failure it shows when a mechanism has more than one.
+- **Don't:** let an example inherit the verification of the rule it illustrates --- the rule being true says nothing about the instance.
+- **Don't:** treat a parenthetical as too small to check; the smaller it is, the less likely anyone ever does.
+
+(Morrison-Lab/ai-config#2086, 2026-08-23: a comment explaining why `subprocess.run` needs an explicit `encoding` claimed a `gh` payload carrying "any non-cp1252 byte (a smart quote in a PR title, an emoji in a check-run name)" would raise.
+Both examples are counterexamples, established that day by decoding each byte and catching the error rather than by reasoning about the codec:
+
+```python
+for b in range(256):
+    try:
+        bytes([b]).decode("cp1252")
+    except UnicodeDecodeError:
+        print(hex(b))
+# -> 0x81, 0x8d, 0x8f, 0x90, 0x9d
+```
+
+Exactly five bytes are undefined in cp1252, so U+201C (`e2 80 9c`) and U+1F600 (`f0 9f 98 80`) decode into silent mojibake with no error at all, while U+1F44D (`f0 9f 91 8d`) does raise, because `0x8D` is one of the five.
+The wrong examples named the rare failure as though it were the common one, inverting the comment's own argument about why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.)
 
 ## A comment beside a value you changed is part of the edit
 

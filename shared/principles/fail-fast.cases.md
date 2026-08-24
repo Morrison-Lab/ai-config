@@ -743,3 +743,42 @@ And the corpus already contained the answer --- the review's own closing point
 was that this file's table "independently confirms that `grep -v '^+++ '` drops
 a raw `++ foo`-style line" --- so the defect was not missing knowledge but a
 rule cited while being broken.)
+
+## A partial guard shipped under a commit message about partial guards
+
+(`Morrison-Lab/ai-config#2086`, 2026-08-23/24, review round 1, blocking.
+A Windows cp1252 decode bug left `subprocess.run`'s captured output as `None`
+while `returncode` stayed 0, because the decode raised inside subprocess's
+reader thread and killed it.
+
+Commit `36268396` fixed it across all three `gh`-consuming scripts ---
+`check-pr-fully-clean.py`, `check-pr-body-figures.py`, and `pr-sweep.py` ---
+and said so, citing this principle as the reason for widening past the one
+script the four open issues named.
+That enumeration was genuinely complete.
+The guarded operation was grepped for, and every site performing it was
+covered.
+
+The hazard ran along a second dimension nobody enumerated.
+Both captured streams are decoded by the same reader-thread machinery, and only
+`stdout` was guarded.
+Commit `7a220736` fixed `stderr`, whose exposure sat on the diagnostic path
+meant to explain a failure:
+
+| script | line in the non-zero-exit branch | result when `stderr` is `None` |
+| --- | --- | --- |
+| `check-pr-body-figures.py` | `res.stderr.strip()` | `AttributeError`, replacing the real error |
+| `pr-sweep.py` | `proc.stderr.strip()` | `AttributeError`, replacing the real error |
+| `check-pr-fully-clean.py` | `f"...: {res.stderr}"` | interpolates `None`, reporting an empty reason |
+
+The third row is the quieter half of the same defect: no crash, and a
+"command failed" message whose reason is the word `None`.
+
+Two things worth keeping.
+The unexamined dimension was derivable from the hazard's own mechanism --- a
+decode failure belongs to a *stream*, so "which streams" followed from the bug
+report without inspecting a single call site.
+And the completeness claim is what suppressed the question: a commit message
+asserting the class was closed across three scripts reads as coverage, so
+nothing prompted anyone to ask "across three scripts along which axis" until
+the reviewer did.)

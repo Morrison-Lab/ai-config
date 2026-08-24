@@ -321,9 +321,11 @@ Calling `reformat()` on the broken pair rejoins it under a lowercase, digit, or
 parenthesis opener, and leaves it alone under all six of the class's forms.
 The case is
 [ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127), where
-`shared/workflow/upgrade-to-gha.md:64` was flagged `Line packs more than one
-sentence` and the fix at `7f352648` -> `d70465f5` both broke the line and
-reworded the opener to `The gha README names`.)
+`shared/workflow/upgrade-to-gha.md:64` at `7f352648` was flagged
+`Line packs more than one sentence`, and the fix at `7f352648` -> `d70465f5`
+both broke the line and reworded the opener to `The gha README names`.
+That file has since moved on, so read both line numbers against `7f352648`
+rather than against the current tree.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
@@ -382,7 +384,8 @@ which printed 9 findings under a summary reading
 sentence rule, plus the runner's own tenth annotation.
 A hand-rolled sweep of the same diff for a long line carrying a semicolon
 returned 8 rather than 7, and the extra one was its own false positive:
-`shared/workflow/upgrade-to-gha.md:62` is 144 characters raw and 73 once
+`shared/workflow/upgrade-to-gha.md:62` at `7f352648` is 144 characters raw and
+73 once
 `strip_inline_markup` removes its code spans and link targets, so it sits below
 `NLB_CLAUSE_MIN_LENGTH` and `classify_line` returns `None`.
 The two thresholds are separate measurements that happen to share a number: the

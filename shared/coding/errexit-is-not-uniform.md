@@ -437,6 +437,28 @@ markdownlint reported a real MD018 failure, `tail` exited 0, and the chain
 continued through the remaining checks and reported them all passing.
 The failure surfaced only on a later run that did not pipe.)
 
+## An explicit `exit` escapes the capture group
+
+The capture idioms above (`|| rc=$?` on a region, a status consumed by an
+`if`) catch **failing commands**, and an explicit `exit` is not one.
+`{ ...; exit 2; } || rc=$?` terminates the whole shell at the `exit`.
+Braces are not a subshell --- `{ }` runs in the caller's own shell, so no
+surrounding command fails and there is no status for the `||` to see.
+A parenthesized `( exit 2 )` would be caught; a braced one never is.
+
+The shape to watch for is a validation guard inside a captured region
+whose non-zero exit is meant to become a classified, reported failure.
+With `exit`, the shell dies before the summary lines run, whatever
+consumes the captured output sees nothing, and under a
+continue-on-error-style wrapper the job can go green with no verdict at
+all.
+Express the guard as data instead: assign the code (`rc=2`) or set a flag
+inside an `if`, and let ordinary flow carry it to the capture boundary.
+
+Measured 2026-08-24 in Morrison-Lab/gha#603: the offline suite caught the
+escaped exit within one run --- expected `exitcode=2`, got no line ---
+which is the same offline-suite payoff this file argues for above.
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely

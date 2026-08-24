@@ -112,6 +112,40 @@ git log --oneline "HEAD..origin/$BRANCH"
 Then follow [`claim-pr`](claim-pr.md)'s tree-and-parents comparison, which distinguishes the two cases a rejected push can mean: an identical merge another session already pushed, where the answer is `git reset --hard origin/<branch>`, and a **differently resolved** one, where a reset silently discards whatever your version got right and the answer is to merge the two commits.
 Never force-push over the difference to find out which it was.
 
+## The diff is the review surface, so read it
+
+The remote check above covers collisions.
+A second staleness lives entirely on your side: edits composed against a
+working tree that has since moved.
+Read a file, then pull or switch branches, then apply an edit whose anchor
+text came from the earlier read, and the edit can still report success
+while writing against text HEAD no longer carries --- matchers forgive
+near-misses, so a stale anchor does not always fail loudly.
+What lands in the push is churn you did not intend, and prose composed
+from the stale read asserts things about the tree that the pushed diff
+contradicts.
+
+Two cheap looks close it.
+Re-read any file you are about to edit whenever a checkout, pull, or reset
+has happened since your last read of it.
+And before anything leaves the machine, run the diff and confirm every
+hunk is one you intended:
+
+```bash
+git diff --stat origin/<default>...HEAD
+```
+
+The diff is also the only surface a reviewer sees, so a changelog claim
+about what this PR fixes has to be derivable from it.
+A fix a hunk cannot show was landed by somebody else's PR, and claiming
+it here misattributes the work.
+
+(Measured 2026-08-24 in Morrison-Lab/gha#599: an edit made from a read
+taken before `git pull` applied against stale text, carried an unscoped
+rewrite of another workflow file into the push, and produced a changelog
+fragment crediting this PR with a fix that had merged the day before ---
+the reviewer caught it in round 3.)
+
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.

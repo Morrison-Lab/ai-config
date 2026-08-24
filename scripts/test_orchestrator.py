@@ -663,6 +663,25 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(res.success)
         self.assertTrue(res.data.get("pr_marked_ready", False))
 
+    def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
+        from orchestrator.cli import build_parser
+
+        parser = build_parser()
+        # Default ingest-issues
+        args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
+        self.assertFalse(args_default.dry_run)
+        self.assertTrue(args_default.claim_pr)
+
+        # Explicit --dry-run and --no-claim-pr
+        args_custom = parser.parse_args(["ingest-issues", "--dry-run", "--no-claim-pr", "--limit", "3"])
+        self.assertTrue(args_custom.dry_run)
+        self.assertFalse(args_custom.claim_pr)
+
+        # Explicit sweep-backlog --dry-run
+        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
+        self.assertTrue(args_sweep.dry_run)
+        self.assertTrue(args_sweep.claim_pr)
+
 
 def main():
     unittest.main(verbosity=2)

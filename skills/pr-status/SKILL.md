@@ -59,8 +59,14 @@ from green checks.
 ## Read the LATEST review, checked for currency
 
 ```bash
-gh pr view "<N>" --json comments,commits,headRefOid \
-  --jq '{review: ([.comments[] | select(.author.login | startswith("claude"))] | last), lastCommitDate: (.commits[-1].committedDate), headRefOid: .headRefOid}'
+gh pr view "<N>" --json comments,commits,headRefOid,author,reviewRequests \
+  --jq '{
+    author: .author.login,
+    reviewRequests: [.reviewRequests[].login],
+    review: ([.comments[] | select(.author.login | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
+    lastCommitDate: (.commits[-1].committedDate),
+    headRefOid: .headRefOid
+  }'
 ```
 
 **This call fetches more than `READ_PR_COMMENTS` maps to** --
@@ -305,6 +311,25 @@ Interpret the output as:
 (The resolve mutation lives in the `ard` skill, step 4b.)
 
 ## Output
+
+Render a **Review Summary Table** for the PR:
+
+| PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
+|:---|:---|:---:|:---:|:---:|:---|
+| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](<review.url>) | 🟢 All Green | `d-morrison` | Ready for human review |
+
+- **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
+- **Author** --- author login.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`). Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA). If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`. If no SHA is named, display `[⚠️ Unverified](url)`.
+- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
+- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md). For self-authored PRs, note `*Self-authored* (GitHub prevents requesting review from author)`. When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+- **Next Step** --- computed next transition:
+  - `Ready for self-merge` (Self-authored, AI approved, CI green).
+  - `Ready for human review` (External author, AI approved, CI green, human review requested).
+  - `Request human review` (External author, AI approved, CI green, human review not yet requested).
+  - `Drive to clean (ARDI)` (AI review has open findings).
+  - `Fix CI / In-flight` (CI failing or review in progress).
+  - `Resolve conflicts (Sync main)` (Behind main).
 
 State, plainly: the latest review's verdict, who/what posted it, and the list
 of any open findings (or "none"). If you read `null`, say the filter didn't

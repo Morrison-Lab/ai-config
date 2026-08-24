@@ -40,8 +40,8 @@ them into one "OK".
 ### 1. Enumerate the open PRs (orchestrator, one cheap call)
 
 ```bash
-gh pr list --state open --json number,title,headRefName,isDraft \
-  --jq '.[] | "\(.number)\t\(.headRefName)\t\(.isDraft)\t\(.title)"'   # LIST_PRS
+gh pr list --state open --json number,title,headRefName,isDraft,author \
+  --jq '.[] | "\(.number)\t\(.headRefName)\t\(.isDraft)\t\(.author.login)\t\(.title)"'   # LIST_PRS
 ```
 
 This is fast and sequential --- a single call to get the work units.
@@ -54,7 +54,7 @@ needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
 Give each subagent its PR number and `headRefName`, and have it gather the
-**six independent signals** below and return one structured row. Carry the
+**seven independent signals** below and return one structured row. Carry the
 disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST
 review* will silently misreport:
 
@@ -66,23 +66,29 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 > Gather the status of PR **#<N>** (branch `<headRefName>`) in this repo and return a single structured row.
 > Do not push, merge, or modify anything.
 >
-> 1. **Latest review verdict, checked for currency against the head.** Read
->    the *most recent* review comment **and** the timestamp of the latest commit, in one call, so a "clean" verdict posted before the last push can't be mistaken for current:
+> 1. **Latest review verdict, checked for currency against the head, with hyperlinked comment URL.** Read
+>    the *most recent* review comment (including its URL for hyperlinking), author, requested reviewers, and the timestamp of the latest commit:
 >    ```bash
->    gh pr view "<N>" --json comments,commits,headRefOid \
->      --jq '{review: ([.comments[] | select(.author.login | startswith("claude"))] | last), lastCommitDate: (.commits[-1].committedDate), headRefOid: .headRefOid}'
+>    gh pr view "<N>" --json comments,commits,headRefOid,author,reviewRequests \
+>      --jq '{
+>        author: .author.login,
+>        reviewRequests: [.reviewRequests[].login],
+>        review: ([.comments[] | select(.author.login | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
+>        lastCommitDate: (.commits[-1].committedDate),
+>        headRefOid: .headRefOid
+>      }'
 >    ```
 >    **This fetches more than `READ_PR_COMMENTS` maps to** -- [`tool-mappings.md`](../../tool-mappings.md)'s entry for that token is a comments-only MCP call, which returns neither `commits` nor `headRefOid`.
->    In a remote/MCP session without `gh`, fetch those two fields with a separate call rather than assuming the token mapping covers this expanded query.
+>    In a remote/MCP session without `gh`, fetch those fields with separate calls rather than assuming the token mapping covers this expanded query.
 >    The reviewer login varies by setup: `gh pr view` reports `claude`; the REST API reports `claude[bot]`.
 >    `startswith("claude")` matches both.
 >    If `.review` is `null`, the reviewer may post as `github-actions[bot]` or another login -- **never report "clean"**; broaden the filter or say no review was found.
->    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review predates the latest push** -- report `in-flight`, not the review body's verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so a plain string comparison works).
+>    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review predates the latest push** -- report `[⏳ In-Flight / Stale](url)` (or `in-flight`), not the review body's verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so a plain string comparison works).
 >    **This timing comparison is best-effort, not proof** -- a review run *started* against an older commit can finish and post *after* a newer push lands, making `createdAt` look current even though the reviewed content is stale (issue comments carry no structured `commit_id` to check directly, unlike formal reviews).
->    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (now part of the same call above) as a corroborating signal; treat a mismatch as `in-flight` even if the timing check alone would have said `clean`.
->    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `unverified` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
->    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `unverified`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading.
->    A rebuttal the reviewer still disputes is **open**, not clean.
+>    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (part of the same call above) as a corroborating signal; treat a mismatch as `[⏳ In-Flight](url)` even if the timing check alone would have said `clean`.
+>    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `[⚠️ Unverified](url)` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
+>    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `[⚠️ Unverified](url)`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading, hyperlinked as `[✅ Clean (Round N)](url)` or `[✅ Approved](url)`.
+>    A rebuttal the reviewer still disputes is **open** (`[❌ Needs Work (Round N)](url)`), not clean.
 > 2. **External reviewer verdict (a formal Copilot review, or a human's formal review at the head) -- read-only, don't request one.**
 >    The comment above is the `@claude` bot only;
 >    a formal review (Copilot's or a human's) is a separate object it won't show.
@@ -105,10 +111,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    fi
 >    ```
 >    Clean requires **three** things: an affirmative zero-new-findings overview (e.g. "generated no new comments" -- never a literally empty body), zero matched inline comments, **and no suppression block in the body**.
->    A "no new comments" overview can still carry real low-confidence findings collapsed into a `<details>` block that never becomes a formal inline comment (verified: PR #660's review 4767752501 read "generated no new comments" while carrying 3 suppressed findings; PR #1029 repeated the shape from round 3 onward).
 >    Match inside the `<summary>` heading, case-insensitively on `suppressed` -- not on either exact phrase, and not anywhere in the body.
->    PR #660 emitted `Comments suppressed due to low confidence (3)` while PRs #1029 and #1031 emit `Suppressed comments (4)`, so a literal grep for the older wording returns zero against a current body that has the block.
->    A body-wide match over-corrects and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on review 4837572117, whose summary table reads "suppressed Copilot findings" outside any collapsed block.
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
 >    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >    ```bash
@@ -122,30 +125,17 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >       | map(sort_by(.submitted_at) | last
 >             | {id, login: .user.login, state, submitted_at})'
 >    ```
->    The `head=` line is repeated deliberately so this block is self-contained:
->    shell state does not persist across separate Bash invocations, and a subagent that runs each fence as its own call would otherwise pass an empty `$h` that matches no review's `commit_id` -- a silent `[]` every time, with nothing signalling the miss.
->    The `.state != "DISMISSED"` exclusion is load-bearing:
->    GitHub's dismiss action flips the review's own `state` in place rather than adding a new review, and retracts neither its body nor its inline threads --
->    so without the exclusion, a substance read would report findings an explicit dismissal already resolved (dismissal being one of the two resolution paths item 6's own prose documents).
->    The `group_by(.user.login)` reduces **per reviewer** before taking each one's latest, mirroring item 6's reduction and for the same reason:
->    two humans can review the same head, and a bare `| last` over the combined list would let a later clean "LGTM" from one reviewer silently drop an earlier reviewer's body-only findings
->    (an inline finding would still surface through item 4's thread count;
->    a body-only one has no thread to catch it).
->    Read **every** review the command returns, not just the newest.
->    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"` (measured 2026-08-15 on this repo: Copilot's review objects report `Bot`, the human reviewers' report `User`), so the type field needs no bot-login blocklist.
->    Judge each matched review by **substance, not state**: on this repo 106 of 106 formal reviews across 60 merged PRs are `COMMENTED`, zero `APPROVED`, humans included (measured 2026-07-30 on #668), so a `state == "APPROVED"` key would never fire -- and a check that never fires is invisible, reporting `no verdict at head` on PRs a human did review.
->    Fetch each matched review's body and its inline comments (the same comments-by-review-id query as the Copilot half, with that review's `id`) and apply the same bar:
->    an affirmative zero-findings read across every matched review means a genuine external verdict at the head;
->    findings in any of them mean `N open`, whatever the other reviewers said.
->    An `APPROVED` state, where a repo's convention produces one, still qualifies -- it just cannot be the key.
->    A human `CHANGES_REQUESTED` is item 6's job and blocks regardless of what this item finds.
->    **This step cannot determine *why* no external verdict exists** -- for either source, it can't tell "never asked" (Copilot not requested, no human invited) from "unreachable" from "a self-review was posted instead."
->    Don't guess; report the plain evidence-based fact (`no verdict at head`), and leave the availability/self-review judgment call to `ardi`, which actually drives the PR and can request reviews.
-> 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); name any failing/pending
->    check, don't just say "red".
-> 4. **Unresolved threads** -- count open inline review threads
+>    Exclude `DISMISSED` reviews before reading anything. Reduce per reviewer via `group_by(.user.login)`.
+>    Judge each matched review by **substance, not state**.
+> 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
+> 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
+>    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.
+>    - If AI review is clean/approved and CI is green:
+>      - If human reviewer is requested (e.g. `d-morrison`), report `d-morrison`.
+>      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
+>    - If AI review is still in-flight or unclean, report `— (AI review in progress)`.
+> 5. **Unresolved threads** -- count open inline review threads
 >    (`READ_PR_REVIEW_COMMENTS`).
->    Run exactly:
 >    ```bash
 >    gh api graphql -f query='query {
 >      repository(owner:"<owner>", name:"<repo>") {
@@ -163,74 +153,52 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >      else if $open == 0 then "resolved" else "\($open) open" end
 >      end'
 >    ```
->    The command emits one of three normalized values: `resolved` (all threads resolved), `N open` (e.g. `3 open`) --- that many unresolved threads, or `N+ open (cap)` --- the 100-thread cap was hit, **cannot confirm clean** --- treat as unresolved.
-> 5. **Behind main?** -- fetch the head ref too (a fresh subagent has no local
->    branch), then compare remote-tracking refs: `git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main`. >0 means main has moved ahead.
-> 6. **Blocking human `CHANGES_REQUESTED`** (`READ_PR_REVIEWS` -- abstract
->    operation token; resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md)).
->    A bot's clean verdict does **not** clear a human's formal review state -- it's a separate object, invisible to the Signal 1 comments query, and its top-level body is often empty (the finding lives in an inline comment):
+> 6. **Behind main?** -- `git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main`.
+> 7. **Blocking human `CHANGES_REQUESTED`** (`READ_PR_REVIEWS`):
 >    ```bash
 >    gh pr view "<N>" --json reviews \
 >      --jq '[.reviews[] | select(.author.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED"))] | group_by(.author.login) | map(sort_by(.submittedAt) | last) | [.[] | select(.state == "CHANGES_REQUESTED") | .author.login]'
 >    ```
->    **`--json reviews` returns the full review history, not one entry per reviewer, and a reviewer's *decisive* state persists across neutral comments** -- GitHub only clears `CHANGES_REQUESTED` when that same reviewer later `APPROVED`s, or via an explicit dismissal; a neutral `COMMENTED` review in between does **not** clear it.
->    Filter to only `APPROVED`/`CHANGES_REQUESTED`/`DISMISSED` states *before* reducing to each author's latest review -- reducing over all states first lets a later `COMMENTED` round hide an earlier `CHANGES_REQUESTED` (verified with a synthetic fixture: naive reduction incorrectly cleared it, state-filtered reduction correctly kept it blocking).
->    **Keep `DISMISSED` in the filter** -- dropping it would let an older `CHANGES_REQUESTED` outlive its own later dismissal, since the dismissal itself would never survive the reduction to compete as "latest" (verified with a second synthetic fixture: `CHANGES_REQUESTED` then `DISMISSED` incorrectly stayed blocking under an `APPROVED`/`CHANGES_REQUESTED`-only filter, correctly cleared once `DISMISSED` was included).
->    The trailing `select(.state == "CHANGES_REQUESTED")` still keeps `DISMISSED` reviews themselves out of the final blocking list.
->    Any non-empty result **blocks** regardless of what any bot says -- only the human (or an explicit dismissal) resolves it.
->    Return the reviewer login(s) from the array, not just a count.
 >
-> Return: PR number, CI (✅/❌-with-name/⏳), review (`clean` / `unverified` / `N open` with the headline finding / `none found` / `in-flight`), external (`clean` / `N open` / `no verdict at head` -- naming the source, Copilot or a human login, when a verdict exists), human-blocked (`none` / `N pending` -- name the reviewer if `N` > 0), threads (`resolved` / `N open` / `N+ open (cap)`), behind-main (`up to date` / `N commits`).
+> Return: PR number, Author, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None`), Next Step (`Ready for self-merge` / `Ready for human review` / `Request human review` / `Drive to clean` / `Fix CI`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`).
 
 ### 3. Assemble (orchestrator)
 
-Collect the rows the subagents return and **pair each with the `title`,
-`headRefName`, and `isDraft`** the orchestrator already has from step 1 (the
-subagent doesn't re-fetch these), then render the table + per-PR findings list
-(see *Output*) --- marking draft PRs from `isDraft`. The output is **identical**
-to the series version --- only the way the signals are gathered changed.
-
-### Graceful degradation to series
-
-If subagent fan-out is unavailable (no `Agent` tool in the session), fall back
-to gathering the six signals **in series** -- loop the exact same per-PR
-gather (items 1-6 above, including the currency check and the human
-`CHANGES_REQUESTED` check) over each PR from step 1. The output is the same;
-it's just slower. Don't substitute a simplified comments-only query here --
-that would silently drop the current-head and human-review guarantees the
-rest of this skill relies on.
+Collect the rows the subagents return and render the **Review Summary Table**:
 
 ## Output
 
+### Primary Review Summary Table
+
 A Markdown table, one row per open PR, with these columns:
 
-| PR | Title | Branch | CI | Review | External | Human | Threads | Behind main |
+| PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
+|:---|:---|:---:|:---:|:---:|:---|
+| [#1091](url) | `d-morrison` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
+| [#1065](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#1087](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#1090](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#1092](url) | `dem-extra1` | [✅ Clean (Round 1)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#1093](url) | `dem-extra1` | [✅ Clean (Round 1)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 
-- **PR** --- make the number a markdown link,
-  `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)` (repo policy --- never a
-  bare `#N`), so it's one-click and compact.
-- **CI** --- ✅ / ❌ (name the failing check) / ⏳ pending.
-- **Review** -- `clean`, `unverified` (postdates the last commit by timing
-  alone but no SHA could corroborate it), `N open` (with the headline
-  finding), `none found` (filter didn't match / no review yet), or
-  `in-flight` if a review run is still going **or** the latest review
-  predates the latest commit (per subagent item 1's currency check) --
-  either way, the current head hasn't been confirmed reviewed yet.
-- **External** -- `clean` (a genuine, non-stub verdict at the current head,
-  from Copilot or from a human's formal review, per subagent item 2 -- name
-  the source), `N open` (findings in that verdict), or `no verdict at head`
-  (neither a Copilot review nor a human formal review exists at the current
-  commit).
-  This step is read-only and doesn't request a review, so it can't tell
-  "never asked" (Copilot not requested, no human invited) from
-  "unreachable" from "a self-review covers it" -- report the plain fact,
-  don't guess at the reason.
-- **Human** -- `none` (no blocking human review) or `N pending` (name the
-  reviewer login(s)) per subagent item 6. This overrides everything else --
-  a `CHANGES_REQUESTED` review blocks regardless of any bot's verdict.
-- **Threads** --- `resolved` (none open), `N open` (unresolved inline review
-  threads), or `N+ open (cap)` (100-thread cap hit --- cannot confirm clean).
-- **Behind main** --- `up to date` or `N commits` (offer `sync-pr-branch`).
+- **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
+- **Author** --- author login.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`). Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA). If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`. If no SHA is named, display `[⚠️ Unverified](url)`.
+- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
+- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md). For self-authored PRs, note `*Self-authored*`. When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+- **Next Step** --- computed next transition:
+  - `Ready for self-merge` (Self-authored, AI approved, CI green).
+  - `Ready for human review` (External author, AI approved, CI green, human review requested).
+  - `Request human review` (External author, AI approved, CI green, human review not yet requested).
+  - `Drive to clean (ARDI)` (AI review has open findings).
+  - `Fix CI / In-flight` (CI failing or review in progress).
+  - `Resolve conflicts (Sync main)` (Behind main).
+
+### Extended Technical Dashboard (Optional / On Request)
+
+When detailed git/thread metrics are needed, include the extended columns:
+
+| PR | Title | Branch | CI | Review | External | Human | Threads | Behind main | Next Step |
 
 Below the table, list each PR's open findings briefly (or "none"), and call out
 anything needing action: branches behind main, failing CI, drafts, reviews
@@ -238,17 +206,10 @@ that returned `null`, or a pending human review. Do **not** label a PR "ready
 to merge" unless it is
 **fully clean** -- **Human is `none`** (a blocking human review overrides
 everything below) *and* at least one of Review or External is `clean` at
-the current head (the canonical rule needs one genuine external verdict, not
-both -- a clean Claude verdict alone is sufficient, and so is a clean
-Copilot verdict or a clean human formal review alone; `unverified` does
-**not** count as clean) *and*
+the current head *and*
 neither one has open findings *and* all CI
 workflows are green *and* it's not behind main *and* every inline review
-thread is resolved (the only open conversation being the final all-clear and
-your reply). If both Review and External come back `none found` / `no verdict
-at head` / `unverified`, this skill has no evidence of a genuine external verdict at all --
-report the PR as not confirmed clean and point at `ardi` to obtain one; don't
-guess whether a self-review already covers it. Never hedge with "ready except
+thread is resolved. Never hedge with "ready except
 for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)

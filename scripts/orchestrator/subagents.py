@@ -188,14 +188,20 @@ class TesterSubagent(BaseSubagent):
     role = "tester"
     capabilities = ["run_tests", "benchmarking", "diagnostics"]
 
-    def __init__(self, pr_claim_manager: Optional[PRClaimManager] = None):
-        self.pr_claim_mgr = pr_claim_manager or PRClaimManager()
+    def __init__(
+        self,
+        pr_claim_manager: Optional[PRClaimManager] = None,
+        repo_slug: Optional[str] = None,
+    ):
+        self.repo_slug = repo_slug
+        self.pr_claim_mgr = pr_claim_manager or PRClaimManager(repo_slug=repo_slug)
 
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
         start_time = time.time()
         test_suite = task.payload.get("test_suite", "default")
         expected_assertions = task.payload.get("expected_assertions", 1)
         pr_number = task.payload.get("pr_number")
+        repo_slug = task.payload.get("repo_slug") or self.repo_slug
         dry_run = task.payload.get("dry_run", False)
 
         # Simulation or test execution logic
@@ -209,6 +215,7 @@ class TesterSubagent(BaseSubagent):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
                 pr_number=pr_number,
                 reviewers=["d-morrison"],
+                repo_slug=repo_slug,
                 dry_run=dry_run,
             )
 

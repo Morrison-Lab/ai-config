@@ -99,6 +99,7 @@ class BacklogSweeper:
                 "branch_name": branch_name,
                 "pr_number": pr_number,
                 "pr_url": pr_url,
+                "repo_slug": self.repo,
                 "recommended_tier": "local_fast",
             },
         )
@@ -116,6 +117,7 @@ class BacklogSweeper:
                 "branch_name": branch_name,
                 "pr_number": pr_number,
                 "pr_url": pr_url,
+                "repo_slug": self.repo,
                 "use_worktree": True,
                 "persist_branch": True,
                 "recommended_tier": "standard_code",
@@ -135,6 +137,7 @@ class BacklogSweeper:
                 "branch_name": branch_name,
                 "pr_number": pr_number,
                 "pr_url": pr_url,
+                "repo_slug": self.repo,
                 "recommended_tier": "adversarial_review",
                 "author_family": "claude",
             },
@@ -153,6 +156,7 @@ class BacklogSweeper:
                 "branch_name": branch_name,
                 "pr_number": pr_number,
                 "pr_url": pr_url,
+                "repo_slug": self.repo,
                 "test_commands": ["python scripts/validate-skills.py", "python scripts/check-links.py"],
             },
         )

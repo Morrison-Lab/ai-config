@@ -142,13 +142,45 @@ only when the segment IMMEDIATELY BEFORE the one holding the `$?` is a
 pipeline. That keeps `cmd | head; other_command; echo $?` quiet, where `$?` is
 `other_command`'s and reading it is correct.
 
-WHAT IT CANNOT SEE
-------------------
-A pipeline inside a compound statement --- `for`, `if`, `case`, `{ ... }` ---
-whose terminator (`done`, `fi`, `esac`, `}`) becomes the immediate predecessor.
-Those are real instances of the bug and this guard misses them. The scanner is
-lexical by design, and parsing shell compound statements to catch them would
-cost more than the miss.
+WHAT IT CANNOT SEE, IN BOTH DIRECTIONS
+--------------------------------------
+The scanner is lexical by design, so anything needing a real shell parse is out
+of reach. The limits are enumerated as `KNOWN_LIMITS` in the test suite, where
+each one is EXERCISED against bash rather than merely described --- and the
+suite fails if a listed limit is no longer real, so the list cannot rot.
+
+Misses (a real bug, no warning):
+
+  * a pipeline inside a compound statement --- `for`, `if`, `case`, `{ ... }`
+    --- whose terminator becomes the immediate predecessor;
+  * a read inside the group that holds the pipe, `( cmd | head; echo $? )`;
+  * a read nested in a substitution, `echo $(echo $?)`;
+  * a top-level backgrounded `set -o pipefail &`, the mirror of the in-paren
+    case the guard does handle;
+  * an assignment substitution containing a nested `$(` or `$((`, or preceded
+    by a second assignment, or followed by an `&>` redirect.
+
+False positives (a warning where the read is correct):
+
+  * `pipefail` set in a BRACE group, which is not scope-tracked the way a
+    paren group is;
+  * `pipefail` set inside a compound statement within a paren group.
+
+Misses are the cheap direction for a warn-only guard, which is why the fixes
+have consistently tightened toward them. The two false positives are recorded
+rather than fixed because both need the same shell parse the scanner avoids.
+
+WHY THE LIMITS ARE MEASURED RATHER THAN ARGUED
+----------------------------------------------
+Three review rounds running, the fix for one round's finding produced the next
+round's finding, every time inside the `pipefail`-scope machinery. That
+recurrence is what `shared/principles/deterministic-tools.md` says to answer
+with an instrument instead of more care, so the suite carries a DIFFERENTIAL
+ORACLE: for each shape it runs bash twice, once plainly and once under
+`set -o pipefail`, and treats a change in the printed status as proof that
+`$?` was reading a pipeline. The guard's verdict is compared against that.
+It reports how many shapes it examined alongside how many agreed, so a run
+that examined nothing is distinguishable from a run that found nothing.
 
 THE INCIDENT
 ------------
@@ -189,7 +221,9 @@ RX_HEREDOC = re.compile(
 # keeps its `set` inside the PIPELINE's own segment rather than an earlier one.
 # Measured, that subshell gives rc=1, so `pipefail` is genuinely in force and a
 # warning there would be false.
-RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
+RX_SET_PIPEFAIL = re.compile(
+    r"^\s*set\b[^;&|\n]*\bpipefail\b" + r"(?!\s*&(?![&>]))"
+)
 
 # `set -o pipefail` at a command position inside a paren group. A segment-wide
 # search cannot do this job: `(set -o pipefail; make) | tail -20; echo $?`
@@ -200,11 +234,18 @@ RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
 # It must NOT be restricted to the group's first command, which an earlier
 # version did: `( true; set -o pipefail; cmd | head )` measures rc=1, so the
 # option really is in force and warning there was false.
-# The trailing `(?!\s*&)` matters: `set -o pipefail &` backgrounds the `set`
+# The trailing lookahead matters: `set -o pipefail &` backgrounds the `set`
 # into a subshell, so the option never reaches the caller. Measured,
 # `( set -o pipefail & grep -q zzz /dev/null | cat ); echo $?` gives 0.
+#
+# It must distinguish a lone `&` from `&&` and `&>`, which do NOT background:
+# `( cd /tmp && set -o pipefail && cmd | cat )` and
+# `( set -o pipefail &>/dev/null; cmd | cat )` both measure rc=1, so the
+# option is in force and warning there is false. A bare `(?!\s*&)` refused
+# both.
+RX_TRAILING_BACKGROUND = r"(?!\s*&(?![&>]))"
 RX_PAREN_PIPEFAIL = re.compile(
-    r"(?:^|[;&\n]\s*)\s*set\b[^;&|\n]*\bpipefail\b(?!\s*&)"
+    r"(?:^|[;&\n]\s*)\s*set\b[^;&|\n]*\bpipefail\b" + RX_TRAILING_BACKGROUND
 )
 
 
@@ -241,6 +282,15 @@ def _paren_sets_pipefail(text, open_index):
             continue
         if char == "\\":
             index += 2
+            continue
+        # The main scanner skips comments; this walker must too. A group's
+        # internal comment carrying an odd number of quotes otherwise put the
+        # walker into quote mode and swallowed the rest of the group, and one
+        # carrying an unbalanced paren truncated it --- either way losing a
+        # real `set -o pipefail` and warning on a protected pipe.
+        if char == "#" and (index == 0 or text[index - 1] in " \t\n;&|("):
+            newline = text.find("\n", index)
+            index = limit if newline == -1 else newline
             continue
         if char in ("'", '"'):
             quote = char
@@ -558,7 +608,12 @@ def scan(command):
                 i = end + 1
                 continue
             parens.append("assign")
-            paren_pf.append(False)
+            # An assignment's substitution reads the pipeline's status, so a
+            # `pipefail` set inside it protects that pipe exactly as it does
+            # in a bare subshell. Measured,
+            # `x=$(set -o pipefail; grep -q zzz /dev/null | cat); echo $?`
+            # gives rc=1. Hard-coding False here warned on it.
+            paren_pf.append(_paren_sets_pipefail(text, i + 1))
             i += 2
             continue
         if char in ("<", ">") and text[i + 1:i + 2] == "(":

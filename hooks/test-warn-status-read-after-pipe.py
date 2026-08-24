@@ -25,6 +25,7 @@ which is the direction that catches an over-broad carve-out.
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -659,6 +660,165 @@ mutant = load_mutant(
 if mutant is not None:
     check("MUTATION quoted arithmetic: a real misread goes quiet",
           fires('cmd | head -20; echo "n=$((1+1)) rc=$?"', mutant), False)
+
+# ---------------------------------------------------------------------------
+# DIFFERENTIAL ORACLE -- ask bash instead of asking a reviewer.
+# ---------------------------------------------------------------------------
+# Three review rounds running, the fix for one round's finding produced the
+# next round's finding, every time inside the `pipefail`-scope machinery. That
+# is the recurrence `shared/principles/deterministic-tools.md` says to answer
+# with an instrument rather than with more care, so the question is decided by
+# running bash rather than by reasoning about it.
+#
+# The oracle: a `$?` read is a MISREAD exactly when prefixing the command with
+# `set -o pipefail` changes the status it prints. If the answer moves, `$?` was
+# reporting a pipeline's last stage; if it does not, `$?` belongs to something
+# else and a warning would assert something false.
+#
+# `grep -q zzz /dev/null` is the producer throughout: it exits 1, reads no
+# input, and cannot SIGPIPE, so `pipefail` is the only thing that can move the
+# answer.
+#
+# EXCEPTIONS are the guard's known limits, listed with the direction of each.
+# The point of naming them here rather than omitting the cases is that the
+# oracle then reports any limit that is NOT on the list, including one
+# introduced by a later edit.
+
+PRODUCER = "grep -q zzz /dev/null"
+
+
+def bash_says_misread(command):
+    """True when `set -o pipefail` changes what the command prints."""
+    plain = subprocess.run(["bash", "-c", command],
+                           capture_output=True, text=True, timeout=10)
+    guarded = subprocess.run(["bash", "-c", "set -o pipefail\n" + command],
+                             capture_output=True, text=True, timeout=10)
+    return plain.stdout != guarded.stdout
+
+
+# (command, why it is exempt). Every entry was measured; each is a case the
+# lexical scanner cannot decide without parsing shell properly.
+KNOWN_LIMITS = {
+    f"for f in 1; do {PRODUCER} | cat; done; echo $?":
+        "miss: compound statement, `done` is the predecessor",
+    f"if true; then {PRODUCER} | cat; fi; echo $?":
+        "miss: compound statement, `fi` is the predecessor",
+    f"{{ {PRODUCER} | cat; }}; echo $?":
+        "miss: compound statement, `}` is the predecessor",
+    f"{{ set -o pipefail; }}; {PRODUCER} | cat; echo $?":
+        "FALSE POSITIVE: brace groups are not scope-tracked like parens",
+    f"( {PRODUCER} | cat; echo $? )":
+        "miss: the read is inside the group holding the pipe",
+    f"{PRODUCER} | cat; echo $(echo $?)":
+        "miss: the read is nested in a substitution",
+    f"set -o pipefail & {PRODUCER} | cat; echo $?":
+        "miss: top-level backgrounded `set`, mirror of the in-paren case",
+    f"out=$({PRODUCER} | head -$(echo 1)); echo $?":
+        "miss: nested substitution inside an assignment",
+    f"A=1 B=$({PRODUCER} | cat); echo $?":
+        "miss: a second assignment ahead of the substitution",
+    f"out=$({PRODUCER} | cat) &>/dev/null; echo $?":
+        "miss: `&>` is not in the trailing-redirect group",
+    f"( if true; then set -o pipefail; fi; {PRODUCER} | cat ); echo $?":
+        "FALSE POSITIVE: `set` inside a compound statement in the group",
+}
+
+ORACLE_CASES = [
+    # Plain shapes the guard must get right.
+    f"{PRODUCER} | cat; echo $?",
+    f'{PRODUCER} | cat; echo "rc=$?"',
+    # `rc=$?` alone prints nothing, so the oracle would see no difference and
+    # wrongly call it not-a-misread. Echo the captured value.
+    f"{PRODUCER} | cat; rc=$?; echo $rc",
+    f"{PRODUCER} | cat; echo ${{?}}",
+    f"{PRODUCER} | cat 2>&1; echo $?",
+    f"{PRODUCER} |& cat; echo $?",
+    f"{PRODUCER} | cat && echo $?",
+    f"{PRODUCER} | cat\necho $?",
+    f"{PRODUCER} |\n  cat\necho $?",
+    f"{PRODUCER} | cat\n# a comment\necho $?",
+    # Not a misread: no pipe, or the status belongs to something else.
+    "true; echo $?",
+    f"{PRODUCER}; echo $?",
+    f"{PRODUCER} | cat; true; echo $?",
+    f"{PRODUCER} | cat & echo $?",
+    f'{PRODUCER} | cat; echo "n=$(wc -l < /dev/null) rc=$?"',
+    f'{PRODUCER} | cat; echo "n=$((1+1)) rc=$?"',
+    f"echo \"$({PRODUCER} | cat)\"; echo $?",
+    "[[ x =~ ^(a|b)$ ]]; echo $?",
+    "ls @(a|b) 2>/dev/null; echo $?",
+    # `pipefail` in force, in each spelling.
+    f"set -o pipefail; {PRODUCER} | cat; echo $?",
+    f"( set -o pipefail; {PRODUCER} | cat ); echo $?",
+    f"( true; set -o pipefail; {PRODUCER} | cat ); echo $?",
+    f'( cd "$(dirname /tmp/x)"; set -o pipefail; {PRODUCER} | cat ); echo $?',
+    f"( arr=(a b); set -o pipefail; {PRODUCER} | cat ); echo $?",
+    f"( cd /tmp && set -o pipefail && {PRODUCER} | cat ); echo $?",
+    f"( set -o pipefail &>/dev/null; {PRODUCER} | cat ); echo $?",
+    f"(\n  # don't drop the status\n  set -o pipefail\n  {PRODUCER} | cat\n);"
+    " echo $?",
+    f"x=$(set -o pipefail; {PRODUCER} | cat); echo $?",
+    # `pipefail` NOT in force, despite appearances.
+    f"( ( set -o pipefail ); {PRODUCER} | cat ); echo $?",
+    f"( ( a; set -o pipefail ); {PRODUCER} | cat ); echo $?",
+    f"( set -o pipefail; true ); {PRODUCER} | cat; echo $?",
+    # The producer must be INSIDE the protected group, or `pipefail` has
+    # nothing to change and the oracle sees no difference for the wrong
+    # reason.
+    f"(set -o pipefail; {PRODUCER}) | cat; echo $?",
+    f"( set -o pipefail & {PRODUCER} | cat ); echo $?",
+    f'grep -rn "set -o pipefail" /dev/null; {PRODUCER} | cat; echo $?',
+    f'echo "remember to set -o pipefail"; {PRODUCER} | cat; echo $?',
+    # Assignment forms.
+    f"out=$({PRODUCER} | cat); echo $?",
+    f"out=$({PRODUCER} | cat) 2>/dev/null; echo $?",
+    f"out=$({PRODUCER} | cat) other=$(true); echo $?",
+    f"export OUT=$({PRODUCER} | cat); echo $?",
+    f"V=$({PRODUCER} | cat) true; echo $?",
+    f"( {PRODUCER} | cat ); echo $?",
+]
+
+# Every known limit is also an oracle case, so the exemption list cannot hold
+# an entry nothing exercises.
+ORACLE_CASES += [c for c in KNOWN_LIMITS if c not in ORACLE_CASES]
+
+if shutil.which("bash") is None:
+    print("NOTE: bash not on PATH; differential oracle skipped")
+else:
+    examined = agreed = exempt = 0
+    for command in ORACLE_CASES:
+        examined += 1
+        try:
+            expected = bash_says_misread(command)
+        except Exception as exc:                      # pragma: no cover
+            failures.append(f"ORACLE could not run {command!r}: {exc}")
+            continue
+        got = fires(command)
+        if command in KNOWN_LIMITS:
+            exempt += 1
+            if got == expected:
+                failures.append(
+                    f"ORACLE: {command!r} is listed in KNOWN_LIMITS "
+                    f"({KNOWN_LIMITS[command]}) but the guard now agrees with "
+                    "bash -- remove the exemption")
+            continue
+        if got != expected:
+            failures.append(
+                f"ORACLE disagrees with bash on {command!r}: "
+                f"bash says misread={expected}, guard fires={got}")
+        else:
+            agreed += 1
+    # Report what was examined, not only what disagreed: a zero-disagreement
+    # run and a harness that never ran leave the same evidence otherwise.
+    print(f"differential oracle: {examined} shapes examined against bash, "
+          f"{agreed} agreed, {exempt} exempt as known limits")
+
+# Every KNOWN_LIMITS entry must actually be exercised, so the list cannot
+# silently accumulate stale exemptions.
+for command in KNOWN_LIMITS:
+    if command not in ORACLE_CASES:
+        failures.append(
+            f"KNOWN_LIMITS entry is never run by the oracle: {command!r}")
 
 if failures:
     print("FAILED:")

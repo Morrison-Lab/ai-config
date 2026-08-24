@@ -8,7 +8,7 @@ The gha *capability* (`cursor-code-review.yml`) is catalogued in
 
 This is lab operating procedure, not wai.
 wai is the writing-principles book and has no Bugbot coverage
-(code search empty, 2026-08-24).
+(`gh api "search/code?q=bugbot+repo:Morrison-Lab/wai"` returned `total_count: 0`, 2026-08-24).
 
 ## Two paths, only one works for us today
 

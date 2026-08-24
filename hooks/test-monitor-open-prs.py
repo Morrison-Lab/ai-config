@@ -10,6 +10,14 @@ spec.loader.exec_module(subject)
 assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
+# The command must run the absolutely-resolved GH_PATH; the literal "gh"
+# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
+# a list display into a tuple inside co_consts, so nested consts are
+# searched too -- a top-level-only check passes on the reverted code.
+assert not any(
+    value == "gh"
+    for const in subject.open_prs.__code__.co_consts
+    for value in (const if isinstance(const, (tuple, list)) else (const,)))
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 import tempfile, os
@@ -33,4 +41,60 @@ with tempfile.TemporaryDirectory() as d:
     finally:
         subject.STATE_PATH = orig_path
 
-print("PASS: the all-open-PR controller preserves state keys and clears stale data on error")
+# require_gh fails fast instead of starting a monitor that can only error
+saved_gh = subject.GH_PATH
+try:
+    subject.GH_PATH = None
+    try:
+        subject.require_gh()
+        raise AssertionError("require_gh should exit when gh is unresolvable")
+    except SystemExit as exit_call:
+        assert "gh" in str(exit_call.code)
+finally:
+    subject.GH_PATH = saved_gh
+
+# Consecutive failures accumulate an error_streak; success resets it.
+with tempfile.TemporaryDirectory() as d:
+    orig_path = subject.STATE_PATH
+    real_open_prs = subject.open_prs
+
+    def failing():
+        raise OSError("[Errno 2] No such file or directory: 'gh'")
+
+    def working():
+        return [{"number": 7}]
+
+    try:
+        subject.STATE_PATH = os.path.join(d, "streak.json")
+        subject.open_prs = failing
+        state = subject.poll_once({})
+        assert state["error"].endswith("'gh'")
+        assert "data" not in state
+        assert state["error_streak"] == 1
+        state = subject.poll_once(state)
+        assert state["error_streak"] == 2
+
+        # A different error text restarts the streak: the streak counts
+        # consecutive polls of the SAME error, so a new failure mode earns
+        # its own persistent report downstream.
+        def failing_differently():
+            raise OSError("connection timed out")
+
+        subject.open_prs = failing_differently
+        state = subject.poll_once(state)
+        assert state["error"] == "connection timed out"
+        assert state["error_streak"] == 1
+        state = subject.poll_once(state)
+        assert state["error_streak"] == 2
+
+        subject.open_prs = working
+        state = subject.poll_once(state)
+        assert "error" not in state
+        assert state["error_streak"] == 0
+        assert state["data"] == [{"number": 7}]
+    finally:
+        subject.open_prs = real_open_prs
+        subject.STATE_PATH = orig_path
+
+print("PASS: gh is resolved or refused at startup; failures accumulate an "
+      "error streak that success resets")

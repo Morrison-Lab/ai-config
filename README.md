@@ -383,7 +383,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply after a commit with no later push or PR creation |
 | `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
 | `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
-| `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt; local pollers cannot wake a terminated model session |
+| `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt, and surfaces once a monitor whose last 3 polls all errored with the same text; local pollers cannot wake a terminated model session |
 | `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
 | `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |

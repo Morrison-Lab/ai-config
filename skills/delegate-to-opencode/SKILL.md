@@ -92,6 +92,45 @@ It applies where the consuming repo has written the rule down, and that repo own
 - **Don't:** treat the `ollama/` prefix as the locality guarantee --- it names a provider entry whose endpoint is user-configurable.
 - **Don't:** read a `-free` suffix, or its absence, as evidence about where the payload goes.
 
+## A third destination: OpenRouter, for models neither tier carries
+
+`opencode` reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter's **stealth** previews --- anonymized frontier models trialled under codenames, free while they last.
+`stealth/ox-alpha` ("Ox Alpha", a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was listed 2026-08-23.
+Stealth ids rotate on a days-to-weeks cycle, so they are absent from the models.dev registry opencode resolves providers from --- and absent from the registry means absent from `opencode models`.
+Declare the model explicitly in `opencode.jsonc` and it becomes selectable as `openrouter/<id>`:
+
+```jsonc
+"provider": {
+  "openrouter": {
+    "models": {
+      "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }
+    }
+  }
+}
+```
+
+Measured 2026-08-23 on opencode 1.18.21: the declaration alone put `openrouter/stealth/ox-alpha` into `opencode models`, and the unauthenticated smoke test failed cleanly with `OpenRouter API key is missing`.
+Auth is `opencode auth login openrouter` or the `OPENROUTER_API_KEY` environment variable, and the key is the user's to enter, never the agent's.
+The current stealth roster is one query, no key needed:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  | python3 -c "import json,sys; [print(m['id'], '|', m['name'], '| ctx:', m['context_length']) for m in json.load(sys.stdin)['data'] if m['id'].startswith('stealth/')]"
+```
+
+Two routing consequences, neither derivable from the split above:
+
+- **The data-sensitivity rule extends to OpenRouter unchanged.**
+  The payload leaves the machine, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
+- **A stealth model inverts the capability caveat rather than sharing it.**
+  The hosted-free ids are unbenchmarked *small* models, so the "no judgment work" exception binds them.
+  A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot --- but "plausibly" is the operative word: it stays unbenchmarked here, so validate its output like any other delegate's, and timestamp any claim about a specific id.
+
+- **Do:** declare a stealth model explicitly in config, and route to it as `openrouter/<provider-id>`.
+- **Do:** re-derive the stealth roster from the API on each use --- the ids expire without notice.
+- **Don't:** read a stealth model's absence from `opencode models` as OpenRouter being unreachable; the registry gap is the cause, and the config declaration is the fix.
+- **Don't:** send data-triggered work to `openrouter/*` --- free stealth pricing is a billing fact, and the bytes still leave the machine, to a lab the id does not even name.
+
 ## Where opencode sits in the budget ladder
 
 `memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, and `opencode`.
@@ -117,8 +156,16 @@ opencode --version
 opencode models
 ```
 
+**On Windows, the OpenCode desktop app does not provide the CLI, so "installed" and "available" diverge.**
+Measured 2026-08-23: `@opencode-aidesktop` was present under `AppData\Local\Programs` while `opencode` resolved in neither Git Bash nor PowerShell --- and `%APPDATA%\npm` was missing from the User `Path` entirely, so a prior npm install would not have surfaced either.
+The recovery is two steps, both durable: `npm install -g opencode-ai` (landed 1.18.21), then add `%APPDATA%\npm` to the User `Path` if absent.
+
+- **Do:** treat `command not found` as an install-surface gap and run the npm install, even when the desktop app is visibly present.
+- **Don't:** read the desktop app's presence as the CLI being installed --- they are separate artifacts with separate install routes.
+
 `opencode models` prints ids as `provider/model`, which is the routing signal from the section above.
 A malformed config fails here rather than mid-run --- see Troubleshooting.
+The gemma/granite ollama entries that section describes were measured 2026-08-19 and are no longer in this machine's config, which was since rewritten around the opencode-quota plugin --- the schema constraint stands, the specific entries do not.
 
 An `ollama/*` id appearing in that list only says the config declares it, not that the daemon is up, so smoke-test the exact id you intend to use:
 

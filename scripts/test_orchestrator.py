@@ -585,11 +585,27 @@ class TestSpecializedSubagents(unittest.TestCase):
         res24 = extract_files_from_markdown(text24)
         self.assertEqual(res24, {".gitignore": "*.pyc\n*.pyo\n.env\n"})
 
+        # Comma-, semicolon-, and lettered-lists
+        text25 = "```scripts/foo.py\nscripts/a.py, scripts/b.py\n```"
+        res25 = extract_files_from_markdown(text25)
+        self.assertEqual(res25, {})
+
+        text26 = "```scripts/foo.py\nscripts/a.py; scripts/b.py\n```"
+        res26 = extract_files_from_markdown(text26)
+        self.assertEqual(res26, {})
+
+        text27 = "```scripts/foo.py\na. scripts/a.py\nb. scripts/b.py\n```"
+        res27 = extract_files_from_markdown(text27)
+        self.assertEqual(res27, {})
+
     def test_find_candidate_file_paths_adjacent_paths(self):
         from orchestrator.subagents import find_candidate_file_paths
 
         res = find_candidate_file_paths("update scripts/a.py scripts/b.py scripts/c.py please")
         self.assertEqual(res, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
+
+        res2 = find_candidate_file_paths("update scripts/a.py, scripts/b.py, and scripts/c.py.")
+        self.assertEqual(res2, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
 
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown

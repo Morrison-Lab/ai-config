@@ -23,7 +23,7 @@ logger = logging.getLogger("orchestrator.subagents")
 
 
 CANDIDATE_FILE_REGEX = re.compile(
-    r"(?:(?<=^)|(?<=[\s`'\"]))((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?=[\s`'\"]|$)"
+    r"(?:(?<=^)|(?<=[\s`'\"]))((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?=[,\s`'\":;.]|$)"
 )
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
@@ -89,12 +89,24 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
             clean_cand.lstrip("./"),
         }
 
+    def _is_single_token_stub_or_path(tok: str) -> bool:
+        t = tok.strip("`'\" \t\r\n")
+        if not t or t.lower() in ("and", "&"):
+            return True
+        if t in STUB_PATTERNS:
+            return True
+        if is_bare_path_line(t):
+            return True
+        if t in cand_variants or t.lstrip("./") in cand_variants:
+            return True
+        return False
+
     def _is_single_line_stub_or_path(raw_line: str) -> bool:
         line_clean = raw_line.strip()
         if not line_clean:
             return True
-        # Strip leading comment markers (#, //, --, /*), bullet markers (*, - with whitespace), or numbered list markers (1., 1) with whitespace)
-        uncommented = re.sub(r"^(?:(?:#+|//|--|/\*+)\s*|(?:[\*\-]\s+)|\d+[.)]\s+)", "", line_clean)
+        # Strip leading comment markers (#, //, --, /*), bullet markers (*, - with whitespace), or list markers (1., 1), a., a) with whitespace)
+        uncommented = re.sub(r"^(?:(?:#+|//|--|/\*+)\s*|(?:[\*\-]\s+)|(?:[a-zA-Z]|\d+)[.)]\s+)", "", line_clean)
         uncommented = re.sub(r"\s*\*+/$", "", uncommented).strip("`'\" \t\r\n")
         if not uncommented:
             return True
@@ -104,6 +116,11 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
             return True
         if uncommented in cand_variants or uncommented.lstrip("./") in cand_variants:
             return True
+        # If line contains separators (, or ;), split into tokens and check if all tokens are paths/stubs
+        if "," in uncommented or ";" in uncommented:
+            tokens = [t.strip() for t in re.split(r"[,;]", uncommented) if t.strip()]
+            if tokens and all(_is_single_token_stub_or_path(t) for t in tokens):
+                return True
         return False
 
     # Return True if ALL non-empty lines are stubs, comments, or bare file paths

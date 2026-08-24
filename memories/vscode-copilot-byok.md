@@ -5,7 +5,7 @@ Where VS Code keeps Copilot Chat and its "bring your own key" (BYOK) model regis
 Everything below was measured on the user's personal Windows 11 machine on **2026-08-23**, against **VS Code 1.134.0** (commit `110a328ea54b42367b803ec53ee0bf52ef26b419`) and the bundled **`GitHub.copilot-chat` 0.62.0**.
 Both version numbers move on VS Code's monthly train, so re-measure rather than quoting these -- the *mechanisms* are the durable part, the versions are the timestamp.
 
-Companion of the [`register-oaicopilot-models`](../skills/register-oaicopilot-models/SKILL.md) skill, which handles the third-party extension route this file's route replaces.
+Companion of the [`register-oaicopilot-models`](../skills/register-oaicopilot-models/SKILL.md) skill, which handles the [machine-dependent alternative route](#which-route-applies-is-a-property-of-the-machine-not-a-preference) to this one.
 Not a companion of [`tools.md`](tools.md)'s "Personal machine setup" section, despite the name: that section documents the shiva login node, a different machine entirely.
 
 ## `code --list-extensions` cannot see a built-in extension, so an absent name is not an absent extension
@@ -54,7 +54,7 @@ So the config carries a pointer and the secret lives in VS Code secret storage, 
 The consequence is operational: **a BYOK key cannot be seeded by editing a file.**
 There is no `settings.json` edit, no dotfile, no scripted install step that puts a working key in place.
 Entering it is a UI-only action the user has to perform.
-Any procedure that claims otherwise is describing the third-party extension route below, not this one.
+Any procedure that claims otherwise is describing the third-party extension route covered in ["Which route applies is a property of the machine, not a preference"](#which-route-applies-is-a-property-of-the-machine-not-a-preference), not this one.
 
 - **Do:** register BYOK models through the chat model picker's **Manage Models...** flow, and hand the key entry to the user as a manual step.
 - **Do:** copy a provider list out of the bundle when you need one, since the obvious guess for a vendor name can be wrong.

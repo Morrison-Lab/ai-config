@@ -95,3 +95,16 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   See also [`git-worktrees.md`](git-worktrees.md) for the liveness rules that decide when a worktree may be touched or reclaimed.
 - **Fix**: Create the worktree before the first edit (`git worktree add`), not after the first commit.
   Treat the primary checkout as read-only during a write session, and push early --- a pushed commit survives anything that happens to a working tree.
+
+## Pattern 10: Two checks on the same artifact treated as independent verification
+- **Mistake**: Rebutting a reviewer's finding with "two independent checks" that were actually two different grep angles on the *same* single source (an installed VS Code bundle), then treating agreement between them as confirmation.
+- **Example**: 2026-08-24, ai-config#2070.
+  A reviewer disputed a setting name (`chat.agentHost.claudeAgent.enabled` vs. `github.copilot.chat.claudeAgent.enabled`), citing VS Code's own live documentation.
+  I rebutted with a schema-shape check and a manifest-absence check -- both reads of the same bundle -- and declared the claim settled.
+  The reviewer re-raised it a third round, still citing the live docs.
+  Fetching that page directly showed the reviewer was citing it accurately, which the bundle-only checks could never have settled: [`vscode-copilot-byok.md`](vscode-copilot-byok.md) explains that both names are real, only one has a functioning schema in this exact build, and which one the vendor's own docs currently name is a separate question a bundle grep cannot answer at all.
+- **Canonical Rule**: [`self-review-fallback.md`](../shared/workflow/self-review-fallback.md)'s cross-vendor section: "Read a cross-vendor disagreement as a prompt to check the item yourself".
+  Checking means consulting a genuinely separate source, not re-deriving from the one you already trust.
+  [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
+- **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
+  Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.

@@ -14,9 +14,9 @@ Measured 2026-08-23/24 on a Windows 11 local session; tracked as
 above" bullet (2026-08-16) records a session where `old.reddit.com` HTML
 still fetched.
 That reading does not transfer to a local session, where routes 1 and 3 are
-refused client-side, before any request reaches Reddit --- see "Route 1 in
-detail" below for what probably does the refusing, and for the override
-nobody has tested yet.
+refused client-side, before any request reaches Reddit at all.
+No permission rule produces that refusal, and its documented override has
+never been tested against Reddit.
 
 ## The five failed routes, and the signature each one leaves
 
@@ -26,9 +26,8 @@ Recognize which wall you hit from its signature rather than re-deriving it:
    "Claude Code is unable to fetch from \<host\>".
    Instant, and worded as a tool refusal rather than a Reddit 403 --- so it
    is a client-side gate, and probably the WebFetch domain safety preflight.
-   A `WebFetch(domain:...)` **allow** rule does not clear it.
-   See "Route 1 in detail" below for what is measured, what is inferred, and
-   the one check nobody has run.
+   A `WebFetch(domain:...)` **allow** rule does not clear it, and no
+   permission rule in any settings scope produces it.
 2. **WebSearch**: returns no reddit.com results at all, and with
    `allowed_domains=["reddit.com"]` it errors "The following domains are not
    accessible to our user agent" --- Anthropic's search crawler is itself
@@ -174,8 +173,9 @@ Four mechanics, each measured working:
   for reddit.com in a local session, or treat a `javascript_tool` 45s
   timeout as the loop having died --- it is still running in the page.
 - **Don't:** add a `WebFetch(domain:...)` allow rule to fix route 1.
-  Measured 2026-08-23 (PT), four such rules covering the bare domain, both
-  hosts, and a wildcard changed nothing.
+  On 2026-08-23 (PT) four such rules covering the bare domain, both hosts,
+  and a wildcard changed nothing --- reported present rather than verified
+  in effect, so lean on the scope read above rather than on this.
 - **Don't:** assert that skipping the preflight would reach Reddit, or that
   it would not.
   Nobody has tested it.

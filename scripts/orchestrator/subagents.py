@@ -29,11 +29,11 @@ STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* .
 
 
 def is_bare_path_line(s: str) -> bool:
-    """Return True if string is a normalized repo-relative or absolute file path."""
+    """Return True if string is a normalized repo-relative or absolute file path with a directory separator."""
     clean = s.replace("\\", "/").strip("`'\" \t\r\n")
     while clean.startswith("./") or clean.startswith("/"):
         clean = clean.lstrip("./")
-    if not clean:
+    if not clean or "/" not in clean:
         return False
     # Must not contain code syntax characters or whitespace
     if any(c in clean for c in " \t()[]{}=:;,<>\"'\\"):
@@ -105,7 +105,8 @@ def find_candidate_file_paths(text: str) -> List[str]:
 def resolve_within_worktree(rel_path: str, wt_path: Path, wt_resolved: Optional[Path] = None) -> Optional[Path]:
     """Resolve rel_path within wt_path and return Path if strictly contained within wt_path (excluding root), else None."""
     wt_root = wt_resolved if wt_resolved is not None else wt_path.resolve()
-    clean_rel = Path(rel_path)
+    clean_str = str(rel_path).replace("\\", "/").lstrip("/")
+    clean_rel = Path(clean_str)
     if clean_rel.is_absolute():
         clean_rel = Path(*clean_rel.parts[1:])
     file_path = (wt_path / clean_rel).resolve()

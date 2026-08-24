@@ -522,6 +522,19 @@ class TestSpecializedSubagents(unittest.TestCase):
         res10 = extract_files_from_markdown(text10, context_text="fix scripts/a.tar.gz")
         self.assertEqual(res10, {})
 
+        # Single dotted tokens (version numbers, domains, numbers) must NOT be discarded as stubs
+        text11 = "```version.txt\n1.0.0\n```"
+        res11 = extract_files_from_markdown(text11)
+        self.assertEqual(res11, {"version.txt": "1.0.0\n"})
+
+        text12 = "```config.txt\nexample.com\n```"
+        res12 = extract_files_from_markdown(text12)
+        self.assertEqual(res12, {"config.txt": "example.com\n"})
+
+        text13 = "```scripts/pi.py\n3.14\n```"
+        res13 = extract_files_from_markdown(text13)
+        self.assertEqual(res13, {"scripts/pi.py": "3.14\n"})
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 
@@ -542,9 +555,14 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertIsNone(resolve_within_worktree("", root))
         self.assertIsNone(resolve_within_worktree("/", root))
 
-        # Absolute paths escaping worktree root must return None
+        # Relative paths escaping worktree root must return None
         escape_path = resolve_within_worktree("../../../etc/passwd", root)
         self.assertIsNone(escape_path)
+
+        # Absolute paths are rebased under the worktree root
+        abs_rebased = resolve_within_worktree("/scripts/bar.py", root)
+        self.assertIsNotNone(abs_rebased)
+        self.assertEqual(abs_rebased, (root / "scripts/bar.py").resolve())
 
     def test_coder_subagent_path_traversal_context_injection_blocked(self):
         from unittest.mock import MagicMock, patch

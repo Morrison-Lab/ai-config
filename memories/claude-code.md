@@ -165,12 +165,10 @@
   **skill command blocks**: the user's local shell is zsh too, so a command
   block I write into a skill gets run under zsh — keep it bash/zsh-portable.
   (A `mapfile` loop in the link-skills draft failed this way; PR #71.)
-- **Process substitution breaks in a pipeline.** `diff <(a) <(b)` works alone
-  but fails under zsh once it feeds a pipe, with `/proc/self/fd/N: No such file
-  or directory` --- and a downstream `grep -c` then reports a false `0`.
+- **Process substitution breaks in a pipeline.**
+  `diff <(a) <(b)` works alone but fails under zsh once it feeds a pipe, with `/proc/self/fd/N: No such file or directory` --- and a downstream `grep -c` then reports a false `0`.
   Bash runs the same line fine, so it survives review.
-  Use temp files instead; see `memories/tools.md`, "A process substitution
-  feeding a pipeline fails under zsh".
+  Use temp files instead; see [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
 
 ## Skill command blocks — resolve the ai-config repo root with the per-skill symlink
 - To `cd` to the repo root from inside a skill, use the **per-skill** form

@@ -889,6 +889,8 @@ identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
+Same false-absence shape as the entries in [`zsh.md`](zsh.md), and this one is not zsh-specific --- it reports "0 found" under any shell, which is why it stays here.
+
 Piping data into an interpreter invoked as `python3 -` (or `sh -`, `bash -`)
 while *also* supplying the script through a `<<'EOF'` heredoc puts two things in
 line for one stdin, and the heredoc wins.
@@ -939,10 +941,7 @@ was shell *quoting*, this one is stdin *contention*.
 - **Don't:** trust a "0 candidates" result from a scan that has never been seen
   to report a nonzero.
 
-(2026-08-03, an ai-config session: this idiom was used to verify ai-config#1078's
-diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line
-violation was reported as "0 found" and the vacuous all-clear was stated to the
-user before the method was caught.)
+(2026-08-03, an ai-config session: this idiom was used to verify ai-config#1078's diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line violation was reported as "0 found" and the vacuous all-clear was stated to the user before the method was caught.)
 
 ## Splitting a shell command into simple commands in Python: two `shlex` gotchas
 

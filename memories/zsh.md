@@ -2,10 +2,12 @@
 
 Satellite of [`tools.md`](tools.md), split at the 1200-line gate (ai-config#694 pattern).
 
-The Bash tool runs zsh here, and this file collects the zsh-versus-bash differences where a check **reports nothing and looks like it ran**.
-That shared shape is the reason they sit together: the output carries no error, so an empty result reads as a finding about the inputs rather than as a failure of the check.
+The Bash tool runs zsh here, and this file collects the **zsh-specific** shell semantics under which a check **reports nothing on stdout and looks like it ran**.
+That shared shape is the reason the entries sit together: a caller reading stdout sees an empty result and takes it as a finding about the inputs rather than as a failure of the check.
+Both entries do write to stderr, so stderr is the signal to read.
 
-Differences that produce a wrong *value* rather than an empty one stay in [`tools.md`](tools.md) --- the unquoted-expansion word-splitting entry, the `grep`-is-a-shell-function entry, and the reserved-variable notes in [`claude-code.md`](claude-code.md).
+The boundary is zsh-specificity, not the false-absence shape.
+[`tools.md`](tools.md) keeps the zsh differences that produce a wrong *value* rather than an empty one --- the unquoted-expansion word-splitting entry --- and it also keeps false-absence entries whose cause is not zsh at all, notably the `cmd | python3 - <<EOF` heredoc entry, which reports "0 found" on every input under any shell.
 
 ## A process substitution feeding a pipeline fails under zsh, and reads as a clean zero
 
@@ -43,7 +45,7 @@ add=$(diff /tmp/a /tmp/b | grep -c '^>')
 
 The negative control is the load-bearing half, per [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s "Any conflict sweep needs a negative control".
 A zero from a detector never once seen to report a difference is not evidence about the inputs.
-Sibling of the plumbing failures recorded in [`tools.md`](tools.md), whose causes there were shell *quoting* and stdin *contention*; this one is fd *lifetime*.
+Sibling of two plumbing failures kept in [`tools.md`](tools.md) --- "A hand-rolled verification check is worth nothing until it has caught something" (shell *quoting*) and "`cmd | python3 - <<EOF` reads the heredoc, not the pipe" (stdin *contention*); this one is fd *lifetime*.
 
 - **Do:** write both sides to real temp files and diff those, whenever a process substitution would otherwise feed a pipeline.
 - **Do:** run a known-differing negative control first, and abort when the detector reports no difference.
@@ -61,9 +63,18 @@ Derive that set rather than counting it, since a count goes stale on the next on
 The entry above is a check that runs and produces nothing.
 This one never runs at all, and the two are indistinguishable from the output.
 
-zsh's default `NOMATCH` option makes a glob matching no file a **fatal error for the entire command**, so nothing in the command list executes.
-Bash's default passes the unmatched pattern through literally instead, so the command still runs.
+zsh's default `NOMATCH` option makes a glob matching no file an error that **skips the whole simple command the pattern appeared in**, so `ls` never runs and none of its other arguments are ever examined.
+Bash's default passes the unmatched pattern through literally instead, so the command still runs and still lists the paths that do exist.
 A multi-path existence check therefore answers correctly under bash and answers nothing at all under zsh.
+
+**The skip is scoped to that one simple command rather than to the whole script, which makes it worse rather than milder.**
+The rest of the command list still runs, and the shell can still exit 0:
+
+```zsh
+zsh -c 'echo BEFORE; ls -d /nonexistent*/x; echo AFTER'   # prints BEFORE and AFTER; rc=0
+```
+
+So a glob check with anything after it returns **success** while having examined nothing.
 
 **The path that exists is never listed, which is the whole harm.**
 The natural way to check several candidate locations is one command naming all of them, and one unmatched pattern anywhere in that list discards the answer for every other path in it.
@@ -83,20 +94,33 @@ Its entire output was:
 That was reported to the user as "no local clone exists".
 It was false: `~/Documents/GitHub/ucd-serg.github.io` --- the first path, which carries no glob --- existed the whole time, and the user had to correct it.
 
-**`2>/dev/null` does not suppress the message, and the redirect is what makes this look like a clean answer.**
-The complaint comes from the shell rather than from `ls`, and the shell emits it before any redirection the command line sets up.
-So the output above is what a caller sees *with* stderr already discarded.
+**A `2>/dev/null` written on the command itself does not suppress the message, and that is what makes the incident's output look like a clean answer.**
+The abort happens while the shell expands that simple command's words, which is *before* the command's own redirections are applied --- so its `2>` never takes effect and the message goes to the shell's stderr.
+
+The tempting cause claim is that the shell emits it before any redirection at all, and that is false.
+A redirection already in effect on the **shell's** fd 2 does capture it, which matters because it is how the line disappears in practice:
+
+```zsh
+zsh -c 'ls -d /etc /nonexistent*/x 2>/dev/null'         # NOT suppressed
+zsh -c '{ ls -d /etc /nonexistent*/x } 2>/dev/null'     # suppressed (block)
+zsh -c 'exec 2>/dev/null; ls -d /etc /nonexistent*/x'   # suppressed (exec)
+zsh -c 'ls -d /etc /nonexistent*/x' 2>/dev/null         # suppressed (outer wrapper)
+```
+
+The distinction is *whose* fd 2 the redirect changes, not ordering.
+Any wrapper that discards a subshell's stderr --- a CI step, a `$(...)` capture with stderr merged away, a harness --- removes the only evidence the check never ran.
 
 Measured 2026-08-24 on macOS 26.6.2, zsh 5.9 and bash 5.3.15, same command under each shell:
 
 ```zsh
-zsh  -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints nothing; rc=1
-bash -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints /etc;     rc=1
+zsh  -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # no path on stdout; error on stderr; rc=1
+bash -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints /etc on stdout;              rc=1
 ```
 
-**Both shells exit 1, so the exit status cannot discriminate.**
-Bash's `1` comes from `ls` failing on the literal unmatched pattern while it still lists `/etc`; zsh's `1` comes from the shell refusing to run `ls` at all.
-A caller that branches on `rc` sees identical answers from a check that worked and a check that never happened, so **stdout is the only discriminator**.
+**On this shape both shells exit 1, so the exit status cannot discriminate.**
+Bash's `1` comes from `ls` failing on the literal unmatched pattern while still listing `/etc`; zsh's `1` comes from the shell refusing to run `ls` at all.
+That equality is an accident of the failing command being last, and it does not generalize --- put anything after the glob and zsh returns 0, as the command list above shows.
+So read **stderr** for the signal, and treat stdout as the fallback discriminator once an outer redirect has thrown stderr away.
 
 The trigger is any unquoted glob character, not only one in a path.
 The same failure hit a `grep` during this entry's own dupe-check, because an unquoted option value was glob-expanded against the working directory:
@@ -111,25 +135,45 @@ Quoting the value (`--include="*.md"`) fixed it.
 This is a false negative that reads as a completed search, which puts it in a family the corpus already documents: [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s "a matrix of zeros is indistinguishable from a detector that never ran", [`fail-fast`](../shared/principles/fail-fast.md)'s pass-path-equals-failure-path shape, and [`fully-clean`](../shared/workflow/fully-clean.md)'s check run that passes having examined nothing.
 The transferable lesson is about **existence checks that abort before running**: an absence is evidence only once you can show the check actually examined the population.
 
-Four remedies, each verified on zsh 5.9 on 2026-08-24:
+Two remedies avoid globbing altogether, and they are the ones to reach for:
 
 ```zsh
 for p in /etc /nonexistent/x; do [ -e "$p" ] && echo "$p"; done  # prints /etc
-zsh -c 'setopt NULL_GLOB; ls -d /etc /nonexistent*/x'            # prints /etc
-zsh -c 'ls -d /etc /nonexistent*/x(N)'                           # prints /etc
 find ~/Documents/GitHub -maxdepth 2 -name ucd-serg.github.io     # no glob at all
 ```
 
-The `(N)` glob qualifier applies `NULL_GLOB` to one pattern rather than to the whole shell, so it is the narrowest of the three zsh-specific fixes.
-Note that the `for` loop above still exits 1, from the final iteration's failed `&&` --- another reason to read what a check printed rather than what it returned.
+Neither is zsh-specific: the loop is POSIX and runs unchanged under bash, and `find` is not a shell feature.
+Note that the loop still exits 1, from the final iteration's failed `&&` --- another reason to read what a check printed rather than what it returned.
 
-- **Do:** test one path per command, or loop with `test -e`/`-d`, when checking several candidate locations.
+**The two zsh-specific fixes trade the false absence for a false *presence*, so prefer the two above.**
+`setopt NULL_GLOB` and the `(N)` glob qualifier both delete an unmatched pattern from the argument list.
+That is correct while some other argument survives, and when **every** pattern is unmatched they delete all of them --- leaving `ls -d` with no arguments, so it lists the working directory and exits 0.
+Measured on zsh 5.9, 2026-08-24:
+
+```zsh
+zsh -c 'setopt NULL_GLOB; ls -d /etc /nonexistent*/x'                  # prints /etc;  rc=0
+zsh -c 'setopt NULL_GLOB; ls -d /nonexistentA*/x /nonexistentB*/x'     # prints "." ;  rc=0
+zsh -c 'ls -d /nonexistentA*/x(N) /nonexistentB*/x(N)'                 # prints "." ;  rc=0
+zsh -c 'setopt CSH_NULL_GLOB; ls -d /nonexistentA*/x /nonexistentB*/x' # errors;       rc=1
+```
+
+A check that answers `.` to "does this repo exist" is worse than one that answers nothing, because the reply is non-empty and exits 0.
+`CSH_NULL_GLOB` closes that hole --- `man zshoptions` describes it as not reporting an error unless every pattern in a command fails to match --- so it errors precisely in the all-unmatched case the other two get wrong.
+The `(N)` qualifier applies `NULL_GLOB` to one pattern rather than to the whole shell, so it is the narrower of that pair, and it carries the same hole.
+
+Testing only the one-matching-path case is what hid this: the fix looked verified because the surviving argument masked the empty-argument-list behaviour.
+That is the negative-control discipline the process-substitution entry above already states, and this entry failed to apply it to its own remedies.
+
+- **Do:** loop with `test -e`/`-d` over one path at a time, or use `find`, when checking several candidate locations.
 - **Do:** read a non-empty stderr as "the check failed to run", never as part of the answer.
 - **Do:** quote any argument containing `*`, `?`, or `[` that is not meant as a glob, including option values like `--include="*.md"`.
-- **Don't:** read an empty result from a multi-path glob check as "none of these exist" --- the paths without globs in them were never examined either.
-- **Don't:** trust the exit status to tell the two apart; both shells return 1 here, and so does the correct loop.
-- **Don't:** assume `2>/dev/null` hid only noise; it hides the one line saying the command never ran.
+- **Do:** run the all-patterns-unmatched case before believing any glob-based existence check, since that is the case `NULL_GLOB` and `(N)` get wrong.
+- **Don't:** read an empty result from a multi-path glob check as "none of these exist" --- the paths carrying no glob were never examined either.
+- **Don't:** trust the exit status to separate a check that ran from one that never ran; zsh returns 0 whenever anything follows the failing command, and 1 only when it happens to come last.
+- **Don't:** assume `2>/dev/null` hid only noise; the line it hides is the one saying the command never ran.
 
 (Measured 2026-08-24 on this machine, in an ai-config session; tracked as ai-config#2128.
-The user supplied the correction --- that the directory existed and the report of its absence was wrong.
-The mechanism, the bash comparison, the identical-exit-status finding, the `--include=*.md` recurrence, and the four remedies were derived and measured afterwards while writing this entry.)
+**From the user:** the correction that the directory existed and that reporting its absence was wrong.
+**Derived and measured afterwards:** the mechanism, the bash contrast, the `--include=*.md` recurrence, and the remedies.
+**From the adversarial review of this entry's own PR:** that the skip is scoped to one simple command rather than the command list, so zsh returns 0 whenever anything follows it; that `exec 2>/dev/null` and a block or wrapper redirect *do* capture the message, falsifying a first draft's cause claim; and that `NULL_GLOB` and `(N)` list the working directory when every pattern is unmatched.
+The first draft asserted the opposite of each, which is why the entry now shows the commands rather than describing them.)

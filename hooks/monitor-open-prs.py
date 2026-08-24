@@ -2,6 +2,7 @@
 """Continuously poll every open PR authored by the authenticated GitHub user."""
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,25 +36,40 @@ def read_state():
         return {}
 
 
+GH_PATH = shutil.which("gh")
+
+
+def require_gh():
+    if GH_PATH is None:
+        sys.exit("FATAL: cannot resolve 'gh' on PATH; refusing to start a "
+                 "monitor that can only error every poll")
+
+
 def open_prs():
     result = subprocess.run(
-        ["gh", "search", "prs", "--author", "@me", "--state", "open", "--limit", "1000",
+        [GH_PATH, "search", "prs", "--author", "@me", "--state", "open", "--limit", "1000",
          "--json", "number,repository,title,updatedAt,url"],
         capture_output=True, text=True, timeout=60, check=True)
     return json.loads(result.stdout)
 
 
+def poll_once(state):
+    state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
+    try:
+        state["data"] = open_prs()
+        state.pop("error", None)
+        state["error_streak"] = 0
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        state.pop("data", None)
+        state["error"] = str(error)
+        state["error_streak"] = int(state.get("error_streak") or 0) + 1
+    write_state(state)
+    return state
+
+
 def monitor():
     while True:
-        state = read_state()
-        state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
-        try:
-            state["data"] = open_prs()
-            state.pop("error", None)
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
-            state.pop("data", None)
-            state["error"] = str(error)
-        write_state(state)
+        poll_once(read_state())
         time.sleep(POLL_SECONDS)
 
 
@@ -73,6 +89,7 @@ def ensure():
 
 
 if __name__ == "__main__":
+    require_gh()
     if sys.argv[1:] == ["--monitor"]:
         monitor()
     else:

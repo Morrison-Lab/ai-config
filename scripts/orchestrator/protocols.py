@@ -42,6 +42,14 @@ Goal: Implement the required fix or feature cleanly inside your isolated worktre
 Rules:
 - Make precise, atomic edits preserving formatting and SemBr conventions.
 - Stage and commit changes with conventional commit messages: `fix: <desc>` or `feat: <desc>`.
+- Do NOT output XML tool calls or function tags.
+- When creating a new file or completely rewriting a file, output the complete file in markdown code blocks with the relative path on the opening line, e.g. ```path/to/file.py.
+- When editing a large existing file, use search/replace blocks:
+<<<<<<< SEARCH
+<exact existing lines to find>
+=======
+<replacement lines>
+>>>>>>> REPLACE
 - Fail fast if tests or syntax checks fail.
 """
 
@@ -95,3 +103,34 @@ Rules:
             "python scripts/check-links.py",
             "python scripts/test_orchestrator.py",
         ]
+
+    @classmethod
+    def check_repo_allows_mwc(cls, repo_root: Optional[Path] = None, repo_slug: Optional[str] = None) -> bool:
+        """Check if repository written policies grant standing mwc authorization.
+
+        Evaluates:
+        1. Explicit repo identity (Morrison-Lab/ai-config).
+        2. If repo_root is provided, inspect written policy files for standing mwc auto-merge grants
+           (must specifically grant auto-merge under mwc, not just general non-destructive permissions).
+        """
+        # ai-config repository explicitly operates under standing MWC
+        if repo_slug and (repo_slug.lower() == "ai-config" or repo_slug.lower().endswith("/ai-config")):
+            return True
+
+        # When targeting an external repo without an explicit repo_root, do not inspect current working directory
+        if repo_slug and "ai-config" not in repo_slug.lower() and repo_root is None:
+            return False
+
+        if repo_root is not None:
+            root = repo_root.resolve()
+            for doc_name in ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
+                doc_path = root / doc_name
+                if doc_path.exists():
+                    try:
+                        content = doc_path.read_text(encoding="utf-8", errors="ignore").lower()
+                        # Strictly check for standing merge grants, not general non-destructive permissions
+                        if "auto-merge under `mwc`" in content or "standing mwc" in content or "standing merge" in content:
+                            return True
+                    except Exception:
+                        pass
+        return False

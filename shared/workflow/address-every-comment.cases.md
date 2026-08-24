@@ -242,30 +242,34 @@ See [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing
 which exception a function RAISES is a signature change that fails silently"
 for the same underlying fact arriving from the author's side.)
 
-(A third draft of this record cited `:409`, `:633`, and `:658` --- correct
-before [#2086](https://github.com/Morrison-Lab/ai-config/pull/2086) merged and
-wrong by 25 lines after, since that PR inserted guards above them. The reviewer
-caught it and gave the right numbers.
+(A third draft of this record cited `:409`, `:633`, and `:658`.
+Those were correct before
+[#2086](https://github.com/Morrison-Lab/ai-config/pull/2086) merged and wrong by
+25 lines after, since that PR inserted guards above them.
+The reviewer caught it and gave the right numbers.
 
-The part worth keeping is what happened next. Checking the reviewer's claim, I
-ran `grep -n` against a local `main` at `df4676c2` and got `409`, `633`, `658`
-back --- and briefly concluded the reviewer was wrong. `origin/main` was
-`b26bbdfc`. The local branch had not fast-forwarded because an unrelated
-session's uncommitted files were blocking the pull, so the checkout was three
-commits stale and silently so.
+The part worth keeping is what happened next.
+Checking the reviewer's claim, `grep -n` against a local `main` at `df4676c2`
+returned `409`, `633`, `658` --- the original values --- which read as a
+refutation of the finding.
+`origin/main` was `b26bbdfc`.
+The local branch had not fast-forwarded because an unrelated session's
+uncommitted files were blocking the pull, so the checkout was three commits
+stale, and silently so.
 
 So the same defect recurred **while verifying a report of it**, one step further
 out: a line number recalled from a stale copy, then a refutation derived from a
-stale copy. `git grep` against a working tree answers a question about that
-working tree, which is not the question when the claim is about `main`. Resolve
-a ref explicitly --- `git show origin/main:<path>` --- and say which ref the
-numbers are as of, which the citation above now does.
+stale copy.
+`git grep` against a working tree answers a question about that working tree,
+which is not the question when the claim is about `main`.
+Resolve a ref explicitly --- `git show origin/main:<path>` --- and say which ref
+the numbers are as of, which the citation above now does.
 
 The general form is in
 [`verify-the-right-artifact`](verify-the-right-artifact.md): a checkout standing
-in for the run. Recorded here because the artifact substituted was not an exotic
-one, it was `main`, and nothing about `grep -n` in a repo announces which commit
-you are reading.)
+in for the run.
+Recorded here because the artifact substituted was not an exotic one, it was
+`main`, and nothing about `grep -n` in a repo announces which commit it read.)
 
 ## "The same check applies to a fix a reviewer describes in prose"
 

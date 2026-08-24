@@ -130,7 +130,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Fetch each matched review's body and inline comments.
 >    An affirmative zero-findings read across every matched review means a genuine external verdict at the head.
 >    Findings in any of them mean `N open`.
-> 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
+> 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending (<check-name>)`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login`, `.reviewRequests`, and human review status.
 >    - If human review has requested changes, report `❌ Changes requested by <login>`.
 >    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.
@@ -167,7 +167,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
 >    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
@@ -191,7 +191,7 @@ A Markdown table, one row per open PR, with these columns:
 | [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 | [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
 | [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
-| [#105](url) (Draft) | `external-dev` | - | ⏳ Pending | - | Draft (Work in progress) |
+| [#105](url) (Draft) | `external-dev` | - | ⏳ Pending (build) | - | Draft (Work in progress) |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`, appended with `(Draft)` if `isDraft` is true.
 - **Author** --- author login.
@@ -199,7 +199,7 @@ A Markdown table, one row per open PR, with these columns:
   Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
   If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
   If no SHA is named, display `[⚠️ Unverified](url)`.
-- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
+- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.

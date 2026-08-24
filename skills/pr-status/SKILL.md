@@ -334,7 +334,7 @@ Render a **Review Summary Table** for the PR:
   Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
   If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
   If no SHA is named, display `[⚠️ Unverified](url)`.
-- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
+- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.

@@ -86,7 +86,9 @@ glab issue create --title "<concise title>" --description "<what & why>
 - Then **claim it** (`claim-pr` pattern) so a parallel session / the `@claude`
   bot doesn't collide:
   ```bash
-  gh issue comment <N> --body "Claude Code CLI (local session) is working on this — paws off until I'm done."   # COMMENT_ISSUE
+  gh issue comment <N> --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.
+
+  _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
   ```
 
 ### 4. Check history

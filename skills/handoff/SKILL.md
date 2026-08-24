@@ -79,11 +79,13 @@ short note so the `@claude` bot and other sessions don't push conflicting
 changes — especially when you have unpushed local commits or running jobs.
 
 ```bash
-gh pr comment <N> --body "⏸️ **Local session paused** (<local timestamp>) — still claimed, paws off.
+gh pr comment <N> --body "⏸️ **Local session paused** (<local timestamp>) — still claimed.
 
 <2-4 bullets: in-flight jobs + IDs, unpushed local commits and why held, what runs next>
 
-Please don't push to this branch in the meantime."   # COMMENT_PR
+Please hold off on pushing to this branch in the meantime.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 ```
 
 If the work is genuinely *finished* (merged/closed, nothing outstanding), post a

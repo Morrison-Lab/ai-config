@@ -41,7 +41,9 @@ WIP — opened up front to claim the issue; implementing now." \
     --draft
 
 echo "Posting claim comment on issue..."
-gh issue comment "$ISSUE_NUM" --body "Claude Code CLI (local session) is working on this — paws off until I'm done."
+gh issue comment "$ISSUE_NUM" --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 
 echo "✓ PR opened and issue claimed."
 git log --oneline -1

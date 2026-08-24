@@ -36,7 +36,7 @@ mutates a PR stays serial.
      - **Skip a driven draft.**
        Any of these marks one:
        the head commit is still the `start:` scaffold (the implementer is mid-flight),
-       a still-live "paws off" claim comment stands (claims expire after 2 hours with no push or comment --- [`claim-pr`](../../shared/workflow/claim-pr.md)),
+       a still-live claim comment stands (claims expire after 2 hours with no push or comment --- [`claim-pr`](../../shared/workflow/claim-pr.md)),
        another actor pushed recently,
        or the draft is deliberately held as a merge-order gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
      - **Include a parked draft.**

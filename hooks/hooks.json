@@ -349,6 +349,54 @@
             "timeout": 15,
             "script": "flag-uncited-rebuttal.py",
             "why": "shared/workflow/address-every-comment.md's 'read the cited source' rule, from Morrison-Lab/ai-config#2070 (2026-08-24): a rebuttal disputing a finding that cited an external URL was posted using only local grep evidence, never fetching the URL the reviewer named -- and the rebuttal was wrong. Warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier WebFetch/WebSearch in the transcript touched."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
+            "timeout": 10,
+            "script": "require-agent-disclosure.py",
+            "why": "cai 2026-08-24 'all comments online posted by bots should say so', citing UCD-SERG/ucd-serg.github.io#108's agent-authored claim comment posted under d-morrison as type: User, author_association MEMBER -- indistinguishable from a human's. memories/github.md already recorded auditors making that mistake. shared/workflow/disclose-agent-authorship.md is the rule; this is the instrument, since the rule is read at read time and the omission happens at composition time. WARNS, never blocks: a missing marker is cheap to repair with a follow-up comment, while a blocked `gh pr comment` interrupts the one action that makes a claim visible to other sessions -- trading a labelling defect for a collision. Anchored at a command position over text whose heredoc BODIES have been stripped -- the opener tail is kept, so piping a heredoc into `--body-file -` still fires while a doc-writing heredoc quoting `gh pr comment` does not. This corpus quotes that command constantly, and matching such a quote is the near-miss require-gh-repo-flag.py shipped with. Fails open.",
+            "_note_marker_avoids_the_robot_emoji": [
+              "The disclosure marker is prose, NOT the robot emoji, and the hook",
+              "warns separately when a body discloses with the emoji instead.",
+              "scripts/check-pr-fully-clean.py matches that emoji as a",
+              "REVIEW_BODY_MARKERS entry, so a disclosed claim comment would be",
+              "admitted into the fully-clean verdict scan as a review -- and a claim",
+              "carries no findings, so it would scan as a CLEAN one. That is the",
+              "false-clean failure shared/workflow/fully-clean.md already records for",
+              "a human-authored self-review, arriving through the very mechanism",
+              "added to make authorship legible."
+            ],
+            "_note_cannot_see_every_body": [
+              "--body-file, --editor, `-F <file>` and an interpolated $BODY all put the",
+              "text where a literal scan cannot reach. The hook reports those as an",
+              "UNREADABLE body rather than as a missing marker, so its warning never",
+              "asserts more than it observed. That partial visibility is the second",
+              "reason it cannot deny: a block built on a check that sees a fraction of",
+              "its population would refuse compliant commands.",
+              "",
+              "skills/ard/SKILL.md's per-round summary is exactly that shape -- posted",
+              "via --body-file on every round of every PR -- so it states the marker",
+              "requirement in its own text rather than relying on this guard.",
+              "",
+              "REGISTERED TWICE, under Bash and under mcp__github__.*, because",
+              "hooks.json matches by TOOL NAME: the MCP tool list inside the script is",
+              "unreachable from a Bash-only entry however complete it is. A remote/web",
+              "session has no `gh` at all, so a Bash-only registration would be silent",
+              "in exactly the population the MCP branch was written for."
+            ],
+            "_note_segmentation_is_quote_aware": [
+              "Segments are split on shell separators OUTSIDE quotes. A plain",
+              "re.split(r'[;&|\\n]+', ...) looked adequate and was not: the marker sits",
+              "on its own line at the END of a body, so splitting on every newline cuts",
+              "the marker off the very command it discloses, and every correctly",
+              "disclosed multi-line comment -- the normal shape -- warned. Caught by the",
+              "test suite before this hook was ever registered.",
+              "",
+              "Judging PER SEGMENT rather than per call is what stops one disclosed body",
+              "vouching for an undisclosed sibling in a batched round, which",
+              "shared/workflow/efficient-pr-babysitting.md actively encourages."
+            ]
           }
         ]
       },
@@ -433,6 +481,13 @@
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
             "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
+            "timeout": 10,
+            "script": "require-agent-disclosure.py",
+            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           }
         ]
       }

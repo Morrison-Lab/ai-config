@@ -82,7 +82,7 @@ Both remedies the round-3 review suggested were a fourth narrowing, and each is 
 A manual action by someone else, on a PR you claimed, is the same trigger with nothing labelled a finding.
 The trigger above still needs a reviewer to state a defect.
 This is the version where nobody states anything.
-You claimed the PR --- posted the "paws off" comment, per [`claim-pr`](claim-pr.md) --- and while you are driving it, another actor performs an action that was already yours to have taken.
+You claimed the PR --- posted the claim comment, per [`claim-pr`](claim-pr.md) --- and while you are driving it, another actor performs an action that was already yours to have taken.
 A human requests the review you should have requested the moment the PR opened or went ready, per [`pr-on-claim`](pr-on-claim.md)'s "Request the external reviewer in the same stride".
 A maintainer merges `main` in to clear a conflict [`sync-with-main`](sync-with-main.md) says you should have been watching for.
 A bot resolves a thread [`address-every-comment`](address-every-comment.md) says you should have resolved on Address.

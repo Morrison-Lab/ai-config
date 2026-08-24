@@ -95,6 +95,16 @@ jobs:
         # sweep in CI would prove nothing. Its classification logic is pure
         # over the GraphQL payload shape, so the tests cover it offline.
         run: python3 scripts/test_pr_sweep.py
+      - name: Run PR-overlap tests
+        # Same reasoning as pr-sweep above: only the tests run here, since
+        # pr-overlap.py queries the GitHub API via `gh`. Its classification,
+        # clustering, and rendering are pure over file sets, so the tests
+        # cover them offline -- including the negative control, which is
+        # asserted to FAIL against a deliberately broken classifier. A
+        # control that cannot fail is the impostor
+        # `batch-merge-and-resolve.md` warns about, and it is what the
+        # hand-run prototype this script replaces actually had.
+        run: python3 scripts/test_pr_overlap.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run ai-session MWC grant tests

@@ -161,6 +161,28 @@ above, so the answer was one read away.
 - **Don't:** read the reformatter's silence as a gate pass --- it has no width
   policy, so it is silent about precisely the violation it creates.
 
+**Fourth dated recurrence, 2026-08-24, the same day as #2085.**
+PR #2071 carried a memory entry whose added lines passed a deliberate scoped
+run of the reformatter ("0 would change") and then failed the gate on three
+lines, each flagged as a long line with a mid-line semicolon.
+The fix wrapped two clauses at their semicolons and reworded a third
+parenthetical so it needed none (heads `456a6c87` -> `57116043`).
+[Issue #2085](https://github.com/Morrison-Lab/ai-config/issues/2085) records
+the same root cause from PR #2073 hours earlier.
+
+What this instance adds to the pairs above is that diligence did not help.
+The author ran the local script on purpose, scoped to the added lines, and
+read its clean result as clearance --- the substitution happened inside a real
+check, not in place of one.
+The second slip came at banking time: the failure was first written up as a
+new `memories/github-actions.md` section forking a third record of this
+lesson, until review consolidated it here instead.
+
+- **Do:** search this fragment and the open issues for the root cause before
+  banking a SemBr failure as a new memory entry.
+- **Don't:** treat a clean scoped reformatter run on your own added lines as
+  covering what the clause rule will read differently.
+
 **A green check run named for this gate may never have run it, and both runs
 carry the same name.**
 The reformatter trap above is about the wrong *tool*.

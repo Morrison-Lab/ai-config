@@ -960,13 +960,13 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 ## Delegate heavy work to another CLI first --- codex, agy, and now opencode
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity) is permanently out of service** (user
-> directive, 2026-08-20), confirmed the same day on a dispatched run that
-> ended `request failed (code 429): Your prepayment credits are depleted` and
-> `Execution failed: model unreachable`.
-> Route nothing to it.
-> The mechanics below are kept as measured history rather than as a live
-> destination, so read the ladder as `opencode`, then `codex`, then Claude.
+> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
+> service** (user directive, 2026-08-20; scope corrected 2026-08-23),
+> confirmed via a dispatched run's `429: prepayment credits depleted`.
+> Route no dispatched subagent work to it.
+> The interactive subscription/extension is unaffected and not at quota --
+> don't extrapolate this into "uninstall the extension".
+> The mechanics below are kept as measured history rather than as a live destination, so read the ladder as `opencode`, then `codex`, then Claude.
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
@@ -980,7 +980,7 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | Antigravity --- **retired, out of service** | none, and none is wanted --- the mechanics below are history |
+| `agy` (Google Antigravity) | Antigravity API --- **retired, out of service (interactive unaffected)** | none, and none is wanted --- the mechanics below are history |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.

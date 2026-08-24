@@ -321,8 +321,90 @@ Diff gives +10/-2 with 10 added lines examined and 8 prose lines examined.
     check("variations: file size extraction", stated.file_sizes.get("docs/guide.md") == 2500)
 
 
+def test_undecodable_stream_guards():
+    """A stream that came back None is an environment failure, not a finding.
+
+    This script is the one that actually crashed: its `res.stderr.strip()` on
+    the non-zero-exit path raised AttributeError when the Windows reader thread
+    died on a decode error. `check-pr-fully-clean.py` carries the equivalent
+    pins, but a pin over there proves nothing about this file -- the previous
+    round's finding was exactly a fix generalized along one axis and left
+    unguarded along another.
+    """
+    class _NoneStdout:
+        returncode = 0
+        stdout = None
+        stderr = ""
+
+    with patch.object(checker.subprocess, "run", lambda *a, **kw: _NoneStdout()):
+        try:
+            checker.run_cmd(["gh", "pr", "view", "1"])
+            outcome = "returned normally"
+        except SystemExit as exc:
+            outcome = f"SystemExit:{exc.code}"
+        except AttributeError:
+            outcome = "AttributeError"
+    check("None stdout exits 2 rather than raising AttributeError",
+          outcome == f"SystemExit:{checker.USAGE_EXIT}", extra=outcome)
+
+    class _NoneStderr:
+        returncode = 1
+        stdout = ""
+        stderr = None
+
+    with patch.object(checker.subprocess, "run", lambda *a, **kw: _NoneStderr()):
+        try:
+            checker.run_cmd(["gh", "pr", "view", "1"])
+            outcome = "returned normally"
+        except SystemExit as exc:
+            outcome = f"SystemExit:{exc.code}"
+        except RuntimeError:
+            outcome = "RuntimeError"
+        except AttributeError:
+            outcome = "AttributeError"
+    # SystemExit specifically, not RuntimeError: `verify_pr_body_figures` wraps
+    # its run_cmd calls in `except Exception`, converts the failure to
+    # status="UNVERIFIED", and main() then exits 0 CLEAN. SystemExit derives
+    # from BaseException, so it escapes that wrapper.
+    check("undecodable stderr on a failed command exits 2, not RuntimeError",
+          outcome == f"SystemExit:{checker.USAGE_EXIT}", extra=outcome)
+
+    class _RealStderr:
+        returncode = 1
+        stdout = ""
+        stderr = "gh: Not Found (HTTP 404)\n"
+
+    with patch.object(checker.subprocess, "run", lambda *a, **kw: _RealStderr()):
+        try:
+            checker.run_cmd(["gh", "pr", "view", "1"])
+            outcome = "returned normally"
+        except SystemExit:
+            outcome = "SystemExit"
+        except RuntimeError as exc:
+            outcome = f"RuntimeError:{exc}"
+    check("negative control: a readable-stderr failure still raises RuntimeError",
+          outcome.startswith("RuntimeError:") and "404" in outcome, extra=outcome)
+
+    recorded = {}
+
+    class _Ok:
+        returncode = 0
+        stdout = "{}"
+        stderr = ""
+
+    def _rec(cmd, **kwargs):
+        recorded.update(kwargs)
+        return _Ok()
+
+    with patch.object(checker.subprocess, "run", _rec):
+        checker.run_cmd(["gh", "pr", "view", "1"])
+    check("run_cmd decodes as UTF-8 explicitly",
+          recorded.get("encoding") == "utf-8", extra=str(recorded.get("encoding")))
+
+
 def main() -> int:
     print("Testing check-pr-body-figures.py...")
+    test_undecodable_stream_guards()
     test_parsing()
     test_stale_body_pin_1531()
     test_clean_body_pin_1531()

@@ -48,10 +48,17 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
     if cwd is not None and not Path(cwd).exists():
         raise RuntimeError(f"Working directory does not exist: {cwd}")
     try:
+        # `encoding` is load-bearing on Windows; see the long note in
+        # `check-pr-fully-clean.py`'s `run_cmd`. In short: the locale codec
+        # there is cp1252, which turns most non-ASCII into silent mojibake and
+        # hard-fails on five bytes, the hard failure leaving `stdout` as None
+        # with `returncode` still 0. This script reads PR bodies, which are the
+        # most emoji-dense payload GitHub serves, so it is more exposed than
+        # most rather than less.
         res = subprocess.run(
             cmd,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=False,
             cwd=str(cwd) if cwd else None,
         )
@@ -61,7 +68,25 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
             "This script requires git (and gh when querying pull requests)."
         )
     if res.returncode != 0:
+        # See the long note in `check-pr-fully-clean.py`'s `run_cmd`. A non-zero
+        # exit with readable stderr is a fact about the command; a non-zero exit
+        # whose stderr could not be decoded is an environment failure, and only
+        # `die` (SystemExit, so it escapes the broad `except Exception` in
+        # `verify_pr_body_figures`) keeps it from being reported as UNVERIFIED
+        # and exiting 0.
+        if res.stderr is None:
+            die(
+                f"Command failed ({' '.join(cmd)}) and its stderr could not be "
+                "read or decoded, so the reason is unavailable. This is an "
+                "environment failure, not a finding about the PR."
+            )
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr.strip()}")
+    if res.stdout is None:
+        die(
+            f"Command produced no capturable stdout ({' '.join(cmd)}); "
+            "its output could not be read or decoded. This is an environment "
+            "failure, not a finding about the PR."
+        )
     return res.stdout.strip()
 
 

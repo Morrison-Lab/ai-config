@@ -407,6 +407,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `warn-nonglobal-substitution.py` | `PreToolUse` (Bash) | warns, never blocks, on an in-place `perl -i`/`sed -i` substitution whose flags carry neither `g` nor a digit -- the shape that silently changes only the first occurrence, which bit mutation testing four times in one session |
 | `warn-dupe-check-chained-to-create.py` | `PreToolUse` (Bash) | warns, never blocks, when a tracker search and a create of the same object kind share one Bash call, so the check runs at the same instant as the action it gates and gates nothing. Detects one lexical shape only, which means its silence is evidence that two commands were not in one string and never that a dupe-check was consulted |
 | `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a separate `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved), or the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`; a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
+| `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -421,6 +422,14 @@ remaining open. If a user systemd bus is unavailable, the installer starts the
 monitor immediately and installs an equivalent per-user cron `@reboot` entry.
 It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path
 depends on a temporary worktree or an individual agent's hook directory.
+
+On Windows the same command registers a Task Scheduler job
+(`ai-config-pr-monitor`, every five minutes) instead of systemd/cron, and
+`python3 scripts/install-pr-monitor.py --status` / `--uninstall` manage it.
+The task inherits your user environment and runs only while you are logged
+on, so sleep and logout pause polling --- acceptable for a secondary backstop
+host ([#2082](https://github.com/Morrison-Lab/ai-config/issues/2082)), not
+for a primary one.
 
 ### Writing a warn-only hook: emit `systemMessage`, not `reason`
 

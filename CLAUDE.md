@@ -178,7 +178,8 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 One such budget remains, and the standing preference is to try it first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`).
-`agy` (Google Antigravity) was the second and is permanently out of service (user directive, 2026-08-20), so route nothing to it.
+`agy` (Google Antigravity)'s API route was the second and is permanently out of service (user directive, 2026-08-20), so route no dispatched subagent work to it.
+Scope corrected 2026-08-23: the interactive subscription/extension is unaffected and not at quota.
 ai-config#1776 tracks the retirement.
 `opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
 `memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics, and keeps the `agy` mechanics as history rather than as a destination.
@@ -483,9 +484,9 @@ a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
 Two PRs touching disjoint files usually have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
-But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
-`gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
-rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
+But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it, rather than recalling what each PR is "about" --- which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
+`python3 scripts/pr-overlap.py -R <owner>/<repo>` is that derivation, sweeping every pair of open PRs at once and reporting how many pairs it examined alongside how many collided.
+Fall back to `gh pr diff <N> --name-only` per PR only where the script cannot run, noting that the hand method misses a rename, whose new path is all the diff reports.
 A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
 **An empty intersection settles the *collision* cases above and cannot see the *dependency* ones.**
 A migration and its consumer, or a PR whose prose cites content another PR adds, are ordering constraints whose file sets never overlap ---

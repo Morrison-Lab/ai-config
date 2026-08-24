@@ -439,6 +439,30 @@ Two habits make it pay off beyond the one check:
   [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
   applies to prose.
 
+**An illustration you invented is the one claim that never prompts the check.**
+Everything above is a claim you set out to verify.
+An example is different: it is chosen to make something you already believe concrete, so it inherits that belief's verification in the writing and is never checked on its own.
+The rule being true is not evidence about the instance, and an instance picked to demonstrate a rule can turn out to be a **counterexample** to it.
+
+That is worse than an ordinary slip, because a wrong example names the wrong failure mode and the surrounding argument then reasons from it.
+A reader takes the example as the concrete case and the prose as its generalization, so a false example redirects the conclusions drawn near it.
+Where a mechanism has more than one outcome, pick the example showing the **dominant** one, and say which outcome it shows.
+
+Distinct from [`examples-are-scanned`](../writing/examples-are-scanned.md), where the example's claim is correct and a checker matches a **token** the prose is discussing.
+Here the claim itself is wrong, so re-reading cannot catch it and only running it can.
+
+- **Do:** execute an illustrative example --- in a comment, a docstring, or prose --- before shipping it, on the same terms as any other claim.
+- **Do:** re-read the surrounding argument after checking one, since a corrected example can invert the point it was supporting.
+- **Don't:** let an example inherit the verification of the rule it illustrates.
+- **Don't:** generalize from one member of a class to the class --- checking U+201C and then writing "a smart quote" is the same unchecked step, one level up.
+
+(Morrison-Lab/ai-config#2086, 2026-08-23: a pre-push draft comment offered "a smart quote in a PR title, an emoji in a check-run name" as inputs that would raise under cp1252.
+Both were wrong in the same direction, and the draft was corrected before reaching a commit --- `git show 36268396:scripts/check-pr-fully-clean.py` carries the corrected wording --- so this is a draft error the process caught rather than a shipped one.
+Measured: cp1252 leaves five bytes undefined, `0x81`, `0x8D`, `0x8F`, `0x90`, `0x9D`, so U+1F600 (`f0 9f 98 80`) mojibakes silently while U+1F44D (`f0 9f 91 8d`) raises on `0x8D`.
+The draft named the rare outcome as though it were the common one, inverting its own argument for why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.
+The first draft of *this entry* then generalized from U+201C to "a smart quote", which an adversarial review refuted by measurement: U+201C (`e2 80 9c`) decodes silently and U+201D (`e2 80 9d`) raises, `0x9D` being one of the five.
+Recording that second step because it is the same error at one remove, committed while documenting why not to.)
+
 ## A signature change's caller set is derived by grep, never from the callers you can see
 
 Adding or retyping a parameter on a shared function changes every call site at once, and the call sites are not a property of the file you are editing.
@@ -465,6 +489,64 @@ grep -rn '\.classify(\|\.collect(' --include='*.py' .
 (Morrison-Lab/ai-config#1841, 2026-08-21: `classify()` in `scripts/check-install.py` gained a required `repo_roots: set[Path]` parameter.
 The session hook and the CI job were both traced and both correct.
 `scripts/check-harness-installs.py` loads the module through `spec_from_file_location` and calls `ci.classify()` and `ci.collect()`, was never searched for, and CI failed with `TypeError: 'PosixPath' object is not iterable`.)
+
+## Changing which exception a function RAISES is a signature change that fails silently
+
+The section above derives a **parameter** change's caller set by grep.
+The exception a function raises belongs to the same interface and needs the same grep, and it is the more dangerous of the two because of how the two fail.
+
+Adding a genuinely **required** parameter fails loudly at the call site, on an arity mismatch.
+The section above's own case was quieter than that and still red: `classify()` kept five parameters and *retyped* one, so nothing mismatched at the call site and the `TypeError` surfaced several frames inside the callee, in CI.
+An optional parameter with a default, or a reordering of same-typed positionals, is quieter again.
+So "parameter changes are loud" is a spectrum, and what follows is the end of it that has no red at all: an exception-type change raises nothing anywhere.
+Where a handler upstream already catches the new type, the error is routed into whatever that handler does next --- and a handler that returns a default, returns `None`, or logs and continues is the code that carries on.
+So the change lands green, and the failure it was meant to report stops being reported.
+
+**The direction is what makes it worth a rule of its own.**
+This edit is typically made *to improve* error handling --- replacing an incidental `AttributeError` with an explicit `raise RuntimeError("...")` that names the problem.
+It therefore reads as a strict improvement and attracts less scrutiny than a change that looks risky, while its actual effect can be to make the error **quieter** than the incidental one it replaced.
+That effect depends entirely on how *narrow* the enclosing handlers are, which is the thing to look up rather than assume.
+Against a narrow `except RuntimeError` the incidental `AttributeError` would have escaped and the explicit one does not, so the change really does make it quieter.
+Against a broad `except Exception` the two are indistinguishable and the change buys nothing either way.
+Measured here on 2026-08-23, the broad form is the overwhelming majority --- 138 of the 140 hits below --- so assuming the narrow case is the wrong default.
+
+Derive the handler set before claiming the change makes anything louder, and note that **base classes catch too**:
+
+```bash
+grep -rnE 'except \(?[A-Za-z_, ]*RuntimeError|except (Exception|BaseException)\b|^[[:space:]]*except[[:space:]]*:' \
+  --include='*.py' .
+```
+
+The narrow form is the trap, and it is the one that comes to mind.
+Measured in this repo on 2026-08-23, `grep -rn 'except RuntimeError'` returns **2** hits where the form above returns **140** --- because `except Exception`, `except (RuntimeError, OSError)`, and a bare `except:` all catch a `RuntimeError` while none of them matches the literal string `except RuntimeError`.
+A grep keyed on the type name is therefore a grep for the handlers that happen to *name* it, which is the same sample-for-population substitution the section above warns about.
+
+That broader form is broader and still not exhaustive, so report it as what it examined rather than as the population: it misses `except(Exception):` with no space, two-space spellings, a tuple split across lines, and a dotted `except errors.RuntimeError:`.
+None of those occurs in a `RuntimeError`-catching form in this repo today, which is why the 140 stands here and is not a general guarantee.
+
+Then read what each hit does with it.
+A handler that re-raises or exits is fine.
+One that returns a default, returns `None`, or records a status and carries on is the case this rule is about.
+
+The same-file case of this check is decidable, so it is being built rather than
+left to judgment: Morrison-Lab/ai-config#2105 specifies an instrument flagging a
+`raise` whose exception type a caller in the same file already catches.
+The cross-file case stays a reading task, since it turns on what each handler
+then does.
+
+- **Do:** grep for handlers of the NEW exception type before changing what a function raises.
+- **Do:** read each handler's body, since only the ones that swallow matter.
+- **Do:** reach for an exception the enclosing handlers do not catch when the point of the change is to stop something being swallowed --- `SystemExit` derives from `BaseException`, so `except Exception` misses it --- and confirm that from the grep rather than assuming it, since a bare `except:` and `except BaseException` do catch it.
+- **Don't:** count an explicit `raise` as louder than the incidental error it replaced.
+  That is a claim about the handlers, not about the raise.
+- **Don't:** read a green suite as evidence, since the swallowing path is the one that does not fail.
+
+(Morrison-Lab/ai-config#2086, 2026-08-23: a fix for a Windows cp1252 decode bug replaced an `AttributeError` from `None.strip()` with an explicit `raise RuntimeError(...)`, to name the decode failure rather than leave it incidental.
+`_resolve_run_head_sha` in `scripts/check-pr-fully-clean.py` wraps its `run_cmd` call in `except RuntimeError: return None`, so the explicit error was swallowed and the caller went on to append `No review comment has been posted evaluating HEAD SHA ...`.
+That is exit 1 **with** a `  - ` finding bullet --- exactly the shape [`fully-clean`](../workflow/fully-clean.md)'s crash test, `rc==1` plus the absence of bullets, cannot tell apart from a genuine verdict.
+The `AttributeError` it replaced had escaped that catch and was at least loud.
+An adversarial self-review caught it before merge.
+The shipped fix calls `die()`, whose `SystemExit` no `except RuntimeError` intercepts.)
 
 ## A "safe because X never happens" comment needs its own counter-example before it ships
 

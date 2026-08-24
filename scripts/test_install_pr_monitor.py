@@ -105,36 +105,50 @@ with tempfile.TemporaryDirectory() as d:
               subject.stop_stale_daemon(state_path, STALE) is None
               and process.poll() is None)
 
-        # In this topology the dying pid stays observable (an unreaped
-        # child on POSIX, an open handle on Windows), so the wait exhausts
-        # and must say so rather than claiming a confirmed stop.
+        # The SIGTERM lands while our Popen handle keeps the child's exit
+        # status unreaped, so what the probe can see afterwards is
+        # topology-dependent: POSIX signal-0 keeps succeeding until the
+        # reap, while the OpenProcess probe reads the recorded exit code
+        # immediately -- and each topology must report honestly either way.
         with open(state_path, "w", encoding="utf-8") as stream:
             json.dump({"pid": process.pid, "checked_at": time.time()}, stream)
         captured = io.StringIO()
         with contextlib.redirect_stdout(captured):
             result = subject.stop_stale_daemon(state_path, STALE, wait_seconds=0.5)
         check("live recorded daemon is stopped", result == process.pid)
-        check("an exhausted wait reports the pid as still observable",
-              "still observable" in captured.getvalue())
+        if os.name == "nt":
+            check("windows probe confirms the stop once the exit code lands",
+                  "stopped stale monitor daemon" in captured.getvalue())
+        else:
+            check("an exhausted wait reports the pid as still observable",
+                  "still observable" in captured.getvalue())
         process.wait(timeout=15)
         check("stopped daemon actually exits", process.poll() is not None)
     finally:
         if process.poll() is None:
             process.kill()
 
-    # When the probe raises, the confirmed-stop path fires without
-    # exhausting the wait; a fake kill makes that branch deterministic in
-    # every topology.
+    # A probe that reports the pid gone takes the confirmed-stop path
+    # without exhausting the wait; a stubbed hook module makes that branch
+    # deterministic on every platform.
     with open(state_path, "w", encoding="utf-8") as stream:
         json.dump({"pid": 4242, "checked_at": time.time()}, stream)
+
+    class GoneModule:
+        STATE_PATH = state_path
+        POLL_SECONDS = 120
+
+        @staticmethod
+        def alive(pid):
+            return False
+
+    real_loader = subject.monitor_module
     real_kill = os.kill
-
-    def fake_kill(pid, sig):
-        if sig == 0:
-            raise OSError("no such process")
-
     try:
-        os.kill = fake_kill
+        # The SIGTERM itself must succeed against the fake pid, or the
+        # quiet no-op branch fires before the probe is ever reached.
+        os.kill = lambda pid, sig: None
+        subject.monitor_module = lambda: GoneModule
         captured = io.StringIO()
         started = time.monotonic()
         with contextlib.redirect_stdout(captured):
@@ -145,6 +159,70 @@ with tempfile.TemporaryDirectory() as d:
               time.monotonic() - started < 2.0)
     finally:
         os.kill = real_kill
+        subject.monitor_module = real_loader
+
+# --- Windows persistence surface (#2082) ---
+real_nt = subject.IS_NT
+try:
+    subject.IS_NT = True
+    command = subject.windows_task_command(r"C:\py\python.exe")
+    check("task command quotes interpreter and hook",
+          command.startswith('"C:\\py\\python.exe" "') and command.endswith('" --monitor'))
+
+    ran = {}
+
+    def fake_run(args, **kwargs):
+        ran["args"] = args
+        return type("Result", (), {"returncode": 0, "stdout": ""})()
+
+    real_run = subject.subprocess.run
+    try:
+        subject.subprocess.run = fake_run
+        subject.install_windows(r"C:\py\python.exe")
+        args = ran["args"]
+        check("schtasks registers a named recurring task",
+              args[:2] == ["schtasks", "/Create"] and "/SC" in args
+              and args[args.index("/MO") + 1] == str(subject.POLL_MINUTES)
+              and args[args.index("/TN") + 1] == subject.TASK_NAME)
+        check("schtasks /TR carries the quoted command line",
+              args[args.index("/TR") + 1] == command)
+
+        missing = type("Result", (), {"returncode": 1, "stdout": ""})()
+        subject.subprocess.run = lambda args_, **k: missing
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = subject.status_windows()
+        check("status says not installed when the query fails",
+              code != 0 and "not installed" in captured.getvalue())
+
+        found = type("Result", (), {"returncode": 0,
+                                    "stdout": f"TaskName: {subject.TASK_NAME}\n"})()
+        subject.subprocess.run = lambda args_, **k: found
+        check("status passes a successful query through",
+              subject.status_windows() == 0)
+
+        subject.subprocess.run = fake_run
+        subject.uninstall_windows()
+        check("uninstall deletes the named task",
+              ran["args"][:2] == ["schtasks", "/Delete"])
+
+        # resolve_dependencies falls back to the running interpreter when
+        # python3.exe is absent, which is the typical Windows layout.
+        shutil.which = lambda name: (r"C:\gh.exe" if name == "gh" else None)
+        check("missing python3 falls back to the running interpreter",
+              subject.resolve_dependencies() == sys.executable)
+    finally:
+        shutil.which = real_which
+finally:
+    subject.IS_NT = real_nt
+
+saved_nt = subject.IS_NT
+try:
+    subject.IS_NT = False
+    check("status is refused off-Windows",
+          exits(subject.main, ["--status"]) is not None)
+finally:
+    subject.IS_NT = saved_nt
 
 print(f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

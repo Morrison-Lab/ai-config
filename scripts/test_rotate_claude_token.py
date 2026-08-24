@@ -325,5 +325,116 @@ check(
     repos == ["acme/one", "octocat/two"] and owners == ["octocat", "acme"],
 )
 
+# The Windows cp1252 decode guards in `gh()`. Pinned HERE rather than only in
+# the sibling suites, because `test_pr_sweep.py` makes the argument itself: a
+# pin in another file proves nothing about this one. This script's stdout is not
+# realistically exposed (every call reads ASCII-only GitHub identifiers), but
+# its stderr is -- a `gh` failure can surface a non-ASCII OS error string on a
+# non-English Windows install -- and the guards must behave the same either way.
+from unittest.mock import patch  # noqa: E402
+
+# A PRISTINE copy of the module. `with_gh` above replaces `rct.gh` globally and
+# never restores it, which is fine for every test wanting a stubbed `gh` and
+# fatal for these, which test `gh` itself.
+#
+# A one-line alternative exists and was rejected for a reason worth stating,
+# since it is the cheaper option: capturing `_real_gh = rct.gh` right after the
+# `exec_module` above would work and needs no second module. A second instance
+# is used because it also isolates `GhError` and any future module-level state
+# these cases touch, so a stub installed later cannot reach them.
+#
+# THE TRAP that buys: `rct_real.GhError is not rct.GhError`. They are distinct
+# classes from distinct module objects, so `except rct.GhError` around a
+# `rct_real` call silently fails to catch. Every case below uses `rct_real` on
+# both sides. Note also that `patch.object(rct_real.subprocess, ...)` is NOT
+# scoped by the second module -- both instances share `sys.modules['subprocess']`
+# -- so those patches are global for their `with` block.
+_spec_real = importlib.util.spec_from_file_location(
+    "rct_real", Path(__file__).parent / "rotate-claude-token.py"
+)
+rct_real = importlib.util.module_from_spec(_spec_real)
+_spec_real.loader.exec_module(rct_real)
+
+
+class _NoneStdout:
+    returncode = 0
+    stdout = None
+    stderr = ""
+
+
+with patch.object(rct_real.subprocess, "run", lambda *a, **kw: _NoneStdout()):
+    try:
+        rct_real.gh(["api", "/user"])
+        outcome = "returned normally"
+    except SystemExit as exc:
+        outcome = f"SystemExit:{exc}"
+    except AttributeError:
+        outcome = "AttributeError"
+check(
+    "gh() exits on None stdout rather than returning it to a caller that will .strip() it",
+    outcome.startswith("SystemExit:") and "environment failure" in outcome,
+)
+
+
+class _NoneStderr:
+    returncode = 1
+    stdout = ""
+    stderr = None
+
+
+with patch.object(rct_real.subprocess, "run", lambda *a, **kw: _NoneStderr()):
+    try:
+        rct_real.gh(["api", "/user"])
+        outcome = "returned normally"
+    except SystemExit as exc:
+        outcome = f"SystemExit:{exc}"
+    except rct_real.GhError:
+        outcome = "GhError"
+    except AttributeError:
+        outcome = "AttributeError"
+check(
+    "gh() exits on a failed call whose stderr could not be decoded",
+    outcome.startswith("SystemExit:"),
+)
+
+
+class _RealStderr:
+    returncode = 1
+    stdout = ""
+    stderr = "gh: Not Found (HTTP 404)\n"
+
+
+with patch.object(rct_real.subprocess, "run", lambda *a, **kw: _RealStderr()):
+    try:
+        rct_real.gh(["api", "/user"])
+        outcome = "returned normally"
+    except SystemExit:
+        outcome = "SystemExit"
+    except rct_real.GhError as exc:
+        outcome = f"GhError:{exc}"
+check(
+    "negative control: a readable-stderr failure still raises GhError, not SystemExit",
+    outcome.startswith("GhError:") and "404" in outcome,
+)
+
+recorded = {}
+
+
+class _Ok:
+    returncode = 0
+    stdout = "octocat\n"
+    stderr = ""
+
+
+def _rec(cmd, **kwargs):
+    recorded.update(kwargs)
+    return _Ok()
+
+
+with patch.object(rct_real.subprocess, "run", _rec):
+    rct_real.gh(["api", "/user", "--jq", ".login"])
+check("gh() decodes subprocess output as UTF-8 explicitly",
+      recorded.get("encoding") == "utf-8")
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

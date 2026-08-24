@@ -889,7 +889,7 @@ identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
-Same false-absence shape as the entries in [`zsh.md`](zsh.md), and this one is not zsh-specific --- it reports "0 found" under any shell, which is why it stays here.
+Same false-absence shape as the entries in [`zsh.md`](zsh.md); the cause here is stdin plumbing rather than a zsh expansion rule, which is why it stays in this file.
 
 Piping data into an interpreter invoked as `python3 -` (or `sh -`, `bash -`)
 while *also* supplying the script through a `<<'EOF'` heredoc puts two things in

@@ -6,14 +6,14 @@ The Bash tool runs zsh, and this file collects the **zsh-specific** shell semant
 That shared shape is the reason the entries sit together: a caller reading stdout sees an empty result and takes it as a finding about the inputs rather than as a failure of the check.
 Each entry writes its complaint to stderr, so stderr is the signal to read.
 
-**Check the platform before applying either entry, because they were measured on different ones and only one reproduces everywhere.**
-The `NOMATCH` entry reproduces on macOS 26.6.2 with zsh 5.9.
+**Check the platform before applying either entry: they were measured on different ones, and one of them turns out to be platform-bound.**
+`NOMATCH` is a documented zsh default rather than a platform behaviour (`man zshoptions`; `zsh -f -c 'echo $options[nomatch]'` prints `on`), and that entry was measured on macOS 26.6.2 with zsh 5.9.
 The process-substitution entry was measured on shiva, a Linux host, and its `/proc/self/fd/11` error is a Linux path --- re-run on this macOS host, `diff <(...) <(...) | grep -c` returns the correct count, because `<(...)` names a `/dev/fd/N` path that stays open.
 So that one is zsh-on-Linux rather than zsh-general.
-Neither claim carries to a platform it was not measured on, which is the caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself: a claim stated unconditionally here is false there.
+Take the documented default as carrying across platforms and the measured error path as not, and re-measure before relying on either somewhere new --- the caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself: a claim stated unconditionally here is false there.
 
 The boundary for this file is zsh-specificity, not the false-absence shape.
-[`tools.md`](tools.md) keeps the zsh difference that produces a wrong *value* rather than an empty one --- the unquoted-expansion word-splitting entry --- and it also keeps false-absence entries whose cause is not zsh at all, notably the `cmd | python3 - <<EOF` heredoc entry, which reports "0 found" on every input under any shell.
+[`tools.md`](tools.md) keeps the zsh difference that produces a wrong *value* rather than an empty one --- the unquoted-expansion word-splitting entry --- and it also keeps false-absence entries whose cause is stdin or fd plumbing rather than a zsh expansion rule, notably the `cmd | python3 - <<EOF` heredoc entry.
 
 ## A process substitution feeding a pipeline fails under zsh, and reads as a clean zero
 
@@ -80,15 +80,16 @@ The rest of the command list still runs, and the shell can still exit 0:
 zsh -c 'echo BEFORE; ls -d /nonexistent*/x; echo AFTER'   # prints BEFORE and AFTER; rc=0
 ```
 
-The failed glob's own status is **discarded** as soon as anything follows it, so the shell reports whatever the last command returned:
+What happens to the failed glob's status depends on **how** the next command is joined, so check the separator before reading anything into it:
 
 ```zsh
-zsh -c 'ls -d /nonexistent*/x; true'    # rc=0
-zsh -c 'ls -d /nonexistent*/x; false'   # rc=1
+zsh -c 'ls -d /nonexistent*/x; true'         # rc=0   -- status replaced
+zsh -c 'ls -d /nonexistent*/x; false'        # rc=1   -- status replaced, coincidentally 1
+zsh -c 'ls -d /nonexistent*/x && echo YES'   # rc=1   -- status survives, YES never printed
 ```
 
-Neither status says anything about the glob.
-A check that ends in `true`, or in any command that succeeds, reports success while having examined nothing.
+After `;` or a newline the shell reports whatever ran last, so the glob's failure is gone and a check ending in any successful command reports success while having examined nothing.
+After `&&` or `||` the failure short-circuits and does propagate, which is why `ls -d <paths> && echo found` is one of the few glob shapes whose status is trustworthy.
 
 **The path that exists is never listed, which is the whole harm.**
 The natural way to check several candidate locations is one command naming all of them, and one unmatched pattern anywhere in that list discards the answer for every other path in it.
@@ -125,7 +126,16 @@ One ordering rule explains every row: the message goes to whatever fd 2 is in ef
 A redirection attached to the failing command has not been applied yet, so it cannot catch the message; one that already changed the shell's fd 2 has, so it does.
 That also covers a builtin, which has no separate process to own an fd --- `zsh -c 'echo /etc /nonexistent*/x 2>/dev/null'` leaves the message visible too, so the rule is about *when* the redirect applies rather than about which process owns it.
 
-Any wrapper discarding a subshell's stderr --- a CI step, a `$(...)` capture with stderr folded in, a harness --- removes the only evidence the check never ran.
+The rule cuts the obvious capture idiom the wrong way, so do not assume a `$(...)` sees the message:
+
+```zsh
+zsh -c 'out=$(ls -d /etc /nonexistent*/x 2>&1); print -r -- "captured=[$out]"'
+# -> message goes to the terminal; captured=[]
+```
+
+The `2>&1` is attached to the failing command, so it is never applied, and the capture comes back empty while the error escapes to the caller's stderr.
+Wrapping the whole thing instead --- `$(zsh -c '...' 2>&1)` or `$({ ... } 2>&1)` --- does capture it, and folds it into the value rather than discarding it, so the caller gets a non-empty "result" that is really an error message.
+Either way it is a CI step, a harness, or an outer `2>/dev/null` that removes the only evidence the check never ran.
 
 Measured 2026-08-24 on macOS 26.6.2, zsh 5.9 and bash 5.3.15, same command under each shell:
 
@@ -136,8 +146,17 @@ bash -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints /etc on stdout;     
 
 **On this shape both shells exit 1, so the exit status cannot discriminate.**
 Bash's `1` comes from `ls` failing on the literal unmatched pattern while still listing `/etc`; zsh's `1` comes from the shell refusing to run `ls` at all.
-That equality is an accident of the failing command being last, and it does not generalize --- put anything after the glob and the glob's status is discarded entirely, as the command list above shows.
-So read **stderr** for the signal, and treat stdout as the fallback discriminator once an outer redirect has thrown stderr away.
+That equality is an accident of the failing command being last, and it does not generalize --- follow the glob with `;` and the status is replaced, as the command list above shows.
+
+**Read stderr for the signal, and note that nothing replaces it.**
+Once an outer redirect has discarded stderr, stdout cannot stand in: a check that ran and found nothing and a check that never ran are then identical on both stdout and status.
+
+```zsh
+zsh -c 'ls -d /nonexistent1 /nonexistent2' 2>/dev/null   # ran, found nothing: empty, rc=1
+zsh -c 'ls -d /etc /nonexistent*/x'        2>/dev/null   # never ran:          empty, rc=1
+```
+
+So preserve stderr rather than planning to recover the distinction from what remains.
 
 The trigger is any unquoted glob character, not only one in a path.
 The same failure hit a `grep` during this entry's own dupe-check, because an unquoted option value was glob-expanded against the working directory:
@@ -162,29 +181,36 @@ find ~/Documents/GitHub -maxdepth 2 -name ucd-serg.github.io     # no glob at al
 Neither is zsh-specific: the loop is POSIX and runs unchanged under bash, and `find` is not a shell feature.
 Note that the loop still exits 1, from the final iteration's failed `&&` --- another reason to read what a check printed rather than what it returned.
 
-**The three zsh-specific options each get one case right and another wrong, which is why the two remedies above are the ones to use.**
-`setopt NULL_GLOB` and the `(N)` glob qualifier delete an unmatched pattern from the argument list, and `CSH_NULL_GLOB` does the same while still erroring when no pattern in the command matched anything.
-Measured on zsh 5.9, 2026-08-24, across both shapes:
+**Neither zsh-specific option fixes the incident without breaking something else, and the third one does not fix the incident at all.**
+`setopt NULL_GLOB` and the `(N)` glob qualifier delete an unmatched pattern from the argument list.
+Measured on zsh 5.9, 2026-08-24, with zsh's default included as the baseline:
 
 ```zsh
 # incident shape: one literal path that exists, one unmatched glob
-zsh -c 'setopt NULL_GLOB;     ls -d /etc /nonexistent*/x'                # /etc ; rc=0
-zsh -c '                      ls -d /etc /nonexistent*/x(N)'             # /etc ; rc=0
-zsh -c 'setopt CSH_NULL_GLOB; ls -d /etc /nonexistent*/x'                # no match; rc=1
+zsh -c '                      ls -d /etc /nonexistent*/x'                # no match; rc=1  <- the bug
+zsh -c 'setopt NULL_GLOB;     ls -d /etc /nonexistent*/x'                # /etc    ; rc=0
+zsh -c '                      ls -d /etc /nonexistent*/x(N)'             # /etc    ; rc=0
+zsh -c 'setopt CSH_NULL_GLOB; ls -d /etc /nonexistent*/x'                # no match; rc=1  <- still the bug
 
 # every pattern unmatched
-zsh -c 'setopt NULL_GLOB;     ls -d /nonexistentA*/x /nonexistentB*/x'   # "."  ; rc=0
-zsh -c '                      ls -d /nonexistentA*/x(N) /nonexistentB*/x(N)'  # "."  ; rc=0
+zsh -c '                      ls -d /nonexistentA*/x /nonexistentB*/x'   # no match; rc=1
+zsh -c 'setopt NULL_GLOB;     ls -d /nonexistentA*/x /nonexistentB*/x'   # "."     ; rc=0  <- false presence
+zsh -c '                      ls -d /nonexistentA*/x(N) /nonexistentB*/x(N)'  # "."; rc=0  <- false presence
 zsh -c 'setopt CSH_NULL_GLOB; ls -d /nonexistentA*/x /nonexistentB*/x'   # no match; rc=1
+
+# at least one pattern matches: the only shape CSH_NULL_GLOB changes
+zsh -c '                      ls -d /et* /nonexistent*/x'                # no match; rc=1
+zsh -c 'setopt CSH_NULL_GLOB; ls -d /et* /nonexistent*/x'                # /etc    ; rc=0
 ```
 
 `NULL_GLOB` and `(N)` handle the incident correctly and fail the all-unmatched case: every pattern is deleted, `ls -d` is left with no operands, and it prints `.` --- its own name for the working directory, not that directory's contents --- and exits 0.
 A check answering `.` to "does this repo exist" is worse than one answering nothing, because the reply is non-empty and the status is success.
 
-**`CSH_NULL_GLOB` inverts that trade rather than closing it, and its man page is easy to misread here.**
+**`CSH_NULL_GLOB` is not the fix, and its man page is what makes it look like one.**
 The wording is "do not report an error unless all the patterns in a command have no matches", and a literal path carrying no metacharacter **is not a pattern**.
-So in the incident shape the sole pattern is the unmatched one, every pattern has therefore failed, and the option errors and discards `/etc` --- reproducing exactly the false absence this entry exists to prevent.
+So in the incident shape the sole pattern is the unmatched one, every pattern has therefore failed, and the option behaves exactly as the default does --- erroring and discarding `/etc`, which is the false absence this entry exists to prevent.
 Reading "pattern" as "argument" is what makes it look like the fix.
+Against the default it changes only the third shape above, where some *other glob* matched, which is a case this incident never involved.
 
 The `(N)` qualifier applies `NULL_GLOB` to a single pattern rather than to the whole shell, so of `NULL_GLOB` and `(N)` it is the narrower, and it carries the same all-unmatched hole.
 
@@ -196,6 +222,9 @@ That is the negative-control discipline the process-substitution entry above alr
 - **Do:** read a non-empty stderr as "the check failed to run", never as part of the answer.
 - **Do:** quote any argument containing `*`, `?`, or `[` that is not meant as a glob, including option values like `--include="*.md"`.
 - **Do:** run the all-patterns-unmatched case before believing any glob-based existence check, since that is the case `NULL_GLOB` and `(N)` get wrong.
+- **Do:** measure a candidate `setopt` against zsh's default as a baseline, so an option that changes nothing in your shape is visible as such.
+- **Don't:** reach for `setopt CSH_NULL_GLOB` to fix this --- it behaves exactly like the default whenever the only pattern is the unmatched one, so it reproduces the false absence it looks like it prevents.
+- **Don't:** read "pattern" in a zsh option's man page as "argument"; a literal path is not a pattern, and that substitution is what makes `CSH_NULL_GLOB` read as a fix.
 - **Don't:** read an empty result from a multi-path glob check as "none of these exist" --- the paths carrying no glob were never examined either.
 - **Don't:** trust the exit status to separate a check that ran from one that never ran; the failed glob's status survives only when its command comes last, and is otherwise replaced by whatever ran after it.
 - **Don't:** assume `2>/dev/null` hid only noise; the line it hides is the one saying the command never ran.
@@ -203,5 +232,5 @@ That is the negative-control discipline the process-substitution entry above alr
 (Measured 2026-08-24 on this machine, in an ai-config session; tracked as ai-config#2128.
 **From the user:** the correction that the directory existed and that reporting its absence was wrong.
 **Derived and measured afterwards:** the mechanism, the bash contrast, the `--include=*.md` recurrence, and the remedies.
-**From two adversarial review rounds on this entry's own PR:** that the skip is scoped to one simple command rather than the command list, so the glob's status is discarded whenever anything follows it; that `exec 2>/dev/null` and a block or wrapper redirect *do* capture the message, falsifying a first draft's cause claim; that `NULL_GLOB` and `(N)` print `.` when every pattern is unmatched; and that `CSH_NULL_GLOB`, which a second draft recommended as the fix, reproduces the original false absence on the incident's own shape because a literal path is not a pattern.
-Each draft asserted the opposite of one of these, which is why the entry now measures every option against both shapes and shows the commands rather than describing them.)
+**From three adversarial review rounds on this entry's own PR:** that the skip is scoped to one simple command rather than the command list; that `exec 2>/dev/null` and a block or wrapper redirect *do* capture the message, falsifying a first draft's cause claim; that `NULL_GLOB` and `(N)` print `.` when every pattern is unmatched; that `CSH_NULL_GLOB`, which a second draft recommended as the fix, behaves like the default on the incident's own shape because a literal path is not a pattern; that `&&` preserves the failed glob's status, so a third draft's "discarded whenever anything follows it" was false; and that stdout cannot stand in for discarded stderr, since a check that ran and found nothing looks identical to one that never ran.
+Each draft fixed one false claim by asserting another, which is why every option is now measured against zsh's own default as a baseline and every row is a command the reader can re-run.)

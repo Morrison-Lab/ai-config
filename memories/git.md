@@ -550,6 +550,11 @@ commit existed, #732's by a reviewer.
 The second time is what makes this worth recording, since the entry above
 already existed and was not applied.)
 
+**Green on the push event is not green on the pull_request event, for a diff-scoped checker --- the two triggers diff different bases.**
+Same commit, ai-config#2074, 2026-08-24: the push-event `new-line-breaks / check-new-line-breaks` run passed on three consecutive heads while the pull_request-event run failed each time, because that run diffs lines added since the merge-base, which is the set the PR is actually judged on.
+Judge a branch by its pull_request-event runs.
+A green push-event run of the same check name proves nothing about the PR verdict.
+
 ## Picking the diff range: `..` vs `...` vs the working tree
 
 Three forms answer three different questions, and reaching for the wrong one

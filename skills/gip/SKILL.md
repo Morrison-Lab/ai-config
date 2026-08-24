@@ -135,34 +135,34 @@ skill file — so **inline the entire per-issue procedure**. Don't point it at
 `gi`/`ardi`; restate the steps. Fill in `<N>`, `<title>`, `<owner>`, `<repo>`,
 and the default branch for each issue:
 
-> Work GitHub issue **#<N>** ("<title>") in `<owner>/<repo>` end to end, on your
-> own branch, in this worktree. You are one of several parallel workers — stay
-> entirely within this worktree and touch only files relevant to this issue.
+> Work GitHub issue **#<N>** ("<title>") in `<owner>/<repo>` end to end,
+> on your own branch,
+> in this worktree.
+> You are one of several parallel workers —
+> stay entirely within this worktree and touch only files relevant to this issue.
 >
-> 1. **Claim it** so no one else double-works it: post a brief "Working on this
->    --- paws off until I'm done." comment on the issue
->    (`gh issue comment <N> --body "..."`, or the MCP
->    `mcp__github__add_issue_comment` equivalent in a remote session).
-> 2. **Check history** — before writing code, scan merged/closed PRs that
->    touched the same area so you don't undo past work or reintroduce a fixed
->    bug (`gh pr list --state all --search "<keywords>"`). If a past PR already
->    solved this, stop and report that instead of re-doing it.
-> 3. **Branch from current `<default-branch>`**: `git fetch origin
->    <default-branch> -q && git checkout -b <slug> origin/<default-branch>`.
+> 1. **Claim it** so no one else double-works it:
+>    post a brief "Working on this --- paws off until I'm done." comment on the issue
+>    (`gh issue comment <N> --body "..."`, or the MCP `mcp__github__add_issue_comment` equivalent in a remote session).
+> 2. **Check history** — before writing code,
+>    scan merged/closed PRs that touched the same area so you don't undo past work or reintroduce a fixed bug (`gh pr list --state all --search "<keywords>"`).
+>    If a past PR already solved this,
+>    stop and report that instead of re-doing it.
+> 3. **Branch from current `<default-branch>`**:
+>    `git fetch origin <default-branch> -q && git checkout -b <slug> origin/<default-branch>`.
 >    Use a descriptive `<slug>`.
-> 4. **Open the draft PR now** — before implementing, so this worktree's work
->    is visible to the other parallel workers and no one double-grabs the issue
->    (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)). Give the branch
->    a diff with an empty commit, push, and open a **draft** PR into
->    `<default-branch>` referencing `Closes #<N>`:
->    `git commit --allow-empty -m "start: <title> (closes #<N>)"`, then
->    `git push -u origin HEAD` (retry with backoff on a network error), then
->    `gh pr create --draft …` (or `mcp__github__create_pull_request` with
->    `draft: true`). A draft doesn't trigger the review bot on an empty diff.
-> 5. **Implement** the change. Keep the diff focused on this issue only —
->    do **not** touch files another issue owns. Follow the repo's conventions
->    (its `CLAUDE.md` / lab manual). Run the repo's pre-commit checks
->    (render / lint / spell / tests) and fix what they flag.
+> 4. **Open the draft PR now** — before implementing,
+>    so this worktree's work is visible to the other parallel workers and no one double-grabs the issue (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)).
+>    Give the branch a diff with an empty commit, push,
+>    and open a **draft** PR into `<default-branch>` referencing `Closes #<N>`:
+>    `git commit --allow-empty -m "start: <title> (closes #<N>)"`,
+>    then `git push -u origin HEAD` (retry with backoff on a network error),
+>    then `gh pr create --draft …` (or `mcp__github__create_pull_request` with `draft: true`).
+>    A draft doesn't trigger the review bot on an empty diff.
+> 5. **Implement** the change.
+>    Keep the diff focused on this issue only — do **not** touch files another issue owns.
+>    Follow the repo's conventions (its `CLAUDE.md` / lab manual).
+>    Run the repo's pre-commit checks (render / lint / spell / tests) and fix what they flag.
 > 6. **Commit and push** the implementation onto the draft PR with a clear
 >    message referencing the issue (`Closes #<N>` so the PR auto-closes it),
 >    then **mark the PR ready for review** — `gh pr ready <N>` (or

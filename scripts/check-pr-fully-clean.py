@@ -572,9 +572,11 @@ VERDICT_CLEAN_PATTERNS = [
     r"\bReady\s+for\s+merge\b",
     r"Verdict:\s*(?:Clean|Approved|Ready)\b",
     r"\bApproved\s+for\s+merge\b",
+    # Anthropic code-review plugin clean template (closes #2147).
+    r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 ]
 
-# The two BARE patterns above carry no verdict on their own: the phrase survives
+# The bare patterns above carry no verdict on their own: the phrase survives
 # intact inside a sentence that says the opposite. `Verdict:\s*...` is safe
 # without a guard because it requires immediate adjacency after the label.
 #
@@ -587,6 +589,7 @@ VERDICT_CLEAN_PATTERNS = [
 BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
+    r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be

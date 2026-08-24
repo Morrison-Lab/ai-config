@@ -14,6 +14,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 import time
 from typing import Any, Dict, List, Optional
 import urllib.request
@@ -93,9 +94,10 @@ class BaseModelAdapter(ABC):
 
 
 class OllamaAdapter(BaseModelAdapter):
-    """Local Ollama model runner with fallback between direct REST API and opencode."""
+    """Local Ollama instance adapter for zero-marginal-cost local inference."""
 
     provider = ModelProvider.OLLAMA
+    _lock = threading.Lock()
 
     def __init__(self, base_url: str = "http://127.0.0.1:11434", default_model: str = "qwen2.5-coder:7b"):
         self.base_url = base_url
@@ -135,9 +137,10 @@ class OllamaAdapter(BaseModelAdapter):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                content = data.get("response", "")
+            with self._lock:
+                with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = data.get("response", "")
                 return ModelResponse(
                     success=True,
                     content=content,
@@ -152,7 +155,14 @@ class OllamaAdapter(BaseModelAdapter):
                 try:
                     full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
                     cmd = ["opencode", "run", "-m", f"ollama/{target_model}", full_prompt]
-                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                    proc = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=timeout_seconds,
+                    )
                     if proc.returncode == 0:
                         return ModelResponse(
                             success=True,
@@ -209,7 +219,14 @@ class OpencodeAdapter(BaseModelAdapter):
         cmd = ["opencode", "run", "-m", target_model, full_prompt]
 
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_seconds,
+            )
             if proc.returncode == 0:
                 return ModelResponse(
                     success=True,
@@ -308,7 +325,14 @@ class OpenRouterAdapter(BaseModelAdapter):
         if shutil.which("opencode"):
             cmd = ["opencode", "run", "-m", f"openrouter/{target_model}", prompt]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                proc = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout_seconds,
+                )
                 if proc.returncode == 0:
                     return ModelResponse(
                         success=True,
@@ -341,6 +365,7 @@ class ClaudeAdapter(BaseModelAdapter):
     """Claude Code CLI / API adapter."""
 
     provider = ModelProvider.CLAUDE
+    _lock = threading.Lock()
 
     def __init__(self, default_model: str = "claude-3-7-sonnet"):
         self.default_model = default_model
@@ -353,15 +378,25 @@ class ClaudeAdapter(BaseModelAdapter):
         prompt: str,
         system_prompt: Optional[str] = None,
         model: Optional[str] = None,
-        timeout_seconds: int = 180,
+        timeout_seconds: int = 300,
     ) -> ModelResponse:
         start_time = time.time()
         target_model = model or self.default_model
 
         if shutil.which("claude"):
-            cmd = ["claude", "-p", prompt]
+            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            cmd = ["claude", "-p", "--tools", "", "--safe-mode", "--no-session-persistence"]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                with self._lock:
+                    proc = subprocess.run(
+                        cmd,
+                        input=full_prompt,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=timeout_seconds,
+                    )
                 if proc.returncode == 0:
                     return ModelResponse(
                         success=True,
@@ -420,9 +455,18 @@ class AgyAdapter(BaseModelAdapter):
         target_model = model or self.default_model
 
         if shutil.which("gemini"):
-            cmd = ["gemini", "-p", prompt]
+            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            cmd = ["gemini", "-p"]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                proc = subprocess.run(
+                    cmd,
+                    input=full_prompt,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout_seconds,
+                )
                 if proc.returncode == 0:
                     return ModelResponse(
                         success=True,
@@ -446,7 +490,7 @@ class AgyAdapter(BaseModelAdapter):
                     model_used=target_model,
                     provider=self.provider,
                     execution_time_seconds=time.time() - start_time,
-                    error=f"gemini CLI invocation failed: {str(exc)}",
+                    error=f"gemini invocation failed: {str(exc)}",
                 )
 
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -490,7 +534,7 @@ class AgyAdapter(BaseModelAdapter):
             model_used=target_model,
             provider=self.provider,
             execution_time_seconds=0.0,
-            error="Gemini CLI executable or GEMINI_API_KEY not configured.",
+            error="gemini CLI executable or GEMINI_API_KEY not available.",
         )
 
 
@@ -499,7 +543,7 @@ class CodexAdapter(BaseModelAdapter):
 
     provider = ModelProvider.CODEX
 
-    def __init__(self, default_model: str = "o3-mini"):
+    def __init__(self, default_model: str = "gpt-4o"):
         self.default_model = default_model
 
     def is_available(self) -> bool:
@@ -516,9 +560,18 @@ class CodexAdapter(BaseModelAdapter):
         target_model = model or self.default_model
 
         if shutil.which("codex"):
-            cmd = ["codex", "exec", prompt]
+            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            cmd = ["codex", "exec"]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                proc = subprocess.run(
+                    cmd,
+                    input=full_prompt,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout_seconds,
+                )
                 if proc.returncode == 0:
                     return ModelResponse(
                         success=True,
@@ -619,9 +672,18 @@ class CursorAdapter(BaseModelAdapter):
         target_model = model or self.default_model
 
         if shutil.which("cursor"):
-            cmd = ["cursor", "--agent", prompt]
+            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            cmd = ["cursor", "--agent"]
             try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                proc = subprocess.run(
+                    cmd,
+                    input=full_prompt,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout_seconds,
+                )
                 if proc.returncode == 0:
                     return ModelResponse(
                         success=True,
@@ -728,10 +790,8 @@ class ModelRouter:
             return self.adapters[ModelProvider.MOCK], "local-mock"
 
         # Escalate capability tier on retries (when model struggles)
-        if retry_count >= 2 and tier not in (TaskTier.ADVERSARIAL_REVIEW, TaskTier.FRONTIER_HEAVY):
+        if retry_count >= 1 and tier not in (TaskTier.ADVERSARIAL_REVIEW, TaskTier.FRONTIER_HEAVY):
             tier = TaskTier.FRONTIER_HEAVY
-        elif retry_count == 1 and tier in (TaskTier.LOCAL_FAST, TaskTier.FREE_HOSTED):
-            tier = TaskTier.STANDARD_CODE
 
         # 2. Adversarial Review -> Must use a different model family than author,
         # preferring local/free reviewers first while strictly preventing same-family self-review.
@@ -852,14 +912,14 @@ class ModelRouter:
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
 
-        # 6. Standard Code Tasks -> Prioritize local zero-cost Ollama, then free pools, then Claude CLI
+        # 6. Standard Code Tasks -> Prioritize Claude CLI for synthesis, then local Ollama / free pools
+        if self.adapters[ModelProvider.CLAUDE].is_available():
+            return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
         if self.adapters[ModelProvider.OLLAMA].is_available():
             return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
         if self.adapters[ModelProvider.OPENCODE].is_available():
             return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
         if self.adapters[ModelProvider.CURSOR].is_available():
             return self.adapters[ModelProvider.CURSOR], "cursor-agent"
-        if self.adapters[ModelProvider.CLAUDE].is_available():
-            return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
 
         return self.adapters[ModelProvider.MOCK], "mock-standard"

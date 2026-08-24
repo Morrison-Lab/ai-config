@@ -70,6 +70,8 @@ def check_file(md: Path) -> None:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     seen: set[Path] = set()
     for glob in SCAN_GLOBS:
         for md in ROOT.glob(glob):

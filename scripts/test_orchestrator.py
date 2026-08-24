@@ -370,11 +370,18 @@ class TestSpecializedSubagents(unittest.TestCase):
         orig_run = subprocess.run
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            if isinstance(cmd, list) and cmd[:2] == ["git", "push"]:
-                mock_proc = MagicMock()
-                mock_proc.returncode = 1
-                mock_proc.stderr = "fatal: remote rejected (permission denied)"
-                return mock_proc
+            if isinstance(cmd, list):
+                if len(cmd) >= 2 and cmd[:2] == ["git", "commit"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 0
+                    mock_proc.stdout = "commit ok"
+                    mock_proc.stderr = ""
+                    return mock_proc
+                if len(cmd) >= 2 and cmd[:2] == ["git", "push"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 1
+                    mock_proc.stderr = "fatal: remote rejected (permission denied)"
+                    return mock_proc
             return orig_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=mock_subprocess_run):
@@ -393,6 +400,298 @@ class TestSpecializedSubagents(unittest.TestCase):
         res = agent.execute(task, ctx)
         self.assertFalse(res.success)
         self.assertEqual(res.data["verdict"], "BLOCKED")
+
+    def test_extract_files_from_markdown_discards_stubs_and_self_referential_blocks(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        # Self-referential single line
+        text1 = "```memories/tools.md\nmemories/tools.md\n```"
+        files1 = extract_files_from_markdown(text1)
+        self.assertEqual(files1, {})
+
+        # Basename echo
+        text2 = "```memories/tools.md\ntools.md\n```"
+        files2 = extract_files_from_markdown(text2)
+        self.assertEqual(files2, {})
+
+        # Ellipsis stub
+        text3 = "```scripts/check.py\n...\n```"
+        files3 = extract_files_from_markdown(text3)
+        self.assertEqual(files3, {})
+
+        # Real multi-line implementation
+        text4 = "```scripts/foo.py\nimport os\nprint('hello world')\n```"
+        files4 = extract_files_from_markdown(text4)
+        self.assertEqual(files4, {"scripts/foo.py": "import os\nprint('hello world')\n"})
+
+    def test_coder_subagent_destructive_truncation_guard(self):
+        from unittest.mock import MagicMock
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.model_adapters import ModelProvider, ModelResponse
+
+        mock_router = MagicMock()
+        mock_adapter = MagicMock()
+        # Model outputs a 2-line stub for an existing 50-line file
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="```scripts/big_file.py\n# stub\npass\n```",
+            model_used="mock-stub-coder",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+        mock_router.route_task.return_value = (mock_adapter, "mock-stub-coder")
+
+        # Create big file in temp workspace
+        big_file_path = os.path.join(self.temp_dir.name, "scripts", "big_file.py")
+        os.makedirs(os.path.dirname(big_file_path), exist_ok=True)
+        with open(big_file_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(f"# Line {i}" for i in range(50)))
+
+        mock_wt_mgr = MagicMock()
+        mock_wt_mgr.isolated_worktree.return_value.__enter__.return_value = Path(self.temp_dir.name)
+        mock_wt_mgr.isolated_worktree.return_value.__exit__.return_value = None
+
+        agent = CoderSubagent(model_router=mock_router, worktree_manager=mock_wt_mgr)
+        task = Task(
+            title="Refactor scripts/big_file.py",
+            role="coder",
+            payload={
+                "instruction": "Fix bug in scripts/big_file.py",
+                "use_worktree": True,
+                "branch_name": "task/truncation-test",
+                "dry_run": False,
+                "push_remote": False,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        res = agent.execute(task, ctx)
+        self.assertFalse(res.success)
+        self.assertIn("Destructive truncation detected", res.error)
+
+    def test_extract_files_from_markdown_fallback_discards_all_stub_patterns(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        for stub in ["...", "# ...", "// ...", "pass", "/* same */", "# same"]:
+            text = f"```scripts/check.py\n{stub}\n```"
+            res = extract_files_from_markdown(text, context_text="please fix scripts/check.py now")
+            self.assertEqual(res, {}, f"Failed to discard stub: {stub}")
+
+    def test_extract_files_from_markdown_fallback_discards_stub_with_multiple_candidates(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        text = "```\nmemories/tools.md\n```"
+        res = extract_files_from_markdown(text, context_text="update memories/tools.md and also scripts/foo.py please")
+        self.assertEqual(res, {})
+
+        text2 = "```\nscripts/a.py\n```"
+        res2 = extract_files_from_markdown(text2, context_text="please fix scripts/a.py and scripts/b.py now")
+        self.assertEqual(res2, {})
+
+        # Shape variants: bare path for unrelated file, header cross-path, and comment-prefixed path
+        text3 = "```\ndocs/readme.md\n```"
+        res3 = extract_files_from_markdown(text3, context_text="fix scripts/a.py")
+        self.assertEqual(res3, {})
+
+        text4 = "```scripts/a.py\nscripts/b.py\n```"
+        res4 = extract_files_from_markdown(text4, context_text="fix scripts/a.py and scripts/b.py")
+        self.assertEqual(res4, {})
+
+        text5 = "```\n# scripts/a.py\n```"
+        res5 = extract_files_from_markdown(text5, context_text="fix scripts/a.py")
+        self.assertEqual(res5, {})
+
+        # Multi-line path stub variants
+        text6 = "```scripts/foo.py\nscripts/a.py\nscripts/b.py\n```"
+        res6 = extract_files_from_markdown(text6)
+        self.assertEqual(res6, {})
+
+        text7 = "```\nscripts/a.py\nscripts/b.py\n```"
+        res7 = extract_files_from_markdown(text7, context_text="fix scripts/a.py and scripts/b.py")
+        self.assertEqual(res7, {})
+
+        text8 = "```\n# ...\n# ...\n```"
+        res8 = extract_files_from_markdown(text8, context_text="fix scripts/a.py")
+        self.assertEqual(res8, {})
+
+        # ./ prefixed and multi-dot extension path stub variants
+        text9 = "```scripts/foo.py\n./scripts/a.py\n./scripts/b.py\n```"
+        res9 = extract_files_from_markdown(text9)
+        self.assertEqual(res9, {})
+
+        text10 = "```\n./scripts/a.tar.gz\n```"
+        res10 = extract_files_from_markdown(text10, context_text="fix scripts/a.tar.gz")
+        self.assertEqual(res10, {})
+
+        # Single dotted tokens (version numbers, domains, numbers) must NOT be discarded as stubs
+        text11 = "```version.txt\n1.0.0\n```"
+        res11 = extract_files_from_markdown(text11)
+        self.assertEqual(res11, {"version.txt": "1.0.0\n"})
+
+        text12 = "```config.txt\nexample.com\n```"
+        res12 = extract_files_from_markdown(text12)
+        self.assertEqual(res12, {"config.txt": "example.com\n"})
+
+        text13 = "```scripts/pi.py\n3.14\n```"
+        res13 = extract_files_from_markdown(text13)
+        self.assertEqual(res13, {"scripts/pi.py": "3.14\n"})
+
+        # Bare no-directory filenames echoing other files must be discarded as stubs
+        text14 = "```scripts/foo.py\nutils.py\n```"
+        res14 = extract_files_from_markdown(text14)
+        self.assertEqual(res14, {})
+
+        text15 = "```scripts/foo.py\nutils.py\nhelpers.py\n```"
+        res15 = extract_files_from_markdown(text15)
+        self.assertEqual(res15, {})
+
+        # Generic extensions (vue, proto, mdc, jsonc, service, env, etc.)
+        text16 = "```scripts/foo.py\nconfig.env\n```"
+        res16 = extract_files_from_markdown(text16)
+        self.assertEqual(res16, {})
+
+        text17 = "```scripts/foo.py\napp.vue\nmain.proto\n```"
+        res17 = extract_files_from_markdown(text17)
+        self.assertEqual(res17, {})
+
+        text18 = "```scripts/foo.py\n.cursor/rules/a.mdc\n```"
+        res18 = extract_files_from_markdown(text18)
+        self.assertEqual(res18, {})
+
+        text19 = "```scripts/foo.py\nsettings.jsonc\nunit.service\n```"
+        res19 = extract_files_from_markdown(text19)
+        self.assertEqual(res19, {})
+
+        # ./ and / prefixed dotfiles
+        text20 = "```scripts/config_loader.py\n./.env\n```"
+        res20 = extract_files_from_markdown(text20)
+        self.assertEqual(res20, {})
+
+        text21 = "```scripts/foo.py\n/.gitignore\n```"
+        res21 = extract_files_from_markdown(text21)
+        self.assertEqual(res21, {})
+
+        # Paths with numeric stem in directory (e.g. docs/2023.md)
+        text22 = "```scripts/foo.py\ndocs/2023.md\n```"
+        res22 = extract_files_from_markdown(text22)
+        self.assertEqual(res22, {})
+
+        # Numbered list markers
+        text23 = "```memories/tools.md\n1. memories/tools.md\n2. memories/git.md\n```"
+        res23 = extract_files_from_markdown(text23)
+        self.assertEqual(res23, {})
+
+        # Legitimate glob files like .gitignore must NOT be discarded
+        text24 = "```.gitignore\n*.pyc\n*.pyo\n.env\n```"
+        res24 = extract_files_from_markdown(text24)
+        self.assertEqual(res24, {".gitignore": "*.pyc\n*.pyo\n.env\n"})
+
+        # Comma-, semicolon-, and lettered-lists
+        text25 = "```scripts/foo.py\nscripts/a.py, scripts/b.py\n```"
+        res25 = extract_files_from_markdown(text25)
+        self.assertEqual(res25, {})
+
+        text26 = "```scripts/foo.py\nscripts/a.py; scripts/b.py\n```"
+        res26 = extract_files_from_markdown(text26)
+        self.assertEqual(res26, {})
+
+        text27 = "```scripts/foo.py\na. scripts/a.py\nb. scripts/b.py\n```"
+        res27 = extract_files_from_markdown(text27)
+        self.assertEqual(res27, {})
+
+        # Bare multi-dot config / minified / typed definition filenames
+        text28 = "```scripts/foo.py\nwebpack.config.js\n```"
+        res28 = extract_files_from_markdown(text28)
+        self.assertEqual(res28, {})
+
+        text29 = "```scripts/foo.py\njquery.min.js\nfile.d.ts\n```"
+        res29 = extract_files_from_markdown(text29)
+        self.assertEqual(res29, {})
+
+    def test_find_candidate_file_paths_adjacent_paths(self):
+        from orchestrator.subagents import find_candidate_file_paths
+
+        res = find_candidate_file_paths("update scripts/a.py scripts/b.py scripts/c.py please")
+        self.assertEqual(res, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
+
+        res2 = find_candidate_file_paths("update scripts/a.py, scripts/b.py, and scripts/c.py.")
+        self.assertEqual(res2, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
+
+        res3 = find_candidate_file_paths("update scripts/a.py,scripts/b.py and .gitignore, README.md, main.py")
+        self.assertEqual(res3, ["scripts/a.py", "scripts/b.py", ".gitignore", "README.md", "main.py"])
+
+    def test_extract_files_from_markdown_default_target_file(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        text = "```python\nprint('hello world')\n```"
+        res = extract_files_from_markdown(text, default_target_file="scripts/my_target.py")
+        self.assertEqual(res, {"scripts/my_target.py": "print('hello world')\n"})
+
+    def test_resolve_within_worktree(self):
+        from orchestrator.subagents import resolve_within_worktree
+
+        root = Path(self.temp_dir.name).resolve()
+        safe_path = resolve_within_worktree("scripts/foo.py", root)
+        self.assertIsNotNone(safe_path)
+        self.assertTrue(safe_path.is_relative_to(root))
+
+        # Root itself must return None (strictly contained)
+        self.assertIsNone(resolve_within_worktree(".", root))
+        self.assertIsNone(resolve_within_worktree("", root))
+        self.assertIsNone(resolve_within_worktree("/", root))
+
+        # Relative paths escaping worktree root must return None
+        escape_path = resolve_within_worktree("../../../etc/passwd", root)
+        self.assertIsNone(escape_path)
+
+        # Absolute paths are rebased under the worktree root
+        abs_rebased = resolve_within_worktree("/scripts/bar.py", root)
+        self.assertIsNotNone(abs_rebased)
+        self.assertEqual(abs_rebased, (root / "scripts/bar.py").resolve())
+
+    def test_coder_subagent_path_traversal_context_injection_blocked(self):
+        from unittest.mock import MagicMock, patch
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.model_adapters import ModelProvider, ModelResponse
+
+        mock_router = MagicMock()
+        mock_adapter = MagicMock()
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="```scripts/safe.py\n# safe\nprint('ok')\n```",
+            model_used="mock-coder",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+        mock_router.route_task.return_value = (mock_adapter, "mock-coder")
+
+        mock_wt_mgr = MagicMock()
+        mock_wt_mgr.isolated_worktree.return_value.__enter__.return_value = Path(self.temp_dir.name)
+        mock_wt_mgr.isolated_worktree.return_value.__exit__.return_value = None
+
+        agent = CoderSubagent(model_router=mock_router, worktree_manager=mock_wt_mgr)
+        task = Task(
+            title="Fix bug with path traversal attempt",
+            role="coder",
+            payload={
+                "instruction": "Fix scripts/../../../../../../etc/passwd.txt vulnerability",
+                "use_worktree": True,
+                "branch_name": "task/path-traversal-test",
+                "dry_run": False,
+                "push_remote": False,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        with patch("subprocess.run") as mock_proc:
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "ok"
+            mock_res.stderr = ""
+            mock_proc.return_value = mock_res
+            res = agent.execute(task, ctx)
+
+        # Should succeed without crashing or leaking sensitive file
+        self.assertTrue(res.success)
+        self.assertIn("scripts/safe.py", res.data["files_modified"])
 
 
 class TestOrchestratorEngineIntegration(unittest.TestCase):
@@ -783,17 +1082,25 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertIsNotNone(claim_info["pr_number"])
         self.assertIn("https://github.com/Morrison-Lab/ai-config/pull/", claim_info["pr_url"])
 
-    def test_tester_subagent_marks_draft_pr_ready(self):
+    def test_pr_claim_manager_merge_pr_under_mwc(self):
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+        merged = mgr.merge_pr_under_mwc(pr_number=2112, dry_run=True)
+        self.assertTrue(merged)
+
+    def test_tester_subagent_marks_draft_pr_ready_and_merges_under_mwc(self):
         from orchestrator.subagents import TesterSubagent
         from orchestrator.models import SubagentContext
 
         tester = TesterSubagent()
         task = Task(
-            title="Verify quality gates",
+            title="Verify quality gates and merge under mwc",
             role="tester",
             payload={
                 "pr_number": 2112,
                 "dry_run": True,
+                "mwc": True,
                 "expected_assertions": 5,
             },
         )
@@ -802,25 +1109,103 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         self.assertTrue(res.success)
         self.assertTrue(res.data.get("pr_marked_ready", False))
+        self.assertTrue(res.data.get("pr_merged", False))
+
+    def test_check_repo_allows_mwc_policy(self):
+        from orchestrator.protocols import AIConfigProtocols
+
+        # ai-config has standing mwc policy
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="Morrison-Lab/ai-config"))
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="owner/ai-config"))
+
+        # External repo slug targeting does NOT inherit current workspace directory
+        self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_slug="SomeOrg/unrelated-repo"))
+
+        # Arbitrary external repo without written policy does not allow mwc by default
+        with tempfile.TemporaryDirectory() as empty_dir:
+            self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
+
+    def test_is_pr_fully_clean_detection(self):
+        import json
+        from unittest.mock import MagicMock
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+
+        # 1. Clean PR
+        clean_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+                {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
+        # 2. Failing CI check
+        dirty_ci_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
+            ],
+            "reviews": [],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("failed", reason)
+
+        # 3. Blocking AI review verdict ("Needs more work")
+        dirty_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("needs more work", reason.lower())
+
+        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
+        blocked_human_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocked", reason.lower())
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 
         parser = build_parser()
-        # Default ingest-issues (safe opt-in default: claim_pr=False)
+        # Default ingest-issues (safe opt-in default: claim_pr=False, mwc=None for auto-detection)
         args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
         self.assertFalse(args_default.dry_run)
         self.assertFalse(args_default.claim_pr)
+        self.assertIsNone(args_default.mwc)
 
-        # Explicit --claim-pr opt-in
-        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3"])
+        # Explicit --claim-pr opt-in and --no-mwc
+        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3", "--no-mwc"])
         self.assertFalse(args_opt_in.dry_run)
         self.assertTrue(args_opt_in.claim_pr)
+        self.assertFalse(args_opt_in.mwc)
 
-        # Explicit sweep-backlog --dry-run
-        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
+        # Explicit sweep-backlog --dry-run and explicit --mwc
+        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2", "--mwc"])
         self.assertTrue(args_sweep.dry_run)
         self.assertFalse(args_sweep.claim_pr)
+        self.assertTrue(args_sweep.mwc)
 
 
 def main():

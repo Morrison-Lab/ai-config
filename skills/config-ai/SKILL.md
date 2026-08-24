@@ -128,32 +128,34 @@ than scaffolding cold:
 The target repo is `ai-config` for the first five rows above, `gha` for the
 last two.
 
-1. **Can this session push to the target repo?** Check the session's GitHub
-   scope (the "Repository Scope" list in a remote/web session's system
-   prompt, or a `git remote -v` / `gh repo view <owner>/<repo>` probe
-   locally), and whether a push would actually be accepted — a scoped
-   session may be able to push only its own harness-assigned branch (see
-   `CLAUDE.md`'s "Use the existing PR branch" 403 exception).
-   - **Yes** → proceed normally: branch off `main` in the target repo (such as `Morrison-Lab/ai-config`), build via the skill/convention chosen in Step 1, commit, push to origin, open a PR immediately, request review, and `ardi` to clean. Never stop after modifying local files without pushing the PR.
-2. **No push access, but the session can still read the target repo and open
-   issues on it** (GitHub MCP scope or `gh`/API access, just not write
-   access to code) → don't lose the request. File one fully-specified issue
-   on the target repo describing: the capability in one sentence, the
-   implementation form chosen in Step 1 and why, the target file(s)/path(s),
-   and enough detail that a future `gi`/`grab-issue` session -- which does
-   have push access -- can build it unattended. Don't claim it (`claim-pr`'s
-   "paws off" comment is for a session about to implement); leave it open
-   for whoever picks it up.
-3. **No access to the target repo at all** (not in the session's GitHub
-   scope, no network path, issue creation itself fails) → file the issue in
-   the **current** repo instead -- whatever repo the session is actually
-   working in. Write it standalone, since a future reader won't have this
-   conversation's context: state plainly that it's really a request for
-   `ai-config`/`gha` and needs to move there. Ask the user to use GitHub's
-   **Transfer issue** feature once a session with access is available. This
-   mirrors `shared/workflow/upstream-issues.md`'s own-repo fallback (its step
-   3), applied here because `ai-config`/`gha` are just as "upstream" of a
-   differently-scoped session as any external dependency is.
+1. **Can this session push to the target repo?**
+   Check the session's GitHub scope (the "Repository Scope" list in a remote/web session's system prompt, or a `git remote -v` / `gh repo view <owner>/<repo>` probe locally),
+   and whether a push would actually be accepted —
+   a scoped session may be able to push only its own harness-assigned branch (see `CLAUDE.md`'s "Use the existing PR branch" 403 exception).
+   - **Yes** → proceed normally:
+     branch off `main` in the target repo (such as `Morrison-Lab/ai-config`),
+     build via the skill/convention chosen in Step 1,
+     commit,
+     push to origin,
+     open a PR immediately,
+     request review,
+     and `ardi` to clean.
+     Never stop after modifying local files without pushing the PR.
+2. **No push access, but the session can still read the target repo and open issues on it** (GitHub MCP scope or `gh`/API access, just not write access to code) → don't lose the request.
+   File one fully-specified issue on the target repo describing:
+   the capability in one sentence,
+   the implementation form chosen in Step 1 and why,
+   the target file(s)/path(s),
+   and enough detail that a future `gi`/`grab-issue` session -- which does have push access -- can build it unattended.
+   Don't claim it (`claim-pr`'s "paws off" comment is for a session about to implement);
+   leave it open for whoever picks it up.
+3. **No access to the target repo at all** (not in the session's GitHub scope, no network path, issue creation itself fails) → file the issue in the **current** repo instead -- whatever repo the session is actually working in.
+   Write it standalone,
+   since a future reader won't have this conversation's context:
+   state plainly that it's really a request for `ai-config`/`gha` and needs to move there.
+   Ask the user to use GitHub's **Transfer issue** feature once a session with access is available.
+   This mirrors `shared/workflow/upstream-issues.md`'s own-repo fallback (its step 3),
+   applied here because `ai-config`/`gha` are just as "upstream" of a differently-scoped session as any external dependency is.
 
 Never silently drop a capability request because the current session happens
 to lack push access to the target repo -- one of these three always applies.

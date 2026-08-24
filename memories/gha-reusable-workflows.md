@@ -1,6 +1,7 @@
 # d-morrison/gha reusable workflows
 
 Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
 
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
 Generic Actions-authoring material stays there.
@@ -51,8 +52,11 @@ Generic Actions-authoring material stays there.
   Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
   Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
   serocalculator#564 is the first consumer.
-- **Convention:** ai-config (and d-morrison repos generally) call `d-morrison/gha` reusable workflows with `@v1` (not a SHA-pinned ref).
+- **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
   SHA-pinning is the pattern for third-party actions only.
+  **Which** major tag is per-capability, not a repo-wide default --- read the README's Versioning section.
+  Corrected 2026-08-24 (ai-config#2126): this bullet previously read `@v1` repo-wide, which the `@v1` freeze made stale.
+  Measured the same day, ai-config's own callers are eight `@v2`, one `@v1` (`sync-shared-fragments`, one of the three capabilities still current there), and two deliberately SHA-pinned to a gha commit.
 - **gha's major tag slides ONLY on a manual `workflow_dispatch`, NOT on every merge to main**
   (`slide-major-tag.yml`; `on: workflow_dispatch:` only, gated `if: github.ref == 'refs/heads/main'`).
   It re-points the major derived from the latest `vX.Y.Z` tag to HEAD when dispatched.
@@ -151,3 +155,23 @@ Generic Actions-authoring material stays there.
   Supports `workflow_dispatch`, `/update-snapshots` PR comment (`pr-mode: true`), and auto-update before R-CMD-check (`ref: github.head_ref`).
   Pass system deps via `apt-packages`.
   Added in gha#103; bcs#226 is the reference caller.
+- **The gha family has THREE different R-dependency mechanisms, with opposite defaults, and picking the wrong one fails only at render time.**
+  A consumer migrating a whole repo touches several of these workflows in one PR, which is exactly when the differences are invisible --- they read as one coherent family, and each caller stub is short enough to look obviously correct.
+  - **`claude.yml`** --- `setup-r` defaults **true**, and with `use-renv` false it runs `setup-r-dependencies` with `extra-packages`, whose default spec includes `local::.`.
+    That resolves against a `DESCRIPTION`.
+    A Quarto site with no `DESCRIPTION` therefore fails on every agent run unless the caller sets `setup-r: false` explicitly.
+  - **`quarto-publish.yml`** --- `setup-r` defaults **false**, and its `r-packages` input reaches `setup-r-dependencies` as `packages:` rather than `extra-packages:`.
+    That *replaces* the default `deps::.` spec instead of adding to it, which is what makes `setup-r: true` work with no `DESCRIPTION` at all.
+  - **`preview.yml`** --- offers neither.
+    It installs R unconditionally and supports only `use-renv` (needs `renv.lock`) or `install-package` (needs the repo to be an R package).
+    A site that is neither has no path, so the preview half of the preview/publish family cannot serve a repo shape the publish half serves fine.
+    Filed as [gha#607](https://github.com/Morrison-Lab/gha/issues/607).
+
+  Read the *composite action*, not the reusable workflow, when the question is which `setup-r-dependencies` argument an input lands in --- the workflow forwards the input by name and the composite decides `packages:` versus `extra-packages:`, so the wrapping file cannot answer it.
+
+  - **Do:** set `setup-r: false` on `claude.yml` for any consumer without a `DESCRIPTION`, and `setup-r: true` plus an explicit `r-packages` on `quarto-publish.yml`.
+  - **Do:** check each workflow's default separately when migrating several at once.
+  - **Don't:** carry a setting across from one gha workflow's caller to another's --- `setup-r` alone defaults opposite ways in two of them.
+  - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
+
+  (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)

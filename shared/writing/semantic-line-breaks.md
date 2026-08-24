@@ -422,7 +422,12 @@ setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
 against a passing job's own log, which prints every `NLB_*` value it used).
 The practical consequence is worth stating in the safe direction: the clause
 check that catches a long line with a mid-line semicolon **is** on by default
-locally, so a local run cannot silently under-report that case.
+locally, so a local run **of `check-new-line-breaks.py`** cannot silently
+under-report that case.
+Naming the script matters only when this sentence is read out of its
+subsection, where "a local run" could otherwise be taken for
+`scripts/semantic-line-breaks.py` --- which has no semicolon rule, per "This
+repo's own reformatter is not that check" above.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

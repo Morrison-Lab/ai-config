@@ -316,13 +316,18 @@ Render a **Review Summary Table** for the PR:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](<review.url>) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
 - **Author** --- author login.
-- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`). Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA). If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`. If no SHA is named, display `[⚠️ Unverified](url)`.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
+  Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
+  If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
+  If no SHA is named, display `[⚠️ Unverified](url)`.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
-- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md). For self-authored PRs, note `*Self-authored* (GitHub prevents requesting review from author)`. When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+  For self-authored PRs, note `*Self-authored* (GitHub prevents requesting review from author)`.
+  When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
 - **Next Step** --- computed next transition:
   - `Ready for self-merge` (Self-authored, AI approved, CI green).
   - `Ready for human review` (External author, AI approved, CI green, human review requested).

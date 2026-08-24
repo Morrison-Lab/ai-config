@@ -53,10 +53,8 @@ calls in one message) so they run at once. The fan-out is read-only, so it
 needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
-Give each subagent its PR number and `headRefName`, and have it gather the
-**seven independent signals** below and return one structured row. Carry the
-disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST
-review* will silently misreport:
+Give each subagent its PR number and `headRefName`, and have it gather the **seven independent signals** below and return one structured row.
+Carry the disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST review* will silently misreport:
 
 A subagent starts **fresh** --- it sees only this prompt, not this skill file ---
 so **inline the exact commands**; don't point it at a section it can't read.
@@ -125,7 +123,8 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >       | map(sort_by(.submitted_at) | last
 >             | {id, login: .user.login, state, submitted_at})'
 >    ```
->    Exclude `DISMISSED` reviews before reading anything. Reduce per reviewer via `group_by(.user.login)`.
+>    Exclude `DISMISSED` reviews before reading anything.
+>    Reduce per reviewer via `group_by(.user.login)`.
 >    Judge each matched review by **substance, not state**.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
@@ -183,9 +182,14 @@ A Markdown table, one row per open PR, with these columns:
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
 - **Author** --- author login.
-- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`). Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA). If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`. If no SHA is named, display `[⚠️ Unverified](url)`.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
+  Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
+  If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
+  If no SHA is named, display `[⚠️ Unverified](url)`.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
-- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md). For self-authored PRs, note `*Self-authored*`. When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+  For self-authored PRs, note `*Self-authored*`.
+  When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
 - **Next Step** --- computed next transition:
   - `Ready for self-merge` (Self-authored, AI approved, CI green).
   - `Ready for human review` (External author, AI approved, CI green, human review requested).
@@ -200,17 +204,9 @@ When detailed git/thread metrics are needed, include the extended columns:
 
 | PR | Title | Branch | CI | Review | External | Human | Threads | Behind main | Next Step |
 
-Below the table, list each PR's open findings briefly (or "none"), and call out
-anything needing action: branches behind main, failing CI, drafts, reviews
-that returned `null`, or a pending human review. Do **not** label a PR "ready
-to merge" unless it is
-**fully clean** -- **Human is `none`** (a blocking human review overrides
-everything below) *and* at least one of Review or External is `clean` at
-the current head *and*
-neither one has open findings *and* all CI
-workflows are green *and* it's not behind main *and* every inline review
-thread is resolved. Never hedge with "ready except
-for one nit."
+Below the table, list each PR's open findings briefly (or "none"), and call out anything needing action: branches behind main, failing CI, drafts, reviews that returned `null`, or a pending human review.
+Do **not** label a PR "ready to merge" unless it is **fully clean** -- **Human is `none`** (a blocking human review overrides everything below) *and* at least one of Review or External is `clean` at the current head *and* neither one has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
+Never hedge with "ready except for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)
 

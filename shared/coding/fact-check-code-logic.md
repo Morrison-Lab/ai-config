@@ -439,6 +439,30 @@ Two habits make it pay off beyond the one check:
   [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
   applies to prose.
 
+**An illustration you invented is the one claim that never prompts the check.**
+Everything above is a claim you set out to verify.
+An example is different: it is chosen to make something you already believe concrete, so it inherits that belief's verification in the writing and is never checked on its own.
+The rule being true is not evidence about the instance, and an instance picked to demonstrate a rule can turn out to be a **counterexample** to it.
+
+That is worse than an ordinary slip, because a wrong example names the wrong failure mode and the surrounding argument then reasons from it.
+A reader takes the example as the concrete case and the prose as its generalization, so a false example redirects the conclusions drawn near it.
+Where a mechanism has more than one outcome, pick the example showing the **dominant** one, and say which outcome it shows.
+
+Distinct from [`examples-are-scanned`](../writing/examples-are-scanned.md), where the example's claim is correct and a checker matches a **token** the prose is discussing.
+Here the claim itself is wrong, so re-reading cannot catch it and only running it can.
+
+- **Do:** execute an illustrative example --- in a comment, a docstring, or prose --- before shipping it, on the same terms as any other claim.
+- **Do:** re-read the surrounding argument after checking one, since a corrected example can invert the point it was supporting.
+- **Don't:** let an example inherit the verification of the rule it illustrates.
+- **Don't:** generalize from one member of a class to the class --- checking U+201C and then writing "a smart quote" is the same unchecked step, one level up.
+
+(Morrison-Lab/ai-config#2086, 2026-08-23: a pre-push draft comment offered "a smart quote in a PR title, an emoji in a check-run name" as inputs that would raise under cp1252.
+Both were wrong in the same direction, and the draft was corrected before reaching a commit --- `git show 36268396:scripts/check-pr-fully-clean.py` carries the corrected wording --- so this is a draft error the process caught rather than a shipped one.
+Measured: cp1252 leaves five bytes undefined, `0x81`, `0x8D`, `0x8F`, `0x90`, `0x9D`, so U+1F600 (`f0 9f 98 80`) mojibakes silently while U+1F44D (`f0 9f 91 8d`) raises on `0x8D`.
+The draft named the rare outcome as though it were the common one, inverting its own argument for why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.
+The first draft of *this entry* then generalized from U+201C to "a smart quote", which an adversarial review refuted by measurement: U+201C (`e2 80 9c`) decodes silently and U+201D (`e2 80 9d`) raises, `0x9D` being one of the five.
+Recording that second step because it is the same error at one remove, committed while documenting why not to.)
+
 ## A signature change's caller set is derived by grep, never from the callers you can see
 
 Adding or retyping a parameter on a shared function changes every call site at once, and the call sites are not a property of the file you are editing.
@@ -471,16 +495,20 @@ The session hook and the CI job were both traced and both correct.
 The section above derives a **parameter** change's caller set by grep.
 The exception a function raises belongs to the same interface and needs the same grep, and it is the more dangerous of the two because of how the two fail.
 
-Adding a **required** parameter fails **loudly**: the arity mismatch raises at the call site, which is how the case above was caught at all --- CI stopped with a `TypeError`.
-The contrast below is with that case specifically; an optional parameter with a default, or a reordering of same-typed positionals, fails as quietly as anything here.
-An exception-type change raises nothing at all.
+Adding a genuinely **required** parameter fails loudly at the call site, on an arity mismatch.
+The section above's own case was quieter than that and still red: `classify()` kept five parameters and *retyped* one, so nothing mismatched at the call site and the `TypeError` surfaced several frames inside the callee, in CI.
+An optional parameter with a default, or a reordering of same-typed positionals, is quieter again.
+So "parameter changes are loud" is a spectrum, and what follows is the end of it that has no red at all: an exception-type change raises nothing anywhere.
 Where a handler upstream already catches the new type, the error is routed into whatever that handler does next --- and a handler that returns a default, returns `None`, or logs and continues is the code that carries on.
 So the change lands green, and the failure it was meant to report stops being reported.
 
 **The direction is what makes it worth a rule of its own.**
 This edit is typically made *to improve* error handling --- replacing an incidental `AttributeError` with an explicit `raise RuntimeError("...")` that names the problem.
 It therefore reads as a strict improvement and attracts less scrutiny than a change that looks risky, while its actual effect can be to make the error **quieter** than the incidental one it replaced.
-An unplanned exception at least propagates; a planned one propagates only as far as the nearest handler written for something else.
+That effect depends entirely on how *narrow* the enclosing handlers are, which is the thing to look up rather than assume.
+Against a narrow `except RuntimeError` the incidental `AttributeError` would have escaped and the explicit one does not, so the change really does make it quieter.
+Against a broad `except Exception` the two are indistinguishable and the change buys nothing either way.
+Measured here on 2026-08-23, the broad form is the overwhelming majority --- 138 of the 140 hits below --- so assuming the narrow case is the wrong default.
 
 Derive the handler set before claiming the change makes anything louder, and note that **base classes catch too**:
 
@@ -490,16 +518,15 @@ grep -rnE 'except \(?[A-Za-z_, ]*RuntimeError|except (Exception|BaseException)\b
 ```
 
 The narrow form is the trap, and it is the one that comes to mind.
-Measured in this repo on 2026-08-23, `grep -rn 'except RuntimeError'` returns **2** hits where the form above returns **140** --- because `except Exception`, `except (RuntimeError, OSError)`, and a bare `except:` each catch a `RuntimeError` while containing none of the word.
+Measured in this repo on 2026-08-23, `grep -rn 'except RuntimeError'` returns **2** hits where the form above returns **140** --- because `except Exception`, `except (RuntimeError, OSError)`, and a bare `except:` all catch a `RuntimeError` while none of them matches the literal string `except RuntimeError`.
 A grep keyed on the type name is therefore a grep for the handlers that happen to *name* it, which is the same sample-for-population substitution the section above warns about.
+
+That broader form is broader and still not exhaustive, so report it as what it examined rather than as the population: it misses `except(Exception):` with no space, two-space spellings, a tuple split across lines, and a dotted `except errors.RuntimeError:`.
+None of those occurs in a `RuntimeError`-catching form in this repo today, which is why the 140 stands here and is not a general guarantee.
 
 Then read what each hit does with it.
 A handler that re-raises or exits is fine.
 One that returns a default, returns `None`, or records a status and carries on is the case this rule is about.
-
-**The same question generalizes past exception types, to any dimension of what a guard covers.**
-Which **streams** a guard reads, which **files** hold a sibling copy of the function, which **branches** of a call reach the same operation: each is a population, and each is one grep away.
-See [`fail-fast`](../principles/fail-fast.md)'s partial-guard section for the dimension the fix in the case record below failed to enumerate.
 
 - **Do:** grep for handlers of the NEW exception type before changing what a function raises.
 - **Do:** read each handler's body, since only the ones that swallow matter.
@@ -534,73 +561,6 @@ Round 1 refuted the FIRST shipped claim --- "a genuine bold-labeled finding in p
 Round 2 refuted the SECOND shipped claim --- "a live finding does not describe itself that way" (adjacency alone) --- with a live finding re-raised across rounds using the identical citation syntax.
 Only the THIRD version, which added an explicit resolution-wording requirement on top of adjacency, was approved ("Ready for merge"), with one narrow residual gap the reviewer explicitly judged non-blocking.
 Both refuted claims were found by the reviewer executing a constructed counter-example, not by the author testing one first, despite this fragment's own execution-based verification section already existing in the corpus at the time either claim was written.)
-
-## An illustrative example is an assertion, so run it before shipping it
-
-The section above governs a claim a fix's safety **rests on**.
-This one governs the claim nothing rests on: the parenthetical offered to make a rule concrete --- "any non-ASCII byte (a smart quote, an emoji)".
-It is chosen to illustrate something you already believe and have usually already verified, so it inherits that verification in the writing without ever being checked itself.
-
-An example is a factual assertion about a specific input.
-Believing the rule is not evidence for the instance, and the instance can be a **counterexample** to the rule it was picked to demonstrate.
-
-**A wrong example does more than fail to help.**
-It names the wrong failure mode, and the surrounding argument then reasons from the wrong one.
-A reader --- including you, on the next pass --- takes the example as the concrete case and the prose as its generalization, so a false example silently redirects every conclusion drawn nearby.
-
-Run it.
-For a claim about an encoding, a parser, a regex, or an API's behaviour, that is a few lines in a REPL, and it costs less than the review round that catches it.
-
-Three neighbours cover adjacent ground, and none of them reaches this.
-
-**[`examples-are-scanned`](../writing/examples-are-scanned.md)** is the other way a documented example goes wrong.
-There the example's claim is correct and the defect sits in a **token** the prose is discussing, which a mechanical checker scanning the file then matches --- that fragment says so directly, noting that re-reading the passage "confirms the *claim*, which is correct".
-Here the claim is what is wrong, and re-reading is exactly what fails to catch it, because a false example reads as fluently as a true one.
-The remedies differ accordingly: that one runs the checker, this one runs the example.
-
-**[`fact-check-prose`](../writing/fact-check-prose.md)'s** concrete-numbers section governs a figure the document **reports**, and its case-record block governs the parenthetical **evidence** attached to support a rule.
-Both are measurements that were taken and then generalized from.
-An illustration is the opposite: nothing was ever measured, because it was invented to teach.
-
-**[`hypothetical-examples`](../writing/hypothetical-examples.md)** treats an invented example as a missed opportunity to use real data, and says explicitly that such an example "can be internally consistent and still not be a finding" for an accuracy check.
-This rule is the case where it is **not** internally consistent with the claim above it.
-
-`memories/preferences.md`'s "Verify code examples actually demonstrate the claimed idiom" asks whether a snippet **uses** the construct the prose names.
-This asks the further question: whether the input behaves the way the example says it does.
-
-**[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)** states the closest thing to this thesis and is worth reading beside it --- "measure the illustrating instance separately whenever a verified mechanism is illustrated by one, since the mechanism's evidence says nothing about which files exhibit it".
-That is scoped to which **files** exhibit a verified mechanism.
-The same gap opens on the illustrating instance's own **behaviour**, and that is the half this rule adds.
-
-- **Do:** execute every illustrative example --- in a comment, a docstring, or prose --- against the real thing before shipping it.
-- **Do:** re-read the surrounding argument after checking an example, since a corrected example can invert the point it was supporting.
-- **Do:** pick the example showing the DOMINANT failure, and say which failure it shows when a mechanism has more than one.
-- **Don't:** let an example inherit the verification of the rule it illustrates --- the rule being true says nothing about the instance.
-- **Don't:** treat a parenthetical as too small to check; the smaller it is, the less likely anyone ever does.
-
-(Morrison-Lab/ai-config#2086, 2026-08-23, and this entry's own first draft.
-A pre-push draft of a comment explaining why `subprocess.run` needs an explicit `encoding` offered "a smart quote in a PR title, an emoji in a check-run name" as inputs that would raise.
-That phrasing never reached a commit --- `git log --all -S` finds it only in the commit adding this entry --- so the draft was corrected before pushing, and the shipped comment classifies both correctly.
-
-What the correction established, by decoding each byte rather than reasoning about the codec:
-
-```python
-for b in range(256):
-    try:
-        bytes([b]).decode("cp1252")
-    except UnicodeDecodeError:
-        print(hex(b))
-# -> 0x81, 0x8d, 0x8f, 0x90, 0x9d
-```
-
-Five bytes are undefined, so U+1F600 (`f0 9f 98 80`) mojibakes silently while U+1F44D (`f0 9f 91 8d`) raises on `0x8D`.
-The draft named the rare outcome as though it were the common one, inverting its own argument about why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.
-
-**The first draft of this entry then repeated the error one level up**, which is why the case is worth recording rather than only the fix.
-It claimed "a smart quote" was a counterexample, generalizing from U+201C.
-U+201C (`e2 80 9c`) is silent, and U+201D (`e2 80 9d`) **raises**, because `0x9D` is also one of the five --- so, smart quotes being paired, a realistic title like `Fix the "foo" bug` raises.
-An adversarial review caught it before push.
-Checking one member of a class and generalizing to the class is the same move as shipping an unchecked example, performed while documenting why not to.)
 
 ## A comment beside a value you changed is part of the edit
 

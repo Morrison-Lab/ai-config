@@ -206,24 +206,35 @@ Windows subprocess reader thread dies and leaves the stream `None`, and
 supplied a suggestion block: `(res.stderr or '').strip()`.
 
 The diagnosis is right.
-The remedy is wrong in that file, for a reason the diagnosis gives no hint of.
+The remedy is inadequate in that file, for a reason the diagnosis gives no hint
+of.
 `verify_pr_body_figures` wraps its `run_cmd` calls in a broad `except Exception`
 and converts the failure into `status="UNVERIFIED"` (`:409`), which `main`
-returns as `CLEAN_EXIT` (`:633`, `:658`).
-Substituting an empty string therefore stops the crash and lets an environment
-failure exit **0 CLEAN** --- turning a loud failure into a silent false pass,
-which is the failure mode the PR existed to close.
+returns as `CLEAN_EXIT` (`:633`, `:658`; `CLEAN_EXIT = 0` at `:37`).
+The suggestion changes only *which* exception is raised, and `except Exception`
+catches an `AttributeError` and a `RuntimeError` identically --- so it removes
+the crash and leaves an environment failure exiting **0 CLEAN**, which is the
+failure mode the PR existed to close.
 
-`die()` was the right remedy instead: `SystemExit` derives from `BaseException`,
-so it escapes that wrapper.
-Measured rather than assumed --- `issubclass(SystemExit, Exception)` is `False`.
+Measured rather than reasoned, by stubbing `subprocess.run` to return
+`CompletedProcess(returncode=1, stdout="", stderr=None)`: the shipped line and
+the suggested line both exit `0`, while `die()` exits `2`.
+`die()` was the right remedy because `SystemExit` derives from `BaseException`
+and escapes that wrapper --- `issubclass(SystemExit, Exception)` is `False`.
+
+Note what the first draft of this record got wrong, since it is the same class
+of error: it said the suggestion would turn a loud crash into a silent pass.
+There was no loud crash to lose.
+The `AttributeError` was already being caught by that same `except Exception`,
+so the silent pass predated the suggestion, and the suggestion simply fails to
+fix it.
 
 What made it visible was asking where the raised error *goes*, rather than
 whether the substitution is safe at the line it sits on.
-That is what separates this from the sibling cases around it, whose suggestions
-were each wrong at the line itself --- a nonexistent path, an anchor that still
-truncated, a citation establishing the opposite.
-Here the suggested line is locally correct and unsafe two frames up, so no
+That is what separates this from its two immediate neighbours, whose suggestions
+were each wrong at the line itself --- a nonexistent path, and an anchor that
+still truncated the body.
+Here the suggested line is locally correct and insufficient two frames up, so no
 amount of scrutiny of the diff hunk reaches it.
 See [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing
 which exception a function RAISES is a signature change that fails silently"

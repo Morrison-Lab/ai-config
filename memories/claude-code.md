@@ -721,7 +721,8 @@ That prompt scales with the output, and the fan-in phases are exactly the ones t
 Nothing was actually lost: the run's journal (`subagents/workflows/<run-id>/journal.jsonl`, the same artifact the entry above reads for degenerate synthesis output) records every completed `agent()` result as a `{"type":"result",...}` line, and the file was reconstructed from it afterwards in a few lines of Python.
 (Measured 2026-08-23, Windows 11 local Claude Code session.)
 
-- **Do:** persist large workflow intermediates by extracting from the run's `journal.jsonl` (during or after the run), or hand the persist agent a path to read from rather than the content itself; reserve embedded-JSON persist prompts for small blobs, well under ~100k tokens.
+- **Do:** persist large workflow intermediates by extracting from the run's `journal.jsonl` (during or after the run), or hand the persist agent a path to read from rather than the content itself;
+  reserve embedded-JSON persist prompts for small blobs, well under ~100k tokens.
 - **Don't:** embed an unbounded phase output verbatim in a persist agent's prompt --- the scout/fan-in phases are the ones that outgrow the request limit, and nothing warns before the oversized call fails.
 
 ## Edit two-step move — delete-only silently drops content
@@ -1146,7 +1147,8 @@ Writing a markdown file through `python3 - <<PY` (unquoted delimiter, chosen so 
 The corruption was caught only by grepping the emitted file.
 (Measured 2026-08-23, Windows 11 / Git Bash local Claude Code session.)
 
-Same backtick-hazard family as `CLAUDE.md`'s "PowerShell CLI Command Safety" section (double-quoted command arguments), and the sibling of its "Tool transport collapses doubled backslashes" entry (QUOTED heredocs); the unquoted-delimiter case was written down nowhere.
+Same backtick-hazard family as `CLAUDE.md`'s "PowerShell CLI Command Safety" section (double-quoted command arguments), and the sibling of its "Tool transport collapses doubled backslashes" entry (QUOTED heredocs);
+the unquoted-delimiter case was written down nowhere.
 
 - **Do:** use a quoted heredoc delimiter (`<<'PY'`) whenever the body carries backticks or dollar signs, pass dynamic values in via a separately-exported environment variable or a placeholder substitution, and grep the emitted file for the expected spans afterwards.
 - **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.

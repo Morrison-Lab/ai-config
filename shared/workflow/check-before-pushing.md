@@ -152,12 +152,23 @@ changelog fragment crediting this PR with a fix that had merged the day
 before --- the reviewer caught the misattribution in round 2 and round 3
 confirmed it fixed.)
 
+## Once pushed, add a new commit rather than amending
+
+Amending an already-pushed commit (`git commit --amend`) rewrites the commit object and mints a new SHA.
+The original commit is orphaned once force-pushed over, even when using safe `--force-with-lease --force-if-includes`.
+The audit trail breaks silently: automated reviewer bots, adversarial reviewer agents, and human reviewers cite specific commit SHAs in their review verdicts and comments.
+Detaching the commit SHA leaves those verdicts pointing to an unreachable history.
+Once a commit is pushed, add a new commit instead of amending.
+The extra commit is squashed cleanly at PR merge, so history tidiness is preserved without breaking the review audit trail.
+
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
+- **Do:** add a new commit rather than amending once a commit has been pushed to the remote.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
+- **Don't:** run `git commit --amend` on a commit that has already been pushed and reviewed, orphaning the SHA cited in review verdicts.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 - **Don't:** pair `--force` *with* the lease and expect protection.
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.

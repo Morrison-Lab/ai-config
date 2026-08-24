@@ -366,6 +366,233 @@ The section above concerns an instrument you ran whose scope you did not check.
 - **Don't:** let the future tense of the claim hide that the answer is already
   in the past.
 
+**An observed absence is only as strong as its sample, and a sample you
+MEASURED is the one least likely to get checked.**
+The bullet above says a record of nobody observing X outranks any argument that
+X should occur.
+That holds when the record covers the population, and the bullet says nothing
+about what to do when it covers a slice.
+
+The **Scope** claim-type at the top of this fragment already prescribes
+checking the population "rather than the sample that came to mind", which
+points at recall.
+This is the harder case, because the sample did not come to mind.
+It was measured.
+Four artifacts were queried, four came back empty, and a universal claim was
+written from them --- so every instinct the Scope rule trains had already
+fired, and the remedy it prescribes felt like it had already been applied.
+
+The bias is what survives the measurement, and it is invisible from inside the
+sample by construction.
+Ask what the sampled items have in common that the population does not, and
+whether that shared property is itself what produces the absence.
+Where it is, each further empty observation adds nothing.
+A filter that excludes the whole sample excludes the next member of it too, so
+the evidence feels like it is accumulating while its weight stays exactly
+where it started.
+
+The cheap discriminator is a **second axis** that the population varies along
+and the sample does not.
+Cost and duration are the two measured below, and they worked because a run
+that exits early spends almost nothing, so the trace it leaves differs in kind
+from a broken path rather than in degree.
+Where every sampled item sits at one end of such an axis, the sample is a
+slice, and the claim that can be supported is about the slice.
+
+**A bounded query prints no denominator, which is the gap in the rule that
+would otherwise cover this.**
+[`deterministic-tools`](../principles/deterministic-tools.md)'s "Read the scope
+an instrument prints" is the standing remedy.
+It contemplates the unprinted case --- "a printed denominator nobody checked is
+worth no more than one that was never printed" --- and prescribes nothing for
+it, which is the gap here rather than an oversight there.
+`gh run list --limit 5` prints no denominator at all.
+It returns exactly as many rows as you asked for, so a truncated answer and a
+complete one are the same shape on screen, and the bound was your own choice
+rather than something the output announced.
+
+So the tell is the flag rather than the output: `--limit N`, `head -N`, `-n N`,
+a first page.
+The deriving query raises the bound and groups, which manufactures the
+denominator the tool declines to print --- `gh run list --limit 200` with
+`group_by(.conclusion)` reports how many were examined beside how many matched,
+which is what [`fail-fast`](../principles/fail-fast.md) asks of any check.
+
+Raise it until the total **stops changing**, rather than to a number that
+sounds generous.
+A run that comes back with exactly 200 rows has told you only that the
+population is at least 200, which is the same non-answer `--limit 5` gave,
+one order of magnitude along.
+State the window whenever you cannot raise it far enough to settle it.
+"None of the five most recent" is a claim you measured, and "never" is not.
+
+**The sharpest instance is the one where every sampled item was verified and
+correct.**
+The two above were samples that were too small and unchecked.
+In the third, a reviewer tested three items at real cost, found all three
+behaved exactly as the text claimed, and endorsed a universal that was false.
+The reason is the sample frame: the three items it tested were the three the
+claim itself had listed, so the author of the claim had chosen the evidence
+that would check it.
+
+That is why the test cannot be "verify your examples".
+Verifying them is what happened.
+A quantifier needs evidence of its own, and the examples in the text are the
+one sample that can never supply it.
+Where a claim says "whatever it starts with", the check is to enumerate the
+cases the text did not name.
+
+- **Do:** name what the sampled items share, before generalizing from their
+  shared emptiness.
+- **Do:** raise the bound until the answer stops changing, or carry the window
+  into the sentence.
+- **Do:** sample along a second axis --- one large item beside four small ones
+  --- rather than adding a fifth of the same kind.
+- **Do:** scope the claim to what was measured, keeping "these four produced
+  none" distinct from "none has ever".
+- **Do:** enumerate the cases a quantified claim did NOT list, since the ones
+  it listed were chosen by whoever wrote the claim.
+- **Don't:** read a query returning exactly `--limit N` rows as a complete
+  answer --- that is precisely what a truncated one looks like.
+- **Don't:** read repeated absence as accumulating evidence when a single
+  filter would explain every observation at once.
+- **Don't:** treat a sample you measured as exempt from the Scope check,
+  because measuring it is what makes that check feel already performed.
+- **Don't:** read a reviewer's endorsement of a universal as evidence for it
+  when the reviewer checked the claim's own examples.
+
+(Three instances, all 2026-08-24, all in one session, on three different
+agents.
+The falsifications and figures are measured.
+The second-axis remedy and the sample-frame reading are inferred from them.
+
+**One.**
+On `UCD-SERG/ucd-serg.github.io`, PRs 94, 95, 97 and 106 carried no
+`claude-review` comment, and that repo's issue #105 was told "no successful
+claude-review run in this repo has ever posted one".
+A run on PR #111 posted a real review hours later.
+
+The cheap-run signature is what the sample missed.
+Across five `pull_request` runs on the `chore/gha-claude-agent` branch, all
+`success` with `is_error: false`, one posted and four were silent.
+The posting run took 250.4s, 9 turns, $1.0797 and 7 denials.
+Cost figures were recorded for three of the four silent runs --- 27.9s at
+$0.1733, 14.5s at $0.0520, and 11.5s at $0.0810, one denial each --- and not
+for the fourth, which is also the one left unattributed below.
+Duration and cost agree, and either would have served: a run under roughly 30
+seconds or 20 cents examined nothing.
+That is the transferable part, and it is a claim about five runs on one branch
+rather than about the repo.
+
+**Why each silent run was silent is a separate question, and the first answer
+reached for was wrong.**
+"Every sampled PR was small, and small is the class the eligibility gate
+filters" is an inferred mechanism, and reaching for the branch's final size to
+refute it is the same substitution one level down.
+PR #111 ends at +172/-33, and no run read that.
+Each run read the head it was triggered on, and those differ: the 16:19:10 run
+saw an **empty** commit at +0/-0, the 16:37:08 and 16:38:16 runs saw
++109/-33, and only the 16:56:56 run saw +172/-33.
+So the size hypothesis is not refuted wholesale --- it is entirely consistent
+with the first run, and inconsistent with the last, which was silent on the
+largest head of the four.
+That is what a per-run reading buys and a merged-diff reading hides, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution of a
+neighbour for the target, inside a section arguing against exactly that.
+
+The timeline attributes the runs directly, which settles it without the size
+argument at all.
+`gh api repos/UCD-SERG/ucd-serg.github.io/issues/111/timeline` shows #111
+created as a **draft** at 16:19:07Z and marked ready for review at 16:38:13Z,
+so the runs at 16:19:10 and 16:37:08 met a draft, and the run at 16:56:56 met a
+PR already carrying the 16:50:49 review.
+Those are two different early exits, neither of them about size.
+The run at 16:38:16, three seconds after ready, stays **unattributed** ---
+recorded as such rather than assigned to whichever branch would round out the
+story.
+A competing exit also goes unexamined by the size explanation: the plugin's
+step 6 drops findings scoring under 80 and says not to proceed when none
+qualify, which produces silence from a run that did examine the diff.
+
+So the correct statement is narrower than the one first written.
+The cheap-run signature separates a full pipeline from an early exit, which
+step-1 branch fires varies per run, several are verifiable from the PR's state
+at run time, and one is not attributable at all.
+The class claim survives untouched, since the original sample was still four
+small PRs read as a universal.
+
+**Two**, on the same repo, and recorded secondhand from the agent that made it
+rather than re-derived here.
+`gh run list --limit 5` over that repo's lint workflow showed no successful
+run, and "never executed once" went into a PR body, a commit message, and a
+self-review.
+The real population was 25 runs, one of them a success.
+
+**Three.**
+On ai-config PR #2142, a diff claimed a CI gate flags a two-sentence line
+"whatever the second one starts with".
+The repo's own review run tested the three opener forms the diff had listed ---
+lowercase, uppercase, backtick --- found all three behaved as written, and
+concluded every checkable assertion matched.
+An adversarial reviewer tested outside that list and found the gate's
+`classify_line` --- in `check-new-line-breaks/check-new-line-breaks.py` in a
+[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, not in this
+repo --- returns `None` for a parenthesis or a digit opener, so an unbroken
+two-sentence line passes there.
+Reproduced independently against that script.
+That gate behaviour is recorded on ai-config#2142, which is where it was
+found; the sampling lesson drawn from it is what ai-config#2149 tracks.)
+
+## A risk claim that appears after the decision is rationalization
+
+The **cause** claim-type at the top of this fragment asks what else explains an
+observation.
+This is the case with no observation in it at all.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "Check that a stated
+trigger actually fired" owns the general locus --- a justification is a factual
+claim and gets fact-checked like one --- and the increment here is that
+**ordering** is the discriminator, which no prior site makes.
+
+A decision gets made on good evidence.
+The justification then acquires a failure mode nobody measured --- a mechanism
+that would supposedly bite if the decision went the other way --- and that
+mechanism quietly escalates the claim, from "this is unnecessary" to "this
+would break every run".
+Both sentences sit in the same paragraph, written in the same pass, and the
+finished prose gives no sign which of them came first.
+
+The tell is positional, which is what makes it checkable: **a risk claim that
+appears AFTER the decision it supports.**
+Evidence gathered before a decision is reasoning.
+A mechanism produced after one is rationalization, and the two read identically
+once the paragraph is finished.
+
+Ask of any such claim whether you would have predicted it before choosing, and
+whether anything was actually run to confirm it.
+Where the answer to both is no, either measure it or delete it.
+The decision almost always still stands on the evidence that genuinely produced
+it, so the invented mechanism is load-bearing for nothing while being false by
+default.
+
+- **Do:** extend the measured-versus-recalled marking above to a third
+  category, the **predicted**, since a justification's risk claims are
+  usually neither measured nor recalled.
+- **Do:** delete an unverified failure mode rather than softening its wording,
+  when the decision survives without it.
+- **Don't:** add a mechanism to a justification after the decision is settled
+  without running something that could falsify it.
+- **Don't:** let a stronger verb ride on an unmeasured claim --- "would break"
+  standing in for "is unnecessary" is the escalation to watch for.
+
+(Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
+`setup-r: false` was chosen on sound evidence, and an unverified `LazyData`
+failure mode was then written into the justification, escalating the claim to
+"would break every run".
+A later round measured that mechanism false.
+The incident was reported by the agent that made it, and the positional tell is
+that agent's own.
+Tracked as ai-config#2149.)
+
 ## Ask whether a candidate can produce the effect at all, before measuring how much it does
 
 The section above says to stop reasoning and go look for the artifact.

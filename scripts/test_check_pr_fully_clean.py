@@ -587,6 +587,24 @@ def main() -> int:
         "classify_verdict: a line-initial verdict IS clean",
         checker.classify_verdict("Ready for merge.") == "clean",
     )
+    check(
+        "classify_verdict: Anthropic code-review plugin clean comment is clean",
+        checker.classify_verdict(
+            "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: Anthropic code-review plugin clean comment with AGENTS.md is clean",
+        checker.classify_verdict(
+            "## Code review\n\nNo issues found. Checked for bugs and AGENTS.md compliance."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: code-review clean comment with trailing qualifier is NOT clean",
+        checker.classify_verdict(
+            "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance once tests pass."
+        ) == "",
+    )
     # Where the vocabulary guards are still load-bearing after the position
     # guard: this corpus writes semantic line breaks, so a negation or hedge
     # routinely sits at the END of the PREVIOUS line, leaving the phrase itself

@@ -684,6 +684,61 @@ only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
 question in one command, and the same off-by-one had already shipped into the
 workflow comment that makes the same claim.)
 
+## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
+
+The bullet above says to fetch a checker at the SHA the calling workflow
+**pins**, and names this repo's own
+`Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76` as the
+worked example.
+That instruction is right about the danger it names --- a default-branch clone
+is the wrong script --- and it is not sufficient, because a **reusable
+workflow** is not a script.
+It is a caller, and a pin freezes the caller's own text while saying nothing
+about the refs that text resolves at run time.
+
+The pinned workflow above delegated in turn to
+`d-morrison/gha/check-new-line-breaks@v2`: a **floating tag**, in what was then
+a different org, so neither the SHA nor the ownership boundary held.
+Measured 2026-08-24, the two artifacts were 340 lines with four knobs and 637
+lines with a clause-break rule on by default, and on one branch they gave
+opposite verdicts --- exit 0 with no findings against exit 1 with 8.
+
+What makes this worse than an ordinary stale read is that every check you would
+run to catch a stale read passes.
+The pinned artifact exists, it fetches at the named SHA, it is legible, and it
+runs clean.
+Nothing about it announces that it is not the thing CI executed, so reading it
+to predict CI gives a confident wrong answer rather than an obviously missing
+one.
+This is
+[`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
+"one half of a mechanism for the whole" arriving through a pin, which is the
+construct that exists to prevent exactly this.
+
+**Follow the delegation chain to its end, and count the hops.**
+A pin is worth what the *last* hop is worth, so one unpinned `uses:` anywhere
+below it voids every pin above:
+
+```bash
+gh api "repos/<owner>/<repo>/contents/<path>/action.yml?ref=<sha>" \
+  -H 'Accept: application/vnd.github.raw' | grep -n 'uses:'
+```
+
+Every ref that command prints must itself be a SHA.
+A composite **action** whose steps nest no `uses:` at all is the terminal case,
+and calling one directly is what makes a pin reach the script --- which is the
+fix this repo took ([ai-config#2165](https://github.com/Morrison-Lab/ai-config/issues/2165)),
+recorded in `.github/workflows/validate.yml`'s own `new-line-breaks` comment.
+
+- **Do:** grep the pinned artifact for nested `uses:` before treating the pin
+  as reaching the code, and require a SHA on every hop.
+- **Do:** prefer pinning the composite action over the reusable workflow that
+  wraps it, since removing the hop is what removes the question.
+- **Don't:** read "I fetched it at the pinned SHA" as having read what runs ---
+  that is true of the caller and says nothing about the callee.
+- **Don't:** treat a cross-org boundary as adding safety here.
+  It adds a second party who can move the tag.
+
 ## A job's step list identifies which version of a reusable workflow ran
 
 The `referenced_workflows[].sha` field ([`gha-reusable-workflows.md`](gha-reusable-workflows.md))

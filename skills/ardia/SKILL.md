@@ -29,28 +29,25 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Include drafts** (`isDraft: true`) unless another agent is actively
-     driving one.
+   - **Include drafts** (`isDraft: true`) unless another agent is actively driving one.
      A draft is the corpus's own in-flight claim signal ---
-     [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an
-     empty `start:` scaffold commit before any code exists --- so read each
-     draft's state rather than sorting by the flag:
+     [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an empty `start:` scaffold commit before any code exists ---
+     so read each draft's state rather than sorting by the flag:
      - **Skip a driven draft.**
-       Any of these marks one: the head commit is
-       still the `start:` scaffold (the implementer is mid-flight), a
-       still-live claim comment stands (claims expire after 2
-       hours with no push or comment ---
-       [`claim-pr`](../../shared/workflow/claim-pr.md)), another actor
-       pushed recently, or the draft is deliberately held as a merge-order
-       gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
+       Any of these marks one:
+       the head commit is still the `start:` scaffold (the implementer is mid-flight),
+       a still-live claim comment stands (claims expire after 2 hours with no push or comment --- [`claim-pr`](../../shared/workflow/claim-pr.md)),
+       another actor pushed recently,
+       or the draft is deliberately held as a merge-order gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
      - **Include a parked draft.**
-       Real implementation on the branch, no
-       live claim, and no recent activity by another actor.
-       The review bot skips drafts in most repos, so once its content
-       passes the repo's checks, mark it ready for review --- a clean
-       verdict is unreachable while it stays draft.
-     Name each draft's disposition, and the signal that decided it, in the
-     scope report, so the user can veto before the loop touches it.
+       Real implementation on the branch,
+       no live claim,
+       and no recent activity by another actor.
+       The review bot skips drafts in most repos,
+       so once its content passes the repo's checks,
+       mark it ready for review --- a clean verdict is unreachable while it stays draft.
+     Name each draft's disposition, and the signal that decided it, in the scope report,
+     so the user can veto before the loop touches it.
    - **Only iterate PRs the user owns / is responsible for** by default. In a
      shared repo, don't start review loops (which push commits) on other
      people's PRs unless told to. If unsure who owns what, ask first.

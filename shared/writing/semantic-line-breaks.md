@@ -394,6 +394,37 @@ stripped text and is inclusive at 80.
 Measuring the raw line rather than the stripped one is one way a hand-rolled
 matcher disagrees with the gate.)
 
+**An ellipsis is a sentence boundary to the gate, so a quotation or an elision
+splits the line it sits on.**
+The lowercase-follower case above is a boundary the reformatter misses and the
+gate finds.
+This one is a boundary **neither** tool is named for, and it arrives in the
+prose this corpus writes constantly: a quoted fragment trailing off, or a
+`[...]` elision inside a citation.
+
+`_SENT_BREAK_RE` matches `[.!?]` followed by any run of closing punctuation
+`` [`"')\]*_] `` and then whitespace and an uppercase letter or markup.
+A `.` is the first character of `...`, and `]` and `"` are both in that closing
+class, so `[...] Text` and `... " And` each match --- the line is then read as
+packing two sentences and flagged, however short it is.
+A lowercase follower does not match, which is why the same construct passes
+mid-clause and fails only when the next word is capitalized.
+
+Verified 2026-08-24 by running the gate's own `_SENT_BREAK_RE` from
+`check-new-line-breaks.py` at the pinned SHA over four inputs:
+`... " And`, `[...] Everything`, and an ordinary `one. Two` each split into two
+segments, while `... continues` stayed one.
+
+- **Do:** break after a `[...]` elision or a trailing-off quotation whenever
+  the next word is capitalized, exactly as after a full stop.
+- **Do:** treat a flagged line whose only `.` is inside an ellipsis as a real
+  finding rather than a false positive.
+- **Don't:** assume an ellipsis is inert because it is not a sentence end in
+  ordinary reading --- the gate matches characters, not intent.
+- **Don't:** expect the reformatter to propose this split.
+  It shares the same regex branch, so it agrees the boundary exists and will
+  not surface it on a line it never had reason to touch.
+
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**
 `NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a
 SHORT line carrying two sentences is flagged all the same.
@@ -422,7 +453,12 @@ setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
 against a passing job's own log, which prints every `NLB_*` value it used).
 The practical consequence is worth stating in the safe direction: the clause
 check that catches a long line with a mid-line semicolon **is** on by default
-locally, so a local run cannot silently under-report that case.
+locally, so a local run **of `check-new-line-breaks.py`** cannot silently
+under-report that case.
+Naming the script matters only when this sentence is read out of its
+subsection, where "a local run" could otherwise be taken for
+`scripts/semantic-line-breaks.py` --- which has no semicolon rule, per "This
+repo's own reformatter is not that check" above.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

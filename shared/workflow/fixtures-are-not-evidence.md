@@ -627,3 +627,57 @@ The reviewer on [#1919](https://github.com/Morrison-Lab/ai-config/pull/1919)
 raised the possibility and explicitly could not settle it from the fixtures,
 which is the shape of the problem in one sentence.)
 
+
+## An alternative no fixture can isolate may be DEAD, not merely untested
+
+Every section above treats a masking fixture as a defect in the **test**: the
+setup supplies a second route to the observable, so the remedy is to assert
+the reason, isolate the fixture, or rewrite the row and re-run the control.
+Each of those presumes the property under test is real and the row is what
+failed to pin it.
+
+There is an outcome the presumption hides.
+When you sit down to isolate an alternative and find that you *cannot* ---
+that every input which reaches it necessarily carries the masking substring
+too --- the finding is about the production code, not the fixture.
+An alternative that no admissible input can reach alone is dead, and a test
+proving it fires would have to be built from an input the system never sees.
+
+The reason this is worth separating is that both states present identically at
+the point you notice them.
+A row that fails to discriminate and a branch that cannot be discriminated
+both look like "this fixture needs more work", and the natural next move ---
+try a sharper fixture --- is the correct response to one and an unbounded
+search in the other.
+So the question to ask on the second or third failed attempt is not "what
+fixture would isolate this" but "does an input exist that reaches this
+alternative and nothing else".
+
+The generative case is an alternation over substrings of a structured value,
+where the domain guarantees co-occurrence.
+A URL path matched against `/comments` and `/replies` cannot distinguish them
+when every reply URL the API issues contains `/comments` as a prefix segment,
+so the `/replies` arm is unreachable by construction rather than by omission.
+Note the direction of the check: the co-occurrence is a fact about the
+**upstream format**, so it is settled by reading that format's documentation or
+a real response, never by trying more fixtures.
+
+The same reading applies to a fixture whose value satisfies two arms at once
+for an unrelated reason --- a `/discussions` path that also contains
+`/comments`.
+That one is the ordinary masking case and a sharper fixture does fix it, which
+is why the two have to be told apart rather than treated as one symptom.
+
+- **Do:** ask whether an isolating input can exist, once a second attempt at
+  isolating an alternative has failed.
+- **Do:** settle co-occurrence from the upstream format's own documentation or
+  a real response, rather than from further fixture attempts.
+- **Do:** report an unreachable alternative as a finding about the
+  implementation --- dead code to remove, or a predicate to restate ---
+  instead of as a coverage gap to fill.
+- **Don't:** read "no test pins this" as "this needs a test";
+  it is equally consistent with "this can never fire", and the two call for
+  opposite changes.
+- **Don't:** keep generating fixtures for an arm whose domain rules out an
+  isolating input --- the search does not terminate, and its failure is the
+  answer rather than an obstacle.

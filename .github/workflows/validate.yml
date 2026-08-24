@@ -258,17 +258,61 @@ jobs:
     # drifted from the last semantic-line-breaks reformat. This only flags
     # lines a PR itself adds, so it can't reflag that drift.
     #
-    # No event_name guard: the reusable workflow's own base-ref input
-    # (github.event.pull_request.base.sha on PRs, '' otherwise) already
-    # makes a non-PR run (e.g. push to main) skip cleanly rather than
-    # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
-    uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
-    with:
-      # This value is a git pathspec, not a shell glob: `*.md` already matches
-      # at any depth (CLAUDE.md and shared/**/foo.md alike), while `**/*.md`
-      # requires a directory component and so silently excludes CLAUDE.md and
-      # every other root-level .md -- the action's own default is `*.md`
-      # (ai-config#962).
-      globs: '*.md'
-      paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'
-      fail: true
+    # Calls the composite ACTION directly rather than the reusable workflow
+    # that wraps it (ai-config#2165). A SHA pin on a reusable workflow freezes
+    # the caller and nothing about what the caller runs: the pinned
+    # `Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76`
+    # delegated in turn to `d-morrison/gha/check-new-line-breaks@v2` -- a
+    # floating tag, in what was then a different org -- so the pinned copy was
+    # 340 lines with four knobs while the ref that actually executed was 637
+    # lines with a clause-break rule on by default. Measured 2026-08-24 on one
+    # branch: the pinned copy exited 0 with no findings, the executed ref
+    # exited 1 with 8. Reading the pinned artifact to predict CI gave the wrong
+    # answer confidently, since that artifact exists, fetches at the named SHA,
+    # and runs clean.
+    #
+    # Removing the indirection is what makes the pin reach the script. This
+    # `uses:` names a composite action whose own steps are frozen at the same
+    # SHA, so there is no second hop left to float. Verify that property before
+    # trusting any pin of this shape: `gh api repos/<owner>/<repo>/contents/\
+    # <path>/action.yml?ref=<sha> -H 'Accept: application/vnd.github.raw' |
+    # grep -n 'uses:'` must show only SHA-pinned refs. (Checked the same day
+    # for the `lint-qmd` action above, which nests no `uses:` at all.)
+    #
+    # The trade-off this buys back is that the checkout and the base-ref
+    # expression now live here rather than in the callee, so they have to stay
+    # correct locally. Both are reproduced from the pinned reusable workflow.
+    #
+    # Note for anyone reproducing this check locally: fetch the SHA below, not
+    # a tag and not the wrapper workflow.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Full history so PR runs can diff added lines against the base. The
+          # action skips with a warning rather than scanning the whole tree
+          # when the base commit is absent, so a shallow clone here would turn
+          # the gate vacuous without turning anything red.
+          fetch-depth: 0
+      - name: Check new markdown lines for missing semantic breaks
+        uses: Morrison-Lab/gha/check-new-line-breaks@fdaeccc47273fb8c542d05b00d488242b8563b15 # v2, gha#300
+        with:
+          # This value is a git pathspec, not a shell glob: `*.md` already
+          # matches at any depth (CLAUDE.md and shared/**/foo.md alike), while
+          # `**/*.md` requires a directory component and so silently excludes
+          # CLAUDE.md and every other root-level .md -- the action's own
+          # default is `*.md` (ai-config#962).
+          globs: '*.md'
+          paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'
+          # Quoted: a composite action's inputs are strings, unlike the
+          # reusable workflow's typed `boolean`.
+          fail: 'true'
+          # On PRs, check only lines added relative to the base; otherwise
+          # (push to main) there is no base to diff against, so the check
+          # skips cleanly instead of scanning the whole tree. This reproduces
+          # the expression the reusable workflow supplied, which is why no
+          # `if: github.event_name == 'pull_request'` guard is needed.
+          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}

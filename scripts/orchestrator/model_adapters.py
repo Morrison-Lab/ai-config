@@ -778,7 +778,35 @@ class ModelRouter:
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
-            # Default: use local/free reviewer if available, else Claude/OpenRouter
+            if "cursor" in author:
+                # Must not use Cursor for review
+                if self.adapters[ModelProvider.OLLAMA].is_available():
+                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+                if self.adapters[ModelProvider.OPENCODE].is_available():
+                    return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+                if self.adapters[ModelProvider.CLAUDE].is_available():
+                    return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+                if self.adapters[ModelProvider.OPENROUTER].is_available():
+                    return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+                if self.adapters[ModelProvider.AGY].is_available():
+                    return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+                return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
+
+            if "codex" in author:
+                # Must not use Codex for review
+                if self.adapters[ModelProvider.OLLAMA].is_available():
+                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+                if self.adapters[ModelProvider.OPENCODE].is_available():
+                    return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+                if self.adapters[ModelProvider.CLAUDE].is_available():
+                    return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+                if self.adapters[ModelProvider.OPENROUTER].is_available():
+                    return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+                if self.adapters[ModelProvider.AGY].is_available():
+                    return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+                return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
+
+            # Default: use local/free reviewer if available, else Claude/OpenRouter, with terminal MOCK fallback
             if self.adapters[ModelProvider.OLLAMA].is_available():
                 return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
             if self.adapters[ModelProvider.OPENCODE].is_available():
@@ -787,6 +815,9 @@ class ModelRouter:
                 return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+            if self.adapters[ModelProvider.AGY].is_available():
+                return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+            return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
         # 3. Local Fast (bounded checks, formatting, link checks) -> Local Ollama / Free
         if tier == TaskTier.LOCAL_FAST:

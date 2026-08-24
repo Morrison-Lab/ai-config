@@ -350,6 +350,20 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         )
         self.assertNotEqual(adapter2.provider, ModelProvider.OPENCODE)
 
+        # When author is Cursor, reviewer must not be Cursor
+        adapter3, model3 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="cursor-agent",
+        )
+        self.assertNotEqual(adapter3.provider, ModelProvider.CURSOR)
+
+        # When author is Codex, reviewer must not be Codex
+        adapter4, model4 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="codex-cli",
+        )
+        self.assertNotEqual(adapter4.provider, ModelProvider.CODEX)
+
     def test_backlog_sweeper_ingest_issue_creates_dag(self):
         fake_issue = {
             "number": 9999,

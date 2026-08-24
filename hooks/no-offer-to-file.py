@@ -59,6 +59,24 @@ def last_assistant_text(path):
     return last
 
 
+try:
+    _lib = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+    )
+    if _lib not in sys.path:
+        sys.path.insert(0, _lib)
+    from fences import strip_code
+except Exception:
+    _FENCE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
+    _CODE_SPAN_RE = re.compile(
+        r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
+    )
+
+    def strip_code(text: str) -> str:
+        """Strip fenced code blocks and inline backtick code spans."""
+        return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -69,7 +87,8 @@ def main() -> int:
     if not text:
         return 0
 
-    hit = RX.search(text)
+    prose = strip_code(text)
+    hit = RX.search(prose)
     if not hit:
         return 0
 

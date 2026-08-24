@@ -523,6 +523,44 @@ class TestWorktreeIsolation(unittest.TestCase):
             res = subprocess.run(["git", "branch", "--list", "task/isolated-code-test"], capture_output=True, text=True, check=False)
             self.assertNotIn("task/isolated-code-test", res.stdout)
 
+    def test_coder_subagent_worktree_commit_failure_fails_fast(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        from unittest.mock import patch
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = Task(
+                title="Failing commit task",
+                role="coder",
+                payload={
+                    "instruction": "Add faulty code",
+                    "target_file": "faulty.py",
+                    "code_content": "def bad(): pass\n",
+                    "use_worktree": True,
+                    "branch_name": "task/failing-commit-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+
+            orig_run = subprocess.run
+            def mock_subprocess_run(cmd, *args, **kwargs):
+                if isinstance(cmd, list) and len(cmd) > 1 and cmd[0] == "git" and cmd[1] == "commit":
+                    return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="fatal: mock commit failure")
+                return orig_run(cmd, *args, **kwargs)
+
+            with patch("subprocess.run", side_effect=mock_subprocess_run):
+                result = coder.execute(task, ctx)
+                self.assertFalse(result.success)
+                self.assertIn("Git commit failed in worktree", result.error)
+
 
 def main():
     unittest.main(verbosity=2)

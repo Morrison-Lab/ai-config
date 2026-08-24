@@ -104,7 +104,15 @@ class CoderSubagent(BaseSubagent):
                             text=True,
                             check=False,
                         )
-                        result_data["committed"] = commit_proc.returncode == 0
+                        if commit_proc.returncode != 0:
+                            err_msg = commit_proc.stderr.strip() or f"git commit exited with code {commit_proc.returncode}"
+                            return SubagentResult(
+                                success=False,
+                                data=result_data,
+                                error=f"Git commit failed in worktree: {err_msg}",
+                                execution_time_seconds=time.time() - start_time,
+                            )
+                        result_data["committed"] = True
                     result_data["worktree_used"] = str(wt_path)
             except Exception as exc:
                 return SubagentResult(

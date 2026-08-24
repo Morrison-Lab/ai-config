@@ -754,7 +754,19 @@ class ModelRouter:
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
-            if "ollama" in author or "qwen" in author or "deepseek" in author:
+            if "deepseek" in author:
+                # Must not use DeepSeek family for review (neither Ollama deepseek nor Opencode deepseek)
+                if self.adapters[ModelProvider.CLAUDE].is_available():
+                    return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+                if self.adapters[ModelProvider.AGY].is_available():
+                    return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+                if self.adapters[ModelProvider.OPENROUTER].is_available():
+                    return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+                if self.adapters[ModelProvider.OLLAMA].is_available():
+                    return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
+                return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
+
+            if "ollama" in author or "qwen" in author:
                 # Must not use Ollama/Qwen for review
                 if self.adapters[ModelProvider.OPENCODE].is_available():
                     return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"

@@ -96,5 +96,16 @@ with tempfile.TemporaryDirectory() as d:
         subject.open_prs = real_open_prs
         subject.STATE_PATH = orig_path
 
+# alive() must be truthful on every platform: signal-0 does not track
+# liveness on Windows (#2082), so the probe is OpenProcess there.
+# Non-positive and garbage pids are refused before any probe -- signal 0
+# to -1 would address a whole process group on POSIX.
+for bad in (None, "abc", 0, -1, -999):
+    assert subject.alive(bad) is False, f"alive({bad!r}) should be False"
+assert subject.alive(os.getpid()) is True
+assert subject.alive(2 ** 30) is False
+if os.name == "nt":
+    assert subject._alive_windows(os.getpid()) is True
+
 print("PASS: gh is resolved or refused at startup; failures accumulate an "
       "error streak that success resets")

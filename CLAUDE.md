@@ -1124,11 +1124,12 @@ The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fra
 [shared/workflow/upgrade-to-gha.md](shared/workflow/upgrade-to-gha.md)
 
 The CI-specific, proactive case of DRW above.
-`Morrison-Lab/gha` ships the lab's reusable workflows, called from a consumer as `uses: Morrison-Lab/gha/.github/workflows/<name>.yml@v2`.
-When a repo you are working in hand-maintains a workflow gha already provides, migrate it in that session --- the upgrade is the deliverable, not the observation.
-The corpus's other gha triggers all wait for an event (a bug to patch, a port to close out, new CI to write), so none of them fires on the commonest case: nothing is broken, and the duplicate has simply sat there absorbing none of gha's fixes.
-Candidates are duplication, drift, missing fixes, or a directory that already calls gha for some workflows and not others; not candidates are repo-specific logic gha does not model and a repo deliberately pinned off gha.
-Pin per capability from gha's README Versioning section rather than copying a neighbouring caller's tag, file the migration as its own issue and PR rather than folding it into whatever brought you to the repo, and read the two migration hazards (`permissions:` and `concurrency:`) before writing the stub.
+`Morrison-Lab/gha` ships the lab's reusable workflows, called from a consumer as `uses: Morrison-Lab/gha/.github/workflows/<name>.yml@vN`.
+When a repo you are working in hand-maintains a workflow gha already provides, migrate it --- the upgrade is the deliverable, not the observation.
+The corpus's other gha triggers each wait for an event (a bug to patch, a port to close out, new CI to write), so none fires on the commonest case: nothing is broken, and the duplicate has simply sat there absorbing none of gha's fixes.
+Candidates are duplication, drift, a named missing fix, or a directory that already calls gha for some workflows and not others.
+Not candidates are repo-specific logic gha does not model, a repo deliberately pinned off gha, and a repo we cannot merge a PR to.
+The fragment carries the rest: taking the inventory from gha's README table rather than its directory listing, pinning per capability, filing the migration as its own issue and PR, the private-consumer access precondition, the `permissions:` and `concurrency:` traps, and how to confirm the self-edit guard when a migration PR gets no review.
 
 ## Don't incur technical debt
 

@@ -12,6 +12,7 @@ index in that directory.
 
 | File | Title | Covers |
 |------|-------|--------|
+| [`python.md`](python.md) | Python and CPython runtime behavior | CPython constant folding hiding literals from top-level co_consts probes (and the nested-search guard), and os.kill(pid, 0) as a measured liveness probe on Windows CPython 3.13, with the zombie/open-handle caveats for wait loops. |
 | [`preferences.md`](preferences.md) | User preferences (cross-workspace) | Standing working rules: never-assume/always-verify, record learnings as you go, cite sources for tool-behavior claims, issue-first, and the ARDI / fully-clean definitions. |
 | [`github.md`](github.md) | GitHub & GitLab CLIs and APIs | The `gh` CLI, `glab` and the GitLab Discussions API, GitHub access from bash in remote sessions, and PR / issue queue management (the GII startup sweep, stacked-PR pitfalls). |
 | [`github-mcp-tools.md`](github-mcp-tools.md) | GitHub MCP tools (Claude Code remote/web sessions) | The GitHub MCP tool surface used when `gh` is unavailable: tool selection, scope and owner-string quirks, review/comment/thread mechanics, and per-tool failure modes. Split out of `github.md` (ai-config#694 pattern) pre-emptively at 1199 lines, just under the 1200-line gate. |

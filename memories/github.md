@@ -1161,3 +1161,26 @@ Download and parse the run's `claude-review-execution-*` artifact
 (exact naming, `jq` pattern, and a worked case are there) rather than
 reading the job log's own summary line, which never shows which tool
 call was actually denied.
+
+## `gh pr edit` can fail on Projects-classic deprecation; PATCH the pulls REST endpoint instead
+
+`gh pr edit <N> --body-file <f>` can fail outright with
+`GraphQL: Projects (classic) is being deprecated ... (repository.pullRequest.projectCards)`
+--- the command's GraphQL query requests `projectCards` whether or not the
+edit involves projects, so the deprecation kills an ordinary body update.
+The REST route performs the same edit without touching that surface:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<N> -X PATCH -F body=@<file>
+```
+
+`-F body=@<file>` keeps the body-file discipline (backtick-safe, no shell
+interpolation), same as `--body-file` on the porcelain command.
+
+- **Do:** fall back to the REST PATCH when `gh pr edit` errors on
+  `projectCards`, rather than retrying or hand-editing on the web.
+- **Don't:** read the error as a permissions or repo problem --- the failing
+  field is one the edit never needed.
+
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows
+session; the REST PATCH succeeded immediately on the same body file.)

@@ -452,6 +452,26 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertEqual(unblocked, 0)
         self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.CANCELLED)
 
+    def test_worktree_manager_lifecycle(self):
+        from orchestrator.worktree_manager import WorktreeManager
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=tmppath)
+
+            task_id = "test-wt-123"
+            with wt_mgr.isolated_worktree(task_id, cleanup=True) as wt_path:
+                self.assertTrue(wt_path.exists())
+                # Verify can create and write files inside isolated worktree
+                test_file = wt_path / "test_isolated.txt"
+                test_file.write_text("isolated content", encoding="utf-8")
+                self.assertTrue(test_file.exists())
+
+            # Verify worktree was automatically cleaned up after exit
+            self.assertFalse(wt_path.exists())
+
 
 def main():
     unittest.main(verbosity=2)

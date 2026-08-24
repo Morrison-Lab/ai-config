@@ -8,6 +8,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from .models import SubagentContext, SubagentResult, Task, TaskPriority, TaskStatus
+from .worktree_manager import WorktreeManager
 
 
 class BaseSubagent(ABC):
@@ -60,11 +61,16 @@ class CoderSubagent(BaseSubagent):
     role = "coder"
     capabilities = ["code_generation", "refactoring", "patch_creation"]
 
+    def __init__(self, worktree_manager: Optional[WorktreeManager] = None):
+        self.worktree_manager = worktree_manager or WorktreeManager()
+
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
         start_time = time.time()
         instruction = task.payload.get("instruction") or task.title
         target_file = task.payload.get("target_file", "")
         code_content = task.payload.get("code_content", "")
+        use_worktree = task.payload.get("use_worktree", False)
+        branch_name = task.payload.get("branch_name")
 
         result_data: Dict[str, Any] = {
             "instruction": instruction,
@@ -72,6 +78,27 @@ class CoderSubagent(BaseSubagent):
             "applied": True,
             "lines_changed": len(code_content.splitlines()) if code_content else 0,
         }
+
+        # If worktree isolation is requested, execute within an isolated worktree
+        if use_worktree:
+            try:
+                with self.worktree_manager.isolated_worktree(
+                    task_id=task.id,
+                    branch_name=branch_name,
+                    cleanup=task.payload.get("cleanup_worktree", True),
+                ) as wt_path:
+                    if target_file and code_content:
+                        file_path = wt_path / target_file
+                        file_path.parent.mkdir(parents=True, exist_ok=True)
+                        file_path.write_text(code_content, encoding="utf-8")
+                    result_data["worktree_used"] = str(wt_path)
+            except Exception as exc:
+                return SubagentResult(
+                    success=False,
+                    data=result_data,
+                    error=f"Worktree execution error: {str(exc)}",
+                    execution_time_seconds=time.time() - start_time,
+                )
 
         elapsed = time.time() - start_time
         return SubagentResult(

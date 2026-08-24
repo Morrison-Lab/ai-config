@@ -1193,21 +1193,3 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
-
-
-## On WSL, `npx` resolves to the Windows node and cannot see the checkout
-
-- **Running `npx --yes markdownlint-cli2@0.22.1` from a WSL session prints a CMD.EXE "UNC paths are not supported" banner plus usage help and exits 2.**
-  PATH carries `/mnt/c/Program Files/nodejs/`, so `npx` is Windows node; it starts in `C:\Windows`, never sees `.markdownlint-cli2.jsonc`, and lints nothing.
-  No Linux node is installed (`which node` finds nothing).
-  Fetch a standalone Linux build into /tmp and prepend it to PATH:
-
-  ```sh
-  curl -fsSL https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz -o /tmp/opencode/node.tar.xz
-  tar -xJf /tmp/opencode/node.tar.xz -C /tmp/opencode
-  export PATH=/tmp/opencode/node-v22.14.0-linux-x64/bin:$PATH
-  ```
-
-  (Measured 2026-08-23 on this machine: after the swap the same command linted 514 files with 0 errors.)
-  - **Do:** read exit 2 plus usage text as "wrong node", not as a lint failure.
-  - **Don't:** conclude markdown passes because npx printed nothing useful.

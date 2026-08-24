@@ -23,7 +23,7 @@ logger = logging.getLogger("orchestrator.subagents")
 
 
 CANDIDATE_FILE_REGEX = re.compile(
-    r"(?:(?<=^)|(?<=[\s`'\"]))((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?=[,\s`'\":;.]|$)"
+    r"(?:(?<=^)|(?<=[\s`'\",;:]))((?:[a-zA-Z0-9_.\-]+/[a-zA-Z0-9_.\-/]+\.[a-zA-Z0-9_]+|[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_]+|\.[a-zA-Z0-9_\-]+))(?=[,\s`'\":;.]|$)"
 )
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
@@ -131,8 +131,9 @@ def find_candidate_file_paths(text: str) -> List[str]:
         cleaned = raw.strip("`'\" \t\r\n").replace("\\", "/")
         if (
             "." in cleaned
-            and not cleaned.startswith(("http://", "https://", ".git"))
+            and not (cleaned == ".git" or cleaned.startswith((".git/", "http://", "https://")))
             and cleaned not in paths
+            and is_bare_path_line(cleaned)
         ):
             paths.append(cleaned)
     return paths
@@ -357,9 +358,13 @@ class CoderSubagent(BaseSubagent):
                     existing_context_blocks: List[str] = []
 
                     max_context_files = task.payload.get("max_context_files", 3)
-                    max_context_lines = task.payload.get("max_context_lines", 400)
+                    max_context_lines_per_file = task.payload.get("max_context_lines", 400)
+                    max_total_context_lines = task.payload.get("max_total_context_lines", 800)
+                    total_lines_injected = 0
 
                     for rel in candidate_paths[:max_context_files]:
+                        if total_lines_injected >= max_total_context_lines:
+                            break
                         file_path = resolve_within_worktree(rel, wt_path, wt_resolved)
                         if file_path is None:
                             logger.warning("Skipping candidate path escaping worktree root: %s", rel)
@@ -369,10 +374,13 @@ class CoderSubagent(BaseSubagent):
                                 cur_content = file_path.read_text(encoding="utf-8", errors="replace")
                                 ext = file_path.suffix.lstrip(".") or "text"
                                 cur_lines = cur_content.splitlines()
-                                snippet = "\n".join(cur_lines[:max_context_lines])
-                                if len(cur_lines) > max_context_lines:
-                                    snippet += f"\n\n# ... ({len(cur_lines) - max_context_lines} remaining lines omitted) ..."
+                                remaining_budget = max_total_context_lines - total_lines_injected
+                                allowed_lines = min(max_context_lines_per_file, remaining_budget)
+                                snippet = "\n".join(cur_lines[:allowed_lines])
+                                if len(cur_lines) > allowed_lines:
+                                    snippet += f"\n\n# ... ({len(cur_lines) - allowed_lines} remaining lines omitted) ..."
                                 existing_context_blocks.append(f"Current content of `{rel}`:\n````{ext}\n{snippet}\n````")
+                                total_lines_injected += min(len(cur_lines), allowed_lines)
                             except Exception as exc:
                                 logger.warning("Failed to read candidate context file %s: %s", rel, exc)
 
@@ -438,7 +446,7 @@ class CoderSubagent(BaseSubagent):
                 is_model_output = (result_data.get("model_used") != "direct_input")
                 min_truncation_orig_lines = task.payload.get("min_truncation_orig_lines", 20)
                 min_truncation_floor_lines = task.payload.get("min_truncation_floor_lines", 5)
-                truncation_ratio = task.payload.get("truncation_ratio", 0.25)
+                truncation_ratio = task.payload.get("truncation_ratio", 0.30)
 
                 for rel_path, content in files_to_write.items():
                     file_path = resolve_within_worktree(rel_path, wt_path, wt_resolved)

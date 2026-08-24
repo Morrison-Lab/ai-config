@@ -616,6 +616,9 @@ class TestSpecializedSubagents(unittest.TestCase):
         res2 = find_candidate_file_paths("update scripts/a.py, scripts/b.py, and scripts/c.py.")
         self.assertEqual(res2, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
 
+        res3 = find_candidate_file_paths("update scripts/a.py,scripts/b.py and .gitignore, README.md, main.py")
+        self.assertEqual(res3, ["scripts/a.py", "scripts/b.py", ".gitignore", "README.md", "main.py"])
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 

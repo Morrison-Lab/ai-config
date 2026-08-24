@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 # Ensure orchestrator package is on path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -370,7 +371,7 @@ class TestModelRouterAndSweeper(unittest.TestCase):
             "title": "Fix memory leak in background worker",
             "body": "Detailed description of memory issue.",
         }
-        dag = self.sweeper.ingest_issue(fake_issue)
+        dag = self.sweeper.ingest_issue(fake_issue, dry_run=True)
         self.assertEqual(len(dag), 4)
 
         roles = [t.role for t in dag]
@@ -380,6 +381,12 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertEqual(dag[1].depends_on, [dag[0].id])
         self.assertEqual(dag[2].depends_on, [dag[1].id])
         self.assertEqual(dag[3].depends_on, [dag[2].id])
+
+        # Check PR-on-claim metadata attached to tasks
+        for task in dag:
+            self.assertTrue(task.payload["branch_name"].startswith("fix/issue-9999"))
+            self.assertIsNotNone(task.payload["pr_number"])
+            self.assertIsNotNone(task.payload["pr_url"])
 
     def test_retry_task_status_guard(self):
         task = Task(title="Failed Task", role="coder")
@@ -603,6 +610,58 @@ class TestWorktreeIsolation(unittest.TestCase):
 
             self.assertFalse(result.success)
             self.assertIn("escapes worktree root", result.error)
+
+
+class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
+    """Tests that orchestrator and subagents strictly follow Morrison-Lab / ai-config protocols."""
+
+    def test_protocols_system_prompts_encode_agents_md(self):
+        from orchestrator.protocols import AIConfigProtocols
+        from orchestrator.subagents import ResearcherSubagent, CoderSubagent, ReviewerSubagent, TesterSubagent
+
+        for agent_cls in [ResearcherSubagent, CoderSubagent, ReviewerSubagent, TesterSubagent]:
+            agent = agent_cls()
+            prompt = agent.get_system_prompt()
+            self.assertIn("WORKTREE ISOLATION", prompt)
+            self.assertIn("PR-ON-CLAIM", prompt)
+            self.assertIn("FAIL-FAST", prompt)
+            self.assertIn("ADVERSARIAL SELF-REVIEW", prompt)
+            self.assertIn("STRICT MERGE POLICY", prompt)
+
+    def test_pr_claim_manager_branch_naming_and_dry_run(self):
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+        branch_feat = mgr.generate_branch_name(2112, "feat: add persistent orchestration loop")
+        self.assertTrue(branch_feat.startswith("feat/issue-2112-feat-add-persistent"))
+
+        branch_fix = mgr.generate_branch_name(2115, "fix memory leak in worker daemon")
+        self.assertTrue(branch_fix.startswith("fix/issue-2115-fix-memory-leak"))
+
+        claim_info = mgr.claim_issue_and_open_draft_pr(2112, "feat: add persistent orchestration loop", dry_run=True)
+        self.assertTrue(claim_info["draft_pr_opened"])
+        self.assertIsNotNone(claim_info["pr_number"])
+        self.assertIn("https://github.com/Morrison-Lab/ai-config/pull/", claim_info["pr_url"])
+
+    def test_tester_subagent_marks_draft_pr_ready(self):
+        from orchestrator.subagents import TesterSubagent
+        from orchestrator.models import SubagentContext
+
+        tester = TesterSubagent()
+        task = Task(
+            title="Verify quality gates",
+            role="tester",
+            payload={
+                "pr_number": 2112,
+                "dry_run": True,
+                "expected_assertions": 5,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=None, worker_id="worker-tester", workspace_root=str(Path.cwd()))
+        res = tester.execute(task, ctx)
+
+        self.assertTrue(res.success)
+        self.assertTrue(res.data.get("pr_marked_ready", False))
 
 
 def main():

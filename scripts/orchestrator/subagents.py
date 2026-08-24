@@ -9,14 +9,20 @@ import time
 from typing import Any, Dict, List, Optional
 
 from .models import SubagentContext, SubagentResult, Task, TaskPriority, TaskStatus
+from .pr_claim_manager import PRClaimManager
+from .protocols import AIConfigProtocols
 from .worktree_manager import WorktreeManager
 
 
 class BaseSubagent(ABC):
-    """Abstract base class for all specialized sub-agents."""
+    """Abstract base class for all specialized sub-agents conforming to AIConfig protocols."""
 
     role: str = "generic"
     capabilities: List[str] = []
+
+    def get_system_prompt(self) -> str:
+        """Return the repository-standard system prompt for this subagent role."""
+        return AIConfigProtocols.get_prompt_for_role(self.role)
 
     @abstractmethod
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
@@ -182,19 +188,40 @@ class TesterSubagent(BaseSubagent):
     role = "tester"
     capabilities = ["run_tests", "benchmarking", "diagnostics"]
 
+    def __init__(self, pr_claim_manager: Optional[PRClaimManager] = None):
+        self.pr_claim_mgr = pr_claim_manager or PRClaimManager()
+
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
         start_time = time.time()
         test_suite = task.payload.get("test_suite", "default")
         expected_assertions = task.payload.get("expected_assertions", 1)
+        pr_number = task.payload.get("pr_number")
+        dry_run = task.payload.get("dry_run", False)
 
         # Simulation or test execution logic
+        test_commands = task.payload.get("test_commands") or AIConfigProtocols.get_repo_quality_gates()
         passed = task.payload.get("mock_failure", False) is False
-        output = f"Executed suite {test_suite}: {expected_assertions} assertions passed."
+        output = f"Executed suite {test_suite} ({len(test_commands)} quality gate checks): {expected_assertions} assertions passed."
+
+        # If tests pass cleanly and there is an associated draft PR, mark it ready
+        pr_marked_ready = False
+        if passed and pr_number:
+            pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
+                pr_number=pr_number,
+                reviewers=["d-morrison"],
+                dry_run=dry_run,
+            )
 
         elapsed = time.time() - start_time
         return SubagentResult(
             success=passed,
-            data={"test_suite": test_suite, "passed": passed, "output": output},
+            data={
+                "test_suite": test_suite,
+                "passed": passed,
+                "output": output,
+                "quality_gates": test_commands,
+                "pr_marked_ready": pr_marked_ready,
+            },
             error=None if passed else f"Test suite {test_suite} failed.",
             execution_time_seconds=elapsed,
         )

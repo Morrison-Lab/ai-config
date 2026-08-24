@@ -219,6 +219,49 @@ CASES = [
      'gh api -X POST -f body="Working on this." repos/o/r/issues/12/comments',
      "missing"),
 
+    # --- round-5: properties a mutation could delete with the suite green ----
+    #
+    # Each of these was implemented and unpinned: removing the behaviour passed
+    # 77/77. A property no test discriminates is one a later edit deletes for
+    # free, which is the whole reason to pin it rather than to trust the code.
+    ("an env-var prefix does not hide a command position",
+     'GH_TOKEN=x gh pr comment 12 --body "bare"', True),
+    ("ANSI-C $'...' keeps its escaped quote, so the body stays whole",
+     "gh pr comment 12 --body $'Done, don\\'t worry.\n\n" + MARKER + "'",
+     False),
+    ("a bare /notes path is a comment target",
+     'glab api -X POST "projects/:id/merge_requests/5/notes" -f body="bare"',
+     True),
+    # GitLab's create-a-new-thread route: `/discussions` with no `/notes` and
+    # no `/comments`, so it is the only fixture that isolates that alternative.
+    # The first attempt used `repos/o/r/discussions/5/comments`, which still
+    # matched via `/comments` and masked the very thing it was pinning.
+    ("a bare /discussions path is a comment target",
+     'glab api -X POST "projects/:id/merge_requests/5/discussions" '
+     '-f body="bare"', True),
+
+    # --- round-5: `gh pr review`'s body flag may sit on a continuation line ---
+    ("review with the body flag on a continuation line",
+     'gh pr review 12 --request-changes \\\n  --body "Findings: one thing."',
+     "missing"),
+    ("review with body-file on a continuation line",
+     'gh pr review 12 --comment \\\n  --body-file /tmp/r.md', None),
+
+    # --- round-5: naming a mutation is not posting ---------------------------
+    ("a command that merely NAMES the mutation posts nothing",
+     'gh api graphql --input payload.json  # addDiscussionComment payload',
+     False),
+
+    # --- round-5: the `--body=` equals form is inline, not unreadable --------
+    ("--body= equals form is a visible body",
+     'gh pr comment 12 --body="Working on this."', "missing"),
+    ("--message= equals form is a visible body",
+     'glab mr note 12 --message="bare"', "missing"),
+    ("--body= equals form WITH marker",
+     'gh pr comment 12 --body="Done.\n\n' + MARKER + '"', False),
+    ("--body= with an expanded variable is still unreadable",
+     'gh pr comment 12 --body="$BODY"', None),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),
@@ -349,6 +392,17 @@ def run():
          True),
         ("a non-comment MCP tool is out of scope",
          "mcp__github__create_pull_request", "Closes #1", False),
+        # Round-5: three of the five MCP tools were unpinned -- removing any of
+        # them from MCP_POST_TOOLS passed the whole suite.
+        ("MCP pending-review comment", "mcp__github__add_comment_to_pending_review",
+         "Bare finding.", True),
+        ("MCP review write", "mcp__github__pull_request_review_write",
+         "Bare review body.", True),
+        ("MCP discussion comment", "mcp__github__discussion_comment_write",
+         "Bare discussion reply.", True),
+        ("MCP discussion comment WITH marker",
+         "mcp__github__discussion_comment_write",
+         "Reply.\n\n" + MARKER, False),
     ):
         got = guard.verdict_mcp(tool, {"body": body}) is not None
         ok = got == expect
@@ -356,7 +410,7 @@ def run():
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 6
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 10
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

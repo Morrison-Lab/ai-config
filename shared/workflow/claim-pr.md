@@ -114,7 +114,12 @@ gh pr view <N> --json comments \
 Keep the old alternative until no claim under the old wording can plausibly still be live --- which, given the 2-hour rule keys on activity and not on the comment's own age, means until every PR and issue open on 2026-08-24 has closed.
 Removing it is a deliberate later edit, not tidying to do in passing.
 
-- **Do:** match `hold off|paws off` case-insensitively wherever a claim is read.
+**Then check the same comment for a release term, because one release marker contains a claim invariant.**
+The retired release wording is `... done --- paws off released.`, which matches `paws off` --- so the invariant that fixes the whole-sentence bug introduces a second one, and this one fails the quiet way round: a *released* PR reads as claimed, the reader backs off, and nothing reports why.
+The sentence matcher this replaced did not collide, so the collision arrived with the fix.
+Treat a comment as a release rather than a claim when it also matches `unclaim|released|PR is free|now mergeable`, and derive that list rather than copying it: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
+
+- **Do:** match `hold off|paws off` case-insensitively wherever a claim is read, then exclude the comment if it also carries a release term.
 - **Do:** treat the old alternative as load-bearing until the threads carrying it have closed.
 - **Don't:** read an empty claim search as an unclaimed thread without first confirming the matcher covers both wordings --- the two results are identical.
 - **Don't:** drop the back-compat alternative as part of an unrelated change.
@@ -146,8 +151,7 @@ An identical tree plus identical parents means the two merges are the same merge
 
 - **Do:** compare trees and parents before deciding what a rejected push
   means.
-- **Do:** discard your local merge with `git reset --hard origin/<branch>`
-  once both match.
+- **Do:** discard your local merge with `git reset --hard origin/<branch>` once both match.
 - **Don't:** re-merge reflexively on a rejected push --- that is what produces the redundant merge commit.
 - **Don't:** force-push over the other session's commit.
 

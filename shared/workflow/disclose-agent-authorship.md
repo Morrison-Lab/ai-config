@@ -22,7 +22,7 @@ Check a replacement marker against both tuples before changing it.
 **The scope is every comment, not every review.**
 Review comments are the case that already discloses, since a review body announces its own agent.
 The comments that need this are the ones that read most like a person: a claim, a release, a status update, a reply on a review thread, a comment filed on an issue on the user's behalf, a paraphrase of the user's own in-chat feedback.
-An issue's own **body** is not a comment and stays unattributed, per [`defer-issue`](../../skills/defer-issue/SKILL.md) --- the scope line below says so, and reading this list as covering issue bodies is the contradiction it would create.
+An issue's own **body** is not a comment and stays unattributed, per [`defer-issue`](../../skills/defer-issue/SKILL.md), which is why this item says *comment* rather than *issue*.
 Each of those is short, conversational, and posted under a human login, which is exactly the shape that gets mistaken for a human.
 
 **A comment posted under a genuine BOT identity needs no marker.**
@@ -79,11 +79,11 @@ It reports those as an **unreadable** body rather than as a missing marker, so i
 `skills/ard/SKILL.md`'s per-round summary is exactly that shape, which is why it states the requirement in its own text rather than relying on the guard.
 
 **Where the marker must NOT go: content that is not a comment.**
-A commit message, a PR title, or an issue title has its own attribution conventions and its own consumers, and a trailing italic line in a commit message corrupts a changelog.
+A commit message, a title of any kind, an issue **body**, or a PR body has its own attribution conventions and its own consumers, and a trailing italic line in a commit message corrupts a changelog.
 PR bodies already carry the harness's own generated-with footer.
 This rule governs comment bodies.
 
-**One exemption, and it is narrow: a comment another MACHINE parses as a command.**
+**The first of two exemptions, and it is narrow: a comment another MACHINE parses as a command.**
 `@dependabot rebase`, `@dependabot squash and merge`, and their equivalents are not addressed to a reader at all --- they are an API call wearing a comment, and the receiving bot parses the body.
 Appending prose to one risks changing what it parses, for no reader's benefit, since nobody mistakes `@dependabot rebase` for a human's considered opinion.
 
@@ -93,15 +93,18 @@ A one-line status comment is short and still has a human reader, so it carries t
 As of 2026-08-24 the exemption covers three sites: `skills/chores/SKILL.md`'s two Dependabot commands, and the review re-request `skills/ardi/SKILL.md` mandates, whose whole body is the reviewer's own `@`-mention.
 That third one is worth naming because the first draft of this rule missed it and asserted the other two were the only instances --- an enumeration of a population nobody had queried, which is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope-claim failure.
 
-**No single query derives that set, and pretending otherwise repeats the error one level up.**
-A literal `--body "@...` grep finds the two Dependabot sites and cannot find the third: per [`memories/mention-triggers.md`](../../memories/mention-triggers.md), the reviewer's handle is deliberately never spelled contiguously in a source file, because a diff view renders the file and the mention gate is a raw substring test.
-So the handle that most needs the exemption is the one no handle-based search can see.
+**No single query derives that set, so run two and say why the first is short.**
+The literal `--body "@...` grep finds the two Dependabot sites and misses the third for a mundane reason: `ardi` states its review re-request in prose rather than in a `--body` command, so a command-shaped search cannot reach it.
 
-Run both, and read the second as the reason the first is incomplete:
+An earlier draft of this passage gave a different and wrong reason --- that the handle is never spelled contiguously in a source file, because a diff view would summon the bot.
+That is false twice over.
+The handle appears 242 times across this corpus's markdown (measured 2026-08-24), including in `AGENTS.md`, `CLAUDE.md` and `README.md`, and none of those has ever dispatched a run.
+And [`memories/mention-triggers.md`](../../memories/mention-triggers.md) states the gate as `contains(github.event.comment.body, '@claude')`, over comment, review and issue bodies --- file contents are not among them.
+The practice of not spelling it applies to text that becomes a comment, which is what that file scopes it to.
 
 ```bash
-grep -rn -- '--body "@' --include='*.md' --include='*.sh' .   # literal handles
-grep -rn 'review re-request\|re-request review\|trigger phrase' skills/  # the assembled one
+grep -rn -- '--body "@' --include='*.md' --include='*.sh' .   # command-shaped sites
+grep -rn '@claude' skills/                                    # prose sites
 ```
 
 - **Do:** omit the marker on a comment whose whole body is a command addressed to another bot.
@@ -113,6 +116,6 @@ grep -rn 'review re-request\|re-request review\|trigger phrase' skills/  # the a
 - **Don't:** use the robot emoji in the marker --- it is a review-body marker, and it converts every disclosed comment into a finding-free review item.
 - **Don't:** treat a comment posted under a human login as self-evidently agent-authored because the account holder knows an agent is running.
   The reader is whoever finds the thread later.
-- **Don't:** put the marker in a commit message, a title, or a PR body.
+- **Don't:** put the marker in a commit message, a title, an issue body, or a PR body.
 
 (Directive from the user, 2026-08-24: "all comments online posted by bots should say so", citing <https://github.com/UCD-SERG/ucd-serg.github.io/pull/108#issuecomment-5397889734> --- an agent-authored claim comment posted under `d-morrison`, `type: User`, `author_association: MEMBER`, reading exactly like a human's.)

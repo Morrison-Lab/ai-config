@@ -80,7 +80,14 @@ _POST_CMDS = (
     # A review needs a BODY flag to be a comment. `gh pr review 12 --approve`
     # posts no prose, so there is nothing to disclose and warning on it spends
     # the guard's credibility on a command it cannot be about.
-    r"gh\s+pr\s+review\b(?=[^\n;|&]*(?:--body\b|--body-file\b|-b\s|-F\s))",
+    # NOT gated on a body flag by a lookahead here. The obvious spelling,
+    # `(?=[^\n;|&]*--body...)`, carries the exact bound this file's own
+    # `is_api_post` docstring diagnoses two blocks below: it cannot cross the
+    # backslash line-continuation that `skills/ard` uses for every long command,
+    # so a review whose body flag sits on a continuation line went SILENT.
+    # The body-flag test is applied per segment in `is_post_segment` instead,
+    # where the whole command is already in hand.
+    r"gh\s+pr\s+review\b",
     # `glab ... comment` is a real alias of `... note`; both spellings ship.
     r"glab\s+mr\s+(?:note|comment)",
     r"glab\s+issue\s+(?:note|comment)",
@@ -116,16 +123,33 @@ def is_api_post(segment):
         return False
     if not API_COMMENT_TARGET_RE.search(segment):
         return False
-    # A GraphQL comment mutation carries its body as a variable, so the
-    # `body=` field test would reject it; the mutation name is the evidence.
-    if re.search(r"addDiscussionComment|addComment", segment, re.IGNORECASE):
-        return True
+    # No GraphQL exception. It was added on the theory that a comment mutation
+    # carries its body as a variable and so would fail the `body=` test -- but
+    # every GraphQL comment site in this corpus supplies `-f body='...'`, so the
+    # branch decided nothing while classifying any command that merely NAMED the
+    # mutation as a post: `gh api graphql --input payload.json  # addDiscussion-
+    # Comment payload` drew a warning for a command posting nothing visible.
     return bool(API_BODY_FIELD_RE.search(segment))
+
+
+# A review with no body flag posts no prose (`gh pr review 12 --approve`), so
+# there is nothing to disclose. Tested over the whole segment rather than in a
+# lookahead, so a continuation line cannot hide the flag.
+REVIEW_ONLY_RE = re.compile(_ANCHOR + r"gh\s+pr\s+review\b", re.MULTILINE)
+ANY_BODY_FLAG_RE = re.compile(
+    r"--body\b|--body=|--body-file|--message\b|--message=|-b\s|-m\s|-F\s"
+    r"|(?:-f|-F|--field|--raw-field)\s+body=")
 
 
 def is_post_segment(segment):
     """True when this segment posts a forge comment by any route."""
-    return bool(POST_RE.search("\n" + segment)) or is_api_post(segment)
+    if POST_RE.search("\n" + segment):
+        # `gh pr review` is the one named verb that may carry no body at all.
+        if (REVIEW_ONLY_RE.search("\n" + segment)
+                and not ANY_BODY_FLAG_RE.search(segment)):
+            return False
+        return True
+    return is_api_post(segment)
 
 
 # Segment boundaries, split QUOTE-AWARE.
@@ -177,7 +201,7 @@ EMOJI_DISCLOSURE_RE = re.compile(
 UNREADABLE_RE = re.compile(
     r"--body-file|--description-file|--editor\b|--web\b"
     r"|-F\s+body=@|(?<!-)-F\s+(?![\w.-]+=)\S"
-    r"|--(?:body|message)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
+    r"|--(?:body|message)[\s=]+(?:\"[^\"]*\$|'[^']*\$|\$)"
     # The short forms expand identically; omitting them reported a marker
     # missing from a body the check demonstrably could not read.
     r"|-(?:b|m)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
@@ -193,7 +217,7 @@ UNREADABLE_RE = re.compile(
 # which invites no correction. `-F body=` and `--raw-field body=` were accepted
 # as posting routes and omitted here, so they drew exactly that.
 HAS_INLINE_BODY_RE = re.compile(
-    r"--(?:body|message)\s+[\"']|-(?:b|m)\s+[\"']"
+    r"--(?:body|message)[\s=]+[\"']?[^\s\"'$]|-(?:b|m)\s+[\"']?[^\s\"'$]"
     r"|(?:-f|-F|--field|--raw-field)\s+body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
@@ -227,10 +251,18 @@ BOT_BODY_RE = re.compile(
     r"^\s*@(?:" + _BOT_HANDLES + r")\b[ \w-]{0,40}\s*$", re.IGNORECASE)
 
 
-# MCP comment-posting tools. `tool-mappings.md` names COMMENT_PR/COMMENT_ISSUE,
-# REPLY_REVIEW_COMMENT and COMMENT_DISCUSSION, which is four of these; the
-# pending-review tool has no registry row, so this list is wider than that file
-# rather than derived from it.
+# MCP comment-posting tools.
+#
+# NOT derived from `tool-mappings.yml`, and the earlier claim that it named four
+# of these was a miscount: that registry maps OPERATIONS, and `add_issue_comment`
+# appears under two of them (COMMENT_PR and COMMENT_ISSUE), so counting rows
+# double-counts one tool. It names two of the five --- `add_issue_comment` and
+# `add_reply_to_pull_request_comment` --- plus COMMENT_DISCUSSION, whose row said
+# no MCP tool existed until this change corrected it. `pull_request_review_write`
+# and `add_comment_to_pending_review` have no operation of their own.
+#
+# So this list is wider than the registry by construction. Re-derive it against
+# the server's tool list rather than against that file.
 MCP_POST_TOOLS = (
     "mcp__github__add_issue_comment",
     "mcp__github__add_comment_to_pending_review",

@@ -10,6 +10,19 @@ The canonical skills under `skills/` are written for Claude Code and name
 concrete tools — mostly `gh`/`git` commands. This registry maps each canonical
 operation to the equivalent GitHub MCP tool so any model can run a skill.
 
+> [!IMPORTANT]
+> **Every comment-posting operation below carries the agent-disclosure marker in
+> its body**, on its own line after a blank line:
+> `_Posted by Claude Code (AI agent) --- not written by a human._`
+>
+> This registry is the substitution point for remote/web sessions, which have no
+> `gh` at all — so a marker-free template here is a marker-free comment there, in
+> exactly the population that cannot fall back to the CLI examples in the skills.
+> See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
+> Two exemptions: a body another machine parses as a command (`@dependabot
+> rebase`), and a comment posted under a genuine bot token, where the forge
+> already reports `type: Bot`.
+
 ## How each model resolves an operation
 
 - **Claude Code** — GitHub MCP tool in remote/web sessions; the CLI command locally.
@@ -36,8 +49,8 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `MERGE_PR` | Merge a pull request. | `gh pr merge "<N>"` | `mcp__github__merge_pull_request` |
 | `MARK_PR_READY` | Flip a draft pull request to ready for review. | `gh pr ready "<N>"` | `mcp__github__update_pull_request (draft=false)` |
 | `REOPEN_PR` | Reopen a closed pull request. | `gh pr reopen "<N>"` | `mcp__github__update_pull_request (state=open)` |
-| `COMMENT_PR` | Post a top-level comment on a pull request. | `gh pr comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
-| `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. | `gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"` | `mcp__github__add_reply_to_pull_request_comment` |
+| `COMMENT_PR` | Post a top-level comment on a pull request. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh pr comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
+| `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"` | `mcp__github__add_reply_to_pull_request_comment` |
 | `RESOLVE_REVIEW_THREAD` | Mark an inline pull-request review thread as resolved. | `gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"<thread_node_id>"}) { thread { isResolved } } }'` | `mcp__github__resolve_review_thread` |
 | `WATCH_PR` | Subscribe to / unsubscribe from a pull request's activity. | (no CLI equivalent) | `mcp__github__subscribe_pr_activity / mcp__github__unsubscribe_pr_activity` |
 | `VIEW_ISSUE` | Read an issue's details. | `gh issue view "<N>"` | `mcp__github__issue_read` |
@@ -46,14 +59,14 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `READ_ISSUE_COMMENTS` | Read an issue's comments. | `gh issue view "<N>" --comments` | `mcp__github__issue_read (method=get_comments)` |
 | `ISSUE_LINKED_PRS` | List the pull requests cross-referenced from an issue's timeline (i.e. PRs that link or close it). | `gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline"` | (no GitHub MCP tool; approximate with SEARCH_PRS) |
 | `CREATE_ISSUE` | Open a new issue. | `gh issue create` | `mcp__github__issue_write (method=create)` |
-| `COMMENT_ISSUE` | Post a comment on an issue. | `gh issue comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
+| `COMMENT_ISSUE` | Post a comment on an issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh issue comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close "<N>" --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
 | `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen "<N>" --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
 | `LABEL_ISSUE` | Set an issue's labels. The two behave differently and are not interchangeable: `--add-label` ADDS to the existing set, while the MCP path REPLACES the whole set, so pass the union of existing and new labels there. The MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit "<N>" --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
 | `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh api "repos/<owner>/<repo>/labels/<name>"` | `mcp__github__get_label` |
 | `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | (no GitHub MCP tool; use gh api REST or graphql) |
 | `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. Readable over REST. | `gh api repos/{owner}/{repo}/discussions/{number}[/comments]` | (no GitHub MCP tool; use gh api REST or graphql) |
-| `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). | `gh api graphql (addDiscussionComment)` | (no GitHub MCP tool; use gh api graphql) |
+| `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api graphql (addDiscussionComment)` | `mcp__github__discussion_comment_write` |
 | `ANSWER_DISCUSSION` | Mark a comment as the accepted answer on a Q&A discussion. | `gh api graphql (markDiscussionCommentAsAnswer)` | (no GitHub MCP tool; use gh api graphql) |
 | `CREATE_DISCUSSION` | Open a new discussion in a category. | `gh api graphql (createDiscussion)` | (no GitHub MCP tool; use gh api graphql) |
 | `CLOSE_DISCUSSION` | Close a discussion with a reason (RESOLVED, OUTDATED, DUPLICATE). | `gh api graphql (closeDiscussion)` | (no GitHub MCP tool; use gh api graphql) |

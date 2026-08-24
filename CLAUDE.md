@@ -623,8 +623,8 @@ _Posted by Claude Code (AI agent) --- not written by a human._
 
 The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**, the false-clean failure [`fully-clean`](shared/workflow/fully-clean.md) already describes.
 Check any replacement marker against that tuple before adopting it.
-The one exemption is a comment another machine parses as a command (`@dependabot rebase`); the test is the audience, not the brevity.
-Comment bodies only --- not commit messages, titles, or PR bodies.
+Two exemptions: a comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the brevity; and a comment posted under a genuine bot token, where the forge already reports `type: Bot`.
+Comment bodies only --- not commit messages, titles, issue bodies, or PR bodies.
 
 - **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
 - **Don't:** use the robot emoji in it, or put it in a commit message or title.

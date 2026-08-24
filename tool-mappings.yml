@@ -107,11 +107,11 @@ operations:
     cli: gh pr reopen "<N>"
     github_mcp: mcp__github__update_pull_request (state=open)
   - id: COMMENT_PR
-    description: Post a top-level comment on a pull request.
+    description: Post a top-level comment on a pull request. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh pr comment "<N>" --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: REPLY_REVIEW_COMMENT
-    description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead.
+    description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"
     github_mcp: mcp__github__add_reply_to_pull_request_comment
   - id: RESOLVE_REVIEW_THREAD
@@ -147,7 +147,7 @@ operations:
     cli: gh issue create
     github_mcp: mcp__github__issue_write (method=create)
   - id: COMMENT_ISSUE
-    description: Post a comment on an issue.
+    description: Post a comment on an issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh issue comment "<N>" --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: CLOSE_ISSUE
@@ -183,9 +183,9 @@ operations:
     cli: gh api repos/{owner}/{repo}/discussions/{number}[/comments]
     github_mcp: (no GitHub MCP tool; use gh api REST or graphql)
   - id: COMMENT_DISCUSSION
-    description: Post a reply on a discussion (top-level or threaded).
+    description: Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh api graphql (addDiscussionComment)
-    github_mcp: (no GitHub MCP tool; use gh api graphql)
+    github_mcp: mcp__github__discussion_comment_write
   - id: ANSWER_DISCUSSION
     description: Mark a comment as the accepted answer on a Q&A discussion.
     cli: gh api graphql (markDiscussionCommentAsAnswer)

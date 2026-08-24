@@ -712,10 +712,12 @@ class ModelRouter:
         tier: TaskTier,
         is_confidential: bool = False,
         prior_author_model: Optional[str] = None,
+        retry_count: int = 0,
     ) -> tuple[BaseModelAdapter, str]:
         """Select best available adapter and model string for a given task requirement,
 
-        prioritizing free and local models where feasible.
+        prioritizing free and local models where feasible, and automatically escalating
+        to stronger model tiers if a task has failed and is retrying.
         """
         # 1. Strict local confidentiality -> Ollama local model only
         if is_confidential:
@@ -724,6 +726,12 @@ class ModelRouter:
                 return ollama, "qwen2.5-coder:7b"
             # Fallback to mock if offline
             return self.adapters[ModelProvider.MOCK], "local-mock"
+
+        # Escalate capability tier on retries (when model struggles)
+        if retry_count >= 2 and tier not in (TaskTier.ADVERSARIAL_REVIEW, TaskTier.FRONTIER_HEAVY):
+            tier = TaskTier.FRONTIER_HEAVY
+        elif retry_count == 1 and tier in (TaskTier.LOCAL_FAST, TaskTier.FREE_HOSTED):
+            tier = TaskTier.STANDARD_CODE
 
         # 2. Adversarial Review -> Must use a different model family than author,
         # preferring local/free reviewers first while strictly preventing same-family self-review.

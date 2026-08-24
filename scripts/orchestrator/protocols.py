@@ -73,6 +73,22 @@ Rules:
         return f"{base}\n---\n{specific}"
 
     @classmethod
+    def get_researcher_prompt(cls) -> str:
+        return cls.get_prompt_for_role("researcher")
+
+    @classmethod
+    def get_coder_prompt(cls) -> str:
+        return cls.get_prompt_for_role("coder")
+
+    @classmethod
+    def get_reviewer_prompt(cls) -> str:
+        return cls.get_prompt_for_role("reviewer")
+
+    @classmethod
+    def get_tester_prompt(cls) -> str:
+        return cls.get_prompt_for_role("tester")
+
+    @classmethod
     def get_repo_quality_gates(cls) -> List[str]:
         return [
             "python scripts/validate-skills.py",

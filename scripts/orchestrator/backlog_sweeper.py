@@ -113,6 +113,7 @@ class BacklogSweeper:
             payload={
                 "issue_number": issue_num,
                 "title": issue_title,
+                "body": issue_body,
                 "stage": "implementation",
                 "branch_name": branch_name,
                 "pr_number": pr_number,
@@ -133,6 +134,7 @@ class BacklogSweeper:
             payload={
                 "issue_number": issue_num,
                 "title": issue_title,
+                "body": issue_body,
                 "stage": "adversarial_review",
                 "branch_name": branch_name,
                 "pr_number": pr_number,
@@ -152,6 +154,7 @@ class BacklogSweeper:
             payload={
                 "issue_number": issue_num,
                 "title": issue_title,
+                "body": issue_body,
                 "stage": "test_verification",
                 "branch_name": branch_name,
                 "pr_number": pr_number,

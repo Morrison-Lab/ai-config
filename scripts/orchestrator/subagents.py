@@ -413,7 +413,7 @@ class CoderSubagent(BaseSubagent):
                         prompt=coder_prompt,
                         system_prompt=AIConfigProtocols.get_coder_prompt(),
                         model=model_name,
-                        timeout_seconds=180,
+                        timeout_seconds=300,
                     )
 
                     if not resp.success or not resp.content:

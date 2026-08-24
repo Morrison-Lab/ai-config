@@ -151,7 +151,7 @@ went into a comment in `.github/workflows/claude.yml` --- a shipped source
 file, not a review artifact, which is what makes it the fourth class above.
 The user added the secret org-wide while the work was still in flight, so the
 comment was false before it merged and would have stayed in the tree.
-Commit `a4589dec`, whose message is "Correct the WORKFLOW_TOKEN comment",
+Commit `a4589dec`, whose subject begins "Correct the WORKFLOW_TOKEN comment",
 touches only that file.
 Reported by the agent that made it.
 Tracked as ai-config#2149.)

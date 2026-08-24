@@ -487,10 +487,21 @@ rather than about the repo.
 **Why each silent run was silent is a separate question, and the first answer
 reached for was wrong.**
 "Every sampled PR was small, and small is the class the eligibility gate
-filters" is an inferred mechanism, and it fails against this very table: the
-branch above is PR #111 itself, at +172/-33, so all four of its silent runs
-were silent on a PR that is not small.
-The timeline attributes them instead.
+filters" is an inferred mechanism, and reaching for the branch's final size to
+refute it is the same substitution one level down.
+PR #111 ends at +172/-33, and no run read that.
+Each run read the head it was triggered on, and those differ: the 16:19:10 run
+saw an **empty** commit at +0/-0, the 16:37:08 and 16:38:16 runs saw
++109/-33, and only the 16:56:56 run saw +172/-33.
+So the size hypothesis is not refuted wholesale --- it is entirely consistent
+with the first run, and inconsistent with the last, which was silent on the
+largest head of the four.
+That is what a per-run reading buys and a merged-diff reading hides, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s substitution of a
+neighbour for the target, inside a section arguing against exactly that.
+
+The timeline attributes the runs directly, which settles it without the size
+argument at all.
 `gh api repos/UCD-SERG/ucd-serg.github.io/issues/111/timeline` shows #111
 created as a **draft** at 16:19:07Z and marked ready for review at 16:38:13Z,
 so the runs at 16:19:10 and 16:37:08 met a draft, and the run at 16:56:56 met a

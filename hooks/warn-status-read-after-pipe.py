@@ -191,13 +191,34 @@ RX_HEREDOC = re.compile(
 # warning there would be false.
 RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
 
-# `set -o pipefail` as the FIRST command inside a paren group. Matched against
-# the text just after a `(`, so the option's scope is known to enclose whatever
-# pipe follows inside that group. A segment-wide search cannot do this job:
-# `(set -o pipefail; make) | tail -20; echo $?` carries the option in the
-# segment while the pipe sits OUTSIDE the subshell, and that is a real misread
-# (measured 0 without an outer `pipefail`, 1 with one).
-RX_PAREN_PIPEFAIL = re.compile(r"\s*set\b[^;&|\n]*\bpipefail\b")
+# `set -o pipefail` at a command position inside a paren group. A segment-wide
+# search cannot do this job: `(set -o pipefail; make) | tail -20; echo $?`
+# carries the option in the segment while the pipe sits OUTSIDE the subshell,
+# and that is a real misread (measured 0 without an outer `pipefail`, 1 with
+# one). So the search is bounded to the group, by `_paren_sets_pipefail`.
+#
+# It must NOT be restricted to the group's first command, which an earlier
+# version did: `( true; set -o pipefail; cmd | head )` measures rc=1, so the
+# option really is in force and warning there was false.
+RX_PAREN_PIPEFAIL = re.compile(r"(?:^|[;&\n]\s*)\s*set\b[^;&|\n]*\bpipefail\b")
+
+
+def _paren_sets_pipefail(text, open_index):
+    """True when the group opening at `open_index` sets `pipefail` ITSELF.
+
+    Searches only up to the group's first NESTED `(`, because an option set in
+    a child group does not survive into the parent: measured,
+    `( ( set -o pipefail ); cmd | head )` gives rc=0 while
+    `( set -o pipefail; cmd | head )` gives rc=1.
+    """
+    limit = len(text)
+    index = open_index + 1
+    while index < limit and text[index] not in "()":
+        index += 1
+    # Sliced rather than passed as pos/endpos: in `pattern.search(s, pos)` the
+    # `^` anchor still matches only at the real start of `s`, so the
+    # start-of-group alternative would never fire.
+    return RX_PAREN_PIPEFAIL.search(text[open_index + 1:index]) is not None
 
 # A real `${PIPESTATUS[0]}` / `$PIPESTATUS` expansion, not the bare word. The
 # author reading a specific stage by index is taking control of the pipeline's
@@ -310,6 +331,19 @@ def _matching_paren(text, open_index):
                 quote = ""
             index += 1
             continue
+        # An escaped character outside quotes is literal. Missing this let
+        # `$(printf %s \')` open a phantom single-quoted span that ran to the
+        # end of the command, and since the caller jumped past the returned
+        # index, the ENTIRE rest of the command went unscanned.
+        if char == "\\":
+            index += 2
+            continue
+        # A `#` comment inside the substitution can hold an unbalanced paren
+        # either way, so skip it rather than counting its characters.
+        if char == "#" and (index == 0 or text[index - 1] in " \t\n;&|("):
+            newline = text.find("\n", index)
+            index = limit if newline == -1 else newline
+            continue
         if char in ("'", '"'):
             quote = char
         elif char == "(":
@@ -407,7 +441,19 @@ def scan(command):
             # Not tracking this produced the guard's one measured false
             # positive, on `shared/principles/fail-fast.md`'s own example.
             if char == "$" and text[i + 1:i + 2] == "(":
+                # `$(( ))` is ARITHMETIC and does not set `$?`, so it must not
+                # shadow a following read. Measured:
+                #   true | false; echo "n=$((1+1)) rc=$?"   -> rc=1 (pipeline)
+                #   true | false; echo "x=$(exit 7) rc=$?"  -> rc=7 (subst)
+                # Omitting this carve-out here, while having it in the
+                # unquoted branch, silenced a genuine misread for one round.
+                if text[i + 2:i + 3] == "(":
+                    i += 3
+                    continue
                 end = _matching_paren(text, i + 1)
+                if end >= n:
+                    i += 2   # unbalanced: keep scanning rather than give up
+                    continue
                 closes.append(end)
                 i = end + 1
                 continue
@@ -462,6 +508,9 @@ def scan(command):
                 # earlier pipeline, so step over it whole and record where it
                 # closed.
                 end = _matching_paren(text, i + 1)
+                if end >= len(text):
+                    i += 2   # unbalanced: keep scanning rather than give up
+                    continue
                 closes.append(end)
                 i = end + 1
                 continue
@@ -493,16 +542,18 @@ def scan(command):
             # A bare subshell's status IS its last command's, so a pipeline
             # inside one is read exactly as a top-level pipeline would be.
             parens.append("show")
-            # `pipefail` set as this group's first command covers pipes inside
-            # the group, and only those.
-            paren_pf.append(
-                RX_PAREN_PIPEFAIL.match(text, i + 1) is not None)
+            # `pipefail` set anywhere at this group's own command level covers
+            # pipes inside the group, and only those.
+            paren_pf.append(_paren_sets_pipefail(text, i))
             i += 1
             continue
         if char == ")" and parens:
+            # `parens` and `paren_pf` are pushed and popped together at every
+            # site, so their lengths are equal by construction. Popping both
+            # unconditionally keeps a violated invariant loud rather than
+            # silently absorbed, per shared/principles/fail-fast.md.
             parens.pop()
-            if paren_pf:
-                paren_pf.pop()
+            paren_pf.pop()
             i += 1
             continue
         if text[i:i + 2] == "[[":
@@ -649,16 +700,17 @@ def find_misread(command):
         if not previous["has_pipe"]:
             continue
 
-        # Segments strictly BEFORE the pipeline, and `set` must open the
-        # segment. Widening either of these silenced real misreads:
-        # `( set -o pipefail; true ); cmd | head; echo $?` has the option
-        # scoped to a subshell the pipe is not in, and
-        # `(set -o pipefail; make) | tail -20; echo $?` pipes OUTSIDE the
-        # protected group. Both measured 0 without an outer `pipefail` and 1
-        # with one, so both are genuine misreads.
+        # `set` must OPEN the segment. That anchor is what does the work here,
+        # measured: without it, `( set -o pipefail; true ); cmd | head; echo $?`
+        # goes quiet, and that is a real misread (0 without an outer
+        # `pipefail`, 1 with one) because the option is scoped to a subshell
+        # the pipe is not in.
         #
-        # A `pipefail` that really does cover the pipe is handled where the
-        # pipe is seen instead, via the per-group `paren_pf` scope in scan().
+        # The slice stops one short of the pipeline for the same reason, and
+        # is belt-and-braces rather than load-bearing: no input is known that
+        # `segments[:index]` would decide differently, since a `set` sharing a
+        # segment with the pipeline is necessarily inside parens, and that
+        # case is decided by the per-group `paren_pf` scope in scan() instead.
         preceding = segments[:index - 1]
         if any(RX_SET_PIPEFAIL.search(RX_QUOTED.sub(" ", s["text"]))
                for s in preceding):

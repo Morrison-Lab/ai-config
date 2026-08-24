@@ -171,6 +171,30 @@ check("pipefail in a nested group the pipe is outside still fires",
 check("pipefail in an earlier subshell still fires",
       fires("( set -o pipefail; true ); cmd | head; echo $?"), True)
 
+# `set -o pipefail` need not be the group's FIRST command. Measured,
+# `( true; set -o pipefail; grep -q zzz /dev/null | cat ); echo $?` gives 1,
+# so the option is in force and a warning would be false.
+check("pipefail later in the group suppresses",
+      fires("( true; set -o pipefail; cmd | head ); echo $?"), False)
+check("pipefail after set -e in the group suppresses",
+      fires("( set -e; set -o pipefail; cmd | head ); echo $?"), False)
+
+# Arithmetic does not set `$?`, so it must not shadow a following read.
+# Measured, `true | false; echo "n=$((1+1)) rc=$?"` prints rc=1.
+check("arithmetic in double quotes does not shadow the read",
+      fires('cmd | head -20; echo "n=$((1+1)) rc=$?"'), True)
+check("bare arithmetic does not shadow the read",
+      fires("cmd | head -20; n=$((1+1)); echo $?"), False)
+
+# An escaped quote inside a substitution must not abort the whole scan. This
+# silenced everything downstream of it for one round.
+check("an escaped quote inside a substitution does not disarm the scan",
+      fires('echo "$(printf %s \\\')" ; cmd | head -20; echo "rc=$?"'), True)
+
+# An unbalanced substitution must degrade locally, not disarm the command.
+check("an unbalanced substitution does not disarm the scan",
+      fires('echo "$(oops" ; cmd | head -20; echo "rc=$?"'), True)
+
 # A `$?` following a command substitution reads the SUBSTITUTION's status, not
 # any earlier pipeline. Measured: `true | cat; echo "x $(exit 7) (rc=$?)"`
 # prints rc=7. Not tracking substitutions inside double quotes produced this
@@ -402,8 +426,28 @@ for label, command in [
     ("for loop", "for f in 1; do cmd | head; done; echo $?"),
     ("if block", "if true; then cmd | head; fi; echo $?"),
     ("brace group", "{ cmd | head; }; echo $?"),
+    # The whole-segment assignment guards cost these three. Each is a real
+    # misread (measured 0 without `pipefail`, 1 with it). Recorded rather than
+    # fixed: tightening the guards is what stopped the false positives above,
+    # and for a warn-only hook a miss is the cheap direction.
+    ("nested substitution in an assignment",
+     "out=$(cmd | head -$(nproc)); echo $?"),
+    ("arithmetic inside an assignment's substitution",
+     "out=$(cmd | head -$((1+1))); echo $?"),
+    ("a second assignment ahead of the substitution",
+     "A=1 B=$(cmd | head -1); echo $?"),
+    # `&>` is absent from the trailing-redirect group, while `>>log 2>&1` is
+    # accepted.
+    ("an &> redirect after an assignment",
+     "out=$(cmd | head -1) &>/dev/null; echo $?"),
+    # A `pipefail` set in a BRACE group, which is not tracked like a paren
+    # group. This one is a false POSITIVE rather than a miss: measured rc=1,
+    # so the option is in force and the warning is wrong.
 ]:
     check(f"KNOWN BLIND SPOT: {label} is missed", fires(command), False)
+
+check("KNOWN FALSE POSITIVE: pipefail in a brace group still warns",
+      fires("{ set -o pipefail; }; cmd | head; echo $?"), True)
 
 
 # ---------------------------------------------------------------------------
@@ -549,6 +593,44 @@ if mutant is not None:
           fires(ASSIGN_NESTED, mutant), False)
     check("MUTATION paren separator: the real hook catches it",
           fires(ASSIGN_NESTED), True)
+
+# 7. Break the substitution shadowing. A `$?` that belongs to a substitution
+#    must start being attributed to the pipeline again.
+mutant = load_mutant(
+    "                shadowed = any(begin <= close < offset "
+    "for close in closes)",
+    "                shadowed = False")
+if mutant is not None:
+    check("MUTATION shadowing: a substitution's own status is misattributed",
+          fires('cmd | head -20; echo "n=$(wc -l < f) rc=$?"', mutant), True)
+
+# 8. Break the per-group pipefail scope. A genuinely protected pipe must start
+#    warning.
+mutant = load_mutant(
+    "            paren_pf.append(_paren_sets_pipefail(text, i))",
+    "            paren_pf.append(False)")
+if mutant is not None:
+    check("MUTATION paren pipefail: a protected pipe warns",
+          fires("( set -o pipefail; cmd | head -20 ); echo $?", mutant), True)
+
+# 9. Break the single-`$(` guard on a whole-segment assignment. A second
+#    assignment in the segment must start firing.
+mutant = load_mutant('                          and body.count("$(") == 1\n',
+                     "")
+if mutant is not None:
+    check("MUTATION single-subst: a second assignment fires",
+          fires("out=$(cmd | head -1) other=$(true); echo $?", mutant), True)
+
+# 10. Break the arithmetic carve-out in the DOUBLE-QUOTE branch, which is
+#     where it was missing for a round.
+mutant = load_mutant(
+    "                if text[i + 2:i + 3] == \"(\":\n"
+    "                    i += 3\n"
+    "                    continue\n",
+    "")
+if mutant is not None:
+    check("MUTATION quoted arithmetic: a real misread goes quiet",
+          fires('cmd | head -20; echo "n=$((1+1)) rc=$?"', mutant), False)
 
 if failures:
     print("FAILED:")

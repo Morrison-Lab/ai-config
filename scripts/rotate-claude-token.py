@@ -84,8 +84,27 @@ def gh(args: list[str], stdin: str | None = None) -> str:
         # `check-pr-fully-clean.py`'s `run_cmd`. Without it the locale codec
         # (cp1252) silently mojibakes most non-ASCII and hard-fails on five
         # bytes, the latter killing subprocess's reader thread and leaving the
-        # stream as None with `returncode` unaffected. This script reads repo
-        # descriptions and org names, which carry arbitrary user text.
+        # stream as None with `returncode` unaffected.
+        #
+        # This script's exposure is narrower than its siblings', and the honest
+        # form of that is "no demonstrated exposure" rather than a producer I
+        # cannot source. Two earlier drafts of this comment each named a
+        # mechanism that turned out to be false -- repo descriptions this script
+        # never reads, then a non-English Windows error string that Go's
+        # `syscall.Errno.error()` argues against, since it requests US English
+        # first and returns UTF-16-to-UTF-8. So no mechanism is claimed here.
+        #
+        # What IS established: the decode failure itself is measured (a lone
+        # 0xE9 on either stream leaves it None with `returncode` intact,
+        # Windows / Python 3.13.7), and its five payloads are read from the
+        # cp1252 table rather than recalled. Of this script's five `gh` call
+        # sites, four read GitHub identifiers and one writes a secret via stdin,
+        # so nothing here is a known-risky payload today.
+        #
+        # The guard earns its place on consistency instead: a reader finding
+        # three of four sibling scripts guarded cannot tell whether the fourth
+        # was considered or missed, and a future call site here that DOES read
+        # arbitrary text would inherit the hole silently.
         proc = subprocess.run(
             ["gh", *args],
             input=stdin,

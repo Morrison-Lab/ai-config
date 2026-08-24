@@ -101,7 +101,9 @@ def stop_stale_daemon(state_path=None, stale_seconds=None, wait_seconds=5.0):
     Only a recently-refreshed state file proves the recorded pid still
     belongs to a live monitor; past the staleness horizon the pid may have
     been recycled to an unrelated process, and the daemon it named is dead
-    anyway, so the file is left alone.  After the SIGTERM, wait for the
+    anyway, so the file is left alone.  A missing, unreadable, or pid-less
+    state file returns None the same quiet way: there is nothing to stop.
+    After the SIGTERM, wait for the
     process to disappear so the cron fallback's ensure() cannot observe
     the dying pid as alive and skip its respawn --- and say so when the
     wait exhausts, so a survived SIGTERM is not reported as a stop.

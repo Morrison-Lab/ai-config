@@ -513,6 +513,15 @@ class TestSpecializedSubagents(unittest.TestCase):
         res8 = extract_files_from_markdown(text8, context_text="fix scripts/a.py")
         self.assertEqual(res8, {})
 
+        # ./ prefixed and multi-dot extension path stub variants
+        text9 = "```scripts/foo.py\n./scripts/a.py\n./scripts/b.py\n```"
+        res9 = extract_files_from_markdown(text9)
+        self.assertEqual(res9, {})
+
+        text10 = "```\n./scripts/a.tar.gz\n```"
+        res10 = extract_files_from_markdown(text10, context_text="fix scripts/a.tar.gz")
+        self.assertEqual(res10, {})
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 

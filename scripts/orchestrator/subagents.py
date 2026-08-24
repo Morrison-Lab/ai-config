@@ -25,8 +25,25 @@ logger = logging.getLogger("orchestrator.subagents")
 CANDIDATE_FILE_REGEX = re.compile(
     r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)"
 )
-BARE_PATH_REGEX = re.compile(r"^(?:[a-zA-Z0-9_\-]+/)*[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_]+$")
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
+
+
+def is_bare_path_line(s: str) -> bool:
+    """Return True if string is a normalized repo-relative or absolute file path."""
+    clean = s.replace("\\", "/").strip("`'\" \t\r\n")
+    while clean.startswith("./") or clean.startswith("/"):
+        clean = clean.lstrip("./")
+    if not clean:
+        return False
+    # Must not contain code syntax characters or whitespace
+    if any(c in clean for c in " \t()[]{}=:;,<>\"'\\"):
+        return False
+    parts = clean.split("/")
+    filename = parts[-1]
+    if "." in filename and not filename.startswith("."):
+        if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
+            return True
+    return False
 
 
 def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
@@ -44,7 +61,13 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
     if cand_path:
         clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
         cand_basename = clean_cand.split("/")[-1]
-        cand_variants = {clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"}
+        cand_variants = {
+            clean_cand,
+            cand_basename,
+            f"/{clean_cand}",
+            f"./{clean_cand}",
+            clean_cand.lstrip("./"),
+        }
 
     def _is_single_line_stub_or_path(raw_line: str) -> bool:
         line_clean = raw_line.strip()
@@ -55,9 +78,9 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
             return True
         if uncommented in STUB_PATTERNS or line_clean in STUB_PATTERNS:
             return True
-        if BARE_PATH_REGEX.match(uncommented):
+        if is_bare_path_line(uncommented):
             return True
-        if uncommented in cand_variants:
+        if uncommented in cand_variants or uncommented.lstrip("./") in cand_variants:
             return True
         return False
 

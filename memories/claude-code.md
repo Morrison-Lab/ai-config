@@ -714,6 +714,17 @@ carries a "schema checks shape, not substance" reminder in its
 model/effort-routing section — this incident is the concrete case behind
 that addition.)
 
+## Workflow phase persistence --- an embedded-JSON persist prompt hits the request ceiling
+
+A Workflow script has no filesystem API, so the tempting checkpoint move is a cheap `agent()` whose prompt embeds the phase output verbatim ("Write this JSON to `<path>`").
+That prompt scales with the output, and the fan-in phases are exactly the ones that outgrow the request limit: a Scout-phase blob (106 findings from 10 scouts) made the persist agent's request ~202,713 tokens against a 200,000 limit, failing with `Prompt is too long`, while the smaller later phases (consolidated ideas, overlap assessments, synthesis) persisted fine --- so the failure arrives as a lost checkpoint at the phase you most wanted saved.
+Nothing was actually lost: the run's journal (`subagents/workflows/<run-id>/journal.jsonl`, the same artifact the entry above reads for degenerate synthesis output) records every completed `agent()` result as a `{"type":"result",...}` line, and the file was reconstructed from it afterwards in a few lines of Python.
+(Measured 2026-08-23, Windows 11 local Claude Code session.)
+
+- **Do:** persist large workflow intermediates by extracting from the run's `journal.jsonl` (during or after the run), or hand the persist agent a path to read from rather than the content itself;
+  reserve embedded-JSON persist prompts for small blobs, well under ~100k tokens.
+- **Don't:** embed an unbounded phase output verbatim in a persist agent's prompt --- the scout/fan-in phases are the ones that outgrow the request limit, and nothing warns before the oversized call fails.
+
 ## Edit two-step move — delete-only silently drops content
 
 Relocating a block of text with `Edit` (an `old_string` that spans the
@@ -1129,3 +1140,15 @@ Confirm with `check-mwc --id "<uuid>"` returning exit 0 before relying on it,
 and if a merge is still blocked after that, re-derive the id from a live
 merge attempt's own denial message rather than trusting the scratchpad guess
 a second time.
+
+## An UNQUOTED Bash-tool heredoc delimiter executes backtick spans inside the body
+
+Writing a markdown file through `python3 - <<PY` (unquoted delimiter, chosen so a shell variable would interpolate) lets the shell run command substitution INSIDE the Python source: a markdown code span (a filename in backticks) inside a Python string literal was executed as a shell command (`command not found` on stderr) and replaced with its empty output, so the written file carried an empty link text --- `[](reddit-access.md)` --- with no error in the file itself.
+The corruption was caught only by grepping the emitted file.
+(Measured 2026-08-23, Windows 11 / Git Bash local Claude Code session.)
+
+Same backtick-hazard family as `CLAUDE.md`'s "PowerShell CLI Command Safety" section (double-quoted command arguments), and the sibling of its "Tool transport collapses doubled backslashes" entry (QUOTED heredocs);
+the unquoted-delimiter case was written down nowhere.
+
+- **Do:** use a quoted heredoc delimiter (`<<'PY'`) whenever the body carries backticks or dollar signs, pass dynamic values in via a separately-exported environment variable or a placeholder substitution, and grep the emitted file for the expected spans afterwards.
+- **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.

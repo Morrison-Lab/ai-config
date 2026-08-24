@@ -946,3 +946,21 @@ Dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`.
 - **Don't:** re-derive "the review workflow is broken repo-wide" from one PR's comments without checking `list_workflow_runs` first.
 - **Don't:** count a listener's own error as one of the retries in [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "retry once, then treat as unreachable" rule.
 (2026-08-07, `Morrison-Lab/ai-config#1238`.)
+
+## A job log's findings ride on `##[error]` annotation lines --- filtering annotations deletes the findings
+
+Reading a failed check's job log through `grep -v` on `##[` (the natural move,
+since `##[group]`/`##[endgroup]` noise dominates the log)
+also deletes the `##[error]` lines,
+which is where `check-new-line-breaks.py`-style checkers print each finding.
+The summary count line ("2 line(s) need a semantic break") survives the filter,
+so the log reads as a check that reported a total and withheld the specifics ---
+inviting a guess at what was flagged.
+(Measured 2026-08-23 on ai-config#2060:
+two CI rounds were spent fixing guessed findings
+because the filter ate the two `##[error]` lines naming the real ones.)
+
+- **Do:** hunt a failure's specifics by grepping the log FOR `##[error]` and `##[warning]`,
+  or dump the failing step's segment raw (`sed -n '/step marker/,/end marker/p'`).
+- **Don't:** strip `##[`-prefixed lines while looking for what a checker flagged ---
+  that filter removes annotations, and annotations are the findings.

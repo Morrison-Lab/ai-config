@@ -327,6 +327,13 @@
             "timeout": 10,
             "script": "no-push-without-self-review.py",
             "why": "cai: don't push until you run self-review locally and get a clean verdict, and use an adversarial subagent for the local self-review -- blocks git push in PreToolUse unless an `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship, or the push itself is prefixed with ALLOW_UNREVIEWED_PUSH=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-uncited-rebuttal.py\"",
+            "timeout": 15,
+            "script": "flag-uncited-rebuttal.py",
+            "why": "shared/workflow/address-every-comment.md's 'read the cited source' rule, from Morrison-Lab/ai-config#2070 (2026-08-24): a rebuttal disputing a finding that cited an external URL was posted using only local grep evidence, never fetching the URL the reviewer named -- and the rebuttal was wrong. Warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier WebFetch/WebSearch in the transcript touched."
           }
         ]
       },

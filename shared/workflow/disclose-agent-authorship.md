@@ -31,7 +31,15 @@ A convention worth anything has to be checkable by one query rather than by read
 
 **Search for the marker as a substring, never as a whole line.**
 A body composed inside an indented code fence carries that fence's indentation into the posted comment, so the marker can arrive with leading spaces.
-Dedenting the source to column 0 is not the fix: a column-0 line ends the enclosing list item, which closes the fence and turns the marker into prose --- markdownlint MD049 catches it, and the comment stops being shown as a command at all.
+Dedenting the source to column 0 is not the fix: a column-0 line ends the enclosing list item, which closes the fence and turns the marker into prose, so the comment stops being shown as a command at all.
+Whether markdownlint notices depends on the file --- measured 2026-08-24 with `markdownlint-cli2@0.22.1` in a repo-wide run under this repo's config, the same dedent raises `MD049` (emphasis-style) in `skills/post-merge/SKILL.md`, `MD046` (code-block-style) in `commands/release-pr.md`, and **nothing at all** in `skills/st/SKILL.md`.
+Measure that repo-wide rather than by linting one file: passing a single path changes which globs and which config apply, and it reported `MD049` for all three here --- a different artifact answering a different question, per [`verify-the-right-artifact`](verify-the-right-artifact.md).
+`MD049` defaults to `consistent`, so it fires only where the document already established asterisk emphasis --- which makes the linter a partial detector here rather than the check.
+
+**That `consistent` default cuts the other way too, and it is the sharper hazard.**
+The marker is underscore-emphasised, so a marker that escapes its fence into prose becomes the document's FIRST emphasis and sets the expectation to underscore --- whereupon every pre-existing `*asterisk*` in that file starts failing.
+Measured here: adding the marker to `skills/migrate-discussion/SKILL.md` at column 0 closed the fence and turned two untouched lines 70 lines below into `MD049` errors, which read as defects in prose nobody had edited.
+So the linter does catch this file, and it reports the wrong lines.
 So the source keeps its indentation and the query drops its anchor.
 
 **The guard cannot see every body, and the gaps are worth knowing.**
@@ -53,10 +61,16 @@ A one-line status comment is short and still has a human reader, so it carries t
 
 As of 2026-08-24 the exemption covers three sites: `skills/chores/SKILL.md`'s two Dependabot commands, and the review re-request `skills/ardi/SKILL.md` mandates, whose whole body is the reviewer's own `@`-mention.
 That third one is worth naming because the first draft of this rule missed it and asserted the other two were the only instances --- an enumeration of a population nobody had queried, which is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope-claim failure.
-Derive the set before restating it:
+
+**No single query derives that set, and pretending otherwise repeats the error one level up.**
+A literal `--body "@...` grep finds the two Dependabot sites and cannot find the third: per [`memories/mention-triggers.md`](../../memories/mention-triggers.md), the reviewer's handle is deliberately never spelled contiguously in a source file, because a diff view renders the file and the mention gate is a raw substring test.
+So the handle that most needs the exemption is the one no handle-based search can see.
+
+Run both, and read the second as the reason the first is incomplete:
 
 ```bash
-grep -rn -- '--body "@\|--message "@' --include="*.md" --include="*.sh" .
+grep -rn -- '--body "@' --include='*.md' --include='*.sh' .   # literal handles
+grep -rn 'review re-request\|re-request review\|trigger phrase' skills/  # the assembled one
 ```
 
 - **Do:** omit the marker on a comment whose whole body is a command addressed to another bot.

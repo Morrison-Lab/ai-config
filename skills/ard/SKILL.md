@@ -171,6 +171,8 @@ resolve via GraphQL (`RESOLVE_REVIEW_THREAD`):
 # /tmp/reply-<comment_id>.md silently writes to the wrong file)
 cat > "/tmp/reply-<comment_id>.md" <<'EOF'
 ✅ Addressed in `<sha>`.
+
+_Posted by Claude Code (AI agent) --- not written by a human._
 EOF
 gh api "repos/{owner}/{repo}/pulls/<N>/comments" \
   -F in_reply_to="<comment_id>" -F body="@/tmp/reply-<comment_id>.md"   # REPLY_REVIEW_COMMENT
@@ -191,6 +193,8 @@ In a remote/web session without `gh`, resolve `RESOLVE_REVIEW_THREAD` via
 ```bash
 cat > "/tmp/reply-<discussion_id>.md" <<'EOF'
 Addressed in `<sha>`.
+
+_Posted by Claude Code (AI agent) --- not written by a human._
 EOF
 glab api -X POST "projects/:id/merge_requests/<N>/discussions/<discussion_id>/notes" \
   -F body="@/tmp/reply-<discussion_id>.md"

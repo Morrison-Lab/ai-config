@@ -87,7 +87,9 @@ this is outward-facing and hard to reverse.
 3. Comment on the discussion pointing at the new issue, then close it:
 
    ```bash
-   gh api graphql -f discussionId='<discussion-id>' -f body='Moved to <issue-url> to track the actionable work.' -f query='
+   gh api graphql -f discussionId='<discussion-id>' -f body='Moved to <issue-url> to track the actionable work.
+
+   _Posted by Claude Code (AI agent) --- not written by a human._' -f query='
      mutation($discussionId: ID!, $body: String!) {
        addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {
          comment { url }

@@ -153,7 +153,7 @@ class PRClaimManager:
             claim_body = (
                 f"Orchestrator worker is working on this via draft PR "
                 f"#{result.get('pr_number')} -- please hold off until done."
-                "\n\n_Posted by Claude Code (AI agent) -- not written by a human._"
+                "\n\n_Posted by Claude Code (AI agent) --- not written by a human._"
             )
             comment_cmd = ["gh", "issue", "comment", str(issue_number), "--body", claim_body]
             if effective_repo:

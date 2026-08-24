@@ -98,10 +98,14 @@ that's your claim.)
 ```bash
 PR=$(gh pr view --json number,headRefName -q .number 2>/dev/null)   # VIEW_PR
 gh pr view "$PR" --json comments \
-  -q '.comments[] | select(.body | test("hold off|paws off"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
+  -q '.comments[] | select(.body | test("hold off|paws off|unclaim|released|PR is free"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
-The alternation is deliberate: claims posted before 2026-08-24 say "paws off", and a claim stays live on activity rather than on age, so an old-wording claim can be live right now.
+The alternation is deliberate, and it covers RELEASES as well as claims.
+Claims posted before 2026-08-24 say "paws off", and a claim stays live on activity rather than on age, so an old-wording claim can be live right now.
+The release terms matter because the old wording made them free: `paws off released` contains `paws off`, so one grep surfaced both sides of the exchange.
+`claim released` contains neither claim term, so a claim-only query returns the claim and not its release --- and step 3 below asks whether the claim "hasn't been unclaimed", which that output cannot answer.
+A released PR would read as live-claimed, and this skill would refuse a legitimate push.
 A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one --- see [`claim-pr`](../../shared/workflow/claim-pr.md).
 
 If the latest claim comment is from someone **other than you**, hasn't been unclaimed, and is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**

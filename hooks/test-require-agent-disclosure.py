@@ -102,11 +102,19 @@ CASES = [
     ("heredoc IS the body, and discloses",
      'gh pr comment 12 --body-file - <<\'EOF\'\nDone.\n\n' + MARKER
      + '\nEOF', False),
+    # `--body-file -` is genuinely unreadable-by-flag, and the heredoc makes the
+    # body visible anyway -- so this must report MISSING, not "cannot read".
     ("heredoc IS the body, and does not disclose",
-     'gh pr comment 12 --body-file - <<\'EOF\'\nDone, undisclosed.\nEOF', True),
+     'gh pr comment 12 --body-file - <<\'EOF\'\nDone, undisclosed.\nEOF', "missing"),
     ("a doc heredoc does not silence a real sibling command",
      'cat > d.md <<\'EOF\'\ngh pr comment <N> --body "x"\nEOF\ngh pr comment 2 --body "bare"',
      True),
+    # The fixture above proves only that the sibling is SEEN. This one proves
+    # the heredoc cannot vouch for it: the doc being written quotes the marker
+    # verbatim, which is the normal shape when editing this very corpus.
+    ("a heredoc quoting the marker does not vouch for a bare sibling",
+     'cat > frag.md <<\'EOF\'\nEnd every body with:\n\n' + MARKER
+     + '\nEOF\ngh pr comment 2 --body "bare claim"', True),
 
     # --- the exemption is whole-body, not first-token (review finding 8) ------
     ("a bot handle followed by prose for humans is NOT exempt",
@@ -114,6 +122,32 @@ CASES = [
      'humans reading this thread: I will also rerun CI"', True),
     ("the review re-request is exempt",
      'gh pr comment 12 --body "@' + 'claude review"', False),
+
+    # --- a READ is not a post; round-2 review finding 3 ----------------------
+    ("gh api GET of comments is a read, not a post",
+     'gh api repos/o/r/issues/12/comments --paginate | jq -s \'.\'', False),
+    ("gh pr review --approve posts no prose",
+     'gh pr review 12 --approve', False),
+    ("gh pr review WITH a body is a post",
+     'gh pr review 12 --request-changes --body-file /tmp/r.md', None),
+
+    # --- forge-API comment routes; round-2 review finding 8 ------------------
+    ("glab api discussion note",
+     'glab api -X POST "projects/:id/merge_requests/5/discussions/9/notes" '
+     '-f body="Addressed."', True),
+    ("gh api graphql addDiscussionComment",
+     "gh api graphql -f body='Moved.' -f query='mutation { "
+     "addDiscussionComment(input:{}) { comment { url } } }'", True),
+    ("gh api graphql addDiscussionComment WITH marker",
+     "gh api graphql -f body='Moved.\n\n" + MARKER + "' -f query='mutation { "
+     "addDiscussionComment(input:{}) { comment { url } } }'", False),
+
+    # --- the exemption must survive a trailing token; round-2 finding 5 ------
+    ("chores site verbatim, with its trailing comment",
+     'gh pr comment "$N" --repo "$REPO" --body "@dependabot rebase"   '
+     '# COMMENT_PR', False),
+    ("bot body followed by another flag",
+     'gh pr comment 12 --body "@dependabot rebase" --repo o/r', False),
 
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
@@ -138,7 +172,11 @@ def run():
     failed = 0
     for label, command, expect in CASES:
         reason = guard.verdict(command)
-        if expect is None:
+        if expect == "missing":
+            ok = reason is not None and "no agent-disclosure marker" in reason
+            print(f"{'PASS' if ok else 'FAIL'}: {label} "
+                  f"(reported missing={ok})")
+        elif expect is None:
             # Must warn, and specifically about a body it could not read --
             # accusing a command of omitting a marker never seen is the
             # misdiagnosis review finding 9 named.

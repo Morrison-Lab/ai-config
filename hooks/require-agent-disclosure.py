@@ -45,6 +45,9 @@ command-position segment is judged on its own text.
 Covers the Bash CLI forms and the `mcp__github__*` comment tools, since a
 remote/web session has no `gh` at all and MCP is its only path there
 (`CLAUDE.md`, "Skills that call gh/glab: fall back to tool-mappings.md").
+That second half needs a SECOND registration: `hooks.json` matches hooks by
+tool name, so an entry under `Bash` alone never reaches an MCP call however
+many MCP tool names this file lists.
 
 Fails OPEN: any parse problem returns 0 with no output.
 """
@@ -62,13 +65,26 @@ import sys
 _POST_CMDS = (
     r"gh\s+pr\s+comment",
     r"gh\s+issue\s+comment",
-    r"gh\s+pr\s+review\b",
+    # A review needs a BODY flag to be a comment. `gh pr review 12 --approve`
+    # posts no prose at all, so there is nothing to disclose and warning on it
+    # spends the guard's credibility on a command it cannot be about.
+    r"gh\s+pr\s+review\b[^\n;|&]*(?:--body\b|--body-file\b|-b\s|-F\s)",
     # `glab ... comment` is a real alias of `... note`; both spellings ship.
     r"glab\s+mr\s+(?:note|comment)",
     r"glab\s+issue\s+(?:note|comment)",
-    # The raw-API form `memories/git.md` prescribes for bodies carrying
-    # backticks, and the only way to post a REVIEW-THREAD reply.
-    r"gh\s+api\s+[^\n;|&]*(?:/comments|/replies)",
+    # The raw-API forms `memories/git.md` prescribes for bodies carrying
+    # backticks, and the only route to a REVIEW-THREAD reply or a discussion
+    # comment. A body-supplying FIELD FLAG is required rather than just the
+    # path: `gh api .../comments` with no field is the review-READ that
+    # `CLAUDE.md`'s own re-check section prescribes and every ARDI round runs,
+    # and a guard that fires on the common read is one nobody reads on the
+    # rare write.
+    r"gh\s+api\s+[^\n;|&]*(?:/comments|/replies|/notes)"
+    r"[^\n;|&]*(?:-f|-F|--field|--raw-field)\s+body=",
+    r"gh\s+api\s+graphql[^\n;|&]*(?:addDiscussionComment|addComment)",
+    # GitLab's raw-API discussion-note form, the counterpart to the above.
+    r"glab\s+api\s+[^\n;|&]*/(?:notes|discussions)"
+    r"[^\n;|&]*(?:-f|--field|--raw-field)\s+body=",
 )
 _ANCHOR = (
     r"(?:^|[;&|\n({`]|\b(?:then|else|elif|do|if|while|until)\s|!\s*)\s*"
@@ -137,9 +153,15 @@ HAS_INLINE_BODY_RE = re.compile(
 # GitHub renders, and a diff view renders this file -- so spelling it here
 # would summon the bot from a source file.
 _BOT_HANDLES = "|".join(["dependabot", "renovate", "copilot", "cl" + "aude"])
+# The `\1` closing quote ends it -- NOT `$`. Anchoring to end-of-segment
+# required `--body` to be the last flag, so the corpus's own two Dependabot
+# sites both warned: `gh pr comment "$N" --repo "$REPO" --body "@dependabot
+# rebase"   # COMMENT_PR` has a trailing comment, and `--body "..." --repo o/r`
+# has a trailing flag. Acting on that warning would mean appending prose to a
+# body Dependabot parses, which is the harm the exemption exists to avoid.
 BOT_COMMAND_RE = re.compile(
     r"--(?:body|message)\s+([\"'])\s*@(?:" + _BOT_HANDLES + r")\b"
-    r"[ \w-]{0,40}\s*\1\s*$",
+    r"[ \w-]{0,40}\s*\1",
     re.IGNORECASE,
 )
 
@@ -210,24 +232,51 @@ def split_segments(text):
     return segments
 
 
+# Placeholder standing in for a heredoc body. Carries no shell separator, so it
+# survives segmentation intact and keeps its body attached to the ONE segment
+# that opened it.
+SLOT = "\x00HEREDOC{}\x00"
+SLOT_RE = re.compile(r"\x00HEREDOC(\d+)\x00")
+
+
 def strip_heredocs(command):
-    """Remove heredoc BODIES, keeping the rest of the opener line.
+    """Remove heredoc BODIES, keeping the opener tail and a body placeholder.
 
     Only the body is prose. The opener line's tail is still shell and routinely
     carries the very command being looked for -- piping a heredoc into
     `--body-file -` is the idiomatic way to post a multi-line body. Same
     reasoning, and the same lesson, as `warn-pr-create-without-dupe-check.py`.
+
+    Returns (stripped_text, bodies). A plain strip was not enough: the body a
+    segment consumes has to stay attached to THAT segment, or a doc-writing
+    heredoc quoting the marker vouches for a bare comment elsewhere in the call.
+    Dropping `<<` along with the body also erased the only signal that a segment
+    had a heredoc at all, so the placeholder carries it.
     """
-    return HEREDOC_RE.sub(lambda m: m.group(2), command)
+    bodies = []
+
+    def take(m):
+        bodies.append(m.group(0))
+        return m.group(2) + " " + SLOT.format(len(bodies) - 1)
+
+    return HEREDOC_RE.sub(take, command), bodies
 
 
-def heredoc_bodies(command):
-    """The heredoc bodies, which may themselves be the comment body."""
-    return "\n".join(m.group(0) for m in HEREDOC_RE.finditer(command))
+def bodies_for(segment, bodies):
+    """The heredoc bodies this segment actually opened."""
+    return "\n".join(bodies[int(i)] for i in SLOT_RE.findall(segment)
+                      if int(i) < len(bodies))
 
 
 def judge_segment(segment, extra):
-    """Return a warning for one command-position segment, or None."""
+    """Return a warning for one command-position segment, or None.
+
+    `extra` is supplied ONLY when this segment actually references a heredoc.
+    Passing every heredoc body to every segment let a doc-writing heredoc that
+    merely QUOTED the marker vouch for a bare comment posted later in the same
+    call -- which is exactly the per-segment property this function exists to
+    provide, defeated by the argument meant to support it.
+    """
     text = segment + "\n" + extra
     if BOT_COMMAND_RE.search(segment):
         return None
@@ -235,6 +284,13 @@ def judge_segment(segment, extra):
         return None
     if EMOJI_DISCLOSURE_RE.search(text):
         return EMOJI
+    # A heredoc body we actually READ settles it: the body is in hand and
+    # carries no marker, so this is a missing marker rather than an unseen one.
+    # `--body-file -` is unreadable BY FLAG and readable in fact when its stdin
+    # is the heredoc, and reporting "cannot read" over a body just read is the
+    # same misdiagnosis the `-F <file>` case produced.
+    if extra:
+        return MISSING
     if UNREADABLE_RE.search(segment) or not HAS_INLINE_BODY_RE.search(segment):
         return UNREADABLE
     return MISSING
@@ -242,15 +298,16 @@ def judge_segment(segment, extra):
 
 def verdict_bash(command):
     """Return a warning string for a Bash command, or None."""
-    stripped = strip_heredocs(command)
+    stripped, bodies = strip_heredocs(command)
     if not POST_RE.search(stripped):
         return None
-    extra = heredoc_bodies(command)
     warnings = []
     for segment in split_segments(stripped):
         if not POST_RE.search("\n" + segment):
             continue
-        found = judge_segment(segment, extra)
+        # A heredoc body IS this segment's comment body only when this segment
+        # opened it. Elsewhere it is somebody else's prose.
+        found = judge_segment(segment, bodies_for(segment, bodies))
         if found and found not in warnings:
             warnings.append(found)
     if not warnings:

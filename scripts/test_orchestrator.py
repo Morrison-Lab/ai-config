@@ -544,6 +544,23 @@ class TestSpecializedSubagents(unittest.TestCase):
         res15 = extract_files_from_markdown(text15)
         self.assertEqual(res15, {})
 
+        # Generic extensions (vue, proto, mdc, jsonc, service, env, etc.)
+        text16 = "```scripts/foo.py\nconfig.env\n```"
+        res16 = extract_files_from_markdown(text16)
+        self.assertEqual(res16, {})
+
+        text17 = "```scripts/foo.py\napp.vue\nmain.proto\n```"
+        res17 = extract_files_from_markdown(text17)
+        self.assertEqual(res17, {})
+
+        text18 = "```scripts/foo.py\n.cursor/rules/a.mdc\n```"
+        res18 = extract_files_from_markdown(text18)
+        self.assertEqual(res18, {})
+
+        text19 = "```scripts/foo.py\nsettings.jsonc\nunit.service\n```"
+        res19 = extract_files_from_markdown(text19)
+        self.assertEqual(res19, {})
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 

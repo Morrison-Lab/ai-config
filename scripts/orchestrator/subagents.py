@@ -28,16 +28,8 @@ CANDIDATE_FILE_REGEX = re.compile(
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
 
-KNOWN_SOURCE_EXTENSIONS = {
-    "py", "md", "yml", "yaml", "json", "sh", "bash", "zsh", "toml", "txt", "ini", "cfg", "conf",
-    "js", "ts", "jsx", "tsx", "qmd", "r", "c", "cpp", "h", "hpp", "go", "rs", "java", "rb",
-    "html", "css", "scss", "sql", "csv", "tsv", "xml", "svg", "dockerfile", "lock", "gz", "tar",
-    "zip", "patch", "diff",
-}
-
-
 def is_bare_path_line(s: str) -> bool:
-    """Return True if string is a normalized repo-relative or bare filename with a recognized extension."""
+    """Return True if string is a normalized repo-relative path, dotfile, or bare filename."""
     clean = s.replace("\\", "/").strip("`'\" \t\r\n")
     while clean.startswith("./") or clean.startswith("/"):
         clean = clean.lstrip("./")
@@ -46,15 +38,25 @@ def is_bare_path_line(s: str) -> bool:
     # Pure numeric or version numbers (e.g. 1.0.0, 3.14) are not file paths
     if re.match(r"^\d+(?:\.\d+)+$", clean):
         return False
+    # Domain names with no directory slash (e.g. example.com) are not file paths
+    if "/" not in clean and re.search(r"\.(?:com|org|net|io|dev|ai|edu|gov|mil|info|biz|me|app|xyz)$", clean, re.IGNORECASE):
+        return False
+    # Multiple dots without a directory separator (e.g. module.exports.foo) are property accesses or dotted identifiers
+    if "/" not in clean and clean.count(".") >= 2 and not clean.endswith((".tar.gz", ".tar.bz2", ".tar.xz")):
+        return False
     # Must not contain code syntax characters or whitespace
     if any(c in clean for c in " \t()[]{}=:;,<>\"'\\"):
         return False
     parts = clean.split("/")
     filename = parts[-1]
-    if "." in filename and not filename.startswith("."):
+    # Dotfiles (e.g. .gitignore, .env, .eslintrc) or files with extension (.py, .vue, .proto, .mdc, .service, etc.)
+    if filename.startswith(".") and len(filename) > 1:
+        if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
+            return True
+    elif "." in filename:
         ext = filename.split(".")[-1].lower()
         stem = ".".join(filename.split(".")[:-1])
-        if ext in KNOWN_SOURCE_EXTENSIONS and not stem.isdigit():
+        if not stem.isdigit() and 1 <= len(ext) <= 12 and re.match(r"^[a-zA-Z0-9]+$", ext):
             if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
                 return True
     return False

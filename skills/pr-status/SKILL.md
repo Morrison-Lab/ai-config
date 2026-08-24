@@ -326,15 +326,21 @@ Render a **Review Summary Table** for the PR:
   If no SHA is named, display `[⚠️ Unverified](url)`.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
-  For self-authored PRs, note `*Self-authored* (GitHub prevents requesting review from author)`.
+  If human review has requested changes, flag `❌ Changes requested by <login>`.
+  For self-authored PRs, note `*Self-authored*`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
-- **Next Step** --- computed next transition:
-  - `Ready for self-merge` (Self-authored, AI approved, CI green).
-  - `Ready for human review` (External author, AI approved, CI green, human review requested).
-  - `Request human review` (External author, AI approved, CI green, human review not yet requested).
-  - `Drive to clean (ARDI)` (AI review has open findings).
-  - `Fix CI / In-flight` (CI failing or review in progress).
-  - `Resolve conflicts (Sync main)` (Behind main).
+- **Next Step** --- computed deterministically using the full state matrix:
+  - If `isDraft`: `Draft (Work in progress)`.
+  - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
+  - If branch is behind main: `Resolve conflicts / Sync main (<N> commits behind)`.
+  - If CI is failing: `Fix CI (<failing-check>)`.
+  - If unaddressed review threads remain: `Resolve inline threads (<N> open)`.
+  - If AI review has open findings: `Drive to clean (ARDI)`.
+  - If AI review is running: `In-flight AI review`.
+  - If fully clean (no human blocks, AI/external review clean, CI green, 0 open threads, up to date with main):
+    - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.
+    - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
+    - If `Author` is external and human review is not yet requested: `Request human review`.
 
 State, plainly: the latest review's verdict, who/what posted it, and the list
 of any open findings (or "none"). If you read `null`, say the filter didn't

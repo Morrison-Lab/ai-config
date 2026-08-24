@@ -53,15 +53,14 @@ calls in one message) so they run at once. The fan-out is read-only, so it
 needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
-Give each subagent its PR number and `headRefName`, and have it gather the **seven independent signals** below and return one structured row.
+Give each subagent its PR number, `headRefName`, and `isDraft`, and have it gather the **seven independent signals** below and return one structured row.
 Carry the disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST review* will silently misreport:
 
 A subagent starts **fresh** --- it sees only this prompt, not this skill file ---
 so **inline the exact commands**; don't point it at a section it can't read.
-Fill in `<N>`, `<headRefName>`, `<owner>`, `<repo>` for each PR (resolve
-owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"'`):
+Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (resolve owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"'`):
 
-> Gather the status of PR **#<N>** (branch `<headRefName>`) in this repo and return a single structured row.
+> Gather the status of PR **#<N>** (branch `<headRefName>`, draft: `<isDraft>`) in this repo and return a single structured row.
 > Do not push, merge, or modify anything.
 >
 > 1. **Latest review verdict, checked for currency against the head, with hyperlinked comment URL.** Read
@@ -83,11 +82,9 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    If `.review` is `null`, the reviewer may post as `github-actions[bot]` or another login -- **never report "clean"**; broaden the filter or say no review was found.
 >    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review predates the latest push** -- report `[⏳ In-Flight / Stale](url)` (or `in-flight`), not the review body's verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so a plain string comparison works).
 >    **This timing comparison is best-effort, not proof** -- a review run *started* against an older commit can finish and post *after* a newer push lands, making `createdAt` look current even though the reviewed content is stale (issue comments carry no structured `commit_id` to check directly, unlike formal reviews).
->    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (part of the same call above) as a corroborating signal;
->    treat a mismatch as `[⏳ In-Flight](url)` even if the timing check alone would have said `clean`.
+>    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (part of the same call above) as a corroborating signal; treat a mismatch as `[⏳ In-Flight](url)` even if the timing check alone would have said `clean`.
 >    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `[⚠️ Unverified](url)` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
->    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally;
->    no SHA named means `[⚠️ Unverified](url)`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading, hyperlinked as `[✅ Clean (Round N)](url)` or `[✅ Approved](url)`.
+>    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `[⚠️ Unverified](url)`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading, hyperlinked as `[✅ Clean (Round N)](url)` or `[✅ Approved](url)`.
 >    A rebuttal the reviewer still disputes is **open** (`[❌ Needs Work (Round N)](url)`), not clean.
 > 2. **External reviewer verdict (a formal Copilot review, or a human's formal review at the head) -- read-only, don't request one.**
 >    The comment above is the `@claude` bot only;
@@ -125,9 +122,12 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >       | map(sort_by(.submitted_at) | last
 >             | {id, login: .user.login, state, submitted_at})'
 >    ```
->    Exclude `DISMISSED` reviews before reading anything.
->    Reduce per reviewer via `group_by(.user.login)`.
->    Judge each matched review by **substance, not state**.
+>    The `head=` line is repeated deliberately so this block is self-contained: shell state does not persist across separate Bash invocations, and a subagent that runs each fence as its own call would otherwise pass an empty `$h` that matches no review's `commit_id` -- a silent `[]` every time.
+>    The `.state != "DISMISSED"` exclusion is load-bearing: GitHub's dismiss action flips the review's own `state` in place rather than adding a new review, and retracts neither its body nor its inline threads.
+>    The `group_by(.user.login)` reduces **per reviewer** before taking each one's latest: two humans can review the same head, and a bare `| last` over the combined list would let a later clean "LGTM" from one reviewer silently drop an earlier reviewer's body-only findings.
+>    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"`, so the type field needs no bot-login blocklist (measured 2026-08-15).
+>    Judge each matched review by **substance, not state**: 106 of 106 formal reviews across 60 merged PRs on this repo are `COMMENTED`, zero `APPROVED` (measured 2026-07-30 on #668).
+>    Fetch each matched review's body and inline comments; an affirmative zero-findings read across every matched review means a genuine external verdict at the head; findings in any of them mean `N open`.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
 >    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.
@@ -135,8 +135,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >      - If human reviewer is requested (e.g. `d-morrison`), report `d-morrison`.
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
 >    - If AI review is still in-flight or unclean, report `— (AI review in progress)`.
-> 5. **Unresolved threads** -- count open inline review threads
->    (`READ_PR_REVIEW_COMMENTS`).
+> 5. **Unresolved threads** -- count open inline review threads (`READ_PR_REVIEW_COMMENTS`).
 >    ```bash
 >    gh api graphql -f query='query {
 >      repository(owner:"<owner>", name:"<repo>") {
@@ -160,12 +159,21 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    gh pr view "<N>" --json reviews \
 >      --jq '[.reviews[] | select(.author.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED"))] | group_by(.author.login) | map(sort_by(.submittedAt) | last) | [.[] | select(.state == "CHANGES_REQUESTED") | .author.login]'
 >    ```
+>    Filter to only `APPROVED`/`CHANGES_REQUESTED`/`DISMISSED` states *before* reducing to each author's latest review -- reducing over all states first lets a later `COMMENTED` round hide an earlier `CHANGES_REQUESTED` (verified with synthetic fixtures).
+>    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
+>    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None`), Next Step (`Ready for self-merge` / `Ready for human review` / `Request human review` / `Drive to clean` / `Fix CI`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
-Collect the rows the subagents return and render the **Review Summary Table**:
+Collect the rows the subagents return and **pair each with the `title`, `headRefName`, and `isDraft`** the orchestrator already has from step 1 (the subagent doesn't re-fetch these), then render the table + per-PR findings list (see *Output*) --- marking draft PRs clearly (e.g. `[#<N>](url) (Draft)`).
+
+### Graceful degradation to series
+
+If subagent fan-out is unavailable (no `Agent` tool in the session), fall back to gathering the seven signals **in series** -- loop the exact same per-PR gather (items 1-7 above, including the currency check, thread resolution, behind-main check, and the human `CHANGES_REQUESTED` check) over each PR from step 1.
+The output is the same; it is just sequential.
+Don't substitute a simplified comments-only query here -- that would silently drop the current-head, thread-resolution, and human-review guarantees the rest of this skill relies on.
 
 ## Output
 
@@ -175,14 +183,13 @@ A Markdown table, one row per open PR, with these columns:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#1091](url) | `d-morrison` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
-| [#1065](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
-| [#1087](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
-| [#1090](url) | `dem-extra1` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
-| [#1092](url) | `dem-extra1` | [✅ Clean (Round 1)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
-| [#1093](url) | `dem-extra1` | [✅ Clean (Round 1)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#101](url) | `d-morrison` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
+| [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+| [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
+| [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | — (AI review in progress) | Drive to clean (ARDI) |
+| [#105](url) (Draft) | `external-dev` | — | ⏳ Pending | — | Draft (Work in progress) |
 
-- **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
+- **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`, appended with `(Draft)` if `isDraft` is true.
 - **Author** --- author login.
 - **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
   Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
@@ -190,15 +197,21 @@ A Markdown table, one row per open PR, with these columns:
   If no SHA is named, display `[⚠️ Unverified](url)`.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+  If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
-- **Next Step** --- computed next transition:
-  - `Ready for self-merge` (Self-authored, AI approved, CI green).
-  - `Ready for human review` (External author, AI approved, CI green, human review requested).
-  - `Request human review` (External author, AI approved, CI green, human review not yet requested).
-  - `Drive to clean (ARDI)` (AI review has open findings).
-  - `Fix CI / In-flight` (CI failing or review in progress).
-  - `Resolve conflicts (Sync main)` (Behind main).
+- **Next Step** --- computed deterministically using the full state matrix:
+  - If `isDraft`: `Draft (Work in progress)`.
+  - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
+  - If branch is behind main: `Resolve conflicts / Sync main (<N> commits behind)`.
+  - If CI is failing: `Fix CI (<failing-check>)`.
+  - If unaddressed review threads remain: `Resolve inline threads (<N> open)`.
+  - If AI review has open findings: `Drive to clean (ARDI)`.
+  - If AI review is running: `In-flight AI review`.
+  - If fully clean (no human blocks, AI/external review clean, CI green, 0 open threads, up to date with main):
+    - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.
+    - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
+    - If `Author` is external and human review is not yet requested: `Request human review`.
 
 ### Extended Technical Dashboard (Optional / On Request)
 

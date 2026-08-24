@@ -147,20 +147,37 @@ zsh  -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # no path on stdout; error on
 bash -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints /etc on stdout;              rc=1
 ```
 
-**On this shape both shells exit 1, so the exit status cannot discriminate.**
-Bash's `1` comes from `ls` failing on the literal unmatched pattern while still listing `/etc`.
+**On this shape, on this machine, both shells exit 1 --- so the status cannot discriminate, while stdout can.**
 Zsh's `1` comes from the shell refusing to run `ls` at all.
-That equality is an accident of the failing command being last, and it does not generalize --- follow the glob with `;` and the status is replaced, as the command list above shows.
+Bash's comes from `ls` running, listing `/etc`, and then failing on the literal unmatched pattern it was handed.
+Those two `1`s mean opposite things, which is the point: read the `/etc` on stdout, not the status.
 
-**Read stderr for the signal, and note that nothing replaces it.**
-Once an outer redirect has discarded stderr, stdout cannot stand in: a check that ran and found nothing and a check that never ran are then identical on both stdout and status.
+Both figures are BSD `ls` on macOS, and the bash one in particular should not be carried to Linux --- GNU coreutils `ls` reserves 2 for an inaccessible command-line argument, which is exactly what the passed-through pattern becomes there.
+The platform caveat below has the measured numbers.
+The equality is also an accident of the failing command being last, and does not survive a `;`, as the command list above shows.
+
+**Read stderr for the signal.**
+Once an outer redirect has discarded it, what remains is an empty stdout where a real path was requested --- and *that* is the durable tell, because it holds on either platform and under either `ls`:
 
 ```zsh
-zsh -c 'ls -d /nonexistent1 /nonexistent2' 2>/dev/null   # ran, found nothing: empty, rc=1
-zsh -c 'ls -d /etc /nonexistent*/x'        2>/dev/null   # never ran:          empty, rc=1
+bash -c 'ls -d /etc /nonexistent*/x' 2>/dev/null   # prints /etc  -- ls ran
+zsh  -c 'ls -d /etc /nonexistent*/x' 2>/dev/null   # prints nothing -- ls never ran
 ```
 
-So preserve stderr rather than planning to recover the distinction from what remains.
+Bash passes the unmatched pattern through literally, so `ls` runs and lists `/etc` before failing on the bogus argument.
+Zsh aborts the command, so nothing is listed at all.
+Asking for a path you know exists and getting nothing back is therefore the check to run.
+
+**Do not reach for the exit status here, and do not compare it against a ran-and-found-nothing baseline, because that comparison is platform-dependent.**
+`ls -d /nonexistent1 /nonexistent2` --- two literal paths, no glob --- exits **1** under BSD `ls` and **2** under GNU coreutils `ls`, whose EXIT STATUS section reserves 2 for "serious trouble".
+The `NOMATCH` abort exits 1 on both.
+So on macOS the two cases are status-identical and on Linux they are not, and neither reading is about zsh.
+
+Measured 2026-08-24 on macOS 26.6.2 with BSD `ls`, which gives 1 and 1.
+Ubuntu with GNU coreutils and the same zsh 5.9 gives 2 and 1, measured by a reviewer on [#2129](https://github.com/Morrison-Lab/ai-config/pull/2129) who installed zsh 5.9 to check.
+Test your own environment before relying on either, per the same caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself.
+
+So preserve stderr, fall back to the empty-stdout tell, and treat the exit status as the least reliable of the three.
 
 The trigger is any unquoted glob character, not only one in a path.
 The same failure hit a `grep` during this entry's own dupe-check, because an unquoted option value was glob-expanded against the working directory:
@@ -224,6 +241,7 @@ That is the negative-control discipline the process-substitution entry above alr
 
 - **Do:** loop with `test -e`/`-d` over one path at a time, or use `find`, when checking several candidate locations.
 - **Do:** read a non-empty stderr as "the check failed to run", never as part of the answer.
+- **Do:** ask for a path you know exists, and read an empty stdout as the check never having run --- the one tell that holds on either platform once stderr is gone.
 - **Do:** quote any argument containing `*`, `?`, or `[` that is not meant as a glob, including option values like `--include="*.md"`.
 - **Do:** run the all-patterns-unmatched case before believing any glob-based existence check, since that is the case `NULL_GLOB` and `(N)` get wrong.
 - **Do:** measure a candidate `setopt` against zsh's default as a baseline, so an option that changes nothing in your shape is visible as such.
@@ -233,6 +251,7 @@ That is the negative-control discipline the process-substitution entry above alr
 - **Don't:** read an empty result from a multi-path glob check as "none of these exist" --- the paths carrying no glob were never examined either.
 - **Don't:** trust the exit status to separate a check that ran from one that never ran.
   After `;` or a newline the failed glob's status is replaced by whatever ran next, and only `&&` or `||` preserves it.
+- **Don't:** carry an `ls` exit code across platforms --- BSD returns 1 where GNU coreutils returns 2 for an inaccessible command-line argument, which has nothing to do with zsh.
 - **Don't:** assume `2>/dev/null` hid only noise.
   The line it hides is the one saying the command never ran.
 
@@ -246,5 +265,5 @@ The skip is scoped to one simple command rather than to the command list.
 `NULL_GLOB` and `(N)` print `.` when every pattern is unmatched.
 `CSH_NULL_GLOB`, which a second draft recommended as the fix, behaves like the default on the incident's own shape, because a literal path is not a pattern.
 `&&` preserves the failed glob's status, so a third draft's "discarded whenever anything follows it" was false.
-And stdout cannot stand in for discarded stderr, since a check that ran and found nothing looks identical to one that never ran.
+And an exit-code pairing offered as proof that stdout cannot discriminate was itself platform-bound: a reviewer installed zsh 5.9 on Ubuntu and measured 2 where BSD `ls` gives 1, so the argument was rebuilt on the empty-stdout tell, which holds under either `ls`.
 Each draft fixed one false claim by asserting another, which is why every option is now measured against zsh's own default as a baseline and every row is a command the reader can re-run.)

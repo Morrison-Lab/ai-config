@@ -236,6 +236,25 @@ def end_to_end_checks():
     out = run_hook(WRONG_REBUTTAL, fetch_records(NO_URL_TEXT))
     check("guard: no URL cited at all -> silent", bool(out), False)
 
+    # Guard 5 (review finding, PR#2102): an UNNUMBERED `gh pr comment` --
+    # exactly how the command is written in practice -- must not pick up an
+    # unrelated fetch from a DIFFERENT repo elsewhere in the transcript. The
+    # only fetch present here is for OtherOrg/other-repo; this worktree's own
+    # `origin` remote is Morrison-Lab/ai-config, so the git-remote fallback
+    # must reject the mismatched fetch rather than misattribute its URL.
+    cross_repo_fetch_use = {"message": {"content": [
+        {"type": "tool_use", "id": "call1", "name": "Bash",
+         "input": {"command":
+                   "gh api repos/OtherOrg/other-repo/issues/99/comments"}}]}}
+    cross_repo_fetch_result = {"message": {"content": [
+        {"type": "tool_result", "tool_use_id": "call1",
+         "content": "Finding: see unrelated-domain.example/some/page for "
+                     "background."}]}}
+    out = run_hook(WRONG_REBUTTAL,
+                   [cross_repo_fetch_use, cross_repo_fetch_result])
+    check("guard 5: unnumbered post ignores a different-repo fetch",
+          bool(out), False)
+
     # Negative control: an ordinary, non-comment-posting Bash command over
     # the SAME transcript never fires.
     transcript_path = write_transcript(fetch_records(FINDING_TEXT))

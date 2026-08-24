@@ -26,10 +26,10 @@ The wrong rebuttal read:
     written."
 
 `shared/workflow/address-every-comment.md`'s "read the cited source" rule
-already exists in prose -- referenced from CLAUDE.md as "a citation gets
-read against what the cited source actually says" -- but nothing enforced it
-at the moment it mattered: before posting a reply that disputes a finding
-which named a specific external source.
+already exists in prose -- `shared/workflow/self-review-fallback.md` states
+it as "a citation gets read against what the cited source actually says"
+-- but nothing enforced it at the moment it mattered: before posting a
+reply that disputes a finding which named a specific external source.
 
 THE CHECK
 ---------
@@ -84,6 +84,7 @@ that cannot establish its own precondition must not fire.
 import json
 import os
 import re
+import subprocess
 import sys
 from urllib.parse import urlparse
 
@@ -194,6 +195,34 @@ def extract_repo(command):
     if m:
         return m.group(1), m.group(2)
     return None, None
+
+
+RX_GIT_REMOTE = re.compile(r"[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?$")
+
+
+def resolve_repo_from_git(cwd):
+    """(owner, repo) inferred from `origin`'s URL at `cwd` -- the same source
+    `gh pr comment`/`gh issue comment` themselves use when no repo is named
+    explicitly on the command line. This is what lets clause 3 tell a
+    same-repo fetch from an unrelated one when the post command carries no
+    `-R` flag, which is the common case: `gh pr comment N --body-file f`
+    names no repo at all, inferring it from the working tree exactly as
+    this function does.
+
+    Fails open to (None, None) on any git or parse trouble -- this is a
+    fallback signal that sharpens attribution, never a precondition for the
+    hook to fire.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "-C", cwd, "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None, None
+    if out.returncode != 0:
+        return None, None
+    m = RX_GIT_REMOTE.search(out.stdout.strip())
+    return (m.group(1), m.group(2)) if m else (None, None)
 
 
 def parse_comment_post(command, cwd):
@@ -424,6 +453,18 @@ def find_cited_urls(records, owner, repo, number):
                 fetch_num, fetch_owner, fetch_repo = pending.pop(use_id)
                 if number is not None and fetch_num is not None and fetch_num != number:
                     continue
+                # A fetch naming a DIFFERENT repo than the one this comment
+                # is being posted to is never a match, even when the PR/issue
+                # number is unresolved -- `owner`/`repo` here is already the
+                # post command's own repo, git-remote-resolved as a fallback
+                # by the caller when the command carried no `-R`. Without
+                # this, an unnumbered `gh pr comment` with an unrelated
+                # earlier fetch anywhere in the transcript (a different repo
+                # entirely) could be misattributed as this PR's citation.
+                if (owner and repo and fetch_owner and fetch_repo
+                        and (fetch_owner.lower() != owner.lower()
+                             or fetch_repo.lower() != repo.lower())):
+                    continue
                 effective_owner = owner or fetch_owner
                 effective_repo = repo or fetch_repo
                 urls = external_urls(_result_text(b), effective_owner, effective_repo)
@@ -522,6 +563,14 @@ def main() -> int:
         owner, repo, number, body_text = parsed
         if not DISPUTE_CUE.search(body_text):
             return 0
+        if not owner or not repo:
+            # `gh pr comment`/`gh issue comment` routinely carry no `-R`,
+            # inferring the repo from the working tree exactly as this
+            # fallback does. Resolving it here is what lets find_cited_urls
+            # reject a same-shaped fetch belonging to an unrelated repo.
+            git_owner, git_repo = resolve_repo_from_git(cwd)
+            owner = owner or git_owner
+            repo = repo or git_repo
 
         transcript_path = payload.get("transcript_path") or ""
         if not transcript_path or not os.path.isfile(transcript_path):

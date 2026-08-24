@@ -1201,6 +1201,78 @@ def main() -> int:
         check(f"a body carrying the agent marker {agent_marker!r} is not excluded",
               not checker.is_non_review_notice(body))
 
+    # `run_cmd` must decode as UTF-8 explicitly. On Windows `text=True` alone
+    # decodes with cp1252, and a `gh` payload carrying any non-cp1252 byte kills
+    # subprocess's reader thread -- leaving returncode 0 and stdout None, so the
+    # returncode guard passes and the caller sees an AttributeError instead of a
+    # decode error. Asserting on the kwarg rather than on behaviour because the
+    # failure only reproduces under a cp1252 locale, which CI does not run.
+    class _FakeCompleted:
+        returncode = 0
+        stdout = "{}"
+        stderr = ""
+
+    recorded_kwargs = {}
+
+    def _fake_run(cmd, **kwargs):
+        recorded_kwargs.update(kwargs)
+        return _FakeCompleted()
+
+    with patch.object(checker.subprocess, "run", _fake_run):
+        checker.run_cmd(["gh", "api", "whatever"])
+    check("run_cmd decodes subprocess output as UTF-8 explicitly",
+          recorded_kwargs.get("encoding") == "utf-8")
+    check("negative control: it still captures output",
+          recorded_kwargs.get("capture_output") is True)
+    # `text` must NOT be pinned: subprocess's docs say text mode is triggered by
+    # any of text/encoding/errors/universal_newlines, so `encoding` already
+    # selects it. Asserting text=True would turn a redundant kwarg into a tested
+    # contract and fail whoever later simplifies the call correctly.
+    check("run_cmd does not also pass a redundant text= kwarg",
+          "text" not in recorded_kwargs)
+
+    # When stdout IS None despite a zero exit, it must exit 2 rather than raise
+    # RuntimeError. Two things depend on that, and a RuntimeError breaks both:
+    # `_resolve_run_head_sha` catches RuntimeError and returns None, which would
+    # convert this environment failure into a plausible-looking finding bullet;
+    # and exit 1 is this script's "not clean" code.
+    class _NoneStdout:
+        returncode = 0
+        stdout = None
+        stderr = ""
+
+    with patch.object(checker.subprocess, "run", lambda cmd, **kw: _NoneStdout()):
+        try:
+            checker.run_cmd(["gh", "api", "whatever"])
+            outcome = "returned normally"
+        except SystemExit as exc:
+            outcome = f"SystemExit:{exc.code}"
+        except RuntimeError:
+            outcome = "RuntimeError"
+        except AttributeError:
+            outcome = "AttributeError"
+    check("run_cmd exits 2 (not 1) when stdout is None, so it is not a verdict",
+          outcome == f"SystemExit:{checker.USAGE_EXIT}")
+    check("negative control: and it is neither RuntimeError nor AttributeError",
+          outcome not in ("RuntimeError", "AttributeError", "returned normally"))
+
+    # The regression that made `die` mandatory rather than merely tidier: a
+    # RuntimeError from run_cmd is swallowed by _resolve_run_head_sha, so the
+    # environment failure would surface as an ordinary "no review at this HEAD"
+    # finding. Pin that it escapes instead.
+    with patch.object(checker.subprocess, "run", lambda cmd, **kw: _NoneStdout()):
+        try:
+            checker._resolve_run_head_sha(
+                "See the run: https://github.com/o/r/actions/runs/123", "o/r"
+            )
+            escaped = False
+        except SystemExit:
+            escaped = True
+        except Exception:
+            escaped = False
+    check("a None-stdout failure escapes _resolve_run_head_sha's RuntimeError catch",
+          escaped)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

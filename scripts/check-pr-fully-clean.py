@@ -62,7 +62,31 @@ def die(message: str) -> None:
 
 def run_cmd(cmd: List[str]) -> str:
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        # `encoding` is load-bearing on Windows, not tidiness. Without it the
+        # locale codec decodes, which is cp1252 there, and cp1252 mis-handles
+        # UTF-8 in TWO ways -- the quieter one being the commoner:
+        #
+        #   * Silent mojibake, for most non-ASCII. Only five bytes are
+        #     undefined in cp1252 (0x81, 0x8D, 0x8F, 0x90, 0x9D), so a smart
+        #     quote (e2 80 9c) or U+1F600 (f0 9f 98 80) decodes WITHOUT error
+        #     into wrong characters. The JSON still parses, so callers matching
+        #     verdict phrases against a review body were silently matching
+        #     against corrupted text.
+        #   * A hard failure, only when one of those five bytes appears --
+        #     U+1F44D is f0 9f 91 8d, which carries 0x8D. The decode then
+        #     raises inside subprocess's reader THREAD, so the thread dies,
+        #     `returncode` stays 0, and `stdout` is left as None. The
+        #     returncode guard below passes and the caller sees an
+        #     AttributeError rather than anything about decoding.
+        #
+        # Strict UTF-8 fixes both: GitHub serves UTF-8, so strict is correct,
+        # and errors="replace" would preserve the silent-corruption case this
+        # is meant to end. `text=True` is omitted deliberately -- per
+        # subprocess's own docs, "Text mode is triggered by setting any of
+        # text, encoding, errors or universal_newlines", so `encoding` already
+        # selects it and naming both invites the reader to think one of them is
+        # doing separate work.
+        res = subprocess.run(cmd, capture_output=True, encoding="utf-8", check=False)
     except FileNotFoundError:
         # A missing binary is an ENVIRONMENT failure, and it must not surface as
         # exit 1 -- that is this script's "not clean" code, so an uninstalled
@@ -78,6 +102,25 @@ def run_cmd(cmd: List[str]) -> str:
         )
     if res.returncode != 0:
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr}")
+    if res.stdout is None:
+        # Defence in depth for the reader-thread failure described above, and
+        # for any future cause of it.
+        #
+        # `die` rather than `raise RuntimeError`, for two independent reasons,
+        # both of which a RuntimeError gets wrong:
+        #   * `_resolve_run_head_sha` wraps its `run_cmd` call in
+        #     `except RuntimeError: return None`. A RuntimeError here would be
+        #     swallowed there, and the caller would go on to report "No review
+        #     comment has been posted evaluating HEAD SHA ..." -- exit 1 WITH a
+        #     finding bullet, which is the one shape fully-clean.md's crash test
+        #     (rc==1 plus no `  - ` bullets) cannot distinguish from a verdict.
+        #   * SystemExit(USAGE_EXIT) exits 2, so an environment failure stays
+        #     out of the "not clean" code, which is why USAGE_EXIT exists.
+        die(
+            f"Command produced no capturable stdout ({' '.join(cmd)}); "
+            "its output could not be read or decoded. This is an environment "
+            "failure, not a verdict about the PR."
+        )
     return res.stdout.strip()
 
 

@@ -331,12 +331,25 @@ def fetch(repo, limit):
             "-f", f"query={QUERY}",
         ],
         capture_output=True,
-        text=True,
+        # `encoding` is load-bearing on Windows; see the long note in
+        # `check-pr-fully-clean.py`'s `run_cmd`. Without it the locale codec
+        # (cp1252) silently mojibakes most non-ASCII and hard-fails on five
+        # bytes, the latter leaving `stdout` as None with `returncode` 0 -- so
+        # the guard below passes and `json.loads(None)` raises TypeError, in a
+        # function whose docstring promises to fail loudly rather than return
+        # an empty set.
+        encoding="utf-8",
     )
     if proc.returncode != 0:
         raise SystemExit(
             f"pr-sweep: gh failed for {repo} (exit {proc.returncode}): "
             f"{proc.stderr.strip()}"
+        )
+    if proc.stdout is None:
+        raise SystemExit(
+            f"pr-sweep: gh produced no capturable stdout for {repo}; its output "
+            "could not be read or decoded. This is an environment failure, not "
+            "an empty sweep."
         )
     payload = json.loads(proc.stdout)
     if payload.get("errors"):

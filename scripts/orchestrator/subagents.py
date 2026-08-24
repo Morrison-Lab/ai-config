@@ -44,9 +44,6 @@ def is_bare_path_line(s: str) -> bool:
     # Domain names with no directory slash (e.g. example.com) are not file paths
     if "/" not in clean and re.search(r"\.(?:com|org|net|io|dev|ai|edu|gov|mil|info|biz|me|app|xyz)$", clean, re.IGNORECASE):
         return False
-    # Multiple dots without a directory separator (e.g. module.exports.foo) are property accesses or dotted identifiers
-    if "/" not in clean and clean.count(".") >= 2 and not clean.endswith((".tar.gz", ".tar.bz2", ".tar.xz")):
-        return False
     # Must not contain code syntax characters or whitespace
     if any(c in clean for c in " \t()[]{}=:;,<>\"'\\"):
         return False

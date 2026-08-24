@@ -598,6 +598,15 @@ class TestSpecializedSubagents(unittest.TestCase):
         res27 = extract_files_from_markdown(text27)
         self.assertEqual(res27, {})
 
+        # Bare multi-dot config / minified / typed definition filenames
+        text28 = "```scripts/foo.py\nwebpack.config.js\n```"
+        res28 = extract_files_from_markdown(text28)
+        self.assertEqual(res28, {})
+
+        text29 = "```scripts/foo.py\njquery.min.js\nfile.d.ts\n```"
+        res29 = extract_files_from_markdown(text29)
+        self.assertEqual(res29, {})
+
     def test_find_candidate_file_paths_adjacent_paths(self):
         from orchestrator.subagents import find_candidate_file_paths
 

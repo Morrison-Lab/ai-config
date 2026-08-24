@@ -7,7 +7,8 @@ Per-tool entries stay in `tools.md` unless they are about the WSL layer itself.
 ## On WSL, `npx` resolves to the Windows node and cannot see the checkout
 
 - **Running `npx --yes markdownlint-cli2@0.22.1` from a WSL session prints a CMD.EXE "UNC paths are not supported" banner plus usage help and exits 2.**
-  PATH carries `/mnt/c/Program Files/nodejs/`, so `npx` is Windows node; it starts in `C:\Windows`, never sees `.markdownlint-cli2.jsonc`, and lints nothing.
+  PATH carries `/mnt/c/Program Files/nodejs/`, so `npx` is Windows node.
+  It starts in `C:\Windows`, never sees `.markdownlint-cli2.jsonc`, and lints nothing.
   No Linux node is installed (`which node` finds nothing).
   Fetch a standalone Linux build into /tmp and prepend it to PATH:
 

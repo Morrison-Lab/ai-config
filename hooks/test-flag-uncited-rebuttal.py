@@ -115,18 +115,30 @@ def fetch_records(result_text, extra_blocks=None):
     return records
 
 
-def run_hook(body_text, records):
-    """Run the hook end-to-end over a `gh pr comment` posting `body_text`;
-    return raw stdout. Deliberately carries NO `-R`/owner-repo flag, matching
-    how this corpus actually writes the command -- see the module docstring."""
+def run_hook_cmd(command_template, body_text, records):
+    """Run the hook end-to-end over an arbitrary command; return raw stdout.
+
+    `command_template` gets `{body}` substituted with the body-file path, so
+    callers control the exact command shape -- in particular, whether it
+    carries a PR/issue number at all.
+    """
     transcript_path = write_transcript(records)
     body_path = body_file_with(body_text)
-    cmd = "gh pr comment 2070 --body-file " + body_path
+    cmd = command_template.format(body=body_path)
     payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
                "transcript_path": transcript_path, "cwd": os.getcwd()}
     proc = subprocess.run([sys.executable, SUBJECT], input=json.dumps(payload),
                           capture_output=True, text=True)
     return proc.stdout.strip()
+
+
+def run_hook(body_text, records):
+    """Run the hook end-to-end over a `gh pr comment 2070` posting
+    `body_text`; return raw stdout. Deliberately carries NO `-R`/owner-repo
+    flag, matching how this corpus actually writes the command -- see the
+    module docstring. Carries a NUMBER (2070), unlike `run_hook_cmd` used
+    directly for the unnumbered-post case."""
+    return run_hook_cmd("gh pr comment 2070 --body-file {body}", body_text, records)
 
 
 # --------------------------------------------------------------------------
@@ -236,12 +248,21 @@ def end_to_end_checks():
     out = run_hook(WRONG_REBUTTAL, fetch_records(NO_URL_TEXT))
     check("guard: no URL cited at all -> silent", bool(out), False)
 
-    # Guard 5 (review finding, PR#2102): an UNNUMBERED `gh pr comment` --
-    # exactly how the command is written in practice -- must not pick up an
-    # unrelated fetch from a DIFFERENT repo elsewhere in the transcript. The
-    # only fetch present here is for OtherOrg/other-repo; this worktree's own
-    # `origin` remote is Morrison-Lab/ai-config, so the git-remote fallback
-    # must reject the mismatched fetch rather than misattribute its URL.
+    # Guard 5 (review finding, PR#2102 round 2): a GENUINELY unnumbered
+    # `gh pr comment` -- no PR number in the command at all, via
+    # run_hook_cmd rather than run_hook (which always carries 2070) -- must
+    # not pick up an unrelated fetch from a DIFFERENT repo elsewhere in the
+    # transcript. With no number on either side, the PRE-EXISTING
+    # number-mismatch guard is a no-op (`number is None`), so only the
+    # owner/repo scoping added in this round can reject the mismatched
+    # fetch. This is the case round 1's version of this test claimed to
+    # cover but did not: that version routed through `run_hook`, which
+    # hardcodes PR 2070, so the pre-existing number check (2070 != 99)
+    # discarded the fetch before the owner/repo code ever ran -- confirmed
+    # by mutation-deleting the owner/repo block and seeing all cases still
+    # pass. This version's fetch also carries an unrelated number (99) to
+    # keep that pre-existing guard equally inert here, so the owner/repo
+    # check is the only thing that can produce a silent result.
     cross_repo_fetch_use = {"message": {"content": [
         {"type": "tool_use", "id": "call1", "name": "Bash",
          "input": {"command":
@@ -250,8 +271,8 @@ def end_to_end_checks():
         {"type": "tool_result", "tool_use_id": "call1",
          "content": "Finding: see unrelated-domain.example/some/page for "
                      "background."}]}}
-    out = run_hook(WRONG_REBUTTAL,
-                   [cross_repo_fetch_use, cross_repo_fetch_result])
+    out = run_hook_cmd("gh pr comment --body-file {body}", WRONG_REBUTTAL,
+                       [cross_repo_fetch_use, cross_repo_fetch_result])
     check("guard 5: unnumbered post ignores a different-repo fetch",
           bool(out), False)
 

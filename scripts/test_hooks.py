@@ -36,7 +36,7 @@ HOOKS = os.path.join(ROOT, "hooks")
 # Hooks that ship without a test today. An explicit, reviewable list -- not a
 # silent gap. A new hook is expected to bring its test; this list should only
 # ever shrink. See ai-config#1080.
-KNOWN_UNTESTED = {"no-offer-to-file.py", "inject-local-time.sh"}
+KNOWN_UNTESTED = {"inject-local-time.sh"}
 
 
 def test_for(subject_basename):

@@ -71,7 +71,7 @@ def pr_node(
     }
 
 
-def files_page(paths, cursor=None):
+def files_page(paths, cursor=None, change_type="MODIFIED"):
     """Build the FILES_QUERY response shape for one page of files."""
     return {
         "repository": {
@@ -82,7 +82,7 @@ def files_page(paths, cursor=None):
                         "endCursor": cursor,
                     },
                     "nodes": [
-                        {"path": p, "changeType": "MODIFIED"} for p in paths
+                        {"path": p, "changeType": change_type} for p in paths
                     ],
                 }
             }
@@ -565,6 +565,29 @@ finally:
 check(
     "a renamed file contributes BOTH its new and its pre-rename path",
     renamed == {"new.yml", "old.yml"},
+)
+
+# A rename sitting on page TWO must trigger the REST lookup exactly as one
+# on page one does. Returning only paths from the pagination loop would drop
+# that signal and silently reinstate the blind spot for large PRs.
+_real_prev = pr_overlap.previous_filenames
+_real_graphql = pr_overlap.gh_graphql
+try:
+    pr_overlap.previous_filenames = lambda o, n, num: ["old.yml"]
+    pr_overlap.gh_graphql = lambda q, f, c: files_page(
+        ["new.yml"], change_type="RENAMED"
+    )
+    page2_rename = pr_overlap.file_set_for(
+        "o", "r",
+        pr_node(1, ["plain.md"], total=2, cursor="CUR", change_type="MODIFIED"),
+        1,
+    )
+finally:
+    pr_overlap.previous_filenames = _real_prev
+    pr_overlap.gh_graphql = _real_graphql
+check(
+    "a rename discovered on page two still folds in its pre-rename path",
+    page2_rename == {"plain.md", "new.yml", "old.yml"},
 )
 check(
     "a PR with no rename pays no REST lookup and keeps its paths",

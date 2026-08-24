@@ -125,6 +125,12 @@ MAX_PAGE_SIZE = 100
 # `shared/coding/configurable-parameters.md` rules out.
 MAX_FILE_PAGES = 100
 
+# Runaway guard on the open-PR pagination loop. Terminating otherwise relies
+# entirely on the API eventually reporting `hasNextPage: false`, and a sweep
+# that never returns is worse than one that fails, since a hung check gets
+# killed by whatever is calling it and reports nothing at all.
+MAX_PR_PAGES = 100
+
 # Printed on every run, including runs that find nothing. A zero here is the
 # case most likely to be misread, so the caveat cannot be conditional on
 # there being findings to caveat.
@@ -465,7 +471,7 @@ def remaining_files(owner, name, number, cursor, page):
             f"#{number}: more file pages were reported but no cursor was "
             "returned, so the remaining files cannot be fetched"
         )
-    paths, seen_pages = [], 0
+    paths, seen_pages, saw_rename = [], 0, False
     while cursor:
         seen_pages += 1
         if seen_pages > MAX_FILE_PAGES:
@@ -484,12 +490,19 @@ def remaining_files(owner, name, number, cursor, page):
         )
         pull = ((data.get("repository") or {}).get("pullRequest") or {})
         files = pull.get("files") or {}
-        paths.extend(
-            n["path"] for n in (files.get("nodes") or []) if n.get("path")
+        nodes = files.get("nodes") or []
+        paths.extend(n["path"] for n in nodes if n.get("path"))
+        # A rename on page two counts exactly as one on page one. Returning
+        # only paths here would drop that signal, so a PR whose rename fell
+        # past the first page would skip the REST lookup below and lose its
+        # pre-rename path -- reinstating the very blind spot the lookup
+        # exists to close, for large PRs only.
+        saw_rename = saw_rename or any(
+            n.get("changeType") == "RENAMED" for n in nodes
         )
         info = files.get("pageInfo") or {}
         cursor = info.get("endCursor") if info.get("hasNextPage") else None
-    return paths
+    return paths, saw_rename
 
 
 def file_set_for(owner, name, pr, page):
@@ -507,12 +520,19 @@ def file_set_for(owner, name, pr, page):
     files = pr.get("files") or {}
     nodes = files.get("nodes") or []
     paths = [n["path"] for n in nodes if n.get("path")]
+    saw_rename = any(n.get("changeType") == "RENAMED" for n in nodes)
     info = files.get("pageInfo") or {}
     if info.get("hasNextPage"):
-        paths.extend(
-            remaining_files(owner, name, pr["number"], info.get("endCursor"), page)
+        rest, rest_rename = remaining_files(
+            owner, name, pr["number"], info.get("endCursor"), page
         )
+        paths.extend(rest)
+        saw_rename = saw_rename or rest_rename
 
+    # Completeness is checked BEFORE the rename paths are folded in. A
+    # pre-rename path is an addition the API never counted in `totalCount`,
+    # so comparing after the fold could let a short set pass by making up
+    # the shortfall with rename aliases.
     total = files.get("totalCount")
     if total is not None and len(set(paths)) < total:
         raise SweepError(
@@ -525,7 +545,7 @@ def file_set_for(owner, name, pr, page):
     # has to come from REST or the collision against a PR still editing the
     # old path is invisible. Only PRs that actually rename something pay the
     # extra request.
-    if any(n.get("changeType") == "RENAMED" for n in nodes):
+    if saw_rename:
         paths.extend(previous_filenames(owner, name, pr["number"]))
 
     return set(paths)
@@ -541,8 +561,14 @@ def fetch(repo, limit, page):
     script exists to derive a complete set rather than a prefix of one.
     """
     owner, name = split_repo(repo)
-    nodes, cursor, total = [], None, 0
+    nodes, cursor, total, seen_pages = [], None, 0, 0
     while len(nodes) < limit:
+        seen_pages += 1
+        if seen_pages > MAX_PR_PAGES:
+            raise SweepError(
+                f"{repo}: PR pagination did not terminate after "
+                f"{MAX_PR_PAGES} pages"
+            )
         want = min(MAX_PAGE_SIZE, limit - len(nodes))
         fields = [
             "-F", f"owner={owner}", "-F", f"name={name}",

@@ -107,4 +107,4 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   Checking means consulting a genuinely separate source, not re-deriving from the one you already trust.
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
 - **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
-  A vendor's own live docs outrank a grep of one installed build for a fast-moving/experimental feature, since a rename can leave a real-looking but superseded string behind (here, as a policy-template alias) that passes every structural check you'd think to run against the bundle alone.
+  Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.

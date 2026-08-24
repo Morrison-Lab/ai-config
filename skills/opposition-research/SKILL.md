@@ -92,6 +92,9 @@ surfaces — so the reads run concurrently. Give each the same scope line from
 Prefer official read-only APIs over scraping (see Anti-patterns): the GitHub
 issues API sorted by reactions, the Reddit `.json` endpoints, the Stack
 Exchange API.
+Note reddit.com specifically is blocked for WebFetch, WebSearch, and curl in
+local sessions --- cover Reddit surfaces from the main session via the
+Claude-in-Chrome route in [`memories/reddit-access.md`](../../memories/reddit-access.md).
 
 ### 4. Keep only the community-valued, on-scope ideas
 

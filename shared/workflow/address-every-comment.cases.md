@@ -198,6 +198,79 @@ share a name. `git ls-files` in the gha checkout settled it in one command.
 Applying the suggestion verbatim would have documented a nonexistent path
 in the entry whose whole purpose is getting someone to run that script.)
 
+## "The diagnosis is about the line; the remedy's correctness is about the call path"
+
+(`Morrison-Lab/ai-config#2086`, 2026-08-23: a review correctly found that
+`res.stderr.strip()` in `scripts/check-pr-body-figures.py` crashes when the
+Windows subprocess reader thread dies and leaves the stream `None`, and
+supplied a suggestion block: `(res.stderr or '').strip()`.
+
+The diagnosis is right.
+The remedy is inadequate in that file, for a reason the diagnosis gives no hint
+of.
+`verify_pr_body_figures` wraps its `run_cmd` calls in a broad `except Exception`
+and converts the failure into `status="UNVERIFIED"` (`:434`), which `main`
+returns as `CLEAN_EXIT` (`:658`, `:683`; `CLEAN_EXIT = 0` at `:37`).
+Those positions are as of `origin/main` at `b26bbdfc`, after
+[#2086](https://github.com/Morrison-Lab/ai-config/pull/2086) merged.
+The suggestion changes only *which* exception is raised, and `except Exception`
+catches an `AttributeError` and a `RuntimeError` identically --- so it removes
+the crash and leaves an environment failure exiting **0 CLEAN**, which is the
+failure mode the PR existed to close.
+
+Measured rather than reasoned, by stubbing `subprocess.run` to return
+`CompletedProcess(returncode=1, stdout="", stderr=None)`: the shipped line and
+the suggested line both exit `0`, while `die()` exits `2`.
+`die()` was the right remedy because `SystemExit` derives from `BaseException`
+and escapes that wrapper --- `issubclass(SystemExit, Exception)` is `False`.
+
+Note what the first draft of this record got wrong, since it is the same class
+of error: it said the suggestion would turn a loud crash into a silent pass.
+There was no loud crash to lose.
+The `AttributeError` was already being caught by that same `except Exception`,
+so the silent pass predated the suggestion, and the suggestion simply fails to
+fix it.
+
+What made it visible was asking where the raised error *goes*, rather than
+whether the substitution is safe at the line it sits on.
+That is what separates this from its two immediate neighbours, whose suggestions
+were each wrong at the line itself --- a nonexistent path, and an anchor that
+still truncated the body.
+Here the suggested line is locally correct and insufficient two frames up, so no
+amount of scrutiny of the diff hunk reaches it.
+See [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing
+which exception a function RAISES is a signature change that fails silently"
+for the same underlying fact arriving from the author's side.)
+
+(A third draft of this record cited `:409`, `:633`, and `:658`.
+Those were correct before
+[#2086](https://github.com/Morrison-Lab/ai-config/pull/2086) merged and wrong by
+25 lines after, since that PR inserted guards above them.
+The reviewer caught it and gave the right numbers.
+
+The part worth keeping is what happened next.
+Checking the reviewer's claim, `grep -n` against a local `main` at `df4676c2`
+returned `409`, `633`, `658` --- the original values --- which read as a
+refutation of the finding.
+`origin/main` was `b26bbdfc`.
+The local branch had not fast-forwarded because an unrelated session's
+uncommitted files were blocking the pull, so the checkout was three commits
+stale, and silently so.
+
+So the same defect recurred **while verifying a report of it**, one step further
+out: a line number recalled from a stale copy, then a refutation derived from a
+stale copy.
+`git grep` against a working tree answers a question about that working tree,
+which is not the question when the claim is about `main`.
+Resolve a ref explicitly --- `git show origin/main:<path>` --- and say which ref
+the numbers are as of, which the citation above now does.
+
+The general form is in
+[`verify-the-right-artifact`](verify-the-right-artifact.md): a checkout standing
+in for the run.
+Recorded here because the artifact substituted was not an exotic one, it was
+`main`, and nothing about `grep -n` in a repo announces which commit it read.)
+
 ## "The same check applies to a fix a reviewer describes in prose"
 
 (gha#318, 2026-07-26: a review correctly found that a heredoc-terminator

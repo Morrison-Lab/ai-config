@@ -1,10 +1,10 @@
 {
   "name": "ai-config",
-  "install": "bash .cursor/install.sh",
+  "install": "bash /agent/repos/ai-config/.cursor/install.sh",
   "terminals": [
     {
       "name": "quarto-preview",
-      "command": "quarto preview --port 4444 --host 0.0.0.0 --no-browser"
+      "command": "cd /agent/repos/ai-config && quarto preview --port 4444 --host 0.0.0.0 --no-browser"
     }
   ],
   "ports": [

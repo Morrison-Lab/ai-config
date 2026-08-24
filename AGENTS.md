@@ -87,7 +87,7 @@ In every session --- at session start, and again periodically during long sessio
 
 ## Verify changes before pushing
 
-There is no build; CI ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)) and pre-commit run the checks directly:
+No compiled app gates this repo; CI ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)) and pre-commit run the checks directly:
 
 ```sh
 python3 scripts/validate-skills.py    # SKILL.md frontmatter, codex-skills/ sync, manifests
@@ -95,7 +95,7 @@ python3 scripts/check-links.py        # no broken relative markdown links
 npx --yes markdownlint-cli2@0.22.1    # style; config in .markdownlint-cli2.jsonc
 ```
 
-Each checker's suite is a standalone script --- `scripts/test_<name>.py`, and `hooks/test-<name>.py` paired with their subjects by `scripts/test_hooks.py`, which also fails on any untested hook --- so a focused check is one `python3` invocation.
+Most checks ship their own suite as a standalone script (`scripts/test_<name>.py`, plus `hooks/test-<name>.py` paired with their subjects by `scripts/test_hooks.py`, which fails on an untested hook outside its explicit allowlist), so a focused check is one `python3` invocation.
 Environment quirks that bite here (the `python` shim, pre-commit's PATH, the submodule) are listed under the Cursor Cloud section below and apply to any agent.
 
 ## Canonical sources vs generated output

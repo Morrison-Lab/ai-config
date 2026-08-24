@@ -141,6 +141,8 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
+  Recurred 2026-08-23: a session still closed an `AGENTS.md` improvement with "Not committed --- say the word if you'd like a branch + PR", and the user answered "always yes --- remember that".
+  The rule is now encoded agent-universally in `AGENTS.md` ("Default to action without asking"), which is where non-Claude sessions pick it up.)
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
@@ -1197,15 +1199,3 @@ safer/preferred choice merely because the repo has external consumers.
   while leaving the pinned copy intact; the fix that shipped replaced the pinned
   copy with a delete-the-override instruction instead, which is why only the
   mechanism change reached `main`.)
-
-## Default to yes on non-destructive actions
-
-Standing grant from the owner (2026-08-23, "always yes"): proceed with non-destructive steps without asking --- commit, branch, push, open or update PRs, run checks, edit the agent-config corpus --- then report what was done in the past tense.
-Encoded universally in `AGENTS.md` ("Default to action without asking"); this entry records the correction that prompted it.
-
-- **Do:** act first on anything reversible, and report the completed action.
-- **Do:** ask only when a step is destructive, genuinely ambiguous, or blocking.
-- **Don't:** end a turn by offering work a standing grant already covers ("say the word and I'll open the PR") --- the offer is what this entry retires.
-- **Don't:** read the grant as merge authority; the strict merge policy stands.
-
-(Learned 2026-08-23: a session closed an `AGENTS.md` improvement with "Not committed --- say the word if you'd like a branch + PR" for work the standing grant already covered; the user answered "always yes --- remember that".)

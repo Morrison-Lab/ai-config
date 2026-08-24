@@ -964,3 +964,20 @@ because the filter ate the two `##[error]` lines naming the real ones.)
   or dump the failing step's segment raw (`sed -n '/step marker/,/end marker/p'`).
 - **Don't:** strip `##[`-prefixed lines while looking for what a checker flagged ---
   that filter removes annotations, and annotations are the findings.
+
+## Passing the repo-local SemBr script does not clear the gha SemBr check --- they enforce different rule sets
+
+`scripts/semantic-line-breaks.py` in this repo and the reusable
+`check-new-line-breaks.yml` in Morrison-Lab/gha are different instruments.
+On #2071 a section passed the local script cleanly ("0 would change") and then
+failed the gha check on three lines, each a long line carrying a mid-line
+semicolon ("consider a break after the clause"), a rule the local script did
+not apply to those lines.
+The local pass was real but measured the wrong instrument, so it licensed a
+push that arrived red; the findings were recoverable only from the job log's
+`##[error]` annotations (see the sibling entry above).
+
+- **Do:** treat the local SemBr run as a fast pre-filter only, and expect the gha check to add mid-line-semicolon findings the local run cannot see; fix any semicolon-splitting candidates in the whole added section in one pass.
+- **Do:** when the gha check fails after a green local run, read its job-log annotations before re-running anything locally.
+- **Don't:** report "checks green locally" as if it predicted the diff-scoped gha checks, or amend-and-repush blind on the strength of the local script alone.
+(Measured 2026-08-24 on ai-config#2071, heads 456a6c87 -> 57116043.)

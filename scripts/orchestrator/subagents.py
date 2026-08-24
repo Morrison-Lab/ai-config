@@ -528,7 +528,9 @@ class TesterSubagent(BaseSubagent):
         # Only promote PR if tests passed AND branch contains real implementation diff
         pr_marked_ready = False
         pr_merged = False
-        mwc = task.payload.get("mwc", True)
+        mwc = task.payload.get("mwc")
+        if mwc is None:
+            mwc = AIConfigProtocols.check_repo_allows_mwc(repo_slug=repo_slug)
 
         if passed and pr_number and (has_real_diff or dry_run):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
@@ -586,6 +588,7 @@ class CoordinatorSubagent(BaseSubagent):
                     "goal": goal,
                     "stage": stage,
                     "dry_run": task.payload.get("dry_run", False),
+                    "mwc": task.payload.get("mwc"),
                     "context_from_parent": task.payload,
                 },
                 depends_on=[prev_task_id] if prev_task_id else [],

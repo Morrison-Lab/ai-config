@@ -826,6 +826,9 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="Morrison-Lab/ai-config"))
         self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="owner/ai-config"))
 
+        # External repo slug targeting does NOT inherit current workspace directory
+        self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_slug="SomeOrg/unrelated-repo"))
+
         # Arbitrary external repo without written policy does not allow mwc by default
         with tempfile.TemporaryDirectory() as empty_dir:
             self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
@@ -864,7 +867,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("failed", reason)
 
-        # 3. Blocking AI review verdict
+        # 3. Blocking AI review verdict ("Needs more work")
         dirty_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
@@ -875,7 +878,20 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("Needs more work", reason)
+        self.assertIn("needs more work", reason.lower())
+
+        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
+        blocked_human_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocked", reason.lower())
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser

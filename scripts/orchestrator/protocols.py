@@ -102,19 +102,27 @@ Rules:
 
         Evaluates:
         1. Explicit repo identity (Morrison-Lab/ai-config).
-        2. Written policy files in repo root (AGENTS.md, CLAUDE.md, GEMINI.md) for standing permission / mwc grants.
+        2. If repo_root is provided, inspect written policy files for standing mwc auto-merge grants
+           (must specifically grant auto-merge under mwc, not just general non-destructive permissions).
         """
-        if repo_slug and "ai-config" in repo_slug:
+        # ai-config repository explicitly operates under standing MWC
+        if repo_slug and (repo_slug.lower() == "ai-config" or repo_slug.lower().endswith("/ai-config")):
             return True
 
-        root = (repo_root or Path.cwd()).resolve()
-        for doc_name in ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
-            doc_path = root / doc_name
-            if doc_path.exists():
-                try:
-                    content = doc_path.read_text(encoding="utf-8", errors="ignore")
-                    if "standing permission" in content.lower() or "standing mwc" in content.lower() or "/mwc" in content.lower():
-                        return True
-                except Exception:
-                    pass
+        # When targeting an external repo without an explicit repo_root, do not inspect current working directory
+        if repo_slug and "ai-config" not in repo_slug.lower() and repo_root is None:
+            return False
+
+        if repo_root is not None:
+            root = repo_root.resolve()
+            for doc_name in ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
+                doc_path = root / doc_name
+                if doc_path.exists():
+                    try:
+                        content = doc_path.read_text(encoding="utf-8", errors="ignore").lower()
+                        # Strictly check for standing merge grants, not general non-destructive permissions
+                        if "auto-merge under `mwc`" in content or "standing mwc" in content or "standing merge" in content:
+                            return True
+                    except Exception:
+                        pass
         return False

@@ -217,16 +217,30 @@ class PRClaimManager:
 
         # 2. Check reviews and comments for clean approval
         reviews = data.get("reviews", [])
-        has_changes_requested = any(r.get("state") == "CHANGES_REQUESTED" for r in reviews)
+        has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
         comments = data.get("comments", [])
         claude_reviews = [c for c in comments if "Claude finished review" in c.get("body", "")]
         if claude_reviews:
-            latest_review = claude_reviews[-1].get("body", "")
-            if "Needs more work" in latest_review or "BLOCKED" in latest_review:
-                return False, "Latest AI review verdict is 'Needs more work' or 'BLOCKED'"
+            latest_review = claude_reviews[-1].get("body", "").lower()
+            blocking_phrases = [
+                "needs more work",
+                "blocked",
+                "blocked on human review",
+                "changes requested",
+                "not clean",
+                "not ready",
+                "impasse",
+                "deadlock",
+                "finding 1 (blocking)",
+                "finding (blocking)",
+                "verdict\n\n**needs more work",
+            ]
+            for phrase in blocking_phrases:
+                if phrase in latest_review:
+                    return False, f"Latest AI review has blocking verdict ('{phrase}')"
 
         return True, "PR is fully clean across CI and review"
 

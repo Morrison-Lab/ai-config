@@ -247,7 +247,7 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 
 - ❌ Sending data-triggered work to an `opencode/*` model because it is free --- free is a billing property, and the payload still leaves the machine.
 - ❌ Retrying a failed or slow `ollama/*` run on the hosted tier.
-- ❌ Passing `--auto` to widen a delegate's permissions instead of scoping the config (repo root `opencode.json` uses a blanket-allow config intentionally as the scoped equivalent — see above — prefer that over `--auto` per-run).
+- ❌ Passing `--auto` to widen a delegate's permissions instead of scoping the config (repo root `opencode.json` uses a blanket-allow config intentionally as the scoped equivalent --- see above --- prefer that over `--auto` per-run).
 - ❌ Pointing a codex-style `MAXPAR` fan-out at one ollama daemon and expecting hosted-style throughput.
 - ❌ Quoting a count, a line number, or a citation a free model returned without re-deriving it.
 - ❌ Skipping opencode for small mechanical work because codex is stronger --- codex has a window to conserve and opencode does not.

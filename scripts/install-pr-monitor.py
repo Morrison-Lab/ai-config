@@ -6,6 +6,12 @@ units), so `gh` and `python3` are resolved absolutely at install time and
 the interactive PATH is persisted for the daemon: into the cron line and a
 systemd drop-in. The checked-in unit stays machine-generic.
 
+On Windows the poll persists as a Task Scheduler job every five minutes;
+the task inherits the user environment, so the hook's runtime `gh`
+resolution sees the interactive PATH. The task runs while you are logged
+on: sleep and logout pause it, which is acceptable for a secondary
+backstop host (#2082).
+
 Installing also STOPS a daemon already running under the old code: systemd's
 `enable --now` no-ops on an active unit and `ensure()` returns early on a
 live pid, so without an explicit stop the installer would report success
@@ -28,6 +34,12 @@ TARGET = Path.home() / ".config" / "systemd" / "user" / UNIT
 HOOK = ROOT / "hooks" / "monitor-open-prs.py"
 INSTALLED_HOOK = Path.home() / ".local" / "share" / "ai-config" / "hooks" / HOOK.name
 CRON_MARKER = "# ai-config-pr-monitor"
+IS_NT = os.name == "nt"
+TASK_NAME = "ai-config-pr-monitor"
+# Matches the Unix staleness horizon below: STALE_POLLS intervals of
+# POLL_SECONDS must fit inside the schedule, or fresh-looking state could
+# outlive its daemon between two task firings.
+POLL_MINUTES = 5
 # A live daemon rewrites checked_at every poll; a state file older than this
 # many poll intervals proves the recorded pid no longer belongs to the
 # monitor. The interval itself is read from the hook, not duplicated here.
@@ -36,6 +48,10 @@ STALE_POLLS = 5
 
 def resolve_dependencies():
     python3 = shutil.which("python3")
+    if python3 is None and IS_NT:
+        # Windows rarely ships a python3.exe alias; run the daemon under
+        # whatever interpreter is executing this installer.
+        python3 = sys.executable
     gh = shutil.which("gh")
     missing = [name for name, path in (("python3", python3), ("gh", gh)) if not path]
     if missing:
@@ -103,31 +119,32 @@ def stop_stale_daemon(state_path=None, stale_seconds=None, wait_seconds=5.0):
     been recycled to an unrelated process, and the daemon it named is dead
     anyway, so the file is left alone.  A missing, unreadable, or pid-less
     state file returns None the same quiet way: there is nothing to stop.
-    After the SIGTERM, wait for the
-    process to disappear so the cron fallback's ensure() cannot observe
-    the dying pid as alive and skip its respawn --- and say so when the
-    wait exhausts, so a survived SIGTERM is not reported as a stop.
+    The liveness probe during the wait is the hook's own alive(), which
+    uses OpenProcess on Windows instead of the meaningless signal-0 kill.
+    After the SIGTERM, wait for the process to disappear so the cron
+    fallback's ensure() cannot observe the dying pid as alive and skip its
+    respawn --- and say so when the wait exhausts, so a survived SIGTERM is
+    not reported as a stop.
     """
-    if state_path is None or stale_seconds is None:
-        module = monitor_module()
-        if state_path is None:
-            state_path = module.STATE_PATH
-        if stale_seconds is None:
-            stale_seconds = STALE_POLLS * module.POLL_SECONDS
+    module = monitor_module()
+    if state_path is None:
+        state_path = module.STATE_PATH
+    if stale_seconds is None:
+        stale_seconds = STALE_POLLS * module.POLL_SECONDS
     try:
         with open(state_path, encoding="utf-8") as stream:
             state = json.load(stream)
         pid = int(state.get("pid"))
         if time.time() - float(state.get("checked_at") or 0) > stale_seconds:
             return None
+        # On Windows os.kill maps SIGTERM to TerminateProcess, which is the
+        # intended outcome for our own daemon; POSIX gets a real SIGTERM.
         os.kill(pid, signal.SIGTERM)
     except (OSError, ValueError, TypeError):
         return None
     deadline = time.monotonic() + wait_seconds
     while time.monotonic() < deadline:
-        try:
-            os.kill(pid, 0)
-        except OSError:
+        if not module.alive(pid):
             print(f"stopped stale monitor daemon (pid {pid})")
             return pid
         time.sleep(0.1)
@@ -137,13 +154,54 @@ def stop_stale_daemon(state_path=None, stale_seconds=None, wait_seconds=5.0):
     return pid
 
 
-def main():
+def windows_task_command(python3):
+    return f'"{python3}" "{INSTALLED_HOOK}" --monitor'
+
+
+def install_windows(python3):
+    subprocess.run(
+        ["schtasks", "/Create", "/F", "/SC", "MINUTE", "/MO", str(POLL_MINUTES),
+         "/TN", TASK_NAME, "/TR", windows_task_command(python3)],
+        check=True)
+    print(f"scheduled task {TASK_NAME} every {POLL_MINUTES} minutes; it runs "
+          "while you are logged on, so sleep and logout pause polling")
+
+
+def status_windows():
+    query = subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME],
+                           capture_output=True, text=True)
+    if query.returncode == 0:
+        print(query.stdout.strip())
+        return 0
+    print(f"{TASK_NAME}: not installed")
+    return 1
+
+
+def uninstall_windows():
+    subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK_NAME], check=True)
+    print(f"deleted scheduled task {TASK_NAME}")
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if IS_NT:
+        if argv == ["--status"]:
+            return status_windows()
+        if argv == ["--uninstall"]:
+            uninstall_windows()
+            return 0
+    if argv:
+        sys.exit(f"FATAL: unsupported arguments {argv} on this platform")
     python3 = resolve_dependencies()
-    path = interactive_path()
     if not HOOK.is_file():
         sys.exit(f"FATAL: monitor source is missing at {HOOK}")
     INSTALLED_HOOK.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HOOK, INSTALLED_HOOK)
+    if IS_NT:
+        stop_stale_daemon()
+        install_windows(python3)
+        return 0
+    path = interactive_path()
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(SOURCE, TARGET)
     write_path_dropin(path)
@@ -161,9 +219,10 @@ def main():
         except (OSError, subprocess.SubprocessError):
             sys.exit("FATAL: neither systemd nor crontab could persist the PR monitor")
         print("started monitor now; installed cron @reboot fallback")
-        return
+        return 0
     print(f"enabled and restarted {UNIT}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

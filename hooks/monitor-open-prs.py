@@ -10,6 +10,7 @@ import time
 
 POLL_SECONDS = 120
 STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
+IS_WINDOWS = os.name == "nt"
 
 
 def write_state(value):
@@ -20,11 +21,51 @@ def write_state(value):
     os.replace(temporary, STATE_PATH)
 
 
-def alive(pid):
+def _alive_windows(pid):
+    # memories/python.md: os.kill(pid, 0) on Windows maps to
+    # GenerateConsoleCtrlEvent, where success does not track liveness, so
+    # the probe goes through OpenProcess instead. A recycled pid whose new
+    # process happened to exit with STILL_ACTIVE (259) reads as alive;
+    # accepted, since a wrong True only delays one respawn cycle.
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
     try:
-        os.kill(int(pid), 0)
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return False
+        return exit_code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def alive(pid):
+    # Non-positive pids are refused before any platform probe: signal 0 to
+    # -1 would address an entire process group on POSIX rather than one pid.
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if IS_WINDOWS:
+        return _alive_windows(pid)
+    try:
+        os.kill(pid, 0)
         return True
-    except (OSError, TypeError, ValueError):
+    except OSError:
         return False
 
 

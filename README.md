@@ -422,6 +422,14 @@ monitor immediately and installs an equivalent per-user cron `@reboot` entry.
 It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path
 depends on a temporary worktree or an individual agent's hook directory.
 
+On Windows the same command registers a Task Scheduler job
+(`ai-config-pr-monitor`, every five minutes) instead of systemd/cron, and
+`python3 scripts/install-pr-monitor.py --status` / `--uninstall` manage it.
+The task inherits your user environment and runs only while you are logged
+on, so sleep and logout pause polling --- acceptable for a secondary backstop
+host ([#2082](https://github.com/Morrison-Lab/ai-config/issues/2082)), not
+for a primary one.
+
 ### Writing a warn-only hook: emit `systemMessage`, not `reason`
 
 A `Stop` hook's `reason` is read **only** alongside `"decision": "block"`.

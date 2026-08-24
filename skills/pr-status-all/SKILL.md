@@ -293,3 +293,7 @@ independent and don't mutate shared state --- like this one.
   threshold this skill has no equivalent of.
   This skill then supplies the per-PR depth it deliberately omits.
   See [`derive-dont-enumerate`](../../shared/workflow/derive-dont-enumerate.md).
+- **`scripts/pr-overlap.py`** -- the same sweep over *pairs* rather than over PRs: which open PRs share a file, and which share none.
+  Reach for it whenever this dashboard's rows are about to be merged, since "collides" is a property of the pair and no per-PR column can carry it.
+  It separates an identical file set (a duplicate to close) from a partial overlap (an order to pick), and reports pairs examined alongside pairs colliding.
+  See [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md).

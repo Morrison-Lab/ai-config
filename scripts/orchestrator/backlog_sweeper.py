@@ -47,7 +47,14 @@ class BacklogSweeper:
             cmd.extend(["-R", self.repo])
 
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+            )
             if proc.returncode == 0:
                 return json.loads(proc.stdout)
             else:

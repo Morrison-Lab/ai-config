@@ -42,6 +42,14 @@ Worked-example case records for the rules below live in
 
 The rule above bans swallowing every error.
 
+[`fail-fast.rationale.md`](fail-fast.rationale.md) carries the argument.
+
+What follows for a **change** to that class lives in
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing which
+exception a function RAISES is a signature change that fails silently":
+swapping the type can route an error into a handler written for something else,
+making it quieter rather than louder, with nothing red to show for it.
+
 ## When exit codes carry meaning, an error path must set its own
 
 The "In code" bullets say to stop with a clear error rather than proceed on bad

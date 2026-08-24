@@ -416,6 +416,9 @@ Different layer, different fix; do not reach for one when you have the other.
 
 (2026-08-06, verified both ways on this machine while running the pre-push checks for `Morrison-Lab/ai-config#1224`.)
 
+opencode's Bash tool on this box has its own failure mode and workaround;
+see [`opencode-bash-windows.md`](opencode-bash-windows.md).
+
 ## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
 **Fixed in ai-config#951.**

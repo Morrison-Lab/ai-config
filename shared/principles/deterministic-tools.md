@@ -92,6 +92,38 @@ That principle says to search for an existing tool before building one.
 This one says to leave a tool behind when your search finds nothing, so
 the next session's search succeeds where yours failed.
 
+**The count that fires this test is itself a claim about state, so derive it
+rather than recalling it.**
+Two occurrences and three are different verdicts here, and the whole
+difference is whether you build --- so an off-by-one in memory is a wrong
+decision, not merely a wrong number.
+A tally assembled at the end of a session is exactly the state claim
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md) says to
+re-query, and it errs upward, because a near-miss caught in a draft is vivid,
+feels like the same mistake, and is not one.
+
+An error caught before it was committed is the process working.
+Counting it toward the bar licenses an instrument the evidence does not
+support, which is worse than not building: the instrument then encodes a
+recurrence pattern nobody actually has, and every later reader inherits it as
+established.
+
+For a claim about what a past commit said, the deriving query is one command
+per commit, and it is not the same as reading the file:
+
+```bash
+git show <commit>:<path>
+```
+
+- **Do:** derive the occurrence count from the artifacts, and say which query
+  produced it.
+- **Do:** report shipped occurrences and caught near-misses as two numbers,
+  since only the first counts toward the bar.
+- **Don't:** let a draft error you caught count as an occurrence --- it is
+  evidence the check worked.
+- **Don't:** build on a remembered tally, however recent the session that
+  produced it.
+
 ## A follow-up question gets a hastier instrument than the main task did
 
 The test above fires on recurrence across occasions, which leaves a gap

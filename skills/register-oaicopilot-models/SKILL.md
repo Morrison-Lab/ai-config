@@ -24,6 +24,24 @@ the `oaicopilot.models` array. There's no separate "oaic configuration" file.
   Serving / MLflow endpoint list, an Azure AI Foundry deployment list) to make
   available in the Copilot model picker.
 
+## When this does NOT fire
+
+This skill is the **work-machine** route: it assumes the `johnny-zhao.oai-compatible-copilot` extension is installed and points at a provider's own endpoint list.
+On a machine without that extension, VS Code's **built-in** Copilot Chat plus core BYOK registration covers the same need with no extra extension, and this skill's whole procedure edits a config nothing reads.
+
+The two routes share almost all of their vocabulary --- "Copilot Chat", "model picker", "Manage Models...", "register a model", "API key" --- so the request never discriminates between them.
+Check the extension, not the wording:
+
+```bash
+find ~/.vscode/extensions -maxdepth 1 -iname "*oai-compatible-copilot*"
+```
+
+Absent means take the core-BYOK route instead, whose mechanics --- where the built-in extension lives, why `code --list-extensions` cannot see it, where the API key actually goes, and the `chat.agentHost.byokModels.enabled` gate that hides a registered model until it is turned on --- are in [`memories/vscode-copilot-byok.md`](../../memories/vscode-copilot-byok.md).
+Note that route has no file to edit: the key reaches VS Code secret storage through the picker's UI, so it cannot be seeded by a config write.
+
+- **Do:** run the `find` above before Step 0, and switch routes when it returns nothing.
+- **Don't:** read "register these models in Copilot" as selecting this skill; the phrase fits both routes, and only the installed extension set decides.
+
 ## Step 0: Locate the config
 
 The extension stores everything in VS Code's **user** `settings.json` (or the

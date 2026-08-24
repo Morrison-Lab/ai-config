@@ -132,7 +132,7 @@ And before anything leaves the machine, read the actual patch and confirm
 every hunk is one you intended:
 
 ```bash
-git diff origin/<default>...HEAD
+git diff origin/<default-branch>...HEAD
 ```
 
 A `--stat` summary is not that look: it names files and counts lines, so
@@ -164,6 +164,10 @@ confirmed it fixed.)
   (That is upstream `master`'s wording.
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
 - **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
+- **Do:** re-read a file before editing it whenever a checkout, pull, or
+  reset has happened since your last read of it.
+- **Don't:** claim a fix in changelog or prose text that the pushed patch
+  itself cannot show.
 
 (Directive from the user, 2026-08-21:
 "cai: add protections against clobbering commits from other agents on a branch

@@ -62,6 +62,24 @@ import sys
 # every reply and every doc that merely QUOTES the command, and this corpus
 # quotes it constantly (`shared/workflow/claim-pr.md` is nothing but such
 # quotes).
+# The gap between two parts of ONE command.
+#
+# A plain `[^\n;|&]*` was wrong twice over: a backslash line-continuation lives
+# inside a single command, and every GraphQL comment site in this corpus puts
+# the mutation name several lines below `gh api graphql` -- so both raw-API
+# detectors matched nothing the corpus actually writes while their single-line
+# test fixtures passed.
+#
+# Skipping quoted spans atomically was the wrong repair: the path segment these
+# detectors look for (`/notes`, `/comments`) sits INSIDE the quoted URL, so the
+# quote-skipping alternative swallowed the very thing being matched.
+_GAP = r"(?:[^\n;&|]|\\\n)*"
+
+# The multi-line variant, for an argument that genuinely spans lines: a GraphQL
+# query is a single quoted string containing newlines. Bounded and non-greedy so
+# it cannot run away across a whole script; `;` and `&` still end it.
+_GAP_ML = r"[^;&]{0,400}?"
+
 _POST_CMDS = (
     r"gh\s+pr\s+comment",
     r"gh\s+issue\s+comment",
@@ -79,12 +97,12 @@ _POST_CMDS = (
     # `CLAUDE.md`'s own re-check section prescribes and every ARDI round runs,
     # and a guard that fires on the common read is one nobody reads on the
     # rare write.
-    r"gh\s+api\s+[^\n;|&]*(?:/comments|/replies|/notes)"
-    r"[^\n;|&]*(?:-f|-F|--field|--raw-field)\s+body=",
-    r"gh\s+api\s+graphql[^\n;|&]*(?:addDiscussionComment|addComment)",
+    r"gh\s+api\s+" + _GAP + r"(?:/comments|/replies|/notes)"
+    + _GAP + r"(?:-f|-F|--field|--raw-field)\s+body=",
+    r"gh\s+api\s+graphql" + _GAP_ML + r"(?:addDiscussionComment|addComment)",
     # GitLab's raw-API discussion-note form, the counterpart to the above.
-    r"glab\s+api\s+[^\n;|&]*/(?:notes|discussions)"
-    r"[^\n;|&]*(?:-f|--field|--raw-field)\s+body=",
+    r"glab\s+api\s+" + _GAP + r"/(?:notes|discussions)"
+    + _GAP + r"(?:-f|-F|--field|--raw-field)\s+body=",
 )
 _ANCHOR = (
     r"(?:^|[;&|\n({`]|\b(?:then|else|elif|do|if|while|until)\s|!\s*)\s*"
@@ -124,9 +142,14 @@ ROBOT = "\U0001f916"
 # disclosing with the wrong marker. A body merely MENTIONING the emoji
 # ("the robot badge broke") discloses nothing, and telling its author to swap
 # markers would replace the one applicable instruction with an inapplicable one.
+# `\b` on both sides: without it "CI regenerated the snapshots" and "badge
+# rewritten" matched, and because this branch returns before MISSING, a body
+# that carried the emoji incidentally AND omitted the marker was told to swap
+# markers rather than to add one -- the inapplicable advice this branch exists
+# to avoid giving.
+_ATTRIB = r"\b(?:posted|generated|written|authored)\b"
 EMOJI_DISCLOSURE_RE = re.compile(
-    ROBOT + r"[^\n]{0,80}(?:posted|generated|written|authored)"
-    r"|(?:posted|generated|written|authored)[^\n]{0,80}" + ROBOT,
+    ROBOT + r"[^\n]{0,80}" + _ATTRIB + r"|" + _ATTRIB + r"[^\n]{0,80}" + ROBOT,
     re.IGNORECASE,
 )
 
@@ -138,11 +161,23 @@ UNREADABLE_RE = re.compile(
     r"--body-file|--description-file|--editor\b|--web\b"
     r"|-F\s+body=@|(?<!-)-F\s+(?!body=)\S"
     r"|--(?:body|message)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
+    # The short forms expand identically; omitting them reported a marker
+    # missing from a body the check demonstrably could not read.
+    r"|-(?:b|m)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
+    # `@file` is gh api's read-from-file sigil, and it is routinely QUOTED
+    # (`-F body="@/tmp/reply.md"`), so the optional quote is load-bearing.
+    r"|(?:-f|-F|--field|--raw-field)\s+body=[\"']?(?:@|\$)"
+    r"|(?:-f|-F|--field|--raw-field)\s+body=(?:\"[^\"]*\$|'[^']*\$)"
 )
 # A body flag with an inline literal value. Its absence on an interactive
 # invocation means there is no body to read here at all.
+# Every spelling `_POST_CMDS` accepts must appear here too, or a body sitting in
+# plain sight is reported as one the check could not read -- the weaker note,
+# which invites no correction. `-F body=` and `--raw-field body=` were accepted
+# as posting routes and omitted here, so they drew exactly that.
 HAS_INLINE_BODY_RE = re.compile(
-    r"--(?:body|message)\s+[\"']|-(?:b|m)\s+[\"']|-f\s+body=|--field\s+body=")
+    r"--(?:body|message)\s+[\"']|-(?:b|m)\s+[\"']"
+    r"|(?:-f|-F|--field|--raw-field)\s+body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
 # `[^"']*` after the handle would swallow unbounded prose, exempting a comment
@@ -204,13 +239,20 @@ def split_segments(text):
     """Split on shell separators that are OUTSIDE quotes."""
     segments, current = [], []
     quote = None
+    ansi_c = False
     escaped = False
+    prev = ""
     for ch in text:
+        prev_ch = prev
+        prev = ch
         if escaped:
             current.append(ch)
             escaped = False
             continue
-        if ch == "\\" and quote != "'":
+        # A plain '...' takes no escapes; ANSI-C $'...' does. Treating the
+        # latter as the former read `$'don\'t'` as closed and split the rest of
+        # the body on its newlines, cutting the marker off its own command.
+        if ch == "\\" and (quote != "'" or ansi_c):
             current.append(ch)
             escaped = True
             continue
@@ -218,9 +260,11 @@ def split_segments(text):
             current.append(ch)
             if ch == quote:
                 quote = None
+                ansi_c = False
             continue
         if ch in "\"'":
             quote = ch
+            ansi_c = ch == "'" and prev_ch == "$"
             current.append(ch)
             continue
         if ch in SEG_SEPARATORS:

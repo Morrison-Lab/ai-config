@@ -24,6 +24,14 @@ Review comments are the case that already discloses, since a review body announc
 The comments that need this are the ones that read most like a person: a claim, a release, a status update, a reply on a review thread, an issue filed on the user's behalf, a paraphrase of the user's own in-chat feedback.
 Each of those is short, conversational, and posted under a human login, which is exactly the shape that gets mistaken for a human.
 
+**A comment posted under a genuine BOT identity needs no marker.**
+The whole argument above is that the forge cannot report authorship when the token belongs to a person.
+Where it belongs to an app --- a workflow posting as `github-actions[bot]`, so the API returns `type: Bot` and the UI shows a bot badge --- the forge already says it, and a marker adds nothing.
+`skills/claude-agent-workflow/SKILL.md`'s in-workflow reply is that case.
+
+The test is the **token**, not the author: an agent driving `gh` with the account holder's PAT posts as a `User` however automated the surrounding workflow is.
+Check `.user.type` on a posted comment if unsure --- `gh api repos/<o>/<r>/issues/comments/<id> --jq .user.type` --- rather than reasoning from how the comment was produced.
+
 **A prose self-identification is not a substitute for the marker.**
 "Claude Code CLI (local session) is working on this" already discloses, so appending the footer to it looks redundant.
 Keep both.
@@ -33,7 +41,11 @@ A convention worth anything has to be checkable by one query rather than by read
 A body composed inside an indented code fence carries that fence's indentation into the posted comment, so the marker can arrive with leading spaces.
 Dedenting the source to column 0 is not the fix: a column-0 line ends the enclosing list item, which closes the fence and turns the marker into prose, so the comment stops being shown as a command at all.
 Whether markdownlint notices depends on the file --- measured 2026-08-24 with `markdownlint-cli2@0.22.1` in a repo-wide run under this repo's config, the same dedent raises `MD049` (emphasis-style) in `skills/post-merge/SKILL.md`, `MD046` (code-block-style) in `commands/release-pr.md`, and **nothing at all** in `skills/st/SKILL.md`.
-Measure that repo-wide rather than by linting one file: passing a single path changes which globs and which config apply, and it reported `MD049` for all three here --- a different artifact answering a different question, per [`verify-the-right-artifact`](verify-the-right-artifact.md).
+Read the per-file lines, not the run's whole output.
+A first pass at this measurement dedented one file at a time and grepped the rule codes out of the entire run, which reported `MD049` for all three --- because a *different* file was broken at the time and contributed its own `MD049` to every run.
+The cause was never the invocation.
+`markdownlint-cli2` unions a command-line path with the config's globs, so `markdownlint-cli2 commands/release-pr.md` lints all 573 files under the same config as a bare run; there is no single-file scope to get wrong.
+The mistake was attributing an error to whichever file the loop happened to be testing, which is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s cause check going unasked.
 `MD049` defaults to `consistent`, so it fires only where the document already established asterisk emphasis --- which makes the linter a partial detector here rather than the check.
 
 **That `consistent` default cuts the other way too, and it is the sharper hazard.**
@@ -41,6 +53,15 @@ The marker is underscore-emphasised, so a marker that escapes its fence into pro
 Measured here: adding the marker to `skills/migrate-discussion/SKILL.md` at column 0 closed the fence and turned two untouched lines 70 lines below into `MD049` errors, which read as defects in prose nobody had edited.
 So the linter does catch this file, and it reports the wrong lines.
 So the source keeps its indentation and the query drops its anchor.
+
+**The searchable invariant is `(AI agent)`, not the full line.**
+`AGENTS.md` says to swap in your own agent's name and keep the rest verbatim, which leaves the literal full line unable to find a Codex- or Gemini-posted comment --- returning nothing, which is indistinguishable from an undisclosed thread.
+That is the same failure this rule's sibling diagnoses for the claim wording, one artifact over.
+`hooks/require-agent-disclosure.py` already encodes the invariant as `posted by .{0,40}\(ai agent\)`; match that, case-insensitively:
+
+```bash
+grep -rn -i "posted by .*(ai agent)" .
+```
 
 **The guard cannot see every body, and the gaps are worth knowing.**
 `hooks/require-agent-disclosure.py` reads the command text and the `mcp__github__*` comment tools, so it is silent on a body it cannot reach: a `--body-file`, an `--editor` session, an interpolated `$BODY`.

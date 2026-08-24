@@ -149,6 +149,42 @@ CASES = [
     ("bot body followed by another flag",
      'gh pr comment 12 --body "@dependabot rebase" --repo o/r', False),
 
+    # --- VERBATIM corpus command lines; round-3 review findings 2 and 7 ------
+    #
+    # The earlier fixtures for these were single-line inventions, and both
+    # passed while the detector matched nothing the corpus actually writes --
+    # `fixtures-are-not-evidence` exactly. These are copied from the skills.
+    ("ard's GitHub review-thread reply, with its line continuation",
+     'gh api "repos/{owner}/{repo}/pulls/<N>/comments" \\\n'
+     '  -F in_reply_to="<comment_id>" -F body="@/tmp/reply-<comment_id>.md"',
+     None),
+    ("ard's GitLab discussion note, with its line continuation",
+     'glab api -X POST "projects/:id/merge_requests/<N>/discussions/<d>/notes" \\\n'
+     '  -F body="@/tmp/reply-<d>.md"', None),
+    ("discussions' multi-line addDiscussionComment, no marker",
+     "gh api graphql -f discussionId='<id>' -f body='<reply text>' -f query='\n"
+     "  mutation($discussionId: ID!, $body: String!) {\n"
+     "    addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {\n"
+     "      comment { id url }\n    }\n  }'", "missing"),
+    ("discussions' multi-line addDiscussionComment, WITH marker",
+     "gh api graphql -f discussionId='<id>' -f body='<reply text>\n\n" + MARKER
+     + "' -f query='\n  mutation($discussionId: ID!, $body: String!) {\n"
+     "    addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {\n"
+     "      comment { id url }\n    }\n  }'", False),
+
+    # --- precision on ordinary corpus reads; round-3 findings 3, 4, 11 -------
+    ("the review-verdict read CLAUDE.md prescribes",
+     "gh api repos/o/r/issues/12/comments --paginate | jq -s '.'", False),
+    ("an incidental robot emoji is a missing marker, not a wrong one",
+     'gh pr comment 5 --body "\U0001f916 CI regenerated the snapshots."',
+     "missing"),
+    ("-b with an expanded variable is unreadable, like --body",
+     'gh pr comment 5 -b "$BODY"', None),
+    ("--raw-field body= is inline and readable",
+     'gh api repos/o/r/issues/12/comments --raw-field body="hi"', "missing"),
+    ("-F body=@file is a file reference, so unreadable",
+     'gh api repos/o/r/issues/12/comments -F body="@/tmp/b.md"', None),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

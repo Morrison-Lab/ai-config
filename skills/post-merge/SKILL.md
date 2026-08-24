@@ -313,7 +313,10 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this --- please hold off" (or the pre-2026-08-24 wording "paws off", or any equivalent claim) and the claim is still live --- a push or comment within the last 2 hours --- skip it --- another session owns it.
+   Match the two-word invariant, `hold off` or the pre-2026-08-24 `paws off`, case-insensitively --- never a whole sentence.
+   The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own emitter four steps below, so a quoted prefix misses claims this very skill posts.
+   See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
+   If a live claim stands --- a push or comment within the last 2 hours --- skip the PR; another session owns it.
    An expired claim (over 2 idle hours) no longer blocks; take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash

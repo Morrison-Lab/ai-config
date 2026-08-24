@@ -119,7 +119,9 @@ _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
 This comment is posted under the account holder's own login on every round of every PR, so it is among the likeliest in the corpus to be mistaken for their own writing --- see [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md).
-The body arrives via `--body-file`, which the disclosure guard cannot read, so nothing will warn you if it is missing.
+The body arrives via `--body-file`, which the disclosure guard cannot read.
+It still warns --- but only that the body is unreadable, never that the marker is absent, and that weaker note reads as a formality rather than a finding.
+So this step states the requirement itself.
 
 **Keep the bot's trigger phrase out of the summary body.** The `issue_comment`
 trigger fires on the bare bot `@`-mention **anywhere** in a comment — even in a

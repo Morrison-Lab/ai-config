@@ -168,6 +168,6 @@ Generic Actions-authoring material stays there.
   - **Do:** set `setup-r: false` on `claude.yml` for any consumer without a `DESCRIPTION`, and `setup-r: true` plus an explicit `r-packages` on `quarto-publish.yml`.
   - **Do:** check each workflow's default separately when migrating several at once.
   - **Don't:** carry a setting across from one gha workflow's caller to another's --- `setup-r` alone defaults opposite ways in two of them.
-  - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block; the composite is where `packages:` versus `extra-packages:` is decided.
+  - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
 
   (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)

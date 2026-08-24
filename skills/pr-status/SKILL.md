@@ -34,11 +34,10 @@ if this session doesn't have `gh`.
 
 ## Verify the PR is still open first
 
-Before checking CI or review, confirm the PR hasn't merged or closed since
-you last looked:
+Before checking CI or review, confirm the PR hasn't merged or closed since you last looked, and fetch its branch name and draft state:
 
 ```bash
-gh pr view <N> --json state,title --jq '"\(.state): \(.title)"'   # VIEW_PR
+gh pr view <N> --json state,title,isDraft,headRefName --jq '"\(.state): \(.title) (draft: \(.isDraft), branch: \(.headRefName))"'   # VIEW_PR
 ```
 
 - `OPEN` → proceed with CI and review checks below.
@@ -59,8 +58,14 @@ from green checks.
 ## Read the LATEST review, checked for currency
 
 ```bash
-gh pr view "<N>" --json comments,commits,headRefOid \
-  --jq '{review: ([.comments[] | select(.author.login | startswith("claude"))] | last), lastCommitDate: (.commits[-1].committedDate), headRefOid: .headRefOid}'
+gh pr view "<N>" --json comments,commits,headRefOid,author,reviewRequests \
+  --jq '{
+    author: .author.login,
+    reviewRequests: [.reviewRequests[].login],
+    review: ([.comments[] | select(.author.login | startswith("claude"))] | last | {url: .url, body: .body, createdAt: .createdAt}),
+    lastCommitDate: (.commits[-1].committedDate),
+    headRefOid: .headRefOid
+  }'
 ```
 
 **This call fetches more than `READ_PR_COMMENTS` maps to** --
@@ -304,8 +309,53 @@ Interpret the output as:
 
 (The resolve mutation lives in the `ard` skill, step 4b.)
 
+## Check if the branch is behind main
+
+Compare remote-tracking refs to see if `main` has moved ahead of the branch:
+
+```bash
+git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main
+```
+
+- `0` -- up to date with main.
+- `>0` -- behind main by that many commits (offer `sync-pr-branch`).
+
 ## Output
 
-State, plainly: the latest review's verdict, who/what posted it, and the list
-of any open findings (or "none"). If you read `null`, say the filter didn't
-match a reviewer login — don't report it as clean.
+Render a **Review Summary Table** for the PR:
+
+| PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
+|:---|:---|:---:|:---:|:---:|:---|
+| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
+
+- **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
+- **Author** --- author login.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
+  Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
+  If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
+  If no SHA is named, display `[⚠️ Unverified](url)`.
+- **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`.
+- **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+  If human review has requested changes, flag `❌ Changes requested by <login>`.
+  For self-authored PRs, note `*Self-authored*`.
+  When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+  When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
+  When AI review is in-flight or unclean, display `- (AI review in progress)`.
+- **Next Step** --- computed deterministically using the full state matrix:
+  - If `isDraft`: `Draft (Work in progress)`.
+  - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
+  - If branch is behind main: `Resolve conflicts / Sync main (<N> commits behind)`.
+  - If CI is failing: `Fix CI (<failing-check>)`.
+  - If unaddressed review threads remain: `Resolve inline threads (<N> open)`.
+  - If AI review or External review has open findings: `Drive to clean (ARDI)`.
+  - If AI review is running: `In-flight AI review`.
+  - If CI is pending: `Wait for CI (<pending-check>)`.
+  - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
+  - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
+    - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.
+    - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
+    - If `Author` is external and human review is not yet requested: `Request human review`.
+
+State, plainly: the latest review's verdict, who/what posted it, and the list of any open findings (or "none").
+If you read `null`, say the filter didn't match a reviewer login — don't report it as clean.
+Extended operational rationale and empirical measurement histories live in [`pr-status-all.rationale.md`](../pr-status-all/pr-status-all.rationale.md).

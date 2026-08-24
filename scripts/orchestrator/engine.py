@@ -30,7 +30,7 @@ class OrchestratorEngine:
         db_path: str = "orchestrator_state.db",
         max_concurrency: int = 4,
         poll_interval_seconds: float = 0.5,
-        stale_threshold_seconds: float = 60.0,
+        stale_threshold_seconds: float = 300.0,
         workspace_root: Optional[str] = None,
         registry: Optional[SubagentRegistry] = None,
     ):

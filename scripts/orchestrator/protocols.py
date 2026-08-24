@@ -42,6 +42,14 @@ Goal: Implement the required fix or feature cleanly inside your isolated worktre
 Rules:
 - Make precise, atomic edits preserving formatting and SemBr conventions.
 - Stage and commit changes with conventional commit messages: `fix: <desc>` or `feat: <desc>`.
+- Do NOT output XML tool calls or function tags.
+- When creating a new file or completely rewriting a file, output the complete file in markdown code blocks with the relative path on the opening line, e.g. ```path/to/file.py.
+- When editing a large existing file, use search/replace blocks:
+<<<<<<< SEARCH
+<exact existing lines to find>
+=======
+<replacement lines>
+>>>>>>> REPLACE
 - Fail fast if tests or syntax checks fail.
 """
 

@@ -253,6 +253,66 @@ derived, which
 entry is written here, as a narrowing of that section, rather than elsewhere as
 a new one.)
 
+## "This change is only reformatting" is a scope claim about your own diff
+
+The claim-type list above names **only** as a scope word, and the commonest
+"only" an author writes is about their own diff: this is just a re-wrap, no
+prose meaning changed, purely mechanical.
+It reads as a description rather than an assertion, which is why nothing fires
+on it.
+It is the same shape as any other scope claim and it is cheaply decidable, so
+derive it.
+
+**The obvious command does not decide it.**
+`git diff -w` ignores whitespace *within* a line, and re-wrapping moves words
+*between* lines, so a genuine re-wrap still shows as changed content.
+Measured on the commit below, `git diff -w` returned 57 lines, and it would
+have returned a non-empty diff for a faithful re-wrap too.
+Using it here produces a false positive on the ordinary case, which is the kind
+of detector that gets switched off.
+
+**Comparing the normalized word stream does decide it**, because re-wrapping
+preserves the sequence of words and an edit does not:
+
+```python
+def words(sha, path):
+    t = subprocess.run(["git", "show", f"{sha}:{path}"],
+                       capture_output=True, text=True, encoding="utf-8").stdout
+    return re.split(r"\s+", t.strip())
+
+words(before, path) == words(after, path)   # True iff a pure re-wrap
+```
+
+Run the negative control first, per
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md): a `textwrap.wrap()`
+re-flow of one sentence must compare **True**.
+Without that, an always-False comparison is indistinguishable from a working
+detector.
+
+**It is a fast negative rather than a proof.**
+A True result licenses the claim.
+A False result means look, not that the claim is wrong --- a re-wrap that also
+fixes a typo compares False and is still fairly called trivial.
+
+- **Do:** compare the word streams before writing "only reformatting", and say
+  what the comparison returned.
+- **Do:** run the re-wrap control first, so a False result means something.
+- **Don't:** reach for `git diff -w` for this --- it cannot separate a re-wrap
+  from an edit, which is the entire question.
+- **Don't:** treat a description of your own diff as exempt because you wrote
+  it; authorship is what makes the scope feel already known.
+
+(Measured 2026-08-24 on
+[#2092](https://github.com/Morrison-Lab/ai-config/pull/2092).
+A commit was pushed reformatting a block to one sentence per line, described as
+altering no prose meaning.
+It also shifted two clauses from first person to third-person passive, which a
+reviewer caught.
+The word-stream comparison returns False with 37 differing tokens, and the
+control returns True.
+Tracked as
+[#2109](https://github.com/Morrison-Lab/ai-config/issues/2109).)
+
 ## Calling your own note stale is a state claim about that note
 
 The two sections above find a state claim hidden inside a recommendation.

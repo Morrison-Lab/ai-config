@@ -129,13 +129,15 @@ Surface an unowned stalled PR to the human, or claim it per [`claim-pr`](claim-p
 [`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
 This is the cheap standing sweep that says where to point it.
 
-`scripts/pr-overlap.py` is its sibling, deriving the same live set and answering the other set-level question --- which pairs of open PRs share a file:
+`scripts/pr-overlap.py` is its sibling, deriving the open-PR set the same way and answering the other set-level question --- which pairs of open PRs share a file:
 
 ```bash
 python3 scripts/pr-overlap.py -R Morrison-Lab/ai-config
 ```
 
 The split is worth keeping straight, because "stalled" is a property of each PR and "collides" is a property of the **pair**, so no per-PR sweep can reach it however carefully it is run.
+The two do not examine the same population by default, though, and the difference is one inverted flag under a near-identical name: `pr-sweep.py` skips drafts unless given `--include-drafts`, while `pr-overlap.py` includes them unless given `--exclude-drafts`.
+That is deliberate --- a draft's file set collides at merge time exactly as a ready one's does --- and it means running both with no flags yields different counts, so quote which one a figure came from.
 [`batch-merge-and-resolve`](batch-merge-and-resolve.md) owns the collision rule and the boundary: an intersection sees collisions and never dependencies.
 
 ## Asserting the set is EMPTY is the enumeration that skips its own check

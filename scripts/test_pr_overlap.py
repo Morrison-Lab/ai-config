@@ -41,8 +41,16 @@ def check(name, condition):
         failures += 1
 
 
-def pr_node(number, paths, draft=False, title=None, total=None, cursor=None):
-    """Build a PR node matching the GraphQL payload shape."""
+def pr_node(
+    number, paths, draft=False, title=None, total=None, cursor=None,
+    change_type="MODIFIED", has_next=None,
+):
+    """Build a PR node matching the GraphQL payload shape.
+
+    `cursor` sets `hasNextPage` so the pagination branch can be reached;
+    `has_next` overrides it independently, so a payload that promises
+    another page while returning no cursor can be built too.
+    """
     return {
         "number": number,
         "title": title or f"PR {number}",
@@ -53,11 +61,32 @@ def pr_node(number, paths, draft=False, title=None, total=None, cursor=None):
         "files": {
             "totalCount": len(paths) if total is None else total,
             "pageInfo": {
-                "hasNextPage": cursor is not None,
+                "hasNextPage": (
+                    cursor is not None if has_next is None else has_next
+                ),
                 "endCursor": cursor,
             },
-            "nodes": [{"path": p} for p in paths],
+            "nodes": [{"path": p, "changeType": change_type} for p in paths],
         },
+    }
+
+
+def files_page(paths, cursor=None):
+    """Build the FILES_QUERY response shape for one page of files."""
+    return {
+        "repository": {
+            "pullRequest": {
+                "files": {
+                    "pageInfo": {
+                        "hasNextPage": cursor is not None,
+                        "endCursor": cursor,
+                    },
+                    "nodes": [
+                        {"path": p, "changeType": "MODIFIED"} for p in paths
+                    ],
+                }
+            }
+        }
     }
 
 
@@ -370,10 +399,13 @@ check(
 )
 
 # --- 10. Drafts are included by default, unlike pr-sweep.py --------------
-# `check-purpose-before-reusing.md`: the sibling skips drafts because a
-# draft's empty diff is a false "empty-diff" finding. Here a draft's file
-# set collides at merge time exactly as a ready one's does, so the sibling's
-# default would hide real collisions. The purpose did not transfer.
+# `check-purpose-before-reusing.md`. The sibling skips drafts by default;
+# it states no reason at its flag, so the inference (not a claim about that
+# file) is that a draft opened per `pr-on-claim.md` has an empty diff, which
+# `pr-sweep.py`'s own `findings_for` would flag as `empty-diff`. Whatever
+# the reason there, here a draft's file set collides at merge time exactly
+# as a ready one's does, so inheriting that default would hide real
+# collisions. The purpose did not transfer.
 DRAFTS = [pr_node(1, ["a.md"], draft=True), pr_node(2, ["a.md"])]
 draft_code, draft_out = run_main(["-R", "o/r", "--strict"], fetch=fake_fetch(DRAFTS))
 check(
@@ -404,7 +436,21 @@ check(
     "JSON names the shared paths",
     parsed["repos"][0]["collisions"][0]["shared"] == ["a.md"],
 )
-check("JSON does not print the control banner to stdout", json_code == 0)
+check(
+    "JSON does not print the control banner to stdout",
+    not json_out.startswith("negative control:"),
+)
+check("a --json run exits 0 when advisory", json_code == 0)
+check(
+    "JSON emits PRs as a list of objects, so no key is a stringified int",
+    isinstance(parsed["repos"][0]["prs"], list)
+    and all(isinstance(p["number"], int) for p in parsed["repos"][0]["prs"]),
+)
+check(
+    "a JSON PR object carries its own file set and collision partners",
+    parsed["repos"][0]["prs"][0]["files"] == ["a.md"]
+    and parsed["repos"][0]["prs"][0]["collides_with"] == [2],
+)
 
 # --- 12. Render surfaces the duplicate/collision split -------------------
 DUPES = [pr_node(n, ["R/rd2qmd.R"]) for n in (105, 108, 111)] + [
@@ -422,6 +468,219 @@ check(
     "with identical file sets" in dupe_out,
 )
 check("the sweep examined all six pairs", "pairs examined: 6" in dupe_out)
+
+# --- 13. The fetch layer: a SHORT file set is not a clean pair -----------
+# The defect an adversarial review reproduced against the first draft: the
+# completeness guard tested only for an EMPTY file set, so a PR reporting
+# three changed files and returning one was accepted, and the missing file
+# was exactly the one that collided. The pair printed as "mergeable in any
+# order" and exited 0 under --strict, under a PASSED control banner.
+short_code, short_out = run_main(
+    ["-R", "o/r", "--strict"],
+    fetch=fake_fetch([
+        pr_node(1, ["a.md"], total=3),   # claims 3 files, returns 1
+        pr_node(2, ["shared.md"]),
+    ]),
+)
+check(
+    "a short-but-nonempty file set is rejected, not accepted as clean",
+    short_code == pr_overlap.USAGE_EXIT,
+)
+check(
+    "the short file set is named as incomplete",
+    "incomplete" in short_out and "#1" in short_out,
+)
+check(
+    "a short file set is NOT reported as mergeable in any order",
+    "mergeable in any order (shares no file with another open PR): #1"
+    not in short_out,
+)
+
+# A payload promising another page while returning no cursor must raise
+# rather than silently dropping every remaining file.
+try:
+    pr_overlap.remaining_files("o", "r", 1, None, 100)
+    no_cursor = False
+except pr_overlap.SweepError:
+    no_cursor = True
+check("remaining_files raises when handed no cursor", no_cursor)
+
+nullcur_code, _ = run_main(
+    ["-R", "o/r", "--strict"],
+    fetch=fake_fetch([
+        pr_node(1, ["a.md"], total=200, has_next=True),  # hasNextPage, no cursor
+        pr_node(2, ["shared.md"]),
+    ]),
+)
+check(
+    "hasNextPage with a null cursor is an error, not an empty page",
+    nullcur_code == pr_overlap.USAGE_EXIT,
+)
+
+# --- 14. The fetch layer: pagination is actually followed ----------------
+# Nothing exercised the pagination branch before, so a bug there would have
+# silently truncated every large PR's file set.
+_real_graphql = pr_overlap.gh_graphql
+try:
+    pr_overlap.gh_graphql = lambda q, f, c: files_page(["page2.md"])
+    paged = pr_overlap.file_set_for(
+        "o", "r", pr_node(1, ["page1.md"], total=2, cursor="CUR"), 1
+    )
+finally:
+    pr_overlap.gh_graphql = _real_graphql
+check(
+    "a second page of files is fetched and folded into the set",
+    paged == {"page1.md", "page2.md"},
+)
+
+_real_graphql = pr_overlap.gh_graphql
+try:
+    # A cursor that never clears must trip the runaway guard rather than
+    # looping forever.
+    pr_overlap.gh_graphql = lambda q, f, c: files_page(["x.md"], cursor="SAME")
+    pr_overlap.remaining_files("o", "r", 1, "CUR", 1)
+    runaway = False
+except pr_overlap.SweepError:
+    runaway = True
+finally:
+    pr_overlap.gh_graphql = _real_graphql
+check("non-terminating file pagination trips the runaway guard", runaway)
+
+# --- 15. A rename's pre-rename path is folded in -------------------------
+# GraphQL's PullRequestChangedFile has no previousFilename field: a rename's
+# `path` is the NEW path only. So a PR renaming foo.yml -> bar.yml and a PR
+# still editing foo.yml would derive disjoint sets, be reported mergeable in
+# any order, and produce a rename/modify conflict at merge time.
+_real_prev = pr_overlap.previous_filenames
+try:
+    pr_overlap.previous_filenames = lambda o, n, num: ["old.yml"]
+    renamed = pr_overlap.file_set_for(
+        "o", "r", pr_node(1, ["new.yml"], change_type="RENAMED"), 100
+    )
+    unrenamed = pr_overlap.file_set_for(
+        "o", "r", pr_node(2, ["plain.yml"], change_type="MODIFIED"), 100
+    )
+finally:
+    pr_overlap.previous_filenames = _real_prev
+check(
+    "a renamed file contributes BOTH its new and its pre-rename path",
+    renamed == {"new.yml", "old.yml"},
+)
+check(
+    "a PR with no rename pays no REST lookup and keeps its paths",
+    unrenamed == {"plain.yml"},
+)
+check(
+    "the rename makes the otherwise-invisible collision visible",
+    pr_overlap.classify_pair(renamed, {"old.yml"}) == "overlap",
+)
+
+# --- 16. gh failure paths --------------------------------------------------
+# Each must raise rather than return something an empty file set could be
+# built from.
+class FakeProc:
+    def __init__(self, code=0, out="", err=""):
+        self.returncode, self.stdout, self.stderr = code, out, err
+
+
+def with_proc(proc_or_exc):
+    """Monkeypatch subprocess.run inside pr_overlap for one call."""
+    def _run(args, capture_output=None, text=None):
+        if isinstance(proc_or_exc, Exception):
+            raise proc_or_exc
+        return proc_or_exc
+    return _run
+
+
+def graphql_raises(proc_or_exc):
+    real = pr_overlap.subprocess.run
+    try:
+        pr_overlap.subprocess.run = with_proc(proc_or_exc)
+        pr_overlap.gh_graphql("q", [], "o/r")
+        return None
+    except pr_overlap.SweepError:
+        return "SweepError"
+    except SystemExit as exc:
+        return exc.code
+    finally:
+        pr_overlap.subprocess.run = real
+
+
+check(
+    "a non-zero gh exit raises rather than returning empty",
+    graphql_raises(FakeProc(code=1, err="boom")) == "SweepError",
+)
+check(
+    "unparseable JSON raises",
+    graphql_raises(FakeProc(out="not json")) == "SweepError",
+)
+check(
+    "a GraphQL errors array raises",
+    graphql_raises(FakeProc(out='{"errors":[{"message":"nope"}]}'))
+    == "SweepError",
+)
+check(
+    "an empty data object raises",
+    graphql_raises(FakeProc(out='{"data":null}')) == "SweepError",
+)
+# A MISSING gh must exit 2, not 1. Exit 1 is this script's "collision found"
+# verdict, so an environment with no gh would report a finding it never
+# made -- and a remote/web session has no gh on PATH at all.
+check(
+    "a missing gh binary exits with the usage status, not the finding status",
+    graphql_raises(FileNotFoundError(2, "No such file or directory", "gh"))
+    == pr_overlap.USAGE_EXIT,
+)
+
+# --- 17. Remaining usage validation --------------------------------------
+check(
+    "--files-per-page below 1 is rejected",
+    usage_exit(["-R", "o/r", "--files-per-page", "0"]) == pr_overlap.USAGE_EXIT,
+)
+check(
+    "--files-per-page above the GraphQL cap is rejected rather than erroring "
+    "at the API",
+    usage_exit(["-R", "o/r", "--files-per-page", "500"])
+    == pr_overlap.USAGE_EXIT,
+)
+
+# --- 18. A wholly underivable repo does not read as an empty one ---------
+allbad_code, allbad_out = run_main(
+    ["-R", "o/r"],
+    fetch=fake_fetch([pr_node(n, ["a.md"], total=9) for n in (1, 2, 3)]),
+)
+check("an all-underivable sweep exits 2", allbad_code == pr_overlap.USAGE_EXIT)
+check(
+    "an all-underivable sweep does NOT claim there were no open PRs",
+    "(no open PRs to compare)" not in allbad_out,
+)
+check(
+    "it says instead that nothing could be compared",
+    "no file set could be derived" in allbad_out,
+)
+
+# --- 19. The control covers the completeness guard, not just the classifier
+# The control has to reach the layer where failures actually live. Breaking
+# the guard must make the control refuse to report anything.
+_real_file_set_for = pr_overlap.file_set_for
+try:
+    pr_overlap.file_set_for = lambda o, n, pr, page: {"whatever"}
+    guard_ok, guard_report = pr_overlap.run_negative_control()
+finally:
+    pr_overlap.file_set_for = _real_file_set_for
+check(
+    "the control FAILS when the completeness guard stops rejecting short sets",
+    not guard_ok,
+)
+check(
+    "the control names the short-file-set failure",
+    any("short file set" in line for line in guard_report),
+)
+control_banner = pr_overlap.run_negative_control()[1][0]
+check(
+    "the control banner does not claim to exercise gh",
+    "does not exercise `gh`" in control_banner,
+)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

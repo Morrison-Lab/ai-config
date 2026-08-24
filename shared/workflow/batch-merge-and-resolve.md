@@ -259,14 +259,17 @@ python3 scripts/pr-overlap.py -R <owner>/<repo> --strict --json
 ```
 
 The two instruments answer different questions, and the file-set one is the cheaper and wider of the pair, so it goes first.
-A file-set intersection is a **superset** of the textual conflicts: two PRs editing distant parts of one file share the file and merge cleanly, so the sweep flags a pair `merge-tree` would call clean.
+It flags many pairs `merge-tree` would call clean, since two PRs editing distant parts of one file share the file and still merge without conflict.
 Run `merge-tree` on the flagged pairs to find which of them actually conflict.
 
-Two collisions run the other way, though, and are the reason the file-set sweep is not merely a cheap approximation of the conflict scan.
-**Identical file sets** --- two PRs implementing the same change --- merge perfectly cleanly, because both sides carry the same content, so no conflict scan can see them.
-That is a duplicate to close rather than an order to pick, which is why the script reports identical sets separately from partial overlaps.
-And the **threshold breach that exists only in the sum**, described below, arrives through appends at different points in one file, which likewise produces no textual conflict.
-Both are invisible to `merge-tree` and both are visible as a shared path.
+Wider is not the same as a **superset**, though, and treating it as one would license stopping at whatever the sweep flagged.
+A rename is the counterexample: GitHub's GraphQL API reports a renamed file by its new path only, so a PR renaming `foo.yml` and a PR still editing `foo.yml` would intersect empty while conflicting at merge time.
+`pr-overlap.py` folds the pre-rename path back in from REST for exactly that reason, and a hand-run `gh pr diff --name-only` comparison does not.
+
+One collision runs the other way, and is the reason the file-set sweep is not merely a cheap approximation of the conflict scan.
+**Identical file sets** are often one change implemented twice, and when they are, both sides carry the same content and merge cleanly, so no conflict scan can see them at all.
+Confirm the contents match before treating such a pair as a duplicate, since set equality is not content equality: two PRs editing the same two files differently have an identical file set and genuinely conflict.
+That is why the script reports identical sets separately from partial overlaps rather than folding them together.
 
 The script's own boundary is the one `CLAUDE.md`'s merge-order section already states, and it prints it on every run rather than only when it finds something.
 An intersection sees **collisions** and never **dependencies**, so a PR asserting something another PR makes true is reported clean by construction.
@@ -444,9 +447,8 @@ that each stay under it and land over it once both merge.
 Neither branch is at fault, and neither branch's checks can see it: each PR
 measures the file as it would exist with only its own change applied, so the
 breach is a property of the **combination** rather than of any member.
-This is also the one mode a pairwise `git merge-tree` sweep cannot find, since
-appends at different points in a file produce no textual conflict at all --- so
-the section above on pair collisions does not cover it.
+A pairwise `git merge-tree` sweep cannot find this either, since appends at different points in a file produce no textual conflict at all --- it shares that property with the identical-file-set duplicate described above.
+The **file-set** half of the pair-collision section does flag the shared path, which is the cue to run the arithmetic below on it; what no conflict scan above will report is the breach itself.
 
 The instrument is arithmetic over three refs rather than a conflict scan:
 

@@ -16,10 +16,20 @@ the intersection before asserting it, rather than recalling what each PR is
 time, which is `shared/principles/deterministic-tools.md`'s stated trigger
 for building the instrument.
 
-This is a sibling of `scripts/pr-sweep.py`, sharing its argument shape and
-its habit of reporting what it examined. The two answer different questions:
-`pr-sweep.py` asks which PRs are stalled, a property of each PR; this asks
-which PRs collide, a property of the *set*.
+This is a sibling of `scripts/pr-sweep.py`, sharing its `--repo/-R`,
+`--limit`, `--json`, and `--strict` shape and its habit of reporting what it
+examined. The two answer different questions: `pr-sweep.py` asks which PRs
+are stalled, a property of each PR; this asks which PRs collide, a property
+of the *set*.
+
+ONE FLAG IS DELIBERATELY INVERTED, and it is worth stating because running
+the two with no flags yields different populations. `pr-sweep.py` skips
+drafts by default and takes `--include-drafts`; this includes them by
+default and takes `--exclude-drafts`. The purpose did not transfer, per
+`shared/workflow/check-purpose-before-reusing.md`: a draft's diff is
+routinely empty, which `pr-sweep.py` would flag as a finding about that PR,
+whereas here a draft's file set collides at merge time exactly as a ready
+one's does -- so excluding drafts would hide real collisions.
 
 WHAT THIS CANNOT SEE, stated here and in every run's output because a zero
 here reads like a merge-order all-clear and is not one. File-set
@@ -44,11 +54,13 @@ Four correctness properties, each of which a hand-run version got wrong:
      is clean by construction "runs the real command, against real refs, and
      returns exactly the clean result a working detector would", so it
      establishes nothing. Comparing a file set with ITSELF is exactly that
-     impostor -- in Python `s & s == s` holds for every set, so such a check
-     reduces to `bool(s)` and cannot fail. The control below instead runs
-     the real pair classifier over fixtures known to collide, known to be
-     identical, and known to be disjoint, and refuses to examine any repo if
-     the classifier misreports one of them.
+     impostor -- in Python `(s & s) == s` is `True` for every set, so a
+     control of that shape is constant-true, and the prototype's
+     `f and (f & f) == f` merely adds `bool(f)` on top, which is no better.
+     The control below instead runs the real pair classifier over fixtures
+     known to collide, known to be identical, and known to be disjoint, plus
+     a file set the fetch layer must REJECT as incomplete, and refuses to
+     examine any repo if one of them is misreported.
   3. A file set that could not be DERIVED must not silently become an empty
      set. An empty set collides with nothing, so a `gh` failure would
      otherwise present as a clean pair and shrink the examined count with no
@@ -81,6 +93,7 @@ import itertools
 import json
 import subprocess
 import sys
+import traceback
 
 # `raise SystemExit("message")` prints the message but exits 1, which is this
 # script's "found a collision" verdict -- so a usage or environment error
@@ -101,6 +114,17 @@ MAX_SHARED_SHOWN = 4
 # `fail-fast.md` warns about.
 FILES_PAGE = 100
 
+# GraphQL connection cap on `first:`. Requesting more is rejected outright,
+# so both the PR set and each file set are paged in chunks of at most this.
+MAX_PAGE_SIZE = 100
+
+# Runaway guard on the per-PR file pagination loop. A constant rather than a
+# literal because it bounds what `--files-per-page` can reach: at a page
+# size of 1 this caps a derivable PR at MAX_FILE_PAGES files, and a
+# configurable flag silently bounded by a buried literal is the shape
+# `shared/coding/configurable-parameters.md` rules out.
+MAX_FILE_PAGES = 100
+
 # Printed on every run, including runs that find nothing. A zero here is the
 # case most likely to be misread, so the caveat cannot be conditional on
 # there being findings to caveat.
@@ -114,17 +138,18 @@ BOUNDARY_NOTE = (
 )
 
 QUERY = """
-query($owner:String!, $name:String!, $first:Int!, $files:Int!) {
+query($owner:String!, $name:String!, $first:Int!, $files:Int!, $after:String) {
   repository(owner:$owner, name:$name) {
-    pullRequests(states:OPEN, first:$first, orderBy:{field:CREATED_AT, direction:ASC}) {
+    pullRequests(states:OPEN, first:$first, after:$after, orderBy:{field:CREATED_AT, direction:ASC}) {
       totalCount
+      pageInfo { hasNextPage endCursor }
       nodes {
         number title url isDraft createdAt
         author { login }
         files(first:$files) {
           totalCount
           pageInfo { hasNextPage endCursor }
-          nodes { path }
+          nodes { path changeType }
         }
       }
     }
@@ -291,12 +316,52 @@ def run_negative_control():
             f"  FAILED: enumeration found {len(collisions)} collisions, want 1"
         )
 
+    # The classifier is the half that does not break in practice; the fetch
+    # layer is. So the control also drives the real completeness guard with
+    # a payload claiming more files than it returns, which must be REJECTED
+    # -- otherwise a short file set would silently read as a clean pair.
+    short_payload = {
+        "number": 0,
+        "files": {
+            "totalCount": 3,
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{"path": "a.md", "changeType": "MODIFIED"}],
+        },
+    }
+    try:
+        file_set_for("control", "control", short_payload, FILES_PAGE)
+        ok = False
+        lines.append(
+            "  FAILED: a short file set (1 of 3 files) was accepted rather "
+            "than rejected as incomplete"
+        )
+    except SweepError:
+        pass
+
+    complete_payload = {
+        "number": 0,
+        "files": {
+            "totalCount": 1,
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
+            "nodes": [{"path": "a.md", "changeType": "MODIFIED"}],
+        },
+    }
+    try:
+        if file_set_for("control", "control", complete_payload, FILES_PAGE) != {
+            "a.md"
+        }:
+            ok = False
+            lines.append("  FAILED: a complete file set was not derived intact")
+    except SweepError as exc:
+        ok = False
+        lines.append(f"  FAILED: a complete file set was rejected ({exc})")
+
     verdict = "PASSED" if ok else "FAILED"
     header = (
         f"negative control: {verdict} "
-        f"({len(CONTROL_CASES)} classifier cases + a 3-pair enumeration; "
-        "includes a known-colliding case, so a detector that cannot report a "
-        "collision is caught here)"
+        f"({len(CONTROL_CASES)} pair-classifier cases including a "
+        "known-colliding one, a 3-pair enumeration, and the file-set "
+        "completeness guard in both directions; does not exercise `gh`)"
     )
     return ok, [header] + lines
 
@@ -304,26 +369,45 @@ def run_negative_control():
 # --- fetching ------------------------------------------------------------
 
 
-def gh_graphql(query, fields, context):
-    """Run one GraphQL query, raising rather than returning an empty result.
+def run_gh(args, context):
+    """Run one `gh` command, raising on every failure path.
 
-    Every failure path raises. A `gh` failure that returned `{}` would
-    become an empty file set, which collides with nothing and so reads as a
-    clean pair -- the pass path and the failure path printing the same
-    thing, which `fail-fast.md` says is not yet a check.
+    A `gh` failure that returned empty output would become an empty file
+    set, which collides with nothing and so reads as a clean pair -- the
+    pass path and the failure path printing the same thing, which
+    `fail-fast.md` says is not yet a check.
+
+    A MISSING `gh` is handled separately and fatally. `subprocess.run`
+    raises `FileNotFoundError` when the binary is absent, and an escaping
+    exception would exit 1 -- this script's "collision found" verdict -- so
+    an environment with no `gh` would report a finding it never made. A
+    remote or web session has no `gh` on PATH at all, per
+    `shared/workflow/fully-clean.md`, so this is a routine state rather than
+    an exotic one.
     """
-    proc = subprocess.run(
-        ["gh", "api", "graphql"] + fields + ["-f", f"query={query}"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(args, capture_output=True, text=True)
+    except FileNotFoundError:
+        die(
+            "pr-overlap: `gh` is not installed or not on PATH, so no PR set "
+            "could be derived. This is an environment failure, not a verdict "
+            "about any PR."
+        )
     if proc.returncode != 0:
         raise SweepError(
             f"gh failed for {context} (exit {proc.returncode}): "
             f"{proc.stderr.strip()}"
         )
+    return proc.stdout
+
+
+def gh_graphql(query, fields, context):
+    """Run one GraphQL query, raising rather than returning an empty result."""
+    stdout = run_gh(
+        ["gh", "api", "graphql"] + fields + ["-f", f"query={query}"], context
+    )
     try:
-        payload = json.loads(proc.stdout)
+        payload = json.loads(stdout)
     except json.JSONDecodeError as exc:
         raise SweepError(f"gh returned unparseable JSON for {context}: {exc}")
     if payload.get("errors"):
@@ -341,19 +425,53 @@ def split_repo(repo):
     return repo.split("/", 1)
 
 
+def previous_filenames(owner, name, number):
+    """Pre-rename paths for a PR that renames files.
+
+    GraphQL's `PullRequestChangedFile` has no `previousFilename` field --
+    only `path`, which for a rename is the NEW path. So a PR renaming
+    `foo.yml` to `bar.yml` and a PR modifying `foo.yml` would derive
+    disjoint sets and be reported mergeable in any order, while the merge
+    produces a rename/modify conflict. `batch-merge-and-resolve.md` already
+    identifies deleted and renamed paths as what breaks a sibling branch.
+
+    REST does carry `previous_filename`, so the old path is folded in
+    alongside the new one. Called only for PRs whose GraphQL payload
+    reported a RENAMED file, so the extra request is rare.
+    """
+    stdout = run_gh(
+        [
+            "gh", "api", f"repos/{owner}/{name}/pulls/{number}/files",
+            "--paginate", "--jq", ".[].previous_filename // empty",
+        ],
+        f"{owner}/{name}#{number} renames",
+    )
+    return [line.strip() for line in stdout.splitlines() if line.strip()]
+
+
 def remaining_files(owner, name, number, cursor, page):
     """Page through a PR's remaining files.
 
     Truncating instead would let a shared file sit unfetched on page two and
     report the pair clean, so the pages are followed to the end.
+
+    A caller reaching this with no cursor is a defect rather than a PR with
+    no further pages: `file_set_for` only calls it when `hasNextPage` was
+    true, so a null `endCursor` there means the payload promised a page it
+    cannot name. Returning `[]` would silently drop every remaining file.
     """
-    paths, guard = [], 0
+    if not cursor:
+        raise SweepError(
+            f"#{number}: more file pages were reported but no cursor was "
+            "returned, so the remaining files cannot be fetched"
+        )
+    paths, seen_pages = [], 0
     while cursor:
-        guard += 1
-        if guard > 100:
+        seen_pages += 1
+        if seen_pages > MAX_FILE_PAGES:
             raise SweepError(
                 f"#{number}: file pagination did not terminate after "
-                f"{guard} pages"
+                f"{MAX_FILE_PAGES} pages of {page}"
             )
         data = gh_graphql(
             FILES_QUERY,
@@ -375,48 +493,87 @@ def remaining_files(owner, name, number, cursor, page):
 
 
 def file_set_for(owner, name, pr, page):
-    """Complete set of paths a PR changes.
+    """Complete set of paths a PR changes, including pre-rename paths.
 
     Raises rather than returning a partial set: a file set that is
     incomplete for an unreported reason produces a clean-looking pair.
+
+    The completeness test compares the derived count against the API's own
+    `totalCount`, rather than merely checking the set is non-empty. A
+    short-but-non-empty set is the dangerous case and the likelier one -- it
+    reads as a real file set, so nothing about the resulting "no collision"
+    invites suspicion.
     """
     files = pr.get("files") or {}
-    paths = [n["path"] for n in (files.get("nodes") or []) if n.get("path")]
+    nodes = files.get("nodes") or []
+    paths = [n["path"] for n in nodes if n.get("path")]
     info = files.get("pageInfo") or {}
     if info.get("hasNextPage"):
         paths.extend(
             remaining_files(owner, name, pr["number"], info.get("endCursor"), page)
         )
-    if files.get("totalCount") and not paths:
+
+    total = files.get("totalCount")
+    if total is not None and len(set(paths)) < total:
         raise SweepError(
-            f"#{pr['number']}: reported {files['totalCount']} changed files "
-            "and returned none"
+            f"#{pr['number']}: reported {total} changed file(s) but only "
+            f"{len(set(paths))} could be derived, so its file set is "
+            "incomplete and any 'no collision' over it would be unfounded"
         )
+
+    # A rename's GraphQL `path` is the NEW path only, so the pre-rename path
+    # has to come from REST or the collision against a PR still editing the
+    # old path is invisible. Only PRs that actually rename something pay the
+    # extra request.
+    if any(n.get("changeType") == "RENAMED" for n in nodes):
+        paths.extend(previous_filenames(owner, name, pr["number"]))
+
     return set(paths)
 
 
 def fetch(repo, limit, page):
-    """Fetch every open PR in one repo, with its complete file set."""
+    """Fetch open PRs for one repo, paginating the PR connection itself.
+
+    The GraphQL `pullRequests` connection caps `first:` at 100, so a repo
+    with more open PRs than that cannot be swept in one request. Paginating
+    here rather than raising `--limit` is the fix: telling a caller to raise
+    a limit past the cap is advice that cannot be followed, and this whole
+    script exists to derive a complete set rather than a prefix of one.
+    """
     owner, name = split_repo(repo)
-    data = gh_graphql(
-        QUERY,
-        [
+    nodes, cursor, total = [], None, 0
+    while len(nodes) < limit:
+        want = min(MAX_PAGE_SIZE, limit - len(nodes))
+        fields = [
             "-F", f"owner={owner}", "-F", f"name={name}",
-            "-F", f"first={limit}", "-F", f"files={page}",
-        ],
-        repo,
-    )
-    repository = data.get("repository")
-    if repository is None:
-        raise SweepError(f"no such repository: {repo}")
-    return owner, name, repository["pullRequests"]
+            "-F", f"first={want}", "-F", f"files={page}",
+        ]
+        if cursor:
+            fields += ["-f", f"after={cursor}"]
+        data = gh_graphql(QUERY, fields, repo)
+        repository = data.get("repository")
+        if repository is None:
+            raise SweepError(f"no such repository: {repo}")
+        connection = repository["pullRequests"]
+        total = connection.get("totalCount", 0)
+        nodes.extend(connection.get("nodes") or [])
+        info = connection.get("pageInfo") or {}
+        if not info.get("hasNextPage"):
+            break
+        cursor = info.get("endCursor")
+        if not cursor:
+            raise SweepError(
+                f"{repo}: more PR pages were reported but no cursor was "
+                "returned, so the open-PR set cannot be completed"
+            )
+    return owner, name, {"totalCount": total, "nodes": nodes}
 
 
 def sweep(repo, limit, page, include_drafts):
     """Derive one repo's open-PR set and compare every pair of file sets."""
-    owner, name, prs = fetch(repo, limit, page)
-    nodes = prs.get("nodes") or []
-    total = prs.get("totalCount", len(nodes))
+    owner, name, connection = fetch(repo, limit, page)
+    nodes = connection.get("nodes") or []
+    total = connection.get("totalCount", len(nodes))
 
     file_sets, meta, underivable, drafts_skipped = {}, {}, [], 0
     for pr in nodes:
@@ -449,14 +606,26 @@ def sweep(repo, limit, page, include_drafts):
         len(underivable) * examined + len(underivable) * (len(underivable) - 1) // 2
     )
 
+    # A list of PR objects rather than dicts keyed by PR number: JSON object
+    # keys are always strings, so a number-keyed dict would force a consumer
+    # to coerce when joining against `collisions[].a`, which stays an int.
+    # `pr-sweep.py` emits a list for the same reason.
+    prs = [
+        dict(
+            meta[number],
+            number=number,
+            files=sorted(file_sets[number]),
+            collides_with=sorted(partners.get(number, ())),
+        )
+        for number in sorted(file_sets)
+    ]
+
     return {
         "repo": repo,
         "open_total": total,
         "returned": len(nodes),
         "drafts_skipped": drafts_skipped,
         "examined": examined,
-        "numbers": sorted(file_sets),
-        "file_sets": {n: sorted(f) for n, f in file_sets.items()},
         "pairs_examined": pairs,
         "pairs_unexaminable": unexaminable,
         "underivable": underivable,
@@ -467,8 +636,7 @@ def sweep(repo, limit, page, include_drafts):
         "identical_clusters": clusters,
         "independent": independent,
         "empty_diff": empty_diff,
-        "partners": {n: sorted(p) for n, p in partners.items()},
-        "meta": meta,
+        "prs": prs,
         # Truncation counts as incomplete: a collision sweep that did not
         # fetch every open PR can report a clean queue whose colliding pair
         # simply was not fetched.
@@ -482,11 +650,13 @@ def sweep(repo, limit, page, include_drafts):
 def render(result):
     """Render one repo's result, leading with what was examined."""
     lines = []
+    by_number = {pr["number"]: pr for pr in result["prs"]}
     truncated = ""
     if result["returned"] < result["open_total"]:
         truncated = (
             f" [TRUNCATED: {result['returned']} of {result['open_total']} "
-            "fetched; raise --limit]"
+            f"fetched; raise --limit (max {MAX_PAGE_SIZE} per page, paged "
+            "automatically above that)]"
         )
     lines.append("=" * 72)
     lines.append(
@@ -513,7 +683,14 @@ def render(result):
     )
 
     if not result["examined"]:
-        lines.append("  (no open PRs to compare)")
+        # "No open PRs" and "no file set could be derived" are opposite
+        # states, and printing the first over the second would report an
+        # empty repo where the truth is a broken sweep.
+        lines.append(
+            "  (no file set could be derived, so nothing was compared)"
+            if result["underivable"]
+            else "  (no open PRs to compare)"
+        )
 
     clusters = result["identical_clusters"]
     if clusters:
@@ -529,7 +706,7 @@ def render(result):
         for cluster in clusters:
             # Every member shares one file set by definition, so any
             # member's own set describes the whole cluster.
-            shared = result["file_sets"].get(cluster[0], [])
+            shared = by_number.get(cluster[0], {}).get("files", [])
             listed = ", ".join(f"#{n}" for n in cluster)
             lines.append(f"  {listed}  ({len(shared)} file(s), identical)")
             for path in shared[:MAX_SHARED_SHOWN]:
@@ -539,7 +716,7 @@ def render(result):
                     f"      ... and {len(shared) - MAX_SHARED_SHOWN} more"
                 )
             for number in cluster:
-                title = result["meta"].get(number, {}).get("title", "")
+                title = by_number.get(number, {}).get("title", "")
                 lines.append(f"      #{number}  {title[:58]}")
 
     overlaps = [c for c in result["collisions"] if c["kind"] == "overlap"]
@@ -564,16 +741,14 @@ def render(result):
     if result["examined"]:
         lines.append("")
         lines.append("per-PR collision count (most entangled first):")
-        for number in sorted(
-            result["numbers"],
-            key=lambda n: (-len(result["partners"].get(n, ())), n),
+        for pr in sorted(
+            result["prs"], key=lambda p: (-len(p["collides_with"]), p["number"])
         ):
-            info = result["meta"].get(number, {})
-            count = len(result["partners"].get(number, ()))
-            draft = " (draft)" if info.get("isDraft") else ""
+            draft = " (draft)" if pr.get("isDraft") else ""
             lines.append(
-                f"  #{number}  {info.get('created', '?')}  "
-                f"collides with {count:2d}{draft}  {info.get('title', '')[:52]}"
+                f"  #{pr['number']}  {pr.get('created', '?')}  "
+                f"collides with {len(pr['collides_with']):2d}{draft}  "
+                f"{pr.get('title', '')[:52]}"
             )
 
     listed = ", ".join(f"#{n}" for n in result["independent"])
@@ -607,11 +782,20 @@ def main(argv=None):
     )
     parser.add_argument(
         "--limit", type=int, default=100,
-        help="Maximum open PRs to fetch per repo (default 100).",
+        help=(
+            "Maximum open PRs to fetch per repo (default 100). Values above "
+            f"{MAX_PAGE_SIZE} are paged automatically, since the GraphQL "
+            f"connection caps a single request at {MAX_PAGE_SIZE}."
+        ),
     )
     parser.add_argument(
         "--files-per-page", type=int, default=FILES_PAGE,
-        help=f"Files fetched per GraphQL page (default {FILES_PAGE}).",
+        help=(
+            f"Files fetched per GraphQL page (default {FILES_PAGE}, max "
+            f"{MAX_PAGE_SIZE}). A PR needing more than {MAX_FILE_PAGES} "
+            "pages at this size is reported as underivable rather than "
+            "silently truncated."
+        ),
     )
     parser.add_argument(
         "--exclude-drafts", action="store_true",
@@ -639,9 +823,9 @@ def main(argv=None):
         split_repo(repo)
     if args.limit < 1:
         die(f"pr-overlap: --limit must be at least 1, got {args.limit}")
-    if args.files_per_page < 1:
+    if args.files_per_page < 1 or args.files_per_page > MAX_PAGE_SIZE:
         die(
-            "pr-overlap: --files-per-page must be at least 1, got "
+            f"pr-overlap: --files-per-page must be 1..{MAX_PAGE_SIZE}, got "
             f"{args.files_per_page}"
         )
 
@@ -702,4 +886,19 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Any exception escaping main() would exit 1 -- this script's "collision
+    # found" verdict -- so an internal error would be read as a finding.
+    # `fail-fast.md`: reserve a distinct status for internal errors whenever
+    # another status carries a verdict, and set it explicitly.
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        traceback.print_exc()
+        print(
+            "pr-overlap: internal error above; this is NOT a verdict about "
+            "any PR.",
+            file=sys.stderr,
+        )
+        sys.exit(USAGE_EXIT)

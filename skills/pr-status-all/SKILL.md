@@ -128,7 +128,8 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"`, so the type field needs no bot-login blocklist (measured 2026-08-15).
 >    Judge each matched review by **substance, not state**: 106 of 106 formal reviews across 60 merged PRs on this repo are `COMMENTED`, zero `APPROVED` (measured 2026-07-30 on #668).
 >    Fetch each matched review's body and inline comments.
->    An affirmative zero-findings read across every matched review means a genuine external verdict at the head; findings in any of them mean `N open`.
+>    An affirmative zero-findings read across every matched review means a genuine external verdict at the head.
+>    Findings in any of them mean `N open`.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
 >    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.

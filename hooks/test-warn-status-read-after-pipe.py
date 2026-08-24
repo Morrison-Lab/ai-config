@@ -161,6 +161,37 @@ check("a comment between the pipeline and the read still fires",
 check("set -o pipefail inside a subshell suppresses",
       fires("( set -o pipefail; cmd | head -20 ); echo $?"), False)
 
+# ...but only for pipes that subshell actually encloses. Each of these carries
+# a real `set -o pipefail` whose scope EXCLUDES the pipe, and each measured 0
+# without an outer pipefail and 1 with one, so each is a genuine misread.
+check("pipefail scoped to a subshell the pipe is outside still fires",
+      fires("(set -o pipefail; make) | tail -20; echo $?"), True)
+check("pipefail in a nested group the pipe is outside still fires",
+      fires("( ( set -o pipefail ); cmd | head ); echo $?"), True)
+check("pipefail in an earlier subshell still fires",
+      fires("( set -o pipefail; true ); cmd | head; echo $?"), True)
+
+# A `$?` following a command substitution reads the SUBSTITUTION's status, not
+# any earlier pipeline. Measured: `true | cat; echo "x $(exit 7) (rc=$?)"`
+# prints rc=7. Not tracking substitutions inside double quotes produced this
+# guard's one measured false positive, on fail-fast.md's own example.
+check("a $? after a substitution in double quotes does not fire",
+      fires('cmd | head -20; echo "n=$(wc -l < f) rc=$?"'), False)
+check("fail-fast.md's own example does not fire",
+      fires('grep -q PATTERN file | head\n'
+            'echo "hits: $(wc -l < out.txt) (rc=$?)"'), False)
+check("a $? after an unquoted substitution does not fire",
+      fires("cmd | head -20; echo $(wc -l < f) $?"), False)
+
+# Two assignments in one segment: the LAST substitution owns the status, so
+# the pipeline in the first does not. Measured 0 with and without pipefail.
+check("a second assignment in the segment does not fire",
+      fires("out=$(cmd | head -1) other=$(true); echo $?"), False)
+
+# A trailing redirect does not change whose status `$?` reports.
+check("an assignment with a trailing redirect still fires",
+      fires("out=$(cmd | head -1) 2>/dev/null; echo $?"), True)
+
 # Bare `(( ))` arithmetic: `|` is bitwise OR, not a pipe.
 check("bare arithmetic is not a pipe",
       fires("(( x = a | b )); echo $?"), False)
@@ -218,11 +249,12 @@ check("newline-separated $? after a pipe fires",
 check("multi-stage pipeline fires",
       fires('cmd | grep x | wc -l; echo "rc=$?"'), True)
 
-# The `|| rc=$?` capture idiom attached to a pipeline. One of the three hits
+# The `|| rc=$?` capture idiom attached to a pipeline. One of the two hits
 # from the corpus-wide negative control (645 fenced blocks, 8 discriminating,
-# 3 fired, 0 false positives -- see the hook docstring for the method), and a
-# true positive by `errexit-is-not-uniform.md`'s own detector list, which says
-# to flag `|| fallback` attached to a pipeline with no `pipefail`.
+# 2 fired -- see the hook docstring for the method and for the false positive
+# an earlier run of it reported), and a true positive by
+# `errexit-is-not-uniform.md`'s own detector list, which says to flag
+# `|| fallback` attached to a pipeline with no `pipefail`.
 check("the || capture idiom on a pipeline fires",
       fires("git diff --cached --name-only | grep -qE '^R/.*\\.R$' || rc=$?"),
       True)

@@ -474,9 +474,11 @@ A run on PR #111 posted a real review hours later.
 
 The cheap-run signature is what the sample missed.
 Across five `pull_request` runs on the `chore/gha-claude-agent` branch, all
-`success` with `is_error: false`, the one that posted took 250.4s, 9 turns,
-$1.0797 and 7 denials, while three silent ones took 27.9s at $0.1733, 14.5s at
-$0.0520, and 11.5s at $0.0810, with one denial each.
+`success` with `is_error: false`, one posted and four were silent.
+The posting run took 250.4s, 9 turns, $1.0797 and 7 denials.
+Cost figures were recorded for three of the four silent runs --- 27.9s at
+$0.1733, 14.5s at $0.0520, and 11.5s at $0.0810, one denial each --- and not
+for the fourth, which is also the one left unattributed below.
 Duration and cost agree, and either would have served: a run under roughly 30
 seconds or 20 cents examined nothing.
 That is the transferable part, and it is a claim about five runs on one branch
@@ -486,8 +488,8 @@ rather than about the repo.
 reached for was wrong.**
 "Every sampled PR was small, and small is the class the eligibility gate
 filters" is an inferred mechanism, and it fails against this very table: the
-branch above is PR #111 itself, at +172/-33, so three of its runs were silent
-on a PR that is not small.
+branch above is PR #111 itself, at +172/-33, so all four of its silent runs
+were silent on a PR that is not small.
 The timeline attributes them instead.
 `gh api repos/UCD-SERG/ucd-serg.github.io/issues/111/timeline` shows #111
 created as a **draft** at 16:19:07Z and marked ready for review at 16:38:13Z,
@@ -522,10 +524,13 @@ The repo's own review run tested the three opener forms the diff had listed ---
 lowercase, uppercase, backtick --- found all three behaved as written, and
 concluded every checkable assertion matched.
 An adversarial reviewer tested outside that list and found the gate's
-`classify_line` returns `None` for a parenthesis or a digit, so an unbroken
+`classify_line` --- in `check-new-line-breaks/check-new-line-breaks.py` in a
+[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, not in this
+repo --- returns `None` for a parenthesis or a digit opener, so an unbroken
 two-sentence line passes there.
-Reproduced independently against the gate's own script.
-Tracked as ai-config#2149.)
+Reproduced independently against that script.
+That gate behaviour is recorded on ai-config#2142, which is where it was
+found; the sampling lesson drawn from it is what ai-config#2149 tracks.)
 
 ## A risk claim that appears after the decision is rationalization
 

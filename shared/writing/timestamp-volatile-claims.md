@@ -170,9 +170,10 @@ Tracked as ai-config#2149.)
   spoke*; this rule timestamps *when a volatile fact was true* --- a different
   quantity that happens to share the "prefer absolute dates" mechanics.
 - [`ardi.md`](../workflow/ardi.md)'s verification-table rules re-derive a PR
-  body's figures, keyed on a **push**. "A claim inside a PR is read at merge
-  time" above is the complement: it keys on the **merge**, and covers state
-  somebody else owns, which no push of yours disturbs.
+  body's figures, keyed on a **push**.
+  "A claim inside a PR is read at merge time" above is the complement:
+  it keys on the **merge**, and covers state somebody else owns, which no
+  push of yours disturbs.
 
 ## In review
 

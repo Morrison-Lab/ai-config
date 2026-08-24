@@ -107,7 +107,7 @@ reproduce for a reviewer, so the METHOD is stated rather than the trees:
         files examined                      : 356
         fenced blocks                       : 645
           discriminating ($? AND | present) :   8
-          fired                             :   3
+          fired                             :   2
 
 Report the middle number, not the first. Only 8 of the 645 could fire under ANY
 implementation, so a matcher firing on every block containing both would still
@@ -115,13 +115,19 @@ score "645 examined, 8 fired" --- the other 637 are padding, and quoting them
 as specificity is the zero-matrix problem
 `shared/workflow/batch-merge-and-resolve.md` names.
 
-All three hits are genuine instances rather than false positives, and two are
-the corpus's own worked examples of this bug: the `|| rc=$?` capture idiom at
-`shared/coding/errexit-is-not-uniform.md`, which that fragment's detector list
-says to flag; `shared/principles/fail-fast.md`'s
-`grep -q PATTERN file | head   # rc is head's`; and the incident command quoted
-in `shared/workflow/algorithmatize-checks.md`. So the false-positive rate over
-the discriminating population is 0 of 8.
+Both hits are genuine: the `|| rc=$?` capture idiom at
+`shared/coding/errexit-is-not-uniform.md`, which that fragment's own detector
+list says to flag, and the incident command quoted in
+`shared/workflow/algorithmatize-checks.md`.
+
+**An earlier run of this control scored 3, and the third was a FALSE
+POSITIVE** --- `shared/principles/fail-fast.md`'s
+`echo "hits: $(wc -l < out.txt) (rc=$?)"`, whose `$?` is `wc`'s and whose own
+inline comment says so. It was reported as a true positive here for a full
+review round, because the docstring quoted the block's first line rather than
+the line holding the read. That is this file's own subject arriving one level
+up: a measurement published without re-deriving what it counted. The
+double-quote branch now tracks substitutions, which is what fixed it.
 
 The control's real limitation is the artifact class. This guard runs on Bash
 TOOL COMMANDS and the control measured MARKDOWN BLOCKS, and the two differ
@@ -183,7 +189,15 @@ RX_HEREDOC = re.compile(
 # keeps its `set` inside the PIPELINE's own segment rather than an earlier one.
 # Measured, that subshell gives rc=1, so `pipefail` is genuinely in force and a
 # warning there would be false.
-RX_SET_PIPEFAIL = re.compile(r"(?:^|[;&|(]\s*)\s*set\b[^;&|\n]*\bpipefail\b")
+RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
+
+# `set -o pipefail` as the FIRST command inside a paren group. Matched against
+# the text just after a `(`, so the option's scope is known to enclose whatever
+# pipe follows inside that group. A segment-wide search cannot do this job:
+# `(set -o pipefail; make) | tail -20; echo $?` carries the option in the
+# segment while the pipe sits OUTSIDE the subshell, and that is a real misread
+# (measured 0 without an outer `pipefail`, 1 with one).
+RX_PAREN_PIPEFAIL = re.compile(r"\s*set\b[^;&|\n]*\bpipefail\b")
 
 # A real `${PIPESTATUS[0]}` / `$PIPESTATUS` expansion, not the bare word. The
 # author reading a specific stage by index is taking control of the pipeline's
@@ -261,10 +275,51 @@ RX_ASSIGN_PREFIX = re.compile(
 
 # The assignment must be the WHOLE segment. Used as a command PREFIX ---
 # `V=$(echo x | grep -q zzz) true; echo $?` --- the following command's status
-# wins instead, measured at 0 for `true`.
+# wins instead, measured at 0 for `true`. Trailing redirects are allowed,
+# since they do not change whose status `$?` reports.
+#
+# The `.*` is greedy and `re.DOTALL`, so it happily spans a SECOND assignment:
+# `out=$(cmd | head -1) other=$(true)` matched, and there the last
+# substitution owns the status while the pipeline does not. The caller
+# therefore also requires the segment to contain exactly one `$(`.
 RX_WHOLE_ASSIGN = re.compile(
-    r"^\s*[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=\$\(.*\)\s*$", re.DOTALL
+    r"^\s*[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=\$\(.*\)"
+    r"(?:\s*\d?[<>]{1,2}\s*\S+)*\s*$",
+    re.DOTALL,
 )
+
+
+def _matching_paren(text, open_index):
+    """Index of the `)` closing the `(` at `open_index`, or len(text).
+
+    Tracks nesting and quoting well enough to skip a substitution whole. Used
+    so a command substitution the guard does not need to look inside is
+    stepped over in one move rather than scanned.
+    """
+    depth = 0
+    quote = ""
+    index = open_index
+    limit = len(text)
+    while index < limit:
+        char = text[index]
+        if quote:
+            if char == "\\" and quote == '"':
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return limit
 
 
 def scan(command):
@@ -282,6 +337,7 @@ def scan(command):
     bounds = []          # (start, end, plain_pipe, assign_pipe) per raw segment
     offsets = []         # absolute offset of each expandable `$?`
     comments = []        # (start, end) of each comment span, blanked later
+    closes = []          # offset at which each command substitution CLOSED
     start = 0
     pipe_plain = False   # a pipe at top level of this segment
     pipe_assign = False  # a pipe inside an assignment's `$( ... )`
@@ -294,6 +350,9 @@ def scan(command):
     # together desynchronized on the first nested group and produced a
     # false positive naming an unbalanced `)`.
     parens = []
+    # Parallel to `parens`: whether that group opened with `set -o pipefail`,
+    # so a pipe inside it is genuinely protected.
+    paren_pf = []
     # Nesting of `[[ ... ]]`, where `|` is regex alternation.
     condition = 0
     i = 0
@@ -340,6 +399,18 @@ def scan(command):
                 offsets.append(i)
                 i += 4
                 continue
+            # A command substitution INSIDE double quotes. Skipping it whole
+            # matters for what follows it: in
+            # `cmd | head -20; echo "n=$(wc -l < f) rc=$?"` the `$?` is
+            # `wc`'s, not the pipeline's --- measured,
+            # `true | cat; echo "x $(exit 7) (rc=$?)"` prints rc=7.
+            # Not tracking this produced the guard's one measured false
+            # positive, on `shared/principles/fail-fast.md`'s own example.
+            if char == "$" and text[i + 1:i + 2] == "(":
+                end = _matching_paren(text, i + 1)
+                closes.append(end)
+                i = end + 1
+                continue
             i += 1
             continue
 
@@ -380,20 +451,35 @@ def scan(command):
             if text[i + 2:i + 3] == "(":
                 parens.append("hide")
                 parens.append("hide")
+                paren_pf.append(False)
+                paren_pf.append(False)
                 i += 3
                 continue
             assigned = RX_ASSIGN_PREFIX.search(text[start:i]) is not None
-            parens.append("assign" if assigned else "hide")
+            if not assigned:
+                # Nothing inside is read as this segment's status, and a `$?`
+                # AFTER it belongs to the substitution rather than to any
+                # earlier pipeline, so step over it whole and record where it
+                # closed.
+                end = _matching_paren(text, i + 1)
+                closes.append(end)
+                i = end + 1
+                continue
+            parens.append("assign")
+            paren_pf.append(False)
             i += 2
             continue
         if char in ("<", ">") and text[i + 1:i + 2] == "(":
             parens.append("hide")
+            paren_pf.append(False)
             i += 2
             continue
         if text[i:i + 2] == "((":
             # Bare `(( ... ))` arithmetic, where `|` is bitwise OR.
             parens.append("hide")
             parens.append("hide")
+            paren_pf.append(False)
+            paren_pf.append(False)
             i += 2
             continue
         if char == "(":
@@ -401,15 +487,22 @@ def scan(command):
             # `+(...)` -- where `|` is pattern alternation rather than a pipe.
             if _last_significant(text, i) in ("@", "!", "?", "*", "+"):
                 parens.append("hide")
+                paren_pf.append(False)
                 i += 1
                 continue
             # A bare subshell's status IS its last command's, so a pipeline
             # inside one is read exactly as a top-level pipeline would be.
             parens.append("show")
+            # `pipefail` set as this group's first command covers pipes inside
+            # the group, and only those.
+            paren_pf.append(
+                RX_PAREN_PIPEFAIL.match(text, i + 1) is not None)
             i += 1
             continue
         if char == ")" and parens:
             parens.pop()
+            if paren_pf:
+                paren_pf.pop()
             i += 1
             continue
         if text[i:i + 2] == "[[":
@@ -483,7 +576,7 @@ def scan(command):
             if _last_significant(text, i) == ">":
                 i += 1
                 continue
-            if not hidden() and not condition:
+            if not hidden() and not condition and not any(paren_pf):
                 if "assign" in parens:
                     pipe_assign = True
                 else:
@@ -513,6 +606,7 @@ def scan(command):
         # assignment IS the segment; used as a command prefix, the following
         # command's status wins.
         piped = plain or (assigned
+                          and body.count("$(") == 1
                           and RX_WHOLE_ASSIGN.match(body) is not None)
         segments.append({"text": body, "has_pipe": piped})
         spans.append((begin, end))
@@ -521,7 +615,13 @@ def scan(command):
     for offset in offsets:
         for index, (begin, end) in enumerate(spans):
             if begin <= offset < end:
-                reads.append({"seg": index})
+                # A command substitution that CLOSED earlier in this segment
+                # owns the status, so a `$?` after it is not reading any
+                # pipeline. Measured: `true | cat; echo "x $(exit 7) (rc=$?)"`
+                # prints rc=7.
+                shadowed = any(begin <= close < offset for close in closes)
+                if not shadowed:
+                    reads.append({"seg": index})
                 break
     return segments, reads
 
@@ -549,18 +649,17 @@ def find_misread(command):
         if not previous["has_pipe"]:
             continue
 
-        # Segments up to AND INCLUDING the pipeline. Including it matters
-        # because separators inside a paren group do not cut, so
-        # `( set -o pipefail; cmd | head -20 ); echo $?` carries its `set`
-        # inside the pipeline's own segment --- and measured, that subshell
-        # really does give rc=1, so warning there would be false.
+        # Segments strictly BEFORE the pipeline, and `set` must open the
+        # segment. Widening either of these silenced real misreads:
+        # `( set -o pipefail; true ); cmd | head; echo $?` has the option
+        # scoped to a subshell the pipe is not in, and
+        # `(set -o pipefail; make) | tail -20; echo $?` pipes OUTSIDE the
+        # protected group. Both measured 0 without an outer `pipefail` and 1
+        # with one, so both are genuine misreads.
         #
-        # Including it is safe only because RX_SET_PIPEFAIL requires `set` at
-        # a command position and the text is quote-stripped first. A bare
-        # mention --- `grep -rn pipefail hooks/ | head -20` --- has no `set`
-        # token, and a quoted one --- `grep -rn "set -o pipefail" hooks/` ---
-        # loses it to the strip.
-        preceding = segments[:index]
+        # A `pipefail` that really does cover the pipe is handled where the
+        # pipe is seen instead, via the per-group `paren_pf` scope in scan().
+        preceding = segments[:index - 1]
         if any(RX_SET_PIPEFAIL.search(RX_QUOTED.sub(" ", s["text"]))
                for s in preceding):
             continue

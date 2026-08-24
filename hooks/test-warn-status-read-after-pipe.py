@@ -179,6 +179,27 @@ check("pipefail later in the group suppresses",
 check("pipefail after set -e in the group suppresses",
       fires("( set -e; set -o pipefail; cmd | head ); echo $?"), False)
 
+# Anything paren-bearing before the `set` must not truncate the search. Each
+# of these measures rc=1, so the read is correct and a warning would be false.
+# An earlier scan stopped at the first `(` or `)` of any kind and warned on
+# all of them.
+for prefix in ('cd "$(dirname /tmp/x)"', "n=$((1+1))", "(true)",
+               "arr=(a b)", ": $(echo x)", "echo $((2*3))"):
+    check(f"pipefail after `{prefix}` in the group suppresses",
+          fires(f"( {prefix}; set -o pipefail; cmd | head ); echo $?"), False)
+
+# ...but a nested group's option still must not protect the parent, in either
+# spelling. Both measure rc=0.
+check("pipefail in a nested group does not suppress",
+      fires("( ( set -o pipefail ); cmd | head ); echo $?"), True)
+check("pipefail after a command in a nested group does not suppress",
+      fires("( ( a; set -o pipefail ); cmd | head ); echo $?"), True)
+
+# A backgrounded `set` runs in a subshell and never reaches the caller.
+# Measured rc=0, so this is a real misread.
+check("a backgrounded set -o pipefail does not suppress",
+      fires("( set -o pipefail & cmd | head ); echo $?"), True)
+
 # Arithmetic does not set `$?`, so it must not shadow a following read.
 # Measured, `true | false; echo "n=$((1+1)) rc=$?"` prints rc=1.
 check("arithmetic in double quotes does not shadow the read",
@@ -440,6 +461,13 @@ for label, command in [
     # accepted.
     ("an &> redirect after an assignment",
      "out=$(cmd | head -1) &>/dev/null; echo $?"),
+    # The read sits INSIDE the group holding the pipe, so there is no
+    # preceding sibling segment to test.
+    ("a read inside the group holding the pipe",
+     "( cmd | head; echo $? )"),
+    # The read is nested in a substitution, which the shadowing rule drops.
+    ("a read nested inside a substitution",
+     "cmd | head; echo $(echo $?)"),
     # A `pipefail` set in a BRACE group, which is not tracked like a paren
     # group. This one is a false POSITIVE rather than a miss: measured rc=1,
     # so the option is in force and the warning is wrong.

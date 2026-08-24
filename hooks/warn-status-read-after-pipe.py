@@ -200,25 +200,68 @@ RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
 # It must NOT be restricted to the group's first command, which an earlier
 # version did: `( true; set -o pipefail; cmd | head )` measures rc=1, so the
 # option really is in force and warning there was false.
-RX_PAREN_PIPEFAIL = re.compile(r"(?:^|[;&\n]\s*)\s*set\b[^;&|\n]*\bpipefail\b")
+# The trailing `(?!\s*&)` matters: `set -o pipefail &` backgrounds the `set`
+# into a subshell, so the option never reaches the caller. Measured,
+# `( set -o pipefail & grep -q zzz /dev/null | cat ); echo $?` gives 0.
+RX_PAREN_PIPEFAIL = re.compile(
+    r"(?:^|[;&\n]\s*)\s*set\b[^;&|\n]*\bpipefail\b(?!\s*&)"
+)
 
 
 def _paren_sets_pipefail(text, open_index):
     """True when the group opening at `open_index` sets `pipefail` ITSELF.
 
-    Searches only up to the group's first NESTED `(`, because an option set in
-    a child group does not survive into the parent: measured,
+    Walks the group's OWN command level: quoted spans and nested `( ... )`
+    groups are skipped whole, and the walk stops at this group's own `)`.
+
+    Skipping a nested group rather than searching it is what keeps a child's
+    option from protecting the parent --- measured,
     `( ( set -o pipefail ); cmd | head )` gives rc=0 while
     `( set -o pipefail; cmd | head )` gives rc=1.
+
+    An earlier version stopped the scan at the first `(` OR `)` of any kind,
+    which truncated before the group's own `set` whenever anything
+    paren-bearing preceded it. That produced a false positive on an idiomatic
+    line: `( cd "$(dirname /tmp/x)"; set -o pipefail; make | tail -20 )`
+    measures rc=1, so the read is correct, and the guard warned anyway.
     """
     limit = len(text)
     index = open_index + 1
-    while index < limit and text[index] not in "()":
+    own = []
+    quote = ""
+    while index < limit:
+        char = text[index]
+        if quote:
+            if char == "\\" and quote == '"':
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char == "\\":
+            index += 2
+            continue
+        if char in ("'", '"'):
+            quote = char
+            own.append(" ")
+            index += 1
+            continue
+        if char == "(":
+            end = _matching_paren(text, index)
+            if end >= limit:
+                return False
+            own.append(" ")
+            index = end + 1
+            continue
+        if char == ")":
+            break
+        own.append(char)
         index += 1
-    # Sliced rather than passed as pos/endpos: in `pattern.search(s, pos)` the
-    # `^` anchor still matches only at the real start of `s`, so the
-    # start-of-group alternative would never fire.
-    return RX_PAREN_PIPEFAIL.search(text[open_index + 1:index]) is not None
+    # Searched over a rebuilt string rather than via pos/endpos: in
+    # `pattern.search(s, pos)` the `^` anchor still matches only at the real
+    # start of `s`, so the start-of-group alternative would never fire.
+    return RX_PAREN_PIPEFAIL.search("".join(own)) is not None
 
 # A real `${PIPESTATUS[0]}` / `$PIPESTATUS` expansion, not the bare word. The
 # author reading a specific stage by index is taking control of the pipeline's

@@ -535,6 +535,12 @@ Don't trust an earlier "verdict" you've cached — a new review may have been po
 Specifically: when scanning checks (`gh pr checks`) shows green or "no failures", that's about CI state, **not** review verdict.
 Always pull the latest review comment and parse it for any "Findings", "Issues", "Remaining" sections before declaring a PR ready.
 
+**Read every round since the one you last processed, not only the newest.**
+Several rounds can land during a monitoring gap, and "read the latest" alone fails exactly then.
+A test-only push between two substantive rounds gets a fresh verdict that says nothing about the earlier round's unaddressed findings, so the latest comment reads clean while older findings sit open
+(measured 2026-08-24 on sparta#1375 --- three rounds landed in one gap, and acting on the newest alone would have reported clean over an open regression finding).
+Diff the round list against what you last handled: fetch all `**Claude finished` comments, note each `Reviewed commit:` SHA, and treat any round newer than your last processed one as unread input.
+
 **Filter on the body marker, not on an author login.**
 The login a review posts under varies by repo and by run --- `claude`, `claude[bot]`, and `github-actions[bot]` have each been observed carrying a real, complete verdict --- so a login-filtered query silently returns the *previous* round's comment and reads exactly like "no new review yet".
 That is a false negative on the one question this section exists to answer, and nothing in the output announces it.

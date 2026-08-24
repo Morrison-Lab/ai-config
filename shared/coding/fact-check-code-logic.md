@@ -29,7 +29,7 @@ Worked-example case records for the rules below live in
   overflow/underflow).
   **A unit/scale conversion fix applied on the way into a computation needs
   the same check on the way out.** When a function rescales an input (e.g.
-  years → days) so it's dimensionally consistent with some internal
+  years -> days) so it's dimensionally consistent with some internal
   computation, any of that rescaled value that gets returned or reused
   downstream needs converting back --- otherwise fixing the input-side mismatch
   just moves the same bug to the output side. Check every quantity the

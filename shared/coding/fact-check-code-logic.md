@@ -471,25 +471,31 @@ The session hook and the CI job were both traced and both correct.
 The section above derives a **parameter** change's caller set by grep.
 The exception a function raises belongs to the same interface and needs the same grep, and it is the more dangerous of the two because of how the two fail.
 
-A parameter change fails **loudly**: the arity or type mismatch raises at the call site, which is how the case above was caught at all --- CI stopped with a `TypeError`.
-An exception-type change raises nothing.
-Where any handler upstream already catches the new type, the error is routed into that handler's recovery path, and a recovery path is by construction the code that carries on.
+Adding a **required** parameter fails **loudly**: the arity mismatch raises at the call site, which is how the case above was caught at all --- CI stopped with a `TypeError`.
+The contrast below is with that case specifically; an optional parameter with a default, or a reordering of same-typed positionals, fails as quietly as anything here.
+An exception-type change raises nothing at all.
+Where a handler upstream already catches the new type, the error is routed into whatever that handler does next --- and a handler that returns a default, returns `None`, or logs and continues is the code that carries on.
 So the change lands green, and the failure it was meant to report stops being reported.
 
 **The direction is what makes it worth a rule of its own.**
-This edit is almost always made *to improve* error handling --- replacing an incidental `AttributeError` with an explicit `raise RuntimeError("...")` that names the problem.
+This edit is typically made *to improve* error handling --- replacing an incidental `AttributeError` with an explicit `raise RuntimeError("...")` that names the problem.
 It therefore reads as a strict improvement and attracts less scrutiny than a change that looks risky, while its actual effect can be to make the error **quieter** than the incidental one it replaced.
 An unplanned exception at least propagates; a planned one propagates only as far as the nearest handler written for something else.
 
-Derive the handler set before claiming the change makes anything louder:
+Derive the handler set before claiming the change makes anything louder, and note that **base classes catch too**:
 
 ```bash
-grep -rn 'except RuntimeError' --include='*.py' .
+grep -rnE 'except \(?[A-Za-z_, ]*RuntimeError|except (Exception|BaseException)\b|^[[:space:]]*except[[:space:]]*:' \
+  --include='*.py' .
 ```
+
+The narrow form is the trap, and it is the one that comes to mind.
+Measured in this repo on 2026-08-23, `grep -rn 'except RuntimeError'` returns **2** hits where the form above returns **140** --- because `except Exception`, `except (RuntimeError, OSError)`, and a bare `except:` each catch a `RuntimeError` while containing none of the word.
+A grep keyed on the type name is therefore a grep for the handlers that happen to *name* it, which is the same sample-for-population substitution the section above warns about.
 
 Then read what each hit does with it.
 A handler that re-raises or exits is fine.
-One that returns a default, returns `None`, or appends a message and carries on is the case this rule is about.
+One that returns a default, returns `None`, or records a status and carries on is the case this rule is about.
 
 **The same question generalizes past exception types, to any dimension of what a guard covers.**
 Which **streams** a guard reads, which **files** hold a sibling copy of the function, which **branches** of a call reach the same operation: each is a population, and each is one grep away.
@@ -497,7 +503,7 @@ See [`fail-fast`](../principles/fail-fast.md)'s partial-guard section for the di
 
 - **Do:** grep for handlers of the NEW exception type before changing what a function raises.
 - **Do:** read each handler's body, since only the ones that swallow matter.
-- **Do:** prefer an exception no upstream handler catches --- `SystemExit` for an environment failure --- when the point of the change is to stop something being swallowed.
+- **Do:** reach for an exception the enclosing handlers do not catch when the point of the change is to stop something being swallowed --- `SystemExit` derives from `BaseException`, so `except Exception` misses it --- and confirm that from the grep rather than assuming it, since a bare `except:` and `except BaseException` do catch it.
 - **Don't:** count an explicit `raise` as louder than the incidental error it replaced; that is a claim about the handlers, not about the raise.
 - **Don't:** read a green suite as evidence, since the swallowing path is the one that does not fail.
 
@@ -559,8 +565,12 @@ An illustration is the opposite: nothing was ever measured, because it was inven
 **[`hypothetical-examples`](../writing/hypothetical-examples.md)** treats an invented example as a missed opportunity to use real data, and says explicitly that such an example "can be internally consistent and still not be a finding" for an accuracy check.
 This rule is the case where it is **not** internally consistent with the claim above it.
 
-`memories/preferences.md`'s "Verify code examples actually demonstrate the claimed idiom" is the closest existing statement, and it asks whether a snippet **uses** the construct the prose names.
+`memories/preferences.md`'s "Verify code examples actually demonstrate the claimed idiom" asks whether a snippet **uses** the construct the prose names.
 This asks the further question: whether the input behaves the way the example says it does.
+
+**[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)** states the closest thing to this thesis and is worth reading beside it --- "measure the illustrating instance separately whenever a verified mechanism is illustrated by one, since the mechanism's evidence says nothing about which files exhibit it".
+That is scoped to which **files** exhibit a verified mechanism.
+The same gap opens on the illustrating instance's own **behaviour**, and that is the half this rule adds.
 
 - **Do:** execute every illustrative example --- in a comment, a docstring, or prose --- against the real thing before shipping it.
 - **Do:** re-read the surrounding argument after checking an example, since a corrected example can invert the point it was supporting.
@@ -568,8 +578,11 @@ This asks the further question: whether the input behaves the way the example sa
 - **Don't:** let an example inherit the verification of the rule it illustrates --- the rule being true says nothing about the instance.
 - **Don't:** treat a parenthetical as too small to check; the smaller it is, the less likely anyone ever does.
 
-(Morrison-Lab/ai-config#2086, 2026-08-23: a comment explaining why `subprocess.run` needs an explicit `encoding` claimed a `gh` payload carrying "any non-cp1252 byte (a smart quote in a PR title, an emoji in a check-run name)" would raise.
-Both examples are counterexamples, established that day by decoding each byte and catching the error rather than by reasoning about the codec:
+(Morrison-Lab/ai-config#2086, 2026-08-23, and this entry's own first draft.
+A pre-push draft of a comment explaining why `subprocess.run` needs an explicit `encoding` offered "a smart quote in a PR title, an emoji in a check-run name" as inputs that would raise.
+That phrasing never reached a commit --- `git log --all -S` finds it only in the commit adding this entry --- so the draft was corrected before pushing, and the shipped comment classifies both correctly.
+
+What the correction established, by decoding each byte rather than reasoning about the codec:
 
 ```python
 for b in range(256):
@@ -580,8 +593,14 @@ for b in range(256):
 # -> 0x81, 0x8d, 0x8f, 0x90, 0x9d
 ```
 
-Exactly five bytes are undefined in cp1252, so U+201C (`e2 80 9c`) and U+1F600 (`f0 9f 98 80`) decode into silent mojibake with no error at all, while U+1F44D (`f0 9f 91 8d`) does raise, because `0x8D` is one of the five.
-The wrong examples named the rare failure as though it were the common one, inverting the comment's own argument about why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.)
+Five bytes are undefined, so U+1F600 (`f0 9f 98 80`) mojibakes silently while U+1F44D (`f0 9f 91 8d`) raises on `0x8D`.
+The draft named the rare outcome as though it were the common one, inverting its own argument about why `errors="replace"` was the wrong fix: silent corruption is the dominant case, and `errors="replace"` preserves exactly that.
+
+**The first draft of this entry then repeated the error one level up**, which is why the case is worth recording rather than only the fix.
+It claimed "a smart quote" was a counterexample, generalizing from U+201C.
+U+201C (`e2 80 9c`) is silent, and U+201D (`e2 80 9d`) **raises**, because `0x9D` is also one of the five --- so, smart quotes being paired, a realistic title like `Fix the "foo" bug` raises.
+An adversarial review caught it before push.
+Checking one member of a class and generalizing to the class is the same move as shipping an unchecked example, performed while documenting why not to.)
 
 ## A comment beside a value you changed is part of the edit
 

@@ -42,10 +42,8 @@ Worked-example case records for the rules below live in
 
 The rule above bans swallowing every error.
 
-A condition's **class** is what a handler keys on, so it is part of the
-function's interface with everything upstream ---
-[`fail-fast.rationale.md`](fail-fast.rationale.md) carries why that beats
-matching message text.
+[`fail-fast.rationale.md`](fail-fast.rationale.md) carries the argument.
+
 What follows for a **change** to that class lives in
 [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing which
 exception a function RAISES is a signature change that fails silently":
@@ -639,37 +637,6 @@ same function, and having written it is what makes the sibling invisible.**
 
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A rule written for one axis
 does not fire on the sibling axis".
-
-**Enumerating one dimension exhaustively says nothing about the dimensions you
-did not enumerate.**
-Every block above concerns a guard covering **fewer** sites than it should, so
-the remedy is to finish the list.
-This is the case where the list was finished and was the wrong list.
-A hazard has more than one dimension --- which files hold a copy of the
-operation, which streams a call captures, which branches reach it --- and
-generalizing thoroughly along one of them produces exactly the assurance that
-ends the search: the fix names a class, covers every member, and says so in the
-commit message.
-The unenumerated dimension is not a member of that list, so no completeness
-check over the list can see it.
-
-Distinct from the axis rules above, which govern a **predicate's** clauses or a
-first-match reading inside one function.
-This one governs the dimension a **fix** generalized along, and it fires even
-when every clause is right and every named site is covered.
-
-- **Do:** name the dimension your fix generalized along, in those words, then
-  ask which other dimension the same hazard runs along.
-- **Do:** read the hazard's own mechanism for the answer --- a decode failure
-  belongs to a *stream*, so streams are a dimension however many files you
-  fixed.
-- **Don't:** read "fixed everywhere" as a covered claim until you have said
-  everywhere *along what*.
-- **Don't:** treat a thorough enumeration as evidence of completeness ---
-  thoroughness along one axis is what makes another axis invisible.
-
-See [`fail-fast.cases.md`](fail-fast.cases.md), "A partial guard shipped under a
-commit message about partial guards".
 
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**

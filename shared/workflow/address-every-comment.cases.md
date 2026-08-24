@@ -198,6 +198,37 @@ share a name. `git ls-files` in the gha checkout settled it in one command.
 Applying the suggestion verbatim would have documented a nonexistent path
 in the entry whose whole purpose is getting someone to run that script.)
 
+## "The diagnosis is about the line; the remedy's correctness is about the call path"
+
+(`Morrison-Lab/ai-config#2086`, 2026-08-23: a review correctly found that
+`res.stderr.strip()` in `scripts/check-pr-body-figures.py` crashes when the
+Windows subprocess reader thread dies and leaves the stream `None`, and
+supplied a suggestion block: `(res.stderr or '').strip()`.
+
+The diagnosis is right.
+The remedy is wrong in that file, for a reason the diagnosis gives no hint of.
+`verify_pr_body_figures` wraps its `run_cmd` calls in a broad `except Exception`
+and converts the failure into `status="UNVERIFIED"` (`:409`), which `main`
+returns as `CLEAN_EXIT` (`:633`, `:658`).
+Substituting an empty string therefore stops the crash and lets an environment
+failure exit **0 CLEAN** --- turning a loud failure into a silent false pass,
+which is the failure mode the PR existed to close.
+
+`die()` was the right remedy instead: `SystemExit` derives from `BaseException`,
+so it escapes that wrapper.
+Measured rather than assumed --- `issubclass(SystemExit, Exception)` is `False`.
+
+What made it visible was asking where the raised error *goes*, rather than
+whether the substitution is safe at the line it sits on.
+That is what separates this from the sibling cases around it, whose suggestions
+were each wrong at the line itself --- a nonexistent path, an anchor that still
+truncated, a citation establishing the opposite.
+Here the suggested line is locally correct and unsafe two frames up, so no
+amount of scrutiny of the diff hunk reaches it.
+See [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Changing
+which exception a function RAISES is a signature change that fails silently"
+for the same underlying fact arriving from the author's side.)
+
 ## "The same check applies to a fix a reviewer describes in prose"
 
 (gha#318, 2026-07-26: a review correctly found that a heredoc-terminator

@@ -62,54 +62,71 @@ import sys
 # every reply and every doc that merely QUOTES the command, and this corpus
 # quotes it constantly (`shared/workflow/claim-pr.md` is nothing but such
 # quotes).
-# The gap between two parts of ONE command.
+# --- what counts as posting a comment ---------------------------------------
 #
-# A plain `[^\n;|&]*` was wrong twice over: a backslash line-continuation lives
-# inside a single command, and every GraphQL comment site in this corpus puts
-# the mutation name several lines below `gh api graphql` -- so both raw-API
-# detectors matched nothing the corpus actually writes while their single-line
-# test fixtures passed.
-#
-# Skipping quoted spans atomically was the wrong repair: the path segment these
-# detectors look for (`/notes`, `/comments`) sits INSIDE the quoted URL, so the
-# quote-skipping alternative swallowed the very thing being matched.
-_GAP = r"(?:[^\n;&|]|\\\n)*"
-
-# The multi-line variant, for an argument that genuinely spans lines: a GraphQL
-# query is a single quoted string containing newlines. Bounded and non-greedy so
-# it cannot run away across a whole script; `;` and `&` still end it.
-_GAP_ML = r"[^;&]{0,400}?"
-
-_POST_CMDS = (
-    r"gh\s+pr\s+comment",
-    r"gh\s+issue\s+comment",
-    # A review needs a BODY flag to be a comment. `gh pr review 12 --approve`
-    # posts no prose at all, so there is nothing to disclose and warning on it
-    # spends the guard's credibility on a command it cannot be about.
-    r"gh\s+pr\s+review\b[^\n;|&]*(?:--body\b|--body-file\b|-b\s|-F\s)",
-    # `glab ... comment` is a real alias of `... note`; both spellings ship.
-    r"glab\s+mr\s+(?:note|comment)",
-    r"glab\s+issue\s+(?:note|comment)",
-    # The raw-API forms `memories/git.md` prescribes for bodies carrying
-    # backticks, and the only route to a REVIEW-THREAD reply or a discussion
-    # comment. A body-supplying FIELD FLAG is required rather than just the
-    # path: `gh api .../comments` with no field is the review-READ that
-    # `CLAUDE.md`'s own re-check section prescribes and every ARDI round runs,
-    # and a guard that fires on the common read is one nobody reads on the
-    # rare write.
-    r"gh\s+api\s+" + _GAP + r"(?:/comments|/replies|/notes)"
-    + _GAP + r"(?:-f|-F|--field|--raw-field)\s+body=",
-    r"gh\s+api\s+graphql" + _GAP_ML + r"(?:addDiscussionComment|addComment)",
-    # GitLab's raw-API discussion-note form, the counterpart to the above.
-    r"glab\s+api\s+" + _GAP + r"/(?:notes|discussions)"
-    + _GAP + r"(?:-f|-F|--field|--raw-field)\s+body=",
-)
+# ANCHORED at a command position -- start of string, after a separator, or after
+# a shell keyword that introduces a command. Unanchored, this fires on every
+# reply and every doc that merely QUOTES the command, and this corpus quotes it
+# constantly (`shared/workflow/claim-pr.md` is nothing but such quotes).
 _ANCHOR = (
     r"(?:^|[;&|\n({`]|\b(?:then|else|elif|do|if|while|until)\s|!\s*)\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
 )
-POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")",
-                     re.MULTILINE)
+
+# The named CLI verbs, where the command word alone settles it.
+_POST_CMDS = (
+    r"gh\s+pr\s+comment",
+    r"gh\s+issue\s+comment",
+    # A review needs a BODY flag to be a comment. `gh pr review 12 --approve`
+    # posts no prose, so there is nothing to disclose and warning on it spends
+    # the guard's credibility on a command it cannot be about.
+    r"gh\s+pr\s+review\b(?=[^\n;|&]*(?:--body\b|--body-file\b|-b\s|-F\s))",
+    # `glab ... comment` is a real alias of `... note`; both spellings ship.
+    r"glab\s+mr\s+(?:note|comment)",
+    r"glab\s+issue\s+(?:note|comment)",
+)
+POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")", re.MULTILINE)
+
+# The raw-API routes need a TWO-PART test rather than one regex spanning the
+# gap between their parts.
+#
+# A single pattern was tried twice and failed twice. `[^\n;|&]*` cannot cross the
+# backslash line-continuation every review-thread reply in `skills/ard` uses.
+# Widening it to `[^;&]{0,400}?` put the COMMENT BODY inside the gap, so an
+# ordinary semicolon in the prose, or a body over 400 characters, made the
+# detector silent -- on exactly the longer, more human-looking replies the rule
+# is for. Both times the fixture was short and punctuation-free and passed.
+#
+# So test the parts independently over the whole segment, which the quote-aware
+# splitter has already bounded to one command. Order-independent by
+# construction, which also fixes `gh api -f body=... <url>`.
+API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
+# A body-supplying field is what separates a POST from the review-READ that
+# `CLAUDE.md` prescribes and every ARDI round runs.
+API_BODY_FIELD_RE = re.compile(r"(?:-f|-F|--field|--raw-field)\s+body=")
+# The comment-bearing endpoints, and the GraphQL comment mutations.
+API_COMMENT_TARGET_RE = re.compile(
+    r"/comments|/replies|/notes|/discussions"
+    r"|addDiscussionComment|addComment", re.IGNORECASE)
+
+
+def is_api_post(segment):
+    """True when this segment posts a comment through a raw forge API."""
+    if not API_CMD_RE.search("\n" + segment):
+        return False
+    if not API_COMMENT_TARGET_RE.search(segment):
+        return False
+    # A GraphQL comment mutation carries its body as a variable, so the
+    # `body=` field test would reject it; the mutation name is the evidence.
+    if re.search(r"addDiscussionComment|addComment", segment, re.IGNORECASE):
+        return True
+    return bool(API_BODY_FIELD_RE.search(segment))
+
+
+def is_post_segment(segment):
+    """True when this segment posts a forge comment by any route."""
+    return bool(POST_RE.search("\n" + segment)) or is_api_post(segment)
+
 
 # Segment boundaries, split QUOTE-AWARE.
 #
@@ -159,7 +176,7 @@ EMOJI_DISCLOSURE_RE = re.compile(
 # being assumed to cover the other.
 UNREADABLE_RE = re.compile(
     r"--body-file|--description-file|--editor\b|--web\b"
-    r"|-F\s+body=@|(?<!-)-F\s+(?!body=)\S"
+    r"|-F\s+body=@|(?<!-)-F\s+(?![\w.-]+=)\S"
     r"|--(?:body|message)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
     # The short forms expand identically; omitting them reported a marker
     # missing from a body the check demonstrably could not read.
@@ -200,7 +217,20 @@ BOT_COMMAND_RE = re.compile(
     re.IGNORECASE,
 )
 
-# MCP comment-posting tools (tool-mappings.md).
+# The same exemption tested against a RAW body, with no shell syntax around it.
+# `verdict_mcp` used to synthesize `--body "<body>"` so it could reuse the
+# shell-shaped pattern below; a `"` inside the body then closed that synthetic
+# argument early, and `@dependabot rebase" and a long note for the humans ...`
+# took the exemption. Reconstructing syntax to reuse a matcher is what reopened
+# a hole the Bash path had a fixture against.
+BOT_BODY_RE = re.compile(
+    r"^\s*@(?:" + _BOT_HANDLES + r")\b[ \w-]{0,40}\s*$", re.IGNORECASE)
+
+
+# MCP comment-posting tools. `tool-mappings.md` names COMMENT_PR/COMMENT_ISSUE,
+# REPLY_REVIEW_COMMENT and COMMENT_DISCUSSION, which is four of these; the
+# pending-review tool has no registry row, so this list is wider than that file
+# rather than derived from it.
 MCP_POST_TOOLS = (
     "mcp__github__add_issue_comment",
     "mcp__github__add_comment_to_pending_review",
@@ -343,11 +373,11 @@ def judge_segment(segment, extra):
 def verdict_bash(command):
     """Return a warning string for a Bash command, or None."""
     stripped, bodies = strip_heredocs(command)
-    if not POST_RE.search(stripped):
+    if not any(is_post_segment(seg) for seg in split_segments(stripped)):
         return None
     warnings = []
     for segment in split_segments(stripped):
-        if not POST_RE.search("\n" + segment):
+        if not is_post_segment(segment):
             continue
         # A heredoc body IS this segment's comment body only when this segment
         # opened it. Elsewhere it is somebody else's prose.
@@ -368,7 +398,7 @@ def verdict_mcp(tool_name, tool_input):
         # `pull_request_review_write` submits without a body on some methods,
         # and a body we never saw is not a body we can judge.
         return None
-    if BOT_COMMAND_RE.search('--body "' + body.strip() + '"'):
+    if BOT_BODY_RE.match(body):
         return None
     if MARKER_RE.search(body):
         return None

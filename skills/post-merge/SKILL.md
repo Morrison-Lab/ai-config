@@ -316,6 +316,11 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    Match the two-word invariant, `hold off` or the pre-2026-08-24 `paws off`, case-insensitively --- never a whole sentence.
    The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own emitter four steps below, so a quoted prefix misses claims this very skill posts.
    See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
+
+   **Then check the same comment for a release term, because one release marker contains a claim invariant.**
+   The retired release wording is `... done --- paws off released.`, which matches `paws off` --- so the invariant that fixes one bug introduces another, and this one fails the safe way round: a released PR reads as claimed, the sweep skips it, and the conflict is never resolved with nothing reporting why.
+   The sentence matcher this replaced did not collide, so the collision arrived with the fix.
+   Treat the comment as a release, not a claim, if it also matches `unclaim|released|PR is free|now mergeable`.
    If a live claim stands --- a push or comment within the last 2 hours --- skip the PR; another session owns it.
    An expired claim (over 2 idle hours) no longer blocks; take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**

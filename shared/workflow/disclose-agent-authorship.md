@@ -21,7 +21,8 @@ Check a replacement marker against both tuples before changing it.
 
 **The scope is every comment, not every review.**
 Review comments are the case that already discloses, since a review body announces its own agent.
-The comments that need this are the ones that read most like a person: a claim, a release, a status update, a reply on a review thread, an issue filed on the user's behalf, a paraphrase of the user's own in-chat feedback.
+The comments that need this are the ones that read most like a person: a claim, a release, a status update, a reply on a review thread, a comment filed on an issue on the user's behalf, a paraphrase of the user's own in-chat feedback.
+An issue's own **body** is not a comment and stays unattributed, per [`defer-issue`](../../skills/defer-issue/SKILL.md) --- the scope line below says so, and reading this list as covering issue bodies is the contradiction it would create.
 Each of those is short, conversational, and posted under a human login, which is exactly the shape that gets mistaken for a human.
 
 **A comment posted under a genuine BOT identity needs no marker.**
@@ -30,7 +31,14 @@ Where it belongs to an app --- a workflow posting as `github-actions[bot]`, so t
 `skills/claude-agent-workflow/SKILL.md`'s in-workflow reply is that case.
 
 The test is the **token**, not the author: an agent driving `gh` with the account holder's PAT posts as a `User` however automated the surrounding workflow is.
-Check `.user.type` on a posted comment if unsure --- `gh api repos/<o>/<r>/issues/comments/<id> --jq .user.type` --- rather than reasoning from how the comment was produced.
+Check `.user.type` on a posted comment if unsure, rather than reasoning from how the comment was produced --- and pick the endpoint by comment KIND, since an issue-or-PR comment and a review-thread comment share an id space but not a route:
+
+```bash
+gh api repos/<o>/<r>/issues/comments/<id> --jq .user.type   # PR or issue comment
+gh api repos/<o>/<r>/pulls/comments/<id>  --jq .user.type   # review-thread reply
+```
+
+Asking the first about a review-thread comment returns `404 Not Found`, which reads as a missing comment rather than as the wrong route.
 
 **A prose self-identification is not a substitute for the marker.**
 "Claude Code CLI (local session) is working on this" already discloses, so appending the footer to it looks redundant.
@@ -44,7 +52,9 @@ Whether markdownlint notices depends on the file --- measured 2026-08-24 with `m
 Read the per-file lines, not the run's whole output.
 A first pass at this measurement dedented one file at a time and grepped the rule codes out of the entire run, which reported `MD049` for all three --- because a *different* file was broken at the time and contributed its own `MD049` to every run.
 The cause was never the invocation.
-`markdownlint-cli2` unions a command-line path with the config's globs, so `markdownlint-cli2 commands/release-pr.md` lints all 573 files under the same config as a bare run; there is no single-file scope to get wrong.
+`markdownlint-cli2` unions a command-line path with the config's globs, so `markdownlint-cli2 commands/release-pr.md` lints all 573 files under the same config as a bare run --- which is why filtering the output by filename is what the loop needed.
+Single-file scope does exist, and `--help` names it: `--no-globs` ignores the config's `globs` and lints the one path (573 files versus 1, measured 2026-08-24).
+Reach for that rather than for a filter when isolating a file.
 The mistake was attributing an error to whichever file the loop happened to be testing, which is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s cause check going unasked.
 `MD049` defaults to `consistent`, so it fires only where the document already established asterisk emphasis --- which makes the linter a partial detector here rather than the check.
 

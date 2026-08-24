@@ -18,6 +18,15 @@ _spec.loader.exec_module(guard)
 
 MARKER = "_Posted by Claude Code (AI agent) --- not written by a human._"
 
+
+def GQL(body):
+    """The corpus's verbatim addDiscussionComment command, with `body` in it."""
+    return ("gh api graphql -f discussionId='<id>' -f body='" + body
+            + "' -f query='\n"
+            "  mutation($discussionId: ID!, $body: String!) {\n"
+            "    addDiscussionComment(input: {discussionId: $discussionId, "
+            "body: $body}) {\n      comment { id url }\n    }\n  }'")
+
 # (label, command, expect_warning)
 CASES = [
     # --- must warn -----------------------------------------------------------
@@ -185,6 +194,31 @@ CASES = [
     ("-F body=@file is a file reference, so unreadable",
      'gh api repos/o/r/issues/12/comments -F body="@/tmp/b.md"', None),
 
+    # --- round-4: the body sits INSIDE what used to be the gap ---------------
+    #
+    # The round-3 GraphQL fixture used the 12-character placeholder
+    # `<reply text>`, which has no `;`, no `&`, and fits any length bound -- so
+    # it passed on the one input that concealed the bug. These vary exactly the
+    # properties the old gap regex was sensitive to.
+    ("GraphQL body containing a semicolon",
+     GQL("Addressed; pushed."), "missing"),
+    ("GraphQL body containing an ampersand",
+     GQL("Fixed A & B."), "missing"),
+    ("GraphQL body longer than the old 400-char bound",
+     GQL("x" * 320), "missing"),
+    ("GraphQL long body WITH marker",
+     GQL("x" * 320 + "\n\n" + MARKER), False),
+
+    # --- round-4: a typed -F field is not a body-file ------------------------
+    ("a typed -F field does not hide a visible body",
+     'gh api repos/o/r/pulls/1/comments -F in_reply_to=5 '
+     '-F body="Addressed, undisclosed."', "missing"),
+
+    # --- round-4: argument order must not decide it --------------------------
+    ("gh api with the body flag before the path",
+     'gh api -X POST -f body="Working on this." repos/o/r/issues/12/comments',
+     "missing"),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),
@@ -306,6 +340,13 @@ def run():
          "mcp__github__add_reply_to_pull_request_comment", "Addressed.", True),
         ("MCP bot-command body is exempt", "mcp__github__add_issue_comment",
          "@dependabot rebase", False),
+        # Round-4: verdict_mcp used to synthesize `--body "<body>"` to reuse the
+        # shell-shaped pattern, so a quote INSIDE the body closed that synthetic
+        # argument early and faked the exemption.
+        ("MCP body with an embedded quote does not fake the exemption",
+         "mcp__github__add_issue_comment",
+         '@dependabot rebase" and a long note for the humans reading this',
+         True),
         ("a non-comment MCP tool is out of scope",
          "mcp__github__create_pull_request", "Closes #1", False),
     ):
@@ -315,7 +356,7 @@ def run():
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 5
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 6
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

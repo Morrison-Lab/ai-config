@@ -10,7 +10,8 @@ jobs:
 When a repo you are working in hand-maintains a workflow gha already provides, migrate it.
 The upgrade is the deliverable, not the observation.
 
-[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md) is the parent principle and supplies the detection tell this rule reuses; what it does not supply is a trigger for the unprompted case, which is what follows.
+[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md) is the parent principle and supplies the detection tell this rule reuses.
+What it does not supply is a trigger for the unprompted case, which is what follows.
 
 ## Why this needs its own trigger
 
@@ -59,9 +60,11 @@ The boundary matters as much as the trigger, because a migration that drops beha
   Where gha covers most of it and misses one input, the fix is a PR to gha adding that input, rather than a migration that silently drops it --- gha is a repo we administrate, so its limit is self-imposed rather than external (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md), "A constraint your own change authored is not evidence against an upstream", and [`upstream-issues`](upstream-issues.md) for the etiquette).
 - **A repo deliberately pinned off gha.**
   A comment, an issue, or a prior decision saying so is a decision, not an oversight.
-  Re-argue it explicitly if you disagree; do not migrate around it, per [`incidents-dont-repeal-decisions`](incidents-dont-repeal-decisions.md).
+  Re-argue it explicitly if you disagree.
+  Do not migrate around it, per [`incidents-dont-repeal-decisions`](incidents-dont-repeal-decisions.md).
 - **A repo we do not administrate.**
-  The operative test is whether we can merge a PR to that repo, not whether its owner appears on a list. gha's README names `d-morrison`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
+  The operative test is whether we can merge a PR to that repo, not whether its owner appears on a list.
+  The gha README names `d-morrison`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
   Read the list as evidence of reach rather than as an allowlist, and treat a repo outside our administration as a question for its maintainer rather than a migration to perform.
 
 Two skills currently sit on the wrong side of this boundary and are being reconciled separately under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133): [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) each author a standalone `claude-code-review.yml` or `claude.yml`, and gha ships both as reusable workflows.
@@ -84,12 +87,14 @@ That split moves as capabilities are added, so read gha's README "Versioning" se
 ## Read the migration hazards before writing the stub
 
 A stub that resolves is not yet a stub that runs.
-One precondition and two traps, the traps being specific to migration rather than to gha in general; [`gha-reusable-workflow-permissions.md`](../../memories/gha-reusable-workflow-permissions.md) carries both traps in full.
+One precondition and two traps, the traps being specific to migration rather than to gha in general.
+[`gha-reusable-workflow-permissions.md`](../../memories/gha-reusable-workflow-permissions.md) carries both traps in full.
 
 - **A private consumer must be granted access first.** gha is public, so public repos can call its reusable workflows automatically.
   A private repo cannot until someone allows access under Settings, Actions, General, Access --- a human step, so establish it before the migration rather than after the first red run.
 - **An under-granted permission fails the whole call with `startup_failure` and zero jobs.**
-  `gh run view` prints only the generic `This run likely failed because of a workflow file issue`; the REST jobs endpoint returns an empty array, and `gh pr checks` shows nothing, because no check run exists to attach an annotation to.
+  `gh run view` prints only the generic `This run likely failed because of a workflow file issue`.
+  The REST jobs endpoint returns an empty array, and `gh pr checks` shows nothing, because no check run exists to attach an annotation to.
   The text naming the job and the permission exists only in the rendered Actions run page's Annotations panel.
   A called reusable workflow cannot hold more `GITHUB_TOKEN` permission than the caller grants, and most repos default to read-only, so copy the `permissions:` block from the matching `examples/<name>.yml`.
 - **Carrying the old workflow's `concurrency:` group across deadlocks the run.**
@@ -119,13 +124,16 @@ Post that comment deliberately, and note that the trigger is a raw substring tes
 - **Do:** read the job log's `::notice::` line before concluding that a missing review on a migration PR was the self-edit guard, then get the verdict from the agent bot.
 - **Don't:** report a hand-rolled duplicate as an observation and move on --- that is the failure this rule names, and it reads as diligence.
 - **Don't:** migrate a workflow carrying repo-specific logic gha does not model, one a prior decision deliberately kept local, or one in a repo we cannot merge a PR to.
-- **Don't:** derive the inventory from gha's workflow-directory listing alone; it also returns caller stubs and maintenance workflows that are not consumer-callable.
-- **Don't:** copy a `@v2` or `@v1` tag from a neighbouring caller; the recommended tag is per-capability.
+- **Don't:** derive the inventory from gha's workflow-directory listing alone.
+  It also returns caller stubs and maintenance workflows that are not consumer-callable.
+- **Don't:** copy a `@v2` or `@v1` tag from a neighbouring caller.
+  The recommended tag is per-capability.
 - **Don't:** carry the old workflow's `permissions:` or `concurrency:` blocks across unexamined --- grant what the example grants, and drop the concurrency block entirely.
 - **Don't:** fold the migration into the PR for whatever brought you to the repo.
 - **Don't:** re-dispatch a review the self-edit guard skipped, or read a confirmed skip as a defect in the PR.
 
 (Directive from the user, 2026-08-24: "cai: if a repo isn't using gha and would benefit, upgrade it".
 Filed as [ai-config#2126](https://github.com/Morrison-Lab/ai-config/issues/2126).
-Measured 2026-08-24: `git show origin/main:AGENTS.md | grep -ci gha` returned 0, so the cross-agent contract carried no gha guidance before this rule. ai-config is itself a consumer --- `grep -rho 'gha/\.github/[a-z]*/[a-z-]*' .github/workflows/ | sort -u` returned nine reusable workflows and one composite action on the same date.
+Measured 2026-08-24: `git show origin/main:AGENTS.md | grep -ci gha` returned 0, so the cross-agent contract carried no gha guidance before this rule.
+The ai-config repo is itself a consumer --- `grep -rho 'gha/\.github/[a-z]*/[a-z-]*' .github/workflows/ | sort -u` returned nine reusable workflows and one composite action on the same date.
 `ucdavis/win#75`, merged 2026-07-17, is the worked migration: the PR converting that repo's hand-rolled review workflow to a gha caller could never itself be bot-reviewed, and win#69 then ran the migrated workflow live.)

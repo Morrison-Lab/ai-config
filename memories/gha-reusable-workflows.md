@@ -52,7 +52,8 @@ Generic Actions-authoring material stays there.
   Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
   Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
   serocalculator#564 is the first consumer.
-- **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref; SHA-pinning is the pattern for third-party actions only.
+- **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
+  SHA-pinning is the pattern for third-party actions only.
   **Which** major tag is per-capability, not a repo-wide default --- read the README's Versioning section.
   Corrected 2026-08-24 (ai-config#2126): this bullet previously read `@v1` repo-wide, which the `@v1` freeze made stale.
   Measured the same day, ai-config's own callers are eight `@v2`, one `@v1` (`sync-shared-fragments`, one of the three capabilities still current there), and two deliberately SHA-pinned to a gha commit.

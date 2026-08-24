@@ -35,6 +35,7 @@ This document records the load-bearing operational rationale, synthetic-fixture 
 
 ## 4. Multi-Signal Next Step Decision Matrix
 
-- **Exhaustive Signal Evaluation**: The transition matrix evaluates all gathered dimensions (draft status, blocking human reviews, branch sync with main, CI checks, unresolved inline review threads, AI review findings, External review findings, and currency confirmation) before reaching the "fully clean" terminal state.
+- **Exhaustive Signal Evaluation**: The transition matrix evaluates all gathered dimensions (draft status, blocking human reviews, branch sync with main, 3-way CI state `[Failing, Pending, Green]`, unresolved inline review threads, AI review findings, External review findings, and currency confirmation) before reaching the "fully clean" terminal state.
   Treating AI review alone as the sole review branch allowed PRs with open External review findings or unconfirmed review currency (`Unverified` / `no verdict at head`) to erroneously declare readiness.
+  Similarly, distinguishing `CI is pending` (`Wait for CI`) from `CI is failing` (`Fix CI`) ensures in-flight CI runs do not fall through to unhandled transitions when reviews are clean.
   The matrix explicitly requires all reviews to be free of open findings and at least one verified clean review at head before transitioning to `Ready for self-merge` or `Ready for human review`.

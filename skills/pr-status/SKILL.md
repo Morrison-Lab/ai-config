@@ -349,6 +349,7 @@ Render a **Review Summary Table** for the PR:
   - If unaddressed review threads remain: `Resolve inline threads (<N> open)`.
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
+  - If CI is pending: `Wait for CI (<pending-check>)`.
   - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
   - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
     - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.

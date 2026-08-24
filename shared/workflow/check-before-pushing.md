@@ -112,6 +112,46 @@ git log --oneline "HEAD..origin/$BRANCH"
 Then follow [`claim-pr`](claim-pr.md)'s tree-and-parents comparison, which distinguishes the two cases a rejected push can mean: an identical merge another session already pushed, where the answer is `git reset --hard origin/<branch>`, and a **differently resolved** one, where a reset silently discards whatever your version got right and the answer is to merge the two commits.
 Never force-push over the difference to find out which it was.
 
+## The diff is the review surface, so read it
+
+The remote check above covers collisions.
+A second staleness lives entirely on your side: edits composed against a
+working tree that has since moved.
+Read a file, then pull or switch branches, then apply an edit whose anchor
+text came from the earlier read, and the edit can still report success
+while writing against text HEAD no longer carries --- matchers forgive
+near-misses, so a stale anchor does not always fail loudly.
+What lands in the push is churn you did not intend, and prose composed
+from the stale read asserts things about the tree that the pushed diff
+contradicts.
+
+Two cheap looks close it.
+Re-read any file you are about to edit whenever a checkout, pull, or reset
+has happened since your last read of it.
+And before anything leaves the machine, read the actual patch and confirm
+every hunk is one you intended:
+
+```bash
+git diff origin/<default-branch>...HEAD
+```
+
+A `--stat` summary is not that look: it names files and counts lines, so
+it surfaces a stray *file* but not a wrong edit inside an expected one ---
+and the wrong-edit-inside-an-expected-file case is exactly the staleness
+this section is about.
+
+The patch is also the only surface a reviewer sees, so a changelog claim
+about what this PR fixes has to be derivable from it.
+A fix the patch cannot show was landed by somebody else's PR, and claiming
+it here misattributes the work.
+
+(Measured 2026-08-24 in Morrison-Lab/gha#599: an edit made from a read
+taken before `git pull` applied without a loud failure, carried an
+unscoped rewrite of another workflow file into the push, and produced a
+changelog fragment crediting this PR with a fix that had merged the day
+before --- the reviewer caught the misattribution in round 2 and round 3
+confirmed it fixed.)
+
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
@@ -124,6 +164,10 @@ Never force-push over the difference to find out which it was.
   (That is upstream `master`'s wording.
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
 - **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
+- **Do:** re-read a file before editing it whenever a checkout, pull, or
+  reset has happened since your last read of it.
+- **Don't:** claim a fix in changelog or prose text that the pushed patch
+  itself cannot show.
 
 (Directive from the user, 2026-08-21:
 "cai: add protections against clobbering commits from other agents on a branch

@@ -437,6 +437,41 @@ markdownlint reported a real MD018 failure, `tail` exited 0, and the chain
 continued through the remaining checks and reported them all passing.
 The failure surfaced only on a later run that did not pipe.)
 
+## An explicit `exit` escapes the capture group
+
+The capture idioms above (`|| rc=$?` on a region, a status consumed by an
+`if`) catch **failing commands**, and an explicit `exit` is not one.
+`{ ...; exit 2; } || rc=$?` in ordinary statement position terminates the
+whole shell at the `exit`.
+Braces are not a subshell --- `{ }` runs in the caller's own shell, so no
+surrounding command fails and there is no status for the `||` to see.
+A parenthesized `( exit 2 )` is a different animal: it forks, so its exit
+becomes a catchable status.
+The same rescue applies wherever bash already forks around the group ---
+command substitution, either side of a pipeline, backgrounding under
+`wait` --- which is why the absolute claim stays scoped to statement
+position.
+
+The shape to watch for is a validation guard inside a captured region
+whose non-zero exit is meant to become a classified, reported failure.
+With `exit`, the shell dies before the summary lines run, whatever
+consumes the captured output sees nothing, and under a
+continue-on-error-style wrapper the job can go green with no verdict at
+all.
+Express the guard as data instead: assign the code (`rc=2`) or set a flag
+inside an `if`, and let ordinary flow carry it to the capture boundary.
+
+- **Do:** express an intended early failure inside a captured region as an
+  assigned code or flag that ordinary flow carries to the boundary, and
+  keep every path's summary writes reachable after it.
+- **Don't:** write a plain `exit` inside a braced capture region and read
+  the trailing `|| rc=$?` as covering it --- statement position gives that
+  pair nothing to catch.
+
+Measured 2026-08-24 in Morrison-Lab/gha#603: the offline suite caught the
+escaped exit within one run --- expected `exitcode=2`, got no line ---
+which is the same offline-suite payoff this file argues for above.
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely

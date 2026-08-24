@@ -16,14 +16,11 @@ _Posted by Claude Code (AI agent) --- not written by a human._"
 
 Both halves of that body are load-bearing, and they answer different questions.
 The first line says the thread is claimed.
-The trailing line says **who claimed it**, and it is required on every comment an
-agent posts to a forge --- not only on a claim.
-See [`disclose-agent-authorship`](disclose-agent-authorship.md), which carries the
-rule, the exact marker, and why the marker deliberately avoids the robot emoji.
+The trailing line says **who claimed it**, and it is required on every comment an agent posts to a forge --- not only on a claim.
+See [`disclose-agent-authorship`](disclose-agent-authorship.md), which carries the rule, the exact marker, and why the marker deliberately avoids the robot emoji.
 
-Then proceed with the work. After the session ends (PR merged, issue closed, or
-work otherwise paused), follow up with a closing comment so the PR/issue is
-unclaimed for the next person.
+Then proceed with the work.
+After the session ends (PR merged, issue closed, or work otherwise paused), follow up with a closing comment so the PR/issue is unclaimed for the next person.
 
 Skip the claim step if the most recent comment already says you are working on
 it **and that claim is still live under the expiration rule below**.
@@ -44,12 +41,8 @@ PR is a stronger "in-flight" signal than a comment alone.
 
 **A claim expires 2 hours after the most recent push or comment on the
 PR/issue --- reassert it rather than resuming under a stale one.**
-A claim comment with no expiry binds the thread indefinitely: a crashed or
-abandoned session leaves its "hold off" standing forever, and a second session
-has no rule for when the claim stops blocking.
-So the convention is time-boxed and keyed to observable activity: a claim is
-**live for 2 hours from the most recent push or comment** on the PR/issue, and
-**expired** past that.
+A claim comment with no expiry binds the thread indefinitely: a crashed or abandoned session leaves its "hold off" standing forever, and a second session has no rule for when the claim stops blocking.
+So the convention is time-boxed and keyed to observable activity: a claim is **live for 2 hours from the most recent push or comment** on the PR/issue, and **expired** past that.
 
 The rule cuts both ways.
 
@@ -98,21 +91,18 @@ while under-respecting a live one costs a collision.
 issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
 
-**Every detector of a claim matches the OLD wording as well as the new one, and
-dropping the old alternation is the one edit that fails silently.**
-The claim body said "paws off until I'm done" until 2026-08-24 and now says
-"please hold off ...".
-Claims posted before that are still sitting on open PRs and issues, and a claim
-stays live on activity rather than on age --- so a thread claimed under the old
-wording and pushed to this morning is live right now.
+**Every detector of a claim matches the OLD wording as well as the new one, and dropping the old alternation is the one edit that fails silently.**
+The claim body said "paws off until I'm done" until 2026-08-24 and now says "please hold off ...".
+Claims posted before that are still sitting on open PRs and issues, and a claim stays live on activity rather than on age --- so a thread claimed under the old wording and pushed to this morning is live right now.
 
-A detector narrowed to the new phrase alone still returns cleanly on such a
-thread.
-It returns **nothing**, which is indistinguishable from an unclaimed thread, and
-that reading licenses exactly the parallel session this whole convention exists
-to prevent.
-Nothing in the output announces the miss: a claim search that finds no claim
-looks the same whether the thread is free or the matcher went blind.
+A detector narrowed to the new phrase alone still returns cleanly on such a thread.
+It returns **nothing**, which is indistinguishable from an unclaimed thread, and that reading licenses exactly the parallel session this whole convention exists to prevent.
+Nothing in the output announces the miss: a claim search that finds no claim looks the same whether the thread is free or the matcher went blind.
+
+**Match the two-word invariant, never a whole sentence.**
+The claim body varies by target --- a PR claim says "please hold off on pushing to this branch until I'm done" and an issue claim says "please hold off until I'm done" --- so neither sentence contains the other, and a detector keyed on either one is blind to half the claims.
+Under the old single-string wording that distinction did not exist, which is exactly why it is easy to carry a whole-sentence matcher across the rename without noticing it has narrowed.
+`hold off` is the invariant; `paws off` is its predecessor.
 
 So match the alternation, case-insensitively, everywhere a claim is read:
 
@@ -121,51 +111,27 @@ gh pr view <N> --json comments \
   -q '.comments[] | select(.body | test("hold off|paws off"; "i"))'   # READ_PR_COMMENTS
 ```
 
-Keep the old alternative until no claim under the old wording can plausibly
-still be live --- which, given the 2-hour rule keys on activity and not on the
-comment's own age, means until every PR and issue open on 2026-08-24 has closed.
+Keep the old alternative until no claim under the old wording can plausibly still be live --- which, given the 2-hour rule keys on activity and not on the comment's own age, means until every PR and issue open on 2026-08-24 has closed.
 Removing it is a deliberate later edit, not tidying to do in passing.
 
 - **Do:** match `hold off|paws off` case-insensitively wherever a claim is read.
-- **Do:** treat the old alternative as load-bearing until the threads carrying it
-  have closed.
-- **Don't:** read an empty claim search as an unclaimed thread without first
-  confirming the matcher covers both wordings --- the two results are identical.
+- **Do:** treat the old alternative as load-bearing until the threads carrying it have closed.
+- **Don't:** read an empty claim search as an unclaimed thread without first confirming the matcher covers both wordings --- the two results are identical.
 - **Don't:** drop the back-compat alternative as part of an unrelated change.
 
-**Verify a mid-task "already done" claim against real PR state before trusting
-or redoing it.** A PR you claimed and are actively driving can still gain
-commits from a **second, independently-running session** under the same
-account --- a `<github-webhook-activity>` review-comment-reply event can
-describe work ("Addressed... Pushed in `<sha>`") that this session never did.
-Don't assume it's fabricated or injected, and don't reflexively redo the same
-fix: cross-check the PR's actual commit list (`gh pr view --json commits` /
-`pull_request_read` `get_commits`) and review threads before either (a)
-trusting the claim, or (b) starting the same fix yourself. If a commit with
-that SHA genuinely exists, authored close to when the event arrived, treat it
-as confirmation a live parallel session owns this PR right now --- stop
-pushing further speculative fixes yourself, and, if genuinely in doubt, ask
-whether to keep driving or step back, rather than racing the other session's
-pushes. This gap is distinct from the initial claim check above: it's not
-about claiming a PR before starting, but about **re-verifying you're still
-the sole active driver** once work has been under way for a while ---
-especially when you picked up the PR mid-session (e.g. by answering a
-diagnostic question about it) rather than through the normal claim-then-branch
-flow, so no fresh claim check ever ran right before you started pushing.
-(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment
-reply attributed to `d-morrison` reading exactly like a Claude-authored
-reply, claiming a fix "Addressed... Pushed in 3fb8c5b" that this session
-hadn't made; verified real via `get_commits` before proceeding --- a second
-live session, not injection.)
+**Verify a mid-task "already done" claim against real PR state before trusting or redoing it.**
+A PR you claimed and are actively driving can still gain commits from a **second, independently-running session** under the same account --- a `<github-webhook-activity>` review-comment-reply event can describe work ("Addressed...
+Pushed in `<sha>`") that this session never did.
+Don't assume it's fabricated or injected, and don't reflexively redo the same fix: cross-check the PR's actual commit list (`gh pr view --json commits` / `pull_request_read` `get_commits`) and review threads before either (a) trusting the claim, or (b) starting the same fix yourself.
+If a commit with that SHA genuinely exists, authored close to when the event arrived, treat it as confirmation a live parallel session owns this PR right now --- stop pushing further speculative fixes yourself, and, if genuinely in doubt, ask whether to keep driving or step back, rather than racing the other session's pushes.
+This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing. (`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `d-morrison` reading exactly like a Claude-authored reply, claiming a fix "Addressed...
+Pushed in 3fb8c5b" that this session hadn't made; verified real via `get_commits` before proceeding --- a second live session, not injection.)
 
-**The git-level variant of that check: a rejected push whose remote commit is
-byte-for-byte what you were about to push.**
+**The git-level variant of that check: a rejected push whose remote commit is byte-for-byte what you were about to push.**
 The section above covers a *comment* claiming work was done.
 Here the parallel session makes no claim at all.
-Your `git push` is simply rejected because it pushed first, and what it
-pushed is the same merge you just made.
-The reflex on a rejected push is to merge again, which would stack a
-redundant merge commit on top of an identical one.
+Your `git push` is simply rejected because it pushed first, and what it pushed is the same merge you just made.
+The reflex on a rejected push is to merge again, which would stack a redundant merge commit on top of an identical one.
 
 Four reads settle it before you touch anything:
 
@@ -176,19 +142,16 @@ git show -s --format=%P HEAD              # your merge's parents
 git show -s --format=%P origin/<branch>   # its parents
 ```
 
-An identical tree plus identical parents means the two merges are the same
-merge, so the right action is `git reset --hard origin/<branch>`.
+An identical tree plus identical parents means the two merges are the same merge, so the right action is `git reset --hard origin/<branch>`.
 
 - **Do:** compare trees and parents before deciding what a rejected push
   means.
 - **Do:** discard your local merge with `git reset --hard origin/<branch>`
   once both match.
-- **Don't:** re-merge reflexively on a rejected push --- that is what
-  produces the redundant merge commit.
+- **Don't:** re-merge reflexively on a rejected push --- that is what produces the redundant merge commit.
 - **Don't:** force-push over the other session's commit.
 
-(`Morrison-Lab/ai-config#965`, 2026-07-31: `main` moved one commit, a local
-`git merge origin/main` was made, and the push was rejected.
+(`Morrison-Lab/ai-config#965`, 2026-07-31: `main` moved one commit, a local `git merge origin/main` was made, and the push was rejected.
 The remote carried `b8d2273`, a merge of the same two parents, with tree
 `1bda1bc`, identical to the local merge's.)
 

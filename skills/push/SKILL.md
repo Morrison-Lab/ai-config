@@ -101,21 +101,12 @@ gh pr view "$PR" --json comments \
   -q '.comments[] | select(.body | test("hold off|paws off"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
-The alternation is deliberate: claims posted before 2026-08-24 say "paws off",
-and a claim stays live on activity rather than on age, so an old-wording claim
-can be live right now.
-A matcher narrowed to the new phrase returns nothing on such a thread, which
-reads exactly like an unclaimed one --- see
-[`claim-pr`](../../shared/workflow/claim-pr.md).
+The alternation is deliberate: claims posted before 2026-08-24 say "paws off", and a claim stays live on activity rather than on age, so an old-wording claim can be live right now.
+A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one --- see [`claim-pr`](../../shared/workflow/claim-pr.md).
 
-If the latest claim comment is from someone **other than you**, hasn't
-been unclaimed, and is still live --- the PR shows a push or comment within
-the last 2 hours, per
-[`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule ---
-**do not push.** Ask the user.
-An expired claim (over 2 idle hours) no longer blocks on its own, but take it
-over with a fresh claim comment and run this skill's other checks (branch-head
-advance, `@claude` run in flight) before pushing.
+If the latest claim comment is from someone **other than you**, hasn't been unclaimed, and is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**
+Ask the user.
+An expired claim (over 2 idle hours) no longer blocks on its own, but take it over with a fresh claim comment and run this skill's other checks (branch-head advance, `@claude` run in flight) before pushing.
 
 ### 4. Hold / block labels
 
@@ -197,14 +188,13 @@ review, not a draft).
 
 ## Relationship to other skills
 
-- **`claim-pr`** — posts/removes the claim comment this skill reads
-  in check #3. `push` is the read side; `claim-pr` is the write side.
+- **`claim-pr`** — posts/removes the claim comment this skill reads in check #3.
+  `push` is the read side; `claim-pr` is the write side.
 - **`session-lock` / `deconflict-sessions`** — the local-checkout counterpart:
   it keeps parallel sessions on one machine from sharing a working tree. `push`
   guards the *remote* branch; `session-lock` guards the *local* tree.
-- **`sync-pr-branch` / `merge-main`** — when check #2 fires because `main` (not
-  the branch) moved ahead, sync the branch first, then push. `sync-pr-branch`
-  ends in a push and should itself honor these checks.
+- **`sync-pr-branch` / `merge-main`** — when check #2 fires because `main` (not the branch) moved ahead, sync the branch first, then push.
+  `sync-pr-branch` ends in a push and should itself honor these checks.
 - **`ardi`** — its push step should run these checks; the "detect an active
   parallel session before pushing" note in `claim-pr` is the same guard.
 - **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** --- the standing rule these checks implement, and the home of the immediacy argument and the `--force-if-includes` mechanism.

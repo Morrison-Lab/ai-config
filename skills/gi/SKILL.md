@@ -87,14 +87,8 @@ check both explicitly here).
 gh issue view <N> --json comments --jq '.comments | last | .body' | cat   # READ_ISSUE_COMMENTS
 ```
 
-If it contains "Working on this" / "hold off" / "paws off" (the last being the
-pre-2026-08-24 wording, still live on threads claimed before then), or an
-equivalent claim, skip
-the issue --- unless the claim has expired: no push or comment on the issue in
-over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration
-rule.
-An expired claim is taken over by posting your own claim comment, never
-silently.
+If it contains "Working on this" / "hold off" / "paws off" (the last being the pre-2026-08-24 wording, still live on threads claimed before then), or an equivalent claim, skip the issue --- unless the claim has expired: no push or comment on the issue in over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+An expired claim is taken over by posting your own claim comment, never silently.
 
 **(2) No open PR already references the issue:**
 

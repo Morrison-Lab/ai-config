@@ -313,21 +313,15 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this --- please hold off" (or the pre-2026-08-24
-   wording "paws off", or any equivalent claim) and the claim is
-   still live --- a push or comment within the last 2 hours ---
-   skip it --- another session owns it.
-   An expired claim (over 2 idle hours) no longer blocks; take over with a
-   fresh claim comment of your own, per
-   [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+   If it says "Working on this --- please hold off" (or the pre-2026-08-24 wording "paws off", or any equivalent claim) and the claim is still live --- a push or comment within the last 2 hours --- skip it --- another session owns it.
+   An expired claim (over 2 idle hours) no longer blocks; take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.
 
    _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
-5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge
-   commit that caused the conflict), and merge:
+5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge commit that caused the conflict), and merge:
    ```bash
    git fetch origin main <branch>   # FETCH — fetch both: we need the new main tip
    git worktree add .claude/worktrees/pr-<N> origin/<branch>
@@ -362,11 +356,9 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
 
-Resolve PRs one at a time — not because worktrees race each other (each
-worktree is an independent checkout), but because the same human or bot may be
-actively working a PR between your claim and your push. One-at-a-time keeps
-the blast radius small. Skip any PR whose conflict is in a file you can't
-understand without more context — comment asking for clarification instead.
+Resolve PRs one at a time — not because worktrees race each other (each worktree is an independent checkout), but because the same human or bot may be actively working a PR between your claim and your push.
+One-at-a-time keeps the blast radius small.
+Skip any PR whose conflict is in a file you can't understand without more context — comment asking for clarification instead.
 
 **Match the response to standing, not only to cause.**
 Step 2 says whether a conflict is yours; it does not say the branch is.

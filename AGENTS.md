@@ -164,12 +164,8 @@ Each reading expires immediately: run the command fresh for every recap rather t
 
 See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
 
-An agent driving `gh`/`glab` under the account holder's credentials posts as
-**that person**: their login, their avatar, a `MEMBER` association, and
-`type: User`.
-Nothing in the API distinguishes such a comment from one they typed, so a reader
-deciding how much weight to give a claim, a status note, or a review has no way
-to tell which they are reading.
+An agent driving `gh`/`glab` under the account holder's credentials posts as **that person**: their login, their avatar, a `MEMBER` association, and `type: User`.
+Nothing in the API distinguishes such a comment from one they typed, so a reader deciding how much weight to give a claim, a status note, or a review has no way to tell which they are reading.
 The forge cannot say it; the body must.
 
 End every comment an agent posts with this line, on its own, after a blank line:
@@ -178,28 +174,17 @@ End every comment an agent posts with this line, on its own, after a blank line:
 _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
-Substitute your own agent's name where you are not Claude Code, and keep the
-rest of the line verbatim so one query finds every disclosed comment.
+Substitute your own agent's name where you are not Claude Code, and keep the rest of the line verbatim so one query finds every disclosed comment.
 
-The marker deliberately contains **no robot emoji**:
-[`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) matches
-that emoji as a review-body marker, so a disclosed claim comment would be
-admitted into the fully-clean verdict scan as a finding-free review.
-Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and
-`REVIEW_AGENT_MARKERS` before adopting it.
+The marker deliberately contains **no robot emoji**: [`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) matches that emoji as a review-body marker, so a disclosed claim comment would be admitted into the fully-clean verdict scan as a finding-free review.
+Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `REVIEW_AGENT_MARKERS` before adopting it.
 
-Scope: comment bodies, on every surface --- claims, releases, status notes,
-review replies, self-reviews, issue comments filed on the user's behalf.
-Not commit messages, not titles, not PR bodies, each of which has its own
-attribution convention.
-One exemption: a comment another machine parses as a command
-(`@dependabot rebase`), where the test is the audience rather than the length.
+Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
+Not commit messages, not titles, not PR bodies, each of which has its own attribution convention.
+One exemption: a comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
 
-- **Do:** append the marker to every agent-posted comment, including ones whose
-  prose already identifies the session.
-- **Don't:** use the robot emoji in the marker, and don't read "the account
-  holder knows an agent is running" as making the disclosure unnecessary --- the
-  reader is whoever finds the thread later.
+- **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
+- **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
 
 ## File formatting & links
 
@@ -209,15 +194,9 @@ One exemption: a comment another machine parses as a command
 
 ## Deliver completed implementation work
 
-When asked to implement, edit, or write up a change on a feature branch, do
-not stop at an uncommitted worktree.
-Complete the delivery cycle: create the applicable tracking issue when
-issue-first workflow applies, commit the scoped changes, run local
-adversarial self-review to a clean verdict, push the branch, open or update
-its Pull Request, request AI review after the final push, and drive CI and
-review findings to a clean result.
-This does not grant merge authority; the strict merge policy below still
-applies.
+When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree.
+Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result.
+This does not grant merge authority; the strict merge policy below still applies.
 
 ## Every self-review is an adversarial review by a separate subagent
 

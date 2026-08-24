@@ -353,12 +353,33 @@
               "added to make authorship legible."
             ],
             "_note_cannot_see_every_body": [
-              "--body-file, -F body=@file and an interpolated $BODY all put the text",
-              "somewhere a literal scan cannot reach. The hook reports those as an",
+              "--body-file, --editor, `-F <file>` and an interpolated $BODY all put the",
+              "text where a literal scan cannot reach. The hook reports those as an",
               "UNREADABLE body rather than as a missing marker, so its warning never",
               "asserts more than it observed. That partial visibility is the second",
-              "reason it cannot deny: a block built on a check that sees a fraction",
-              "of its population would refuse compliant commands."
+              "reason it cannot deny: a block built on a check that sees a fraction of",
+              "its population would refuse compliant commands.",
+              "",
+              "skills/ard/SKILL.md's per-round summary is exactly that shape -- posted",
+              "via --body-file on every round of every PR -- so it states the marker",
+              "requirement in its own text rather than relying on this guard.",
+              "",
+              "Registered under Bash AND matched against the mcp__github__* comment",
+              "tools, because a remote/web session has no `gh` at all and MCP is its",
+              "only path there. A Bash-only guard would be silent exactly where the CLI",
+              "is absent."
+            ],
+            "_note_segmentation_is_quote_aware": [
+              "Segments are split on shell separators OUTSIDE quotes. A plain",
+              "re.split(r'[;&|\\n]+', ...) looked adequate and was not: the marker sits",
+              "on its own line at the END of a body, so splitting on every newline cuts",
+              "the marker off the very command it discloses, and every correctly",
+              "disclosed multi-line comment -- the normal shape -- warned. Caught by the",
+              "test suite before this hook was ever registered.",
+              "",
+              "Judging PER SEGMENT rather than per call is what stops one disclosed body",
+              "vouching for an undisclosed sibling in a batched round, which",
+              "shared/workflow/efficient-pr-babysitting.md actively encourages."
             ]
           }
         ]

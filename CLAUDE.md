@@ -567,10 +567,13 @@ A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-re
 When the user gives feedback, corrections, or guidance in the CLI or chat while working a PR, paraphrase it and post it as a PR comment:
 
 ```
-gh pr comment <N> --body "..."
+gh pr comment <N> --body "<paraphrase>
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
 One to three sentences is enough.
+The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
 Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
 
@@ -611,28 +614,19 @@ The `claim-pr` skill operationalizes this (the exact claim wording, when it appl
 
 [shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
 
-A comment posted through `gh`/`glab` under the account holder's credentials
-carries **their** login, avatar, and `MEMBER` association, and reads as
-`type: User` --- so nothing in the API distinguishes it from a comment they
-typed, and `memories/github.md` already records auditors mistaking exactly that.
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login, avatar, and `MEMBER` association, and reads as `type: User` --- so nothing in the API distinguishes it from a comment they typed, and `memories/github.md` already records auditors mistaking exactly that.
 The forge cannot say it, so the body has to: end every comment with
 
 ```
 _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
-The marker deliberately avoids the robot emoji, which
-`scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry ---
-a disclosed claim comment would otherwise scan as a finding-free **review**, the
-false-clean failure [`fully-clean`](shared/workflow/fully-clean.md) already
-describes.
+The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**, the false-clean failure [`fully-clean`](shared/workflow/fully-clean.md) already describes.
 Check any replacement marker against that tuple before adopting it.
-The one exemption is a comment another machine parses as a command
-(`@dependabot rebase`); the test is the audience, not the brevity.
+The one exemption is a comment another machine parses as a command (`@dependabot rebase`); the test is the audience, not the brevity.
 Comment bodies only --- not commit messages, titles, or PR bodies.
 
-- **Do:** append the marker to every claim, release, status, reply, and
-  self-review comment, including ones whose prose already names the session.
+- **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
 - **Don't:** use the robot emoji in it, or put it in a commit message or title.
 
 
@@ -640,11 +634,7 @@ Comment bodies only --- not commit messages, titles, or PR bodies.
 
 [shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)
 
-When a short `CLAUDE.md` names a fuller document as the actual authority
---- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style
-guide --- read that document before the first edit, and front-load its
-pre-PR requirements into the first commit rather than discovering them via
-a red CI check.
+When a short `CLAUDE.md` names a fuller document as the actual authority --- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style guide --- read that document before the first edit, and front-load its pre-PR requirements into the first commit rather than discovering them via a red CI check.
 
 ## Open a PR immediately after claiming an issue
 

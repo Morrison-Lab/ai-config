@@ -28,9 +28,8 @@ Operationalizes the strong form of the claim workflow: branch → empty commit �
 4. Open a **draft PR** with:
    - Title: issue title (or override)
    - Body: `"Closes #<N>\n\nWIP — opened up front to claim the issue; implementing now."`
-5. Post a claim comment on the issue: `"Claude Code CLI (local session) is working on this — please hold off until I'm done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._"`
-   (the trailing marker is required on every agent-posted comment --- see
-   [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md))
+5. Post a claim comment on the issue, whose body is the claim line, a blank line, and the agent-disclosure marker every agent-posted comment carries (see [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md)).
+   `\n` here is notation for a real newline, as in step 4 --- inside a bash double-quoted string those two characters stay two characters, so [`pr-on-claim.sh`](pr-on-claim.sh) writes the body with actual line breaks: `"Claude Code CLI (local session) is working on this — please hold off until I'm done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._"`
 
 ## Why draft?
 

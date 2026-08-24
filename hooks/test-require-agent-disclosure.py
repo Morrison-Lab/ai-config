@@ -67,6 +67,59 @@ CASES = [
      'git push && gh pr comment 12 --body "Pushed."', True),
     ("a variable elsewhere does not hide a visible marker",
      f'gh pr comment "$N" --repo "$REPO" --body "Done.\n\n{MARKER}"', False),
+
+    # --- forms the first version missed entirely (review findings 2, 12) ------
+    ("gh api issues comments",
+     'gh api repos/o/r/issues/12/comments -f body="Working on this."', True),
+    ("gh api review-thread reply",
+     'gh api repos/o/r/pulls/12/comments/9/replies -f body="Addressed."', True),
+    ("gh api reply WITH marker",
+     f'gh api repos/o/r/pulls/12/comments/9/replies -f body="Addressed.\n\n{MARKER}"',
+     False),
+    ("glab mr comment alias",
+     'glab mr comment 12 --message "Working on this."', True),
+    ("glab issue comment alias",
+     'glab issue comment 12 --message "Working on this."', True),
+    ("command after then",
+     'if true; then gh pr comment 12 --body "bare"; fi', True),
+    ("negated command",
+     '! gh pr comment 12 --body "bare"', True),
+    ("command inside a do-loop",
+     'for n in 1 2; do gh pr comment $n --body "bare"; done', True),
+
+    # --- one marker must not vouch for a sibling (review finding 4) -----------
+    ("a disclosed comment does not vouch for an undisclosed sibling",
+     f'gh pr comment 1 --body "a\n\n{MARKER}" && gh pr comment 2 --body "b"',
+     True),
+    ("both disclosed is silent",
+     f'gh pr comment 1 --body "a\n\n{MARKER}" && gh pr comment 2 --body "b\n\n{MARKER}"',
+     False),
+    ("a grep for the marker does not vouch for a bare comment",
+     'grep -rn "Posted by Claude Code (AI agent)" . ; gh pr comment 2 --body "bare"',
+     True),
+
+    # --- heredocs: body when piped, prose when written (review finding 3) -----
+    ("heredoc IS the body, and discloses",
+     'gh pr comment 12 --body-file - <<\'EOF\'\nDone.\n\n' + MARKER
+     + '\nEOF', False),
+    ("heredoc IS the body, and does not disclose",
+     'gh pr comment 12 --body-file - <<\'EOF\'\nDone, undisclosed.\nEOF', True),
+    ("a doc heredoc does not silence a real sibling command",
+     'cat > d.md <<\'EOF\'\ngh pr comment <N> --body "x"\nEOF\ngh pr comment 2 --body "bare"',
+     True),
+
+    # --- the exemption is whole-body, not first-token (review finding 8) ------
+    ("a bot handle followed by prose for humans is NOT exempt",
+     'gh pr comment 12 --body "@dependabot rebase please, and a note for the '
+     'humans reading this thread: I will also rerun CI"', True),
+    ("the review re-request is exempt",
+     'gh pr comment 12 --body "@' + 'claude review"', False),
+
+    # --- unreadable vs missing must not be confused (review finding 9) -------
+    ("gh pr comment -F <file> is a body-file, reported unreadable",
+     'gh pr comment 12 -F /tmp/body.md', None),
+    ("--editor is unreadable",
+     'gh pr comment 12 --editor', None),
 ]
 
 # --- the emoji branch --------------------------------------------------------
@@ -84,17 +137,35 @@ INDIRECT_CASES = [
 def run():
     failed = 0
     for label, command, expect in CASES:
-        got = guard.verdict(command) is not None
-        ok = got == expect
+        reason = guard.verdict(command)
+        if expect is None:
+            # Must warn, and specifically about a body it could not read --
+            # accusing a command of omitting a marker never seen is the
+            # misdiagnosis review finding 9 named.
+            ok = reason is not None and "cannot read" in reason
+            print(f"{'PASS' if ok else 'FAIL'}: {label} "
+                  f"(reported unreadable={ok})")
+        else:
+            got = reason is not None
+            ok = got == expect
+            print(f"{'PASS' if ok else 'FAIL'}: {label} "
+                  f"(warned={got}, expected={expect})")
         failed += not ok
-        print(f"{'PASS' if ok else 'FAIL'}: {label} "
-              f"(warned={got}, expected={expect})")
 
     reason = guard.verdict(ROBOT_CASE)
     ok = reason is not None and "robot emoji" in reason
     failed += not ok
     print(f"{'PASS' if ok else 'FAIL'}: a robot-emoji disclosure is named as "
           f"the wrong marker")
+
+    # Review finding 14: a body merely MENTIONING the emoji discloses nothing,
+    # so the emoji advice would be inapplicable and would displace the real one.
+    mention = 'gh pr comment 12 --body "The \U0001f916 badge broke; rerunning."'
+    reason = guard.verdict(mention)
+    ok = reason is not None and "robot emoji" not in reason
+    failed += not ok
+    print(f"{'PASS' if ok else 'FAIL'}: merely mentioning the emoji is not "
+          f"treated as disclosing with it")
 
     for label, command in INDIRECT_CASES:
         reason = guard.verdict(command)
@@ -150,7 +221,27 @@ def run():
         failed += not ok
         print(f"{'PASS' if ok else 'FAIL'}: {label}")
 
-    total = len(CASES) + 1 + len(INDIRECT_CASES) + 1 + 4
+    # Review finding 10: a remote/web session has no `gh`, so MCP is its only
+    # path -- a Bash-only guard is silent exactly where the CLI is absent.
+    for label, tool, body, expect in (
+        ("MCP add_issue_comment bare", "mcp__github__add_issue_comment",
+         "Working on this.", True),
+        ("MCP add_issue_comment disclosed", "mcp__github__add_issue_comment",
+         "Working on this.\n\n" + MARKER, False),
+        ("MCP review reply bare",
+         "mcp__github__add_reply_to_pull_request_comment", "Addressed.", True),
+        ("MCP bot-command body is exempt", "mcp__github__add_issue_comment",
+         "@dependabot rebase", False),
+        ("a non-comment MCP tool is out of scope",
+         "mcp__github__create_pull_request", "Closes #1", False),
+    ):
+        got = guard.verdict_mcp(tool, {"body": body}) is not None
+        ok = got == expect
+        failed += not ok
+        print(f"{'PASS' if ok else 'FAIL'}: {label} "
+              f"(warned={got}, expected={expect})")
+
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 5
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

@@ -9,6 +9,41 @@
 - For UMS/maintenance passes this matters because stale muscle memory ("use
   create/edit") can fail repeatedly after the tool list changes.
 
+## WebFetch answers with a SUMMARY, so read the source when the answer is an exact literal
+- `WebFetch` runs a prompt against the fetched page using a small fast model.
+  For "what does this do" that is the point.
+  For "what exactly does it write" it is a paraphrase of the thing you asked
+  for, and a paraphrase can silently change a character.
+- Measured 2026-08-24 on
+  <https://usethis.r-lib.org/reference/git_vaccinate.html>, asked to quote the
+  exact list of patterns verbatim.
+  It returned `.Rdata`.
+  The page's own roxygen, and `r-lib/usethis`'s `git_ignore_lines` in
+  `R/git.R`, both say `.RData`.
+- The single wrong character was consequential, which is the argument for the
+  rule rather than for more care.
+  gitignore matching is case-sensitive on Linux, so a check built from the
+  returned literal would never have matched the file R actually writes --- and
+  nothing about the output would have said so.
+  It was caught only because the value was about to become a hard-coded
+  default and got cross-checked against the source.
+- This is [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)
+  one layer further in than that fragment's own examples reach.
+  The rendered page was the right artifact; the **summarizer** was the
+  adjacent one, and asking it to "quote exactly" does not make it a
+  transcription tool.
+- **Do:** raw-fetch the source (per the section below) when the answer is a
+  pattern list, a default value, a flag name, a version string, or anything
+  else you are about to copy character-for-character.
+- **Do:** prefer a repository's own code over its rendered reference page for
+  such a literal, since the page is generated and the code is the thing that
+  runs.
+- **Don't:** read a `WebFetch` result as a quotation, however literal it
+  looks, and however explicitly the prompt asked for one.
+- (Tracked as ai-config#2144.
+  Found while building `Morrison-Lab/gha`'s `check-junk-files` capability,
+  whose default pattern set is exactly this list.)
+
 ## WebFetch 403 on a rendered docs site -> raw.githubusercontent.com; WebSearch to find the exact source path
 - A GitHub-Pages/Quarto-rendered docs site (e.g. `jarl.etiennebacher.com`,
   `ucd-serg.github.io/lab-manual/...`) can reject `WebFetch` outright (403 —

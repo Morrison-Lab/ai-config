@@ -456,8 +456,9 @@ Every hook must ship a companion `test-<name>.py` beside it in the same change b
 `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
-*tested* guard cannot regress unnoticed and an *untested* one cannot hide. It
-gates `validate` and pre-commit. One hook is untested today
+*tested* guard cannot regress unnoticed and an *untested* one cannot hide.
+It gates `validate` and pre-commit.
+One hook is untested today
 (`inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in
 [#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).

@@ -3,81 +3,117 @@
 
 Without `pipefail`, a pipeline's exit status is its RIGHTMOST command's, so
 `cmd | head -20; echo "exit=$?"` reports whether `head` succeeded. `head`
-almost always succeeds. The status of the thing you actually ran is discarded
-one character earlier, and nothing in the output says so.
+succeeds on any input, including none. The status of the thing you actually ran
+is discarded one character earlier, and nothing in the output says so.
 
-WHY THIS IS A HOOK RATHER THAN ANOTHER PROSE SITE
--------------------------------------------------
-The mechanism is already written down three times over:
-`shared/coding/errexit-is-not-uniform.md` measures it in two shapes,
-`shared/principles/fail-fast.rationale.md` states that a whole-call status
-belongs to the last command in a `;`-sequence or a `pipefail`-less pipeline,
-and `shared/workflow/algorithmatize-checks.md` names truncating pipes as
-interpretations of an instrument's answer.
+WHY A GUARD RATHER THAN ANOTHER PROSE SITE
+------------------------------------------
+Not because the corpus lacked the rule. It had it, exactly, with `head` named:
+`shared/coding/errexit-is-not-uniform.md:430` reads "**Don't:** pipe a
+verification check into `tail` or `head` for readability while its exit status
+is still gating what runs next", and its case record two lines later is a
+near-identical 2026-08-03 incident (markdownlint piped to `tail`, `tail` exited
+0, the chain reported every check passing).
 
-All three were loaded and none fired, because the failure happens at
-COMPOSITION time. The pipe is added as a formatting decision about output
-length, at which moment the exit status is not in view at all.
+So the honest account is that a correct, specific rule was not consulted, and
+a fourth prose site would not have been either. That is what makes this
+decidable-from-one-artifact condition worth a guard instead: the failure
+happens at COMPOSITION time, when the pipe is added as a formatting decision
+about output length and the exit status is not in view at all.
 
-`algorithmatize-checks.md` states the tell as "a sentence about an instrument
-that names no exit status". That tell cannot catch this case, and the gap is
-the whole reason for the guard: the offending sentence NAMED an exit status.
-It named the wrong command's. A reader sees `exit=0` and has no way to tell it
-apart from a real reading.
-
-WHY THIS WARNS RATHER THAN BLOCKS
----------------------------------
+WHY IT WARNS RATHER THAN BLOCKS
+-------------------------------
 Reading a pipeline's status is legitimate under `pipefail`, and legitimate
-whenever the author genuinely wants the rightmost command's status --- `grep -c
-... | tail -1` is a real thing to want. The shape is suggestive, never
-decisive, so this only ever ADDS context. There is no code path that denies,
-escalates, or auto-approves; in particular it never emits `permissionDecision`,
-whose absence defers to the normal permission flow.
+whenever the author wants the rightmost command's status --- `grep -c ... |
+tail -1` is a real thing to want. The shape is suggestive, never decisive, so
+this only ever ADDS context. There is no code path that denies, escalates, or
+auto-approves; it never emits `permissionDecision`, whose absence defers to the
+normal permission flow.
 
 WHAT IT ANCHORS ON
 ------------------
 Structure, not vocabulary. This corpus quotes shell snippets constantly ---
-including inside the very fragments that describe this bug --- so a substring
-matcher for `$?` would fire on documentation. Two structural rules keep it off
-prose:
+including inside the fragments describing this bug --- so a substring matcher
+for `$?` would fire on documentation. Two structural rules keep it off prose:
 
   * A `$?` inside SINGLE quotes is literal to the shell, so it is never a
     status read. That covers every `bash -c '... | tail; echo "rc=$?"'` this
     corpus writes to demonstrate the bug, and it is a deliberate
     under-approximation: someone genuinely running `bash -c` with a pipe
     inside gets no warning. Warn-not-block makes that the cheap direction.
-  * A heredoc BODY is content being written, not a value being consumed, so
-    its bodies are stripped before scanning regardless of whether the
-    delimiter was quoted. Writing `$?` into a file is not reasoning from a
-    misread status.
+  * A heredoc BODY is content being written, not a value consumed, so bodies
+    are stripped regardless of delimiter quoting.
 
 A `$?` in DOUBLE quotes does expand, and is exactly the observed bug
-(`echo "exit=$?"`), so those are scanned.
+(`echo "exit=$?"`), so those are scanned. `${?}` is the same read spelled
+differently and is scanned too.
 
-THE NEGATIVE CONTROL
---------------------
+WHAT IS NOT A PIPE
+------------------
+Four constructs put a `|` in a command string without creating a pipeline whose
+status `$?` would report, and each was measured against bash before being
+excluded:
+
+  * `<(...)` and `>(...)` process substitution, and `$(...)` command
+    substitution --- these run in a separate process, so `diff <(a|cat)
+    <(b|cat); echo $?` reports `diff`'s status.
+  * `[[ ... ]]`, where `|` is regex alternation: `[[ $x =~ ^(a|b)$ ]]`.
+  * `>|`, the noclobber-override redirect.
+  * `||`, which is a separator.
+
+And `&` is a segment separator ONLY when it is not part of a redirect. `2>&1`,
+`1>&2`, `>&2`, `&>out` and `|&` all contain `&` and none of them ends a
+command. Getting this wrong garbled the diagnostic on the very command this
+guard was built for, which reported a phantom pipeline of `1 | head -20` --- the
+`1` being the tail of `2>&1`.
+
+A line ending in a trailing `|` continues its pipeline onto the next line, so
+that newline does not split a segment. Piping across lines is ordinary
+formatting for a long command.
+
+THE NEGATIVE CONTROL, AND WHAT IT IS WORTH
+------------------------------------------
 A matcher that fires on nothing and a matcher that never ran leave the same
-evidence, so the rate was measured rather than asserted. Running `find_misread`
-over every fenced shell block in `shared/`, `memories/`, `skills/`, `CLAUDE.md`
-and `AGENTS.md` on 2026-08-24: **705 blocks examined, 1 fired.**
+evidence, so the rate was measured. Method: `find_misread` over every fenced
+block in `shared/`, `memories/`, `skills/`, `CLAUDE.md`, `AGENTS.md` and
+`README.md`, matching ```` ``` ```` fences of any language tag, on 2026-08-24
+at this branch's HEAD.
 
-That one is `shared/coding/errexit-is-not-uniform.md`'s
-`git diff --cached --name-only | grep -qE '...' || rc=$?`, and it is a true
-positive by that fragment's own standard --- its detector list says to "flag
-`|| fallback` attached to a pipeline in a script without `pipefail`". The
-capture idiom is correct there only because `grep`'s status is the one wanted;
-the guard cannot know that, and saying so is the point of a warning.
+    all fenced blocks examined          : 774
+      discriminating ($? AND | present) :   8
+      fired                             :   2
+
+Report the middle number, not the first. Only 8 of the 774 could fire under ANY
+implementation, so a matcher firing on every block containing both would still
+score "774 examined, 8 fired" --- the other 766 are padding, and quoting them
+as specificity is the zero-matrix problem
+`shared/workflow/batch-merge-and-resolve.md` names.
+
+Both hits are genuine instances rather than false positives: the `|| rc=$?`
+capture idiom at `shared/coding/errexit-is-not-uniform.md`, which that
+fragment's own detector list says to flag, and the incident command quoted in
+`shared/workflow/algorithmatize-checks.md`.
+
+The control's real limitation is the artifact class. This guard runs on Bash
+TOOL COMMANDS and the control measured MARKDOWN BLOCKS, and the two differ
+systematically along the axis the scanner excludes by design, since prose is
+dense in single-quoted `bash -c '...'` demonstrations. So it bounds the
+documentation-noise risk and says little about the live false-positive rate.
 
 THE POSITIONAL RULE
 -------------------
-`$?` holds the status of the last command that finished. So the guard fires
+`$?` holds the status of the last command that finished, so the guard fires
 only when the segment IMMEDIATELY BEFORE the one holding the `$?` is a
-pipeline. That ordering is what keeps `cmd | head; other_command; echo $?`
-quiet: there `$?` is `other_command`'s, and reading it is correct.
+pipeline. That keeps `cmd | head; other_command; echo $?` quiet, where `$?` is
+`other_command`'s and reading it is correct.
 
-Segments are split on unquoted `;`, newline, `&`, `&&` and `||`. A single
-unquoted `|` does not split a segment --- it marks it as a pipeline, which is
-the property being tested.
+WHAT IT CANNOT SEE
+------------------
+A pipeline inside a compound statement --- `for`, `if`, `case`, `{ ... }` ---
+whose terminator (`done`, `fi`, `esac`, `}`) becomes the immediate predecessor.
+Those are real instances of the bug and this guard misses them. The scanner is
+lexical by design, and parsing shell compound statements to catch them would
+cost more than the miss.
 
 THE INCIDENT
 ------------
@@ -87,10 +123,6 @@ THE INCIDENT
 
 reported `exit=0`. The checker's real exit was 1, and a PR's cleanliness was
 reasoned from the wrong number. Tracked as ai-config#2149.
-
-Remedies, in the order `errexit-is-not-uniform.md` prefers them: open the line
-with `set -o pipefail;`, or drop the pipe and redirect to a file
-(`cmd >/tmp/out.txt 2>&1; rc=$?`), or read `${PIPESTATUS[0]}`.
 """
 
 import json
@@ -101,18 +133,20 @@ import sys
 # carry a redirect or a pipe on either side of the opener; then the body up to a
 # terminator that `<<-` allows to be tab-indented.
 #
-# Borrowed verbatim from hooks/warn-dupe-check-chained-to-create.py, where the
-# same pattern carries its own review history. Group 2 is the opener line's
-# tail, which is still live shell and is kept; the body is dropped.
+# Borrowed from hooks/warn-dupe-check-chained-to-create.py, where the same
+# pattern carries its own review history. Group 2 is the opener line's tail,
+# which is still live shell and is kept; the body is dropped.
 RX_HEREDOC = re.compile(
     r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)\n"
     r".*?\n[ \t]*\1\b",
     re.DOTALL,
 )
 
-# Separators that END a command segment, longest first so `&&` is not read as
-# `&` and `||` is not read as a pipe.
-SPLITTERS = ("&&", "||", ";", "\n", "&")
+# `set -o pipefail`, `set -euo pipefail`, `set -eo pipefail`. Anchored on a
+# `set` command rather than on the bare word, so that grepping the corpus FOR
+# the word --- `grep -rn pipefail hooks/ | head -20; echo $?` --- does not
+# silently disarm the guard on a genuine misread.
+RX_SET_PIPEFAIL = re.compile(r"\bset\b[^;&|\n]*\bpipefail\b")
 
 MAXLEN = 90
 
@@ -123,16 +157,22 @@ A `$?` read directly follows a pipeline, and no `pipefail` is in force.
     reads $?:  {read}
 
 Without `set -o pipefail`, a pipeline's exit status is its RIGHTMOST command's.
-A trailing `head`, `tail`, `grep` or `jq` almost always succeeds, so `$?` here
-reports the formatter's status and the real command's is already discarded.
-The number that gets printed is indistinguishable from a correct reading.
+A trailing `head`, `tail` or `jq` added purely to shorten output usually
+succeeds whatever the real command did, so `$?` here reports the formatter's
+status while the one you wanted is already gone. The number that prints is
+indistinguishable from a correct reading.
 
-`shared/coding/errexit-is-not-uniform.md` measures this; its preferred remedies
-in order:
+Prefer taking the status BEFORE the pipe:
 
-    set -o pipefail; <pipeline>; echo "rc=$?"     # one word, fixes the line
-    cmd >/tmp/out.txt 2>&1; rc=$?; head -20 /tmp/out.txt   # status before trim
-    cmd | head -20; rc=${{PIPESTATUS[0]}}          # the stage you meant
+    cmd >/tmp/out.txt 2>&1; rc=$?; head -20 /tmp/out.txt   # status, then trim
+    cmd | head -20; rc=${{PIPESTATUS[0]}}                   # the stage you meant
+
+`set -o pipefail;` also fixes the read, but do not reach for it first here.
+`shared/coding/errexit-is-not-uniform.md` warns that a producer piped to `head`
+gets SIGPIPEd once `head` has read enough, which `pipefail` turns into a false
+FAILURE --- measured, `set -o pipefail; seq 1 200000 | head -20` gives rc=141.
+It is the right remedy for a script whose every stage must succeed, and the
+wrong one for a long output deliberately truncated.
 
 If you genuinely want the last stage's status --- `grep -c ... | tail -1` ---
 carry on. This is a reminder, not a refusal.
@@ -148,30 +188,51 @@ def strip_heredoc_bodies(command):
     return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 
+def _last_significant(text, upto):
+    """The last non-whitespace character before `upto`, or ''."""
+    index = upto - 1
+    while index >= 0 and text[index] in " \t":
+        index -= 1
+    return text[index] if index >= 0 else ""
+
+
 def scan(command):
     """Split into segments and locate expandable `$?` reads.
 
     Returns (segments, reads):
-      segments -- list of {"text": str, "has_pipe": bool}
-      reads    -- list of {"seg": int} for each `$?` the shell would expand
+      segments -- list of {"text": str, "has_pipe": bool}, empties dropped
+      reads    -- list of {"seg": int}, one per `$?` or `${?}` the shell would
+                  expand, mapped onto the surviving segment list
 
-    Single-quoted spans are traversed without recording reads or pipes, since
-    the shell treats both characters as literal inside them.
+    Reads are collected by absolute offset and mapped to segments afterwards,
+    so dropping empty segments cannot shift a read onto the wrong one.
     """
-    segments = []
-    reads = []
+    text = command
+    bounds = []          # (start, end, has_pipe) for every raw segment
+    offsets = []         # absolute offset of each expandable `$?`
     start = 0
     has_pipe = False
     quote = ""
+    # Depth of contexts in which a `|` is not a pipeline: `$(`, `<(`, `>(`.
+    subshell = 0
+    # Nesting of `[[ ... ]]`, where `|` is regex alternation.
+    condition = 0
     i = 0
-    n = len(command)
+    n = len(text)
+
+    def cut(end, skip):
+        nonlocal start, has_pipe, i
+        bounds.append((start, end, has_pipe))
+        has_pipe = False
+        i = end + skip
+        start = i
 
     while i < n:
-        char = command[i]
+        char = text[i]
 
         if quote == "'":
-            # Inside single quotes nothing is special except the closing quote.
-            # A backslash is literal here, matching the shell.
+            # Inside single quotes only the closing quote is special; a
+            # backslash is literal, matching the shell.
             if char == "'":
                 quote = ""
             i += 1
@@ -179,56 +240,131 @@ def scan(command):
 
         if quote == '"':
             if char == "\\" and i + 1 < n:
-                i += 2  # `\$` is a literal dollar, so skip the pair
+                i += 2  # `\$` is a literal dollar
                 continue
             if char == '"':
                 quote = ""
                 i += 1
                 continue
-            if char == "$" and command[i + 1:i + 2] == "?":
-                reads.append({"seg": len(segments)})
+            if char == "$" and text[i + 1:i + 2] == "?":
+                offsets.append(i)
                 i += 2
+                continue
+            if char == "$" and text[i + 1:i + 3] == "{?" and text[i + 3:i + 4] == "}":
+                offsets.append(i)
+                i += 4
                 continue
             i += 1
             continue
 
-        # Unquoted.
+        # --- unquoted -------------------------------------------------------
         if char == "\\" and i + 1 < n:
-            i += 2
+            i += 2  # covers backslash-newline line continuation
             continue
         if char in ("'", '"'):
             quote = char
             i += 1
             continue
-        if char == "$" and command[i + 1:i + 2] == "?":
-            reads.append({"seg": len(segments)})
+
+        if char == "$" and text[i + 1:i + 2] == "?":
+            offsets.append(i)
+            i += 2
+            continue
+        if char == "$" and text[i + 1:i + 4] == "{?}":
+            offsets.append(i)
+            i += 4
+            continue
+        if char == "$" and text[i + 1:i + 2] == "(":
+            subshell += 1
+            i += 2
+            continue
+        if char in ("<", ">") and text[i + 1:i + 2] == "(":
+            subshell += 1
+            i += 2
+            continue
+        if char == ")" and subshell:
+            subshell -= 1
+            i += 1
+            continue
+        if text[i:i + 2] == "[[":
+            condition += 1
+            i += 2
+            continue
+        if text[i:i + 2] == "]]" and condition:
+            condition -= 1
             i += 2
             continue
 
-        two = command[i:i + 2]
+        two = text[i:i + 2]
+
         if two in ("&&", "||"):
-            segments.append({"text": command[start:i].strip(),
-                             "has_pipe": has_pipe})
-            has_pipe = False
-            i += 2
-            start = i
+            cut(i, 2)
             continue
-        if char in (";", "\n", "&"):
-            segments.append({"text": command[start:i].strip(),
-                             "has_pipe": has_pipe})
+
+        if char == "&":
+            previous = _last_significant(text, i)
+            # `2>&1`, `>&2`, `1>&2` -- fd duplication, not a separator.
+            if previous in ("<", ">"):
+                i += 1
+                continue
+            # `&>file`, `&>>file` -- redirect of both streams.
+            if text[i + 1:i + 2] == ">":
+                i += 1
+                continue
+            # `|&` -- pipe including stderr. The `|` already marked the pipe.
+            if previous == "|":
+                i += 1
+                continue
+            # A lone `&` BACKGROUNDS what precedes it, so the `$?` that follows
+            # is the async launch's status (0) rather than the pipeline's.
+            # Measured: `cmd | head -20 & echo $?` prints 0 whatever `cmd` did.
+            # Clearing the flag keeps the guard from asserting something false.
             has_pipe = False
-            i += 1
-            start = i
+            cut(i, 1)
             continue
+
+        if char == ";":
+            cut(i, 1)
+            continue
+
+        if char == "\n":
+            # A trailing `|`, `&&` or `||` continues onto the next line.
+            previous = _last_significant(text, i)
+            if previous in ("|", "&"):
+                i += 1
+                continue
+            cut(i, 1)
+            continue
+
         if char == "|":
-            # A lone `|` is a pipe; `||` was consumed above.
-            has_pipe = True
+            # `>|` is the noclobber-override redirect, not a pipe.
+            if _last_significant(text, i) == ">":
+                i += 1
+                continue
+            if not subshell and not condition:
+                has_pipe = True
             i += 1
             continue
 
         i += 1
 
-    segments.append({"text": command[start:n].strip(), "has_pipe": has_pipe})
+    bounds.append((start, n, has_pipe))
+
+    segments = []
+    spans = []
+    for begin, end, piped in bounds:
+        body = text[begin:end].strip()
+        if not body:
+            continue  # an empty segment is punctuation, not a command
+        segments.append({"text": body, "has_pipe": piped})
+        spans.append((begin, end))
+
+    reads = []
+    for offset in offsets:
+        for index, (begin, end) in enumerate(spans):
+            if begin <= offset < end:
+                reads.append({"seg": index})
+                break
     return segments, reads
 
 
@@ -241,7 +377,8 @@ def find_misread(command):
     """Return (pipeline_text, read_text) for the earliest offending pair.
 
     Fires when an expandable `$?` sits in a segment whose IMMEDIATE predecessor
-    is a pipeline, and no `pipefail` or `PIPESTATUS` appears in any earlier
+    is a pipeline, `set ... pipefail` appears in no segment before that
+    pipeline, and `PIPESTATUS` appears neither before it nor in the reading
     segment. Returns None otherwise.
     """
     segments, reads = scan(strip_heredoc_bodies(command))
@@ -253,14 +390,19 @@ def find_misread(command):
         previous = segments[index - 1]
         if not previous["has_pipe"]:
             continue
-        # The author has already taken control of pipeline status: either the
-        # option is set, or a specific stage is being read by index.
-        earlier = segments[:index]
-        if any("pipefail" in s["text"] or "PIPESTATUS" in s["text"]
-               for s in earlier):
+
+        # Segments strictly BEFORE the pipeline. The pipeline itself is
+        # excluded on purpose: `grep -rn pipefail hooks/ | head -20; echo $?`
+        # merely mentions the word and is a genuine misread.
+        preceding = segments[:index - 1]
+        if any(RX_SET_PIPEFAIL.search(s["text"]) for s in preceding):
             continue
+        if any("PIPESTATUS" in s["text"] for s in preceding):
+            continue
+        # The author is reading a specific stage by index in the same breath.
         if "PIPESTATUS" in segments[index]["text"]:
             continue
+
         return truncate(previous["text"]), truncate(segments[index]["text"])
     return None
 
@@ -274,7 +416,9 @@ def main():
         return 0
 
     if not isinstance(payload, dict):
-        return 0  # fail open: the harness always sends an object
+        print("warn-status-read-after-pipe: hook input was not an object",
+              file=sys.stderr)
+        return 0
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
         return 0
@@ -311,7 +455,7 @@ def main():
         },
         "systemMessage": (
             f"`{read}` reads the status of `{pipeline}`'s LAST stage, not the "
-            "command's. Add `set -o pipefail;`, redirect to a file, or read "
+            "command's. Take the status before the pipe, or read "
             "${PIPESTATUS[0]}."
         ),
     }))

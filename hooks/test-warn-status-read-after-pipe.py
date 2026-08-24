@@ -44,6 +44,17 @@ def fires(command, module=hook):
     return module.find_misread(command) is not None
 
 
+def reported(command, module=hook):
+    """The (pipeline, read) pair the matcher would name, or None.
+
+    `fires()` collapses the tuple, which makes the suite blind to a garbled
+    diagnostic --- the hook naming a pipeline that does not exist. Adversarial
+    review caught exactly that (a phantom `1 | head -20` recovered from the
+    tail of `2>&1`), so the archetype asserts the pair rather than the bool.
+    """
+    return module.find_misread(command)
+
+
 def run_hook(command, tool_name="Bash"):
     payload = json.dumps({
         "tool_name": tool_name,
@@ -61,6 +72,40 @@ def run_hook(command, tool_name="Bash"):
 INCIDENT = ('python3 scripts/check-pr-fully-clean.py 111 '
             '-R UCD-SERG/ucd-serg.github.io 2>&1 | head -20; echo "exit=$?"')
 check("the measured incident fires", fires(INCIDENT), True)
+
+# The DIAGNOSTIC, not just the verdict. `2>&1` must not be mistaken for a
+# segment separator, which would recover a phantom pipeline of `1 | head -20`.
+check("the incident names the real pipeline",
+      reported(INCIDENT)[0],
+      "python3 scripts/check-pr-fully-clean.py 111 "
+      "-R UCD-SERG/ucd-serg.github.io 2>&1 | head -20")
+check("the incident names the real read", reported(INCIDENT)[1],
+      'echo "exit=$?"')
+
+# Redirects containing `&` are not separators. Each of these is a real misread
+# that a naive `&` split would report as quiet.
+check("a trailing 2>&1 after the pipeline fires",
+      fires("cmd | head -20 2>&1; echo $?"), True)
+check("1>&2 after the pipeline fires",
+      fires("cmd | grep x 1>&2; echo $?"), True)
+check("&> after the pipeline fires",
+      fires("cmd | head -20 &> /tmp/out; echo $?"), True)
+check("|& is a pipe, not a separator",
+      fires("cmd |& head -20; echo $?"), True)
+
+# A trailing `|` continues the pipeline onto the next line.
+check("a pipeline continued across lines fires",
+      fires("cmd |\n  head -20\necho $?"), True)
+
+# `${?}` is the same read spelled differently.
+check("${?} after a pipe fires",
+      fires("cmd | head -20; echo ${?}"), True)
+
+# Merely naming the option does not disarm the guard.
+check("grepping for the word pipefail still fires",
+      fires('grep -rn pipefail hooks/ | head -20; echo "exit=$?"'), True)
+check("grepping for PIPESTATUS still fires",
+      fires("rg PIPESTATUS shared/ | head -5; rc=$?"), True)
 
 check("rc=$? after a pipe fires",
       fires("python3 check.py | head -20; rc=$?"), True)
@@ -108,7 +153,18 @@ check("set -euo pipefail suppresses",
       fires("set -euo pipefail\ncmd | head -20\nrc=$?"), False)
 
 # The author has taken control of the pipeline's per-stage status explicitly.
-check("PIPESTATUS suppresses",
+#
+# NOTE the shape of this case. The obvious spelling --- `cmd | head -20;
+# rc=${PIPESTATUS[0]}` --- contains no `$?` at all, so it is quiet whether or
+# not the PIPESTATUS guard exists, and asserting on it tests nothing. Review
+# caught that vacuity; this version carries a real `$?` beside the
+# `${PIPESTATUS[0]}`, so only the guard keeps it quiet.
+check("PIPESTATUS in the reading segment suppresses",
+      fires('cmd | head -20; echo "$? and ${PIPESTATUS[0]}"'), False)
+
+# The vacuous form stays in the suite as a regression marker, labelled so that
+# nobody later mistakes it for coverage of the guard.
+check("PIPESTATUS alone is quiet (vacuous: contains no $?)",
       fires("cmd | head -20; rc=${PIPESTATUS[0]}"), False)
 
 # No pipe: `$?` is the command's own status and reading it is the correct move.
@@ -175,9 +231,39 @@ check("an escaped dollar in double quotes does not fire",
 check("$? preceding the pipeline does not fire",
       fires('echo "$?"; cmd | head -20'), False)
 
+# A `|` that is not a pipeline. Each was measured against bash: the status
+# `$?` reports belongs to the outer command, so a warning would assert
+# something false.
+check("process substitution is not a pipe",
+      fires("diff <(sort a | cat) <(sort b | cat); echo $?"), False)
+
+check("command substitution is not a pipe",
+      fires('out=$(cmd | head -1); echo $?'), False)
+
+check("regex alternation inside [[ ]] is not a pipe",
+      fires("[[ $x =~ ^(a|b)$ ]]; echo $?"), False)
+
+check("the noclobber redirect >| is not a pipe",
+      fires("cmd >| /tmp/out; echo $?"), False)
+
+# Backgrounding: `$?` is the async launch's status, not the pipeline's.
+check("a backgrounded pipeline does not fire",
+      fires("cmd | head -20 & echo $?"), False)
+
 # Nothing at all to match.
 check("an unrelated command does not fire",
       fires("git status --short"), False)
+
+# Documented blind spots. These ARE the bug and the guard misses them, which
+# is a deliberate limit rather than an oversight -- catching them means parsing
+# shell compound statements. Asserted so the limit is visible and so a later
+# implementation that fixes one turns this line red on purpose.
+for label, command in [
+    ("for loop", "for f in 1; do cmd | head; done; echo $?"),
+    ("if block", "if true; then cmd | head; fi; echo $?"),
+    ("brace group", "{ cmd | head; }; echo $?"),
+]:
+    check(f"KNOWN BLIND SPOT: {label} is missed", fires(command), False)
 
 
 # ---------------------------------------------------------------------------
@@ -250,12 +336,35 @@ if mutant is not None:
           fires(INCIDENT, mutant), True)
 
 # 2. Break the pipefail suppression. The pipefail negative must start firing.
-mutant = load_mutant('if any("pipefail" in s["text"]',
-                     'if any(False and "pipefail" in s["text"]')
+mutant = load_mutant("if any(RX_SET_PIPEFAIL.search(s[\"text\"])",
+                     "if any(False and RX_SET_PIPEFAIL.search(s[\"text\"])")
 if mutant is not None:
     check("MUTATION pipefail: pipefail negative goes red",
           fires('set -o pipefail; cmd | head -20; echo "exit=$?"', mutant),
           True)
+
+# 2b. Break the PIPESTATUS suppression on the reading segment. The
+#     non-vacuous PIPESTATUS negative must start firing; the vacuous spelling
+#     must NOT, which is what proves it was never testing this guard.
+mutant = load_mutant('if "PIPESTATUS" in segments[index]["text"]:',
+                     "if False:")
+if mutant is not None:
+    check("MUTATION PIPESTATUS: the non-vacuous negative goes red",
+          fires('cmd | head -20; echo "$? and ${PIPESTATUS[0]}"', mutant),
+          True)
+    check("MUTATION PIPESTATUS: the vacuous spelling stays quiet",
+          fires("cmd | head -20; rc=${PIPESTATUS[0]}", mutant), False)
+
+# 2c. Break the redirect carve-out for `&`. The archetype's diagnostic must
+#     degrade to the phantom pipeline review found.
+mutant = load_mutant('            if previous in ("<", ">"):\n'
+                     "                i += 1\n"
+                     "                continue\n",
+                     "")
+if mutant is not None:
+    got = reported(INCIDENT, mutant)
+    check("MUTATION redirect: the diagnostic degrades to a phantom pipeline",
+          got is not None and got[0] == "1 | head -20", True)
 
 # 3. Break the single-quote exclusion. Documentation must start firing.
 mutant = load_mutant('        if quote == "\'":', "        if False:")

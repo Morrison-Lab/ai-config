@@ -100,7 +100,8 @@ it as a fact with a vintage, worth re-verifying before repeating.
 
 ## A claim inside a PR is read at merge time, not at composition time
 
-The failure above decays over months, and an undated claim is what lets it.
+The failure above decays slowly, over however long an undated claim sits
+unchallenged.
 The interval that matters inside a PR is far shorter, and the claim can be
 true, freshly verified, and correctly written and still be false by the time
 anyone reads it.
@@ -114,11 +115,16 @@ Anything a human can change while the PR is open qualifies: a repository
 secret, a branch protection rule, an org setting, a dependency's version, a
 sibling PR's status.
 
-Note what is different here, because it is easy to file this under ordinary
-staleness and move on.
-The claim was not sloppy and was not recalled.
-It was measured, correctly, and the world changed underneath it during the
-interval the PR itself created.
+The increment over the re-derivation rules is the **trigger**, and it is worth
+stating precisely.
+[`ardi`](../workflow/ardi.md)'s verification-table rules already require
+re-deriving a PR body's figures, and every one of them keys on a **push** ---
+a round that changes the diff expires the figures that round was about.
+A PR sitting open while *external* state moves trips none of them.
+Nobody pushed, the diff did not change, and the claim went stale anyway,
+because a repository secret is not an artifact your commits control.
+So this widens both the trigger, from a push to the merge itself, and the
+claim class, from figures you derived to state somebody else owns.
 
 So a timestamp is necessary and not sufficient.
 Marking the vintage tells a later reader to re-verify, which is the right
@@ -133,7 +139,9 @@ has moved.
 - **Don't:** treat "I verified this when I wrote it" as covering a claim a
   reader will meet days later.
 
-(Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
+(The incident is measured; the re-check-before-merge remedy is inferred from
+it, on a single occurrence.
+Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
 `WORKFLOW_TOKEN` was measured absent from the repo, and "Not set in this repo"
 went into a PR comment.
 The user added the secret org-wide while the work was still in flight, so the

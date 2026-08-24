@@ -1045,47 +1045,58 @@ the check returned, you did not read its answer.
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "Tailing check-links.py reported clean over three broken links".
 
-**A sentence naming the WRONG exit status defeats that tell, and it becomes
-the likelier mistake once the rule above is known.**
+**A sentence naming the WRONG exit status defeats that tell.**
 The tell just given is a sentence about an instrument that names no exit
-status.
-It cannot catch a sentence that names one.
+status, so it cannot catch a sentence that names one.
+A truncating pipe supplies exactly that: without `pipefail` the status belongs
+to the pipeline's rightmost command, so a trailing `head` answers instead of
+the instrument, and the number that prints is a real number produced by a real
+read.
 
-Without `set -o pipefail`, a pipeline's exit status is its rightmost command's.
-So piping an instrument through `head` to shorten its output and then reading
-`$?` reports whether `head` succeeded, and `head` succeeds on any input,
-including none.
-The number printed is a real number produced by a real read, and nothing
-distinguishes it from a correct one.
+The mechanism, its two shapes, and its remedies belong to
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "A pipe
+discards the status of everything left of it" and the ad-hoc-chain section
+after it, which measure both.
+[`fail-fast.rationale`](../principles/fail-fast.rationale.md)'s "`$?` belongs
+to the last thing evaluated" separates this from the neighbouring case where
+`$?` is misdirected by a command substitution and `pipefail` changes nothing.
+Read those rather than a third statement here.
+What is local to this fragment is only that its own tell has a blind spot, and
+which way that blind spot points: the rule's success is what produces the
+shape, since a reader who has internalized "always print the exit status" can
+satisfy that instruction with the pipe still in place.
 
-Note which way this fails.
-The remedy block above redirects to a file precisely so that no pipe stands
-between the instrument and its status, and a reader who has internalized
-"always print the exit status" can satisfy that instruction with the pipe still
-in place.
-The rule's own success is what produces this shape, rather than preventing it.
-
-Composition is the moment to catch it, because the pipe gets added as a
-formatting decision about output length, at which point the exit status is not
-in view at all.
-That makes it decidable from one artifact, so it is a guard rather than a
-further paragraph:
+**The honest reason this became a guard is not that the corpus lacked a rule.**
+`errexit-is-not-uniform` already names this exact shape, with `head` named ---
+"pipe a verification check into `tail` or `head` for readability while its exit
+status is still gating what runs next" --- and carries a 2026-08-03 case record
+of the same defect.
+That rule was not consulted.
+A fourth prose site would not have been either, which is what makes the
+composition-time condition worth an instrument instead:
 [`hooks/warn-status-read-after-pipe.py`](../../hooks/warn-status-read-after-pipe.py)
 warns when a `$?` read directly follows a pipeline carrying no `pipefail`.
-It warns rather than blocking, since reading the last stage's status is correct
+It warns rather than blocks, since reading the last stage's status is correct
 under `pipefail` and correct whenever that stage is the one you meant.
 
-- **Do:** open a one-off line with `set -o pipefail;` when you are about to
-  read the status of an instrument you piped.
-- **Do:** redirect to a file and read `$?` before trimming, so no pipe sits
-  between the instrument and its answer.
+- **Do:** take the status before the pipe --- redirect to a file, read `$?`,
+  then trim --- which is the remedy that holds whatever the producer does.
+- **Do:** read `${PIPESTATUS[0]}` when you want one specific stage.
 - **Don't:** read a printed exit status as evidence that the status was read
   correctly --- the wrong command's prints exactly like the right one's.
-- **Don't:** treat `head` or `tail` as inert because it only shortens the
-  output --- it replaces the exit status too.
+- **Don't:** reach for `set -o pipefail` first on a deliberately truncated
+  output.
+  A producer piped to `head` is SIGPIPEd once `head` has read enough, which
+  `pipefail` turns into a false failure --- measured,
+  `set -o pipefail; seq 1 200000 | head -20` gives `rc=141`.
+  `errexit-is-not-uniform` states this caveat where it prefers the
+  split-command remedy for an ad-hoc chain.
 
 (Measured 2026-08-24, driving `UCD-SERG/ucd-serg.github.io#111`.
-The user reported the misread; the defeated-tell reading is inferred.
+The misread is measured.
+The claim that this fragment's tell is what failed is inferred, and the
+competing explanation --- a correct rule elsewhere that nobody opened --- is
+the likelier one, stated above.
 
 ```bash
 python3 scripts/check-pr-fully-clean.py 111 -R UCD-SERG/ucd-serg.github.io 2>&1 | head -20; echo "exit=$?"

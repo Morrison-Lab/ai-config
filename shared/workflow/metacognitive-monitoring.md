@@ -398,31 +398,40 @@ an item leaves a different trace than a path that is broken.
 Where every sampled item sits at one end of such an axis, the sample is a
 slice, and the claim that can be supported is about the slice.
 
-**A bounded query returns a WINDOW, and nothing in its output says so.**
-The sample above was bounded by which artifacts happened to be looked at.
-The commoner version is bounded by a number you chose yourself --- `--limit 5`,
-`head -20`, `-n 10`, the first page of results.
-Such a query returns exactly as many rows as you asked for, so a truncated
-answer and a complete one are the same shape on screen.
-The limit being the author's own choice is what removes the last cue, since
-nothing arrives marked as partial.
+**A bounded query prints no denominator, which is the gap in the rule that
+would otherwise cover this.**
+[`deterministic-tools`](../principles/deterministic-tools.md)'s "Read the scope
+an instrument prints" is the standing remedy, and it assumes the instrument
+prints a scope to read.
+`gh run list --limit 5` prints none.
+It returns exactly as many rows as you asked for, so a truncated answer and a
+complete one are the same shape on screen, and the bound was your own choice
+rather than something the output announced.
 
-A second instance landed the same day, in the same session, on a different
-agent.
-`gh run list --limit 5` showed no successful run, and "never executed once"
-went into a PR body, a commit message, and a self-review.
-The real population was 25 runs, one of them a success.
-The deriving query raises the bound and reports what it examined:
-`gh run list --limit 200` with `group_by(.conclusion)`, which is the negative
-control [`batch-merge-and-resolve`](batch-merge-and-resolve.md) requires of any
-sweep --- how many were looked at, beside how many matched.
-
-Two agents made this mistake independently within one session and neither
-noticed, which is the argument for keying on the shape rather than on either
-instance.
+So the tell is the flag rather than the output: `--limit N`, `head -N`, `-n N`,
+a first page.
+The deriving query raises the bound and groups, which manufactures the
+denominator the tool declines to print --- `gh run list --limit 200` with
+`group_by(.conclusion)` reports how many were examined beside how many matched,
+which is what [`fail-fast`](../principles/fail-fast.md) asks of any check.
 State the window whenever you cannot raise it.
-"None of the five most recent" is a claim you measured.
-"Never" is not.
+"None of the five most recent" is a claim you measured, and "never" is not.
+
+**The sharpest instance is the one where every sampled item was verified and
+correct.**
+The two above were samples that were too small and unchecked.
+In the third, a reviewer tested three items at real cost, found all three
+behaved exactly as the text claimed, and endorsed a universal that was false.
+The reason is the sample frame: the three items it tested were the three the
+claim itself had listed, so the author of the claim had chosen the evidence
+that would check it.
+
+That is why the test cannot be "verify your examples".
+Verifying them is what happened.
+A quantifier needs evidence of its own, and the examples in the text are the
+one sample that can never supply it.
+Where a claim says "whatever it starts with", the check is to enumerate the
+cases the text did not name.
 
 - **Do:** name what the sampled items share, before generalizing from their
   shared emptiness.
@@ -436,26 +445,50 @@ State the window whenever you cannot raise it.
   answer --- that is precisely what a truncated one looks like.
 - **Don't:** read repeated absence as accumulating evidence when a single
   filter would explain every observation at once.
+- **Do:** enumerate the cases a quantified claim did NOT list, since the ones
+  it listed were chosen by whoever wrote the claim.
 - **Don't:** treat a sample you measured as exempt from the Scope check,
   because measuring it is what makes that check feel already performed.
+- **Don't:** read a reviewer's endorsement of a universal as evidence for it
+  when the reviewer checked the claim's own examples.
 
-(The falsification and the cost figures below are measured.
-The second-axis remedy is inferred from them.
-2026-08-24 on `UCD-SERG/ucd-serg.github.io`: PRs 94, 95, 97 and 106 carried no
+(Three instances, all 2026-08-24, all in one session, on three different
+agents.
+The falsifications and figures are measured.
+The second-axis remedy and the sample-frame reading are inferred from them.
+
+**One.**
+On `UCD-SERG/ucd-serg.github.io`, PRs 94, 95, 97 and 106 carried no
 `claude-review` comment, and that repo's issue #105 was told "no successful
 claude-review run in this repo has ever posted one".
 A run on PR #111 posted a real review hours later.
-Four `pull_request` runs on one branch, all `success` and all with
-`is_error: false`, separate the two classes by cost alone.
-The posting run took 250.4s, 9 turns, $1.0797 and 7 denials.
-The three silent runs took 27.9s at $0.1733, 14.5s at $0.0520, and 11.5s at
-$0.0810, with one denial each.
-A run under roughly 30 seconds or 20 cents examined nothing.
+A separate measurement over four `pull_request` runs on one branch, all
+`success` with `is_error: false`, separates the two classes.
+The posting run took 250.4s, 9 turns, $1.0797 and 7 denials, while the three
+silent ones took 27.9s at $0.1733, 14.5s at $0.0520, and 11.5s at $0.0810,
+with one denial each.
+Duration and cost agree, and either would have served: a run under roughly 30
+seconds or 20 cents examined nothing.
 Every sampled PR was small, which is precisely the class the `code-review`
 plugin's step-1 eligibility gate filters --- it decides the PR does not need
 review and stops without posting, exactly as that step instructs.
-So the posting path was never broken, and cost was the axis that would have
-shown it.
+So the posting path was never broken.
+
+**Two.**
+`gh run list --limit 5` showed no successful run, and "never executed once"
+went into a PR body, a commit message, and a self-review.
+The real population was 25 runs, one of them a success.
+
+**Three.**
+On ai-config PR #2142, a diff claimed a CI gate flags a two-sentence line
+"whatever the second one starts with".
+The repo's own review run tested the three opener forms the diff had listed ---
+lowercase, uppercase, backtick --- found all three behaved as written, and
+concluded every checkable assertion matched.
+An adversarial reviewer tested outside that list and found the gate's
+`classify_line` returns `None` for a parenthesis or a digit, so an unbroken
+two-sentence line passes there.
+Reproduced independently against the gate's own script.
 Tracked as ai-config#2149.)
 
 ## A risk claim that appears after the decision is rationalization
@@ -463,6 +496,10 @@ Tracked as ai-config#2149.)
 The **cause** claim-type at the top of this fragment asks what else explains an
 observation.
 This is the case with no observation in it at all.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "Check that a stated
+trigger actually fired" owns the general locus --- a justification is a factual
+claim and gets fact-checked like one --- and the increment here is that
+**ordering** is the discriminator, which no prior site makes.
 
 A decision gets made on good evidence.
 The justification then acquires a failure mode nobody measured --- a mechanism
@@ -485,8 +522,9 @@ The decision almost always still stands on the evidence that genuinely produced
 it, so the invented mechanism is load-bearing for nothing while being false by
 default.
 
-- **Do:** mark which claims in a justification were measured and which are
-  predictions.
+- **Do:** extend the measured-versus-recalled marking above to a third
+  category, the **predicted**, since a justification's risk claims are
+  usually neither measured nor recalled.
 - **Do:** delete an unverified failure mode rather than softening its wording,
   when the decision survives without it.
 - **Don't:** add a mechanism to a justification after the decision is settled

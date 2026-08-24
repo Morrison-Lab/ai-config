@@ -581,7 +581,8 @@ Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-confi
 
 Kin to the two path gotchas above --- it produces a confident wrong answer
 rather than an error --- but it is not about paths, so it gets its own entry.
-The zsh differences that make a check report a **false absence** live in [`zsh.md`](zsh.md); this one reports a wrong value rather than an empty one.
+The zsh differences that make a check report a **false absence** live in [`zsh.md`](zsh.md).
+This one reports a wrong value rather than an empty one.
 
 `SHELL=/bin/zsh` on this machine, and zsh leaves `SH_WORD_SPLIT` **off** by
 default.
@@ -889,7 +890,8 @@ identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
-Same false-absence shape as the entries in [`zsh.md`](zsh.md); the cause here is stdin plumbing rather than a zsh expansion rule, which is why it stays in this file.
+Same false-absence shape as the entries in [`zsh.md`](zsh.md).
+The cause here is stdin plumbing rather than a zsh expansion rule, which is why it stays in this file.
 
 Piping data into an interpreter invoked as `python3 -` (or `sh -`, `bash -`)
 while *also* supplying the script through a `<<'EOF'` heredoc puts two things in

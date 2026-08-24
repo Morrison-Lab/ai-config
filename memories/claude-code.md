@@ -168,7 +168,8 @@
 - **Process substitution breaks in a pipeline.**
   `diff <(a) <(b)` works alone but fails under zsh once it feeds a pipe, with `/proc/self/fd/N: No such file or directory` --- and a downstream `grep -c` then reports a false `0`.
   Bash runs the same line fine, so it survives review.
-  Use temp files instead; see [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
+  Use temp files instead.
+  See [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
 
 ## Skill command blocks — resolve the ai-config repo root with the per-skill symlink
 - To `cd` to the repo root from inside a skill, use the **per-skill** form

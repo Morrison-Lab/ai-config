@@ -7,7 +7,8 @@ That shared shape is the reason the entries sit together: a caller reading stdou
 Each entry writes its complaint to stderr, so stderr is the signal to read.
 
 **Check the platform before applying either entry: they were measured on different ones, and one of them turns out to be platform-bound.**
-`NOMATCH` is a documented zsh default rather than a platform behaviour (`man zshoptions`; `zsh -f -c 'echo $options[nomatch]'` prints `on`), and that entry was measured on macOS 26.6.2 with zsh 5.9.
+`NOMATCH` is a documented zsh default rather than a platform behaviour --- `man zshoptions` carries it, and `zsh -f -c 'echo $options[nomatch]'` prints `on`.
+That entry was measured on macOS 26.6.2 with zsh 5.9.
 The process-substitution entry was measured on shiva, a Linux host, and its `/proc/self/fd/11` error is a Linux path --- re-run on this macOS host, `diff <(...) <(...) | grep -c` returns the correct count, because `<(...)` names a `/dev/fd/N` path that stays open.
 So that one is zsh-on-Linux rather than zsh-general.
 Take the documented default as carrying across platforms and the measured error path as not, and re-measure before relying on either somewhere new --- the caveat `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section states for itself: a claim stated unconditionally here is false there.
@@ -51,7 +52,8 @@ add=$(diff /tmp/a /tmp/b | grep -c '^>')
 
 The negative control is the load-bearing half, per [`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s "Any conflict sweep needs a negative control".
 A zero from a detector never once seen to report a difference is not evidence about the inputs.
-Sibling of two plumbing failures kept in [`tools.md`](tools.md) --- "A hand-rolled verification check is worth nothing until it has caught something" (shell *quoting*) and "`cmd | python3 - <<EOF` reads the heredoc, not the pipe" (stdin *contention*); this one is fd *lifetime*.
+Sibling of two plumbing failures kept in [`tools.md`](tools.md): "A hand-rolled verification check is worth nothing until it has caught something" (shell *quoting*) and "`cmd | python3 - <<EOF` reads the heredoc, not the pipe" (stdin *contention*).
+This one is fd *lifetime*.
 
 - **Do:** write both sides to real temp files and diff those, whenever a process substitution would otherwise feed a pipeline.
 - **Do:** run a known-differing negative control first, and abort when the detector reports no difference.
@@ -123,7 +125,8 @@ zsh -c 'ls -d /etc /nonexistent*/x' 2>/dev/null         # suppressed (outer wrap
 ```
 
 One ordering rule explains every row: the message goes to whatever fd 2 is in effect *at expansion time*, which is the shell's own.
-A redirection attached to the failing command has not been applied yet, so it cannot catch the message; one that already changed the shell's fd 2 has, so it does.
+A redirection attached to the failing command has not been applied yet, so it cannot catch the message.
+One that already changed the shell's own fd 2 has been applied, so it does.
 That also covers a builtin, which has no separate process to own an fd --- `zsh -c 'echo /etc /nonexistent*/x 2>/dev/null'` leaves the message visible too, so the rule is about *when* the redirect applies rather than about which process owns it.
 
 The rule cuts the obvious capture idiom the wrong way, so do not assume a `$(...)` sees the message:
@@ -145,7 +148,8 @@ bash -c 'ls -d /etc /nonexistent*/x 2>/dev/null'   # prints /etc on stdout;     
 ```
 
 **On this shape both shells exit 1, so the exit status cannot discriminate.**
-Bash's `1` comes from `ls` failing on the literal unmatched pattern while still listing `/etc`; zsh's `1` comes from the shell refusing to run `ls` at all.
+Bash's `1` comes from `ls` failing on the literal unmatched pattern while still listing `/etc`.
+Zsh's `1` comes from the shell refusing to run `ls` at all.
 That equality is an accident of the failing command being last, and it does not generalize --- follow the glob with `;` and the status is replaced, as the command list above shows.
 
 **Read stderr for the signal, and note that nothing replaces it.**
@@ -224,13 +228,23 @@ That is the negative-control discipline the process-substitution entry above alr
 - **Do:** run the all-patterns-unmatched case before believing any glob-based existence check, since that is the case `NULL_GLOB` and `(N)` get wrong.
 - **Do:** measure a candidate `setopt` against zsh's default as a baseline, so an option that changes nothing in your shape is visible as such.
 - **Don't:** reach for `setopt CSH_NULL_GLOB` to fix this --- it behaves exactly like the default whenever the only pattern is the unmatched one, so it reproduces the false absence it looks like it prevents.
-- **Don't:** read "pattern" in a zsh option's man page as "argument"; a literal path is not a pattern, and that substitution is what makes `CSH_NULL_GLOB` read as a fix.
+- **Don't:** read "pattern" in a zsh option's man page as "argument".
+  A literal path is not a pattern, and that substitution is what makes `CSH_NULL_GLOB` read as a fix.
 - **Don't:** read an empty result from a multi-path glob check as "none of these exist" --- the paths carrying no glob were never examined either.
-- **Don't:** trust the exit status to separate a check that ran from one that never ran; the failed glob's status survives only when its command comes last, and is otherwise replaced by whatever ran after it.
-- **Don't:** assume `2>/dev/null` hid only noise; the line it hides is the one saying the command never ran.
+- **Don't:** trust the exit status to separate a check that ran from one that never ran.
+  After `;` or a newline the failed glob's status is replaced by whatever ran next, and only `&&` or `||` preserves it.
+- **Don't:** assume `2>/dev/null` hid only noise.
+  The line it hides is the one saying the command never ran.
 
-(Measured 2026-08-24 on this machine, in an ai-config session; tracked as ai-config#2128.
+(Measured 2026-08-24 on this machine, in an ai-config session.
+Tracked as ai-config#2128.
 **From the user:** the correction that the directory existed and that reporting its absence was wrong.
 **Derived and measured afterwards:** the mechanism, the bash contrast, the `--include=*.md` recurrence, and the remedies.
-**From three adversarial review rounds on this entry's own PR:** that the skip is scoped to one simple command rather than the command list; that `exec 2>/dev/null` and a block or wrapper redirect *do* capture the message, falsifying a first draft's cause claim; that `NULL_GLOB` and `(N)` print `.` when every pattern is unmatched; that `CSH_NULL_GLOB`, which a second draft recommended as the fix, behaves like the default on the incident's own shape because a literal path is not a pattern; that `&&` preserves the failed glob's status, so a third draft's "discarded whenever anything follows it" was false; and that stdout cannot stand in for discarded stderr, since a check that ran and found nothing looks identical to one that never ran.
+**From three adversarial review rounds on this entry's own PR**, each correcting the draft before it.
+The skip is scoped to one simple command rather than to the command list.
+`exec 2>/dev/null`, a block, and an outer wrapper *do* capture the message, which falsified a first draft's cause claim.
+`NULL_GLOB` and `(N)` print `.` when every pattern is unmatched.
+`CSH_NULL_GLOB`, which a second draft recommended as the fix, behaves like the default on the incident's own shape, because a literal path is not a pattern.
+`&&` preserves the failed glob's status, so a third draft's "discarded whenever anything follows it" was false.
+And stdout cannot stand in for discarded stderr, since a check that ran and found nothing looks identical to one that never ran.
 Each draft fixed one false claim by asserting another, which is why every option is now measured against zsh's own default as a baseline and every row is a command the reader can re-run.)

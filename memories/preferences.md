@@ -959,18 +959,12 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 ## Delegate heavy work to another CLI first --- codex, agy, and now opencode
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API route is permanently out of service** (user
-> directive, 2026-08-20), confirmed the same day on a dispatched run that
-> ended `request failed (code 429): Your prepayment credits are depleted` and
-> `Execution failed: model unreachable`.
+> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
+> service** (user directive, 2026-08-20; scope corrected 2026-08-23),
+> confirmed via a dispatched run's `429: prepayment credits depleted`.
 > Route no dispatched subagent work to it.
-> **Scoped to API calls only** (user correction, 2026-08-23): the interactive
-> Antigravity subscription (the IDE/extension) is unaffected, active, and not
-> at quota -- this directive governs only the `agy` CLI's API-dispatch route
-> used as a subagent destination, not whether the Antigravity extension may be
-> installed or used interactively. Don't extrapolate "route nothing to it" into
-> "uninstall the extension" -- that over-reads a quota/billing fact about one
-> access path into a verdict about a different one.
+> The interactive subscription/extension is unaffected and not at quota --
+> don't extrapolate this into "uninstall the extension".
 > The mechanics below are kept as measured history rather than as a live
 > destination, so read the ladder as `opencode`, then `codex`, then Claude.
 > Tracked as ai-config#1776.

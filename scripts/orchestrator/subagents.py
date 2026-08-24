@@ -155,28 +155,53 @@ def resolve_within_worktree(rel_path: str, wt_path: Path, wt_resolved: Optional[
 def extract_files_from_markdown(text: str, context_text: str = "", default_target_file: str = "") -> Dict[str, str]:
     """Extract (file_path, content) pairs from markdown code blocks, ignoring stub/self-referential blocks."""
     files: Dict[str, str] = {}
-    blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
-    for header, content in blocks:
-        parts = header.strip().split()
-        if parts:
-            cand = parts[-1]
-            if "." in cand and not cand.startswith(("http://", "https://")):
-                clean_cand = cand.strip("`'\" \t\r\n").replace("\\", "/")
-                if not is_stub_or_self_referential(content, clean_cand):
-                    files[clean_cand] = content
+    pattern = re.compile(r"(?:(?:###?\s+(?:File:\s*)?|File:\s*|Path:\s*)[`'\"]?([a-zA-Z0-9_./\\-]+\.[a-zA-Z0-9]+)[`'\"]?\s*\n\s*)?```([^\n]*)\n(.*?)```", flags=re.DOTALL)
 
-    # Fallback: if no path header found, but code blocks exist
-    if not files and blocks:
-        first_block_content = blocks[0][1]
-        if not is_stub_or_self_referential(first_block_content, ""):
-            if default_target_file:
-                clean_default = default_target_file.strip("`'\" \t\r\n").replace("\\", "/")
-                if not is_stub_or_self_referential(first_block_content, clean_default):
-                    files[clean_default] = first_block_content
-            elif context_text:
-                candidates = find_candidate_file_paths(context_text)
-                if candidates and not any(is_stub_or_self_referential(first_block_content, c) for c in candidates):
-                    files[candidates[0]] = first_block_content
+    for match in pattern.finditer(text):
+        preceding_cand, header, content = match.groups()
+        found_path = ""
+
+        # 1. Check tokens in header (e.g. ```python scripts/foo.py or ```scripts/foo.py)
+        parts = header.strip().split()
+        for p in reversed(parts):
+            cand = p.strip("`'\" \t\r\n").replace("\\", "/")
+            if "." in cand and not cand.startswith(("http://", "https://")) and is_bare_path_line(cand):
+                found_path = cand
+                break
+
+        # 2. Check preceding markdown header (e.g. ### File: CLAUDE.md)
+        if not found_path and preceding_cand:
+            cand = preceding_cand.strip("`'\" \t\r\n").replace("\\", "/")
+            if is_bare_path_line(cand):
+                found_path = cand
+
+        # 3. Check first line of content (e.g. # File: scripts/foo.py or // scripts/foo.py or <!-- CLAUDE.md -->)
+        if not found_path and content:
+            first_line = content.splitlines()[0].strip()
+            # Match common comment path headers
+            m = re.match(r"^(?:#+|//|--|/\*+|<!--)\s*(?:File:\s*|Path:\s*)?[`'\"]?([a-zA-Z0-9_./\\-]+\.[a-zA-Z0-9]+)[`'\"]?(?:\s*\*+/|\s*-->)?$", first_line)
+            if m:
+                cand = m.group(1).strip("`'\" \t\r\n").replace("\\", "/")
+                if is_bare_path_line(cand):
+                    found_path = cand
+
+        if found_path and not is_stub_or_self_referential(content, found_path):
+            files[found_path] = content
+
+    # Fallback: if no path header found, but valid non-stub code blocks exist
+    if not files:
+        blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
+        if blocks:
+            first_block_content = blocks[0][1]
+            if not is_stub_or_self_referential(first_block_content, ""):
+                if default_target_file:
+                    clean_default = default_target_file.strip("`'\" \t\r\n").replace("\\", "/")
+                    if not is_stub_or_self_referential(first_block_content, clean_default):
+                        files[clean_default] = first_block_content
+                elif context_text:
+                    candidates = find_candidate_file_paths(context_text)
+                    if candidates and not any(is_stub_or_self_referential(first_block_content, c) for c in candidates):
+                        files[candidates[0]] = first_block_content
 
     return files
 
@@ -567,6 +592,15 @@ class ReviewerSubagent(BaseSubagent):
         # If diff not in payload, read from git branch
         if not diff and branch_name and not dry_run:
             try:
+                subprocess.run(
+                    ["git", "fetch", "origin", branch_name],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30,
+                    check=False,
+                )
                 proc = subprocess.run(
                     ["git", "diff", f"origin/main...origin/{branch_name}"],
                     capture_output=True,
@@ -579,7 +613,7 @@ class ReviewerSubagent(BaseSubagent):
                 if proc.returncode == 0 and proc.stdout.strip():
                     diff = proc.stdout
                 else:
-                    # Fallback to local ref if not yet fetched
+                    # Fallback to local ref if present
                     local_proc = subprocess.run(
                         ["git", "diff", f"origin/main...{branch_name}"],
                         capture_output=True,
@@ -589,7 +623,7 @@ class ReviewerSubagent(BaseSubagent):
                         timeout=30,
                         check=False,
                     )
-                    if local_proc.returncode == 0:
+                    if local_proc.returncode == 0 and local_proc.stdout.strip():
                         diff = local_proc.stdout
             except Exception:
                 pass

@@ -266,6 +266,50 @@ class TestSpecializedSubagents(unittest.TestCase):
         roles = [t.role for t in res.spawned_tasks]
         self.assertEqual(roles, ["research", "code", "review", "test"])
 
+    def test_extract_files_from_markdown_formats(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        sample = (
+            "Here is the solution:\n"
+            "```scripts/foo.py\n"
+            "print('foo')\n"
+            "```\n\n"
+            "```python scripts/bar.py\n"
+            "print('bar')\n"
+            "```\n\n"
+            "```main.py\n"
+            "print('main')\n"
+            "```\n\n"
+            "```markdown docs/guide.md\n"
+            "# Guide\n"
+            "```\n\n"
+            "```python\n"
+            "# pure language block, not a file\n"
+            "```\n"
+        )
+        extracted = extract_files_from_markdown(sample)
+        self.assertIn("scripts/foo.py", extracted)
+        self.assertEqual(extracted["scripts/foo.py"].strip(), "print('foo')")
+        self.assertIn("scripts/bar.py", extracted)
+        self.assertEqual(extracted["scripts/bar.py"].strip(), "print('bar')")
+        self.assertIn("main.py", extracted)
+        self.assertEqual(extracted["main.py"].strip(), "print('main')")
+        self.assertIn("docs/guide.md", extracted)
+        self.assertEqual(extracted["docs/guide.md"].strip(), "# Guide")
+        self.assertNotIn("python", extracted)
+
+    def test_reviewer_subagent_empty_branch_diff_blocks(self):
+        agent = self.registry.get_for_role("reviewer")
+        task = Task(
+            title="Review empty branch",
+            role="reviewer",
+            payload={"branch_name": "nonexistent-empty-branch-test", "dry_run": False},
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        res = agent.execute(task, ctx)
+        self.assertFalse(res.success)
+        self.assertEqual(res.data["verdict"], "BLOCKED")
+
 
 class TestOrchestratorEngineIntegration(unittest.TestCase):
     """End-to-end integration test of the multi-threaded orchestration engine."""

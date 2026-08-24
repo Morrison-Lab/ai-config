@@ -25,14 +25,15 @@ logger = logging.getLogger("orchestrator.subagents")
 def extract_files_from_markdown(text: str) -> Dict[str, str]:
     """Extract (file_path, content) pairs from markdown code blocks."""
     files: Dict[str, str] = {}
-    # Matches ```path/to/file.ext\n<content>\n``` or ```python path/to/file.ext\n<content>\n```
-    pattern = r"```(?:[a-zA-Z0-9_\-]+)?\s*([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)\n(.*?)```"
-    matches = re.findall(pattern, text, flags=re.DOTALL)
-    for path_str, content in matches:
-        clean_path = path_str.strip()
-        # Avoid treating language names as filenames
-        if "." in clean_path and not clean_path.startswith("http"):
-            files[clean_path] = content
+    blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
+    for header, content in blocks:
+        parts = header.strip().split()
+        if not parts:
+            continue
+        # Extract candidate path from the header line (e.g. 'scripts/foo.py' or 'python scripts/foo.py')
+        cand = parts[-1]
+        if "." in cand and not cand.startswith(("http://", "https://")):
+            files[cand] = content
 
     return files
 
@@ -343,16 +344,40 @@ class ReviewerSubagent(BaseSubagent):
         if not diff and branch_name and not dry_run:
             try:
                 proc = subprocess.run(
-                    ["git", "diff", "origin/main...HEAD"],
+                    ["git", "diff", f"origin/main...origin/{branch_name}"],
                     capture_output=True,
                     text=True,
                     timeout=30,
                     check=False,
                 )
-                if proc.returncode == 0:
+                if proc.returncode == 0 and proc.stdout.strip():
                     diff = proc.stdout
+                else:
+                    # Fallback to local ref if not yet fetched
+                    local_proc = subprocess.run(
+                        ["git", "diff", f"origin/main...{branch_name}"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        check=False,
+                    )
+                    if local_proc.returncode == 0:
+                        diff = local_proc.stdout
             except Exception:
                 pass
+
+            # Fail-fast if no diff found for a real branch review
+            if not diff.strip():
+                return SubagentResult(
+                    success=False,
+                    data={
+                        "verdict": "BLOCKED",
+                        "findings": [{"level": "ERROR", "message": f"No implementation diff found on branch '{branch_name}' against origin/main."}],
+                        "model_used": "empty-diff-check",
+                    },
+                    error=f"Empty implementation diff on branch '{branch_name}'.",
+                    execution_time_seconds=time.time() - start_time,
+                )
 
         findings: List[Dict[str, Any]] = []
         is_clean = True

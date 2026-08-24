@@ -193,7 +193,9 @@ Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `RE
 
 Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
 Not commit messages, not titles, not issue bodies, not PR bodies, each of which has its own attribution convention.
-Two exemptions: a comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length; and a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
+Two exemptions.
+A comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
+And a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
 
 - **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
 - **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
@@ -208,7 +210,8 @@ Two exemptions: a comment another machine parses as a command (`@dependabot reba
 
 When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree.
 Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result.
-This does not grant merge authority; the strict merge policy below still applies.
+This does not grant merge authority.
+The strict merge policy below still applies.
 
 ## Every self-review is an adversarial review by a separate subagent
 

@@ -321,8 +321,10 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    The retired release wording is `... done --- paws off released.`, which matches `paws off` --- so the invariant that fixes one bug introduces another, and this one fails the safe way round: a released PR reads as claimed, the sweep skips it, and the conflict is never resolved with nothing reporting why.
    The sentence matcher this replaced did not collide, so the collision arrived with the fix.
    Treat the comment as a release, not a claim, if it also matches `unclaim|released|PR is free|now mergeable`.
-   If a live claim stands --- a push or comment within the last 2 hours --- skip the PR; another session owns it.
-   An expired claim (over 2 idle hours) no longer blocks; take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+   If a live claim stands --- a push or comment within the last 2 hours --- skip the PR.
+   Another session owns it.
+   An expired claim (over 2 idle hours) no longer blocks.
+   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.

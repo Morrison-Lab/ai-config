@@ -196,7 +196,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `gh` authenticates as whatever account is logged in locally (often the user's own, e.g. seen as `dem-extra1` on `Lacaedemon/sparta`), so when an agent (or a dispatched subagent) replies to an inline review comment on the user's behalf, `gh api repos/<o>/<r>/pulls/<N>/reviews` lists it as a `COMMENTED` review authored by the user — indistinguishable at a glance from the user genuinely opening the PR in a browser and typing a reply themselves.
   **Since 2026-08-24 the fix is on the posting side:** every comment an agent posts carries a trailing `_Posted by Claude Code (AI agent) --- not written by a human._` marker, so the body says what the author field cannot.
   See [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md).
-  That makes agent-authored comments identifiable **going forward**; comments posted before that date carry no marker, so this warning still governs when auditing older threads.
+  That makes agent-authored comments identifiable **going forward**.
+  Comments posted before that date carry no marker, so this warning still governs when auditing older threads.
   Before treating an unexpected review entry as a signal that the human intervened, check whether its body/inline-comment content reads like the agent's own scripted reply (referencing a specific commit SHA, restating verification numbers) rather than free-form human commentary — if so, it's the session's own tooling, not new human input.
   **The same ambiguity runs the other way, and there it arrives as a positive claim rather than an inference you might draw.**
   An automated reviewer reading the PR's own history sees that same bot-account commit and can describe it *in its review body* as the work of a human, e.g. "that finding was confirmed and fixed by a human reviewer (`dem-extra1`) in commit `<sha>`", stating as fact something no API field asserts.

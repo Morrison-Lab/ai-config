@@ -93,7 +93,9 @@ longer than that, reassert your claim.")
 
 **Every detector of a claim matches the OLD wording as well as the new one, and dropping the old alternation is the one edit that fails silently.**
 There were **three** retired wordings, not one, and enumerating them from the file in front of you is how the third was missed for a whole review round.
-`claim-pr`, `gi`, `st`, `pr-on-claim`, `post-merge` and `handoff` all said "paws off until I'm done"; [`ardi`](ardi.md) --- the corpus's highest-traffic claim emitter, run on every PR in every repo --- said "back off until done", and had done since 2026-06-17.
+Most emitters carried the `paws off` invariant --- `claim-pr`, `gi`, `st`, `gip`, `pr-on-claim`, `post-merge`, `iterate`, `handoff` (as "still claimed, paws off.") and the orchestrator (as "paws off until done").
+[`ardi`](ardi.md) did not.
+It said "back off until done", and had done since 2026-06-17 --- and it is the corpus's highest-traffic claim emitter, run on every PR in every repo.
 All three now read "please hold off ...".
 
 Derive that set from history rather than from the current tree, which no longer contains any of them:
@@ -111,7 +113,8 @@ Nothing in the output announces the miss: a claim search that finds no claim loo
 **Match the two-word invariant, never a whole sentence.**
 The claim body varies by target --- a PR claim says "please hold off on pushing to this branch until I'm done" and an issue claim says "please hold off until I'm done" --- so neither sentence contains the other, and a detector keyed on either one is blind to half the claims.
 Under the old single-string wording that distinction did not exist, which is exactly why it is easy to carry a whole-sentence matcher across the rename without noticing it has narrowed.
-`hold off` is the invariant; `paws off` and `back off` are its predecessors, and a matcher naming only the first predecessor is the failure this very section describes, committed by the section itself.
+`hold off` is the invariant.
+`paws off` and `back off` are its two predecessors, and a matcher naming only the first is the failure this very section describes, committed by the section itself.
 
 So match the alternation, case-insensitively, everywhere a claim is read:
 
@@ -135,12 +138,14 @@ Treat a comment as a release rather than a claim when it also matches `unclaim|r
 - **Don't:** enumerate the retired wordings from the files you happen to be editing --- `back off` was invisible to exactly that method for a full review round, because the one file that posted it was not one of the six that agreed with each other.
 
 **Verify a mid-task "already done" claim against real PR state before trusting or redoing it.**
-A PR you claimed and are actively driving can still gain commits from a **second, independently-running session** under the same account --- a `<github-webhook-activity>` review-comment-reply event can describe work ("Addressed...
-Pushed in `<sha>`") that this session never did.
+A PR you claimed and are actively driving can still gain commits from a **second, independently-running session** under the same account.
+A `<github-webhook-activity>` review-comment-reply event can describe work this session never did, in the form "Addressed, pushed in `<sha>`".
 Don't assume it's fabricated or injected, and don't reflexively redo the same fix: cross-check the PR's actual commit list (`gh pr view --json commits` / `pull_request_read` `get_commits`) and review threads before either (a) trusting the claim, or (b) starting the same fix yourself.
 If a commit with that SHA genuinely exists, authored close to when the event arrived, treat it as confirmation a live parallel session owns this PR right now --- stop pushing further speculative fixes yourself, and, if genuinely in doubt, ask whether to keep driving or step back, rather than racing the other session's pushes.
-This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing. (`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `d-morrison` reading exactly like a Claude-authored reply, claiming a fix "Addressed...
-Pushed in 3fb8c5b" that this session hadn't made; verified real via `get_commits` before proceeding --- a second live session, not injection.)
+This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing.
+
+(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `d-morrison`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
+It was verified real via `get_commits` before proceeding --- a second live session, not injection.)
 
 **The git-level variant of that check: a rejected push whose remote commit is byte-for-byte what you were about to push.**
 The section above covers a *comment* claiming work was done.

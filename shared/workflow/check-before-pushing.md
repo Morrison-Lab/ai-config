@@ -128,23 +128,29 @@ contradicts.
 Two cheap looks close it.
 Re-read any file you are about to edit whenever a checkout, pull, or reset
 has happened since your last read of it.
-And before anything leaves the machine, run the diff and confirm every
-hunk is one you intended:
+And before anything leaves the machine, read the actual patch and confirm
+every hunk is one you intended:
 
 ```bash
-git diff --stat origin/<default>...HEAD
+git diff origin/<default>...HEAD
 ```
 
-The diff is also the only surface a reviewer sees, so a changelog claim
+A `--stat` summary is not that look: it names files and counts lines, so
+it surfaces a stray *file* but not a wrong edit inside an expected one ---
+and the wrong-edit-inside-an-expected-file case is exactly the staleness
+this section is about.
+
+The patch is also the only surface a reviewer sees, so a changelog claim
 about what this PR fixes has to be derivable from it.
-A fix a hunk cannot show was landed by somebody else's PR, and claiming
+A fix the patch cannot show was landed by somebody else's PR, and claiming
 it here misattributes the work.
 
 (Measured 2026-08-24 in Morrison-Lab/gha#599: an edit made from a read
-taken before `git pull` applied against stale text, carried an unscoped
-rewrite of another workflow file into the push, and produced a changelog
-fragment crediting this PR with a fix that had merged the day before ---
-the reviewer caught it in round 3.)
+taken before `git pull` applied without a loud failure, carried an
+unscoped rewrite of another workflow file into the push, and produced a
+changelog fragment crediting this PR with a fix that had merged the day
+before --- the reviewer caught the misattribution in round 2 and round 3
+confirmed it fixed.)
 
 - **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.

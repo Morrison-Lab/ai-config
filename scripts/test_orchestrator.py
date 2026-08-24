@@ -371,7 +371,8 @@ class TestModelRouterAndSweeper(unittest.TestCase):
             "title": "Fix memory leak in background worker",
             "body": "Detailed description of memory issue.",
         }
-        dag = self.sweeper.ingest_issue(fake_issue, dry_run=True)
+        # Test opt-in auto_claim_pr=True (with dry_run)
+        dag = self.sweeper.ingest_issue(fake_issue, auto_claim_pr=True, dry_run=True)
         self.assertEqual(len(dag), 4)
 
         roles = [t.role for t in dag]
@@ -387,6 +388,17 @@ class TestModelRouterAndSweeper(unittest.TestCase):
             self.assertTrue(task.payload["branch_name"].startswith("fix/issue-9999"))
             self.assertIsNotNone(task.payload["pr_number"])
             self.assertIsNotNone(task.payload["pr_url"])
+
+        # Test default safe mode (auto_claim_pr=False)
+        fake_issue_2 = {
+            "number": 9998,
+            "title": "Fix crash in task worker",
+            "body": "Detailed description of crash.",
+        }
+        dag_default = self.sweeper.ingest_issue(fake_issue_2, dry_run=True)
+        self.assertEqual(len(dag_default), 4)
+        for task in dag_default:
+            self.assertIsNone(task.payload["pr_number"])
 
     def test_retry_task_status_guard(self):
         task = Task(title="Failed Task", role="coder")
@@ -667,20 +679,20 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         from orchestrator.cli import build_parser
 
         parser = build_parser()
-        # Default ingest-issues
+        # Default ingest-issues (safe opt-in default: claim_pr=False)
         args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
         self.assertFalse(args_default.dry_run)
-        self.assertTrue(args_default.claim_pr)
+        self.assertFalse(args_default.claim_pr)
 
-        # Explicit --dry-run and --no-claim-pr
-        args_custom = parser.parse_args(["ingest-issues", "--dry-run", "--no-claim-pr", "--limit", "3"])
-        self.assertTrue(args_custom.dry_run)
-        self.assertFalse(args_custom.claim_pr)
+        # Explicit --claim-pr opt-in
+        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3"])
+        self.assertFalse(args_opt_in.dry_run)
+        self.assertTrue(args_opt_in.claim_pr)
 
         # Explicit sweep-backlog --dry-run
         args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
         self.assertTrue(args_sweep.dry_run)
-        self.assertTrue(args_sweep.claim_pr)
+        self.assertFalse(args_sweep.claim_pr)
 
 
 def main():

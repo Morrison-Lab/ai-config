@@ -56,7 +56,7 @@ class BacklogSweeper:
         self,
         issue: Dict[str, Any],
         priority: int = TaskPriority.NORMAL.value,
-        auto_claim_pr: bool = True,
+        auto_claim_pr: bool = False,
         dry_run: bool = False,
     ) -> List[Task]:
         """Convert a single GitHub issue into a multi-agent orchestrated DAG with PR-on-claim."""
@@ -171,7 +171,7 @@ class BacklogSweeper:
         )
         return dag
 
-    def ingest_backlog(self, limit: int = 10, auto_claim_pr: bool = True, dry_run: bool = False) -> int:
+    def ingest_backlog(self, limit: int = 10, auto_claim_pr: bool = False, dry_run: bool = False) -> int:
         """Ingest open issues up to limit into the queue."""
         issues = self.fetch_open_issues(limit=limit)
         total_ingested = 0

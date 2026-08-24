@@ -280,7 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument("--limit", type=int, default=10, help="Number of issues to ingest")
     p_ingest.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_ingest.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
-    p_ingest.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=True, help="Enable/disable automated PR-on-claim creation (default: enabled)")
+    p_ingest.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
     p_ingest.set_defaults(func=cmd_ingest_issues)
 
     # sweep-backlog
@@ -289,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("--limit", type=int, default=5, help="Number of issues to sweep")
     p_sweep.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_sweep.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
-    p_sweep.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=True, help="Enable/disable automated PR-on-claim creation (default: enabled)")
+    p_sweep.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
     p_sweep.add_argument("-p", "--poll-interval", type=float, default=0.5, help="Poll interval seconds")
     p_sweep.add_argument("-s", "--stale-threshold", type=float, default=60.0, help="Heartbeat stale threshold seconds")
     p_sweep.set_defaults(func=cmd_sweep_backlog)

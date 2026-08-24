@@ -323,6 +323,21 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-status-read-after-pipe.py\"",
+            "timeout": 10,
+            "script": "warn-status-read-after-pipe.py",
+            "why": "shared/workflow/algorithmatize-checks.md's exit-status section, plus shared/coding/errexit-is-not-uniform.md which measures the mechanism. Without `pipefail` a pipeline's status is its RIGHTMOST command's, so `checker | head -20; echo \"exit=$?\"` reports whether `head` succeeded. Measured 2026-08-24 on UCD-SERG/ucd-serg.github.io#111: that exact line reported `exit=0` while the checker exited 1, and the PR's cleanliness was reasoned from it. The prose tell that already existed -- a sentence about an instrument naming no exit status -- cannot catch this, because the sentence NAMED one. WARNS, never blocks: reading the last stage's status is correct under `pipefail` and correct when that stage is the one meant. Fires only when an expandable `$?` sits in the segment IMMEDIATELY after a pipeline and no `pipefail`/`PIPESTATUS` appears earlier. Single-quoted spans and heredoc bodies are excluded so the corpus's own documentation of this bug cannot trip it; negative control on 2026-08-24 examined 705 fenced shell blocks corpus-wide and fired on 1, itself a true positive by errexit-is-not-uniform's own detector list. Fails open. Tracked as #2149.",
+            "_note_deliberate_under_approximation": [
+              "A `$?` inside SINGLE quotes is literal to the shell, so it is",
+              "never recorded -- which also means `bash -c '... | head; echo",
+              "$?'` gets no warning. That is accepted rather than overlooked:",
+              "this corpus writes such demonstration lines constantly, and a",
+              "warn-only guard should miss a real case before it fires on",
+              "every fragment that describes the rule it enforces."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",

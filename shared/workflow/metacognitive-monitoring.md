@@ -366,6 +366,143 @@ The section above concerns an instrument you ran whose scope you did not check.
 - **Don't:** let the future tense of the claim hide that the answer is already
   in the past.
 
+**An observed absence is only as strong as its sample, and a sample you
+MEASURED is the one least likely to get checked.**
+The bullet above says a record of nobody observing X outranks any argument that
+X should occur.
+That holds when the record covers the population, and the bullet says nothing
+about what to do when it covers a slice.
+
+The **Scope** claim-type at the top of this fragment already prescribes
+checking the population "rather than the sample that came to mind", which
+points at recall.
+This is the harder case, because the sample did not come to mind.
+It was measured.
+Four artifacts were queried, four came back empty, and a universal claim was
+written from them --- so every instinct the Scope rule trains had already
+fired, and the remedy it prescribes felt like it had already been applied.
+
+The bias is what survives the measurement, and it is invisible from inside the
+sample by construction.
+Ask what the sampled items have in common that the population does not, and
+whether that shared property is itself what produces the absence.
+Where it is, each further empty observation adds nothing.
+A filter that excludes the whole sample excludes the next member of it too, so
+the evidence feels like it is accumulating while its weight stays exactly
+where it started.
+
+The cheap discriminator is a **second axis** that the population varies along
+and the sample does not.
+Cost, size, duration, and age all serve, because a gate that silently declines
+an item leaves a different trace than a path that is broken.
+Where every sampled item sits at one end of such an axis, the sample is a
+slice, and the claim that can be supported is about the slice.
+
+**A bounded query returns a WINDOW, and nothing in its output says so.**
+The sample above was bounded by which artifacts happened to be looked at.
+The commoner version is bounded by a number you chose yourself --- `--limit 5`,
+`head -20`, `-n 10`, the first page of results.
+Such a query returns exactly as many rows as you asked for, so a truncated
+answer and a complete one are the same shape on screen.
+The limit being the author's own choice is what removes the last cue, since
+nothing arrives marked as partial.
+
+A second instance landed the same day, in the same session, on a different
+agent.
+`gh run list --limit 5` showed no successful run, and "never executed once"
+went into a PR body, a commit message, and a self-review.
+The real population was 25 runs, one of them a success.
+The deriving query raises the bound and reports what it examined:
+`gh run list --limit 200` with `group_by(.conclusion)`, which is the negative
+control [`batch-merge-and-resolve`](batch-merge-and-resolve.md) requires of any
+sweep --- how many were looked at, beside how many matched.
+
+Two agents made this mistake independently within one session and neither
+noticed, which is the argument for keying on the shape rather than on either
+instance.
+State the window whenever you cannot raise it.
+"None of the five most recent" is a claim you measured.
+"Never" is not.
+
+- **Do:** name what the sampled items share, before generalizing from their
+  shared emptiness.
+- **Do:** raise the bound until the answer stops changing, or carry the window
+  into the sentence.
+- **Do:** sample along a second axis --- one large item beside four small ones
+  --- rather than adding a fifth of the same kind.
+- **Do:** scope the claim to what was measured, keeping "these four produced
+  none" distinct from "none has ever".
+- **Don't:** read a query returning exactly `--limit N` rows as a complete
+  answer --- that is precisely what a truncated one looks like.
+- **Don't:** read repeated absence as accumulating evidence when a single
+  filter would explain every observation at once.
+- **Don't:** treat a sample you measured as exempt from the Scope check,
+  because measuring it is what makes that check feel already performed.
+
+(The falsification and the cost figures below are measured.
+The second-axis remedy is inferred from them.
+2026-08-24 on `UCD-SERG/ucd-serg.github.io`: PRs 94, 95, 97 and 106 carried no
+`claude-review` comment, and that repo's issue #105 was told "no successful
+claude-review run in this repo has ever posted one".
+A run on PR #111 posted a real review hours later.
+Four `pull_request` runs on one branch, all `success` and all with
+`is_error: false`, separate the two classes by cost alone.
+The posting run took 250.4s, 9 turns, $1.0797 and 7 denials.
+The three silent runs took 27.9s at $0.1733, 14.5s at $0.0520, and 11.5s at
+$0.0810, with one denial each.
+A run under roughly 30 seconds or 20 cents examined nothing.
+Every sampled PR was small, which is precisely the class the `code-review`
+plugin's step-1 eligibility gate filters --- it decides the PR does not need
+review and stops without posting, exactly as that step instructs.
+So the posting path was never broken, and cost was the axis that would have
+shown it.
+Tracked as ai-config#2149.)
+
+## A risk claim that appears after the decision is rationalization
+
+The **cause** claim-type at the top of this fragment asks what else explains an
+observation.
+This is the case with no observation in it at all.
+
+A decision gets made on good evidence.
+The justification then acquires a failure mode nobody measured --- a mechanism
+that would supposedly bite if the decision went the other way --- and that
+mechanism quietly escalates the claim, from "this is unnecessary" to "this
+would break every run".
+Both sentences sit in the same paragraph, written in the same pass, and the
+finished prose gives no sign which of them came first.
+
+The tell is positional, which is what makes it checkable: **a risk claim that
+appears AFTER the decision it supports.**
+Evidence gathered before a decision is reasoning.
+A mechanism produced after one is rationalization, and the two read identically
+once the paragraph is finished.
+
+Ask of any such claim whether you would have predicted it before choosing, and
+whether anything was actually run to confirm it.
+Where the answer to both is no, either measure it or delete it.
+The decision almost always still stands on the evidence that genuinely produced
+it, so the invented mechanism is load-bearing for nothing while being false by
+default.
+
+- **Do:** mark which claims in a justification were measured and which are
+  predictions.
+- **Do:** delete an unverified failure mode rather than softening its wording,
+  when the decision survives without it.
+- **Don't:** add a mechanism to a justification after the decision is settled
+  without running something that could falsify it.
+- **Don't:** let a stronger verb ride on an unmeasured claim --- "would break"
+  standing in for "is unnecessary" is the escalation to watch for.
+
+(Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
+`setup-r: false` was chosen on sound evidence, and an unverified `LazyData`
+failure mode was then written into the justification, escalating the claim to
+"would break every run".
+A later round measured that mechanism false.
+The incident was reported by the agent that made it, and the positional tell is
+that agent's own.
+Tracked as ai-config#2149.)
+
 ## Ask whether a candidate can produce the effect at all, before measuring how much it does
 
 The section above says to stop reasoning and go look for the artifact.

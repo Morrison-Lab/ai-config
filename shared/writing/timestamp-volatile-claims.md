@@ -98,6 +98,50 @@ even though snapr had since been published to CRAN (0.1.0, 2026-05-22). A
 timestamp on the original --- "not on CRAN as of <date>" --- would have marked
 it as a fact with a vintage, worth re-verifying before repeating.
 
+## A claim inside a PR is read at merge time, not at composition time
+
+The failure above decays over months, and an undated claim is what lets it.
+The interval that matters inside a PR is far shorter, and the claim can be
+true, freshly verified, and correctly written and still be false by the time
+anyone reads it.
+
+A PR body, a review comment, and a commit message are each composed once and
+read later --- at review, at merge, and afterwards in the log.
+So a claim about mutable state inside one carries an implicit "as of when I
+wrote this" that no reader ever sees, and a PR's own lifetime is long enough
+for the state to move.
+Anything a human can change while the PR is open qualifies: a repository
+secret, a branch protection rule, an org setting, a dependency's version, a
+sibling PR's status.
+
+Note what is different here, because it is easy to file this under ordinary
+staleness and move on.
+The claim was not sloppy and was not recalled.
+It was measured, correctly, and the world changed underneath it during the
+interval the PR itself created.
+
+So a timestamp is necessary and not sufficient.
+Marking the vintage tells a later reader to re-verify, which is the right
+remedy for docs nobody is about to act on.
+A PR **is** acted on, so a mutable-state claim inside one owes a re-check
+before merge as well --- re-run the query, and correct the text when the answer
+has moved.
+
+- **Do:** re-derive any mutable-state claim in a PR body or comment before the
+  PR merges, not only before writing it.
+- **Do:** timestamp it as well, so it stays checkable in the log afterwards.
+- **Don't:** treat "I verified this when I wrote it" as covering a claim a
+  reader will meet days later.
+
+(Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
+`WORKFLOW_TOKEN` was measured absent from the repo, and "Not set in this repo"
+went into a PR comment.
+The user added the secret org-wide while the work was still in flight, so the
+shipped comment was false by the time it was read.
+A later commit corrected it.
+Reported by the agent that made it.
+Tracked as ai-config#2149.)
+
 ## Relationship to other rules
 
 - [`fact-check-prose.md`](fact-check-prose.md) checks that a claim is *true*

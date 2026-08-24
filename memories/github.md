@@ -1096,6 +1096,10 @@ bug" for the broader lesson.)
 
 - **`gh api orgs/<org>/installations` answers this without a browser, in any org you own.**
   Measured 2026-08-21 under a classic PAT carrying `admin:org`: `Morrison-Lab` returned `claude`, `google-labs-jules`, and `cursor`.
+  The `cursor` slug means the GitHub App is installed, not that Bugbot
+  reviews PRs.
+  Dashboard enablement, the Enterprise GHA queue, and the author-mismatch
+  on `bugbot run` are in [`cursor-bugbot.md`](cursor-bugbot.md).
 
   ```bash
   gh api orgs/<org>/installations --jq '.installations[].app_slug'

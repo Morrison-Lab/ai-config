@@ -208,8 +208,8 @@ def cmd_cancel(args: argparse.Namespace) -> None:
 
 def cmd_ingest_issues(args: argparse.Namespace) -> None:
     store = StateStore(args.db)
-    sweeper = BacklogSweeper(store, repo=args.repo)
-    print(f"Querying GitHub issues (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr})...")
+    sweeper = BacklogSweeper(store, repo=args.repo, mwc=args.mwc)
+    print(f"Querying GitHub issues (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr}, mwc={args.mwc})...")
     count = sweeper.ingest_backlog(
         limit=args.limit,
         auto_claim_pr=args.claim_pr,
@@ -221,8 +221,8 @@ def cmd_ingest_issues(args: argparse.Namespace) -> None:
 def cmd_sweep_backlog(args: argparse.Namespace) -> None:
     setup_logging(args.verbose)
     store = StateStore(args.db)
-    sweeper = BacklogSweeper(store, repo=args.repo)
-    print(f"Sweeping GitHub backlog (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr})...")
+    sweeper = BacklogSweeper(store, repo=args.repo, mwc=args.mwc)
+    print(f"Sweeping GitHub backlog (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr}, mwc={args.mwc})...")
     ingested = sweeper.ingest_backlog(
         limit=args.limit,
         auto_claim_pr=args.claim_pr,
@@ -281,6 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_ingest.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
     p_ingest.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
+    p_ingest.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=True, help="Enable standing mwc auto-merge on clean PR verdict (default: true)")
     p_ingest.set_defaults(func=cmd_ingest_issues)
 
     # sweep-backlog
@@ -290,6 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_sweep.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
     p_sweep.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
+    p_sweep.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=True, help="Enable standing mwc auto-merge on clean PR verdict (default: true)")
     p_sweep.add_argument("-p", "--poll-interval", type=float, default=0.5, help="Poll interval seconds")
     p_sweep.add_argument("-s", "--stale-threshold", type=float, default=60.0, help="Heartbeat stale threshold seconds")
     p_sweep.set_defaults(func=cmd_sweep_backlog)

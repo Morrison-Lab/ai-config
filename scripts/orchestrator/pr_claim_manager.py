@@ -187,3 +187,27 @@ class PRClaimManager:
 
         logger.info("PR #%d marked ready for review", pr_number)
         return True
+
+    def merge_pr_under_mwc(
+        self,
+        pr_number: int,
+        repo_slug: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> bool:
+        """Merge a PR using squash and delete-branch under active mwc authorization."""
+        effective_repo = self.get_effective_repo_slug(repo_slug)
+        if dry_run or not shutil.which("gh"):
+            logger.info("[Dry-Run/No GH] Simulating merge of PR #%d under mwc (repo: %s)", pr_number, effective_repo)
+            return True
+
+        merge_cmd = ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"]
+        if effective_repo:
+            merge_cmd.extend(["-R", effective_repo])
+
+        rc, out, err = self._run_cmd(merge_cmd)
+        if rc == 0:
+            logger.info("Successfully merged PR #%d under mwc", pr_number)
+            return True
+        else:
+            logger.warning("Failed to merge PR #%d under mwc: %s", pr_number, err)
+            return False

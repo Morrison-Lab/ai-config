@@ -370,11 +370,18 @@ class TestSpecializedSubagents(unittest.TestCase):
         orig_run = subprocess.run
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            if isinstance(cmd, list) and cmd[:2] == ["git", "push"]:
-                mock_proc = MagicMock()
-                mock_proc.returncode = 1
-                mock_proc.stderr = "fatal: remote rejected (permission denied)"
-                return mock_proc
+            if isinstance(cmd, list):
+                if len(cmd) >= 2 and cmd[:2] == ["git", "commit"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 0
+                    mock_proc.stdout = "commit ok"
+                    mock_proc.stderr = ""
+                    return mock_proc
+                if len(cmd) >= 2 and cmd[:2] == ["git", "push"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 1
+                    mock_proc.stderr = "fatal: remote rejected (permission denied)"
+                    return mock_proc
             return orig_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=mock_subprocess_run):
@@ -783,17 +790,25 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertIsNotNone(claim_info["pr_number"])
         self.assertIn("https://github.com/Morrison-Lab/ai-config/pull/", claim_info["pr_url"])
 
-    def test_tester_subagent_marks_draft_pr_ready(self):
+    def test_pr_claim_manager_merge_pr_under_mwc(self):
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+        merged = mgr.merge_pr_under_mwc(pr_number=2112, dry_run=True)
+        self.assertTrue(merged)
+
+    def test_tester_subagent_marks_draft_pr_ready_and_merges_under_mwc(self):
         from orchestrator.subagents import TesterSubagent
         from orchestrator.models import SubagentContext
 
         tester = TesterSubagent()
         task = Task(
-            title="Verify quality gates",
+            title="Verify quality gates and merge under mwc",
             role="tester",
             payload={
                 "pr_number": 2112,
                 "dry_run": True,
+                "mwc": True,
                 "expected_assertions": 5,
             },
         )
@@ -802,25 +817,29 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         self.assertTrue(res.success)
         self.assertTrue(res.data.get("pr_marked_ready", False))
+        self.assertTrue(res.data.get("pr_merged", False))
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 
         parser = build_parser()
-        # Default ingest-issues (safe opt-in default: claim_pr=False)
+        # Default ingest-issues (safe opt-in default: claim_pr=False, mwc=True)
         args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
         self.assertFalse(args_default.dry_run)
         self.assertFalse(args_default.claim_pr)
+        self.assertTrue(args_default.mwc)
 
-        # Explicit --claim-pr opt-in
-        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3"])
+        # Explicit --claim-pr opt-in and --no-mwc
+        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3", "--no-mwc"])
         self.assertFalse(args_opt_in.dry_run)
         self.assertTrue(args_opt_in.claim_pr)
+        self.assertFalse(args_opt_in.mwc)
 
         # Explicit sweep-backlog --dry-run
         args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
         self.assertTrue(args_sweep.dry_run)
         self.assertFalse(args_sweep.claim_pr)
+        self.assertTrue(args_sweep.mwc)
 
 
 def main():

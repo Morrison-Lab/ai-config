@@ -25,10 +25,11 @@ logger = logging.getLogger("orchestrator.sweeper")
 class BacklogSweeper:
     """Ingests open repository issues and orchestrates their end-to-end resolution."""
 
-    def __init__(self, state_store: StateStore, repo: Optional[str] = None):
+    def __init__(self, state_store: StateStore, repo: Optional[str] = None, mwc: bool = True):
         self.store = state_store
         self.queue = TaskQueue(state_store)
         self.repo = repo
+        self.mwc = mwc
         self.pr_claim_mgr = PRClaimManager(repo_slug=repo)
 
     def fetch_open_issues(self, limit: int = 30) -> List[Dict[str, Any]]:
@@ -161,6 +162,7 @@ class BacklogSweeper:
                 "pr_number": pr_number,
                 "pr_url": pr_url,
                 "repo_slug": self.repo,
+                "mwc": self.mwc,
                 "test_commands": ["python scripts/validate-skills.py", "python scripts/check-links.py"],
             },
         )

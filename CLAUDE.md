@@ -483,10 +483,9 @@ a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
 Two PRs touching disjoint files usually have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
-But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
-`gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
-rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
-`python3 scripts/pr-overlap.py -R <owner>/<repo>` is the instrument for that derivation, sweeping every pair of open PRs at once and reporting how many pairs it examined alongside how many collided.
+But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it, rather than recalling what each PR is "about" --- which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
+`python3 scripts/pr-overlap.py -R <owner>/<repo>` is that derivation, sweeping every pair of open PRs at once and reporting how many pairs it examined alongside how many collided.
+Fall back to `gh pr diff <N> --name-only` per PR only where the script cannot run, noting that the hand method misses a rename, whose new path is all the diff reports.
 A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
 **An empty intersection settles the *collision* cases above and cannot see the *dependency* ones.**
 A migration and its consumer, or a PR whose prose cites content another PR adds, are ordering constraints whose file sets never overlap ---

@@ -120,7 +120,8 @@ MAX_PAGE_SIZE = 100
 
 # Runaway guard on the per-PR file pagination loop. A constant rather than a
 # literal because it bounds what `--files-per-page` can reach: at a page
-# size of 1 this caps a derivable PR at MAX_FILE_PAGES files, and a
+# size of 1 this caps a derivable PR at MAX_FILE_PAGES + 1 files (the extra
+# one comes from the first page, which arrives with the PR itself), and a
 # configurable flag silently bounded by a buried literal is the shape
 # `shared/coding/configurable-parameters.md` rules out.
 MAX_FILE_PAGES = 100
@@ -169,7 +170,7 @@ query($owner:String!, $name:String!, $number:Int!, $files:Int!, $after:String!) 
     pullRequest(number:$number) {
       files(first:$files, after:$after) {
         pageInfo { hasNextPage endCursor }
-        nodes { path }
+        nodes { path changeType }
       }
     }
   }
@@ -392,7 +393,14 @@ def run_gh(args, context):
     an exotic one.
     """
     try:
-        proc = subprocess.run(args, capture_output=True, text=True)
+        # `encoding="utf-8"` rather than `text=True`: the latter decodes with
+        # the platform's preferred encoding, which on Windows is cp1252, and
+        # a byte sequence it cannot decode leaves `stdout=None` with
+        # returncode 0 -- so a return-code test alone passes and the caller
+        # gets None. A path (or a PR title) outside cp1252 is ordinary.
+        proc = subprocess.run(
+            args, capture_output=True, encoding="utf-8", errors="replace"
+        )
     except FileNotFoundError:
         die(
             "pr-overlap: `gh` is not installed or not on PATH, so no PR set "
@@ -402,7 +410,11 @@ def run_gh(args, context):
     if proc.returncode != 0:
         raise SweepError(
             f"gh failed for {context} (exit {proc.returncode}): "
-            f"{proc.stderr.strip()}"
+            f"{(proc.stderr or '').strip()}"
+        )
+    if proc.stdout is None:
+        raise SweepError(
+            f"gh produced no readable output for {context} despite exiting 0"
         )
     return proc.stdout
 
@@ -482,7 +494,7 @@ def remaining_files(owner, name, number, cursor, page):
         data = gh_graphql(
             FILES_QUERY,
             [
-                "-F", f"owner={owner}", "-F", f"name={name}",
+                "-f", f"owner={owner}", "-f", f"name={name}",
                 "-F", f"number={number}", "-F", f"files={page}",
                 "-f", f"after={cursor}",
             ],
@@ -561,17 +573,26 @@ def fetch(repo, limit, page):
     script exists to derive a complete set rather than a prefix of one.
     """
     owner, name = split_repo(repo)
-    nodes, cursor, total, seen_pages = [], None, 0, 0
-    while len(nodes) < limit:
+    # Keyed by PR number rather than accumulated as a list. Counting raw
+    # nodes lets a connection that re-serves a page inflate the count past
+    # `totalCount`, so the completeness invariant below would report a
+    # sweep that saw 100 distinct PRs out of 250 as complete -- a false
+    # clean produced by the pagination itself.
+    by_number, cursor, total, seen_pages = {}, None, 0, 0
+    while len(by_number) < limit:
         seen_pages += 1
         if seen_pages > MAX_PR_PAGES:
             raise SweepError(
                 f"{repo}: PR pagination did not terminate after "
-                f"{MAX_PR_PAGES} pages"
+                f"{MAX_PR_PAGES} pages ({len(by_number)} distinct PRs seen)"
             )
-        want = min(MAX_PAGE_SIZE, limit - len(nodes))
+        want = min(MAX_PAGE_SIZE, limit - len(by_number))
+        # `-f` for owner and name, not `-F`: `-F` applies magic type
+        # conversion, so a repo named `owner/2024` becomes the integer 2024
+        # and the String! variable is rejected. `first` and `files` do want
+        # the integer conversion.
         fields = [
-            "-F", f"owner={owner}", "-F", f"name={name}",
+            "-f", f"owner={owner}", "-f", f"name={name}",
             "-F", f"first={want}", "-F", f"files={page}",
         ]
         if cursor:
@@ -582,7 +603,16 @@ def fetch(repo, limit, page):
             raise SweepError(f"no such repository: {repo}")
         connection = repository["pullRequests"]
         total = connection.get("totalCount", 0)
-        nodes.extend(connection.get("nodes") or [])
+        for node in connection.get("nodes") or []:
+            # GraphQL returns a null entry for a node it cannot serve. A
+            # skipped one would silently shrink the population, so the
+            # incompleteness is raised rather than absorbed.
+            if not isinstance(node, dict) or node.get("number") is None:
+                raise SweepError(
+                    f"{repo}: the API returned a PR node with no number, so "
+                    "the open-PR set is incomplete"
+                )
+            by_number.setdefault(node["number"], node)
         info = connection.get("pageInfo") or {}
         if not info.get("hasNextPage"):
             break
@@ -592,7 +622,10 @@ def fetch(repo, limit, page):
                 f"{repo}: more PR pages were reported but no cursor was "
                 "returned, so the open-PR set cannot be completed"
             )
-    return owner, name, {"totalCount": total, "nodes": nodes}
+    return owner, name, {
+        "totalCount": total,
+        "nodes": [by_number[n] for n in sorted(by_number)],
+    }
 
 
 def sweep(repo, limit, page, include_drafts):

@@ -72,7 +72,15 @@ def pr_node(
 
 
 def files_page(paths, cursor=None, change_type="MODIFIED"):
-    """Build the FILES_QUERY response shape for one page of files."""
+    """Build the FILES_QUERY response shape for one page of files.
+
+    Every field this injects must actually be SELECTED by FILES_QUERY. A
+    fixture is not evidence about the system it imitates: an earlier
+    revision injected `changeType` while the query requested `path` alone,
+    so the page-two rename test passed against a field the real API never
+    returned and the fix it certified was dead code. The assertions just
+    below pin the fixture to the query so that cannot recur silently.
+    """
     return {
         "repository": {
             "pullRequest": {
@@ -117,6 +125,43 @@ def run_main(argv, fetch=None):
         pr_overlap.fetch = original
     return code, buffer.getvalue()
 
+
+# --- 0. The fixtures must not claim fields the real queries never select --
+# `shared/workflow/fixtures-are-not-evidence.md`: a fixture lives in the
+# repo, is named after real output, and vouches for a shape it may not have.
+# The concrete incident: `files_page()` injected `changeType` while
+# FILES_QUERY selected `path` alone, so the page-two rename test asserted
+# behaviour the real API could never produce, and the fix it certified never
+# executed. These checks run FIRST, because every fetch-side test below is
+# only as good as the fixtures' fidelity to the queries.
+check(
+    "QUERY selects changeType, which the rename fold depends on",
+    "changeType" in pr_overlap.QUERY,
+)
+check(
+    "FILES_QUERY selects changeType too, so a rename on page two is seen",
+    "changeType" in pr_overlap.FILES_QUERY,
+)
+check(
+    "every field files_page() injects is selected by FILES_QUERY",
+    all(
+        field in pr_overlap.FILES_QUERY
+        for field in files_page(["x"])["repository"]["pullRequest"]["files"][
+            "nodes"
+        ][0]
+    ),
+)
+check(
+    "every file field pr_node() injects is selected by QUERY",
+    all(
+        field in pr_overlap.QUERY
+        for field in pr_node(1, ["x"])["files"]["nodes"][0]
+    ),
+)
+check(
+    "both queries page their file connections",
+    "hasNextPage" in pr_overlap.QUERY and "hasNextPage" in pr_overlap.FILES_QUERY,
+)
 
 # --- 1. A duplicate is not a collision -----------------------------------
 # The issue this script closes turned on the distinction: four altdoc PRs
@@ -505,10 +550,14 @@ except pr_overlap.SweepError:
     no_cursor = True
 check("remaining_files raises when handed no cursor", no_cursor)
 
+# `total=1` deliberately: with a larger totalCount the completeness guard
+# fires first and this test passes even with the null-cursor guard removed,
+# watching nothing. Mutation-tested -- reverting `remaining_files` to
+# `return ([], False)` must turn this exit 0.
 nullcur_code, _ = run_main(
     ["-R", "o/r", "--strict"],
     fetch=fake_fetch([
-        pr_node(1, ["a.md"], total=200, has_next=True),  # hasNextPage, no cursor
+        pr_node(1, ["a.md"], total=1, has_next=True),  # hasNextPage, no cursor
         pr_node(2, ["shared.md"]),
     ]),
 )
@@ -608,7 +657,7 @@ class FakeProc:
 
 def with_proc(proc_or_exc):
     """Monkeypatch subprocess.run inside pr_overlap for one call."""
-    def _run(args, capture_output=None, text=None):
+    def _run(*args, **kwargs):
         if isinstance(proc_or_exc, Exception):
             raise proc_or_exc
         return proc_or_exc
@@ -703,6 +752,111 @@ control_banner = pr_overlap.run_negative_control()[1][0]
 check(
     "the control banner does not claim to exercise gh",
     "does not exercise `gh`" in control_banner,
+)
+
+# --- 20. Pagination that re-serves a page must not read as complete ------
+# A connection whose endCursor does not advance re-serves the same nodes.
+# Counting raw nodes rather than distinct PR numbers let the total climb
+# past totalCount, so a sweep that saw 2 distinct PRs of 9 set `ok` and
+# exited 0 -- a false clean manufactured by the pagination itself, while
+# the headline visibly said 2 of 9.
+class StuckConnection:
+    """A pullRequests connection that keeps returning the same page."""
+
+    def __init__(self, nodes, total):
+        self.nodes, self.total, self.calls = nodes, total, 0
+
+    def __call__(self, query, fields, context):
+        self.calls += 1
+        return {
+            "repository": {
+                "pullRequests": {
+                    "totalCount": self.total,
+                    "pageInfo": {"hasNextPage": True, "endCursor": "STUCK"},
+                    "nodes": self.nodes,
+                }
+            }
+        }
+
+
+stuck = StuckConnection([pr_node(1, ["a.md"]), pr_node(2, ["b.md"])], total=9)
+_real_graphql = pr_overlap.gh_graphql
+try:
+    pr_overlap.gh_graphql = stuck
+    try:
+        pr_overlap.fetch("o/r", 100, 100)
+        stuck_raised = False
+    except pr_overlap.SweepError:
+        stuck_raised = True
+finally:
+    pr_overlap.gh_graphql = _real_graphql
+check(
+    "a connection re-serving one page trips the runaway guard rather than "
+    "inflating the count",
+    stuck_raised,
+)
+check(
+    "it stopped at the page cap rather than looping forever",
+    stuck.calls == pr_overlap.MAX_PR_PAGES,
+)
+
+# The same shape end-to-end must not exit 0.
+_real_graphql = pr_overlap.gh_graphql
+try:
+    pr_overlap.gh_graphql = StuckConnection(
+        [pr_node(1, ["a.md"]), pr_node(2, ["b.md"])], total=9
+    )
+    stuck_code, stuck_out = run_main(["-R", "o/r", "--strict"])
+finally:
+    pr_overlap.gh_graphql = _real_graphql
+check(
+    "a stuck-pagination sweep exits with the usage status, not 0",
+    stuck_code == pr_overlap.USAGE_EXIT,
+)
+
+# --- 21. A malformed PR node is incompleteness, not something to skip ----
+# GraphQL returns a null entry for a node it cannot serve. Skipping it would
+# shrink the population silently, which is the whole failure this script
+# exists to prevent.
+for label, bad in (("a null node", None), ("a node with no number", {"title": "x"})):
+    _real_graphql = pr_overlap.gh_graphql
+    try:
+        pr_overlap.gh_graphql = lambda q, f, c, _b=bad: {
+            "repository": {
+                "pullRequests": {
+                    "totalCount": 2,
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "nodes": [pr_node(1, ["a.md"]), _b],
+                }
+            }
+        }
+        try:
+            pr_overlap.fetch("o/r", 100, 100)
+            raised = False
+        except pr_overlap.SweepError:
+            raised = True
+    finally:
+        pr_overlap.gh_graphql = _real_graphql
+    check(f"{label} is reported as incompleteness rather than skipped", raised)
+
+# --- 22. gh returning undecodable output is not a clean result -----------
+# subprocess reports a pipe-decode failure by leaving stdout None with
+# returncode 0, so a return-code test alone passes and the caller receives
+# None. Reproduced on Windows/cp1252 with a byte valid in UTF-8 but
+# undefined in cp1252.
+_real_run = pr_overlap.subprocess.run
+try:
+    pr_overlap.subprocess.run = lambda *a, **k: FakeProc(code=0, out=None)
+    try:
+        pr_overlap.run_gh(["gh", "whatever"], "o/r")
+        none_raised = False
+    except pr_overlap.SweepError:
+        none_raised = True
+finally:
+    pr_overlap.subprocess.run = _real_run
+check(
+    "gh exiting 0 with unreadable stdout raises rather than returning None",
+    none_raised,
 )
 
 print(f"\n{passes} passed, {failures} failed")

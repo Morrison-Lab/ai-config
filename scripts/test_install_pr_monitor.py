@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("install-pr-monitor.py")
@@ -51,6 +52,9 @@ try:
     os.environ["PATH"] = '/usr/bin:/evil"dir'
     check("double quote in PATH refuses the install",
           exits(subject.interactive_path) is not None)
+    os.environ["PATH"] = "/usr/bin:/evil\ndir"
+    check("control character in PATH refuses the install",
+          exits(subject.interactive_path) is not None)
     os.environ["PATH"] = "/usr/bin:/opt/homebrew/bin"
     check("clean PATH passes through",
           subject.interactive_path() == "/usr/bin:/opt/homebrew/bin")
@@ -88,8 +92,19 @@ with tempfile.TemporaryDirectory() as d:
     process = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"])
     try:
+        # A state file past the freshness horizon leaves even a live pid
+        # alone: the pid may have been recycled to an unrelated process,
+        # and the daemon that wrote the file is dead anyway.
         with open(state_path, "w", encoding="utf-8") as stream:
-            json.dump({"pid": process.pid}, stream)
+            json.dump({"pid": process.pid,
+                       "checked_at": time.time() - 2 * subject.STALE_STATE_SECONDS},
+                      stream)
+        check("stale state file leaves a live pid alone",
+              subject.stop_stale_daemon(state_path) is None
+              and process.poll() is None)
+
+        with open(state_path, "w", encoding="utf-8") as stream:
+            json.dump({"pid": process.pid, "checked_at": time.time()}, stream)
         check("live recorded daemon is stopped",
               subject.stop_stale_daemon(state_path) == process.pid)
         process.wait(timeout=15)

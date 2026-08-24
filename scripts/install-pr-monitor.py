@@ -18,6 +18,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,6 +28,9 @@ TARGET = Path.home() / ".config" / "systemd" / "user" / UNIT
 HOOK = ROOT / "hooks" / "monitor-open-prs.py"
 INSTALLED_HOOK = Path.home() / ".local" / "share" / "ai-config" / "hooks" / HOOK.name
 CRON_MARKER = "# ai-config-pr-monitor"
+# A live daemon rewrites checked_at every poll (120 s); a state file older
+# than this proves the recorded pid no longer belongs to the monitor.
+STALE_STATE_SECONDS = 600
 
 
 def resolve_dependencies():
@@ -41,10 +45,10 @@ def resolve_dependencies():
 
 def interactive_path():
     path = os.environ.get("PATH", "")
-    if '"' in path:
-        sys.exit("FATAL: PATH contains a double quote, which cannot be "
-                 "persisted safely into a crontab line or systemd drop-in; "
-                 "clean PATH and re-run")
+    if '"' in path or any(ord(character) < 0x20 for character in path):
+        sys.exit("FATAL: PATH contains a double quote or control character, "
+                 "which cannot be persisted safely into a crontab line or "
+                 "systemd drop-in; clean PATH and re-run")
     return path
 
 
@@ -91,15 +95,32 @@ def monitor_state_path():
 
 
 def stop_stale_daemon(state_path=None):
-    """Kill the recorded daemon so the start below runs the fixed code."""
+    """Kill the recorded daemon so the start below runs the fixed code.
+
+    Only a recently-refreshed state file proves the recorded pid still
+    belongs to a live monitor; past STALE_STATE_SECONDS the pid may have
+    been recycled to an unrelated process, and the daemon it named is dead
+    anyway, so the file is left alone.  After the SIGTERM, wait for the
+    process to disappear so the cron fallback's ensure() cannot observe
+    the dying pid as alive and skip its respawn.
+    """
     if state_path is None:
         state_path = monitor_state_path()
     try:
         with open(state_path, encoding="utf-8") as stream:
-            pid = int(json.load(stream).get("pid"))
+            state = json.load(stream)
+        pid = int(state.get("pid"))
+        if time.time() - float(state.get("checked_at") or 0) > STALE_STATE_SECONDS:
+            return None
         os.kill(pid, signal.SIGTERM)
     except (OSError, ValueError, TypeError):
         return None
+    for _ in range(50):
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            break
+        time.sleep(0.1)
     print(f"stopped stale monitor daemon (pid {pid})")
     return pid
 

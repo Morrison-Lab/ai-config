@@ -11,8 +11,13 @@ assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
 assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
 # The command must run the absolutely-resolved GH_PATH; the literal "gh"
-# reappearing in open_prs would be a revert of the #1953 fix.
-assert "gh" not in subject.open_prs.__code__.co_consts
+# reappearing in open_prs would be a revert of the #1953 fix. CPython folds
+# a list display into a tuple inside co_consts, so nested consts are
+# searched too -- a top-level-only check passes on the reverted code.
+assert not any(
+    value == "gh"
+    for const in subject.open_prs.__code__.co_consts
+    for value in (const if isinstance(const, (tuple, list)) else (const,)))
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 import tempfile, os

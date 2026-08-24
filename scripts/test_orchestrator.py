@@ -561,6 +561,36 @@ class TestSpecializedSubagents(unittest.TestCase):
         res19 = extract_files_from_markdown(text19)
         self.assertEqual(res19, {})
 
+        # ./ and / prefixed dotfiles
+        text20 = "```scripts/config_loader.py\n./.env\n```"
+        res20 = extract_files_from_markdown(text20)
+        self.assertEqual(res20, {})
+
+        text21 = "```scripts/foo.py\n/.gitignore\n```"
+        res21 = extract_files_from_markdown(text21)
+        self.assertEqual(res21, {})
+
+        # Paths with numeric stem in directory (e.g. docs/2023.md)
+        text22 = "```scripts/foo.py\ndocs/2023.md\n```"
+        res22 = extract_files_from_markdown(text22)
+        self.assertEqual(res22, {})
+
+        # Numbered list markers
+        text23 = "```memories/tools.md\n1. memories/tools.md\n2. memories/git.md\n```"
+        res23 = extract_files_from_markdown(text23)
+        self.assertEqual(res23, {})
+
+        # Legitimate glob files like .gitignore must NOT be discarded
+        text24 = "```.gitignore\n*.pyc\n*.pyo\n.env\n```"
+        res24 = extract_files_from_markdown(text24)
+        self.assertEqual(res24, {".gitignore": "*.pyc\n*.pyo\n.env\n"})
+
+    def test_find_candidate_file_paths_adjacent_paths(self):
+        from orchestrator.subagents import find_candidate_file_paths
+
+        res = find_candidate_file_paths("update scripts/a.py scripts/b.py scripts/c.py please")
+        self.assertEqual(res, ["scripts/a.py", "scripts/b.py", "scripts/c.py"])
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 

@@ -23,7 +23,7 @@ logger = logging.getLogger("orchestrator.subagents")
 
 
 CANDIDATE_FILE_REGEX = re.compile(
-    r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)"
+    r"(?:(?<=^)|(?<=[\s`'\"]))((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?=[\s`'\"]|$)"
 )
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
@@ -32,7 +32,10 @@ def is_bare_path_line(s: str) -> bool:
     """Return True if string is a normalized repo-relative path, dotfile, or bare filename."""
     clean = s.replace("\\", "/").strip("`'\" \t\r\n")
     while clean.startswith("./") or clean.startswith("/"):
-        clean = clean.lstrip("./")
+        if clean.startswith("./"):
+            clean = clean[2:]
+        elif clean.startswith("/"):
+            clean = clean[1:]
     if not clean:
         return False
     # Pure numeric or version numbers (e.g. 1.0.0, 3.14) are not file paths
@@ -56,7 +59,8 @@ def is_bare_path_line(s: str) -> bool:
     elif "." in filename:
         ext = filename.split(".")[-1].lower()
         stem = ".".join(filename.split(".")[:-1])
-        if not stem.isdigit() and 1 <= len(ext) <= 12 and re.match(r"^[a-zA-Z0-9]+$", ext):
+        # If no directory prefix, exclude numeric stems to avoid version collisions; with directory prefix, any valid extension is fine
+        if ("/" in clean or not stem.isdigit()) and 1 <= len(ext) <= 12 and re.match(r"^[a-zA-Z0-9]+$", ext):
             if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
                 return True
     return False
@@ -89,7 +93,9 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
         line_clean = raw_line.strip()
         if not line_clean:
             return True
-        uncommented = line_clean.lstrip("#/ *-").rstrip("*/").strip("`'\" \t\r\n")
+        # Strip leading comment markers (#, //, --, /*), bullet markers (*, - with whitespace), or numbered list markers (1., 1) with whitespace)
+        uncommented = re.sub(r"^(?:(?:#+|//|--|/\*+)\s*|(?:[\*\-]\s+)|\d+[.)]\s+)", "", line_clean)
+        uncommented = re.sub(r"\s*\*+/$", "", uncommented).strip("`'\" \t\r\n")
         if not uncommented:
             return True
         if uncommented in STUB_PATTERNS or line_clean in STUB_PATTERNS:

@@ -60,7 +60,8 @@ the consumer repo automatically inherits:
 1. **Bot-actor filtering**: Evaluates mention triggers (`@claude`) on comments, reviews, and assigned issues while filtering out bot-generated loops.
 2. **Concurrency serialization**: Per-issue/PR concurrency with `cancel-in-progress: false` to avoid clobbering concurrent in-flight agent pushes.
 3. **Late-comment polling**: Scans for comments arriving during execution so long-running sessions drain multi-comment bursts.
-4. **Post-push review triggering**: Captures head SHAs before and after execution; if changes were pushed, automatically requests review and dispatches the review workflow.
+4. **Post-push review triggering**: Captures head SHAs before and after execution;
+   if changes were pushed, automatically requests review and dispatches the review workflow.
 5. **Tool permission sandboxing**: Restricts allowed CLI tools (`gh` read commands, `git`, build tools) and enforces secure WebFetch domain allowlisting.
 6. **Threaded inline replies**: Automatically posts responses as threaded inline replies when triggered by pull request review comments.
 7. **Environment and secret propagation**: Handles private submodules (`SUBMODULES_TOKEN`) and optional domain tokens (`EPI202_TOKEN`).

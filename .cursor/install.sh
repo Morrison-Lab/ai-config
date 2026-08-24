@@ -34,7 +34,7 @@ fi
 # 3. Python tooling: pyyaml (pin derived from validate.yml) and pre-commit.
 #    Use python3 -m pip with --break-system-packages for PEP 668 environments.
 PYYAML_PIN="$(grep -oE 'pyyaml==[0-9.]+' .github/workflows/validate.yml | head -1 || echo 'pyyaml')"
-python3 -m pip install --quiet --disable-pip-version-check --break-system-packages \
+$SUDO python3 -m pip install --quiet --disable-pip-version-check --break-system-packages \
   "$PYYAML_PIN" pre-commit
 
 # 4. Quarto renders and previews the documentation website. Pinned for

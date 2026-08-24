@@ -150,7 +150,7 @@ added a `workflow_dispatch` trigger to `claude-code-review.yml`, and #111
 granted the `actions: write` permission used to dispatch that trigger.
 Rungs 1 and 2 were both applied exactly as the section prescribes: a
 `MERGE ORDER` box in chat, twice, and an ordering note leading each PR body.
-#111 was merged first anyway, at `17:49:30Z`, leaving #110 open and behind
+PR #111 was merged first anyway, at `17:49:30Z`, leaving #110 open and behind
 until a branch update landed it at `17:56:00Z`.
 Rung 3 was correctly withheld: both PRs were clean at the same moment, so
 drafting one would have stalled its own review loop over a constraint whose

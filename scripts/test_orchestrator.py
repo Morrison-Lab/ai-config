@@ -487,6 +487,26 @@ class TestSpecializedSubagents(unittest.TestCase):
         res2 = extract_files_from_markdown(text2, context_text="please fix scripts/a.py and scripts/b.py now")
         self.assertEqual(res2, {})
 
+        # Shape variants: bare path for unrelated file, header cross-path, and comment-prefixed path
+        text3 = "```\ndocs/readme.md\n```"
+        res3 = extract_files_from_markdown(text3, context_text="fix scripts/a.py")
+        self.assertEqual(res3, {})
+
+        text4 = "```scripts/a.py\nscripts/b.py\n```"
+        res4 = extract_files_from_markdown(text4, context_text="fix scripts/a.py and scripts/b.py")
+        self.assertEqual(res4, {})
+
+        text5 = "```\n# scripts/a.py\n```"
+        res5 = extract_files_from_markdown(text5, context_text="fix scripts/a.py")
+        self.assertEqual(res5, {})
+
+    def test_extract_files_from_markdown_default_target_file(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        text = "```python\nprint('hello world')\n```"
+        res = extract_files_from_markdown(text, default_target_file="scripts/my_target.py")
+        self.assertEqual(res, {"scripts/my_target.py": "print('hello world')\n"})
+
     def test_resolve_within_worktree(self):
         from orchestrator.subagents import resolve_within_worktree
 
@@ -495,6 +515,12 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertIsNotNone(safe_path)
         self.assertTrue(safe_path.is_relative_to(root))
 
+        # Root itself must return None (strictly contained)
+        self.assertIsNone(resolve_within_worktree(".", root))
+        self.assertIsNone(resolve_within_worktree("", root))
+        self.assertIsNone(resolve_within_worktree("/", root))
+
+        # Absolute paths escaping worktree root must return None
         escape_path = resolve_within_worktree("../../../etc/passwd", root)
         self.assertIsNone(escape_path)
 

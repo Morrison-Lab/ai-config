@@ -25,19 +25,39 @@ logger = logging.getLogger("orchestrator.subagents")
 CANDIDATE_FILE_REGEX = re.compile(
     r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)"
 )
-STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */")
+BARE_PATH_REGEX = re.compile(r"^(?:[a-zA-Z0-9_\-]+/)*[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_]+$")
+STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
 
-def is_stub_or_self_referential(content: str, cand_path: str) -> bool:
-    """Return True if content is a placeholder stub or echoes the file path."""
+def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
+    """Return True if content is a placeholder stub, echoes any file path, or is a bare path string."""
     clean_content = content.strip()
-    clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
-    cand_basename = clean_cand.split("/")[-1]
+    if not clean_content:
+        return True
 
-    if clean_content in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
+    lines = [line.strip() for line in clean_content.splitlines() if line.strip()]
+    if not lines:
         return True
-    if clean_content in STUB_PATTERNS and len(clean_content.splitlines()) <= 2:
+
+    # Check if all non-empty lines are stubs (e.g. "... \n pass" or "# ...\n# ...")
+    all_stub_lines = all(
+        line in STUB_PATTERNS or line.lstrip("#/ *-").rstrip("*/").strip() in STUB_PATTERNS
+        for line in lines
+    )
+    if all_stub_lines:
         return True
+
+    # If content is a single line, check if it's a bare or commented path string
+    if len(lines) == 1:
+        uncommented = lines[0].lstrip("#/ *-").rstrip("*/").strip("`'\" \t\r\n")
+        if BARE_PATH_REGEX.match(uncommented) or uncommented in STUB_PATTERNS:
+            return True
+        if cand_path:
+            clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
+            cand_basename = clean_cand.split("/")[-1]
+            if uncommented in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
+                return True
+
     return False
 
 
@@ -56,18 +76,18 @@ def find_candidate_file_paths(text: str) -> List[str]:
 
 
 def resolve_within_worktree(rel_path: str, wt_path: Path, wt_resolved: Optional[Path] = None) -> Optional[Path]:
-    """Resolve rel_path within wt_path and return Path if strictly contained within wt_path, else None."""
+    """Resolve rel_path within wt_path and return Path if strictly contained within wt_path (excluding root), else None."""
     wt_root = wt_resolved if wt_resolved is not None else wt_path.resolve()
     clean_rel = Path(rel_path)
     if clean_rel.is_absolute():
         clean_rel = Path(*clean_rel.parts[1:])
     file_path = (wt_path / clean_rel).resolve()
-    if not file_path.is_relative_to(wt_root):
+    if file_path == wt_root or not file_path.is_relative_to(wt_root):
         return None
     return file_path
 
 
-def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, str]:
+def extract_files_from_markdown(text: str, context_text: str = "", default_target_file: str = "") -> Dict[str, str]:
     """Extract (file_path, content) pairs from markdown code blocks, ignoring stub/self-referential blocks."""
     files: Dict[str, str] = {}
     blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
@@ -80,15 +100,18 @@ def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, 
                 if not is_stub_or_self_referential(content, clean_cand):
                     files[clean_cand] = content
 
-    # Fallback: if no path header found, but code blocks exist and context_text mentions a file path
-    if not files and blocks and context_text:
-        candidates = find_candidate_file_paths(context_text)
-        if candidates:
-            first_block_content = blocks[0][1]
-            # If the block content is a stub or self-referential against ANY candidate, reject it outright
-            is_stub = any(is_stub_or_self_referential(first_block_content, cand) for cand in candidates)
-            if not is_stub and not is_stub_or_self_referential(first_block_content, ""):
-                files[candidates[0]] = first_block_content
+    # Fallback: if no path header found, but code blocks exist
+    if not files and blocks:
+        first_block_content = blocks[0][1]
+        if not is_stub_or_self_referential(first_block_content, ""):
+            if default_target_file:
+                clean_default = default_target_file.strip("`'\" \t\r\n").replace("\\", "/")
+                if not is_stub_or_self_referential(first_block_content, clean_default):
+                    files[clean_default] = first_block_content
+            elif context_text:
+                candidates = find_candidate_file_paths(context_text)
+                if candidates and not any(is_stub_or_self_referential(first_block_content, c) for c in candidates):
+                    files[candidates[0]] = first_block_content
 
     return files
 
@@ -329,7 +352,11 @@ class CoderSubagent(BaseSubagent):
                             execution_time_seconds=time.time() - start_time,
                         )
 
-                    extracted = extract_files_from_markdown(resp.content, context_text=f"{instruction}\n{issue_body}")
+                    extracted = extract_files_from_markdown(
+                        resp.content,
+                        context_text=f"{instruction}\n{issue_body}",
+                        default_target_file=target_file,
+                    )
                     if extracted:
                         files_to_write.update(extracted)
 

@@ -1194,3 +1194,16 @@ while `_selftest.yml` was green on `main`.)
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
 
+## Claude Code MCP tool search is default-on
+
+Measured 2026-08-23 on Claude Code 2.1.221 against the docs page
+[code.claude.com/docs/en/mcp](https://code.claude.com/docs/en/mcp) ("Scale with MCP tool search").
+
+- **MCP tool definitions load deferred by default on Claude 4.5-generation models**, so Reddit-style advice to "enable tool search" (`ENABLE_TOOL_SEARCH=true`) to save session-start context is already satisfied here.
+  Only tool names and server instructions load upfront; bodies arrive via a `ToolSearch` call when first needed.
+  Re-verify before relying on this: run `/context` in a live session and read the MCP tools line instead of recalling this bullet.
+- **Knobs:** `ENABLE_TOOL_SEARCH` values are `(unset)` (all tools deferred), `auto` (defer only once tool definitions reach 10% of the context window; below that they load upfront), `auto:N` (the same threshold mode with a custom percentage, N is 0--100, e.g. `auto:5` for 5%), `true` (force deferral everywhere it can work), and `false` (all tools upfront).
+- **What silently turns it off:** a custom `ANTHROPIC_BASE_URL` pointing at a non-first-party host (most proxies drop `tool_reference` blocks), `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`, Google Cloud's Agent Platform models earlier than the Claude 4.5 generation, and Microsoft Foundry deployments hosted on Azure (their serving stack rejects it server-side, which no `ENABLE_TOOL_SEARCH` value overrides).
+- **Local setup:** `github-local` (toolsets `default,actions`, dozens of tools) plus `local-llm` are user-scoped in `~/.claude.json`.
+  Corpus rules route local GitHub work through the `gh` CLI, so scoping `github-local` out of local sessions remains an open option even with search on; it would also remove tool-selection noise, not just tokens.
+  Tracked in ai-config#2066.

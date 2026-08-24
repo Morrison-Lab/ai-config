@@ -5,7 +5,8 @@ over Reddit's agentic-AI communities,
 so future runs start from measured targets instead of re-deriving them.
 Produced by the issue [#2041](https://github.com/Morrison-Lab/ai-config/issues/2041) review
 (orchestrated workflow, 2026-08-23:
-top-of-year listings plus practice-term search, ~25 subreddits, 2,661 unique posts;
+top-of-year listings plus practice-term search, ~25 subreddits harvested, 2,661 unique posts,
+of which the 22 subreddits below produced rankable yield;
 full ranked findings are in that issue's report comment).
 
 Yield = how much corpus-applicable practice signal the 2026-08 harvest actually produced,
@@ -18,14 +19,14 @@ the working Claude-in-Chrome route): [`reddit-access.md`](reddit-access.md).
 
 | Subreddit | Yield (2026-08) | What it carried |
 |---|---|---|
-| r/AI_Agents | high | Broad agentic-practice surface: orchestration postmortems, token-overhead benchmarks, security incidents, unattended-ops checklists; highest single-post engagement in the dataset. |
+| r/AI_Agents | high | Broad agentic-practice surface: orchestration postmortems, token-overhead benchmarks, security incidents, unattended-ops checklists. |
 | r/ClaudeAI | high | Primary-source tips (Claude Code team), rules-file compliance findings, hook patterns, terminal workflow posts; several of the top-scoring practice posts in the run. |
 | r/ClaudeCode | high | Highest density of directly-applicable Claude Code workflow posts: review pipelines, skills with published benchmarks, agent teams, worker pools, token audits. |
 | r/cursor | high | Planning-loop and spec-driven workflows, cost-routing measurements, and the price-vs-actual-cost study; practices transfer to Claude Code with little translation. |
 | r/LocalLLaMA | high | Tool-interface design from experienced builders, skill-file handoff patterns, and the strongest incident threads; noisy with model releases but the practice posts are substantive. |
 | r/mcp | high | Concentrated, convergent clusters on tool-schema bloat, Code Mode, and CLI-over-MCP; small subreddit but nearly every harvested post was on-scope. |
 | r/AgentsOfAI | medium | Prohibition-unreliability evidence and Boris Cherny primary-source material; mixed with hype but recurring on-scope threads. |
-| r/artificial | medium | Incident reports (deletions, sudo bypass, sandbox escape, runaway bills) -- motivation evidence for guardrails rather than practice descriptions. |
+| r/artificial | medium | Incident reports (deletions, sudo bypass, sandbox escape, runaway bills) --- motivation evidence for guardrails rather than practice descriptions. |
 | r/AutoGPT | medium | Verification tooling, guardrail placement grounded in dated incidents, and config-generation tools; low scores but concrete artifacts. |
 | r/LangChain | medium | Architecture postmortems (typed graphs over omnipotent agents) and tool-error-shape experiments; lower volume but tested claims. |
 | r/LLMDevs | medium | Context-routing bootstraps with deterministic drift checkers and adoption trajectories; occasional but high-precision hits. |

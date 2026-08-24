@@ -186,6 +186,7 @@ _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
 Substitute your own agent's name where you are not Claude Code, and keep the rest of the line verbatim so one query finds every disclosed comment.
+Check the substituted **name** against `REVIEW_BODY_MARKERS` as well as a replacement marker: `code review` is one of its entries, so an agent named for code review would reintroduce through its own name the false-clean the emoji ban exists to prevent.
 
 The marker deliberately contains **no robot emoji**: [`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) matches that emoji as a review-body marker, so a disclosed claim comment would be admitted into the fully-clean verdict scan as a finding-free review.
 Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `REVIEW_AGENT_MARKERS` before adopting it.

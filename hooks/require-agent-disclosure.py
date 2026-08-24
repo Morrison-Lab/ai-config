@@ -37,6 +37,14 @@ EXEMPT: a body whose WHOLE content is a command addressed to another bot
 audience -- a machine parses that body -- not the length, so the pattern is
 anchored to the whole body rather than to its first token.
 
+The corpus declares a SECOND exemption this guard does not implement: a comment
+posted under a genuine bot token, where the forge already reports `type: Bot`
+and the marker adds nothing. Whether a token is an app's or a person's is not in
+the command text, so no lexical check can decide it -- which is why the rule
+carries it and the instrument does not. The visible consequence is that
+`skills/claude-agent-workflow/SKILL.md`'s in-workflow reply draws a warning it
+should not. Warn-only, so the cost is a note rather than a refusal.
+
 PER SEGMENT, not per call. A batched round posting several comments in one
 Bash call is the encouraged shape (`shared/workflow/efficient-pr-babysitting.md`),
 so one disclosed body must not vouch for an undisclosed sibling. Each
@@ -214,14 +222,19 @@ UNREADABLE_RE = re.compile(
     # the negation -- which made `-F "in_reply_to=5"` look like a file.
     r"|(?<!-)-F\s+[\"']?[^\s\"'=]+[\"']?(?:\s|$)"
     r"|--(?:body|message)[\s=]+(?:\"[^\"]*\$|'[^']*\$|\$)"
-    # NOTE: the short `-b`/`-m` forms need no clause of their own. They fall
-    # through to the `not HAS_INLINE_BODY_RE` branch, which already rejects a
-    # value beginning with `$`. A separate alternative here was dead code whose
-    # comment described a behaviour the pattern below had taken over.
+    # The short forms expand identically, and they DO need their own clause.
+    # A round-6 edit deleted this on the theory that `HAS_INLINE_BODY_RE` had
+    # taken it over -- but that pattern only rejects a value BEGINNING with `$`,
+    # so `-b "Addressed in $SHA."` fell through and was reported as a body whose
+    # marker is missing: an assertion about text the check never read, and the
+    # opposite verdict from `--body` on the identical body.
+    r"|-(?:b|m)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
     # `@file` is gh api's read-from-file sigil, and it is routinely QUOTED
     # (`-F body="@/tmp/reply.md"`), so the optional quote is load-bearing.
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=[\"']?(?:@|\$)"
-    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=(?:[^\"'\s]*\$)"
+    # Must cross quotes and spaces: a `$` anywhere in the value makes the body
+    # unreadable, not just one directly after `body=`.
+    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=(?:[^\"']*\$|\"[^\"]*\$|'[^']*\$)"
 )
 # A body flag with an inline literal value. Its absence on an interactive
 # invocation means there is no body to read here at all.
@@ -238,9 +251,15 @@ HAS_INLINE_BODY_RE = re.compile(
 # that merely opens with a bot handle and then addresses a human at length.
 #
 # The review-re-request handle is assembled rather than written contiguously.
-# `memories/mention-triggers.md`: the gate is a raw substring test over text
-# GitHub renders, and a diff view renders this file -- so spelling it here
-# would summon the bot from a source file.
+# NOT because spelling it in a source file would summon the bot -- that reasoning
+# is false, and `shared/workflow/disclose-agent-authorship.md` refutes it: the
+# gate reads comment, review and issue BODIES
+# (`contains(github.event.comment.body, ...)`), not file contents, and the handle
+# already appears hundreds of times across this corpus's markdown.
+# The concatenation is kept for a narrower reason: this string is a matcher
+# whose whole job is to recognise that handle, and a future edit that moves it
+# into a comment body -- an error message, a posted note -- would carry the live
+# handle with it. Assembling it makes that move visible.
 _BOT_HANDLES = "|".join(["dependabot", "renovate", "copilot", "cl" + "aude"])
 # The `\1` closing quote ends it -- NOT `$`. Anchoring to end-of-segment
 # required `--body` to be the last flag, so the corpus's own two Dependabot

@@ -31,14 +31,14 @@ Where it belongs to an app --- a workflow posting as `github-actions[bot]`, so t
 `skills/claude-agent-workflow/SKILL.md`'s in-workflow reply is that case.
 
 The test is the **token**, not the author: an agent driving `gh` with the account holder's PAT posts as a `User` however automated the surrounding workflow is.
-Check `.user.type` on a posted comment if unsure, rather than reasoning from how the comment was produced --- and pick the endpoint by comment KIND, since an issue-or-PR comment and a review-thread comment share an id space but not a route:
+Check `.user.type` on a posted comment if unsure, rather than reasoning from how the comment was produced --- and pick the endpoint by comment KIND, since an issue-or-PR comment and a review-thread comment have separate id spaces and separate routes:
 
 ```bash
 gh api repos/<o>/<r>/issues/comments/<id> --jq .user.type   # PR or issue comment
 gh api repos/<o>/<r>/pulls/comments/<id>  --jq .user.type   # review-thread reply
 ```
 
-Asking the first about a review-thread comment returns `404 Not Found`, which reads as a missing comment rather than as the wrong route.
+Asking the first about a review-thread comment returns `404 Not Found` --- which reads as a missing comment rather than as the wrong route, and is the reason to pick the route by kind rather than to try one and see.
 
 **A prose self-identification is not a substitute for the marker.**
 "Claude Code CLI (local session) is working on this" already discloses, so appending the footer to it looks redundant.
@@ -98,7 +98,7 @@ The literal `--body "@...` grep finds the two Dependabot sites and misses the th
 
 An earlier draft of this passage gave a different and wrong reason --- that the handle is never spelled contiguously in a source file, because a diff view would summon the bot.
 That is false twice over.
-The handle appears 250 times across this corpus's markdown at this commit, by the command below, including in `AGENTS.md`, `CLAUDE.md` and `README.md`, and none of those has ever dispatched a run.
+The handle appears 248 times across this corpus's markdown, counting every file but this one --- the command below is itself an occurrence, so a figure that included this file would move each time the file was edited, and both earlier drafts of this sentence were wrong for exactly that reason.
 And [`memories/mention-triggers.md`](../../memories/mention-triggers.md) states the gate as `contains(github.event.comment.body, '@claude')`, over comment, review and issue bodies --- file contents are not among them.
 The practice of not spelling it applies to text that becomes a comment, which is what that file scopes it to.
 
@@ -108,7 +108,7 @@ The practice of not spelling it applies to text that becomes a comment, which is
 # and returned its own test fixtures as apparent sites.
 grep -rn --include='*.md' --include='*.sh' -- '--body "@' .   # command-shaped sites
 grep -rn '@claude' skills/                                    # prose sites
-git grep -noi '@claude' -- '*.md' | wc -l                     # the figure above
+git grep -noi '@claude' -- '*.md' ':!shared/workflow/disclose-agent-authorship.md' | wc -l   # the figure above
 ```
 
 - **Do:** omit the marker on a comment whose whole body is a command addressed to another bot.

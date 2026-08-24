@@ -189,6 +189,18 @@ CASES = [
      "missing"),
     ("-b with an expanded variable is unreadable, like --body",
      'gh pr comment 5 -b "$BODY"', None),
+    # A MID-STRING `$VAR` is the case the whole-value fixture above cannot see:
+    # HAS_INLINE_BODY_RE rejects only a value BEGINNING with `$`, so a round-6
+    # edit deleted the short-flag clause as "dead" and this shape started
+    # reporting a missing marker over a body the check never read.
+    ("-b with a mid-string expansion is still unreadable",
+     'gh pr comment 5 -b "Addressed in $SHA."', None),
+    ("-f body= with a mid-string expansion is unreadable",
+     'gh pr comment 5 -f body="Addressed in $SHA."', None),
+    ("-F \"body=...\" with a mid-string expansion is unreadable",
+     'gh pr comment 5 -F "body=Addressed in $SHA."', None),
+    ("--body with a mid-string expansion is unreadable",
+     'gh pr comment 5 --body "Addressed in $SHA."', None),
     ("--raw-field body= is inline and readable",
      'gh api repos/o/r/issues/12/comments --raw-field body="hi"', "missing"),
     ("-F body=@file is a file reference, so unreadable",

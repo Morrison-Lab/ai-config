@@ -80,17 +80,19 @@ Three measured consequences (2026-08-23, Windows 11, CPython 3.13.7):
 - Against the caller's own `subprocess` child: the call returned without
   error and the child survived, so in that topology it walks and quacks
   like the POSIX probe.
-- Against live unrelated same-user processes, it fails in two shapes:
-  `OSError` WinError 87 (`cmd.exe`, `explorer.exe`) --- byte-identical to
-  what a dead pid raises --- and WinError 5 (`conhost.exe`).
+- Against live unrelated processes it fails, in two measured shapes:
+  `OSError` WinError 87 on verified same-user targets (`cmd.exe`,
+  `explorer.exe`, `conhost.exe`) --- byte-identical to what a dead pid
+  raises --- and WinError 5 on service or unverified-owner targets
+  (`svchost.exe`), consistent with access-denied.
   So read as a probe, it reports live processes as gone.
   The exact Win32 predicate separating success from failure was not
   established; what the measurements support is "succeeds on the caller's
   own children and parent, fails variously on unrelated live processes",
   and the entry deliberately claims no more than that.
 - Delivery: `GenerateConsoleCtrlEvent`'s own documentation says CTRL_C
-  "cannot be generated for process groups" --- with a nonzero id the call
-  succeeds *without delivering anything* (measured: a
+  "cannot be generated for process groups" --- a nonzero id never
+  delivers, and when the call succeeds nothing was received (measured: a
   `CREATE_NEW_PROCESS_GROUP` child probed with signal 0 survived
   untouched).
   Only `os.kill(0, 0)`, the POSIX self-group idiom, actually delivers ---

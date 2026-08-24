@@ -9,82 +9,10 @@
 - For UMS/maintenance passes this matters because stale muscle memory ("use
   create/edit") can fail repeatedly after the tool list changes.
 
-## WebFetch 403 on a rendered docs site -> raw.githubusercontent.com; WebSearch to find the exact source path
-- A GitHub-Pages/Quarto-rendered docs site (e.g. `jarl.etiennebacher.com`,
-  `ucd-serg.github.io/lab-manual/...`) can reject `WebFetch` outright (403 —
-  likely anti-scraping), even though the plain-text/markdown **source** it was
-  built from is a public file in a public repo and fetches fine via
-  `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`. This
-  isn't `d-morrison/gha`-specific (that repo's own `CLAUDE.md` documents it
-  for the lab manual) — it generalizes to any Quarto/Docusaurus-style site,
-  including third-party tool docs with no relation to our own repos.
-- **When the exact source path isn't obvious** (unlike the lab-manual case
-  where `foo.html` predictably maps to `foo.qmd`), guessing candidate paths
-  one `curl -o /dev/null -w "%{http_code}"` at a time is slow and often wrong.
-  `WebSearch` for `<repo-or-tool-name> <topic> site:github.com` (or just
-  `<tool> <config-file> github`) surfaces the actual repo file path (e.g.
-  `jarl/docs/reference/config-file.md`) from its indexed GitHub listing —
-  faster than blind guessing, and the found path fetches cleanly via
-  `raw.githubusercontent.com` immediately after. (Confirmed on jarl's docs
-  site: `jarl.etiennebacher.com/reference/config-file` 403'd, but
-  `WebSearch` surfaced `docs/reference/config-file.md` as the underlying
-  file, which raw-fetched with the full field-by-field config reference.)
-- **A 404 from `raw.githubusercontent.com` is often a filename-case mismatch, not a missing file.**
-  The rendered URL's slug is lowercased by the site generator while the source file's own name may not be.
-  Advanced R serves `function-operators.html` from `Function-operators.Rmd`, so the obvious raw URL 404s and the capitalized one returns the chapter.
-  Retry with the repo's own capitalization before concluding the source lives at some other path.
-  (ai-config#760, 2026-07-28: `adv-r.hadley.nz` 403'd through the proxy, and the first raw attempt 404'd purely on the leading capital.)
-- **Reddit is the inverse of the pattern above: the rendered HTML serves, and
-  the machine-readable form 403s.**
-  Every other entry in this section reaches for a site's *source* when the
-  rendered page refuses, so the instinct on a Reddit URL is to append `.json`
-  or switch to `api.reddit.com` --- the two documented ways to get structured
-  post and comment data.
-  Both return 403 to an unauthenticated datacenter client, and adding
-  `api.reddit.com` to an egress allowlist does not help, since the refusal is
-  Reddit's rather than the proxy's.
-  `old.reddit.com/r/<sub>/comments/<id>/` HTML fetches fine and carries the
-  post body and its comment tree, so read that and stop looking for a
-  structured endpoint.
-  Screenshots stay unreadable either way, so a post whose substance is in an
-  image is only partly recoverable --- say so rather than reporting the post as
-  read.
-  (2026-08-16, reading three r/ClaudeCode and r/ClaudeAI workflow posts for
-  ai-config#1563: the `.json` paths and `api.reddit.com` each 403'd, old.reddit
-  HTML worked, and post 1's heartbeat config and post 3's dashboard images were
-  never legible.
-  Note `skills/opposition-research/SKILL.md` names "the Reddit `.json`
-  endpoints" as a data source, which holds for a session that can authenticate
-  and not for this one.)
-  In a **local** session even the HTML route above is closed --- WebFetch
-  refuses all three reddit.com hosts before Reddit answers, probably at its
-  domain safety preflight rather than under any permission rule.
-  [`reddit-access.md`](reddit-access.md) carries the five failed routes and
-  the working Claude-in-Chrome route (measured 2026-08-23/24).
-- **`docs.github.com` itself can be blocked outright by a remote session's
-  network policy** (proxy 403 on every page, and `api.github.com` too —
-  both at the curl/WebFetch level; the GitHub MCP tools route through
-  their own server and keep working), not
-  just anti-scraping — but `raw.githubusercontent.com` stays reachable, and
-  GitHub's docs are built from the public `github/docs` repo. Verify a docs
-  claim or URL against that source instead: page content lives under
-  `content/<area>/.../<slug>.md`, but live-URL paths do NOT map 1:1 to
-  source paths (the docs get reorganized; e.g.
-  `/billing/managing-billing-for-your-products/...` now lives at
-  `content/billing/concepts/product-billing/github-actions.md`). If a page
-  was moved, its frontmatter carries a `redirect_from:` list — an old URL
-  appearing there means it still works for readers via redirect — and
-  shared text is factored into `data/reusables/<area>/<name>.md` includes,
-  so grep for a `{% data reusables.<area>.<name> %}` tag and fetch that
-  file when a section's body looks like one include line. Version-gated
-  (`{% ifversion <flag> %}`) passages resolve via `data/features/<flag>.yml`:
-  its `versions:` block (e.g. `fpt: '*'`) says which plans the gated text
-  applies to: `fpt` = Free/Pro/Team on github.com, `ghec` = GitHub Enterprise
-  Cloud (also github.com-hosted), `ghes` = GitHub Enterprise Server
-  (self-hosted). (Used on
-  ai-config#601 to verify the GitHub Actions billing and `jobs.<job_id>.if`
-  citations offline, and on gha#272 to confirm the approval-required
-  `pull_request`-runs exception applies to github.com.)
+## Web fetching lives in its own file
+- `WebFetch`, `raw.githubusercontent.com` fallbacks, and what a fetch
+  actually returns are in
+  [`claude-code-webfetch.md`](claude-code-webfetch.md).
 
 ## Claude Code on the web: CI monitoring toggles have no default setting
 - The per-PR "CI monitoring" panel (web session sidebar) shows two toggles,
@@ -165,12 +93,11 @@
   **skill command blocks**: the user's local shell is zsh too, so a command
   block I write into a skill gets run under zsh — keep it bash/zsh-portable.
   (A `mapfile` loop in the link-skills draft failed this way; PR #71.)
-- **Process substitution breaks in a pipeline.** `diff <(a) <(b)` works alone
-  but fails under zsh once it feeds a pipe, with `/proc/self/fd/N: No such file
-  or directory` --- and a downstream `grep -c` then reports a false `0`.
+- **Process substitution breaks in a pipeline.**
+  `diff <(a) <(b)` works alone but fails under zsh once it feeds a pipe, with `/proc/self/fd/N: No such file or directory` --- and a downstream `grep -c` then reports a false `0`.
   Bash runs the same line fine, so it survives review.
-  Use temp files instead; see `memories/tools.md`, "A process substitution
-  feeding a pipeline fails under zsh".
+  Use temp files instead.
+  See [`memories/zsh.md`](zsh.md), "A process substitution feeding a pipeline fails under zsh".
 
 ## Skill command blocks — resolve the ai-config repo root with the per-skill symlink
 - To `cd` to the repo root from inside a skill, use the **per-skill** form

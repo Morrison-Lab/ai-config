@@ -591,6 +591,37 @@ class StateStore:
                 )
             return cancelled
 
+    def retry_task(self, task_id: str, reason: str = "Manual retry requested via CLI") -> bool:
+        """Atomically retry a FAILED or CANCELLED task by resetting it to READY."""
+        now = time.time()
+        import uuid
+        with self.transaction() as cur:
+            cur.execute(
+                """
+                UPDATE tasks
+                SET status = 'READY',
+                    error = ?,
+                    retry_count = retry_count + 1,
+                    assigned_worker_id = NULL,
+                    heartbeat_at = NULL,
+                    completed_at = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('FAILED', 'CANCELLED')
+                """,
+                (reason, now, task_id),
+            )
+            success = cur.rowcount > 0
+            if success:
+                event_id = f"{task_id}-retry-{uuid.uuid4().hex}"
+                cur.execute(
+                    """
+                    INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (event_id, task_id, "TASK_RETRY", json.dumps({"reason": reason}), now),
+                )
+            return success
+
     def get_ready_tasks(self, limit: int = 50) -> List[Task]:
         """Fetch tasks in READY status, sorted by priority and creation date."""
         return self.list_tasks(status=TaskStatus.READY, limit=limit)

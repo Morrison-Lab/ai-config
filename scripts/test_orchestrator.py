@@ -355,6 +355,32 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         roles = [t.role for t in dag]
         self.assertEqual(roles, ["researcher", "coder", "reviewer", "tester"])
 
+        # Check dependencies: coder depends on researcher, reviewer on coder, tester on reviewer
+        self.assertEqual(dag[1].depends_on, [dag[0].id])
+        self.assertEqual(dag[2].depends_on, [dag[1].id])
+        self.assertEqual(dag[3].depends_on, [dag[2].id])
+
+    def test_retry_task_status_guard(self):
+        task = Task(title="Failed Task", role="coder")
+        self.store.create_task(task)
+        self.store.claim_task(task.id, "worker-1")
+        self.store.complete_task(task.id, {"status": "ok"})
+
+        # Retrying a COMPLETED task must return False
+        retried = self.store.retry_task(task.id)
+        self.assertFalse(retried)
+
+        # Now test on a FAILED task
+        task2 = Task(title="Failed Task 2", role="coder", max_retries=0)
+        self.store.create_task(task2)
+        self.store.claim_task(task2.id, "worker-1")
+        self.store.fail_task(task2.id, "fatal error", can_retry=False)
+
+        self.assertEqual(self.store.get_task(task2.id).status, TaskStatus.FAILED)
+        retried2 = self.store.retry_task(task2.id, reason="Manual user retry")
+        self.assertTrue(retried2)
+        self.assertEqual(self.store.get_task(task2.id).status, TaskStatus.READY)
+
     def test_fail_task_status_guard_cannot_clobber_completed(self):
         task = Task(title="Guarded Task", role="coder")
         self.store.create_task(task)

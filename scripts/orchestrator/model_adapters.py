@@ -431,17 +431,58 @@ class AgyAdapter(BaseModelAdapter):
                         provider=self.provider,
                         execution_time_seconds=time.time() - start_time,
                     )
+                return ModelResponse(
+                    success=False,
+                    content=proc.stdout,
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=proc.stderr.strip() or f"gemini exited with code {proc.returncode}",
+                )
             except Exception as exc:
-                logger.warning("gemini CLI failed: %s", exc)
+                return ModelResponse(
+                    success=False,
+                    content="",
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=f"gemini CLI invocation failed: {str(exc)}",
+                )
 
-        if self.is_available():
-            return ModelResponse(
-                success=True,
-                content=f"Processed by Antigravity / Gemini adapter for: {prompt[:80]}",
-                model_used=target_model,
-                provider=self.provider,
-                execution_time_seconds=time.time() - start_time,
-            )
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if api_key:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+            }
+            if system_prompt:
+                payload["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    return ModelResponse(
+                        success=True,
+                        content=content.strip(),
+                        model_used=target_model,
+                        provider=self.provider,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+            except Exception as exc:
+                return ModelResponse(
+                    success=False,
+                    content="",
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=f"Gemini API request failed: {str(exc)}",
+                )
 
         return ModelResponse(
             success=False,
@@ -449,7 +490,7 @@ class AgyAdapter(BaseModelAdapter):
             model_used=target_model,
             provider=self.provider,
             execution_time_seconds=0.0,
-            error="Gemini CLI or GEMINI_API_KEY not configured.",
+            error="Gemini CLI executable or GEMINI_API_KEY not configured.",
         )
 
 
@@ -486,17 +527,65 @@ class CodexAdapter(BaseModelAdapter):
                         provider=self.provider,
                         execution_time_seconds=time.time() - start_time,
                     )
+                return ModelResponse(
+                    success=False,
+                    content=proc.stdout,
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=proc.stderr.strip() or f"codex exited with code {proc.returncode}",
+                )
             except Exception as exc:
-                logger.warning("codex CLI failed: %s", exc)
+                return ModelResponse(
+                    success=False,
+                    content="",
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=f"codex invocation failed: {str(exc)}",
+                )
 
-        if bool(os.environ.get("OPENAI_API_KEY")):
-            return ModelResponse(
-                success=True,
-                content=f"Processed by Codex adapter for: {prompt[:80]}",
-                model_used=target_model,
-                provider=self.provider,
-                execution_time_seconds=time.time() - start_time,
-            )
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            url = "https://api.openai.com/v1/chat/completions"
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            payload = {
+                "model": target_model,
+                "messages": messages,
+            }
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    return ModelResponse(
+                        success=True,
+                        content=content.strip(),
+                        model_used=target_model,
+                        provider=self.provider,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+            except Exception as exc:
+                return ModelResponse(
+                    success=False,
+                    content="",
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=f"OpenAI API request failed: {str(exc)}",
+                )
 
         return ModelResponse(
             success=False,
@@ -517,7 +606,7 @@ class CursorAdapter(BaseModelAdapter):
         self.default_model = default_model
 
     def is_available(self) -> bool:
-        return shutil.which("cursor") is not None or os.path.exists(os.path.expanduser("~/.cursor"))
+        return shutil.which("cursor") is not None
 
     def invoke(
         self,
@@ -529,14 +618,35 @@ class CursorAdapter(BaseModelAdapter):
         start_time = time.time()
         target_model = model or self.default_model
 
-        if self.is_available():
-            return ModelResponse(
-                success=True,
-                content=f"Processed by Cursor adapter for: {prompt[:80]}",
-                model_used=target_model,
-                provider=self.provider,
-                execution_time_seconds=time.time() - start_time,
-            )
+        if shutil.which("cursor"):
+            cmd = ["cursor", "--agent", prompt]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                if proc.returncode == 0:
+                    return ModelResponse(
+                        success=True,
+                        content=proc.stdout.strip(),
+                        model_used=target_model,
+                        provider=self.provider,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+                return ModelResponse(
+                    success=False,
+                    content=proc.stdout,
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=proc.stderr.strip() or f"cursor exited with code {proc.returncode}",
+                )
+            except Exception as exc:
+                return ModelResponse(
+                    success=False,
+                    content="",
+                    model_used=target_model,
+                    provider=self.provider,
+                    execution_time_seconds=time.time() - start_time,
+                    error=f"cursor CLI invocation failed: {str(exc)}",
+                )
 
         return ModelResponse(
             success=False,
@@ -544,7 +654,7 @@ class CursorAdapter(BaseModelAdapter):
             model_used=target_model,
             provider=self.provider,
             execution_time_seconds=0.0,
-            error="Cursor environment not detected.",
+            error="Cursor CLI executable not available on PATH.",
         )
 
 

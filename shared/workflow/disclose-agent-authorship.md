@@ -98,13 +98,17 @@ The literal `--body "@...` grep finds the two Dependabot sites and misses the th
 
 An earlier draft of this passage gave a different and wrong reason --- that the handle is never spelled contiguously in a source file, because a diff view would summon the bot.
 That is false twice over.
-The handle appears 242 times across this corpus's markdown (measured 2026-08-24), including in `AGENTS.md`, `CLAUDE.md` and `README.md`, and none of those has ever dispatched a run.
+The handle appears 250 times across this corpus's markdown at this commit, by the command below, including in `AGENTS.md`, `CLAUDE.md` and `README.md`, and none of those has ever dispatched a run.
 And [`memories/mention-triggers.md`](../../memories/mention-triggers.md) states the gate as `contains(github.event.comment.body, '@claude')`, over comment, review and issue bodies --- file contents are not among them.
 The practice of not spelling it applies to text that becomes a comment, which is what that file scopes it to.
 
 ```bash
-grep -rn -- '--body "@' --include='*.md' --include='*.sh' .   # command-shaped sites
+# Option flags go BEFORE `--`; after it they are read as file operands, and the
+# search silently runs unfiltered. The first draft of this block got that wrong
+# and returned its own test fixtures as apparent sites.
+grep -rn --include='*.md' --include='*.sh' -- '--body "@' .   # command-shaped sites
 grep -rn '@claude' skills/                                    # prose sites
+git grep -noi '@claude' -- '*.md' | wc -l                     # the figure above
 ```
 
 - **Do:** omit the marker on a comment whose whole body is a command addressed to another bot.

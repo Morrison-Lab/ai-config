@@ -57,13 +57,6 @@ import sys
 
 # --- what counts as posting a comment ---------------------------------------
 #
-# ANCHORED at a command position -- start of string, after a separator, or
-# after a shell keyword that introduces a command. Unanchored, this fires on
-# every reply and every doc that merely QUOTES the command, and this corpus
-# quotes it constantly (`shared/workflow/claim-pr.md` is nothing but such
-# quotes).
-# --- what counts as posting a comment ---------------------------------------
-#
 # ANCHORED at a command position -- start of string, after a separator, or after
 # a shell keyword that introduces a command. Unanchored, this fires on every
 # reply and every doc that merely QUOTES the command, and this corpus quotes it
@@ -110,10 +103,20 @@ POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")", re.MULTILIN
 API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # A body-supplying field is what separates a POST from the review-READ that
 # `CLAUDE.md` prescribes and every ARDI round runs.
-API_BODY_FIELD_RE = re.compile(r"(?:-f|-F|--field|--raw-field)\s+body=")
+# The optional quote is load-bearing: `tool-mappings`'s own canonical reply
+# command is `-F "body=@<file>"`, quote first, and this corpus writes the
+# quoted-whole-argument spelling for sibling flags too
+# (`request-pr-review`'s `-f "reviewers[]=<r>"`). Without it the registry line
+# this change annotates was completely invisible to the guard.
+API_BODY_FIELD_RE = re.compile(r"(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 # The comment-bearing endpoints, and the GraphQL comment mutations.
+# No `/replies` alternative. GitHub's reply route is
+# `POST /repos/{o}/{r}/pulls/{n}/comments/{id}/replies`, so it always contains
+# `/comments` -- the alternative could never fire alone, which is why no fixture
+# could isolate it and why two attempts at one were masked by their own paths.
+# An untestable alternative also implies a route that does not exist.
 API_COMMENT_TARGET_RE = re.compile(
-    r"/comments|/replies|/notes|/discussions"
+    r"/comments|/notes|/discussions"
     r"|addDiscussionComment|addComment", re.IGNORECASE)
 
 
@@ -123,12 +126,16 @@ def is_api_post(segment):
         return False
     if not API_COMMENT_TARGET_RE.search(segment):
         return False
-    # No GraphQL exception. It was added on the theory that a comment mutation
-    # carries its body as a variable and so would fail the `body=` test -- but
-    # every GraphQL comment site in this corpus supplies `-f body='...'`, so the
-    # branch decided nothing while classifying any command that merely NAMED the
-    # mutation as a post: `gh api graphql --input payload.json  # addDiscussion-
-    # Comment payload` drew a warning for a command posting nothing visible.
+    # A GraphQL comment mutation may carry its body inside the query text or in
+    # an `--input` file rather than in a `body=` field, so the field test alone
+    # would miss it. The earlier version of this branch keyed on the mutation
+    # NAME alone, which classified `gh api graphql --input p.json  # addDiscuss-
+    # ionComment payload` -- a comment about a payload -- as a post.
+    # `mutation` beside the name is what separates executing one from naming one.
+    if (re.search(r"\bmutation\b", segment)
+            and re.search(r"addDiscussionComment|addComment", segment,
+                          re.IGNORECASE)):
+        return True
     return bool(API_BODY_FIELD_RE.search(segment))
 
 
@@ -138,7 +145,7 @@ def is_api_post(segment):
 REVIEW_ONLY_RE = re.compile(_ANCHOR + r"gh\s+pr\s+review\b", re.MULTILINE)
 ANY_BODY_FLAG_RE = re.compile(
     r"--body\b|--body=|--body-file|--message\b|--message=|-b\s|-m\s|-F\s"
-    r"|(?:-f|-F|--field|--raw-field)\s+body=")
+    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 
 def is_post_segment(segment):
@@ -200,15 +207,21 @@ EMOJI_DISCLOSURE_RE = re.compile(
 # being assumed to cover the other.
 UNREADABLE_RE = re.compile(
     r"--body-file|--description-file|--editor\b|--web\b"
-    r"|-F\s+body=@|(?<!-)-F\s+(?![\w.-]+=)\S"
+    # `-F <file>` is gh pr comment's own body-file shorthand. Matched as a token
+    # with NO `=` in it, rather than by a negative lookahead after an optional
+    # quote: the optional quote gave the engine a backtracking path where it
+    # skipped the quote, failed to find `key=` starting at `"`, and so satisfied
+    # the negation -- which made `-F "in_reply_to=5"` look like a file.
+    r"|(?<!-)-F\s+[\"']?[^\s\"'=]+[\"']?(?:\s|$)"
     r"|--(?:body|message)[\s=]+(?:\"[^\"]*\$|'[^']*\$|\$)"
-    # The short forms expand identically; omitting them reported a marker
-    # missing from a body the check demonstrably could not read.
-    r"|-(?:b|m)\s+(?:\"[^\"]*\$|'[^']*\$|\$)"
+    # NOTE: the short `-b`/`-m` forms need no clause of their own. They fall
+    # through to the `not HAS_INLINE_BODY_RE` branch, which already rejects a
+    # value beginning with `$`. A separate alternative here was dead code whose
+    # comment described a behaviour the pattern below had taken over.
     # `@file` is gh api's read-from-file sigil, and it is routinely QUOTED
     # (`-F body="@/tmp/reply.md"`), so the optional quote is load-bearing.
-    r"|(?:-f|-F|--field|--raw-field)\s+body=[\"']?(?:@|\$)"
-    r"|(?:-f|-F|--field|--raw-field)\s+body=(?:\"[^\"]*\$|'[^']*\$)"
+    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=[\"']?(?:@|\$)"
+    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=(?:[^\"'\s]*\$)"
 )
 # A body flag with an inline literal value. Its absence on an interactive
 # invocation means there is no body to read here at all.
@@ -218,7 +231,7 @@ UNREADABLE_RE = re.compile(
 # as posting routes and omitted here, so they drew exactly that.
 HAS_INLINE_BODY_RE = re.compile(
     r"--(?:body|message)[\s=]+[\"']?[^\s\"'$]|-(?:b|m)\s+[\"']?[^\s\"'$]"
-    r"|(?:-f|-F|--field|--raw-field)\s+body=")
+    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
 # `[^"']*` after the handle would swallow unbounded prose, exempting a comment

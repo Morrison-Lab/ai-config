@@ -262,6 +262,47 @@ CASES = [
     ("--body= with an expanded variable is still unreadable",
      'gh pr comment 12 --body="$BODY"', None),
 
+    # --- round-6: the QUOTED whole-argument field form ----------------------
+    #
+    # `tool-mappings`'s own canonical reply command writes `-F "body=@<file>"`,
+    # quote first, and the field pattern required `body=` to follow whitespace
+    # directly -- so the registry line this change annotates was invisible.
+    ("gh api with a quoted body= argument",
+     'gh api repos/o/r/issues/1/comments -f "body=Working on this."', "missing"),
+    ("gh api with a quoted body= argument, WITH marker",
+     'gh api repos/o/r/issues/1/comments -f "body=Done.\n\n' + MARKER + '"',
+     False),
+    ("the registry's own quoted body=@file reply command",
+     'gh api -X POST "repos/o/r/pulls/1/comments/9/replies" -F "body=@/tmp/r.md"',
+     None),
+    ("a quoted typed field does not look like a body-file",
+     'gh api repos/o/r/pulls/1/comments -F "in_reply_to=5" -f body="Addressed."',
+     "missing"),
+    ("an unquoted -F file is still a body-file",
+     'gh pr comment 12 -F "/tmp/body.md"', None),
+
+    # --- round-6: executing a GraphQL mutation vs naming one -----------------
+    ("a GraphQL mutation whose body is not in a body= field",
+     "gh api graphql --input p.json -f query='mutation { addDiscussionComment(x) }'",
+     None),
+    ("a comment mentioning the mutation posts nothing",
+     'gh api graphql --input p.json  # addDiscussionComment payload', False),
+
+    # --- round-6: properties that survived mutation with the suite green -----
+    ("command substitution is a command position",
+     'URL=$(gh pr comment 12 --body "bare")', True),
+    ("a brace group is a command position",
+     '{ gh pr comment 12 --body "bare"; }', True),
+    ("the marker needs its attribution prefix, not just the parenthetical",
+     'gh pr comment 12 --body "Our (AI agent) policy is documented."', "missing"),
+    ("a heredoc piped into --body-file - keeps its opener tail",
+     "cat <<'EOF' | gh pr comment 12 --body-file -\nDone, undisclosed.\nEOF",
+     "missing"),
+    # GitHub's reply route always contains `/comments`, so this is caught by
+    # that alternative -- there is no separate `/replies` one to pin.
+    ("the review-thread reply route is a comment target",
+     'gh api "repos/o/r/pulls/1/comments/9/replies" -f body="bare"', True),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),
@@ -362,11 +403,21 @@ def run():
                 emitted = json.loads(out)["hookSpecificOutput"]
             except Exception:
                 emitted = {}
+            try:
+                whole = json.loads(out)
+            except Exception:
+                whole = {}
             ok = (proc.returncode == 0
                   and emitted.get("hookEventName") == "PreToolUse"
                   and "additionalContext" in emitted
                   and "permissionDecision" not in emitted
-                  and "disclosure marker" in emitted.get("additionalContext", ""))
+                  and "disclosure marker" in emitted.get("additionalContext", "")
+                  # The user-facing half. Warning only the model leaves the
+                  # account holder unaware a comment posted under their login
+                  # was flagged, and check-hook-output-shape.py's systemMessage
+                  # rule fires on Stop hooks only, so nothing else pins this.
+                  and isinstance(whole.get("systemMessage"), str)
+                  and "agent" in whole.get("systemMessage", ""))
         else:
             ok = proc.returncode == 0 and out == ""
         failed += not ok
@@ -403,14 +454,19 @@ def run():
         ("MCP discussion comment WITH marker",
          "mcp__github__discussion_comment_write",
          "Reply.\n\n" + MARKER, False),
+        # Round-6: the isinstance guard exists for review methods that submit no
+        # body at all (resolve_thread, delete_pending); nothing pinned it.
+        ("an MCP call with no body is not judged",
+         "mcp__github__pull_request_review_write", None, False),
     ):
-        got = guard.verdict_mcp(tool, {"body": body}) is not None
+        payload = {} if body is None else {"body": body}
+        got = guard.verdict_mcp(tool, payload) is not None
         ok = got == expect
         failed += not ok
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 10
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 11
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

@@ -614,21 +614,18 @@ The `claim-pr` skill operationalizes this (the exact claim wording, when it appl
 
 [shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
 
-A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login, avatar, and `MEMBER` association, and reads as `type: User` --- so nothing in the API distinguishes it from a comment they typed, and `memories/github.md` already records auditors mistaking exactly that.
-The forge cannot say it, so the body has to: end every comment with
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/github.md` records auditors mistaking exactly that.
+The forge cannot say it, so the body must: end every agent-posted comment with
 
 ```
 _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
-The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**, the false-clean failure [`fully-clean`](shared/workflow/fully-clean.md) already describes.
-Check any replacement marker against that tuple before adopting it.
-Two exemptions: a comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the brevity; and a comment posted under a genuine bot token, where the forge already reports `type: Bot`.
-Comment bodies only --- not commit messages, titles, issue bodies, or PR bodies.
+The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**.
+The fragment carries the rest: the two exemptions, the comment-bodies-only scope, and the queries that verify a marker or a bot identity.
 
 - **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
-- **Don't:** use the robot emoji in it, or put it in a commit message or title.
-
+- **Don't:** use the robot emoji in it, or put it in a commit message, a title, an issue body, or a PR body.
 
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 

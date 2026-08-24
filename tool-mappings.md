@@ -16,7 +16,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 > `_Posted by Claude Code (AI agent) --- not written by a human._`
 >
 > This registry is the substitution point for remote/web sessions, which have no
-> `gh` at all — so a marker-free template here is a marker-free comment there, in
+> `gh` at all --- so a marker-free template here is a marker-free comment there, in
 > exactly the population that cannot fall back to the CLI examples in the skills.
 > See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
 > Two exemptions: a body another machine parses as a command (`@dependabot
@@ -64,10 +64,10 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen "<N>" --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
 | `LABEL_ISSUE` | Set an issue's labels. The two behave differently and are not interchangeable: `--add-label` ADDS to the existing set, while the MCP path REPLACES the whole set, so pass the union of existing and new labels there. The MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit "<N>" --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
 | `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh api "repos/<owner>/<repo>/labels/<name>"` | `mcp__github__get_label` |
-| `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | (no GitHub MCP tool; use gh api REST or graphql) |
-| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. Readable over REST. | `gh api repos/{owner}/{repo}/discussions/{number}[/comments]` | (no GitHub MCP tool; use gh api REST or graphql) |
-| `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api graphql (addDiscussionComment)` | `mcp__github__discussion_comment_write` |
-| `ANSWER_DISCUSSION` | Mark a comment as the accepted answer on a Q&A discussion. | `gh api graphql (markDiscussionCommentAsAnswer)` | (no GitHub MCP tool; use gh api graphql) |
+| `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | `mcp__github__list_discussions` |
+| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. Readable over REST. | `gh api repos/{owner}/{repo}/discussions/{number}[/comments]` | `mcp__github__get_discussion / mcp__github__get_discussion_comments` |
+| `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh api graphql (addDiscussionComment)` | `mcp__github__discussion_comment_write (method=add\|reply)` |
+| `ANSWER_DISCUSSION` | Mark a comment as the accepted answer on a Q&A discussion. | `gh api graphql (markDiscussionCommentAsAnswer)` | `mcp__github__discussion_comment_write (method=mark_answer)` |
 | `CREATE_DISCUSSION` | Open a new discussion in a category. | `gh api graphql (createDiscussion)` | (no GitHub MCP tool; use gh api graphql) |
 | `CLOSE_DISCUSSION` | Close a discussion with a reason (RESOLVED, OUTDATED, DUPLICATE). | `gh api graphql (closeDiscussion)` | (no GitHub MCP tool; use gh api graphql) |
 | `PUSH` | Push commits to a branch. | `git push -u origin "<branch>"` | (use git; no GitHub MCP equivalent) |

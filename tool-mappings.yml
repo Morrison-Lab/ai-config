@@ -177,19 +177,19 @@ operations:
   - id: LIST_DISCUSSIONS
     description: List a repository's discussions. Readable over REST; writes are GraphQL-only.
     cli: gh api repos/{owner}/{repo}/discussions
-    github_mcp: (no GitHub MCP tool; use gh api REST or graphql)
+    github_mcp: mcp__github__list_discussions
   - id: VIEW_DISCUSSION
     description: Read a discussion topic and its comment thread. Readable over REST.
     cli: gh api repos/{owner}/{repo}/discussions/{number}[/comments]
-    github_mcp: (no GitHub MCP tool; use gh api REST or graphql)
+    github_mcp: mcp__github__get_discussion / mcp__github__get_discussion_comments
   - id: COMMENT_DISCUSSION
     description: Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh api graphql (addDiscussionComment)
-    github_mcp: mcp__github__discussion_comment_write
+    github_mcp: mcp__github__discussion_comment_write (method=add|reply)
   - id: ANSWER_DISCUSSION
     description: Mark a comment as the accepted answer on a Q&A discussion.
     cli: gh api graphql (markDiscussionCommentAsAnswer)
-    github_mcp: (no GitHub MCP tool; use gh api graphql)
+    github_mcp: mcp__github__discussion_comment_write (method=mark_answer)
   - id: CREATE_DISCUSSION
     description: Open a new discussion in a category.
     cli: gh api graphql (createDiscussion)

@@ -110,7 +110,13 @@ for d in json.load(sys.stdin):
     for n in d.get('notes', []):
         body = n.get('body', '').lower()
         # Both wordings: claims posted before 2026-08-24 say 'paws off'.
-        if ('hold off' in body or 'paws off' in body) and not n.get('resolved'):
+        # A RELEASE is excluded first -- the retired release note
+        # '... done --- paws off released.' contains 'paws off', so a claim-only
+        # test resolves the release's thread instead of the claim's.
+        is_release = any(t in body for t in
+                         ('unclaim', 'released', 'pr is free', 'now mergeable'))
+        is_claim = ('hold off' in body or 'paws off' in body) and not is_release
+        if is_claim and not n.get('resolved'):
             print(d['id']); break
     else: continue
     break

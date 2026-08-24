@@ -33,15 +33,15 @@ If only one positional arg is given, treat it as `pr_number`.
     Call `mcp__github__pull_request_read(method = "get_comments", owner = <owner>, repo = <repo>, pullNumber = <pr_number>)`. Walk the last ~10 comments and confirm:
 
     - the most recent claim/release exchange is an unmatched claim that hasn't yet been followed by a release.
-      **Match the two-word invariant `hold off` (case-insensitively), never a full sentence** — the PR claim reads `please hold off on pushing to this branch until I'm done` while the issue claim reads `please hold off until I'm done`, so neither sentence is a substring of the other and a matcher keyed on either one misses the other.
-      **Also match the pre-2026-08-24 invariant `paws off`**: claims posted before that date are still live on open PRs, since a claim expires on activity rather than on age, and a matcher narrowed to the new wording returns nothing on them — indistinguishable from no claim at all.
+      **Match the two-word invariant `hold off` (case-insensitively), never a full sentence** --- the PR claim reads `please hold off on pushing to this branch until I'm done` while the issue claim reads `please hold off until I'm done`, so neither sentence is a substring of the other and a matcher keyed on either one misses the other.
+      **Also match the pre-2026-08-24 invariant `paws off`**: claims posted before that date are still live on open PRs, since a claim expires on activity rather than on age, and a matcher narrowed to the new wording returns nothing on them --- indistinguishable from no claim at all.
       So the claim test is `test("hold off|paws off"; "i")`.
       Treat **any** of these as a release marker --- four the corpus posts today plus one retired form still sitting on open PRs, and enumerating only this command's own is what makes it post a stray release over somebody else's completed handover:
-        - this command's `… done — claim released.`
-        - its pre-2026-08-24 form `… done — paws off released.`
-        - `claim-pr`'s `Done with my local session — unclaiming.`
+        - this command's `… done --- claim released.`
+        - its pre-2026-08-24 form `… done --- paws off released.`
+        - `claim-pr`'s `Done with my local session --- unclaiming.`
         - `ardi`'s on-clean unclaim, `Done --- PR is free.`
-        - `post-merge`'s conflict unclaim, `Conflict resolved — branch is now mergeable. …`
+        - `post-merge`'s conflict unclaim, `Conflict resolved --- branch is now mergeable. …`
 
       Derive that list rather than trusting this one, since a skill may add a sixth: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
     - and that claim's `lane` matches the lane we're releasing.
@@ -51,7 +51,7 @@ If only one positional arg is given, treat it as `pr_number`.
 3. Compose the comment body, exactly in this shape so other agents recognise it:
 
     ```
-    <lane> done — claim released.
+    <lane> done --- claim released.
 
     _Posted by Claude Code (AI agent) --- not written by a human._
     ```
@@ -59,12 +59,12 @@ If only one positional arg is given, treat it as `pr_number`.
     If `summary` is provided, append it in parentheses on the first line:
 
     ```
-    <lane> done — claim released. (<summary>)
+    <lane> done --- claim released. (<summary>)
 
     _Posted by Claude Code (AI agent) --- not written by a human._
     ```
 
-    The trailing marker is required on every agent-posted comment, and is deliberately emoji-free — see [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md).
+    The trailing marker is required on every agent-posted comment, and is deliberately emoji-free --- see [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md).
 
 4. Post the comment:
 

@@ -168,7 +168,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 > `_Posted by Claude Code (AI agent) --- not written by a human._`
 >
 > This registry is the substitution point for remote/web sessions, which have no
-> `gh` at all — so a marker-free template here is a marker-free comment there, in
+> `gh` at all --- so a marker-free template here is a marker-free comment there, in
 > exactly the population that cannot fall back to the CLI examples in the skills.
 > See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
 > Two exemptions: a body another machine parses as a command (`@dependabot

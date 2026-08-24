@@ -140,6 +140,31 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 (`rme`#988/`epi204`#362: both cited `shared/writing/math-derivation-steps.md` in present tense while `ai-config`#502 was still open and each repo's `.ai-config` pin predated it --- flagged as a dangling reference by review in both, fixed by bumping the pin once #502 merged and hedging the still-open `gha`#228 half of the same citation.)
 
+## Surface merge-order constraints --- Draft-gating is the last resort, not the default
+
+(`UCD-SERG/ucd-serg.github.io`
+[#110](https://github.com/UCD-SERG/ucd-serg.github.io/pull/110) /
+[#111](https://github.com/UCD-SERG/ucd-serg.github.io/pull/111), 2026-08-24:
+two PRs with a genuine ordering dependency and **zero** file overlap --- #110
+added a `workflow_dispatch` trigger to `claude-code-review.yml`, and #111
+granted the `actions: write` permission used to dispatch that trigger.
+Rungs 1 and 2 were both applied exactly as the section prescribes: a
+`MERGE ORDER` box in chat, twice, and an ordering note leading each PR body.
+#111 was merged first anyway, at `17:49:30Z`, leaving #110 open and behind
+until a branch update landed it at `17:56:00Z`.
+Rung 3 was correctly withheld: both PRs were clean at the same moment, so
+drafting one would have stalled its own review loop over a constraint whose
+violation cost six and a half minutes.
+What bounded that cost was the callee rather than any surface on the PRs ---
+gha's dispatch step falls back and posts a warning comment instead of failing
+the run, so an `actions: write` dispatch pointed at a workflow still lacking
+the trigger degraded gracefully.
+The moral: rung 2 failed open, rung 3 was correctly withheld, and the callee's
+graceful degradation is what priced the violation at minutes rather than
+breakage.
+Recorded as [ai-config#2163](https://github.com/Morrison-Lab/ai-config/issues/2163),
+with no rule change proposed.)
+
 ## Re-check for latest review findings before reporting PR status --- A process question is still a status fetch
 
 (Morrison-Lab/gha#511, 2026-08-18: the user asked why the session had not

@@ -121,6 +121,7 @@ class BacklogSweeper:
                 "repo_slug": self.repo,
                 "use_worktree": True,
                 "persist_branch": True,
+                "push_remote": not dry_run,
                 "recommended_tier": "standard_code",
             },
         )

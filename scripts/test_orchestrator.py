@@ -298,6 +298,37 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertEqual(extracted["docs/guide.md"].strip(), "# Guide")
         self.assertNotIn("python", extracted)
 
+    def test_extract_files_from_markdown_context_fallback(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        generic_sample = (
+            "Here is the code to fix the issue:\n"
+            "```python\n"
+            "import os\n"
+            "def sweep(): pass\n"
+            "```\n"
+        )
+        context = "Issue: `hooks/monitor-open-prs.py` accumulates temporary state files."
+        extracted = extract_files_from_markdown(generic_sample, context_text=context)
+        self.assertIn("hooks/monitor-open-prs.py", extracted)
+        self.assertIn("def sweep(): pass", extracted["hooks/monitor-open-prs.py"])
+
+    def test_coder_subagent_empty_patch_fails_fast(self):
+        agent = self.registry.get_for_role("coder")
+        task = Task(
+            title="Empty code task",
+            role="coder",
+            payload={
+                "instruction": "Fix something",
+                "use_worktree": True,
+                "branch_name": "task/empty-patch-test",
+                "dry_run": True,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        res = agent.execute(task, ctx)
+        self.assertTrue(res.success)  # In dry_run mode, dry-run simulation succeeds
+
     def test_reviewer_subagent_empty_branch_diff_blocks(self):
         agent = self.registry.get_for_role("reviewer")
         task = Task(

@@ -145,7 +145,16 @@ class PRClaimManager:
             logger.info("Successfully opened draft PR for issue #%d: %s", issue_number, result["pr_url"])
 
             # 7. Post claim comment on issue
-            claim_body = f"Orchestrator worker is working on this via draft PR #{result.get('pr_number')} -- paws off until done."
+            # The trailing marker discloses agent authorship on every comment we
+            # post, and is deliberately emoji-free: check-pr-fully-clean.py
+            # matches the robot emoji as a review-body marker, so a claim
+            # carrying it would scan as a finding-free review.
+            # See shared/workflow/disclose-agent-authorship.md.
+            claim_body = (
+                f"Orchestrator worker is working on this via draft PR "
+                f"#{result.get('pr_number')} -- please hold off until done."
+                "\n\n_Posted by Claude Code (AI agent) -- not written by a human._"
+            )
             comment_cmd = ["gh", "issue", "comment", str(issue_number), "--body", claim_body]
             if effective_repo:
                 comment_cmd.extend(["-R", effective_repo])

@@ -89,7 +89,7 @@ git log --oneline HEAD.."origin/$BRANCH" 2>/dev/null
 
 An object you cannot resolve locally is the **stronger** signal, not the milder one: the remote moved after your last fetch and you cannot see what is there.
 
-### 3. "Paws off" claim by someone else
+### 3. Claim comment by someone else
 
 Look at the open PR for this branch for a claim comment posted by **another**
 session or person. (Your own most-recent "I'm working on this" comment is fine —
@@ -98,10 +98,17 @@ that's your claim.)
 ```bash
 PR=$(gh pr view --json number,headRefName -q .number 2>/dev/null)   # VIEW_PR
 gh pr view "$PR" --json comments \
-  -q '.comments[] | select(.body | test("paws off"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
+  -q '.comments[] | select(.body | test("hold off|paws off"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
-If the latest "paws off" comment is from someone **other than you**, hasn't
+The alternation is deliberate: claims posted before 2026-08-24 say "paws off",
+and a claim stays live on activity rather than on age, so an old-wording claim
+can be live right now.
+A matcher narrowed to the new phrase returns nothing on such a thread, which
+reads exactly like an unclaimed one --- see
+[`claim-pr`](../../shared/workflow/claim-pr.md).
+
+If the latest claim comment is from someone **other than you**, hasn't
 been unclaimed, and is still live --- the PR shows a push or comment within
 the last 2 hours, per
 [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule ---
@@ -190,7 +197,7 @@ review, not a draft).
 
 ## Relationship to other skills
 
-- **`claim-pr`** — posts/removes the "paws off" claim comment this skill reads
+- **`claim-pr`** — posts/removes the claim comment this skill reads
   in check #3. `push` is the read side; `claim-pr` is the write side.
 - **`session-lock` / `deconflict-sessions`** — the local-checkout counterpart:
   it keeps parallel sessions on one machine from sharing a working tree. `push`
@@ -208,7 +215,7 @@ review, not a draft).
 - ❌ Force-pushing over commits another session added (check #2)
 - ❌ Bare `git push --force` instead of `--force-with-lease --force-if-includes` (check #6)
 - ❌ Reusing an earlier fetch as the check --- the reading has to be taken immediately before the push (check #2)
-- ❌ Pushing past a fresh "paws off" claim from someone else (check #3)
+- ❌ Pushing past a fresh claim comment from someone else (check #3)
 - ❌ Pushing onto a `do-not-merge` / `hold` PR without asking (check #4)
 - ❌ Pushing while a `@claude` run is mid-session on the branch (check #5)
 - ❌ Pushing directly to `main` / the default branch (check #1)

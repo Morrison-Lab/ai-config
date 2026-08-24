@@ -139,7 +139,9 @@ this is outward-facing and hard to reverse.
    not planned:
 
    ```bash
-   gh issue comment <N> --body 'Moved to <discussion-url> — this is better suited to Discussions.'   # COMMENT_ISSUE
+   gh issue comment <N> --body 'Moved to <discussion-url> — this is better suited to Discussions.
+
+   _Posted by Claude Code (AI agent) --- not written by a human._'   # COMMENT_ISSUE
    gh issue close <N> --reason 'not planned'   # CLOSE_ISSUE
    ```
 

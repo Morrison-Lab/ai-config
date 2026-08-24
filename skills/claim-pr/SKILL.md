@@ -34,8 +34,12 @@ Past 2 hours the claim has expired; re-post it before resuming.
 ### GitHub
 
 ```bash
-gh pr comment <N> --body "Claude Code CLI (local session) is working on this — paws off until I'm done."      # COMMENT_PR
-gh issue comment <N> --body "Claude Code CLI (local session) is working on this — paws off until I'm done."   # COMMENT_ISSUE
+gh pr comment <N> --body "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
+gh issue comment <N> --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
 
 (`COMMENT_PR` / `COMMENT_ISSUE` are abstract operation tokens — resolve to your
@@ -47,7 +51,9 @@ On GitLab, post the claim as a **resolvable discussion** (not a plain note)
 so it can be resolved later:
 
 ```bash
-glab mr note create <N> --message "Claude Code CLI (local session) is working on this — paws off until I'm done."
+glab mr note create <N> --message "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
 > GitLab MR notes are resolvable discussions by default.
@@ -102,7 +108,9 @@ DISCUSSION_ID=$(glab api "projects/<PROJECT_ID>/merge_requests/<MR_IID>/discussi
 import json, sys
 for d in json.load(sys.stdin):
     for n in d.get('notes', []):
-        if 'paws off' in n.get('body', '') and not n.get('resolved'):
+        body = n.get('body', '').lower()
+        # Both wordings: claims posted before 2026-08-24 say 'paws off'.
+        if ('hold off' in body or 'paws off' in body) and not n.get('resolved'):
             print(d['id']); break
     else: continue
     break
@@ -117,8 +125,12 @@ glab api --method PUT \
 ### GitHub — post a closing comment
 
 ```bash
-gh pr comment <N> --body "Done with my local session — unclaiming."      # COMMENT_PR
-gh issue comment <N> --body "Done with my local session — unclaiming."   # COMMENT_ISSUE
+gh pr comment <N> --body "Done with my local session — unclaiming.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
+gh issue comment <N> --body "Done with my local session — unclaiming.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
 
 ## Notes

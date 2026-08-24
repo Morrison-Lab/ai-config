@@ -130,9 +130,15 @@ EOF
 - Check `gh label list` for an existing `followup`, `deferred`, or
   `tech-debt` label and add it with `--label`. **Don't fabricate labels
   that don't exist** — `gh` will fail and you'll have to retry.
-- Don't add `🤖 Generated with Claude Code` attribution to the issue body
+- Don't add `🤖 Generated with Claude Code` attribution to the issue **body**
   unless the user asks. Issue attribution isn't covered by the global
   `attribution` setting.
+  This is not an exemption from the agent-disclosure rule, which governs
+  **comments** rather than issue bodies and uses a different, deliberately
+  emoji-free marker --- see
+  [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md).
+  So a comment this skill posts on the deferring PR carries the marker, while
+  the filed issue's own body stays unattributed.
 
 **GitLab:**
 

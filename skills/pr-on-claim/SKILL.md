@@ -28,7 +28,9 @@ Operationalizes the strong form of the claim workflow: branch → empty commit �
 4. Open a **draft PR** with:
    - Title: issue title (or override)
    - Body: `"Closes #<N>\n\nWIP — opened up front to claim the issue; implementing now."`
-5. Post a claim comment on the issue: `"Claude Code CLI (local session) is working on this — paws off until I'm done."`
+5. Post a claim comment on the issue: `"Claude Code CLI (local session) is working on this — please hold off until I'm done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._"`
+   (the trailing marker is required on every agent-posted comment --- see
+   [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md))
 
 ## Why draft?
 

@@ -142,7 +142,7 @@ last two.
    implementation form chosen in Step 1 and why, the target file(s)/path(s),
    and enough detail that a future `gi`/`grab-issue` session -- which does
    have push access -- can build it unattended. Don't claim it (`claim-pr`'s
-   "paws off" comment is for a session about to implement); leave it open
+   claim comment is for a session about to implement); leave it open
    for whoever picks it up.
 3. **No access to the target repo at all** (not in the session's GitHub
    scope, no network path, issue creation itself fails) → file the issue in

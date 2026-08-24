@@ -607,6 +607,35 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
+## Every comment you post to a forge says an agent posted it
+
+[shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
+
+A comment posted through `gh`/`glab` under the account holder's credentials
+carries **their** login, avatar, and `MEMBER` association, and reads as
+`type: User` --- so nothing in the API distinguishes it from a comment they
+typed, and `memories/github.md` already records auditors mistaking exactly that.
+The forge cannot say it, so the body has to: end every comment with
+
+```
+_Posted by Claude Code (AI agent) --- not written by a human._
+```
+
+The marker deliberately avoids the robot emoji, which
+`scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry ---
+a disclosed claim comment would otherwise scan as a finding-free **review**, the
+false-clean failure [`fully-clean`](shared/workflow/fully-clean.md) already
+describes.
+Check any replacement marker against that tuple before adopting it.
+The one exemption is a comment another machine parses as a command
+(`@dependabot rebase`); the test is the audience, not the brevity.
+Comment bodies only --- not commit messages, titles, or PR bodies.
+
+- **Do:** append the marker to every claim, release, status, reply, and
+  self-review comment, including ones whose prose already names the session.
+- **Don't:** use the robot emoji in it, or put it in a commit message or title.
+
+
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 
 [shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)

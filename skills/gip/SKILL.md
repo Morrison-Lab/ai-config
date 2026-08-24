@@ -140,7 +140,9 @@ and the default branch for each issue:
 > entirely within this worktree and touch only files relevant to this issue.
 >
 > 1. **Claim it** so no one else double-works it: post a brief "Working on this
->    --- paws off until I'm done." comment on the issue
+>    --- please hold off until I'm done." comment on the issue, ending with the
+>    agent-disclosure marker every agent-posted comment carries
+>    (`_Posted by Claude Code (AI agent) --- not written by a human._`)
 >    (`gh issue comment <N> --body "..."`, or the MCP
 >    `mcp__github__add_issue_comment` equivalent in a remote session).
 > 2. **Check history** — before writing code, scan merged/closed PRs that

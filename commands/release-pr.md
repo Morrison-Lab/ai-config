@@ -6,7 +6,7 @@ allowed-tools:
   - mcp__github__pull_request_read
 ---
 
-Counterpart to `/claim-pr`. Post a single, recognisable "paws off released" comment so other agents and sessions know the PR is free for the next person.
+Counterpart to `/claim-pr`. Post a single, recognisable "claim released" comment so other agents and sessions know the PR is free for the next person.
 
 ## Arguments
 
@@ -31,7 +31,7 @@ If only one positional arg is given, treat it as `pr_number`.
 
     Call `mcp__github__pull_request_read(method = "get_comments", owner = <owner>, repo = <repo>, pullNumber = <pr_number>)`. Walk the last ~10 comments and confirm:
 
-    - the most recent claim/release exchange is an unmatched claim — a "paws off until I'm done" claim comment that hasn't yet been followed by a release. Treat **either** release phrasing as a release marker: this command's `… done — paws off released.` **or** the existing `claim-pr` skill's `Done with my local session — unclaiming.`,
+    - the most recent claim/release exchange is an unmatched claim — a claim comment (`please hold off until I'm done`, or the pre-2026-08-24 wording `paws off until I'm done`) that hasn't yet been followed by a release. **Match both wordings on each side**, case-insensitively: claims and releases posted before 2026-08-24 use the old phrasing and are still live on open PRs, and a matcher narrowed to the new phrase alone returns nothing on them — indistinguishable from no claim at all. Treat **any** of these as a release marker: this command's `… done — claim released.`, its pre-2026-08-24 form `… done — paws off released.`, **or** the existing `claim-pr` skill's `Done with my local session — unclaiming.`,
     - and that claim's `lane` matches the lane we're releasing.
 
     If the most recent signal is already a release, or the claim was by a different lane, stop and tell the user — don't post a stray release that misrepresents who was holding the PR.
@@ -39,14 +39,22 @@ If only one positional arg is given, treat it as `pr_number`.
 3. Compose the comment body, exactly in this shape so other agents recognise it:
 
     ```
-    <lane> done — paws off released.
+    <lane> done — claim released.
+
+    _Posted by Claude Code (AI agent) --- not written by a human._
     ```
 
-    If `summary` is provided, append it in parentheses on the same line:
+    If `summary` is provided, append it in parentheses on the first line:
 
     ```
-    <lane> done — paws off released. (<summary>)
+    <lane> done — claim released. (<summary>)
+
+    _Posted by Claude Code (AI agent) --- not written by a human._
     ```
+
+    The trailing marker is required on every agent-posted comment, and is
+    deliberately emoji-free — see
+    [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md).
 
 4. Post the comment:
 

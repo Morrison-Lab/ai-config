@@ -6,9 +6,20 @@ to start a conflicting parallel session.
 Use:
 
 ```
-gh pr comment <N> --body "Working on this --- paws off until I'm done."
-gh issue comment <N> --body "Working on this --- paws off until I'm done."
+gh pr comment <N> --body "Working on this --- please hold off on pushing to this branch until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
+gh issue comment <N> --body "Working on this --- please hold off until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
+
+Both halves of that body are load-bearing, and they answer different questions.
+The first line says the thread is claimed.
+The trailing line says **who claimed it**, and it is required on every comment an
+agent posts to a forge --- not only on a claim.
+See [`disclose-agent-authorship`](disclose-agent-authorship.md), which carries the
+rule, the exact marker, and why the marker deliberately avoids the robot emoji.
 
 Then proceed with the work. After the session ends (PR merged, issue closed, or
 work otherwise paused), follow up with a closing comment so the PR/issue is
@@ -34,7 +45,7 @@ PR is a stronger "in-flight" signal than a comment alone.
 **A claim expires 2 hours after the most recent push or comment on the
 PR/issue --- reassert it rather than resuming under a stale one.**
 A claim comment with no expiry binds the thread indefinitely: a crashed or
-abandoned session leaves its "paws off" standing forever, and a second session
+abandoned session leaves its "hold off" standing forever, and a second session
 has no rule for when the claim stops blocking.
 So the convention is time-boxed and keyed to observable activity: a claim is
 **live for 2 hours from the most recent push or comment** on the PR/issue, and
@@ -87,6 +98,41 @@ while under-respecting a live one costs a collision.
 issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
 
+**Every detector of a claim matches the OLD wording as well as the new one, and
+dropping the old alternation is the one edit that fails silently.**
+The claim body said "paws off until I'm done" until 2026-08-24 and now says
+"please hold off ...".
+Claims posted before that are still sitting on open PRs and issues, and a claim
+stays live on activity rather than on age --- so a thread claimed under the old
+wording and pushed to this morning is live right now.
+
+A detector narrowed to the new phrase alone still returns cleanly on such a
+thread.
+It returns **nothing**, which is indistinguishable from an unclaimed thread, and
+that reading licenses exactly the parallel session this whole convention exists
+to prevent.
+Nothing in the output announces the miss: a claim search that finds no claim
+looks the same whether the thread is free or the matcher went blind.
+
+So match the alternation, case-insensitively, everywhere a claim is read:
+
+```bash
+gh pr view <N> --json comments \
+  -q '.comments[] | select(.body | test("hold off|paws off"; "i"))'   # READ_PR_COMMENTS
+```
+
+Keep the old alternative until no claim under the old wording can plausibly
+still be live --- which, given the 2-hour rule keys on activity and not on the
+comment's own age, means until every PR and issue open on 2026-08-24 has closed.
+Removing it is a deliberate later edit, not tidying to do in passing.
+
+- **Do:** match `hold off|paws off` case-insensitively wherever a claim is read.
+- **Do:** treat the old alternative as load-bearing until the threads carrying it
+  have closed.
+- **Don't:** read an empty claim search as an unclaimed thread without first
+  confirming the matcher covers both wordings --- the two results are identical.
+- **Don't:** drop the back-compat alternative as part of an unrelated change.
+
 **Verify a mid-task "already done" claim against real PR state before trusting
 or redoing it.** A PR you claimed and are actively driving can still gain
 commits from a **second, independently-running session** under the same
@@ -105,7 +151,7 @@ about claiming a PR before starting, but about **re-verifying you're still
 the sole active driver** once work has been under way for a while ---
 especially when you picked up the PR mid-session (e.g. by answering a
 diagnostic question about it) rather than through the normal claim-then-branch
-flow, so no fresh "paws off" check ever ran right before you started pushing.
+flow, so no fresh claim check ever ran right before you started pushing.
 (`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment
 reply attributed to `d-morrison` reading exactly like a Claude-authored
 reply, claiming a fix "Addressed... Pushed in 3fb8c5b" that this session

@@ -313,7 +313,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this --- paws off" (or equivalent) and the claim is
+   If it says "Working on this --- please hold off" (or the pre-2026-08-24
+   wording "paws off", or any equivalent claim) and the claim is
    still live --- a push or comment within the last 2 hours ---
    skip it --- another session owns it.
    An expired claim (over 2 idle hours) no longer blocks; take over with a
@@ -321,7 +322,9 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash
-   gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR
+   gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.
+
+   _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
 5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge
    commit that caused the conflict), and merge:
@@ -354,7 +357,9 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    ```
 8. **Unclaim** with a brief resolution summary:
    ```bash
-   gh pr comment <N> --body "Conflict resolved — branch is now mergeable. <one-line summary of what conflicted and how it was resolved>"   # COMMENT_PR
+   gh pr comment <N> --body "Conflict resolved — branch is now mergeable. <one-line summary of what conflicted and how it was resolved>
+
+   _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
 
 Resolve PRs one at a time — not because worktrees race each other (each

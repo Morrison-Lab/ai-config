@@ -895,9 +895,9 @@ It lapsed.
 
 [shared/workflow/incidents-dont-repeal-decisions.md](shared/workflow/incidents-dont-repeal-decisions.md)
 
-## Non-destructive repo and memory actions
+## Non-destructive actions
 
-The user gives general permission to proceed with non-destructive actions such as setting up PRs, reading GitHub repository data through the API, running non-destructive Git and Perl commands, and editing shared `CLAUDE.md` memory. This includes pushing branches and opening PRs against the ai-config repo. Default to action without confirmation for reasonable non-destructive steps; ask only for destructive, ambiguous high-impact, or genuinely blocking choices. Destructive operations still require explicit instruction.
+Standing grant, recorded universally in `AGENTS.md` ("Default to action without asking"): proceed with non-destructive steps without asking, and ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
 
 ## Auto-orchestration: always look for Workflow opportunities
 

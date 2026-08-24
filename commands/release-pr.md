@@ -34,7 +34,7 @@ If only one positional arg is given, treat it as `pr_number`.
 
     - the most recent claim/release exchange is an unmatched claim that hasn't yet been followed by a release.
       **Match the two-word invariant `hold off` (case-insensitively), never a full sentence** --- the PR claim reads `please hold off on pushing to this branch until I'm done` while the issue claim reads `please hold off until I'm done`, so neither sentence is a substring of the other and a matcher keyed on either one misses the other.
-      **Also match both retired invariants, `paws off` and `back off`** (the second was `ardi`'s, and is easy to miss because six other skills agreed on the first): claims posted before 2026-08-24 are still live on open PRs, since a claim expires on activity rather than on age, and a matcher narrowed to the new wording returns nothing on them --- indistinguishable from no claim at all.
+      **Also match both retired invariants, `paws off` and `back off`** (the second was `ardi`'s, and is easy to miss because seven other skills agreed on the first): claims posted before 2026-08-24 are still live on open PRs, since a claim expires on activity rather than on age, and a matcher narrowed to the new wording returns nothing on them --- indistinguishable from no claim at all.
       So the claim test is `test("hold off|paws off|back off"; "i")`.
       Treat **any** of these as a release marker --- four the corpus posts today plus one retired form still sitting on open PRs, and enumerating only this command's own is what makes it post a stray release over somebody else's completed handover:
         - this command's `… done --- claim released.`

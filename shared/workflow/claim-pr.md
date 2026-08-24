@@ -99,12 +99,17 @@ It said "back off until done", and had done since 2026-06-17 --- and it is the c
 Both now read "please hold off ...".
 
 Derive that set from history rather than from the current tree, which no longer contains any of them.
-Widen the pathspec past `skills/` and match the opening quote only, since `handoff` opens a multi-line body whose closing quote is on another line, and the orchestrator is executable code rather than a skill:
+Match the **wordings**, not the `--body` flag.
+Keying on the flag looks tighter and reaches neither `gip`, which states its claim as quoted prose inside a worker brief, nor the orchestrator, which builds the body as a Python f-string on a different line from the flag --- the two emitters least like the others, and so the two a flag-shaped search is least able to find.
+Widen the pathspec past `skills/` for the same reason.
 
 ```bash
 git log -p --all -- 'skills/**' 'shared/**' 'commands/**' 'scripts/**' \
-  | grep -oiE '^\+.*--(body|message) "[^"]*(off until|claim)' | sort -u
+  | grep -oiE '^\+.*(paws off|back off|hold off)[^"]*' | sort -u
 ```
+
+That returns the matcher and prose lines too, so it wants a skim rather than a count --- the deliberate trade for a search that cannot miss an emitter because of how it happened to spell the call.
+
 Claims posted before that are still sitting on open PRs and issues, and a claim stays live on activity rather than on age --- so a thread claimed under the old wording and pushed to this morning is live right now.
 
 A detector narrowed to the new phrase alone still returns cleanly on such a thread.
@@ -136,7 +141,7 @@ Treat a comment as a release rather than a claim when it also matches `unclaim|r
 - **Do:** treat both old alternatives as load-bearing until the threads carrying them have closed.
 - **Don't:** read an empty claim search as an unclaimed thread without first confirming the matcher covers both wordings --- the two results are identical.
 - **Don't:** drop a back-compat alternative as part of an unrelated change.
-- **Don't:** enumerate the retired wordings from the files you happen to be editing --- `back off` was invisible to exactly that method for a full review round, because the one file that posted it was not one of the six that agreed with each other.
+- **Don't:** enumerate the retired wordings from the files you happen to be editing --- `back off` was invisible to exactly that method for a full review round, because the one file that posted it was not one of the seven that agreed with each other.
 
 **Verify a mid-task "already done" claim against real PR state before trusting or redoing it.**
 A PR you claimed and are actively driving can still gain commits from a **second, independently-running session** under the same account.

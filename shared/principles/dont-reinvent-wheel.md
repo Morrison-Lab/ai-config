@@ -138,6 +138,9 @@ through a different, more robust mechanism.
 The `Task` fix was verified empirically to be a no-op; the actual fix
 was migrating to the canonical version.)
 
+Both this section and the close-the-loop paragraph above wait for an event --- a bug to patch, or a capability you just ported.
+[`upgrade-to-gha`](../workflow/upgrade-to-gha.md) carries the unprompted case, where nothing is broken and the duplicate has simply sat there, and it reuses the structural tell above as one of its four candidate conditions.
+
 ## Prefer forking or contributing over re-building
 
 When an existing external source is close but not exact — it does most

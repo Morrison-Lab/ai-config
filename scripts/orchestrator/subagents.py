@@ -30,7 +30,7 @@ STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* .
 
 
 def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
-    """Return True if content is a placeholder stub, echoes any file path, or is a bare path string."""
+    """Return True if content is a placeholder stub, echoes file paths, or is a list of bare path strings."""
     clean_content = content.strip()
     if not clean_content:
         return True
@@ -39,26 +39,30 @@ def is_stub_or_self_referential(content: str, cand_path: str = "") -> bool:
     if not lines:
         return True
 
-    # Check if all non-empty lines are stubs (e.g. "... \n pass" or "# ...\n# ...")
-    all_stub_lines = all(
-        line in STUB_PATTERNS or line.lstrip("#/ *-").rstrip("*/").strip() in STUB_PATTERNS
-        for line in lines
-    )
-    if all_stub_lines:
-        return True
+    # Build candidate variants for path checking
+    cand_variants = set()
+    if cand_path:
+        clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
+        cand_basename = clean_cand.split("/")[-1]
+        cand_variants = {clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"}
 
-    # If content is a single line, check if it's a bare or commented path string
-    if len(lines) == 1:
-        uncommented = lines[0].lstrip("#/ *-").rstrip("*/").strip("`'\" \t\r\n")
-        if BARE_PATH_REGEX.match(uncommented) or uncommented in STUB_PATTERNS:
+    def _is_single_line_stub_or_path(raw_line: str) -> bool:
+        line_clean = raw_line.strip()
+        if not line_clean:
             return True
-        if cand_path:
-            clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
-            cand_basename = clean_cand.split("/")[-1]
-            if uncommented in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
-                return True
+        uncommented = line_clean.lstrip("#/ *-").rstrip("*/").strip("`'\" \t\r\n")
+        if not uncommented:
+            return True
+        if uncommented in STUB_PATTERNS or line_clean in STUB_PATTERNS:
+            return True
+        if BARE_PATH_REGEX.match(uncommented):
+            return True
+        if uncommented in cand_variants:
+            return True
+        return False
 
-    return False
+    # Return True if ALL non-empty lines are stubs, comments, or bare file paths
+    return all(_is_single_line_stub_or_path(line) for line in lines)
 
 
 def find_candidate_file_paths(text: str) -> List[str]:

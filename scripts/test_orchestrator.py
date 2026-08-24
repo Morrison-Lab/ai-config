@@ -575,6 +575,35 @@ class TestWorktreeIsolation(unittest.TestCase):
                 self.assertFalse(result.success)
                 self.assertIn("Git commit failed in worktree", result.error)
 
+    def test_coder_subagent_worktree_path_traversal_blocked(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = PathTraversalTask = Task(
+                title="Path traversal attack simulation",
+                role="coder",
+                payload={
+                    "instruction": "Overwrite outside file",
+                    "target_file": "../../../outside.txt",
+                    "code_content": "malicious content\n",
+                    "use_worktree": True,
+                    "branch_name": "task/traversal-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+            result = coder.execute(task, ctx)
+
+            self.assertFalse(result.success)
+            self.assertIn("escapes worktree root", result.error)
+
 
 def main():
     unittest.main(verbosity=2)

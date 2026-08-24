@@ -120,10 +120,27 @@ class WorktreeManager:
         if not self.worktree_parent.exists():
             return cleaned
 
+        # Parse active worktree mappings from git to accurately identify branches
+        wt_branch_map: dict[Path, str] = {}
+        rc, out, _ = self._run_git(["worktree", "list", "--porcelain"])
+        if rc == 0:
+            current_wt: Optional[Path] = None
+            for line in out.splitlines():
+                if line.startswith("worktree "):
+                    current_wt = Path(line.split(" ", 1)[1].strip()).resolve()
+                elif line.startswith("branch ") and current_wt:
+                    ref = line.split(" ", 1)[1].strip()
+                    if ref.startswith("refs/heads/"):
+                        ref = ref[len("refs/heads/"):]
+                    wt_branch_map[current_wt] = ref
+
         for child in self.worktree_parent.iterdir():
             if child.is_dir() and child.name.startswith("task_"):
-                safe_id = child.name[5:]
-                branch_name = f"task/{safe_id}"
+                resolved_child = child.resolve()
+                branch_name = wt_branch_map.get(resolved_child)
+                if not branch_name:
+                    safe_id = child.name[5:]
+                    branch_name = f"task/{safe_id}"
                 self.remove_worktree(child, delete_branch=branch_name, force=True)
                 cleaned += 1
 

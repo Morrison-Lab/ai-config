@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import os
+from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional
 
@@ -90,7 +91,19 @@ class CoderSubagent(BaseSubagent):
                     delete_branch=not persist_branch,
                 ) as wt_path:
                     if target_file and code_content:
-                        file_path = wt_path / target_file
+                        # Prevent absolute paths or directory traversals from escaping worktree
+                        clean_rel = Path(target_file)
+                        if clean_rel.is_absolute():
+                            clean_rel = Path(*clean_rel.parts[1:])
+                        file_path = (wt_path / clean_rel).resolve()
+                        wt_resolved = wt_path.resolve()
+                        if not file_path.is_relative_to(wt_resolved):
+                            return SubagentResult(
+                                success=False,
+                                data=result_data,
+                                error=f"Security error: target_file '{target_file}' escapes worktree root {wt_path}",
+                                execution_time_seconds=time.time() - start_time,
+                            )
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_text(code_content, encoding="utf-8")
 

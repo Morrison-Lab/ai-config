@@ -413,6 +413,45 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertEqual(self.router.get_adapter(ModelProvider.CODEX).provider, ModelProvider.CODEX)
         self.assertEqual(self.router.get_adapter(ModelProvider.CURSOR).provider, ModelProvider.CURSOR)
 
+    def test_reclaim_stale_tasks_status_guard_respects_cancelled(self):
+        task = Task(title="Stale Task", role="coder")
+        self.store.create_task(task)
+        self.store.claim_task(task.id, "worker-1")
+
+        # Simulate heartbeat expiring in past
+        with self.store.transaction() as cur:
+            cur.execute("UPDATE tasks SET heartbeat_at = 1.0 WHERE id = ?", (task.id,))
+
+        # Cancel the task
+        self.store.cancel_task(task.id, reason="User cancelled")
+        self.assertEqual(self.store.get_task(task.id).status, TaskStatus.CANCELLED)
+
+        # reclaim_stale_tasks must NOT reclaim a CANCELLED task
+        reclaimed = self.store.reclaim_stale_tasks(stale_threshold_seconds=1.0)
+        self.assertEqual(reclaimed, 0)
+        self.assertEqual(self.store.get_task(task.id).status, TaskStatus.CANCELLED)
+
+    def test_resolve_blocked_tasks_status_guard_respects_cancelled(self):
+        t1 = Task(title="Parent", role="coder")
+        t2 = Task(title="Child", role="tester", depends_on=[t1.id])
+        self.store.create_task(t1)
+        self.store.create_task(t2)
+
+        self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.BLOCKED)
+
+        # Cancel child before parent completes
+        self.store.cancel_task(t2.id, reason="No longer needed")
+        self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.CANCELLED)
+
+        # Parent completes
+        self.store.claim_task(t1.id, "worker-1")
+        self.store.complete_task(t1.id, {"status": "ok"})
+
+        # resolve_blocked_tasks must NOT unblock a CANCELLED child
+        unblocked = self.store.resolve_blocked_tasks()
+        self.assertEqual(unblocked, 0)
+        self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.CANCELLED)
+
 
 def main():
     unittest.main(verbosity=2)

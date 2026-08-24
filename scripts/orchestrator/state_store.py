@@ -668,23 +668,26 @@ class StateStore:
                             error = 'Dependency failed or cancelled',
                             completed_at = ?,
                             updated_at = ?
-                        WHERE id = ?
+                        WHERE id = ? AND status = 'BLOCKED'
                         """,
                         (now, now, t_id),
                     )
-                    cur.execute(
-                        """
-                        INSERT INTO task_events (id, task_id, event_type, details, timestamp)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            f"{t_id}-dep-failed-{now}",
-                            t_id,
-                            "TASK_FAILED",
-                            json.dumps({"reason": "Dependency failed or cancelled"}),
-                            now,
-                        ),
-                    )
+                    if cur.rowcount > 0:
+                        import uuid
+                        event_id = f"{t_id}-dep-failed-{uuid.uuid4().hex}"
+                        cur.execute(
+                            """
+                            INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (
+                                event_id,
+                                t_id,
+                                "TASK_FAILED",
+                                json.dumps({"reason": "Dependency failed or cancelled"}),
+                                now,
+                            ),
+                        )
                 # If all dependencies are COMPLETED, unblock to READY
                 elif all(s == "COMPLETED" for s in statuses):
                     cur.execute(
@@ -692,24 +695,27 @@ class StateStore:
                         UPDATE tasks
                         SET status = 'READY',
                             updated_at = ?
-                        WHERE id = ?
+                        WHERE id = ? AND status = 'BLOCKED'
                         """,
                         (now, t_id),
                     )
-                    cur.execute(
-                        """
-                        INSERT INTO task_events (id, task_id, event_type, details, timestamp)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            f"{t_id}-unblocked-{now}",
-                            t_id,
-                            "TASK_UNBLOCKED",
-                            json.dumps({"status": "READY"}),
-                            now,
-                        ),
-                    )
-                    unblocked_count += 1
+                    if cur.rowcount > 0:
+                        import uuid
+                        event_id = f"{t_id}-unblocked-{uuid.uuid4().hex}"
+                        cur.execute(
+                            """
+                            INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (
+                                event_id,
+                                t_id,
+                                "TASK_UNBLOCKED",
+                                json.dumps({"status": "READY"}),
+                                now,
+                            ),
+                        )
+                        unblocked_count += 1
         return unblocked_count
 
     def reclaim_stale_tasks(self, stale_threshold_seconds: float = 60.0) -> int:
@@ -717,6 +723,7 @@ class StateStore:
         now = time.time()
         cutoff = now - stale_threshold_seconds
         reclaimed_count = 0
+        import uuid
 
         with self.transaction() as cur:
             cur.execute(
@@ -743,23 +750,26 @@ class StateStore:
                             retry_count = retry_count + 1,
                             error = 'Lease expired / worker timeout, reclaimed',
                             updated_at = ?
-                        WHERE id = ?
+                        WHERE id = ? AND status = 'RUNNING'
                         """,
                         (now, t_id),
                     )
-                    cur.execute(
-                        """
-                        INSERT INTO task_events (id, task_id, event_type, details, timestamp)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            f"{t_id}-reclaimed-{now}",
-                            t_id,
-                            "TASK_RECLAIMED",
-                            json.dumps({"reason": "Lease heartbeat expired", "retry_count": retries + 1}),
-                            now,
-                        ),
-                    )
+                    if cur.rowcount > 0:
+                        event_id = f"{t_id}-reclaimed-{uuid.uuid4().hex}"
+                        cur.execute(
+                            """
+                            INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (
+                                event_id,
+                                t_id,
+                                "TASK_RECLAIMED",
+                                json.dumps({"reason": "Lease heartbeat expired", "retry_count": retries + 1}),
+                                now,
+                            ),
+                        )
+                        reclaimed_count += 1
                 else:
                     cur.execute(
                         """
@@ -768,24 +778,26 @@ class StateStore:
                             error = 'Task timed out with no remaining retries',
                             completed_at = ?,
                             updated_at = ?
-                        WHERE id = ?
+                        WHERE id = ? AND status = 'RUNNING'
                         """,
                         (now, now, t_id),
                     )
-                    cur.execute(
-                        """
-                        INSERT INTO task_events (id, task_id, event_type, details, timestamp)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            f"{t_id}-timeout-failed-{now}",
-                            t_id,
-                            "TASK_FAILED",
-                            json.dumps({"reason": "Max retries exceeded on timeout"}),
-                            now,
-                        ),
-                    )
-                reclaimed_count += 1
+                    if cur.rowcount > 0:
+                        event_id = f"{t_id}-timeout-failed-{uuid.uuid4().hex}"
+                        cur.execute(
+                            """
+                            INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (
+                                event_id,
+                                t_id,
+                                "TASK_FAILED",
+                                json.dumps({"reason": "Max retries exceeded on timeout"}),
+                                now,
+                            ),
+                        )
+                        reclaimed_count += 1
         return reclaimed_count
 
     def get_events(self, task_id: str) -> List[TaskEvent]:

@@ -190,12 +190,20 @@ class OrchestratorEngine:
                 if result.spawned_tasks:
                     self.queue.enqueue_child_tasks(task.id, result.spawned_tasks)
 
-                self.state_store.complete_task(
+                completed = self.state_store.complete_task(
                     task.id,
                     result=result.data,
                     artifacts=result.artifacts,
                 )
-                logger.info("Task %s ('%s') completed successfully in %.2fs", task.id, task.title, time.time() - start_time)
+                if completed:
+                    logger.info("Task %s ('%s') completed successfully in %.2fs", task.id, task.title, time.time() - start_time)
+                else:
+                    logger.warning(
+                        "Task %s ('%s') finished execution in %.2fs but complete_task was rejected (status was not RUNNING, may have been cancelled or reclaimed).",
+                        task.id,
+                        task.title,
+                        time.time() - start_time,
+                    )
             else:
                 err_msg = result.error or "Subagent reported execution failure."
                 self.state_store.fail_task(task.id, error=err_msg, can_retry=True, worker_id=worker_id)

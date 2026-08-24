@@ -56,6 +56,10 @@
   Note `skills/opposition-research/SKILL.md` names "the Reddit `.json`
   endpoints" as a data source, which holds for a session that can authenticate
   and not for this one.)
+  In a **local** session even the HTML route above is closed --- WebFetch
+  domain-blocks all three reddit.com hosts before Reddit answers.
+  [`reddit-access.md`](reddit-access.md) carries the five failed routes and
+  the working Claude-in-Chrome route (measured 2026-08-23/24).
 - **`docs.github.com` itself can be blocked outright by a remote session's
   network policy** (proxy 403 on every page, and `api.github.com` too —
   both at the curl/WebFetch level; the GitHub MCP tools route through

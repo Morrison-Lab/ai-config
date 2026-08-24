@@ -387,7 +387,11 @@ class CoderSubagent(BaseSubagent):
                     max_total_context_lines = task.payload.get("max_total_context_lines", 800)
                     total_lines_injected = 0
 
-                    for rel in candidate_paths[:max_context_files]:
+                    sorted_candidates = sorted(
+                        candidate_paths,
+                        key=lambda p: (0 if "/" in p and not p.startswith(("CLAUDE.", "AGENTS.")) else (2 if p in ("CLAUDE.md", "AGENTS.md", "README.md") else 1)),
+                    )
+                    for rel in sorted_candidates[:max_context_files]:
                         if total_lines_injected >= max_total_context_lines:
                             break
                         file_path = resolve_within_worktree(rel, wt_path, wt_resolved)
@@ -403,7 +407,7 @@ class CoderSubagent(BaseSubagent):
                                 allowed_lines = min(max_context_lines_per_file, remaining_budget)
                                 snippet = "\n".join(cur_lines[:allowed_lines])
                                 if len(cur_lines) > allowed_lines:
-                                    snippet += f"\n\n# ... ({len(cur_lines) - allowed_lines} remaining lines omitted) ..."
+                                    snippet += f"\n\n# ... ({len(cur_lines) - allowed_lines} remaining lines omitted) ...\n# Note: `{rel}` is a large file ({len(cur_lines)} lines). If modifying `{rel}`, use search/replace blocks:\n# <<<<<<< SEARCH\n# <exact lines to find>\n# =======\n# <replacement lines>\n# >>>>>>> REPLACE"
                                 existing_context_blocks.append(f"Current content of `{rel}`:\n````{ext}\n{snippet}\n````")
                                 total_lines_injected += min(len(cur_lines), allowed_lines)
                             except Exception as exc:

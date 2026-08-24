@@ -233,25 +233,58 @@ class PRClaimManager:
             return False, "PR has CHANGES_REQUESTED review"
 
         comments = data.get("comments", [])
-        claude_reviews = [c for c in comments if "Claude finished review" in c.get("body", "")]
-        if claude_reviews:
-            latest_review = claude_reviews[-1].get("body", "").lower()
-            blocking_phrases = [
-                "needs more work",
-                "blocked",
-                "blocked on human review",
-                "changes requested",
-                "not clean",
-                "not ready",
-                "impasse",
-                "deadlock",
-                "finding 1 (blocking)",
-                "finding (blocking)",
-                "verdict\n\n**needs more work",
-            ]
-            for phrase in blocking_phrases:
-                if phrase in latest_review:
-                    return False, f"Latest AI review has blocking verdict ('{phrase}')"
+        blocking_phrases = [
+            "needs more work",
+            "needs_work",
+            "blocked",
+            "blocked on human review",
+            "changes requested",
+            "not clean",
+            "not ready",
+            "impasse",
+            "deadlock",
+            "finding 1 (blocking)",
+            "finding (blocking)",
+            "verdict\n\n**needs more work",
+            "verdict: blocked",
+            "verdict: needs_work",
+        ]
+
+        # Scan all review comments for blocking findings
+        for c in comments:
+            body = c.get("body", "").lower()
+            if "claude finished review" in body or "adversarial" in body or "review report" in body:
+                for phrase in blocking_phrases:
+                    if phrase in body:
+                        return False, f"Review comment has blocking verdict ('{phrase}')"
+
+        # 3. Require at least one explicit clean / approved review
+        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
+        has_approved_comment = False
+
+        approval_phrases = [
+            "adversarial self-review verdict: approved",
+            "adversarial code review verdict: approved",
+            "adversarial code review report: pr",
+            "verdict: clean",
+            "verdict: approved",
+            "verdict**: clean",
+            "verdict**: approved",
+            "clean / approved",
+            "verdict: **clean",
+            "verdict: **approved",
+            "claude finished review",
+        ]
+
+        for c in comments:
+            body = c.get("body", "").lower()
+            if any(phrase in body for phrase in approval_phrases):
+                if not any(bp in body for bp in blocking_phrases):
+                    has_approved_comment = True
+                    break
+
+        if not (has_approved_review or has_approved_comment):
+            return False, "No approved adversarial or external review found on PR"
 
         return True, "PR is fully clean across CI and review"
 

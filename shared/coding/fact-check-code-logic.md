@@ -528,17 +528,25 @@ Then read what each hit does with it.
 A handler that re-raises or exits is fine.
 One that returns a default, returns `None`, or records a status and carries on is the case this rule is about.
 
+The same-file case of this check is decidable, so it is being built rather than
+left to judgment: Morrison-Lab/ai-config#2105 specifies an instrument flagging a
+`raise` whose exception type a caller in the same file already catches.
+The cross-file case stays a reading task, since it turns on what each handler
+then does.
+
 - **Do:** grep for handlers of the NEW exception type before changing what a function raises.
 - **Do:** read each handler's body, since only the ones that swallow matter.
 - **Do:** reach for an exception the enclosing handlers do not catch when the point of the change is to stop something being swallowed --- `SystemExit` derives from `BaseException`, so `except Exception` misses it --- and confirm that from the grep rather than assuming it, since a bare `except:` and `except BaseException` do catch it.
-- **Don't:** count an explicit `raise` as louder than the incidental error it replaced; that is a claim about the handlers, not about the raise.
+- **Don't:** count an explicit `raise` as louder than the incidental error it replaced.
+  That is a claim about the handlers, not about the raise.
 - **Don't:** read a green suite as evidence, since the swallowing path is the one that does not fail.
 
 (Morrison-Lab/ai-config#2086, 2026-08-23: a fix for a Windows cp1252 decode bug replaced an `AttributeError` from `None.strip()` with an explicit `raise RuntimeError(...)`, to name the decode failure rather than leave it incidental.
 `_resolve_run_head_sha` in `scripts/check-pr-fully-clean.py` wraps its `run_cmd` call in `except RuntimeError: return None`, so the explicit error was swallowed and the caller went on to append `No review comment has been posted evaluating HEAD SHA ...`.
 That is exit 1 **with** a `  - ` finding bullet --- exactly the shape [`fully-clean`](../workflow/fully-clean.md)'s crash test, `rc==1` plus the absence of bullets, cannot tell apart from a genuine verdict.
 The `AttributeError` it replaced had escaped that catch and was at least loud.
-An adversarial self-review caught it before merge; the shipped fix calls `die()`, whose `SystemExit` no `except RuntimeError` intercepts.)
+An adversarial self-review caught it before merge.
+The shipped fix calls `die()`, whose `SystemExit` no `except RuntimeError` intercepts.)
 
 ## A "safe because X never happens" comment needs its own counter-example before it ships
 

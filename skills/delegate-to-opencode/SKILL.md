@@ -112,7 +112,10 @@ a `models` entry earns its lines only by setting a display name, or by reaching 
 ```
 
 The unauthenticated smoke test failed cleanly with `OpenRouter API key is missing` (same measurement).
-Auth is `opencode auth login openrouter` or the `OPENROUTER_API_KEY` environment variable, and the key is the user's to enter, never the agent's.
+Auth is the `OPENROUTER_API_KEY` environment variable, and the key is the user's to enter, never the agent's.
+The interactive route is broken as of 1.18.21: `opencode auth login <provider>` failed with `Failed to load auth provider metadata ... fetch() URL is invalid` for every provider tried, with or without a config entry.
+Measured 2026-08-23, tracked in [ai-config#2058](https://github.com/Morrison-Lab/ai-config/issues/2058) --- so have the user set the env var (`setx OPENROUTER_API_KEY <key>` on Windows) instead.
+A rejected key answers `User not found`, and one measured cause (2026-08-23) is a paste that doubles the `sk-or-v1-` prefix --- the shape check that catches the paste error without exposing the value is length, 82 characters against a real key's 73 (`sk-or-v1-` is 9 characters plus 64 hex, matching OpenRouter's current key format).
 The current stealth roster is one query, no key needed:
 
 ```bash
@@ -126,7 +129,8 @@ Two routing consequences:
   A hosted destination's payload leaves the machine, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
 - **A stealth model inverts the capability caveat rather than sharing it** --- the consequence the split cannot supply.
   The hosted-free ids are unbenchmarked *small* models, so the "no judgment work" exception binds them.
-  A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot --- but "plausibly" is the operative word: it stays unbenchmarked here, so validate its output like any other delegate's, and timestamp any claim about a specific id.
+  A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot --- but "plausibly" is the operative word: validate its output like any other delegate's, and timestamp any claim about a specific id.
+  First probe rather than a benchmark: on 2026-08-23 `stealth/ox-alpha` scored 4/4 on a known-answer crash-diagnosis task with strict-JSON output, including a byte-level UTF-8 detail (0x9d as the tail of U+201D) --- one task, so it licenses trying such work, not trusting it unvalidated.
 
 - **Do:** activate the provider with a config entry, and route to a stealth model as `openrouter/<model-id>`.
 - **Do:** re-derive the stealth roster from the API on each use --- the ids expire without notice.
@@ -233,6 +237,16 @@ So ask for the structure in the prompt and validate it on return.
 Expect that validation to fail sometimes, because emitting strict JSON is one of the things small models are worst at.
 
 ### 3. Run it
+
+**Pass `--agent plan` for a text-only dispatch --- the default agent stalled on exactly the prompt shape sidecar work sends.**
+`opencode run` defaults to the `build` agent, which runs with tools enabled.
+Measured 2026-08-23 on 1.18.21 with `openrouter/stealth/ox-alpha`: a ~350-word diagnosis prompt (a Python traceback plus a function body, JSON-only output requested) produced zero streamed output across two default-agent runs --- one killed at a 5-minute timeout, the other left running in the background and never observed to finish --- while `--agent plan` completed the identical prompt in 36 seconds, and the default agent answered trivial and medium prompts in 13-15 seconds throughout.
+A candidate explanation is the prompt's file paths inducing tool use that goes nowhere headless, but that mechanism is unconfirmed.
+The measurements above are what this section asserts.
+The fix applies to the background pattern below too: a job that silently stalls under the default agent stalls the same way inside a background-runner-plus-DONE-marker dispatch, so pass `--agent plan` there as well for pure-text batch items.
+
+- **Do:** dispatch pure-text work (diagnose, summarize, extract, reformat) with `--agent plan`, including inside the background-runner pattern below.
+- **Don't:** read a silent multi-minute default-agent run as model slowness --- the same model answered in seconds under the plan agent.
 
 There is no sandbox flag either.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.

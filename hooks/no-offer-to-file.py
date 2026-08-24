@@ -73,6 +73,7 @@ except Exception:
     )
 
     def strip_code(text: str) -> str:
+        """Strip fenced code blocks and inline backtick code spans."""
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 

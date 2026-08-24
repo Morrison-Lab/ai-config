@@ -82,9 +82,18 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    If `.review` is `null`, the reviewer may post as `github-actions[bot]` or another login -- **never report "clean"**; broaden the filter or say no review was found.
 >    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review predates the latest push** -- report `[⏳ In-Flight / Stale](url)` (or `in-flight`), not the review body's verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so a plain string comparison works).
 >    **This timing comparison is best-effort, not proof** -- a review run *started* against an older commit can finish and post *after* a newer push lands, making `createdAt` look current even though the reviewed content is stale (issue comments carry no structured `commit_id` to check directly, unlike formal reviews).
->    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (part of the same call above) as a corroborating signal; treat a mismatch as `[⏳ In-Flight](url)` even if the timing check alone would have said `clean`.
->    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `[⚠️ Unverified](url)` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
->    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `[⚠️ Unverified](url)`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading, hyperlinked as `[✅ Clean (Round N)](url)` or `[✅ Approved](url)`.
+>    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"),
+>    cross-check that mentioned SHA's prefix against `.headRefOid` (part of the same call above) as a corroborating signal;
+>    treat a mismatch as `[⏳ In-Flight](url)` even if the timing check alone would have said `clean`.
+>    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** --
+>    report `[⚠️ Unverified](url)` (not `clean`) instead,
+>    since `committedDate` is the commit's local committer timestamp,
+>    not when GitHub received the push,
+>    and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
+>    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally;
+>    no SHA named means `[⚠️ Unverified](url)`, not `clean`, full stop --
+>    apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading,
+>    hyperlinked as `[✅ Clean (Round N)](url)` or `[✅ Approved](url)`.
 >    A rebuttal the reviewer still disputes is **open** (`[❌ Needs Work (Round N)](url)`), not clean.
 > 2. **External reviewer verdict (a formal Copilot review, or a human's formal review at the head) -- read-only, don't request one.**
 >    The comment above is the `@claude` bot only;
@@ -127,7 +136,9 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    The `group_by(.user.login)` reduces **per reviewer** before taking each one's latest: two humans can review the same head, and a bare `| last` over the combined list would let a later clean "LGTM" from one reviewer silently drop an earlier reviewer's body-only findings.
 >    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"`, so the type field needs no bot-login blocklist (measured 2026-08-15).
 >    Judge each matched review by **substance, not state**: 106 of 106 formal reviews across 60 merged PRs on this repo are `COMMENTED`, zero `APPROVED` (measured 2026-07-30 on #668).
->    Fetch each matched review's body and inline comments; an affirmative zero-findings read across every matched review means a genuine external verdict at the head; findings in any of them mean `N open`.
+>    Fetch each matched review's body and inline comments;
+>    an affirmative zero-findings read across every matched review means a genuine external verdict at the head;
+>    findings in any of them mean `N open`.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
 >    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.

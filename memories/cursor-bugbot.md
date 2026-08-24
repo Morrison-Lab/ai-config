@@ -7,8 +7,10 @@ The gha *capability* (`cursor-code-review.yml`) is catalogued in
 [`gha-reusable-workflows.md`](gha-reusable-workflows.md).
 
 This is lab operating procedure, not wai.
-wai is the writing-principles book and has no Bugbot coverage
-(code search empty, 2026-08-24).
+On 2026-08-24,
+`gh api "search/code?q=bugbot+repo:d-morrison/wai"`
+and `gh api "search/code?q=cursor+review+repo:d-morrison/wai"`
+both returned `total_count: 0`.
 
 ## Two paths, only one works for us today
 
@@ -51,7 +53,7 @@ Measured on [Morrison-Lab/gha#597](https://github.com/Morrison-Lab/gha/pull/597)
 
 - Comment `bugbot run` from `dem-extra1`
   ([comment](https://github.com/Morrison-Lab/gha/pull/597#issuecomment-5391377690)):
-  `cursor[bot]` replied **Bugbot couldn't run — GitHub account mismatch**
+  `cursor[bot]` replied **Bugbot couldn't run: GitHub account mismatch**
   ("The GitHub account linked to your Cursor account does not match the PR author
   … or run Bugbot from a team that covers this repository.").
   No `Cursor Bugbot` check appeared (polled 4 minutes).
@@ -62,7 +64,8 @@ Measured on [Morrison-Lab/gha#597](https://github.com/Morrison-Lab/gha/pull/597)
   [PR review 5005059956](https://github.com/Morrison-Lab/gha/pull/597#pullrequestreview-5005059956).
 
 A session whose `gh api user` is not the PR author cannot test this path
-by commenting. Have the author comment, or use a PR they authored.
+by commenting.
+Have the author comment, or use a PR they authored.
 
 Personal **Pro** (and Pro+) does not qualify for the Enterprise trigger API.
 Pro can still use dashboard Bugbot on PRs that account authored.
@@ -74,7 +77,7 @@ Pro can still use dashboard Bugbot on PRs that account authored.
 Cursor documents the [Bugbot API](https://cursor.com/docs/bugbot.md#api)
 as **Enterprise teams** only.
 
-Dispatching this repo's dogfood caller (`cursor-review.yml`) on 2026-08-24
+Dispatching gha's dogfood caller (`cursor-review.yml`) on 2026-08-24
 against PR #597
 ([run 32694255358](https://github.com/Morrison-Lab/gha/actions/runs/32694255358)):
 
@@ -90,8 +93,8 @@ Use dashboard Bugbot, or replace the secret with an Enterprise `admin:*` key.
 
 `ai-code-review.yml` can pick `cursor` only when that secret is a working
 Enterprise key **and** `cursor` is in `agents`.
-This repo's `ai-review.yml` does not pass `CURSOR_API_KEY` and does not
-include `cursor` in the default agent list.
+`Morrison-Lab/gha`'s `ai-review.yml` does not pass `CURSOR_API_KEY` and does
+not include `cursor` in the default agent list.
 
 ## What "queued" vs "reviewed" means
 

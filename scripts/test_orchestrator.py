@@ -830,6 +830,53 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         with tempfile.TemporaryDirectory() as empty_dir:
             self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
 
+    def test_is_pr_fully_clean_detection(self):
+        import json
+        from unittest.mock import MagicMock
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+
+        # 1. Clean PR
+        clean_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+                {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
+        # 2. Failing CI check
+        dirty_ci_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
+            ],
+            "reviews": [],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("failed", reason)
+
+        # 3. Blocking AI review verdict
+        dirty_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("Needs more work", reason)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

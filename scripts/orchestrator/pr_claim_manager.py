@@ -188,17 +188,65 @@ class PRClaimManager:
         logger.info("PR #%d marked ready for review", pr_number)
         return True
 
+    def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
+        """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
+        effective_repo = self.get_effective_repo_slug(repo_slug)
+        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments"]
+        if effective_repo:
+            cmd.extend(["-R", effective_repo])
+
+        rc, out, err = self._run_cmd(cmd)
+        if rc != 0:
+            return False, f"Failed to query PR #{pr_number} metadata: {err}"
+
+        try:
+            data = json.loads(out)
+        except Exception as exc:
+            return False, f"Failed to parse PR #{pr_number} JSON: {exc}"
+
+        # 1. Check CI statusCheckRollup
+        checks = data.get("statusCheckRollup", [])
+        for chk in checks:
+            name = chk.get("name") or chk.get("context", "unknown")
+            status = chk.get("status")
+            conclusion = (chk.get("conclusion") or chk.get("state") or "").upper()
+            if status != "COMPLETED":
+                return False, f"Check '{name}' is still in progress (status={status})"
+            if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
+                return False, f"Check '{name}' failed with conclusion={conclusion}"
+
+        # 2. Check reviews and comments for clean approval
+        reviews = data.get("reviews", [])
+        has_changes_requested = any(r.get("state") == "CHANGES_REQUESTED" for r in reviews)
+        if has_changes_requested:
+            return False, "PR has CHANGES_REQUESTED review"
+
+        comments = data.get("comments", [])
+        claude_reviews = [c for c in comments if "Claude finished review" in c.get("body", "")]
+        if claude_reviews:
+            latest_review = claude_reviews[-1].get("body", "")
+            if "Needs more work" in latest_review or "BLOCKED" in latest_review:
+                return False, "Latest AI review verdict is 'Needs more work' or 'BLOCKED'"
+
+        return True, "PR is fully clean across CI and review"
+
     def merge_pr_under_mwc(
         self,
         pr_number: int,
         repo_slug: Optional[str] = None,
         dry_run: bool = False,
     ) -> bool:
-        """Merge a PR using squash and delete-branch under active mwc authorization."""
+        """Merge a PR using squash and delete-branch under active mwc authorization once fully clean."""
         effective_repo = self.get_effective_repo_slug(repo_slug)
         if dry_run or not shutil.which("gh"):
             logger.info("[Dry-Run/No GH] Simulating merge of PR #%d under mwc (repo: %s)", pr_number, effective_repo)
             return True
+
+        # Verify PR is fully clean across CI and review before executing merge
+        is_clean, reason = self.is_pr_fully_clean(pr_number, repo_slug=effective_repo)
+        if not is_clean:
+            logger.warning("Cannot merge PR #%d under mwc: %s", pr_number, reason)
+            return False
 
         merge_cmd = ["gh", "pr", "merge", str(pr_number), "--squash", "--delete-branch"]
         if effective_repo:

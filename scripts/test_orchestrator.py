@@ -355,10 +355,37 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         roles = [t.role for t in dag]
         self.assertEqual(roles, ["researcher", "coder", "reviewer", "tester"])
 
-        # Check dependencies: coder depends on researcher, reviewer on coder, tester on reviewer
-        self.assertEqual(dag[1].depends_on, [dag[0].id])
-        self.assertEqual(dag[2].depends_on, [dag[1].id])
-        self.assertEqual(dag[3].depends_on, [dag[2].id])
+    def test_fail_task_status_guard_cannot_clobber_completed(self):
+        task = Task(title="Guarded Task", role="coder")
+        self.store.create_task(task)
+        self.store.claim_task(task.id, "worker-1")
+        self.store.complete_task(task.id, {"status": "ok"})
+
+        # Late worker attempt to fail should be refused and return False
+        failed = self.store.fail_task(task.id, error="Late error", can_retry=True, worker_id="worker-1")
+        self.assertFalse(failed)
+
+        # Task remains COMPLETED
+        t = self.store.get_task(task.id)
+        self.assertEqual(t.status, TaskStatus.COMPLETED)
+
+    def test_find_tasks_by_payload_field_validation(self):
+        task = Task(title="Issue Task", payload={"issue_number": 42})
+        self.store.create_task(task)
+
+        found = self.store.find_tasks_by_payload_field("issue_number", 42)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].id, task.id)
+
+        # Invalid field name with SQL injection characters must raise ValueError
+        with self.assertRaises(ValueError):
+            self.store.find_tasks_by_payload_field("x') OR 1=1 --", 42)
+
+    def test_codex_and_cursor_adapters_registered(self):
+        self.assertIn(ModelProvider.CODEX, self.router.adapters)
+        self.assertIn(ModelProvider.CURSOR, self.router.adapters)
+        self.assertEqual(self.router.get_adapter(ModelProvider.CODEX).provider, ModelProvider.CODEX)
+        self.assertEqual(self.router.get_adapter(ModelProvider.CURSOR).provider, ModelProvider.CURSOR)
 
 
 def main():

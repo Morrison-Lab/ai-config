@@ -198,14 +198,14 @@ class OrchestratorEngine:
                 logger.info("Task %s ('%s') completed successfully in %.2fs", task.id, task.title, time.time() - start_time)
             else:
                 err_msg = result.error or "Subagent reported execution failure."
-                self.state_store.fail_task(task.id, error=err_msg, can_retry=True)
+                self.state_store.fail_task(task.id, error=err_msg, can_retry=True, worker_id=worker_id)
                 logger.warning("Task %s ('%s') failed: %s", task.id, task.title, err_msg)
 
         except Exception as exc:
             stop_heartbeat.set()
             err_msg = f"Exception during execution: {str(exc)}"
             logger.exception("Error executing task %s ('%s')", task.id, task.title)
-            self.state_store.fail_task(task.id, error=err_msg, can_retry=True)
+            self.state_store.fail_task(task.id, error=err_msg, can_retry=True, worker_id=worker_id)
 
     def get_status(self) -> Dict[str, Any]:
         """Return live health and queue status of the orchestrator."""

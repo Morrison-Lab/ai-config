@@ -186,7 +186,36 @@ def cmd_retry(args: argparse.Namespace) -> None:
         print(f"Task '{args.task_id}' not found.", file=sys.stderr)
         sys.exit(1)
 
-    store.fail_task(task.id, error="Manual retry requested via CLI", can_retry=True)
+    if task.status not in (TaskStatus.FAILED, TaskStatus.CANCELLED):
+        print(f"Cannot retry task '{task.id}': current status is {task.status.value}. Only FAILED or CANCELLED tasks can be retried.", file=sys.stderr)
+        sys.exit(1)
+
+    # Force status transition back to READY with incremented retry count
+    with store.transaction() as cur:
+        now = time.time()
+        import uuid
+        cur.execute(
+            """
+            UPDATE tasks
+            SET status = 'READY',
+                error = 'Manual retry requested via CLI',
+                retry_count = retry_count + 1,
+                assigned_worker_id = NULL,
+                heartbeat_at = NULL,
+                completed_at = NULL,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (now, task.id),
+        )
+        event_id = f"{task.id}-retry-{uuid.uuid4().hex}"
+        cur.execute(
+            """
+            INSERT INTO task_events (id, task_id, event_type, details, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (event_id, task.id, "TASK_RETRY", json.dumps({"reason": "Manual retry requested via CLI"}), now),
+        )
     print(f"Task '{task.id}' reset to READY for retry.")
 
 

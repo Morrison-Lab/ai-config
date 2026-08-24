@@ -337,9 +337,13 @@ class StateStore:
 
     def find_tasks_by_payload_field(self, field_name: str, value: Any, limit: int = 100) -> List[Task]:
         """Find tasks where payload JSON has field_name == value."""
-        query = "SELECT * FROM tasks WHERE json_extract(payload, '$." + field_name + "') = ? LIMIT ?"
+        import re
+        if not re.match(r"^[a-zA-Z0-9_]+$", field_name):
+            raise ValueError(f"Invalid field_name identifier: {field_name}")
+
+        query = "SELECT * FROM tasks WHERE json_extract(payload, '$.' || ?) = ? LIMIT ?"
         with self.transaction() as cur:
-            cur.execute(query, (value, limit))
+            cur.execute(query, (field_name, value, limit))
             rows = cur.fetchall()
             results = []
             for row in rows:
@@ -352,6 +356,7 @@ class StateStore:
     def claim_task(self, task_id: str, worker_id: str) -> bool:
         """Atomically claim a READY task for execution by a worker."""
         now = time.time()
+        import uuid
         with self.transaction() as cur:
             cur.execute(
                 """
@@ -367,13 +372,14 @@ class StateStore:
             )
             claimed = cur.rowcount > 0
             if claimed:
+                event_id = f"{task_id}-claimed-{uuid.uuid4().hex}"
                 cur.execute(
                     """
                     INSERT INTO task_events (id, task_id, event_type, details, timestamp)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
-                        f"{task_id}-claimed-{now}",
+                        event_id,
                         task_id,
                         "TASK_CLAIMED",
                         json.dumps({"worker_id": worker_id}),
@@ -404,6 +410,7 @@ class StateStore:
     ) -> bool:
         """Mark a task as completed, store result/artifacts, and record event."""
         now = time.time()
+        import uuid
         with self.transaction() as cur:
             cur.execute(
                 """
@@ -428,13 +435,14 @@ class StateStore:
                             """,
                             (task_id, k, json.dumps(v), now),
                         )
+                event_id = f"{task_id}-completed-{uuid.uuid4().hex}"
                 cur.execute(
                     """
                     INSERT INTO task_events (id, task_id, event_type, details, timestamp)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
-                        f"{task_id}-completed-{now}",
+                        event_id,
                         task_id,
                         "TASK_COMPLETED",
                         json.dumps({"result_keys": list(result.keys())}),
@@ -443,11 +451,33 @@ class StateStore:
                 )
             return success
 
-    def fail_task(self, task_id: str, error: str, can_retry: bool = True) -> bool:
-        """Handle task execution failure with retry calculation."""
+    def fail_task(
+        self,
+        task_id: str,
+        error: str,
+        can_retry: bool = True,
+        worker_id: Optional[str] = None,
+    ) -> bool:
+        """Handle task execution failure with retry calculation and status fencing."""
         now = time.time()
+        import uuid
         with self.transaction() as cur:
-            cur.execute("SELECT retry_count, max_retries FROM tasks WHERE id = ?", (task_id,))
+            if worker_id:
+                cur.execute(
+                    """
+                    SELECT retry_count, max_retries FROM tasks
+                    WHERE id = ? AND status IN ('RUNNING', 'READY') AND (assigned_worker_id = ? OR assigned_worker_id IS NULL)
+                    """,
+                    (task_id, worker_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT retry_count, max_retries FROM tasks
+                    WHERE id = ? AND status IN ('RUNNING', 'READY')
+                    """,
+                    (task_id,),
+                )
             row = cur.fetchone()
             if not row:
                 return False
@@ -457,41 +487,70 @@ class StateStore:
 
             if can_retry and retries < max_retries:
                 # Requeue for retry
-                cur.execute(
-                    """
-                    UPDATE tasks
-                    SET status = 'READY',
-                        error = ?,
-                        retry_count = retry_count + 1,
-                        assigned_worker_id = NULL,
-                        heartbeat_at = NULL,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (error, now, task_id),
-                )
+                if worker_id:
+                    cur.execute(
+                        """
+                        UPDATE tasks
+                        SET status = 'READY',
+                            error = ?,
+                            retry_count = retry_count + 1,
+                            assigned_worker_id = NULL,
+                            heartbeat_at = NULL,
+                            updated_at = ?
+                        WHERE id = ? AND status IN ('RUNNING', 'READY') AND (assigned_worker_id = ? OR assigned_worker_id IS NULL)
+                        """,
+                        (error, now, task_id, worker_id),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE tasks
+                        SET status = 'READY',
+                            error = ?,
+                            retry_count = retry_count + 1,
+                            assigned_worker_id = NULL,
+                            heartbeat_at = NULL,
+                            updated_at = ?
+                        WHERE id = ? AND status IN ('RUNNING', 'READY')
+                        """,
+                        (error, now, task_id),
+                    )
                 event_type = "TASK_RETRY"
             else:
-                cur.execute(
-                    """
-                    UPDATE tasks
-                    SET status = 'FAILED',
-                        error = ?,
-                        completed_at = ?,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (error, now, now, task_id),
-                )
+                if worker_id:
+                    cur.execute(
+                        """
+                        UPDATE tasks
+                        SET status = 'FAILED',
+                            error = ?,
+                            completed_at = ?,
+                            updated_at = ?
+                        WHERE id = ? AND status IN ('RUNNING', 'READY') AND (assigned_worker_id = ? OR assigned_worker_id IS NULL)
+                        """,
+                        (error, now, now, task_id, worker_id),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE tasks
+                        SET status = 'FAILED',
+                            error = ?,
+                            completed_at = ?,
+                            updated_at = ?
+                        WHERE id = ? AND status IN ('RUNNING', 'READY')
+                        """,
+                        (error, now, now, task_id),
+                    )
                 event_type = "TASK_FAILED"
 
+            event_id = f"{task_id}-{event_type.lower()}-{uuid.uuid4().hex}"
             cur.execute(
                 """
                 INSERT INTO task_events (id, task_id, event_type, details, timestamp)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
-                    f"{task_id}-{event_type.lower()}-{now}",
+                    event_id,
                     task_id,
                     event_type,
                     json.dumps({"error": error, "retry_count": retries + (1 if event_type == "TASK_RETRY" else 0)}),

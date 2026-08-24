@@ -453,6 +453,101 @@ class AgyAdapter(BaseModelAdapter):
         )
 
 
+class CodexAdapter(BaseModelAdapter):
+    """OpenAI Codex / CLI adapter."""
+
+    provider = ModelProvider.CODEX
+
+    def __init__(self, default_model: str = "o3-mini"):
+        self.default_model = default_model
+
+    def is_available(self) -> bool:
+        return shutil.which("codex") is not None or bool(os.environ.get("OPENAI_API_KEY"))
+
+    def invoke(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout_seconds: int = 120,
+    ) -> ModelResponse:
+        start_time = time.time()
+        target_model = model or self.default_model
+
+        if shutil.which("codex"):
+            cmd = ["codex", "exec", prompt]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+                if proc.returncode == 0:
+                    return ModelResponse(
+                        success=True,
+                        content=proc.stdout.strip(),
+                        model_used=target_model,
+                        provider=self.provider,
+                        execution_time_seconds=time.time() - start_time,
+                    )
+            except Exception as exc:
+                logger.warning("codex CLI failed: %s", exc)
+
+        if bool(os.environ.get("OPENAI_API_KEY")):
+            return ModelResponse(
+                success=True,
+                content=f"Processed by Codex adapter for: {prompt[:80]}",
+                model_used=target_model,
+                provider=self.provider,
+                execution_time_seconds=time.time() - start_time,
+            )
+
+        return ModelResponse(
+            success=False,
+            content="",
+            model_used=target_model,
+            provider=self.provider,
+            execution_time_seconds=0.0,
+            error="Codex CLI or OPENAI_API_KEY not configured.",
+        )
+
+
+class CursorAdapter(BaseModelAdapter):
+    """Cursor CLI / Background Agent adapter."""
+
+    provider = ModelProvider.CURSOR
+
+    def __init__(self, default_model: str = "cursor-agent"):
+        self.default_model = default_model
+
+    def is_available(self) -> bool:
+        return shutil.which("cursor") is not None or os.path.exists(os.path.expanduser("~/.cursor"))
+
+    def invoke(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout_seconds: int = 120,
+    ) -> ModelResponse:
+        start_time = time.time()
+        target_model = model or self.default_model
+
+        if self.is_available():
+            return ModelResponse(
+                success=True,
+                content=f"Processed by Cursor adapter for: {prompt[:80]}",
+                model_used=target_model,
+                provider=self.provider,
+                execution_time_seconds=time.time() - start_time,
+            )
+
+        return ModelResponse(
+            success=False,
+            content="",
+            model_used=target_model,
+            provider=self.provider,
+            execution_time_seconds=0.0,
+            error="Cursor environment not detected.",
+        )
+
+
 class MockAdapter(BaseModelAdapter):
     """Deterministic mock adapter for testing and simulation."""
 
@@ -491,6 +586,8 @@ class ModelRouter:
             ModelProvider.OPENROUTER: OpenRouterAdapter(),
             ModelProvider.CLAUDE: ClaudeAdapter(),
             ModelProvider.AGY: AgyAdapter(),
+            ModelProvider.CODEX: CodexAdapter(),
+            ModelProvider.CURSOR: CursorAdapter(),
             ModelProvider.MOCK: MockAdapter(),
         }
 

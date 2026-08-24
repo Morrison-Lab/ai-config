@@ -108,6 +108,60 @@ count.
   the other forms return the same confident non-empty result for whoever
   checks them next.
 
+## The weakest population of all is the files already open in front of you
+
+The section above narrows a **query** that was too narrow.
+It still assumes a query ran.
+The commoner failure runs none: the population is whatever files this session
+happened to open, and a convention gets asserted across a corpus from the six
+files that were in view.
+
+That reads as *more* rigorous than a grep rather than less, which is why no
+prompt to check arrives.
+A grep returns matching lines; opening six files returns six whole files you
+actually read, so the evidence feels richer.
+The width is the part that never gets stated, because a file you opened is a
+file you already had a reason to think relevant --- so the set is selected by
+the same belief it is then used to confirm.
+
+The consequence is specific and one-directional.
+Availability sampling returns **confirmations** and cannot return a
+counterexample, since a file that disagrees is exactly the file no prior step
+gave you a reason to open.
+So the six agreeing files are not six pieces of evidence.
+They are one piece of evidence about how you chose files, and the corpus can be
+unanimous in your sample while a seventh file states the opposite.
+
+**Derive from history, not only from the current tree.**
+A tree-wide `git grep` fixes the availability problem and answers only "where
+does this string appear now".
+When the claim is about a convention --- what the corpus *says*, and since when
+--- the deriving query runs over commits:
+
+```bash
+git log -S '<phrase>' --oneline -- <path>    # commits that changed its count
+git log -G '<alternative>' --oneline -- <path>
+```
+
+That reaches a variant renamed away, one introduced under different wording,
+and the commit that made the corpus disagree with itself --- none of which a
+snapshot of the tree can show.
+Publish the command beside the claim, per
+[`challenge-the-assignment`](challenge-the-assignment.md), so the width is
+checkable rather than implied.
+
+- **Do:** run a tree-wide or history-wide derivation before asserting what a
+  corpus does, even when you have read whole files rather than grep hits.
+- **Do:** treat unanimity across a hand-picked sample as a fact about the
+  sampling, and go looking specifically for a file that disagrees.
+- **Do:** reach for `git log -S`/`-G` when the claim is about a convention
+  over time rather than about the current contents.
+- **Don't:** count files you opened for another reason as a population ---
+  they were selected by the belief under test.
+- **Don't:** read "I read these in full" as covering more than "I grepped";
+  depth per file and width across files are different measurements, and only
+  the second one bounds a scope claim.
+
 ## The instrument
 
 `scripts/pr-sweep.py` is this rule's deterministic half for the open-PR case.

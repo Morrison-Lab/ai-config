@@ -283,6 +283,47 @@ Only the mutation answers whether the assertion depends on the fix.
 - **Don't:** read a green guard as one whose subject ran.
   A payload rejected upstream and a working fix are the same observable.
 
+### A misleading test label also licenses a DELETION, which is the direction with no mutation available
+
+The **Misleading label** entry above treats a test name that overstates its
+assertion as a source of false confidence in a fix.
+It runs the other way too, and that direction is the dangerous one, because the
+remedy the list prescribes cannot be applied to it.
+Mutating the fix is what exposes a test that does not depend on it.
+There is no fix to mutate when the change under consideration is *removing*
+code, and a suite that stays green is the entire evidence on offer.
+
+The shape is a clause you judge redundant because a neighbouring pattern
+appears to subsume it.
+That judgment is about two patterns' **domains**, which is a claim, and the
+green suite gets read as having checked it.
+It has not: a suite proves the clause is untested, never that it is unreachable.
+
+The specific miss worth naming is a near-subsumption --- a neighbour that covers
+the anchored form of a case and not the free one.
+A pattern rejecting a value that *begins* with a marker does not reach the same
+marker mid-string, so the two look interchangeable on every example anyone
+wrote down and differ on the case nobody did.
+
+The consequence is easy to under-rate because nothing crashes.
+An over-broad rule and a deleted clause both still return a verdict, so the
+regression shows up as a **change of reason** rather than a failure: an
+assertion about text that was never read, in place of the assertion about text
+that was.
+A caller reading only the pass/fail bit sees no difference at all.
+
+- **Do:** state the two patterns' domains and produce an input inside one and
+  outside the other, before deleting either as redundant.
+- **Do:** read the assertion body rather than the test name, when a test is
+  what persuades you a clause is dead.
+- **Do:** diff the *reason* a check reports, not only its pass/fail bit, after
+  removing a branch that produced one.
+- **Don't:** read a green suite as evidence that a clause is unreachable ---
+  it is evidence the clause is untested, which is the argument for a test
+  rather than for a deletion.
+- **Don't:** trust an anchored pattern to cover the unanchored case;
+  `^marker` and `marker` agree on every example that starts with the marker.
+
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 
 The mutation above proves the fix is needed, by reverting it and watching the

@@ -22,18 +22,26 @@ from .worktree_manager import WorktreeManager
 logger = logging.getLogger("orchestrator.subagents")
 
 
-def extract_files_from_markdown(text: str) -> Dict[str, str]:
-    """Extract (file_path, content) pairs from markdown code blocks."""
+def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, str]:
+    """Extract (file_path, content) pairs from markdown code blocks or context file fallbacks."""
     files: Dict[str, str] = {}
     blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
     for header, content in blocks:
         parts = header.strip().split()
-        if not parts:
-            continue
-        # Extract candidate path from the header line (e.g. 'scripts/foo.py' or 'python scripts/foo.py')
-        cand = parts[-1]
-        if "." in cand and not cand.startswith(("http://", "https://")):
-            files[cand] = content
+        if parts:
+            cand = parts[-1]
+            if "." in cand and not cand.startswith(("http://", "https://")):
+                files[cand] = content
+
+    # Fallback: if no path header found, but code blocks exist and context_text mentions a file path
+    if not files and blocks and context_text:
+        candidates = re.findall(
+            r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
+            context_text,
+        )
+        if candidates:
+            target = candidates[0].strip("`'\" \t\r\n")
+            files[target] = blocks[0][1]
 
     return files
 
@@ -156,7 +164,7 @@ class CoderSubagent(BaseSubagent):
         use_worktree = task.payload.get("use_worktree", True)
         branch_name = task.payload.get("branch_name")
         dry_run = task.payload.get("dry_run", False)
-        push_remote = task.payload.get("push_remote", True)
+        push_remote = task.payload.get("push_remote", False)
 
         result_data: Dict[str, Any] = {
             "instruction": instruction,
@@ -242,11 +250,20 @@ class CoderSubagent(BaseSubagent):
                             execution_time_seconds=time.time() - start_time,
                         )
 
-                    extracted = extract_files_from_markdown(resp.content)
+                    extracted = extract_files_from_markdown(resp.content, context_text=f"{instruction}\n{issue_body}")
                     if extracted:
                         files_to_write.update(extracted)
                     elif target_file:
                         files_to_write[target_file] = resp.content
+
+                # Fail-fast if model produced no code modifications
+                if not files_to_write:
+                    return SubagentResult(
+                        success=False,
+                        data=result_data,
+                        error=f"Model code generation failed: no valid file modifications produced by {result_data.get('model_used')}.",
+                        execution_time_seconds=time.time() - start_time,
+                    )
 
                 # Write files into worktree with path validation
                 total_lines = 0
@@ -272,38 +289,42 @@ class CoderSubagent(BaseSubagent):
                 result_data["applied"] = bool(files_to_write)
 
                 # Stage and commit
-                if files_to_write:
-                    subprocess.run(["git", "add", "."], cwd=str(wt_path), capture_output=True, check=False)
-                    commit_proc = subprocess.run(
-                        ["git", "commit", "-m", f"fix: {instruction[:60]}"],
+                subprocess.run(["git", "add", "."], cwd=str(wt_path), capture_output=True, check=False)
+                commit_proc = subprocess.run(
+                    ["git", "commit", "-m", f"fix: {instruction[:60]}"],
+                    cwd=str(wt_path),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if commit_proc.returncode != 0:
+                    err_msg = commit_proc.stderr.strip() or f"git commit exited with code {commit_proc.returncode}"
+                    return SubagentResult(
+                        success=False,
+                        data=result_data,
+                        error=f"Git commit failed in worktree: {err_msg}",
+                        execution_time_seconds=time.time() - start_time,
+                    )
+                result_data["committed"] = True
+
+                # Push branch to remote origin
+                if push_remote:
+                    push_proc = subprocess.run(
+                        ["git", "push", "-u", "origin", branch_name],
                         cwd=str(wt_path),
                         capture_output=True,
                         text=True,
                         check=False,
                     )
-                    if commit_proc.returncode != 0:
-                        err_msg = commit_proc.stderr.strip() or f"git commit exited with code {commit_proc.returncode}"
+                    if push_proc.returncode != 0:
+                        err_msg = push_proc.stderr.strip() or f"git push exited with code {push_proc.returncode}"
                         return SubagentResult(
                             success=False,
                             data=result_data,
-                            error=f"Git commit failed in worktree: {err_msg}",
+                            error=f"Git push failed from worktree to origin/{branch_name}: {err_msg}",
                             execution_time_seconds=time.time() - start_time,
                         )
-                    result_data["committed"] = True
-
-                    # Push branch to remote origin
-                    if push_remote:
-                        push_proc = subprocess.run(
-                            ["git", "push", "-u", "origin", branch_name],
-                            cwd=str(wt_path),
-                            capture_output=True,
-                            text=True,
-                            check=False,
-                        )
-                        if push_proc.returncode != 0:
-                            logger.warning("Git push failed from worktree: %s", push_proc.stderr)
-                        else:
-                            result_data["pushed"] = True
+                    result_data["pushed"] = True
 
                 result_data["worktree_used"] = str(wt_path)
 
@@ -462,6 +483,7 @@ class TesterSubagent(BaseSubagent):
 
         # Run real quality gate checks if not in dry-run mode
         if not dry_run and passed:
+            env = {**os.environ, "PYTHONUTF8": "1"}
             for cmd_str in test_commands:
                 try:
                     proc = subprocess.run(
@@ -471,6 +493,7 @@ class TesterSubagent(BaseSubagent):
                         text=True,
                         timeout=120,
                         check=False,
+                        env=env,
                     )
                     if proc.returncode != 0:
                         passed = False
@@ -504,6 +527,11 @@ class TesterSubagent(BaseSubagent):
 
         # Only promote PR if tests passed AND branch contains real implementation diff
         pr_marked_ready = False
+        pr_merged = False
+        mwc = task.payload.get("mwc")
+        if mwc is None:
+            mwc = AIConfigProtocols.check_repo_allows_mwc(repo_slug=repo_slug)
+
         if passed and pr_number and (has_real_diff or dry_run):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
                 pr_number=pr_number,
@@ -511,6 +539,13 @@ class TesterSubagent(BaseSubagent):
                 repo_slug=repo_slug,
                 dry_run=dry_run,
             )
+            # Under active mwc authorization, auto-merge when ready & quality gates are green
+            if mwc and pr_marked_ready:
+                pr_merged = self.pr_claim_mgr.merge_pr_under_mwc(
+                    pr_number=pr_number,
+                    repo_slug=repo_slug,
+                    dry_run=dry_run,
+                )
 
         elapsed = time.time() - start_time
         return SubagentResult(
@@ -522,6 +557,7 @@ class TesterSubagent(BaseSubagent):
                 "quality_gates": test_commands,
                 "has_real_diff": has_real_diff,
                 "pr_marked_ready": pr_marked_ready,
+                "pr_merged": pr_merged,
             },
             error=None if passed else f"Test suite {test_suite} failed: {'; '.join(output_logs)}",
             execution_time_seconds=elapsed,
@@ -552,6 +588,7 @@ class CoordinatorSubagent(BaseSubagent):
                     "goal": goal,
                     "stage": stage,
                     "dry_run": task.payload.get("dry_run", False),
+                    "mwc": task.payload.get("mwc"),
                     "context_from_parent": task.payload,
                 },
                 depends_on=[prev_task_id] if prev_task_id else [],

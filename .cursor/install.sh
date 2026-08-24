@@ -24,18 +24,18 @@ fi
 #    plugin-source check only reports its empty-directory branch without it.
 git submodule update --init --recursive
 
-# 2. System packages: `python` shim and `python3-pip`.
+# 2. System packages: update apt index and install `python` shim + `python3-pip` if missing.
 #    test_compare_shell_forms.py spawns a real bash that invokes `python` (not `python3`).
 if ! command -v python >/dev/null 2>&1 || ! command -v pip3 >/dev/null 2>&1; then
   $SUDO apt-get update -qq
   $SUDO apt-get install -y -qq python-is-python3 python3-pip
 fi
 
-# 3. Python tooling: pyyaml for the validators (CI pins 6.0.2), pre-commit for
-#    the secret-scanning hook.
+# 3. Python tooling: pyyaml (pin derived from validate.yml) and pre-commit.
 #    Use python3 -m pip with --break-system-packages for PEP 668 environments.
+PYYAML_PIN="$(grep -oE 'pyyaml==[0-9.]+' .github/workflows/validate.yml | head -1 || echo 'pyyaml')"
 python3 -m pip install --quiet --disable-pip-version-check --break-system-packages \
-  pyyaml==6.0.2 pre-commit
+  "$PYYAML_PIN" pre-commit
 
 # 4. Quarto renders and previews the documentation website. Pinned for
 #    reproducibility; the version check keeps the install idempotent.
@@ -47,6 +47,7 @@ if [ "$(quarto --version 2>/dev/null || true)" != "$QUARTO_VERSION" ]; then
   trap 'rm -f "$deb"' EXIT
   curl -fsSL -o "$deb" \
     "https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-${arch}.deb"
+  $SUDO apt-get update -qq
   $SUDO apt-get install -y --no-install-recommends "$deb"
   rm -f "$deb"
   trap - EXIT

@@ -1,4 +1,4 @@
-﻿# pr-status-all / pr-status Rationale & Verification History
+# pr-status-all / pr-status Rationale & Verification History
 
 This document records the load-bearing operational rationale, synthetic-fixture verifications, and empirical measurements supporting the signal gathering and verdict computation in `pr-status-all` and `pr-status`.
 

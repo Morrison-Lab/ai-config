@@ -136,6 +136,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    - If AI review is clean/approved and CI is green:
 >      - If human reviewer is requested (e.g. `d-morrison`), report `d-morrison`.
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
+>    - If AI review is clean/approved but CI is failing or pending, report `— (CI in progress / failing)`.
 >    - If AI review is still in-flight or unclean, report `— (AI review in progress)`.
 > 5. **Unresolved threads** -- count open inline review threads (`READ_PR_REVIEW_COMMENTS`).
 >    ```bash
@@ -246,6 +247,7 @@ independent and don't mutate shared state --- like this one.
 
 ## Notes
 
+- Extended operational rationale, empirical measurements, and synthetic fixture histories live in [`pr-status-all.rationale.md`](pr-status-all.rationale.md).
 - Skip draft PRs from the "ready" assessment but still show them (mark as
   draft).
 - One unit of work per PR: in the parallel path that's one subagent per PR; in

@@ -339,6 +339,8 @@ Render a **Review Summary Table** for the PR:
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
+  When AI review is clean but CI is failing or pending, display `— (CI in progress / failing)`.
+  When AI review is in-flight or unclean, display `— (AI review in progress)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -352,6 +354,6 @@ Render a **Review Summary Table** for the PR:
     - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.
 
-State, plainly: the latest review's verdict, who/what posted it, and the list
-of any open findings (or "none"). If you read `null`, say the filter didn't
-match a reviewer login — don't report it as clean.
+State, plainly: the latest review's verdict, who/what posted it, and the list of any open findings (or "none").
+If you read `null`, say the filter didn't match a reviewer login — don't report it as clean.
+Extended operational rationale and empirical measurement histories live in [`pr-status-all.rationale.md`](../pr-status-all/pr-status-all.rationale.md).

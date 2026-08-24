@@ -581,6 +581,8 @@ Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-confi
 
 Kin to the two path gotchas above --- it produces a confident wrong answer
 rather than an error --- but it is not about paths, so it gets its own entry.
+The zsh differences that make a check report a **false absence** live in [`zsh.md`](zsh.md).
+This one reports a wrong value rather than an empty one.
 
 `SHELL=/bin/zsh` on this machine, and zsh leaves `SH_WORD_SPLIT` **off** by
 default.
@@ -888,6 +890,9 @@ identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
+Same false-absence shape as the entries in [`zsh.md`](zsh.md).
+The cause here is stdin plumbing rather than a zsh expansion rule, which is why it stays in this file.
+
 Piping data into an interpreter invoked as `python3 -` (or `sh -`, `bash -`)
 while *also* supplying the script through a `<<'EOF'` heredoc puts two things in
 line for one stdin, and the heredoc wins.
@@ -938,86 +943,7 @@ was shell *quoting*, this one is stdin *contention*.
 - **Don't:** trust a "0 candidates" result from a scan that has never been seen
   to report a nonzero.
 
-(2026-08-03, an ai-config session: this idiom was used to verify ai-config#1078's
-diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line
-violation was reported as "0 found" and the vacuous all-clear was stated to the
-user before the method was caught.)
-
-## A process substitution feeding a pipeline fails under zsh, and reads as a clean zero
-
-`diff <(a) <(b)` works at a zsh prompt and breaks the moment it feeds a pipe.
-The piped form dies with `diff: /proc/self/fd/11: No such file or directory`,
-because the path `<(...)` names no longer resolves when `diff` opens it.
-Bash runs the identical line correctly, so a snippet copied from a bash script
-or another machine silently changes meaning here.
-
-Measured on zsh 5.9 and bash 5.1.16, against two files known to differ:
-
-```bash
-diff <(cat f1) <(cat f2)                             # zsh: works
-o=$(diff <(cat f1) <(cat f2))                        # zsh: works
-diff <(cat f1) <(cat f2) | grep -c '^>'              # zsh: /proc/self/fd error
-bash -c 'diff <(cat f1) <(cat f2) | grep -c "^>"'    # bash: correct answer
-```
-
-The pipeline is the trigger.
-Neither the surrounding `$(...)` nor a shell function inside the `<(...)` is
-required, since plain `cat` in a bare pipeline fails the same way.
-
-**The failure presents as an all-clear rather than as an error.**
-`diff` writes its complaint to stderr and produces no stdout, so a downstream
-`grep -c` counts zero, and a trailing `|| true` makes that zero unconditional.
-The caller reads `0` as "the two inputs are identical".
-This is the [`fail-fast`](../shared/principles/fail-fast.md) shape where the
-pass path and the failure path print the same thing, reached by a route that
-fragment does not cover: the comparison never ran at all, rather than its exit
-status being swallowed.
-The `|| true` could not have helped in any case, because a pipeline reports
-only its last command's status --- see
-[`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)'s
-"A pipe discards the status of everything left of it".
-
-Take the fd plumbing out of the comparison, and prove the detector works before
-believing any zero it reports:
-
-```bash
-norm "$tracked" > /tmp/a; norm "$inst" > /tmp/b      # real files, no <(...)
-printf 'a\nb\n' > /tmp/nc1; printf 'a\nZZZ\n' > /tmp/nc2
-nc=$(diff /tmp/nc1 /tmp/nc2 | grep -c '^>')
-[ "$nc" -ge 1 ] || { echo "DETECTOR BROKEN --- aborting"; exit 1; }
-add=$(diff /tmp/a /tmp/b | grep -c '^>')
-```
-
-The negative control is the load-bearing half, per
-[`batch-merge-and-resolve`](../shared/workflow/batch-merge-and-resolve.md)'s
-"Any conflict sweep needs a negative control".
-A zero from a detector never once seen to report a difference is not evidence
-about the inputs.
-This is the third sibling of the two entries above, whose plumbing failures
-were shell *quoting* and stdin *contention*; this one is fd *lifetime*.
-
-- **Do:** write both sides to real temp files and diff those, whenever a
-  process substitution would otherwise feed a pipeline.
-- **Do:** run a known-differing negative control first, and abort when the
-  detector reports no difference.
-- **Don't:** pipe the output of a command reading `<(...)` under zsh, on the
-  strength of the same line working in bash or at a bare zsh prompt.
-- **Don't:** read `0` from a `... | grep -c` as agreement when the producer
-  could have died before writing anything.
-
-(2026-08-03, auditing six installed dotfiles against their tracked copies on
-shiva: `add=$(diff <(norm "$tracked") <(norm "$inst") | grep -c '^>' || true)`
-reported `installed-only=0 repo-only=0` for all six files, which was read as
-"identical apart from em-dash normalization".
-Every one of those runs had emitted the `/proc/self/fd/11` error on stderr.
-Re-run against temp files, four of the six differed --- `tui-alloc` by 6
-installed-only and 15 repo-only lines.
-Every `<(...)` use already in this corpus was checked and is safe, since none
-feeds a pipeline: `skills/use-math-macros/SKILL.md`'s bare `comm -23`, plus the
-`< <(...)` redirects in `skills/cascade/SKILL.md` and
-`references/cloud-setup/cloud-setup.sh`.
-Derive that set rather than counting it, since a count goes stale on the next
-one added: `git grep -n '<(' -- ':!memories/'`.)
+(2026-08-03, an ai-config session: this idiom was used to verify ai-config#1078's diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line violation was reported as "0 found" and the vacuous all-clear was stated to the user before the method was caught.)
 
 ## Splitting a shell command into simple commands in Python: two `shlex` gotchas
 

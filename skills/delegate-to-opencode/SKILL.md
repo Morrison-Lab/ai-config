@@ -11,8 +11,8 @@ allowed-tools:
 
 # delegate-to-opencode --- run sidecar work on a free or local model
 
-The `opencode` CLI reaches two model tiers this corpus has no other route to: a hosted free tier (opencode Zen) and a fully local one (ollama).
-Both cost no quota at all, so work small enough for them should not spend Claude's budget, codex's window, or agy's.
+The `opencode` CLI reaches two model tiers this corpus has no other route to --- a hosted free tier (opencode Zen) and a fully local one (ollama) --- plus OpenRouter as a third destination once its provider is activated.
+The two tiers cost no quota at all, so work small enough for them should not spend Claude's budget, codex's window, or agy's.
 The local tier also does something none of the other destinations can: it keeps the payload on the machine.
 
 Claude stays the orchestrator.
@@ -53,7 +53,7 @@ Here they point the same way: authoring and judgment work is exactly what the fr
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md)'s "Data sensitivity is a second trigger" section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.
 
 That trigger does not transfer to opencode.
-It **splits**, because opencode is two destinations rather than one, and the two differ in the only property the trigger cares about.
+It **splits**, because opencode is more than one destination, and the destinations differ in the only property the trigger cares about.
 
 **The split.**
 `opencode/*` is opencode Zen, a hosted gateway: the payload leaves the machine exactly as it does for any other hosted model.
@@ -95,21 +95,22 @@ It applies where the consuming repo has written the rule down, and that repo own
 ## A third destination: OpenRouter, for models neither tier carries
 
 `opencode` reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter's **stealth** previews --- anonymized frontier models trialled under codenames, free while they last.
-`stealth/ox-alpha` ("Ox Alpha", a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was listed 2026-08-23.
-Stealth ids rotate on a days-to-weeks cycle, so they are absent from the models.dev registry opencode resolves providers from --- and absent from the registry means absent from `opencode models`.
-Declare the model explicitly in `opencode.jsonc` and it becomes selectable as `openrouter/<id>`:
+`stealth/ox-alpha` ("Ox Alpha", a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was the roster's one entry on 2026-08-23.
+
+The provider is carried by the models.dev registry opencode resolves models from --- stealth ids included --- but it stays **inactive until the config or the auth store references it**, which is why a machine with no openrouter entry lists no `openrouter/*` ids at all.
+Any reference activates it: adding the entry below to the existing `provider` block of `opencode.jsonc` took this machine's `opencode models` from zero `openrouter/*` ids to 360 --- the full registry roster, including `stealth/ox-alpha` (which the registry already carried) and 359 ids the entry never named (measured 2026-08-23 on opencode 1.18.21).
+An empty `"openrouter": {}` therefore activates the same roster; a `models` entry earns its lines only by setting a display name, or by reaching an id the registry does not carry yet:
 
 ```jsonc
-"provider": {
-  "openrouter": {
-    "models": {
-      "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }
-    }
+// merged into the existing "provider" block of opencode.jsonc --- not a standalone file
+"openrouter": {
+  "models": {
+    "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }
   }
 }
 ```
 
-Measured 2026-08-23 on opencode 1.18.21: the declaration alone put `openrouter/stealth/ox-alpha` into `opencode models`, and the unauthenticated smoke test failed cleanly with `OpenRouter API key is missing`.
+The unauthenticated smoke test failed cleanly with `OpenRouter API key is missing` (same measurement).
 Auth is `opencode auth login openrouter` or the `OPENROUTER_API_KEY` environment variable, and the key is the user's to enter, never the agent's.
 The current stealth roster is one query, no key needed:
 
@@ -118,17 +119,17 @@ curl -s https://openrouter.ai/api/v1/models \
   | python3 -c "import json,sys; [print(m['id'], '|', m['name'], '| ctx:', m['context_length']) for m in json.load(sys.stdin)['data'] if m['id'].startswith('stealth/')]"
 ```
 
-Two routing consequences, neither derivable from the split above:
+Two routing consequences:
 
-- **The data-sensitivity rule extends to OpenRouter unchanged.**
-  The payload leaves the machine, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
-- **A stealth model inverts the capability caveat rather than sharing it.**
+- **The data-sensitivity rule extends to OpenRouter on the split's own terms.**
+  A hosted destination's payload leaves the machine, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
+- **A stealth model inverts the capability caveat rather than sharing it** --- the consequence the split cannot supply.
   The hosted-free ids are unbenchmarked *small* models, so the "no judgment work" exception binds them.
   A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot --- but "plausibly" is the operative word: it stays unbenchmarked here, so validate its output like any other delegate's, and timestamp any claim about a specific id.
 
-- **Do:** declare a stealth model explicitly in config, and route to it as `openrouter/<provider-id>`.
+- **Do:** activate the provider with a config entry, and route to a stealth model as `openrouter/<model-id>`.
 - **Do:** re-derive the stealth roster from the API on each use --- the ids expire without notice.
-- **Don't:** read a stealth model's absence from `opencode models` as OpenRouter being unreachable; the registry gap is the cause, and the config declaration is the fix.
+- **Don't:** read an empty `openrouter/*` listing as OpenRouter being unreachable --- an unreferenced provider is inactive, and one config entry activates the whole roster.
 - **Don't:** send data-triggered work to `openrouter/*` --- free stealth pricing is a billing fact, and the bytes still leave the machine, to a lab the id does not even name.
 
 ## Where opencode sits in the budget ladder
@@ -157,10 +158,13 @@ opencode models
 ```
 
 **On Windows, the OpenCode desktop app does not provide the CLI, so "installed" and "available" diverge.**
-Measured 2026-08-23: `@opencode-aidesktop` was present under `AppData\Local\Programs` while `opencode` resolved in neither Git Bash nor PowerShell --- and `%APPDATA%\npm` was missing from the User `Path` entirely, so a prior npm install would not have surfaced either.
+Measured 2026-08-23: `@opencode-aidesktop` was present under `AppData\Local\Programs` while `opencode` resolved in neither Git Bash nor PowerShell, and `%APPDATA%\npm` was absent from the User `Path`.
+How this file's 2026-08-19 measurements ran on the same machine is unrecorded --- an install surface since removed is one explanation --- so treat CLI availability as a per-session check rather than a machine property.
 The recovery is two steps, both durable: `npm install -g opencode-ai` (landed 1.18.21), then add `%APPDATA%\npm` to the User `Path` if absent.
+A User `Path` edit reaches **new** shells only, so the session that made it still prefixes the directory onto its own `PATH` (or calls the binary by full path) --- retrying the bare name in the same session reproduces the exact symptom the fix just cured.
 
 - **Do:** treat `command not found` as an install-surface gap and run the npm install, even when the desktop app is visibly present.
+- **Do:** export the npm directory onto the current session's `PATH` after the User `Path` edit, before retrying.
 - **Don't:** read the desktop app's presence as the CLI being installed --- they are separate artifacts with separate install routes.
 
 `opencode models` prints ids as `provider/model`, which is the routing signal from the section above.
@@ -286,7 +290,7 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 
 ## Anti-patterns
 
-- ❌ Sending data-triggered work to an `opencode/*` model because it is free --- free is a billing property, and the payload still leaves the machine.
+- ❌ Sending data-triggered work to an `opencode/*` or `openrouter/*` model because it is free --- free is a billing property, and the payload still leaves the machine.
 - ❌ Retrying a failed or slow `ollama/*` run on the hosted tier.
 - ❌ Passing `--auto` to widen a delegate's permissions instead of scoping the config.
 - ❌ Pointing a codex-style `MAXPAR` fan-out at one ollama daemon and expecting hosted-style throughput.

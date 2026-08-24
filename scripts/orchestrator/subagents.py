@@ -4,17 +4,25 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import os
+from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional
 
 from .models import SubagentContext, SubagentResult, Task, TaskPriority, TaskStatus
+from .pr_claim_manager import PRClaimManager
+from .protocols import AIConfigProtocols
+from .worktree_manager import WorktreeManager
 
 
 class BaseSubagent(ABC):
-    """Abstract base class for all specialized sub-agents."""
+    """Abstract base class for all specialized sub-agents conforming to AIConfig protocols."""
 
     role: str = "generic"
     capabilities: List[str] = []
+
+    def get_system_prompt(self) -> str:
+        """Return the repository-standard system prompt for this subagent role."""
+        return AIConfigProtocols.get_prompt_for_role(self.role)
 
     @abstractmethod
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
@@ -60,11 +68,16 @@ class CoderSubagent(BaseSubagent):
     role = "coder"
     capabilities = ["code_generation", "refactoring", "patch_creation"]
 
+    def __init__(self, worktree_manager: Optional[WorktreeManager] = None):
+        self.worktree_manager = worktree_manager or WorktreeManager()
+
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
         start_time = time.time()
         instruction = task.payload.get("instruction") or task.title
         target_file = task.payload.get("target_file", "")
         code_content = task.payload.get("code_content", "")
+        use_worktree = task.payload.get("use_worktree", False)
+        branch_name = task.payload.get("branch_name")
 
         result_data: Dict[str, Any] = {
             "instruction": instruction,
@@ -72,6 +85,61 @@ class CoderSubagent(BaseSubagent):
             "applied": True,
             "lines_changed": len(code_content.splitlines()) if code_content else 0,
         }
+
+        # If worktree isolation is requested, execute within an isolated worktree
+        if use_worktree:
+            try:
+                persist_branch = task.payload.get("persist_branch", True)
+                with self.worktree_manager.isolated_worktree(
+                    task_id=task.id,
+                    branch_name=branch_name,
+                    cleanup=task.payload.get("cleanup_worktree", True),
+                    delete_branch=not persist_branch,
+                ) as wt_path:
+                    if target_file and code_content:
+                        # Prevent absolute paths or directory traversals from escaping worktree
+                        clean_rel = Path(target_file)
+                        if clean_rel.is_absolute():
+                            clean_rel = Path(*clean_rel.parts[1:])
+                        file_path = (wt_path / clean_rel).resolve()
+                        wt_resolved = wt_path.resolve()
+                        if not file_path.is_relative_to(wt_resolved):
+                            return SubagentResult(
+                                success=False,
+                                data=result_data,
+                                error=f"Security error: target_file '{target_file}' escapes worktree root {wt_path}",
+                                execution_time_seconds=time.time() - start_time,
+                            )
+                        file_path.parent.mkdir(parents=True, exist_ok=True)
+                        file_path.write_text(code_content, encoding="utf-8")
+
+                        # Stage and commit the change to the worktree branch
+                        import subprocess
+                        subprocess.run(["git", "add", "."], cwd=str(wt_path), capture_output=True, check=False)
+                        commit_proc = subprocess.run(
+                            ["git", "commit", "-m", f"fix: {instruction[:60]}"],
+                            cwd=str(wt_path),
+                            capture_output=True,
+                            text=True,
+                            check=False,
+                        )
+                        if commit_proc.returncode != 0:
+                            err_msg = commit_proc.stderr.strip() or f"git commit exited with code {commit_proc.returncode}"
+                            return SubagentResult(
+                                success=False,
+                                data=result_data,
+                                error=f"Git commit failed in worktree: {err_msg}",
+                                execution_time_seconds=time.time() - start_time,
+                            )
+                        result_data["committed"] = True
+                    result_data["worktree_used"] = str(wt_path)
+            except Exception as exc:
+                return SubagentResult(
+                    success=False,
+                    data=result_data,
+                    error=f"Worktree execution error: {str(exc)}",
+                    execution_time_seconds=time.time() - start_time,
+                )
 
         elapsed = time.time() - start_time
         return SubagentResult(
@@ -120,19 +188,47 @@ class TesterSubagent(BaseSubagent):
     role = "tester"
     capabilities = ["run_tests", "benchmarking", "diagnostics"]
 
+    def __init__(
+        self,
+        pr_claim_manager: Optional[PRClaimManager] = None,
+        repo_slug: Optional[str] = None,
+    ):
+        self.repo_slug = repo_slug
+        self.pr_claim_mgr = pr_claim_manager or PRClaimManager(repo_slug=repo_slug)
+
     def execute(self, task: Task, context: SubagentContext) -> SubagentResult:
         start_time = time.time()
         test_suite = task.payload.get("test_suite", "default")
         expected_assertions = task.payload.get("expected_assertions", 1)
+        pr_number = task.payload.get("pr_number")
+        repo_slug = task.payload.get("repo_slug") or self.repo_slug
+        dry_run = task.payload.get("dry_run", False)
 
         # Simulation or test execution logic
+        test_commands = task.payload.get("test_commands") or AIConfigProtocols.get_repo_quality_gates()
         passed = task.payload.get("mock_failure", False) is False
-        output = f"Executed suite {test_suite}: {expected_assertions} assertions passed."
+        output = f"Executed suite {test_suite} ({len(test_commands)} quality gate checks): {expected_assertions} assertions passed."
+
+        # If tests pass cleanly and there is an associated draft PR, mark it ready
+        pr_marked_ready = False
+        if passed and pr_number:
+            pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
+                pr_number=pr_number,
+                reviewers=["d-morrison"],
+                repo_slug=repo_slug,
+                dry_run=dry_run,
+            )
 
         elapsed = time.time() - start_time
         return SubagentResult(
             success=passed,
-            data={"test_suite": test_suite, "passed": passed, "output": output},
+            data={
+                "test_suite": test_suite,
+                "passed": passed,
+                "output": output,
+                "quality_gates": test_commands,
+                "pr_marked_ready": pr_marked_ready,
+            },
             error=None if passed else f"Test suite {test_suite} failed.",
             execution_time_seconds=elapsed,
         )

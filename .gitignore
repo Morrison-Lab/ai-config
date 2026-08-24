@@ -31,3 +31,9 @@ _site/
 
 # Scratch diffs from review tooling (`gh pr diff > N.patch`). Never tracked.
 *.patch
+
+# Orchestrator local state databases
+*.db
+*.db-wal
+*.db-shm
+.orchestrator/

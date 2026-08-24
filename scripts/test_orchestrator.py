@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 # Ensure orchestrator package is on path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -336,12 +337,33 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertIn(adapter.provider, (ModelProvider.OLLAMA, ModelProvider.MOCK))
 
     def test_model_router_adversarial_review_routes_cross_model(self):
+        # When author is Claude, reviewer must not be Claude
         adapter, model = self.router.route_task(
             tier=TaskTier.ADVERSARIAL_REVIEW,
             prior_author_model="claude-3-7-sonnet",
         )
-        # Reviewer must not be Claude
         self.assertNotEqual(adapter.provider, ModelProvider.CLAUDE)
+
+        # When author is Opencode, reviewer must not be Opencode
+        adapter2, model2 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="opencode/deepseek-v4-flash-free",
+        )
+        self.assertNotEqual(adapter2.provider, ModelProvider.OPENCODE)
+
+        # When author is Cursor, reviewer must not be Cursor
+        adapter3, model3 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="cursor-agent",
+        )
+        self.assertNotEqual(adapter3.provider, ModelProvider.CURSOR)
+
+        # When author is Codex, reviewer must not be Codex
+        adapter4, model4 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="codex-cli",
+        )
+        self.assertNotEqual(adapter4.provider, ModelProvider.CODEX)
 
     def test_backlog_sweeper_ingest_issue_creates_dag(self):
         fake_issue = {
@@ -349,7 +371,8 @@ class TestModelRouterAndSweeper(unittest.TestCase):
             "title": "Fix memory leak in background worker",
             "body": "Detailed description of memory issue.",
         }
-        dag = self.sweeper.ingest_issue(fake_issue)
+        # Test opt-in auto_claim_pr=True (with dry_run)
+        dag = self.sweeper.ingest_issue(fake_issue, auto_claim_pr=True, dry_run=True)
         self.assertEqual(len(dag), 4)
 
         roles = [t.role for t in dag]
@@ -360,13 +383,30 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertEqual(dag[2].depends_on, [dag[1].id])
         self.assertEqual(dag[3].depends_on, [dag[2].id])
 
+        # Check PR-on-claim metadata attached to tasks
+        for task in dag:
+            self.assertTrue(task.payload["branch_name"].startswith("fix/issue-9999"))
+            self.assertIsNotNone(task.payload["pr_number"])
+            self.assertIsNotNone(task.payload["pr_url"])
+
+        # Test default safe mode (auto_claim_pr=False)
+        fake_issue_2 = {
+            "number": 9998,
+            "title": "Fix crash in task worker",
+            "body": "Detailed description of crash.",
+        }
+        dag_default = self.sweeper.ingest_issue(fake_issue_2, dry_run=True)
+        self.assertEqual(len(dag_default), 4)
+        for task in dag_default:
+            self.assertIsNone(task.payload["pr_number"])
+
     def test_retry_task_status_guard(self):
         task = Task(title="Failed Task", role="coder")
         self.store.create_task(task)
         self.store.claim_task(task.id, "worker-1")
         self.store.complete_task(task.id, {"status": "ok"})
 
-        # Retrying a COMPLETED task must return False
+        # Cannot retry a COMPLETED task
         retried = self.store.retry_task(task.id)
         self.assertFalse(retried)
 
@@ -451,6 +491,208 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         unblocked = self.store.resolve_blocked_tasks()
         self.assertEqual(unblocked, 0)
         self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.CANCELLED)
+
+
+class TestWorktreeIsolation(unittest.TestCase):
+    """Test suite for worktree lifecycle, subagent isolation, and cleanup."""
+
+    def test_worktree_manager_lifecycle_and_branch_cleanup(self):
+        from orchestrator.worktree_manager import WorktreeManager
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=tmppath)
+
+            task_id = "test-wt-456"
+            target_branch = "task/test-wt-456"
+
+            with wt_mgr.isolated_worktree(task_id, cleanup=True, delete_branch=True) as wt_path:
+                self.assertTrue(wt_path.exists())
+                test_file = wt_path / "test_isolated.txt"
+                test_file.write_text("isolated content", encoding="utf-8")
+                self.assertTrue(test_file.exists())
+
+            # Verify worktree directory is cleaned up
+            self.assertFalse(wt_path.exists())
+
+            # Verify branch was deleted and not leaked
+            res = subprocess.run(["git", "branch", "--list", target_branch], capture_output=True, text=True, check=False)
+            self.assertNotIn(target_branch, res.stdout)
+
+    def test_coder_subagent_with_worktree_isolation(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = Task(
+                title="Isolated code task",
+                role="coder",
+                payload={
+                    "instruction": "Add helper function",
+                    "target_file": "isolated_test_file.py",
+                    "code_content": "def helper(): return 42\n",
+                    "use_worktree": True,
+                    "branch_name": "task/isolated-code-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+            result = coder.execute(task, ctx)
+
+            self.assertTrue(result.success)
+            self.assertTrue(result.data.get("committed", False))
+
+            # Verify branch was cleaned up as requested
+            res = subprocess.run(["git", "branch", "--list", "task/isolated-code-test"], capture_output=True, text=True, check=False)
+            self.assertNotIn("task/isolated-code-test", res.stdout)
+
+    def test_coder_subagent_worktree_commit_failure_fails_fast(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        from unittest.mock import patch
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = Task(
+                title="Failing commit task",
+                role="coder",
+                payload={
+                    "instruction": "Add faulty code",
+                    "target_file": "faulty.py",
+                    "code_content": "def bad(): pass\n",
+                    "use_worktree": True,
+                    "branch_name": "task/failing-commit-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+
+            orig_run = subprocess.run
+            def mock_subprocess_run(cmd, *args, **kwargs):
+                if isinstance(cmd, list) and len(cmd) > 1 and cmd[0] == "git" and cmd[1] == "commit":
+                    return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="fatal: mock commit failure")
+                return orig_run(cmd, *args, **kwargs)
+
+            with patch("subprocess.run", side_effect=mock_subprocess_run):
+                result = coder.execute(task, ctx)
+                self.assertFalse(result.success)
+                self.assertIn("Git commit failed in worktree", result.error)
+
+    def test_coder_subagent_worktree_path_traversal_blocked(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = PathTraversalTask = Task(
+                title="Path traversal attack simulation",
+                role="coder",
+                payload={
+                    "instruction": "Overwrite outside file",
+                    "target_file": "../../../outside.txt",
+                    "code_content": "malicious content\n",
+                    "use_worktree": True,
+                    "branch_name": "task/traversal-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+            result = coder.execute(task, ctx)
+
+            self.assertFalse(result.success)
+            self.assertIn("escapes worktree root", result.error)
+
+
+class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
+    """Tests that orchestrator and subagents strictly follow Morrison-Lab / ai-config protocols."""
+
+    def test_protocols_system_prompts_encode_agents_md(self):
+        from orchestrator.protocols import AIConfigProtocols
+        from orchestrator.subagents import ResearcherSubagent, CoderSubagent, ReviewerSubagent, TesterSubagent
+
+        for agent_cls in [ResearcherSubagent, CoderSubagent, ReviewerSubagent, TesterSubagent]:
+            agent = agent_cls()
+            prompt = agent.get_system_prompt()
+            self.assertIn("WORKTREE ISOLATION", prompt)
+            self.assertIn("PR-ON-CLAIM", prompt)
+            self.assertIn("FAIL-FAST", prompt)
+            self.assertIn("ADVERSARIAL SELF-REVIEW", prompt)
+            self.assertIn("STRICT MERGE POLICY", prompt)
+
+    def test_pr_claim_manager_branch_naming_and_dry_run(self):
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+        branch_feat = mgr.generate_branch_name(2112, "feat: add persistent orchestration loop")
+        self.assertTrue(branch_feat.startswith("feat/issue-2112-feat-add-persistent"))
+
+        branch_fix = mgr.generate_branch_name(2115, "fix memory leak in worker daemon")
+        self.assertTrue(branch_fix.startswith("fix/issue-2115-fix-memory-leak"))
+
+        claim_info = mgr.claim_issue_and_open_draft_pr(2112, "feat: add persistent orchestration loop", dry_run=True)
+        self.assertTrue(claim_info["draft_pr_opened"])
+        self.assertIsNotNone(claim_info["pr_number"])
+        self.assertIn("https://github.com/Morrison-Lab/ai-config/pull/", claim_info["pr_url"])
+
+    def test_tester_subagent_marks_draft_pr_ready(self):
+        from orchestrator.subagents import TesterSubagent
+        from orchestrator.models import SubagentContext
+
+        tester = TesterSubagent()
+        task = Task(
+            title="Verify quality gates",
+            role="tester",
+            payload={
+                "pr_number": 2112,
+                "dry_run": True,
+                "expected_assertions": 5,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=None, worker_id="worker-tester", workspace_root=str(Path.cwd()))
+        res = tester.execute(task, ctx)
+
+        self.assertTrue(res.success)
+        self.assertTrue(res.data.get("pr_marked_ready", False))
+
+    def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
+        from orchestrator.cli import build_parser
+
+        parser = build_parser()
+        # Default ingest-issues (safe opt-in default: claim_pr=False)
+        args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
+        self.assertFalse(args_default.dry_run)
+        self.assertFalse(args_default.claim_pr)
+
+        # Explicit --claim-pr opt-in
+        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3"])
+        self.assertFalse(args_opt_in.dry_run)
+        self.assertTrue(args_opt_in.claim_pr)
+
+        # Explicit sweep-backlog --dry-run
+        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
+        self.assertTrue(args_sweep.dry_run)
+        self.assertFalse(args_sweep.claim_pr)
 
 
 def main():

@@ -209,8 +209,12 @@ def cmd_cancel(args: argparse.Namespace) -> None:
 def cmd_ingest_issues(args: argparse.Namespace) -> None:
     store = StateStore(args.db)
     sweeper = BacklogSweeper(store, repo=args.repo)
-    print(f"Querying GitHub issues (limit={args.limit})...")
-    count = sweeper.ingest_backlog(limit=args.limit)
+    print(f"Querying GitHub issues (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr})...")
+    count = sweeper.ingest_backlog(
+        limit=args.limit,
+        auto_claim_pr=args.claim_pr,
+        dry_run=args.dry_run,
+    )
     print(f"Successfully ingested {count} issues into the orchestration queue.")
 
 
@@ -218,8 +222,12 @@ def cmd_sweep_backlog(args: argparse.Namespace) -> None:
     setup_logging(args.verbose)
     store = StateStore(args.db)
     sweeper = BacklogSweeper(store, repo=args.repo)
-    print(f"Sweeping GitHub backlog (limit={args.limit})...")
-    ingested = sweeper.ingest_backlog(limit=args.limit)
+    print(f"Sweeping GitHub backlog (limit={args.limit}, dry_run={args.dry_run}, claim_pr={args.claim_pr})...")
+    ingested = sweeper.ingest_backlog(
+        limit=args.limit,
+        auto_claim_pr=args.claim_pr,
+        dry_run=args.dry_run,
+    )
     print(f"Ingested {ingested} issues. Starting multi-model orchestration engine (concurrency={args.concurrency})...")
 
     engine = OrchestratorEngine(
@@ -271,6 +279,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest = subparsers.add_parser("ingest-issues", help="Ingest open GitHub issues into orchestration queue")
     p_ingest.add_argument("--limit", type=int, default=10, help="Number of issues to ingest")
     p_ingest.add_argument("--repo", help="Target GitHub repository (owner/repo)")
+    p_ingest.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
+    p_ingest.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
     p_ingest.set_defaults(func=cmd_ingest_issues)
 
     # sweep-backlog
@@ -278,6 +288,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("-c", "--concurrency", type=int, default=3, help="Worker concurrency limit")
     p_sweep.add_argument("--limit", type=int, default=5, help="Number of issues to sweep")
     p_sweep.add_argument("--repo", help="Target GitHub repository (owner/repo)")
+    p_sweep.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
+    p_sweep.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
     p_sweep.add_argument("-p", "--poll-interval", type=float, default=0.5, help="Poll interval seconds")
     p_sweep.add_argument("-s", "--stale-threshold", type=float, default=60.0, help="Heartbeat stale threshold seconds")
     p_sweep.set_defaults(func=cmd_sweep_backlog)

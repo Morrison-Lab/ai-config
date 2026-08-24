@@ -67,8 +67,7 @@ The boundary matters as much as the trigger, because a migration that drops beha
   The gha README names `d-morrison`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
   Read the list as evidence of reach rather than as an allowlist, and treat a repo outside our administration as a question for its maintainer rather than a migration to perform.
 
-Two skills currently sit on the wrong side of this boundary and are being reconciled separately under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133): [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) each author a standalone `claude-code-review.yml` or `claude.yml`, and gha ships both as reusable workflows.
-Until that lands, a workflow one of those skills authored deliberately is a decision rather than an oversight, so read it under the second bullet above.
+Both [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) author caller stubs delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` and `Morrison-Lab/gha/.github/workflows/claude.yml@v2` (reconciled under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133)).
 
 ## The migration is its own change
 

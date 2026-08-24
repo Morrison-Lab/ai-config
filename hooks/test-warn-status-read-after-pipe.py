@@ -296,7 +296,7 @@ check("multi-stage pipeline fires",
       fires('cmd | grep x | wc -l; echo "rc=$?"'), True)
 
 # The `|| rc=$?` capture idiom attached to a pipeline. One of the two hits
-# from the corpus-wide negative control (645 fenced blocks, 8 discriminating,
+# from the corpus-wide negative control (8 discriminating blocks,
 # 2 fired -- see the hook docstring for the method and for the false positive
 # an earlier run of it reported), and a true positive by
 # `errexit-is-not-uniform.md`'s own detector list, which says to flag

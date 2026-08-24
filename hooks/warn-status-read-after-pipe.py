@@ -104,14 +104,18 @@ reproduce for a reviewer, so the METHOD is stated rather than the trees:
     three backticks at column 0; the fence lines are not part of a block
   * run 2026-08-24 at this branch's HEAD
 
-        files examined                      : 356
-        fenced blocks                       : 645
+        files examined                      : 358
+        fenced blocks                       : 657
           discriminating ($? AND | present) :   8
           fired                             :   2
 
-Report the middle number, not the first. Only 8 of the 645 could fire under ANY
+(The file and block totals drift as `main` gains markdown --- an earlier run
+the same day read 356/645 --- while the discriminating and fired counts have
+held. Re-derive at your HEAD rather than comparing against these two.)
+
+Report the middle number, not the first. Only 8 of the 657 could fire under ANY
 implementation, so a matcher firing on every block containing both would still
-score "645 examined, 8 fired" --- the other 637 are padding, and quoting them
+score "657 examined, 8 fired" --- the rest are padding, and quoting them
 as specificity is the zero-matrix problem
 `shared/workflow/batch-merge-and-resolve.md` names.
 

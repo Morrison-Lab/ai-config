@@ -160,3 +160,37 @@ The brief's author had no way to see this from the count alone --- reading
 the status code as a confound required already knowing what it encodes,
 which is exactly why a supplied number needs re-deriving rather than only
 re-reading.)
+
+## A run-level conclusion stood in for a job-level one
+
+(`Morrison-Lab/ai-config#2019`, measured 2026-08-23.
+A brief handed a UMS agent the premise that `R CMD check` "never completed on
+this PR", offered as measurement rather than as inference.
+What had actually been queried was `ucdavis/bcs#732`'s five `R-CMD-check.yaml`
+runs, four of which concluded `cancelled`.
+Nobody queried the jobs inside them.
+
+Run `32610472088` had already answered the question.
+Its `macos-latest (release)` job concluded `success` at 01:58:32Z and its
+`ubuntu-latest (release)` job at 02:01:21Z, about half an hour after the PR
+opened;
+only `windows-latest (release)` was cancelled.
+So the package had checked green on two platforms while the brief was
+asserting the check had produced nothing.
+
+The premise is what makes this a case record rather than a stray error.
+It was load-bearing: the agent built a `fully-clean.md` subsection on it, and
+that subsection's own prescribed test --- "confirm at least one run reached a
+conclusion" --- is satisfied vacuously by a `cancelled` conclusion, so the
+instrument inherited the premise's defect and failed toward "clean" in exactly
+the state it was written to catch.
+An adversarial review found it, and the subsection was deleted rather than
+patched.
+
+The transferable half is narrower than "verify your premises".
+A run-level `cancelled` says the run stopped;
+it says nothing about which of that run's jobs had already finished.
+"The run was cancelled" and "the check never ran" are different claims, and the
+brief measured the first while asserting the second, which is why running a
+query did not protect it.
+`list_workflow_jobs` on any one of those four runs settles it.)

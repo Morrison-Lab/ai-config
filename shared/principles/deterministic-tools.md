@@ -1,8 +1,22 @@
+**Automate everything.**
+Never do by hand any work that can be automated.
+
 Prefer deterministic, inspectable algorithms over model judgment ---
 and where none exists, build one.
 The goal is to write ourselves out of a job: every task we perform by
 reading and deciding is a candidate to become a script whose output we
 merely consume.
+
+Read "work" broadly.
+Model judgment is the case this fragment was written for and the hardest to
+displace, but the rule is not about judgment --- it is about **doing by hand
+what something else already computes**,
+which includes work carrying no judgment at all.
+A hand-typed section number is not a decision anyone made;
+it is a value the renderer was already producing,
+kept in a second place by hand.
+That kind of case is the easiest to miss,
+precisely because nothing about it feels like deciding.
 
 This is one principle with two faces, operating on different timescales.
 They are not alternatives, and neither supersedes the other.
@@ -158,6 +172,58 @@ opposite of correct.
 `UCD-SERG/serocalculator#569` had already diagnosed the same thing, and it
 surfaced only during the dupe check before filing a new issue.)
 
+## The third case: a value your toolchain already generates
+
+Two instances of this principle are already well covered.
+Model judgment displaced by an algorithm is this fragment's main subject.
+Data with an external source of truth is [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).
+
+A third sits between them and belongs to neither: **a value the toolchain already derives from the artifact itself**, written out by hand alongside it.
+Section numbers a renderer computes from heading depth.
+A table of contents a generator emits.
+A count, a total, or a cross-reference that some tool resolves.
+An index whose entries the build produces.
+
+It is the least visible of the three, for a reason worth naming.
+Hard-coded external data has an obvious owner elsewhere, so the question "where does this really come from?" arises naturally.
+Model judgment at least feels like work, so it prompts the question of whether it should be.
+Typing `## 6.2` prompts nothing.
+It is not a decision, it is not a lookup, and it looks like authorship.
+
+**The failure mode is silent divergence, and it is worse than being wrong.**
+Two generators now exist for one value: yours and the tool's.
+While nobody enables the tool's, the hand-written copy looks authoritative and stays correct.
+The moment anything turns the real one on --- a format option, a config inherited from a parent directory, a downstream consumer with different defaults --- both run, and the artifact carries two answers at once.
+
+Measured 2026-08-22 on `ucdavis/matt.contracts#2`:
+a Quarto document whose 30 headings carried hand-typed numbers
+while a directory `_metadata.yml` set `number-sections: true`.
+Every heading rendered doubly numbered --- `2 1. Objectives and estimands`,
+`2.3 1.3 Estimand framework` --- and the eight `@sec-` cross-references
+resolved to the generated scheme, so a reference to the estimand section read
+"Section 2.3" while its heading offered the reader both `2.3` and `1.3` with
+nothing to say which was the section number.
+Neither number was wrong on its own.
+What the document lost was the ability to answer what a section is called,
+which is the only thing a cross-reference is for.
+None of it was visible in the source, and nine review rounds over a day did
+not catch it, because every one of them read the `.qmd`.
+
+**The check is one question, asked before typing a value into an artifact:** does anything in this toolchain already compute this?
+If yes, let it, and delete the copy.
+If the tool's version is turned off, prefer turning it on over maintaining the manual one --- an inert generator is a latent conflict, not an absent one.
+
+**And where the value is generated, verify the generated artifact.**
+Source inspection cannot see this class of defect by construction: the hand-typed number and the generated one are both correct in the file, and only the render shows them colliding.
+That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) applied here --- checking the `.qmd` is checking an adjacent object.
+
+- **Do:** ask what the toolchain already derives before writing a value by hand.
+- **Do:** enable the generator and delete the hand-maintained copy, rather than leaving the generator off.
+- **Do:** read the rendered output when a value is generated, since the source cannot show the collision.
+- **Don't:** treat "it is not a judgment call" as putting something outside this principle --- the clearest cases involve no judgment at all.
+- **Don't:** assume an unused generator is harmless;
+  it runs the moment a config elsewhere turns it on.
+
 ## Limits
 
 Design, genuine judgment, and semantic work stay with a human or a model:
@@ -187,6 +253,144 @@ That framing is the whole content of "write ourselves out of a job".
 - **Don't:** automate a genuine judgment badly to satisfy the rule; a
   misfiring instrument is worse than none.
 
+## Fix the class, not the site: route every call through one checked helper
+
+When a review finds a defect that a *second* call site could reintroduce,
+patching the sites the reviewer named leaves every future site free to
+repeat it.
+Routing all of them through one helper that performs the check narrows the
+class, and the difference is observable: the raw primitive should appear
+once, inside the helper, and nowhere else.
+Read "one place the mistake could live" as the helper itself, never as a
+tolerance for one stray call --- a stray call is a site the fix missed.
+
+Two counts hide behind that sentence, and only the second is mechanical.
+"How many call sites could still commit this defect" is a judgment about
+reachability, and this file's own review list rejects an instrument
+standing in for a judgment it cannot make.
+What a script can count is the raw primitive the helper was built to
+monopolize --- occurrences of `subprocess.run` in a file, of a bare
+`open(`, of the unguarded API.
+Ask the judgment question to decide whether the fix is structural, and
+derive the primitive count to say where it stands.
+If the primitive appears anywhere outside the helper, the fix went to a
+site: one stray call is already an unguarded call site, not a margin.
+
+A helper forbids only what its signature makes unavailable.
+Routing every call through one function does nothing if the function still
+accepts an unguarded call, and an OPTIONAL parameter is a shape a call site
+forgets --- the caller reads as complete without that argument, and nothing
+at the call site says otherwise.
+So put the input the guarded step is derived FROM in a REQUIRED argument,
+and derive the step itself inside.
+That forbids OMISSION and nothing else: a call passing an empty or wrong
+value still reaches the unguarded behaviour, so report that you closed the
+skipping spelling rather than reporting the unsafe call impossible.
+
+Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), at
+commit `cf6c47ce`; at the time of writing that PR's branch carries it and
+`main` does not.
+One commit threaded an optional `overrides=` through the config reads it
+knew about and left one pre-existing read without it, which was a live
+bypass.
+Making the raw `argv` a required argument in place of `overrides=`, and
+deriving the overrides from `argv` inside the helper, removed the spelling
+rather than the instance --- twice over, since the same helper takes the
+pushing command's environment as a second required argument for the same
+reason.
+
+State the residue in those terms rather than as an impossibility.
+A caller passing `argv=[]` derives no overrides and gets the unguarded read
+back, and two end-to-end rows in that guard's own regression suite fail when
+an existing call site passes one --- so the value is asserted everywhere the
+helper is called today, and nothing stops a NEW call site from spelling it.
+
+A choke point narrows the class without closing it, so say which you
+achieved.
+The next author can still bypass the helper unless something asserts they
+did not --- a test counting the raw primitive, a lint rule, or a
+behavioural test that fails when an unguarded call is added.
+Absent one of those, "one place the mistake could live" describes the
+current revision and not an invariant, and the two claims are worth
+different amounts.
+
+This is the same instinct as the rest of this file, one scale down.
+An instrument beats a rule because a rule can be forgotten.
+A single choke point beats a repeated check for exactly that reason.
+
+Two neighbouring rules cover what this one does not.
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+recurrence section fires when the same finding class returns to a
+*detector* that keeps almost working, and answers by replacing the kind of
+evidence.
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "safe
+because X never happens" section fires when a second counter-example
+refutes one ambiguity, and answers by searching for the general class of
+counter-example instead of patching the instance.
+The first asks whether the instrument is the right kind of thing; the
+second asks how wide the defect is.
+Both wait on a recurrence to tell them.
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+"A fix for a defect class is where a fresh instance of that class hides"
+is the closest relative of all, and the complement to this one: it asks where the next instance will be and answers "the fix", where
+this asks how many places could host one at all.
+This one asks how many places can commit the defect, which a single diff
+can answer before any recurrence --- though answerable is not answered,
+and a class that reopens after a first fix is evidence that nobody asked.
+
+Measured 2026-08-22 on
+[ai-config#1932](https://github.com/Morrison-Lab/ai-config/pull/1932).
+That PR added a `PreToolUse` guard and its test suite --- at the time of
+writing they sit on its own branch rather than on `main` --- and every
+function named below came from one or the other.
+A timeout budget was enforced in `_rev_parse`.
+Two helpers added later, `_git_config` and `_rev_parse_ref`, each ran
+`git` on its own hardcoded timeout and read no deadline, so one path could
+spend six unbudgeted subprocess calls --- eighteen seconds against a
+ten-second `PreToolUse` timeout that fails **open**.
+Patching those two would have left the next helper free to repeat it.
+Every call was routed through one budgeted `_run_git`, leaving the guard
+with a single `subprocess.run`, inside that helper.
+
+How firmly that is held is worth stating, because the two counts land
+differently.
+`budget_cases()` asserts the budget behaviourally: it runs the bare push
+--- the path with the most calls --- against a `git` shim sleeping a
+second per call, and fails on any of four conditions: the hook
+exiting non-zero, not denying, denying for a reason other than running out
+of time, or elapsed passing 6.0 seconds against a 2-second budget.
+The deadline is absolute, set once, so an unguarded call consumes the
+budget instead of extending the run: elapsed tracks the larger of the
+budget and the number of calls, and about six unguarded calls are needed
+to pass 6.0.
+Six is exactly the pre-fix shape, which the fixing commit's own
+message recorded failing at 6.1 seconds.
+So the test catches a wholesale reopening of the class and not one new
+unguarded call, which is weaker than "the budget is enforced".
+The structural count is asserted by nothing at all.
+
+- **Do:** ask which call sites could still commit the defect to decide
+  whether the fix is structural, and derive the primitive's count to say
+  where it stands.
+- **Do:** treat any occurrence of the primitive outside the helper as an
+  unfinished fix, instead of counting to two.
+- **Do:** prefer a choke point the next author must go out of their way to
+  bypass over a check the next author must remember.
+- **Do:** make the input a required argument and derive the guarded step
+  inside, so the call that SKIPS it cannot be spelled.
+- **Do:** say whether the count is enforced or merely current, and name
+  the assertion that would enforce it.
+- **Don't:** patch the sites a reviewer happened to name --- they found
+  the instances, not the boundary.
+- **Don't:** take the un-skippable input as an OPTIONAL parameter --- that
+  routes the callers you remembered and leaves the spelling that skips it.
+- **Don't:** claim a bypass is impossible when nothing tests for one.
+- **Don't:** reach for a choke point when the defect genuinely has one
+  site.
+  `## Limits` above already says a bad tool is worse than the judgment it
+  replaced.
+
 ## In review
 
 Flag these with the same weight as the other principle-level findings:
@@ -201,6 +405,11 @@ Flag these with the same weight as the other principle-level findings:
   corpus, where the second could have re-run the first.
 - Conversely, a new instrument standing in for a judgment it cannot make,
   or built for a task with exactly one occurrence.
+- A fix applied to the two or three call sites a reviewer named, where
+  routing them through one checked helper would drop the unguarded count
+  to zero.
+- A guarding input threaded through call sites as an optional parameter,
+  where making it required would leave the skipping call unspellable.
 
 (Directives from the user, 2026-07-30: "cai: minimize use of generative
 ai in agentic work; maximize use of deterministic, inspectable algorithms

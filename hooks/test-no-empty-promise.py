@@ -176,6 +176,14 @@ TOOL_RESULT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "content": "ok"}]}}
 
 
+# Running a negative control against another revision of the hook: copy that
+# revision AND `remind-ums-after-error.py` into one directory and point this
+# suite at the copy. `no-empty-promise.py` imports `visible_prose` from that
+# sibling and returns 0 unconditionally when the import fails, so a copy
+# placed on its own goes silent on EVERY case -- which reports as a suite-wide
+# failure rather than as the missing dependency it is.
+
+
 def say(text):
     return {"type": "assistant", "message": {"content": [
         {"type": "text", "text": text}]}}
@@ -311,6 +319,16 @@ CASES = [
      False, "'memorize.' at a sentence end still discharges"),
     ([say("Going forward I'll do X."), dispatch("Open ums.md and summarize it.")],
      True, "a dotted FILENAME still does not discharge"),
+    # Review finding on #1968. `_NOT_PATH` originally rejected ANY preceding
+    # `/`, which silently dropped `/ums` -- the spelling this corpus actually
+    # uses to invoke a skill, and the one likeliest to appear in a dispatch
+    # prompt. A path and an invocation differ in what precedes the slash.
+    ([say("Going forward I'll do X."), dispatch("Then run /ums on this.")],
+     False, "the slash-command spelling `/ums` still discharges (#1968)"),
+    ([say("Going forward I'll do X."), dispatch("/memorize the outcome.")],
+     False, "`/memorize` at the start of a prompt still discharges"),
+    ([say("Going forward I'll do X."), dispatch("Open skills/ums and read it.")],
+     True, "a path ending in `ums` still does not discharge"),
 
     # Round 9: a bare skill word in a BASH payload is a search term, not an
     # action -- `grep -n ums README.md` discharged a promise.
@@ -606,6 +624,88 @@ CASES = [
     ([say("I owe #1937 the ARDI loop."),
       bash("python3 -B -u hooks/monitor-open-prs.py --monitor")],
      False, "several interpreter flags before the script still discharge"),
+
+    # --- ai-config#1966. `BASH_WRITE` decides what counts as a durable
+    # write, so a false match there is a false DISCHARGE -- the silent
+    # direction. `\b` sits between a name and a following `-`, so `--write\b`
+    # matched curl's `--write-out` and `git\s+(?:add|commit|...)\b` matched
+    # `git commit-tree`. Both directions are pinned, because the defect was
+    # precisely that a real write and these were indistinguishable.
+    #
+    # The curl line is verbatim from the issue. It pairs a rule-surface path
+    # (a URL ending in CLAUDE.md) with a flag that writes nothing, so a pure
+    # HTTP status check read as having shipped a mechanism.
+    ([say("Going forward I'll always check this before replying."),
+      bash("curl -s --write-out '%{http_code}' "
+           "https://example.com/CLAUDE.md")],
+     True, "`curl --write-out` writes nothing and does NOT discharge (#1966)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-tree -p HEAD -m 'shared/workflow/fully-clean.md' $TREE")],
+     True, "`git commit-tree` is not `git commit` and does NOT discharge"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-graph write && cat shared/workflow/fully-clean.md")],
+     True, "`git commit-graph write` does NOT discharge"),
+
+    # The true-positive half. Each of these still has to work, or the guard
+    # has been tightened past the defect into the behaviour itself.
+    ([say("Going forward I'll always check this before replying."),
+      bash("python3 scripts/semantic-line-breaks.py --write "
+           "shared/workflow/fully-clean.md")],
+     False, "a genuine `--write` flag still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit -m 'record it' shared/workflow/fully-clean.md")],
+     False, "`git commit` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git add shared/workflow/fully-clean.md")],
+     False, "`git add` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git rm shared/workflow/fully-clean.md")],
+     False, "`git rm` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git mv shared/workflow/fully-clean.md shared/workflow/fc.md")],
+     False, "`git mv` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i` still discharges (no hyphenated sibling to guard)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i.bak 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i.bak` still discharges -- `.` is already a non-word char"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("tee -a shared/workflow/fully-clean.md < /tmp/note")],
+     False, "`tee` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat CLAUDE.md | tee shared/workflow/fully-clean.md")],
+     False, "`tee` mid-pipeline still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p skills/new-guard")],
+     False, "`mkdir` still discharges"),
+    # `memories/notes` deliberately does NOT work here, and that is
+    # MECHANISM_PATH rather than BASH_WRITE: each of its alternatives demands
+    # a FILE, so a bare directory cannot discharge a promise. Pinned so the
+    # `mkdir` case above is not read as the guard failing.
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p memories/notes")],
+     True, "creating a bare DIRECTORY does not discharge (MECHANISM_PATH)"),
+    # Second review finding on #1968: the earlier comment justified leaving
+    # `tee`/`mkdir` on a plain `\b` by the hyphenated-sibling axis, which is
+    # the wrong axis -- `\btee\b` matched inside a PATH, so a READ discharged
+    # a promise. Latent (no such path exists in this repo today) but wrong in
+    # exactly the way the rest of this diff is about.
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat shared/workflow/tee-notes.md")],
+     True, "a path containing `tee` is a READ and does NOT discharge (#1968)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("grep -n x shared/workflow/mkdir-guide.md")],
+     True, "a path containing `mkdir` does NOT discharge"),
+    # `commit` is NOT the only member of that group with a hyphenated
+    # sibling: `git --list-cmds=main,others` also reports `add--interactive`,
+    # the deprecated interactive backend. Pinned so the exclusion is a
+    # checked decision rather than an assumption -- and pinned in the LOUD
+    # direction, since a genuine staging that stops discharging costs an
+    # extra block the author clears in one command.
+    ([say("Going forward I'll always check this before replying."),
+      bash("git add--interactive shared/workflow/fully-clean.md")],
+     True, "`git add--interactive` is excluded with the rest of the group"),
 ]
 
 

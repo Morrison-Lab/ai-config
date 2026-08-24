@@ -56,6 +56,15 @@ directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
+## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
+
+`Morrison-Lab/gha` holds the lab's reusable GitHub Actions workflows; a consumer repo calls one with a stub (`uses: Morrison-Lab/gha/.github/workflows/<name>.yml@v2`) instead of carrying its own copy.
+When a repo you are working in hand-maintains a workflow gha already provides, migrate it in that session rather than noting it --- the upgrade is the deliverable.
+Candidates are duplication, drift from a shared version, missing fixes gha already carries, or a `.github/workflows/` that already calls gha for some workflows and not others.
+Not candidates are a workflow with genuinely repo-specific logic gha does not model, and a repo a prior decision deliberately pinned off gha.
+Derive gha's inventory from its own contents listing and take each capability's tag from its README's Versioning section, since `@v1` was frozen and the recommended tag varies per workflow.
+Full rule, including the boundary cases and why the migration PR's own review is skipped: [`shared/workflow/upgrade-to-gha.md`](shared/workflow/upgrade-to-gha.md).
+
 ## Manage quota, including the structural kind
 
 Treat token cost as a property of a workflow's **shape**, not only of the choices made inside one session.

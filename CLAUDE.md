@@ -1119,6 +1119,17 @@ Apply this in review too: a hand-rolled equivalent of functionality that already
 
 The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fragment below is the R-function special case; the `scout-peers` skill gates borrowed code by license.
 
+## If a repo isn't using `gha` and would benefit, upgrade it
+
+[shared/workflow/upgrade-to-gha.md](shared/workflow/upgrade-to-gha.md)
+
+The CI-specific, proactive case of DRW above.
+`Morrison-Lab/gha` ships the lab's reusable workflows, called from a consumer as `uses: Morrison-Lab/gha/.github/workflows/<name>.yml@v2`.
+When a repo you are working in hand-maintains a workflow gha already provides, migrate it in that session --- the upgrade is the deliverable, not the observation.
+The corpus's other gha triggers all wait for an event (a bug to patch, a port to close out, new CI to write), so none of them fires on the commonest case: nothing is broken, and the duplicate has simply sat there absorbing none of gha's fixes.
+Candidates are duplication, drift, missing fixes, or a directory that already calls gha for some workflows and not others; not candidates are repo-specific logic gha does not model and a repo deliberately pinned off gha.
+Pin per capability from gha's README Versioning section rather than copying a neighbouring caller's tag, file the migration as its own issue and PR rather than folding it into whatever brought you to the repo, and read the two migration hazards (`permissions:` and `concurrency:`) before writing the stub.
+
 ## Don't incur technical debt
 
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)

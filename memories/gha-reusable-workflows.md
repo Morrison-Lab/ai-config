@@ -1,6 +1,7 @@
 # d-morrison/gha reusable workflows
 
 Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
 
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
 Generic Actions-authoring material stays there.

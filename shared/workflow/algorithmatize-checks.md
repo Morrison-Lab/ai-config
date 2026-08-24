@@ -1058,13 +1058,16 @@ The mechanism, its two shapes, and its remedies belong to
 discards the status of everything left of it" and the ad-hoc-chain section
 after it, which measure both.
 [`fail-fast.rationale`](../principles/fail-fast.rationale.md)'s "`$?` belongs
-to the last thing evaluated" separates this from the neighbouring case where
-`$?` is misdirected by a command substitution and `pipefail` changes nothing.
-Read those rather than a third statement here.
-What is local to this fragment is only that its own tell has a blind spot, and
-which way that blind spot points: the rule's success is what produces the
-shape, since a reader who has internalized "always print the exit status" can
-satisfy that instruction with the pipe still in place.
+to the last thing evaluated" separates this from the neighbouring case where a
+command substitution misdirects the read and `pipefail` changes nothing.
+Read those for the mechanism.
+The bullets below restate their remedies rather than replacing them, because a
+bare pointer is invisible to anyone who does not follow it, and they add one
+measurement of their own.
+What is local to this fragment is the blind spot in its own tell, and which way
+that blind spot points: the rule's success is what produces the shape, since a
+reader who has internalized "always print the exit status" can satisfy that
+instruction with the pipe still in place.
 
 **The honest reason this became a guard is not that the corpus lacked a rule.**
 `errexit-is-not-uniform` already names this exact shape, with `head` named ---

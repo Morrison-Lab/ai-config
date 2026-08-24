@@ -11,11 +11,16 @@ Each negative names the shape it protects rather than merely asserting False,
 so a later reader can tell a deliberate exclusion from an accident.
 
 The file ends with a MUTATION section. A suite that passes against a
-deliberately broken matcher is not testing the matcher, so each of the three
-load-bearing rules --- the pipe test, the `pipefail` suppression, and the
-single-quote exclusion --- is broken on purpose and asserted to turn a test
-red. `memories/regex-negation-needs-adversarial-tests` records the case that
+deliberately broken matcher is not testing the matcher, so each load-bearing
+rule is broken on purpose and asserted to change a result: the pipe test, the
+`pipefail` suppression, the `PIPESTATUS` suppression, the `&` redirect
+carve-out, the single-quote exclusion, the comment skip, the assignment
+carve-out, and the in-paren separator guard.
+`memories/regex-negation-needs-adversarial-tests` records the case that
 motivated this: an 18-of-18 passing suite that hid two real bugs.
+
+Two of these mutate a POSITIVE into a miss rather than a negative into a fire,
+which is the direction that catches an over-broad carve-out.
 """
 import importlib.util
 import json
@@ -101,11 +106,44 @@ check("a pipeline continued across lines fires",
 check("${?} after a pipe fires",
       fires("cmd | head -20; echo ${?}"), True)
 
-# Merely naming the option does not disarm the guard.
+# Merely naming the option does not disarm the guard, in any of the ways this
+# corpus names it. Every one of these was quiet under a looser suppression
+# test, and every one is a genuine misread.
 check("grepping for the word pipefail still fires",
       fires('grep -rn pipefail hooks/ | head -20; echo "exit=$?"'), True)
 check("grepping for PIPESTATUS still fires",
       fires("rg PIPESTATUS shared/ | head -5; rc=$?"), True)
+check("a quoted mention of set -o pipefail still fires",
+      fires('grep -rn "set -o pipefail" hooks/; cmd | head -20; echo $?'),
+      True)
+check("echoing a reminder about pipefail still fires",
+      fires('echo "remember to set -o pipefail"; cmd | head -20; echo $?'),
+      True)
+check("an earlier PIPESTATUS read still fires",
+      fires("rc=${PIPESTATUS[0]}; cmd | head -20; echo $?"), True)
+check("the bare word PIPESTATUS still fires",
+      fires("echo PIPESTATUS; cmd | head -20; echo $?"), True)
+
+# A command substitution on the right of an ASSIGNMENT takes the pipeline's
+# own status, so this is the target bug rather than an exclusion. Measured:
+#   out=$(grep -q zzz /dev/null | cat); echo $?              -> 0
+#   set -o pipefail; out=$(grep -q zzz /dev/null | cat)      -> 1
+check("a pipeline assigned from a substitution fires",
+      fires("out=$(cmd | head -1); echo $?"), True)
+check("an exported assignment from a substitution fires",
+      fires("export OUT=$(cmd | tail -1); echo $?"), True)
+
+# A bare subshell's status is its last command's, so a pipeline inside one
+# reads exactly as a top-level pipeline does.
+check("a pipeline inside a bare subshell fires",
+      fires("( cmd | head -20 ); echo $?"), True)
+
+# Comments are the third prose surface. A comment CORRECTLY describing this
+# bug must not trip the guard that enforces it.
+check("a comment mentioning $? does not fire",
+      fires("make test | tail -5\n# TODO capture $? properly\necho ok"), False)
+check("a comment explaining the bug does not fire",
+      fires("python3 x.py | head -20\n# note: $? is head's here\ntrue"), False)
 
 check("rc=$? after a pipe fires",
       fires("python3 check.py | head -20; rc=$?"), True)
@@ -131,10 +169,11 @@ check("newline-separated $? after a pipe fires",
 check("multi-stage pipeline fires",
       fires('cmd | grep x | wc -l; echo "rc=$?"'), True)
 
-# The `|| rc=$?` capture idiom attached to a pipeline. This is the single hit
-# from the corpus-wide negative control (705 fenced shell blocks, 1 fired), and
-# it is a true positive by `errexit-is-not-uniform.md`'s own detector list,
-# which says to flag `|| fallback` attached to a pipeline with no `pipefail`.
+# The `|| rc=$?` capture idiom attached to a pipeline. One of the three hits
+# from the corpus-wide negative control (645 fenced blocks, 8 discriminating,
+# 3 fired, 0 false positives -- see the hook docstring for the method), and a
+# true positive by `errexit-is-not-uniform.md`'s own detector list, which says
+# to flag `|| fallback` attached to a pipeline with no `pipefail`.
 check("the || capture idiom on a pipeline fires",
       fires("git diff --cached --name-only | grep -qE '^R/.*\\.R$' || rc=$?"),
       True)
@@ -237,8 +276,20 @@ check("$? preceding the pipeline does not fire",
 check("process substitution is not a pipe",
       fires("diff <(sort a | cat) <(sort b | cat); echo $?"), False)
 
-check("command substitution is not a pipe",
-      fires('out=$(cmd | head -1); echo $?'), False)
+# A command substitution used as an ARGUMENT: the outer command's status wins.
+check("command substitution as an argument is not a pipe",
+      fires('echo "$(cmd | head -1)"; echo $?'), False)
+
+# A nested bare group inside a substitution must not desynchronize the paren
+# stack. Under a counter these fired, naming a pipeline with an unbalanced `)`.
+check("a nested group inside a substitution stays quiet",
+      fires("out=$( (cd /tmp) ; cat f | head -1 ); echo $?"), True)
+check("a nested group inside process substitution stays quiet",
+      fires("diff <( (cd /tmp); sort a | uniq ) <(sort b); echo $?"), False)
+
+# Arithmetic is not a substitution and carries no pipe.
+check("arithmetic expansion is not a pipe",
+      fires("n=$(( 1 + 2 )); echo $?"), False)
 
 check("regex alternation inside [[ ]] is not a pipe",
       fires("[[ $x =~ ^(a|b)$ ]]; echo $?"), False)
@@ -336,7 +387,7 @@ if mutant is not None:
           fires(INCIDENT, mutant), True)
 
 # 2. Break the pipefail suppression. The pipefail negative must start firing.
-mutant = load_mutant("if any(RX_SET_PIPEFAIL.search(s[\"text\"])",
+mutant = load_mutant("if any(RX_SET_PIPEFAIL.search(RX_QUOTED.sub(\" \", s[\"text\"]))",
                      "if any(False and RX_SET_PIPEFAIL.search(s[\"text\"])")
 if mutant is not None:
     check("MUTATION pipefail: pipefail negative goes red",
@@ -346,7 +397,7 @@ if mutant is not None:
 # 2b. Break the PIPESTATUS suppression on the reading segment. The
 #     non-vacuous PIPESTATUS negative must start firing; the vacuous spelling
 #     must NOT, which is what proves it was never testing this guard.
-mutant = load_mutant('if "PIPESTATUS" in segments[index]["text"]:',
+mutant = load_mutant('if RX_PIPESTATUS.search(segments[index]["text"]):',
                      "if False:")
 if mutant is not None:
     check("MUTATION PIPESTATUS: the non-vacuous negative goes red",
@@ -371,6 +422,40 @@ mutant = load_mutant('        if quote == "\'":', "        if False:")
 if mutant is not None:
     check("MUTATION single-quote: documentation goes red",
           fires("""bash -c 'false | tail -1; echo "rc=$?"'""", mutant), True)
+
+# 4. Break the comment skip. A comment describing the bug must start firing.
+mutant = load_mutant(
+    '        if char == "#" and (i == 0 or text[i - 1] in " \\t\\n;&|("):',
+    "        if False:")
+if mutant is not None:
+    check("MUTATION comment: a comment about $? goes red",
+          fires("make test | tail -5\n# TODO capture $? properly\necho ok",
+                mutant), True)
+
+# 5. Break the assignment carve-out, so `$(` always hides. The assignment case
+#    is a REAL instance, so mutating this turns a positive into a miss.
+mutant = load_mutant(
+    "            assigned = RX_ASSIGN_PREFIX.search(text[start:i]) is not None",
+    "            assigned = False")
+if mutant is not None:
+    check("MUTATION assignment: the assigned pipeline is missed",
+          fires("out=$(cmd | head -1); echo $?", mutant), False)
+
+# 6. Break the in-paren separator guard. A `;` inside a substitution then ends
+#    the outer segment and exposes an unbalanced `)` in the diagnostic.
+mutant = load_mutant("        if parens:\n"
+                     '            if two in ("&&", "||"):\n'
+                     "                i += 2\n"
+                     "                continue\n"
+                     '            if char in ("&", ";", "\\n"):\n'
+                     "                i += 1\n"
+                     "                continue\n",
+                     "")
+if mutant is not None:
+    got = reported("diff <( (cd /tmp); sort a | uniq ) <(sort b); echo $?",
+                   mutant)
+    check("MUTATION paren separator: the diagnostic degrades",
+          got is not None and got[0].endswith(")"), True)
 
 if failures:
     print("FAILED:")

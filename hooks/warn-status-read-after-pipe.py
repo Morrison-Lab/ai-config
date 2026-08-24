@@ -50,16 +50,37 @@ differently and is scanned too.
 
 WHAT IS NOT A PIPE
 ------------------
-Four constructs put a `|` in a command string without creating a pipeline whose
-status `$?` would report, and each was measured against bash before being
-excluded:
+Several constructs put a `|` in a command string without creating a pipeline
+whose status `$?` reports, and each was measured against bash rather than
+reasoned about:
 
-  * `<(...)` and `>(...)` process substitution, and `$(...)` command
-    substitution --- these run in a separate process, so `diff <(a|cat)
-    <(b|cat); echo $?` reports `diff`'s status.
+  * `<(...)` and `>(...)` process substitution --- a separate process, so
+    `diff <(a|cat) <(b|cat); echo $?` reports `diff`'s status.
+  * `$(...)` used as an ARGUMENT, where the outer command's status wins:
+    `echo "$(a|b)"; echo $?` is `echo`'s.
   * `[[ ... ]]`, where `|` is regex alternation: `[[ $x =~ ^(a|b)$ ]]`.
+  * `$(( ... ))` arithmetic.
   * `>|`, the noclobber-override redirect.
   * `||`, which is a separator.
+  * A comment, `# ...`, which is prose and the third such surface after single
+    quotes and heredoc bodies. A comment correctly explaining this bug
+    otherwise trips the guard enforcing it.
+
+Two neighbours of those are NOT excluded, because bash reads them as the
+pipeline's own status, which makes them instances of the bug rather than
+exceptions to it:
+
+  * `$(...)` on the right of an ASSIGNMENT. Measured,
+    `out=$(grep -q zzz /dev/null | cat); echo $?` gives 0 while the real
+    command exited 1, and `set -o pipefail` flips it to 1 --- and `pipefail`
+    changing the answer is exactly what proves the status is the pipeline's.
+  * A bare subshell, `( cmd | head ); echo $?`.
+
+Paren contexts are tracked on a STACK rather than a counter, since a bare
+group nested inside a substitution otherwise decrements the wrong thing and
+leaves an unbalanced `)` in the reported pipeline. Separators inside any paren
+group belong to that group's own command list and do not end the outer
+segment.
 
 And `&` is a segment separator ONLY when it is not part of a redirect. `2>&1`,
 `1>&2`, `>&2`, `&>out` and `|&` all contain `&` and none of them ends a
@@ -74,25 +95,33 @@ formatting for a long command.
 THE NEGATIVE CONTROL, AND WHAT IT IS WORTH
 ------------------------------------------
 A matcher that fires on nothing and a matcher that never ran leave the same
-evidence, so the rate was measured. Method: `find_misread` over every fenced
-block in `shared/`, `memories/`, `skills/`, `CLAUDE.md`, `AGENTS.md` and
-`README.md`, matching ```` ``` ```` fences of any language tag, on 2026-08-24
-at this branch's HEAD.
+evidence, so the rate was measured. An earlier figure quoted here did not
+reproduce for a reviewer, so the METHOD is stated rather than the trees:
 
-    all fenced blocks examined          : 774
-      discriminating ($? AND | present) :   8
-      fired                             :   2
+  * files --- `git ls-files 'shared/*.md' 'memories/*.md' 'skills/*.md'
+    CLAUDE.md AGENTS.md README.md` (tracked files only)
+  * blocks --- the regions between lines whose first three characters are
+    three backticks at column 0; the fence lines are not part of a block
+  * run 2026-08-24 at this branch's HEAD
 
-Report the middle number, not the first. Only 8 of the 774 could fire under ANY
+        files examined                      : 356
+        fenced blocks                       : 645
+          discriminating ($? AND | present) :   8
+          fired                             :   3
+
+Report the middle number, not the first. Only 8 of the 645 could fire under ANY
 implementation, so a matcher firing on every block containing both would still
-score "774 examined, 8 fired" --- the other 766 are padding, and quoting them
+score "645 examined, 8 fired" --- the other 637 are padding, and quoting them
 as specificity is the zero-matrix problem
 `shared/workflow/batch-merge-and-resolve.md` names.
 
-Both hits are genuine instances rather than false positives: the `|| rc=$?`
-capture idiom at `shared/coding/errexit-is-not-uniform.md`, which that
-fragment's own detector list says to flag, and the incident command quoted in
-`shared/workflow/algorithmatize-checks.md`.
+All three hits are genuine instances rather than false positives, and two are
+the corpus's own worked examples of this bug: the `|| rc=$?` capture idiom at
+`shared/coding/errexit-is-not-uniform.md`, which that fragment's detector list
+says to flag; `shared/principles/fail-fast.md`'s
+`grep -q PATTERN file | head   # rc is head's`; and the incident command quoted
+in `shared/workflow/algorithmatize-checks.md`. So the false-positive rate over
+the discriminating population is 0 of 8.
 
 The control's real limitation is the artifact class. This guard runs on Bash
 TOOL COMMANDS and the control measured MARKDOWN BLOCKS, and the two differ
@@ -142,11 +171,22 @@ RX_HEREDOC = re.compile(
     re.DOTALL,
 )
 
-# `set -o pipefail`, `set -euo pipefail`, `set -eo pipefail`. Anchored on a
-# `set` command rather than on the bare word, so that grepping the corpus FOR
-# the word --- `grep -rn pipefail hooks/ | head -20; echo $?` --- does not
-# silently disarm the guard on a genuine misread.
-RX_SET_PIPEFAIL = re.compile(r"\bset\b[^;&|\n]*\bpipefail\b")
+# `set -o pipefail`, `set -euo pipefail`, `set -eo pipefail`. Anchored to the
+# START of a segment, so only a real `set` command counts. Merely naming the
+# option must not disarm the guard, and this corpus names it constantly:
+# `grep -rn pipefail hooks/ | head -20; echo $?` and
+# `echo "remember to set -o pipefail"; cmd | head -20; echo $?` are both
+# genuine misreads, and both were quiet under a looser test.
+RX_SET_PIPEFAIL = re.compile(r"^\s*set\b[^;&|\n]*\bpipefail\b")
+
+# A real `${PIPESTATUS[0]}` / `$PIPESTATUS` expansion, not the bare word. The
+# author reading a specific stage by index is taking control of the pipeline's
+# status; `echo PIPESTATUS` is not.
+RX_PIPESTATUS = re.compile(r"\$\{?PIPESTATUS\b")
+
+# Quoted spans, stripped before testing for a `set` command so that a QUOTED
+# mention -- `grep -rn "set -o pipefail" hooks/` -- cannot pass for one.
+RX_QUOTED = re.compile(r"'[^']*'|\"(?:\\[\s\S]|[^\"\\])*\"")
 
 MAXLEN = 90
 
@@ -196,6 +236,20 @@ def _last_significant(text, upto):
     return text[index] if index >= 0 else ""
 
 
+# `VAR=`, `local VAR=`, `export VAR=` immediately before a `$(`. An assignment
+# takes the substitution's OWN status, so `out=$(cmd | head -1); echo $?` reads
+# the pipeline and is a genuine instance of this bug. Measured:
+#   out=$(grep -q zzz /dev/null | cat); echo $?               -> 0  (cat's)
+#   set -o pipefail; out=$(... | cat); echo $?                -> 1
+# `pipefail` flipping the answer is what proves it is the pipeline's status.
+# Used as an argument instead -- `echo "$(a|b)"` -- the outer command's status
+# wins, so those stay excluded.
+RX_ASSIGN_PREFIX = re.compile(
+    r"(?:^|[;&|]\s*)\s*(?:local\s+|export\s+|declare\s+|readonly\s+)?"
+    r"[A-Za-z_][A-Za-z0-9_]*=$"
+)
+
+
 def scan(command):
     """Split into segments and locate expandable `$?` reads.
 
@@ -213,17 +267,30 @@ def scan(command):
     start = 0
     has_pipe = False
     quote = ""
-    # Depth of contexts in which a `|` is not a pipeline: `$(`, `<(`, `>(`.
-    subshell = 0
+    # A STACK rather than a counter, so a bare `( ... )` nested inside a
+    # `$( ... )` cannot decrement the wrong thing. Entries are "hide" for a
+    # context whose `|` is not a readable pipeline status (`<(`, `>(`, and a
+    # `$(` used as an argument) and "show" for one whose status IS read (a
+    # bare subshell, and a `$(` on the right of an assignment). Counting these
+    # together desynchronized on the first nested group and produced a
+    # false positive naming an unbalanced `)`.
+    parens = []
     # Nesting of `[[ ... ]]`, where `|` is regex alternation.
     condition = 0
     i = 0
     n = len(text)
 
+    def hidden():
+        return "hide" in parens
+
     def cut(end, skip):
-        nonlocal start, has_pipe, i
+        nonlocal start, has_pipe, i, condition
         bounds.append((start, end, has_pipe))
         has_pipe = False
+        # A command separator ends any unterminated `[[`, so a stray one
+        # cannot disable pipe detection for the rest of the string.
+        condition = 0
+        del parens[:]
         i = end + skip
         start = i
 
@@ -274,16 +341,38 @@ def scan(command):
             offsets.append(i)
             i += 4
             continue
+        # A `#` at a word boundary starts a comment, which runs to end of line.
+        # Comments are the third prose surface (after single quotes and heredoc
+        # bodies), and the one that bites hardest: a comment CORRECTLY
+        # explaining this bug otherwise trips the guard describing it.
+        if char == "#" and (i == 0 or text[i - 1] in " \t\n;&|("):
+            newline = text.find("\n", i)
+            i = n if newline == -1 else newline
+            continue
+
         if char == "$" and text[i + 1:i + 2] == "(":
-            subshell += 1
+            # `$((` is arithmetic, not a substitution, and carries no pipe.
+            if text[i + 2:i + 3] == "(":
+                parens.append("hide")
+                parens.append("hide")
+                i += 3
+                continue
+            assigned = RX_ASSIGN_PREFIX.search(text[start:i]) is not None
+            parens.append("show" if assigned else "hide")
             i += 2
             continue
         if char in ("<", ">") and text[i + 1:i + 2] == "(":
-            subshell += 1
+            parens.append("hide")
             i += 2
             continue
-        if char == ")" and subshell:
-            subshell -= 1
+        if char == "(":
+            # A bare subshell's status IS its last command's, so a pipeline
+            # inside one is read exactly as a top-level pipeline would be.
+            parens.append("show")
+            i += 1
+            continue
+        if char == ")" and parens:
+            parens.pop()
             i += 1
             continue
         if text[i:i + 2] == "[[":
@@ -296,6 +385,18 @@ def scan(command):
             continue
 
         two = text[i:i + 2]
+
+        # Inside any paren group a separator belongs to that group's internal
+        # command list, not to the outer one. Splitting there let a `;` inside
+        # `<( ... )` end the outer segment and expose the group's tail --- and
+        # an unbalanced `)` with it --- at top level.
+        if parens:
+            if two in ("&&", "||"):
+                i += 2
+                continue
+            if char in ("&", ";", "\n"):
+                i += 1
+                continue
 
         if two in ("&&", "||"):
             cut(i, 2)
@@ -341,7 +442,7 @@ def scan(command):
             if _last_significant(text, i) == ">":
                 i += 1
                 continue
-            if not subshell and not condition:
+            if not hidden() and not condition:
                 has_pipe = True
             i += 1
             continue
@@ -395,12 +496,14 @@ def find_misread(command):
         # excluded on purpose: `grep -rn pipefail hooks/ | head -20; echo $?`
         # merely mentions the word and is a genuine misread.
         preceding = segments[:index - 1]
-        if any(RX_SET_PIPEFAIL.search(s["text"]) for s in preceding):
+        if any(RX_SET_PIPEFAIL.search(RX_QUOTED.sub(" ", s["text"]))
+               for s in preceding):
             continue
-        if any("PIPESTATUS" in s["text"] for s in preceding):
-            continue
-        # The author is reading a specific stage by index in the same breath.
-        if "PIPESTATUS" in segments[index]["text"]:
+        # `PIPESTATUS` is checked ONLY in the reading segment. An earlier
+        # segment reading it refers to some earlier pipeline and says nothing
+        # about this one, so scanning the prefix let `rc=${PIPESTATUS[0]};
+        # cmd | head -20; echo $?` disarm itself.
+        if RX_PIPESTATUS.search(segments[index]["text"]):
             continue
 
         return truncate(previous["text"]), truncate(segments[index]["text"])

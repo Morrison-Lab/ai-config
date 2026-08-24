@@ -55,6 +55,18 @@ def find_candidate_file_paths(text: str) -> List[str]:
     return paths
 
 
+def resolve_within_worktree(rel_path: str, wt_path: Path, wt_resolved: Optional[Path] = None) -> Optional[Path]:
+    """Resolve rel_path within wt_path and return Path if strictly contained within wt_path, else None."""
+    wt_root = wt_resolved if wt_resolved is not None else wt_path.resolve()
+    clean_rel = Path(rel_path)
+    if clean_rel.is_absolute():
+        clean_rel = Path(*clean_rel.parts[1:])
+    file_path = (wt_path / clean_rel).resolve()
+    if not file_path.is_relative_to(wt_root):
+        return None
+    return file_path
+
+
 def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, str]:
     """Extract (file_path, content) pairs from markdown code blocks, ignoring stub/self-referential blocks."""
     files: Dict[str, str] = {}
@@ -71,11 +83,12 @@ def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, 
     # Fallback: if no path header found, but code blocks exist and context_text mentions a file path
     if not files and blocks and context_text:
         candidates = find_candidate_file_paths(context_text)
-        for target in candidates:
+        if candidates:
             first_block_content = blocks[0][1]
-            if not is_stub_or_self_referential(first_block_content, target):
-                files[target] = first_block_content
-                break
+            # If the block content is a stub or self-referential against ANY candidate, reject it outright
+            is_stub = any(is_stub_or_self_referential(first_block_content, cand) for cand in candidates)
+            if not is_stub and not is_stub_or_self_referential(first_block_content, ""):
+                files[candidates[0]] = first_block_content
 
     return files
 
@@ -244,6 +257,7 @@ class CoderSubagent(BaseSubagent):
                 cleanup=task.payload.get("cleanup_worktree", True),
                 delete_branch=not persist_branch,
             ) as wt_path:
+                wt_resolved = wt_path.resolve()
                 files_to_write: Dict[str, str] = {}
 
                 # 1. If explicit file and content provided, use directly
@@ -254,17 +268,13 @@ class CoderSubagent(BaseSubagent):
                     combined_context = f"{instruction}\n{issue_body}\n{task.payload.get('context_from_parent', '')}"
                     candidate_paths = find_candidate_file_paths(combined_context)
                     existing_context_blocks: List[str] = []
-                    wt_resolved = wt_path.resolve()
 
                     max_context_files = task.payload.get("max_context_files", 3)
                     max_context_lines = task.payload.get("max_context_lines", 400)
 
                     for rel in candidate_paths[:max_context_files]:
-                        clean_rel = Path(rel)
-                        if clean_rel.is_absolute():
-                            clean_rel = Path(*clean_rel.parts[1:])
-                        file_path = (wt_path / clean_rel).resolve()
-                        if not file_path.is_relative_to(wt_resolved):
+                        file_path = resolve_within_worktree(rel, wt_path, wt_resolved)
+                        if file_path is None:
                             logger.warning("Skipping candidate path escaping worktree root: %s", rel)
                             continue
                         if file_path.is_file():
@@ -322,8 +332,6 @@ class CoderSubagent(BaseSubagent):
                     extracted = extract_files_from_markdown(resp.content, context_text=f"{instruction}\n{issue_body}")
                     if extracted:
                         files_to_write.update(extracted)
-                    elif target_file:
-                        files_to_write[target_file] = resp.content
 
                 # Fail-fast if model produced no valid code modifications
                 if not files_to_write:
@@ -335,18 +343,15 @@ class CoderSubagent(BaseSubagent):
                     )
 
                 # Pass 1: Validate all target files (path escape + destructive truncation on model output)
-                wt_resolved = wt_path.resolve()
                 validated_edits: List[Tuple[Path, str, str]] = []
                 is_model_output = (result_data.get("model_used") != "direct_input")
                 min_truncation_orig_lines = task.payload.get("min_truncation_orig_lines", 20)
+                min_truncation_floor_lines = task.payload.get("min_truncation_floor_lines", 5)
                 truncation_ratio = task.payload.get("truncation_ratio", 0.25)
 
                 for rel_path, content in files_to_write.items():
-                    clean_rel = Path(rel_path)
-                    if clean_rel.is_absolute():
-                        clean_rel = Path(*clean_rel.parts[1:])
-                    file_path = (wt_path / clean_rel).resolve()
-                    if not file_path.is_relative_to(wt_resolved):
+                    file_path = resolve_within_worktree(rel_path, wt_path, wt_resolved)
+                    if file_path is None:
                         return SubagentResult(
                             success=False,
                             data=result_data,
@@ -359,7 +364,7 @@ class CoderSubagent(BaseSubagent):
                         orig_text = file_path.read_text(encoding="utf-8", errors="replace")
                         orig_lines = len(orig_text.splitlines())
                         new_lines = len(content.splitlines())
-                        if orig_lines > min_truncation_orig_lines and new_lines < max(5, int(orig_lines * truncation_ratio)):
+                        if orig_lines > min_truncation_orig_lines and new_lines < max(min_truncation_floor_lines, int(orig_lines * truncation_ratio)):
                             return SubagentResult(
                                 success=False,
                                 data=result_data,

@@ -476,6 +476,28 @@ class TestSpecializedSubagents(unittest.TestCase):
             res = extract_files_from_markdown(text, context_text="please fix scripts/check.py now")
             self.assertEqual(res, {}, f"Failed to discard stub: {stub}")
 
+    def test_extract_files_from_markdown_fallback_discards_stub_with_multiple_candidates(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        text = "```\nmemories/tools.md\n```"
+        res = extract_files_from_markdown(text, context_text="update memories/tools.md and also scripts/foo.py please")
+        self.assertEqual(res, {})
+
+        text2 = "```\nscripts/a.py\n```"
+        res2 = extract_files_from_markdown(text2, context_text="please fix scripts/a.py and scripts/b.py now")
+        self.assertEqual(res2, {})
+
+    def test_resolve_within_worktree(self):
+        from orchestrator.subagents import resolve_within_worktree
+
+        root = Path(self.temp_dir.name).resolve()
+        safe_path = resolve_within_worktree("scripts/foo.py", root)
+        self.assertIsNotNone(safe_path)
+        self.assertTrue(safe_path.is_relative_to(root))
+
+        escape_path = resolve_within_worktree("../../../etc/passwd", root)
+        self.assertIsNone(escape_path)
+
     def test_coder_subagent_path_traversal_context_injection_blocked(self):
         from unittest.mock import MagicMock, patch
         from orchestrator.subagents import CoderSubagent

@@ -17,8 +17,6 @@ That reading does not transfer to a local session, where routes 1 and 3 are
 refused client-side, before any request reaches Reddit --- see "Route 1 in
 detail" below for what probably does the refusing, and for the override
 nobody has tested yet.
-Routes 2, 4, and 5 are refused by Reddit itself, so they fail for a
-different reason and no client-side setting will lift them.
 
 ## The five failed routes, and the signature each one leaves
 
@@ -52,50 +50,62 @@ and wrong remedy: a `WebFetch(domain:...)` allow rule.
 Keep what was measured separate from what is inferred here, because only
 the first is settled and the two are easy to read as one claim.
 
-**Measured: a `WebFetch(domain:...)` allow rule does not clear it.**
-On 2026-08-23 (PT), with allow rules present for
+**Measured: no permission rule is involved.**
+Checked 2026-08-23 (PT) on the affected machine, across every settings scope
+--- user, project, worktree, and the managed policy path
+(`C:\ProgramData\ClaudeCode\managed-settings.json`, absent) --- no `deny`,
+`ask`, or `allow` entry mentions WebFetch or reddit, and
+`skipWebFetchPreflight` is unset.
+The refusal reproduces in exactly that state, first-hand, so no permission
+rule produces it.
+That read is the cheapest check available and the only one that eliminates a
+whole class of cause, so re-run it before accepting any of this on another
+machine.
+
+**Measured: a `WebFetch(domain:...)` allow rule does not clear it either.**
+On 2026-08-23 (PT), with allow rules reported present for
 `WebFetch(domain:reddit.com)`, `WebFetch(domain:www.reddit.com)`,
 `WebFetch(domain:old.reddit.com)` and `WebFetch(domain:*.reddit.com)`, a
 WebFetch to an `old.reddit.com` post URL returned the identical refusal.
-The control carries as much weight as the result.
-`https://example.com` fetched successfully in the same session, so WebFetch
-itself was working and the refusal is specific to the host.
-Provenance is worth stating, since the settings file carrying those rules is
-no longer on disk and the result cannot be re-derived from the repo.
-Record the settings scope and paste the `/permissions` output if you re-run
-it.
-The refusal wording itself was re-confirmed first-hand the same day from a
-worktree with no such rules present.
+Weight this one below the read above.
+The settings file carrying those rules is no longer on disk and no
+`/permissions` output was captured, so the rules were reported present
+rather than verified in effect.
+Its control is sound: `https://example.com` fetched successfully in the same
+session, so WebFetch itself was working and the refusal is specific to the
+host.
 
-**Inferred: the WebFetch domain safety check is the likeliest mechanism.**
-This is a derivation rather than a reading, so hold it loosely.
-Claude Code's [data-usage docs](https://code.claude.com/docs/en/data-usage),
-under "WebFetch domain safety check", say:
+**Inferred: the WebFetch domain safety check is what refuses.**
+This is elimination rather than a reading, because the refusal string
+appears nowhere in the docs.
+Claude Code's [data-usage docs](https://code.claude.com/docs/en/data-usage)
+(read 2026-08-23), under "WebFetch domain safety check", say:
 "Before fetching a URL, the WebFetch tool sends the requested hostname to
 `api.anthropic.com` to check it against a safety blocklist maintained by
 Anthropic.
 Only the hostname is sent, not the full URL, path, or page contents."
-That gate is host-level and the refusal names the host, which is what points
-at it.
+Once permission rules are excluded that is the one documented host-level
+gate left, and it fits the observable: instant, naming the host, and refused
+before any request reaches Reddit.
 The same section records that a hostname passing the check is cached for
 five minutes while a blocked or failed one is re-checked on the next
 request, so there is no stale cache to wait out and a retry changes nothing.
 
-**What the measurement does not exclude.**
-Permission rules are evaluated `deny`, then `ask`, then `allow`, so a `deny`
-rule on the host in any settings scope produces this same refusal and no
-allow rule can clear it.
-The docs describe other host-level gates on WebFetch too --- a preapproved
-documentation-domain set, and separately-configured sandbox network rules.
-So "an allow rule did not help" narrows the candidates without identifying
-one.
-Read the `deny` arrays across every settings scope before concluding
-anything, since that is the cheapest candidate to rule out.
+**Two candidates that look relevant and are not.**
+The preapproved documentation-domain set only ever *grants*.
+The tools-reference says WebFetch "prompts the first time it reaches a new
+domain, except for a built-in set of preapproved documentation domains that
+fetch without a prompt", so a domain outside that set draws a prompt rather
+than an instant refusal.
+Sandbox network rules gate Bash commands and their child processes rather
+than WebFetch, and the sandbox "runs on macOS, Linux, and WSL2" with
+"Native Windows is not supported" --- which is where this was measured.
 
 **`skipWebFetchPreflight: true` in settings.json is the documented override
-for the preflight**, and the only one the docs name for it.
+for that check**, and the only one the docs name for it.
 They present it as one of two remedies for a network that blocks
-`api.anthropic.com`, the other being to allowlist that domain.
+`api.anthropic.com`, the other being to allowlist `api.anthropic.com`
+itself.
 They are explicit that it disables the check outright rather than
 allowlisting one host --- with it set, "WebFetch attempts to retrieve any
 URL without consulting the blocklist" --- so they advise pairing it with
@@ -111,9 +121,9 @@ remote session while the `.json` paths and `api.reddit.com` 403'd, so
 skipping the preflight may reach old.reddit HTML.
 It may equally expose Reddit's own 403 and TLS fingerprinting, which is the
 wall route 4 already hits from this machine.
-The experiment is worth running for a second reason: a refusal that survives
-it rules the preflight out, leaving the deny-rule and sandbox candidates
-above.
+Record whichever happens, because the two outcomes say different things.
+The same "unable to fetch" refusal surviving the override would rule the
+preflight out, whereas a Reddit 403 would confirm it.
 
 ## The working route: Claude in Chrome, in-page fetch
 
@@ -145,15 +155,18 @@ Four mechanics, each measured working:
 - **Pace the fetches** at ~1s apart; logged-in Reddit allows roughly 100
   requests per 10 minutes.
 
+## Do and Don't
+
 - **Do:** route Reddit reads through Claude in Chrome's in-page fetch
   (origin first, `credentials:'include'`), and check the `window` state
   after a `javascript_tool` timeout before re-running the loop.
 - **Do:** describe route 1's block as a client-side gate, probably the
   WebFetch domain safety preflight, and say which part is measured and
   which is inferred.
-- **Do:** read the `deny` arrays across every settings scope before
-  accepting the preflight as the cause --- a deny rule on the host produces
-  the same refusal and is cheaper to check.
+- **Do:** re-read the `deny`, `ask`, and `allow` arrays across every
+  settings scope on a new machine before carrying the inference there.
+  They were checked empty on the measured machine, which is what left the
+  preflight as the remaining candidate.
 - **Do:** record what happens if you ever get to set
   `skipWebFetchPreflight: true`, since the result settles both whether
   Reddit becomes reachable and whether the preflight was the cause.

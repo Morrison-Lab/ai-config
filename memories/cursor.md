@@ -4,6 +4,8 @@ Cursor-specific agent and plugin behavior, split out of
 [`tools.md`](tools.md) so that file stays under the 1200-line memory-file
 gate (ai-config#694 / #2003).
 General local-tool notes stay in `tools.md`.
+GitHub PR review via Bugbot is in [`cursor-bugbot.md`](cursor-bugbot.md),
+not this file.
 
 ## Cursor agent cannot write `.cursorignore` from the sandbox
 

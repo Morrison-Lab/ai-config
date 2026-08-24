@@ -5,6 +5,16 @@ Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows f
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
 Generic Actions-authoring material stays there.
 
+- **`cursor-code-review.yml`** --- queues Cursor Bugbot via the
+  Enterprise `POST /bugbot/review` API (`CURSOR_API_KEY` with `admin:*`).
+  It is not a mention bot (no `cursor.yml`).
+  A Team-plan key fails the queue step with
+  `HTTP 401: Invalid Team API Key` (measured Morrison-Lab/gha
+  run 32694255358, 2026-08-24); that is the wrong key class, not missing
+  `secrets:` wiring.
+  Team/individual: enable Bugbot in the Cursor dashboard instead.
+  Lab operating notes (author-mismatch on `bugbot run`, dashboard vs GHA)
+  live in [`cursor-bugbot.md`](cursor-bugbot.md).
 - **`quarto-publish.yml`** --- sets up Quarto, renders, and deploys the site.
   Caller stub is ~12 lines.
   See `examples/quarto-publish.yml` in the gha repo.

@@ -726,10 +726,12 @@ class ModelRouter:
             return self.adapters[ModelProvider.MOCK], "local-mock"
 
         # 2. Adversarial Review -> Must use a different model family than author,
-        # preferring local/free reviewers first.
+        # preferring local/free reviewers first while strictly preventing same-family self-review.
         if tier == TaskTier.ADVERSARIAL_REVIEW:
-            if prior_author_model and "claude" in prior_author_model.lower():
-                # Must not use Claude for review; prioritize free/local
+            author = (prior_author_model or "").lower()
+
+            if "claude" in author:
+                # Must not use Claude for review
                 if self.adapters[ModelProvider.OLLAMA].is_available():
                     return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
                 if self.adapters[ModelProvider.OPENCODE].is_available():
@@ -739,14 +741,40 @@ class ModelRouter:
                 if self.adapters[ModelProvider.AGY].is_available():
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
-            else:
-                # Review with free/local first if independent, else Claude/OpenRouter
+
+            if "opencode" in author:
+                # Must not use Opencode for review
+                if self.adapters[ModelProvider.OLLAMA].is_available():
+                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+                if self.adapters[ModelProvider.CLAUDE].is_available():
+                    return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+                if self.adapters[ModelProvider.OPENROUTER].is_available():
+                    return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+                if self.adapters[ModelProvider.AGY].is_available():
+                    return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+                return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
+
+            if "ollama" in author or "qwen" in author or "deepseek" in author:
+                # Must not use Ollama/Qwen for review
                 if self.adapters[ModelProvider.OPENCODE].is_available():
                     return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
                 if self.adapters[ModelProvider.CLAUDE].is_available():
                     return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
                 if self.adapters[ModelProvider.OPENROUTER].is_available():
                     return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
+                if self.adapters[ModelProvider.AGY].is_available():
+                    return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
+                return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
+
+            # Default: use local/free reviewer if available, else Claude/OpenRouter
+            if self.adapters[ModelProvider.OLLAMA].is_available():
+                return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+            if self.adapters[ModelProvider.OPENCODE].is_available():
+                return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+            if self.adapters[ModelProvider.CLAUDE].is_available():
+                return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+            if self.adapters[ModelProvider.OPENROUTER].is_available():
+                return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
 
         # 3. Local Fast (bounded checks, formatting, link checks) -> Local Ollama / Free
         if tier == TaskTier.LOCAL_FAST:

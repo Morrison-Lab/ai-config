@@ -336,12 +336,19 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertIn(adapter.provider, (ModelProvider.OLLAMA, ModelProvider.MOCK))
 
     def test_model_router_adversarial_review_routes_cross_model(self):
+        # When author is Claude, reviewer must not be Claude
         adapter, model = self.router.route_task(
             tier=TaskTier.ADVERSARIAL_REVIEW,
             prior_author_model="claude-3-7-sonnet",
         )
-        # Reviewer must not be Claude
         self.assertNotEqual(adapter.provider, ModelProvider.CLAUDE)
+
+        # When author is Opencode, reviewer must not be Opencode
+        adapter2, model2 = self.router.route_task(
+            tier=TaskTier.ADVERSARIAL_REVIEW,
+            prior_author_model="opencode/deepseek-v4-flash-free",
+        )
+        self.assertNotEqual(adapter2.provider, ModelProvider.OPENCODE)
 
     def test_backlog_sweeper_ingest_issue_creates_dag(self):
         fake_issue = {
@@ -366,7 +373,7 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.store.claim_task(task.id, "worker-1")
         self.store.complete_task(task.id, {"status": "ok"})
 
-        # Retrying a COMPLETED task must return False
+        # Cannot retry a COMPLETED task
         retried = self.store.retry_task(task.id)
         self.assertFalse(retried)
 
@@ -452,8 +459,13 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.assertEqual(unblocked, 0)
         self.assertEqual(self.store.get_task(t2.id).status, TaskStatus.CANCELLED)
 
-    def test_worktree_manager_lifecycle(self):
+
+class TestWorktreeIsolation(unittest.TestCase):
+    """Test suite for worktree lifecycle, subagent isolation, and cleanup."""
+
+    def test_worktree_manager_lifecycle_and_branch_cleanup(self):
         from orchestrator.worktree_manager import WorktreeManager
+        import subprocess
         import tempfile
         from pathlib import Path
 
@@ -461,16 +473,55 @@ class TestModelRouterAndSweeper(unittest.TestCase):
             tmppath = Path(tmpdir)
             wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=tmppath)
 
-            task_id = "test-wt-123"
-            with wt_mgr.isolated_worktree(task_id, cleanup=True) as wt_path:
+            task_id = "test-wt-456"
+            target_branch = "task/test-wt-456"
+
+            with wt_mgr.isolated_worktree(task_id, cleanup=True, delete_branch=True) as wt_path:
                 self.assertTrue(wt_path.exists())
-                # Verify can create and write files inside isolated worktree
                 test_file = wt_path / "test_isolated.txt"
                 test_file.write_text("isolated content", encoding="utf-8")
                 self.assertTrue(test_file.exists())
 
-            # Verify worktree was automatically cleaned up after exit
+            # Verify worktree directory is cleaned up
             self.assertFalse(wt_path.exists())
+
+            # Verify branch was deleted and not leaked
+            res = subprocess.run(["git", "branch", "--list", target_branch], capture_output=True, text=True, check=False)
+            self.assertNotIn(target_branch, res.stdout)
+
+    def test_coder_subagent_with_worktree_isolation(self):
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.models import SubagentContext
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from orchestrator.worktree_manager import WorktreeManager
+            wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
+            coder = CoderSubagent(worktree_manager=wt_mgr)
+
+            task = Task(
+                title="Isolated code task",
+                role="coder",
+                payload={
+                    "instruction": "Add helper function",
+                    "target_file": "isolated_test_file.py",
+                    "code_content": "def helper(): return 42\n",
+                    "use_worktree": True,
+                    "branch_name": "task/isolated-code-test",
+                    "persist_branch": False,
+                },
+            )
+            ctx = SubagentContext(task=task, state_store=None, worker_id="worker-test", workspace_root=str(Path.cwd()))
+            result = coder.execute(task, ctx)
+
+            self.assertTrue(result.success)
+            self.assertTrue(result.data.get("committed", False))
+
+            # Verify branch was cleaned up as requested
+            res = subprocess.run(["git", "branch", "--list", "task/isolated-code-test"], capture_output=True, text=True, check=False)
+            self.assertNotIn("task/isolated-code-test", res.stdout)
 
 
 def main():

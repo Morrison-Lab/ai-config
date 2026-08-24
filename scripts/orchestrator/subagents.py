@@ -82,15 +82,29 @@ class CoderSubagent(BaseSubagent):
         # If worktree isolation is requested, execute within an isolated worktree
         if use_worktree:
             try:
+                persist_branch = task.payload.get("persist_branch", True)
                 with self.worktree_manager.isolated_worktree(
                     task_id=task.id,
                     branch_name=branch_name,
                     cleanup=task.payload.get("cleanup_worktree", True),
+                    delete_branch=not persist_branch,
                 ) as wt_path:
                     if target_file and code_content:
                         file_path = wt_path / target_file
                         file_path.parent.mkdir(parents=True, exist_ok=True)
                         file_path.write_text(code_content, encoding="utf-8")
+
+                        # Stage and commit the change to the worktree branch
+                        import subprocess
+                        subprocess.run(["git", "add", "."], cwd=str(wt_path), capture_output=True, check=False)
+                        commit_proc = subprocess.run(
+                            ["git", "commit", "-m", f"fix: {instruction[:60]}"],
+                            cwd=str(wt_path),
+                            capture_output=True,
+                            text=True,
+                            check=False,
+                        )
+                        result_data["committed"] = commit_proc.returncode == 0
                     result_data["worktree_used"] = str(wt_path)
             except Exception as exc:
                 return SubagentResult(

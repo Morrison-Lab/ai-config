@@ -1,4 +1,4 @@
-﻿"""Worktree isolation and lifecycle manager for orchestrator subagents."""
+"""Worktree isolation and lifecycle manager for orchestrator subagents."""
 
 from __future__ import annotations
 
@@ -39,8 +39,11 @@ class WorktreeManager:
         task_id: str,
         branch_name: Optional[str] = None,
         base_ref: str = "HEAD",
-    ) -> Path:
-        """Create an isolated worktree for a task under .worktrees/<sanitized_id>."""
+    ) -> tuple[Path, str]:
+        """Create an isolated worktree for a task under .worktrees/<sanitized_id>.
+
+        Returns a tuple of (worktree_path, target_branch).
+        """
         safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in task_id)
         worktree_path = self.worktree_parent / f"task_{safe_id}"
         target_branch = branch_name or f"task/{safe_id}"
@@ -49,7 +52,7 @@ class WorktreeManager:
 
         # If worktree already exists, remove it first
         if worktree_path.exists():
-            self.remove_worktree(worktree_path, force=True)
+            self.remove_worktree(worktree_path, delete_branch=target_branch, force=True)
 
         # Create worktree with a dedicated branch
         rc, out, err = self._run_git(
@@ -70,8 +73,8 @@ class WorktreeManager:
                         f"Failed to create worktree at {worktree_path}: {err}; {err2}; {err3}"
                     )
 
-        logger.info("Created isolated worktree at %s for task %s", worktree_path, task_id)
-        return worktree_path
+        logger.info("Created isolated worktree at %s for task %s (branch: %s)", worktree_path, task_id, target_branch)
+        return worktree_path, target_branch
 
     def remove_worktree(
         self,
@@ -79,8 +82,10 @@ class WorktreeManager:
         delete_branch: Optional[str] = None,
         force: bool = True,
     ) -> bool:
-        """Remove a git worktree and clean up residual directories."""
+        """Remove a git worktree and clean up residual directories and branch."""
         if not worktree_path.exists():
+            if delete_branch:
+                self._run_git(["branch", "-D", delete_branch])
             return True
 
         args = ["worktree", "remove"]
@@ -105,7 +110,7 @@ class WorktreeManager:
         if delete_branch:
             self._run_git(["branch", "-D", delete_branch])
 
-        logger.info("Cleaned up worktree at %s", worktree_path)
+        logger.info("Cleaned up worktree at %s (deleted branch: %s)", worktree_path, delete_branch)
         return True
 
     def cleanup_stale_worktrees(self) -> int:
@@ -117,7 +122,9 @@ class WorktreeManager:
 
         for child in self.worktree_parent.iterdir():
             if child.is_dir() and child.name.startswith("task_"):
-                self.remove_worktree(child, force=True)
+                safe_id = child.name[5:]
+                branch_name = f"task/{safe_id}"
+                self.remove_worktree(child, delete_branch=branch_name, force=True)
                 cleaned += 1
 
         self._run_git(["worktree", "prune"])
@@ -130,11 +137,13 @@ class WorktreeManager:
         branch_name: Optional[str] = None,
         base_ref: str = "HEAD",
         cleanup: bool = True,
+        delete_branch: bool = True,
     ) -> Generator[Path, None, None]:
         """Context manager creating a dedicated worktree and ensuring cleanup on exit."""
-        wt_path = self.create_worktree(task_id, branch_name=branch_name, base_ref=base_ref)
+        wt_path, created_branch = self.create_worktree(task_id, branch_name=branch_name, base_ref=base_ref)
         try:
             yield wt_path
         finally:
             if cleanup:
-                self.remove_worktree(wt_path, force=True)
+                branch_to_delete = created_branch if delete_branch else None
+                self.remove_worktree(wt_path, delete_branch=branch_to_delete, force=True)

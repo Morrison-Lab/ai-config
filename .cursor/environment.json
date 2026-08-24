@@ -1,0 +1,16 @@
+{
+  "name": "ai-config",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "quarto-preview",
+      "command": "quarto preview --port 4444 --host 0.0.0.0 --no-browser"
+    }
+  ],
+  "ports": [
+    {
+      "name": "quarto-preview",
+      "port": 4444
+    }
+  ]
+}

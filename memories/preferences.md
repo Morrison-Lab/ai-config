@@ -966,8 +966,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > Route no dispatched subagent work to it.
 > The interactive subscription/extension is unaffected and not at quota --
 > don't extrapolate this into "uninstall the extension".
-> The mechanics below are kept as measured history rather than as a live
-> destination, so read the ladder as `opencode`, then `codex`, then Claude.
+> The mechanics below are kept as measured history rather than as a live destination, so read the ladder as `opencode`, then `codex`, then Claude.
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.

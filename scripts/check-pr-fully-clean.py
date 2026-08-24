@@ -54,6 +54,11 @@ if hasattr(sys.stdout, "reconfigure"):
 # reason.
 USAGE_EXIT = 2
 
+# Stand-in for a captured stream that came back None. Both stdout and stderr are
+# exposed to the same Windows reader-thread decode failure, so a diagnostic that
+# reads stderr must not itself crash on it, nor silently print "None".
+STREAM_UNREADABLE = "<stream could not be read or decoded>"
+
 
 def die(message: str) -> None:
     print(message, file=sys.stderr)
@@ -101,7 +106,13 @@ def run_cmd(cmd: List[str]) -> str:
             "This script requires the GitHub CLI; -R cannot substitute for it."
         )
     if res.returncode != 0:
-        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr}")
+        # `stderr` is exposed to the same reader-thread decode failure as
+        # `stdout`, so it can be None here. This line does not call `.strip()`,
+        # so it never crashed -- it would just interpolate the literal "None"
+        # and report an empty reason for the failure, which is the same defect
+        # in quieter clothes. Named explicitly instead.
+        stderr = res.stderr if res.stderr is not None else STREAM_UNREADABLE
+        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {stderr}")
     if res.stdout is None:
         # Defence in depth for the reader-thread failure described above, and
         # for any future cause of it.

@@ -55,6 +55,11 @@ from datetime import datetime, timezone
 # enough to catch the 73-minute and 26-minute gaps that motivated this
 # script. A parameter rather than a literal, per
 # `shared/coding/configurable-parameters.md`.
+# Stand-in for a captured stream that came back None. Both stdout and stderr are
+# exposed to the same Windows reader-thread decode failure, so a diagnostic that
+# reads stderr must not itself crash on it.
+STREAM_UNREADABLE = "<stream could not be read or decoded>"
+
 DEFAULT_STALE_MINUTES = 30
 
 # Maximum number of changed file paths to show individually in text output.
@@ -341,9 +346,14 @@ def fetch(repo, limit):
         encoding="utf-8",
     )
     if proc.returncode != 0:
+        # `stderr` is exposed to the same reader-thread decode failure as
+        # `stdout`, so it can be None here. Substituting rather than dying,
+        # because the command ALREADY failed and that is the news: crashing on
+        # the diagnostic would replace a real error with an AttributeError.
+        stderr = proc.stderr if proc.stderr is not None else STREAM_UNREADABLE
         raise SystemExit(
             f"pr-sweep: gh failed for {repo} (exit {proc.returncode}): "
-            f"{proc.stderr.strip()}"
+            f"{stderr.strip()}"
         )
     if proc.stdout is None:
         raise SystemExit(

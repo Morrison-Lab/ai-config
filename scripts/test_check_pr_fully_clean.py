@@ -1273,6 +1273,31 @@ def main() -> int:
     check("a None-stdout failure escapes _resolve_run_head_sha's RuntimeError catch",
           escaped)
 
+    # stderr is exposed to the same reader-thread decode failure as stdout, so a
+    # non-zero exit whose stderr came back None must still report the real
+    # failure (the command failed) rather than crashing on the diagnostic or
+    # interpolating a bare "None" as the reason.
+    class _NoneStderr:
+        returncode = 1
+        stdout = ""
+        stderr = None
+
+    with patch.object(checker.subprocess, "run", lambda cmd, **kw: _NoneStderr()):
+        try:
+            checker.run_cmd(["gh", "api", "whatever"])
+            msg = "<returned normally>"
+        except RuntimeError as exc:
+            msg = str(exc)
+        except AttributeError as exc:
+            msg = f"AttributeError: {exc}"
+    check("a non-zero exit with None stderr still raises RuntimeError",
+          msg.startswith("Command failed"))
+    # `getattr` with a default rather than attribute access: against a script
+    # lacking the constant this must FAIL informatively, not raise
+    # AttributeError and take the whole suite down with it.
+    check("negative control: and it names the unreadable stream, not 'None'",
+          getattr(checker, "STREAM_UNREADABLE", "<constant absent>") in msg)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

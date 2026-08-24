@@ -402,3 +402,19 @@ exclude the real answer behind it --- reintroducing the exact loss.
 The two rules are individually reasonable and collide only when composed,
 which is the class of defect a memory catches and a code review of either side
 alone does not.)
+- **A push-versus-mention review race presents as a gha#368 short-circuit, not
+  as a race.**
+  Posting "@claude review" in the same round as a push dispatches a second
+  run for the same PR; per-PR concurrency cancels the in-flight
+  synchronize-triggered one mid-SDK-call, and the resolver step then fails the
+  job with "Claude review produced no execution output (action
+  short-circuit / setup failure; gha#368) --- treating as a failed review",
+  which names the wrong disease.
+  Discriminator: the `Run Claude Code Review` step reads `cancelled` while
+  `Resolve final review outcome` reads `failure` --- a real #368 short-circuit
+  never gets far enough to be cancelled by name.
+  Remedy is prevention (CLAUDE.md's "only post the mention when a round pushed
+  no code") plus recovery: let every racing run settle, then dispatch exactly
+  one `workflow_dispatch`.
+  (Measured 2026-08-24, ai-config#2074: two rounds burned to this before the
+  clean single-dispatch re-review landed the verdict.)

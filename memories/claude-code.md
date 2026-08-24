@@ -57,7 +57,8 @@
   endpoints" as a data source, which holds for a session that can authenticate
   and not for this one.)
   In a **local** session even the HTML route above is closed --- WebFetch
-  domain-blocks all three reddit.com hosts before Reddit answers.
+  refuses all three reddit.com hosts before Reddit answers, probably at its
+  domain safety preflight rather than under any permission rule.
   [`reddit-access.md`](reddit-access.md) carries the five failed routes and
   the working Claude-in-Chrome route (measured 2026-08-23/24).
 - **`docs.github.com` itself can be blocked outright by a remote session's
@@ -1140,6 +1141,21 @@ Confirm with `check-mwc --id "<uuid>"` returning exit 0 before relying on it,
 and if a merge is still blocked after that, re-derive the id from a live
 merge attempt's own denial message rather than trusting the scratchpad guess
 a second time.
+
+## Claude Code MCP tool search is default-on
+
+Measured 2026-08-23 on Claude Code 2.1.221 against the docs page [code.claude.com/docs/en/mcp](https://code.claude.com/docs/en/mcp) ("Scale with MCP tool search").
+
+- **MCP tool definitions load deferred by default on Claude 4.5-generation models**, so Reddit-style advice to "enable tool search" (`ENABLE_TOOL_SEARCH=true`) to save session-start context is already satisfied here.
+  Only tool names and server instructions load upfront;
+  bodies arrive via a `ToolSearch` call when first needed.
+  Re-verify before relying on this: run `/context` in a live session and read the MCP tools line instead of recalling this bullet.
+- **Knobs:** `ENABLE_TOOL_SEARCH` values are `(unset)` (all tools deferred), `auto` (defer only once tool definitions reach 10% of the context window, below which they load upfront), `auto:N` (the same threshold mode with a custom percentage, N is 0--100, e.g. `auto:5` for 5%), `true` (force deferral everywhere it can work), and `false` (all tools upfront).
+- **What silently turns it off:** a custom `ANTHROPIC_BASE_URL` pointing at a non-first-party host (most proxies drop `tool_reference` blocks), `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`, Google Cloud's Agent Platform models earlier than the Claude 4.5 generation, and Microsoft Foundry deployments hosted on Azure (their serving stack rejects it server-side, which no `ENABLE_TOOL_SEARCH` value overrides).
+- **Local setup:** `github-local` (toolsets `default,actions`, dozens of tools) plus `local-llm` are user-scoped in `~/.claude.json`.
+  Corpus rules route local GitHub work through the `gh` CLI, so scoping `github-local` out of local sessions remains an open option even with search on;
+  it would also remove tool-selection noise, not just tokens.
+  Tracked in ai-config#2066.
 
 ## An UNQUOTED Bash-tool heredoc delimiter executes backtick spans inside the body
 

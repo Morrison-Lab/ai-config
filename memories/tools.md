@@ -1193,4 +1193,3 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
-

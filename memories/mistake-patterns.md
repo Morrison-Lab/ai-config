@@ -11,7 +11,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 2: Passivity on Standing Rules
 - **Mistake**: Asking permission for routine, non-destructive steps already authorized by standing rules.
 - **Example**: Asking "Should I open a PR?" when standing rules mandate opening PRs for completed changes.
-- **Canonical Rule**: See `CLAUDE.md` ("Non-destructive repo and memory actions" and "Open a PR for every pushed feature branch").
+- **Canonical Rule**: See `CLAUDE.md` ("Non-destructive actions") and `AGENTS.md` ("Default to action without asking"), plus "Open a PR for every pushed feature branch".
 - **Fix**: Execute standing instructions autonomously; reserve questions for genuine design ambiguity.
 
 ## Pattern 3: Give Up Instead of Diagnose

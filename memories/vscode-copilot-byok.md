@@ -76,6 +76,13 @@ Read out of the same core bundle's configuration schema, with the three agent-ho
 All three carry `tags: ["experimental","advanced"]`, so they are hidden from the settings UI's default view and have to be searched for or written into `settings.json` directly.
 Being experimental, they are also the most likely entries in this file to be renamed or removed by a later VS Code release.
 
+**The Claude-agent row disagrees with VS Code's own published documentation, and this is worth stating rather than picking a winner.**
+`code.visualstudio.com/docs/agents/run/agent-harnesses` (fetched 2026-08-24) says the toggle is `github.copilot.chat.claudeAgent.enabled`, not `chat.agentHost.claudeAgent.enabled`.
+That string is genuinely present in this exact build too -- but only as a `policyReference:{name:"Claude3PIntegration"}` entry inside the Windows enterprise-policy/installer metadata, immediately beside `win32ContextMenu`, with **no** `contributes.configuration` schema anywhere in the build (confirmed absent from both the core bundle's property list and the `copilot-chat` extension's own `package.json`).
+`chat.agentHost.claudeAgent.enabled` is the only one of the two with an actual `type:"boolean"` schema declaration in this build, which is what the settings UI and `settings.json` both key off.
+Reading `Claude3PIntegration` as the policy name shared by both entries, the likeliest explanation is a rename: the toggle moved from the extension's own `github.copilot.chat.*` namespace into core's `chat.agentHost.*` namespace, and the docs page has not caught up, while the old name is kept alive as a policy-template alias for existing enterprise Group Policy deployments.
+That is inference, not a re-verified fact -- state which name you tried and whether it worked, rather than asserting either name is *the* current one without testing it live.
+
 - **Do:** set `chat.agentHost.byokModels.enabled` to `true` in the same pass that registers a BYOK model, and say so, since the default hides the result.
 - **Do:** re-read the defaults out of the bundle when they matter, rather than quoting this table -- an experimental setting's default is exactly the kind of thing a monthly release changes.
 - **Don't:** diagnose a missing BYOK model as a registration failure before checking this switch.

@@ -535,6 +535,15 @@ class TestSpecializedSubagents(unittest.TestCase):
         res13 = extract_files_from_markdown(text13)
         self.assertEqual(res13, {"scripts/pi.py": "3.14\n"})
 
+        # Bare no-directory filenames echoing other files must be discarded as stubs
+        text14 = "```scripts/foo.py\nutils.py\n```"
+        res14 = extract_files_from_markdown(text14)
+        self.assertEqual(res14, {})
+
+        text15 = "```scripts/foo.py\nutils.py\nhelpers.py\n```"
+        res15 = extract_files_from_markdown(text15)
+        self.assertEqual(res15, {})
+
     def test_extract_files_from_markdown_default_target_file(self):
         from orchestrator.subagents import extract_files_from_markdown
 

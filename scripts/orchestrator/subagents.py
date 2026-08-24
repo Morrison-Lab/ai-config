@@ -28,12 +28,23 @@ CANDIDATE_FILE_REGEX = re.compile(
 STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */", "-- ...")
 
 
+KNOWN_SOURCE_EXTENSIONS = {
+    "py", "md", "yml", "yaml", "json", "sh", "bash", "zsh", "toml", "txt", "ini", "cfg", "conf",
+    "js", "ts", "jsx", "tsx", "qmd", "r", "c", "cpp", "h", "hpp", "go", "rs", "java", "rb",
+    "html", "css", "scss", "sql", "csv", "tsv", "xml", "svg", "dockerfile", "lock", "gz", "tar",
+    "zip", "patch", "diff",
+}
+
+
 def is_bare_path_line(s: str) -> bool:
-    """Return True if string is a normalized repo-relative or absolute file path with a directory separator."""
+    """Return True if string is a normalized repo-relative or bare filename with a recognized extension."""
     clean = s.replace("\\", "/").strip("`'\" \t\r\n")
     while clean.startswith("./") or clean.startswith("/"):
         clean = clean.lstrip("./")
-    if not clean or "/" not in clean:
+    if not clean:
+        return False
+    # Pure numeric or version numbers (e.g. 1.0.0, 3.14) are not file paths
+    if re.match(r"^\d+(?:\.\d+)+$", clean):
         return False
     # Must not contain code syntax characters or whitespace
     if any(c in clean for c in " \t()[]{}=:;,<>\"'\\"):
@@ -41,8 +52,11 @@ def is_bare_path_line(s: str) -> bool:
     parts = clean.split("/")
     filename = parts[-1]
     if "." in filename and not filename.startswith("."):
-        if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
-            return True
+        ext = filename.split(".")[-1].lower()
+        stem = ".".join(filename.split(".")[:-1])
+        if ext in KNOWN_SOURCE_EXTENSIONS and not stem.isdigit():
+            if all(re.match(r"^[a-zA-Z0-9_.\-]+$", p) for p in parts):
+                return True
     return False
 
 

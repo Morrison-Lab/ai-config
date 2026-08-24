@@ -281,7 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ingest.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_ingest.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
     p_ingest.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
-    p_ingest.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=True, help="Enable standing mwc auto-merge on clean PR verdict (default: true)")
+    p_ingest.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=None, help="Enable mwc auto-merge (default: auto-detect from repo written policies)")
     p_ingest.set_defaults(func=cmd_ingest_issues)
 
     # sweep-backlog
@@ -291,7 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sweep.add_argument("--repo", help="Target GitHub repository (owner/repo)")
     p_sweep.add_argument("--dry-run", action="store_true", help="Simulate PR creation and comments without live GitHub writes")
     p_sweep.add_argument("--claim-pr", action=argparse.BooleanOptionalAction, default=False, help="Enable automated PR-on-claim creation (default: false, opt-in)")
-    p_sweep.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=True, help="Enable standing mwc auto-merge on clean PR verdict (default: true)")
+    p_sweep.add_argument("--mwc", action=argparse.BooleanOptionalAction, default=None, help="Enable mwc auto-merge (default: auto-detect from repo written policies)")
     p_sweep.add_argument("-p", "--poll-interval", type=float, default=0.5, help="Poll interval seconds")
     p_sweep.add_argument("-s", "--stale-threshold", type=float, default=60.0, help="Heartbeat stale threshold seconds")
     p_sweep.set_defaults(func=cmd_sweep_backlog)

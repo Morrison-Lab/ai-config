@@ -95,3 +95,26 @@ Rules:
             "python scripts/check-links.py",
             "python scripts/test_orchestrator.py",
         ]
+
+    @classmethod
+    def check_repo_allows_mwc(cls, repo_root: Optional[Path] = None, repo_slug: Optional[str] = None) -> bool:
+        """Check if repository written policies grant standing mwc authorization.
+
+        Evaluates:
+        1. Explicit repo identity (Morrison-Lab/ai-config).
+        2. Written policy files in repo root (AGENTS.md, CLAUDE.md, GEMINI.md) for standing permission / mwc grants.
+        """
+        if repo_slug and "ai-config" in repo_slug:
+            return True
+
+        root = (repo_root or Path.cwd()).resolve()
+        for doc_name in ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]:
+            doc_path = root / doc_name
+            if doc_path.exists():
+                try:
+                    content = doc_path.read_text(encoding="utf-8", errors="ignore")
+                    if "standing permission" in content.lower() or "standing mwc" in content.lower() or "/mwc" in content.lower():
+                        return True
+                except Exception:
+                    pass
+        return False

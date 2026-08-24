@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from .models import Task, TaskPriority, TaskStatus
 from .pr_claim_manager import PRClaimManager
+from .protocols import AIConfigProtocols
 from .state_store import StateStore
 from .task_queue import TaskQueue
 
@@ -25,11 +26,14 @@ logger = logging.getLogger("orchestrator.sweeper")
 class BacklogSweeper:
     """Ingests open repository issues and orchestrates their end-to-end resolution."""
 
-    def __init__(self, state_store: StateStore, repo: Optional[str] = None, mwc: bool = True):
+    def __init__(self, state_store: StateStore, repo: Optional[str] = None, mwc: Optional[bool] = None):
         self.store = state_store
         self.queue = TaskQueue(state_store)
         self.repo = repo
-        self.mwc = mwc
+        if mwc is None:
+            self.mwc = AIConfigProtocols.check_repo_allows_mwc(repo_slug=repo)
+        else:
+            self.mwc = mwc
         self.pr_claim_mgr = PRClaimManager(repo_slug=repo)
 
     def fetch_open_issues(self, limit: int = 30) -> List[Dict[str, Any]]:

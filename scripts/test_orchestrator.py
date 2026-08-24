@@ -819,15 +819,26 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(res.data.get("pr_marked_ready", False))
         self.assertTrue(res.data.get("pr_merged", False))
 
+    def test_check_repo_allows_mwc_policy(self):
+        from orchestrator.protocols import AIConfigProtocols
+
+        # ai-config has standing mwc policy
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="Morrison-Lab/ai-config"))
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="owner/ai-config"))
+
+        # Arbitrary external repo without written policy does not allow mwc by default
+        with tempfile.TemporaryDirectory() as empty_dir:
+            self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 
         parser = build_parser()
-        # Default ingest-issues (safe opt-in default: claim_pr=False, mwc=True)
+        # Default ingest-issues (safe opt-in default: claim_pr=False, mwc=None for auto-detection)
         args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
         self.assertFalse(args_default.dry_run)
         self.assertFalse(args_default.claim_pr)
-        self.assertTrue(args_default.mwc)
+        self.assertIsNone(args_default.mwc)
 
         # Explicit --claim-pr opt-in and --no-mwc
         args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3", "--no-mwc"])
@@ -835,8 +846,8 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(args_opt_in.claim_pr)
         self.assertFalse(args_opt_in.mwc)
 
-        # Explicit sweep-backlog --dry-run
-        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
+        # Explicit sweep-backlog --dry-run and explicit --mwc
+        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2", "--mwc"])
         self.assertTrue(args_sweep.dry_run)
         self.assertFalse(args_sweep.claim_pr)
         self.assertTrue(args_sweep.mwc)

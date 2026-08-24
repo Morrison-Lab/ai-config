@@ -212,6 +212,9 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
 fi
 
 # --- Cursor rules: symlink cursor-rules into ~/.cursor/rules ---
+# User-global rules live in cursor-rules/ (every workspace). Project rules
+# live in .cursor/rules/ (this repo as a Cursor workspace) and are not
+# copied here --- 002-use-repo-skills.mdc is this-repo-only.
 if [ -d "$SCRIPT_DIR/cursor-rules" ]; then
   printf '\n--- Cursor rules ---\n'
   mkdir -p "$CURSOR_DIR/rules"
@@ -219,6 +222,66 @@ if [ -d "$SCRIPT_DIR/cursor-rules" ]; then
     [ -f "$src" ] || [ -d "$src" ] || continue
     link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
   done
+fi
+
+# --- Cursor skills: plugin or ~/.claude/skills or ~/.cursor/skills, not two ---
+# Cursor discovers ~/.claude/skills for compatibility, so a live Claude
+# symlink install already serves this catalog. A marketplace/local Cursor
+# plugin does too. Linking ~/.cursor/skills on top of either doubles the
+# listing (ai-config#1409).
+if [ -d "$SCRIPT_DIR/skills" ]; then
+  printf '\n--- Cursor skills ---\n'
+  skip_cursor_skills=""
+  if command -v python3 >/dev/null 2>&1; then
+    set +e
+    skip_cursor_skills="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+      --cursor-dir "$CURSOR_DIR" \
+      --claude-dir "$CLAUDE_DIR" \
+      --repo-root "$SCRIPT_DIR")"
+    skip_cursor_rc=$?
+    set -e
+    if [ "$skip_cursor_rc" -eq 0 ]; then
+      # Same as the Codex plugin path: a skip that leaves this repo's
+      # bare links in place stacks two catalogs (ai-config#1409). Remove
+      # any ~/.cursor/skills symlink that resolves into this checkout or
+      # a sibling worktree, not only an exact readlink of $SCRIPT_DIR.
+      removed=0
+      if [ -d "$CURSOR_DIR/skills" ]; then
+        stacked_paths="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+          --print-stacked \
+          --cursor-dir "$CURSOR_DIR" \
+          --repo-root "$SCRIPT_DIR")"
+        while IFS= read -r dest; do
+          [ -n "$dest" ] || continue
+          if [ -L "$dest" ]; then
+            rm "$dest"
+            removed=$((removed + 1))
+          fi
+        done <<EOF
+$stacked_paths
+EOF
+      fi
+      printf 'skip  Cursor skills (%s; removed %d stale skill link(s))\n' \
+        "$skip_cursor_skills" "$removed"
+    else
+      skip_cursor_skills=""
+    fi
+  fi
+  if [ -z "$skip_cursor_skills" ]; then
+    mkdir -p "$CURSOR_DIR/skills"
+    for src in "$SCRIPT_DIR"/skills/*; do
+      [ -d "$src" ] || continue
+      link_one "$src" "$CURSOR_DIR/skills/$(basename "$src")"
+    done
+    if [ -d "$SCRIPT_DIR/shared/sembr-skills/skills" ]; then
+      for src in "$SCRIPT_DIR"/shared/sembr-skills/skills/*; do
+        [ -d "$src" ] || continue
+        link_one "$src" "$CURSOR_DIR/skills/$(basename "$src")"
+      done
+    else
+      printf 'skip  sembr-skills (submodule not checked out -- run: git submodule update --init -- shared/sembr-skills)\n'
+    fi
+  fi
 fi
 
 

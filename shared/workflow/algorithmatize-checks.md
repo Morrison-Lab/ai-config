@@ -1044,3 +1044,50 @@ the check returned, you did not read its answer.
 
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "Tailing check-links.py reported clean over three broken links".
+
+## Put the discriminator at the producer, where it is exact
+
+A consumer classifying an artifact by its content is running an inference;
+the producer stating the fact at write time is running none.
+When a classification keeps needing another special case,
+stop refining the inference and move the fact upstream.
+
+The measured case (Lacaedemon/sparta#1381, 2026-08-23):
+a study harness had to tell a battle that *ended* from a dump that was *cut off*,
+and both leave the same artifact -- a short snapshot series and a zero exit.
+Three consumer-side discriminators failed in sequence,
+each refuted by a reviewer with a case the heuristic could not see:
+the exit code (the timeout path exits zero),
+the snapshot count (identical in both cases),
+and team presence in the last snapshot
+(a victory between two sample ticks leaves both teams present,
+and some victory conditions end a battle with both armies fielded).
+The fix was one line at the producer:
+the recorder, which can read the sim's own ended flag directly,
+writes a terminal snapshot carrying an explicit `battle_over` marker.
+Every consumer then classifies by the marker, exactly, with no heuristic left to refute.
+
+The tell is a classifier that keeps being wrong in new ways.
+Each refinement handles the last counterexample and invites the next,
+because the information genuinely is not in the artifact --
+while the producer had it all along, as one boolean, at the moment of writing.
+
+The same session produced the same lesson in a second shape:
+a study whose validity turned on a configuration value (which doctrine the sim ran under)
+carried that value only in prose -- a README recommendation and a generator default --
+and two full study runs silently executed on the invalid configuration
+when a wrapper's own default shadowed the generator's.
+The fix was again to make the producer state the fact:
+the runner now reads the value back off a generated artifact
+and prints it on the first and last line of every run log.
+**A validity assumption that lives only in prose rots;
+one echoed by the run that depends on it is checked on every execution.**
+
+- **Do:** move a discriminator to the producer the moment its consumer-side
+  version needs a second special case.
+- **Do:** make every run echo the configuration values its validity depends on,
+  read back from what was actually generated rather than from the intended inputs.
+- **Don't:** refine a content heuristic past its second refuted counterexample --
+  the refutations are evidence the information is not in the artifact.
+- **Don't:** leave a validity assumption as prose in a README while the run
+  that depends on it logs nothing.

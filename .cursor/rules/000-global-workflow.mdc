@@ -1,0 +1,33 @@
+---
+description: "Global AI workflow guidelines, worktree isolation, PR review, and merge control rules for Morrison-Lab repositories."
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Global Agent Workflow Rules (Morrison-Lab)
+
+## Keep ai-config and repo checkouts fresh
+- Keep `ai-config` updated (`main` branch, `git pull --ff-only`).
+- Run `bootstrap.sh` to ensure symlinks in local environment are fresh.
+
+## Worktree isolation
+- **Always use a worktree.** When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` so parallel sessions never step on working directory state.
+
+## Timestamp recaps in local time
+- Include timestamps in user's local time zone (Pacific Time, `America/Los_Angeles`).
+- Query fresh time via `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
+
+## No empty promises
+- **Never commit to future behaviour without shipping a mechanism in the same turn.** "Going forward, I will X" / "from now on I won't Y" / "I'll always Z" must arrive with a written rule, a memory entry, an automated guard, or a filed issue behind it.
+- A written rule or memory entry is the minimum and is always available, so "there was no mechanism to build" is never the reason.
+- Promising the mechanism itself in the future tense ("I'll add a guard for this") is the same empty promise one level down.
+- When no mechanism is worth building, drop the promise and state the plain fact instead. See `shared/workflow/no-empty-promises.md`.
+
+## Strict Merge Control Policy
+- **NEVER merge any Pull Request or Merge Request without explicit user permission.**
+- Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
+
+## Request review and drive every started PR to clean
+- Request AI review (`@claude review`) after completing code pushes.
+- Run `ardi` / review loop to drive CI to clean.
+- Request human review ONLY after AI approval or deadlock.

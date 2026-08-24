@@ -738,3 +738,58 @@ The two are anchored by the re-raise at 17:12:39Z and by noticing the second
 miss at 17:41:36Z --- derived from the PR timestamps rather than carried over
 from a figure quoted in a live comment, which is how "ninety minutes" reached
 the first draft of this entry.)
+
+**Accepting a finding does not verify the fix it appears to license.**
+Everything above governs how a finding is *disposed of*.
+This governs the Address itself, which is the disposition nothing checks,
+because implementing a correct finding feels like the end of the question
+rather than the start of a new one.
+
+A finding has two parts, and only the first carries the reviewer's evidence.
+"Your summary hides variation" is an observation, and the reviewer measured
+it.
+"Therefore report the variation" is an inference, and nobody measured that.
+It presupposes the variation is signal, which is a separate claim about a
+separate thing --- so an Address can be a faithful, careful implementation of
+a correct finding and still publish noise as structure.
+
+The test is one question, asked before implementing any finding about
+variation, spread, or a range presented as a point value:
+**what would this quantity do if I changed something the claim is not about?**
+Vary a nuisance parameter --- a second seed, a second run, a second sampling
+window --- and see whether the structure survives.
+The cost is usually one line, because the harness that produced the original
+measurement is still open.
+
+Note which direction this cuts.
+It is not an argument for resisting review, and the reviewer is usually right
+about what they measured.
+It is an argument that their verification does not transfer to your remedy,
+so the remedy needs its own.
+
+- **Do:** separate a finding's observation from its implied remedy, and check
+  the remedy independently before pushing it.
+- **Do:** vary a parameter the claim is not about, when the finding is that a
+  summary conceals variation.
+- **Don't:** read "a summary hides variation" as establishing that the
+  variation is real --- ask which axis it lies on first.
+- **Don't:** treat the reviewer's care in measuring as covering the inference
+  drawn from the measurement.
+
+(Measured across rounds 4 and 5 of an adversarial loop on
+[ucdavis/matt.contracts#2](https://github.com/ucdavis/matt.contracts/pull/2),
+2026-08-23.
+Round 4 correctly observed that "half-widths are optimistic by a factor of
+about 3.4" was a range presented as a point value: the measured ratios were
+3.61, 3.41 and 3.30 at N = 20, 40 and 100.
+The summary was replaced with those per-N figures and with implied
+sample-size factors of 13, 12 and 11.
+Round 5 re-ran the same chunk at two further base seeds and got
+3.441 / 3.398 / 3.363 and 3.441 / 3.405 / 3.332 --- the N = 20 value moving by
+more than the whole apparent trend, and the headline 13 becoming 12.
+The ratio is `sqrt(p(1-p)*DE / (p_r(1-p_r)*DE_r))`, which contains no N at
+all, so the trend could not have been real.
+Reverted to the wording round 4 had displaced, which was stable at all three
+seeds.
+Tracked as
+[ai-config#2028](https://github.com/Morrison-Lab/ai-config/issues/2028).)

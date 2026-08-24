@@ -22,7 +22,7 @@ Three rules already name a condition for reaching toward gha, and each waits for
 - [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) opens with "Check `d-morrison/gha` before writing bespoke CI", which fires when you are **about to write new CI**.
 
 Those three are the migration-condition rules, not every mention of gha in the corpus.
-`grep -rln --include='*.md' gha` returned 86 files on 2026-08-24, and others route work toward gha for different reasons --- [`config-ai`](../../skills/config-ai/SKILL.md)'s routing table picks gha as the home for a new shared capability, and [`convert-repo-format`](../../skills/convert-repo-format/SKILL.md) assumes a target template already calls it.
+`git grep -l gha origin/main -- '*.md' | wc -l` returned 88 on 2026-08-24, and others route work toward gha for different reasons --- [`config-ai`](../../skills/config-ai/SKILL.md)'s routing table picks gha as the home for a new shared capability, and [`convert-repo-format`](../../skills/convert-repo-format/SKILL.md) assumes a target template already calls it.
 None of those decides whether an existing repo should migrate.
 
 And none of the three reaches the commonest case.

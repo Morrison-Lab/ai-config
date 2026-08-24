@@ -14,30 +14,39 @@ Hit while adding a mobile within-chapter TOC to `d-morrison/rme` (#929); apply t
 any Quarto website (rme, psw, qwt, …).
 - **Single-file `quarto render <file>.qmd` serves cached compiled theme CSS.**
   Edits to `custom.scss` / theme SCSS may NOT appear in the output — Quarto reuses
-  the cached sass bundle. The tell: the
+  the cached sass bundle.
+The tell: the
   `_site/site_libs/bootstrap/bootstrap-*.min.css` content hash stays identical
-  across renders. Force a recompile by clearing the sass cache and the stale libs
+  across renders.
+Force a recompile by clearing the sass cache and the stale libs
   first: `rm -rf ~/.cache/quarto/sass _site/site_libs`, then re-render. (A
   "verified" CSS rule was actually stale until I cleared this.)
 - **The within-chapter "On this page" TOC is hidden on mobile with no built-in
-  replacement.** Quarto's bootstrap hides `#quarto-margin-sidebar` below the `md`
-  breakpoint (`@media (max-width: 767.98px)` in `_bootstrap-rules.scss`). There is
+  replacement.**
+Quarto's bootstrap hides `#quarto-margin-sidebar` below the `md`
+  breakpoint (`@media (max-width: 767.98px)` in `_bootstrap-rules.scss`).
+There is
   no `toc:` option to re-enable it; the `quarto-toc-toggle` "convert TOC to a
   floating menu" in `quarto.js` is an overlap-avoidance feature for wide screens,
   not a mobile feature (on a phone the margin sidebar is already `display:none`,
   so it never fires).
-- **A cloned within-chapter TOC must NOT carry `role="doc-toc"`.** Quarto's mobile
+- **A cloned within-chapter TOC must NOT carry `role="doc-toc"`.**
+Quarto's mobile
   CSS includes a bare `nav[role=doc-toc] { display: none }` (inside the `md` media
   query), so any clone with that role stays hidden even when you mean to show it.
   Use a plain `<nav aria-label="…">` instead.
-- **Navbar headroom = reveal-on-scroll-up.** Quarto attaches Headroom to
+- **Navbar headroom = reveal-on-scroll-up.**
+Quarto attaches Headroom to
   `#quarto-header`; on scroll it toggles `sidebar-unpinned` on the header AND on
-  every `.sidebar` / `.headroom-target` element (see `quarto-nav.js`). To make a
+  every `.sidebar` / `.headroom-target` element (see `quarto-nav.js`).
+To make a
   custom element hide-on-scroll-down / reappear-on-scroll-up in step with the
   navbar, place it inside `#quarto-header` (it inherits the header's transform) or
   give it `.headroom-target`. (Used to put a "Contents" TOC button in the navbar.)
-- **`quarto render` auto-modifies `.gitignore`.** On first render, Quarto appends
-  `/.quarto/` and `**/*.quarto_ipynb` to `.gitignore`. If `.quarto/` is already
+- **`quarto render` auto-modifies `.gitignore`.**
+On first render, Quarto appends
+  `/.quarto/` and `**/*.quarto_ipynb` to `.gitignore`.
+If `.quarto/` is already
   present, `/.quarto/` is redundant (the unanchored form already covers the root).
   Remove `/.quarto/` only when `.quarto/` is already present; keep `**/*.quarto_ipynb`.
 - **Manuscript projects do NOT support `repo-url` / `repo-actions` natively.**
@@ -48,15 +57,19 @@ any Quarto website (rme, psw, qwt, …).
   via inline JS — see `d-morrison/qmt/_repo-links.lua` for a full implementation.
   Upstream issue: quarto-dev/quarto-cli#14627.
 - **In Quarto Lua filters, use `quarto.doc.input_file` (not `PANDOC_STATE.input_files[1]`)
-  to get the real source path.** Quarto preprocesses `.qmd` files into temp files before
+  to get the real source path.**
+Quarto preprocesses `.qmd` files into temp files before
   passing them to Pandoc; `PANDOC_STATE.input_files[1]` gives the temp path, not the
-  original `.qmd`. `quarto.doc.input_file` reads the `quarto-source` param and returns
-  the real path. To compute the repo-relative path: strip `os.getenv("QUARTO_PROJECT_DIR")`
+  original `.qmd`.
+`quarto.doc.input_file` reads the `quarto-source` param and returns
+  the real path.
+To compute the repo-relative path: strip `os.getenv("QUARTO_PROJECT_DIR")`
   from the front (`abs_input:sub(#project_root + 2)`). (Learned while writing `_repo-links.lua`
   for d-morrison/qmt.)
 - **A plain project-wide `quarto render` (no `--to`) DOES render every format a
   document's own front matter lists** — even formats the project's `_quarto.yml`
-  doesn't configure. Verified from a clean state (`rm -rf _site .quarto` first,
+  doesn't configure.
+Verified from a clean state (`rm -rf _site .quarto` first,
   no priming single-file renders) on `d-morrison/macros`: `_quarto.yml` there
   configures only `format: html:`, yet a bare `quarto render` still produced
   `.pdf`, `.docx`, and reveal.js `.html` output for every doc whose own front
@@ -67,16 +80,19 @@ any Quarto website (rme, psw, qwt, …).
   `quarto render <doc>.qmd --to pdf` — don't assume a bare project render is
   HTML-only without checking. (Corrected in ai-config#408 after re-verifying
   from a clean state; the empirical result contradicted both an earlier claim
-  logged here and a reviewer's proposed replacement.) The durable lesson
+  logged here and a reviewer's proposed replacement.)
+The durable lesson
   survives: don't write "CI covers this" in a PR description from assumption —
   verify what CI *actually* does before asserting either that it does or
   doesn't cover a given check.
 - **Custom Quarto shortcode Lua files belong under YAML `shortcodes:`, not
-  `filters:`.** A Lua file that returns a shortcode table (for example
+  `filters:`.**
+A Lua file that returns a shortcode table (for example
   `return { ['slidebreak'] = slidebreak }`) does **not** register that
   shortcode when listed under `filters:`; Quarto treats it as a Pandoc filter,
   leaves `{{< slidebreak >}}` literal in rendered HTML, and warns
-  `Shortcode 'slidebreak' not found`. Put the path under front-matter or
+  `Shortcode 'slidebreak' not found`.
+Put the path under front-matter or
   project metadata `shortcodes:` instead (e.g.
   `shortcodes: [../_extensions/d-morrison/slidebreak/slidebreak.lua]`), even
   when the file lives inside `_extensions/`. (Observed directly in
@@ -84,12 +100,14 @@ any Quarto website (rme, psw, qwt, …).
   `filters:` to `shortcodes:` made the shortcode render and removed the
   warning in a standalone `quarto render` smoke test.)
 - **Large site renders crash Deno's default 8 GB V8 heap — deterministically,
-  not flakily.** Quarto's launcher script hardcodes
+  not flakily.**
+Quarto's launcher script hardcodes
   `--max-old-space-size=8192,--max-heap-size=8192` and *prepends* those
   defaults before any user-supplied `$QUARTO_DENO_V8_OPTIONS` inside one
   `--v8-flags=` argument; V8 lets the last occurrence of a flag win, so
   setting `QUARTO_DENO_V8_OPTIONS=--max-old-space-size=12288,--max-heap-size=12288`
-  in the environment is the supported override. The crash signature: all
+  in the environment is the supported override.
+The crash signature: all
   chapters render fine individually, then `Fatal JavaScript out of memory:
   Ineffective mark-compacts near heap limit` late in the ~35-40-file site
   render (cumulative heap, worst in finalization/search-indexing), exit code
@@ -97,9 +115,12 @@ any Quarto website (rme, psw, qwt, …).
   V8's fatal-error handler dies on a trap instruction, and the launcher's
   own log line confirms it (`Trace/breakpoint trap (core dumped)` followed
   by `Process completed with exit code 133`, observed identically in both
-  failing runs). Reproducible on every re-run. Fixed fleet-wide in gha#263 (the
+  failing runs).
+Reproducible on every re-run.
+Fixed fleet-wide in gha#263 (the
   `preview`/`quarto-publish` composites export the 12 GB override; standard
-  runners have 16 GB). To validate a heap-flag change without a 20-minute
+  runners have 16 GB).
+To validate a heap-flag change without a 20-minute
   render: run Quarto's own bundled deno
   (`/opt/quarto/bin/tools/x86_64/deno eval` with the launcher-composed flag
   string) against a >8 GB JS-heap allocation loop — crashes under the
@@ -252,11 +273,16 @@ Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/8
   during "Set up Quarto": `quarto install tinytex`'s latest-release lookup is an
   unauthenticated GitHub API call, and shared runners intermittently rate-limit it.
   Fix: `env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (or `${{ github.token }}`) on the
-  setup step. gha's `preview` composite already does this; `quarto-publish` gap filed
-  as gha#270. (Broke ucdavis/win's preview/publish repeatedly; fixed in win PR #69.)
+  setup step.
+gha's `preview` composite already does this;
+`quarto-publish` gap filed
+  as gha#270.
+(Broke ucdavis/win's preview/publish repeatedly;
+fixed in win PR #69.)
 - **`renv::restore()` fails compiling `curl` ("libcurl was not found")** on
   current ubuntu runner images: the R build libs are no longer preinstalled, so any
-  renv repo needs an explicit apt step. Working set for a typical
+  renv repo needs an explicit apt step.
+Working set for a typical
   curl/openssl/xml2/gert/V8/igraph/ragg/textshaping lockfile:
   `libcurl4-openssl-dev libssl-dev libxml2-dev libgit2-dev libnode-dev libglpk-dev
   libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev libpng-dev

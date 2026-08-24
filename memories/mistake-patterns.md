@@ -102,7 +102,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   A reviewer disputed a setting name (`chat.agentHost.claudeAgent.enabled` vs. `github.copilot.chat.claudeAgent.enabled`), citing VS Code's own live documentation.
   I rebutted with a schema-shape check and a manifest-absence check -- both reads of the same bundle -- and declared the claim settled.
   The reviewer re-raised it a third round, still citing the live docs.
-  Fetching that page directly showed the reviewer was right: the bundle contained a real but superseded/policy-alias string, not the current documented one.
+  Fetching that page directly showed the reviewer was citing it accurately, which the bundle-only checks could never have settled: [`vscode-copilot-byok.md`](vscode-copilot-byok.md) explains that both names are real, only one has a functioning schema in this exact build, and which one the vendor's own docs currently name is a separate question a bundle grep cannot answer at all.
 - **Canonical Rule**: [`self-review-fallback.md`](../shared/workflow/self-review-fallback.md)'s cross-vendor section: "Read a cross-vendor disagreement as a prompt to check the item yourself".
   Checking means consulting a genuinely separate source, not re-deriving from the one you already trust.
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."

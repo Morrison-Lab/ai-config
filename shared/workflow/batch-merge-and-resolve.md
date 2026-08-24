@@ -448,7 +448,8 @@ Neither branch is at fault, and neither branch's checks can see it: each PR
 measures the file as it would exist with only its own change applied, so the
 breach is a property of the **combination** rather than of any member.
 A pairwise `git merge-tree` sweep cannot find this either, since appends at different points in a file produce no textual conflict at all --- it shares that property with the identical-file-set duplicate described above.
-The **file-set** half of the pair-collision section does flag the shared path, which is the cue to run the arithmetic below on it; what no conflict scan above will report is the breach itself.
+The **file-set** half of the pair-collision section does flag the shared path, which is the cue to run the arithmetic below on it.
+What no conflict scan above will report is the breach itself.
 
 The instrument is arithmetic over three refs rather than a conflict scan:
 

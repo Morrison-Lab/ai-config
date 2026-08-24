@@ -23,7 +23,7 @@ logger = logging.getLogger("orchestrator.subagents")
 
 
 def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, str]:
-    """Extract (file_path, content) pairs from markdown code blocks or context file fallbacks."""
+    """Extract (file_path, content) pairs from markdown code blocks, ignoring stub/self-referential blocks."""
     files: Dict[str, str] = {}
     blocks = re.findall(r"```([^\n]*)\n(.*?)```", text, flags=re.DOTALL)
     for header, content in blocks:
@@ -31,17 +31,30 @@ def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, 
         if parts:
             cand = parts[-1]
             if "." in cand and not cand.startswith(("http://", "https://")):
-                files[cand] = content
+                clean_cand = cand.strip("`'\" \t\r\n").replace("\\", "/")
+                clean_content = content.strip()
+                cand_basename = clean_cand.split("/")[-1]
+
+                # Discard self-referential stubs (e.g. ```memories/tools.md\nmemories/tools.md\n```)
+                if clean_content in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
+                    continue
+                if clean_content in ("...", "# ...", "// ...", "pass", "/* same */", "# same") and len(clean_content.splitlines()) <= 2:
+                    continue
+                files[clean_cand] = content
 
     # Fallback: if no path header found, but code blocks exist and context_text mentions a file path
     if not files and blocks and context_text:
         candidates = re.findall(
-            r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
+            r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
             context_text,
         )
-        if candidates:
-            target = candidates[0].strip("`'\" \t\r\n")
-            files[target] = blocks[0][1]
+        for raw_cand in candidates:
+            target = raw_cand.strip("`'\" \t\r\n").replace("\\", "/")
+            cand_basename = target.split("/")[-1]
+            first_block_content = blocks[0][1].strip()
+            if first_block_content not in (target, cand_basename, "...", "pass"):
+                files[target] = blocks[0][1]
+                break
 
     return files
 
@@ -216,7 +229,35 @@ class CoderSubagent(BaseSubagent):
                 if target_file and code_content:
                     files_to_write[target_file] = code_content
                 else:
-                    # 2. Invoke generative AI model to synthesize solution
+                    # 2. Locate existing candidate files in worktree to provide context
+                    candidate_paths: List[str] = []
+                    combined_context = f"{instruction}\n{issue_body}\n{task.payload.get('context_from_parent', '')}"
+                    for raw_cand in re.findall(
+                        r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
+                        combined_context,
+                    ):
+                        cand_norm = raw_cand.strip("`'\" \t\r\n").replace("\\", "/")
+                        if cand_norm not in candidate_paths and "." in cand_norm and not cand_norm.startswith(("http://", "https://", ".git")):
+                            candidate_paths.append(cand_norm)
+
+                    existing_context_blocks: List[str] = []
+                    for rel in candidate_paths[:3]:
+                        p = (wt_path / rel).resolve()
+                        if p.exists() and p.is_file():
+                            try:
+                                cur_content = p.read_text(encoding="utf-8", errors="replace")
+                                ext = p.suffix.lstrip(".") or "text"
+                                cur_lines = cur_content.splitlines()
+                                snippet = "\n".join(cur_lines[:400])
+                                if len(cur_lines) > 400:
+                                    snippet += f"\n\n# ... ({len(cur_lines) - 400} remaining lines omitted) ..."
+                                existing_context_blocks.append(f"Current content of `{rel}`:\n```{ext}\n{snippet}\n```")
+                            except Exception:
+                                pass
+
+                    context_str = "\n\n".join(existing_context_blocks)
+
+                    # 3. Invoke generative AI model to synthesize solution
                     adapter, model_name = self.model_router.route_task(
                         tier=TaskTier.STANDARD_CODE,
                         retry_count=task.retry_count,
@@ -227,11 +268,15 @@ class CoderSubagent(BaseSubagent):
                         f"Implement a complete, working solution for the following issue:\n"
                         f"Title: {instruction}\n"
                         f"Description:\n{issue_body}\n\n"
+                    )
+                    if context_str:
+                        coder_prompt += f"{context_str}\n\n"
+                    coder_prompt += (
                         f"Requirements:\n"
                         f"- Write complete, production-ready code with no omitted sections or placeholders.\n"
                         f"- Output each modified or new file in a markdown code block with the relative file path on the opening line, e.g.:\n"
                         f"```scripts/foo.py\n"
-                        f"# file content here\n"
+                        f"# complete file content here\n"
                         f"```\n"
                     )
 
@@ -256,7 +301,7 @@ class CoderSubagent(BaseSubagent):
                     elif target_file:
                         files_to_write[target_file] = resp.content
 
-                # Fail-fast if model produced no code modifications
+                # Fail-fast if model produced no valid code modifications
                 if not files_to_write:
                     return SubagentResult(
                         success=False,
@@ -265,7 +310,7 @@ class CoderSubagent(BaseSubagent):
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # Write files into worktree with path validation
+                # Write files into worktree with security and destructive-truncation validation
                 total_lines = 0
                 wt_resolved = wt_path.resolve()
                 for rel_path, content in files_to_write.items():
@@ -280,6 +325,23 @@ class CoderSubagent(BaseSubagent):
                             error=f"Security error: target_file '{rel_path}' escapes worktree root {wt_path}",
                             execution_time_seconds=time.time() - start_time,
                         )
+
+                    # Destructive truncation guard on existing files
+                    if file_path.exists() and file_path.is_file():
+                        orig_text = file_path.read_text(encoding="utf-8", errors="replace")
+                        orig_lines = len(orig_text.splitlines())
+                        new_lines = len(content.splitlines())
+                        if orig_lines > 20 and new_lines < max(5, int(orig_lines * 0.25)):
+                            return SubagentResult(
+                                success=False,
+                                data=result_data,
+                                error=(
+                                    f"Destructive truncation detected for '{rel_path}': "
+                                    f"attempted to replace {orig_lines}-line file with {new_lines}-line stub. "
+                                    f"Failing fast to trigger tier escalation."
+                                ),
+                                execution_time_seconds=time.time() - start_time,
+                            )
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_text(content, encoding="utf-8")
                     total_lines += len(content.splitlines())
@@ -295,6 +357,8 @@ class CoderSubagent(BaseSubagent):
                     cwd=str(wt_path),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=False,
                 )
                 if commit_proc.returncode != 0:
@@ -314,6 +378,8 @@ class CoderSubagent(BaseSubagent):
                         cwd=str(wt_path),
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=False,
                     )
                     if push_proc.returncode != 0:
@@ -368,6 +434,8 @@ class ReviewerSubagent(BaseSubagent):
                     ["git", "diff", f"origin/main...origin/{branch_name}"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=30,
                     check=False,
                 )
@@ -379,6 +447,8 @@ class ReviewerSubagent(BaseSubagent):
                         ["git", "diff", f"origin/main...{branch_name}"],
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         timeout=30,
                         check=False,
                     )
@@ -491,6 +561,8 @@ class TesterSubagent(BaseSubagent):
                         shell=True,
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         timeout=120,
                         check=False,
                         env=env,
@@ -516,6 +588,8 @@ class TesterSubagent(BaseSubagent):
                     ["git", "diff", f"origin/main...origin/{branch_name}"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=30,
                     check=False,
                 )

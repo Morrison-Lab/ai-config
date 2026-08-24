@@ -401,6 +401,73 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertFalse(res.success)
         self.assertEqual(res.data["verdict"], "BLOCKED")
 
+    def test_extract_files_from_markdown_discards_stubs_and_self_referential_blocks(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        # Self-referential single line
+        text1 = "```memories/tools.md\nmemories/tools.md\n```"
+        files1 = extract_files_from_markdown(text1)
+        self.assertEqual(files1, {})
+
+        # Basename echo
+        text2 = "```memories/tools.md\ntools.md\n```"
+        files2 = extract_files_from_markdown(text2)
+        self.assertEqual(files2, {})
+
+        # Ellipsis stub
+        text3 = "```scripts/check.py\n...\n```"
+        files3 = extract_files_from_markdown(text3)
+        self.assertEqual(files3, {})
+
+        # Real multi-line implementation
+        text4 = "```scripts/foo.py\nimport os\nprint('hello world')\n```"
+        files4 = extract_files_from_markdown(text4)
+        self.assertEqual(files4, {"scripts/foo.py": "import os\nprint('hello world')\n"})
+
+    def test_coder_subagent_destructive_truncation_guard(self):
+        from unittest.mock import MagicMock
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.model_adapters import ModelProvider, ModelResponse
+
+        mock_router = MagicMock()
+        mock_adapter = MagicMock()
+        # Model outputs a 2-line stub for an existing 50-line file
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="```scripts/big_file.py\n# stub\npass\n```",
+            model_used="mock-stub-coder",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+        mock_router.route_task.return_value = (mock_adapter, "mock-stub-coder")
+
+        # Create big file in temp workspace
+        big_file_path = os.path.join(self.temp_dir.name, "scripts", "big_file.py")
+        os.makedirs(os.path.dirname(big_file_path), exist_ok=True)
+        with open(big_file_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(f"# Line {i}" for i in range(50)))
+
+        mock_wt_mgr = MagicMock()
+        mock_wt_mgr.isolated_worktree.return_value.__enter__.return_value = Path(self.temp_dir.name)
+        mock_wt_mgr.isolated_worktree.return_value.__exit__.return_value = None
+
+        agent = CoderSubagent(model_router=mock_router, worktree_manager=mock_wt_mgr)
+        task = Task(
+            title="Refactor scripts/big_file.py",
+            role="coder",
+            payload={
+                "instruction": "Fix bug in scripts/big_file.py",
+                "use_worktree": True,
+                "branch_name": "task/truncation-test",
+                "dry_run": False,
+                "push_remote": False,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        res = agent.execute(task, ctx)
+        self.assertFalse(res.success)
+        self.assertIn("Destructive truncation detected", res.error)
+
 
 class TestOrchestratorEngineIntegration(unittest.TestCase):
     """End-to-end integration test of the multi-threaded orchestration engine."""

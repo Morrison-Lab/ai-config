@@ -1197,3 +1197,15 @@ safer/preferred choice merely because the repo has external consumers.
   while leaving the pinned copy intact; the fix that shipped replaced the pinned
   copy with a delete-the-override instruction instead, which is why only the
   mechanism change reached `main`.)
+
+## Default to yes on non-destructive actions
+
+Standing grant from the owner (2026-08-23, "always yes"): proceed with non-destructive steps without asking --- commit, branch, push, open or update PRs, run checks, edit the agent-config corpus --- then report what was done in the past tense.
+Encoded universally in `AGENTS.md` ("Default to action without asking"); this entry records the correction that prompted it.
+
+- **Do:** act first on anything reversible, and report the completed action.
+- **Do:** ask only when a step is destructive, genuinely ambiguous, or blocking.
+- **Don't:** end a turn by offering work a standing grant already covers ("say the word and I'll open the PR") --- the offer is what this entry retires.
+- **Don't:** read the grant as merge authority; the strict merge policy stands.
+
+(Learned 2026-08-23: a session closed an `AGENTS.md` improvement with "Not committed --- say the word if you'd like a branch + PR" for work the standing grant already covered; the user answered "always yes --- remember that".)

@@ -370,11 +370,18 @@ class TestSpecializedSubagents(unittest.TestCase):
         orig_run = subprocess.run
 
         def mock_subprocess_run(cmd, *args, **kwargs):
-            if isinstance(cmd, list) and cmd[:2] == ["git", "push"]:
-                mock_proc = MagicMock()
-                mock_proc.returncode = 1
-                mock_proc.stderr = "fatal: remote rejected (permission denied)"
-                return mock_proc
+            if isinstance(cmd, list):
+                if len(cmd) >= 2 and cmd[:2] == ["git", "commit"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 0
+                    mock_proc.stdout = "commit ok"
+                    mock_proc.stderr = ""
+                    return mock_proc
+                if len(cmd) >= 2 and cmd[:2] == ["git", "push"]:
+                    mock_proc = MagicMock()
+                    mock_proc.returncode = 1
+                    mock_proc.stderr = "fatal: remote rejected (permission denied)"
+                    return mock_proc
             return orig_run(cmd, *args, **kwargs)
 
         with patch("subprocess.run", side_effect=mock_subprocess_run):
@@ -783,17 +790,25 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertIsNotNone(claim_info["pr_number"])
         self.assertIn("https://github.com/Morrison-Lab/ai-config/pull/", claim_info["pr_url"])
 
-    def test_tester_subagent_marks_draft_pr_ready(self):
+    def test_pr_claim_manager_merge_pr_under_mwc(self):
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+        merged = mgr.merge_pr_under_mwc(pr_number=2112, dry_run=True)
+        self.assertTrue(merged)
+
+    def test_tester_subagent_marks_draft_pr_ready_and_merges_under_mwc(self):
         from orchestrator.subagents import TesterSubagent
         from orchestrator.models import SubagentContext
 
         tester = TesterSubagent()
         task = Task(
-            title="Verify quality gates",
+            title="Verify quality gates and merge under mwc",
             role="tester",
             payload={
                 "pr_number": 2112,
                 "dry_run": True,
+                "mwc": True,
                 "expected_assertions": 5,
             },
         )
@@ -802,25 +817,103 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         self.assertTrue(res.success)
         self.assertTrue(res.data.get("pr_marked_ready", False))
+        self.assertTrue(res.data.get("pr_merged", False))
+
+    def test_check_repo_allows_mwc_policy(self):
+        from orchestrator.protocols import AIConfigProtocols
+
+        # ai-config has standing mwc policy
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="Morrison-Lab/ai-config"))
+        self.assertTrue(AIConfigProtocols.check_repo_allows_mwc(repo_slug="owner/ai-config"))
+
+        # External repo slug targeting does NOT inherit current workspace directory
+        self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_slug="SomeOrg/unrelated-repo"))
+
+        # Arbitrary external repo without written policy does not allow mwc by default
+        with tempfile.TemporaryDirectory() as empty_dir:
+            self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
+
+    def test_is_pr_fully_clean_detection(self):
+        import json
+        from unittest.mock import MagicMock
+        from orchestrator.pr_claim_manager import PRClaimManager
+
+        mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
+
+        # 1. Clean PR
+        clean_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+                {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
+        # 2. Failing CI check
+        dirty_ci_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
+            ],
+            "reviews": [],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("failed", reason)
+
+        # 3. Blocking AI review verdict ("Needs more work")
+        dirty_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("needs more work", reason.lower())
+
+        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
+        blocked_human_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocked", reason.lower())
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 
         parser = build_parser()
-        # Default ingest-issues (safe opt-in default: claim_pr=False)
+        # Default ingest-issues (safe opt-in default: claim_pr=False, mwc=None for auto-detection)
         args_default = parser.parse_args(["ingest-issues", "--limit", "5"])
         self.assertFalse(args_default.dry_run)
         self.assertFalse(args_default.claim_pr)
+        self.assertIsNone(args_default.mwc)
 
-        # Explicit --claim-pr opt-in
-        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3"])
+        # Explicit --claim-pr opt-in and --no-mwc
+        args_opt_in = parser.parse_args(["ingest-issues", "--claim-pr", "--limit", "3", "--no-mwc"])
         self.assertFalse(args_opt_in.dry_run)
         self.assertTrue(args_opt_in.claim_pr)
+        self.assertFalse(args_opt_in.mwc)
 
-        # Explicit sweep-backlog --dry-run
-        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2"])
+        # Explicit sweep-backlog --dry-run and explicit --mwc
+        args_sweep = parser.parse_args(["sweep-backlog", "--dry-run", "--limit", "2", "--mwc"])
         self.assertTrue(args_sweep.dry_run)
         self.assertFalse(args_sweep.claim_pr)
+        self.assertTrue(args_sweep.mwc)
 
 
 def main():

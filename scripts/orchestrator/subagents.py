@@ -483,6 +483,7 @@ class TesterSubagent(BaseSubagent):
 
         # Run real quality gate checks if not in dry-run mode
         if not dry_run and passed:
+            env = {**os.environ, "PYTHONUTF8": "1"}
             for cmd_str in test_commands:
                 try:
                     proc = subprocess.run(
@@ -492,6 +493,7 @@ class TesterSubagent(BaseSubagent):
                         text=True,
                         timeout=120,
                         check=False,
+                        env=env,
                     )
                     if proc.returncode != 0:
                         passed = False
@@ -525,6 +527,11 @@ class TesterSubagent(BaseSubagent):
 
         # Only promote PR if tests passed AND branch contains real implementation diff
         pr_marked_ready = False
+        pr_merged = False
+        mwc = task.payload.get("mwc")
+        if mwc is None:
+            mwc = AIConfigProtocols.check_repo_allows_mwc(repo_slug=repo_slug)
+
         if passed and pr_number and (has_real_diff or dry_run):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
                 pr_number=pr_number,
@@ -532,6 +539,13 @@ class TesterSubagent(BaseSubagent):
                 repo_slug=repo_slug,
                 dry_run=dry_run,
             )
+            # Under active mwc authorization, auto-merge when ready & quality gates are green
+            if mwc and pr_marked_ready:
+                pr_merged = self.pr_claim_mgr.merge_pr_under_mwc(
+                    pr_number=pr_number,
+                    repo_slug=repo_slug,
+                    dry_run=dry_run,
+                )
 
         elapsed = time.time() - start_time
         return SubagentResult(
@@ -543,6 +557,7 @@ class TesterSubagent(BaseSubagent):
                 "quality_gates": test_commands,
                 "has_real_diff": has_real_diff,
                 "pr_marked_ready": pr_marked_ready,
+                "pr_merged": pr_merged,
             },
             error=None if passed else f"Test suite {test_suite} failed: {'; '.join(output_logs)}",
             execution_time_seconds=elapsed,
@@ -573,6 +588,7 @@ class CoordinatorSubagent(BaseSubagent):
                     "goal": goal,
                     "stage": stage,
                     "dry_run": task.payload.get("dry_run", False),
+                    "mwc": task.payload.get("mwc"),
                     "context_from_parent": task.payload,
                 },
                 depends_on=[prev_task_id] if prev_task_id else [],

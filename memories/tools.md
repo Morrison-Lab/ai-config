@@ -1,16 +1,11 @@
 # Local tools & CLIs
 
-## Cursor agent cannot write `.cursorignore` from the sandbox
+## Cursor
 
-The Write/StrReplace tools, and a sandboxed Shell, refuse a file named
-`.cursorignore` with `operation not permitted`, including a tempfile of that
-name under `/tmp`. The filename is the trigger, not the destination.
-
-- **Do:** write `.cursorignore` with Shell `required_permissions: ["all"]`.
-- **Don't:** retry Write or StrReplace after that denial, or conclude the
-  path is unwritable.
-
-(Measured 2026-08-18 on Morrison-Lab/ai-config#1642.)
+See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior
+(`.cursorignore` sandbox writes and hidden worktrees, plugin vs
+`~/.cursor/skills` vs `~/.claude/skills`, and not wiring Claude hooks into
+the Cursor plugin).
 
 ## Codex plugin marketplace renames require a remove/re-add migration
 

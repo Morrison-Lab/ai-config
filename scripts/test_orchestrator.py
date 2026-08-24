@@ -314,20 +314,73 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertIn("def sweep(): pass", extracted["hooks/monitor-open-prs.py"])
 
     def test_coder_subagent_empty_patch_fails_fast(self):
-        agent = self.registry.get_for_role("coder")
+        from unittest.mock import MagicMock
+        from orchestrator.model_adapters import ModelResponse, ModelProvider
+        from orchestrator.subagents import CoderSubagent
+
+        mock_router = MagicMock()
+        mock_adapter = MagicMock()
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="I am only conversational text with no code blocks or target files.",
+            model_used="mock-conversational",
+            provider=ModelProvider.CLAUDE,
+            execution_time_seconds=0.1,
+        )
+        mock_router.route_task.return_value = (mock_adapter, "mock-conversational")
+
+        agent = CoderSubagent(model_router=mock_router)
         task = Task(
-            title="Empty code task",
+            title="Non-code conversational response",
             role="coder",
             payload={
-                "instruction": "Fix something",
+                "instruction": "Fix bug without providing file headers",
                 "use_worktree": True,
-                "branch_name": "task/empty-patch-test",
-                "dry_run": True,
+                "branch_name": "task/empty-patch-live-test",
+                "dry_run": False,
+                "push_remote": False,
             },
         )
         ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
         res = agent.execute(task, ctx)
-        self.assertTrue(res.success)  # In dry_run mode, dry-run simulation succeeds
+        self.assertFalse(res.success)
+        self.assertIn("no valid file modifications", res.error)
+
+    def test_coder_subagent_push_failure_fails_fast(self):
+        import subprocess
+        from unittest.mock import patch, MagicMock
+        from orchestrator.subagents import CoderSubagent
+
+        agent = CoderSubagent()
+        task = Task(
+            title="Push failure task",
+            role="coder",
+            payload={
+                "instruction": "Implement feature",
+                "target_file": "scripts/test_push_fail.py",
+                "code_content": "# test content\n",
+                "use_worktree": True,
+                "branch_name": "task/push-fail-test",
+                "dry_run": False,
+                "push_remote": True,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+
+        orig_run = subprocess.run
+
+        def mock_subprocess_run(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and cmd[:2] == ["git", "push"]:
+                mock_proc = MagicMock()
+                mock_proc.returncode = 1
+                mock_proc.stderr = "fatal: remote rejected (permission denied)"
+                return mock_proc
+            return orig_run(cmd, *args, **kwargs)
+
+        with patch("subprocess.run", side_effect=mock_subprocess_run):
+            res = agent.execute(task, ctx)
+            self.assertFalse(res.success)
+            self.assertIn("Git push failed from worktree", res.error)
 
     def test_reviewer_subagent_empty_branch_diff_blocks(self):
         agent = self.registry.get_for_role("reviewer")

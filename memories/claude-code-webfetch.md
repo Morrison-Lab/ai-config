@@ -49,8 +49,8 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   `ucd-serg.github.io/lab-manual/...`) can reject `WebFetch` outright (403 —
   likely anti-scraping), even though the plain-text/markdown **source** it was
   built from is a public file in a public repo and fetches fine via
-  `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`. This
-  isn't `d-morrison/gha`-specific (that repo's own `CLAUDE.md` documents it
+  `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`.
+  This isn't `d-morrison/gha`-specific (that repo's own `CLAUDE.md` documents it
   for the lab manual) — it generalizes to any Quarto/Docusaurus-style site,
   including third-party tool docs with no relation to our own repos.
 - **When the exact source path isn't obvious** (unlike the lab-manual case
@@ -101,18 +101,18 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   both at the curl/WebFetch level; the GitHub MCP tools route through
   their own server and keep working), not
   just anti-scraping — but `raw.githubusercontent.com` stays reachable, and
-  GitHub's docs are built from the public `github/docs` repo. Verify a docs
-  claim or URL against that source instead: page content lives under
+  GitHub's docs are built from the public `github/docs` repo.
+  Verify a docs claim or URL against that source instead: page content lives under
   `content/<area>/.../<slug>.md`, but live-URL paths do NOT map 1:1 to
   source paths (the docs get reorganized; e.g.
   `/billing/managing-billing-for-your-products/...` now lives at
-  `content/billing/concepts/product-billing/github-actions.md`). If a page
-  was moved, its frontmatter carries a `redirect_from:` list — an old URL
+  `content/billing/concepts/product-billing/github-actions.md`).
+  If a page was moved, its frontmatter carries a `redirect_from:` list — an old URL
   appearing there means it still works for readers via redirect — and
   shared text is factored into `data/reusables/<area>/<name>.md` includes,
   so grep for a `{% data reusables.<area>.<name> %}` tag and fetch that
-  file when a section's body looks like one include line. Version-gated
-  (`{% ifversion <flag> %}`) passages resolve via `data/features/<flag>.yml`:
+  file when a section's body looks like one include line.
+  Version-gated (`{% ifversion <flag> %}`) passages resolve via `data/features/<flag>.yml`:
   its `versions:` block (e.g. `fpt: '*'`) says which plans the gated text
   applies to: `fpt` = Free/Pro/Team on github.com, `ghec` = GitHub Enterprise
   Cloud (also github.com-hosted), `ghes` = GitHub Enterprise Server

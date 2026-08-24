@@ -230,7 +230,7 @@ class TestSpecializedSubagents(unittest.TestCase):
 
     def test_researcher_subagent(self):
         agent = self.registry.get_for_role("researcher")
-        task = Task(title="Research query", role="researcher", payload={"query": "Find AST parsers"})
+        task = Task(title="Research query", role="researcher", payload={"query": "Find AST parsers", "dry_run": True})
         ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
         res = agent.execute(task, ctx)
         self.assertTrue(res.success)
@@ -240,14 +240,14 @@ class TestSpecializedSubagents(unittest.TestCase):
         agent = self.registry.get_for_role("reviewer")
 
         # Clean code
-        task_clean = Task(title="Review clean diff", role="reviewer", payload={"diff": "+ def foo(): return 42"})
+        task_clean = Task(title="Review clean diff", role="reviewer", payload={"diff": "+ def foo(): return 42", "dry_run": True})
         ctx = SubagentContext(task=task_clean, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
         res_clean = agent.execute(task_clean, ctx)
         self.assertTrue(res_clean.success)
         self.assertEqual(res_clean.data["verdict"], "CLEAN")
 
         # Unsafe code
-        task_unsafe = Task(title="Review unsafe diff", role="reviewer", payload={"diff": "+ eval(user_input)"})
+        task_unsafe = Task(title="Review unsafe diff", role="reviewer", payload={"diff": "+ eval(user_input)", "dry_run": True})
         res_unsafe = agent.execute(task_unsafe, ctx)
         self.assertFalse(res_unsafe.success)
         self.assertEqual(res_unsafe.data["verdict"], "BLOCKED")
@@ -289,7 +289,7 @@ class TestOrchestratorEngineIntegration(unittest.TestCase):
         coord_task = Task(
             title="Coordinate Feature X",
             role="coordinator",
-            payload={"goal": "Feature X", "stages": ["researcher", "coder", "tester"]},
+            payload={"goal": "Feature X", "stages": ["researcher", "coder", "tester"], "dry_run": True},
         )
         self.engine.queue.enqueue(coord_task)
 

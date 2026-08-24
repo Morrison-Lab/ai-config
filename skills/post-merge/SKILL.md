@@ -313,8 +313,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
-   Match the two-word invariant, `hold off` or the pre-2026-08-24 `paws off`, case-insensitively --- never a whole sentence.
-   The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own emitter four steps below, so a quoted prefix misses claims this very skill posts.
+   Match the two-word invariant, `hold off` or either retired wording `paws off` / `back off`, case-insensitively --- never a whole sentence.
+   The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own claim emitter (step 4), so a quoted prefix misses claims this very skill posts.
    See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
 
    **Then check the same comment for a release term, because one release marker contains a claim invariant.**

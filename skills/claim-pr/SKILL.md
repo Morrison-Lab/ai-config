@@ -115,7 +115,8 @@ for d in json.load(sys.stdin):
         # test resolves the release's thread instead of the claim's.
         is_release = any(t in body for t in
                          ('unclaim', 'released', 'pr is free', 'now mergeable'))
-        is_claim = ('hold off' in body or 'paws off' in body) and not is_release
+        is_claim = (any(t in body for t in ('hold off', 'paws off', 'back off'))
+                    and not is_release)
         if is_claim and not n.get('resolved'):
             print(d['id']); break
     else: continue

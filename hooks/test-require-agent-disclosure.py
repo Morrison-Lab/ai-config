@@ -201,6 +201,13 @@ CASES = [
      'gh pr comment 5 -F "body=Addressed in $SHA."', None),
     ("--body with a mid-string expansion is unreadable",
      'gh pr comment 5 --body "Addressed in $SHA."', None),
+    # A single-quoted `$` does not expand in bash, so this body IS readable --
+    # and it is reported unreadable anyway, deliberately. The `--body`/`--message`
+    # clause has always behaved this way, so the short forms match it rather than
+    # diverging, and the error is toward the weaker note rather than toward an
+    # assertion about text never read. Pinned so the choice is visible as one.
+    ("a single-quoted $ is reported unreadable, matching --body's behaviour",
+     "gh pr comment 5 -b 'costs $9'", None),
     ("--raw-field body= is inline and readable",
      'gh api repos/o/r/issues/12/comments --raw-field body="hi"', "missing"),
     ("-F body=@file is a file reference, so unreadable",

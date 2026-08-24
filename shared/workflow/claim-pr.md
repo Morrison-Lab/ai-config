@@ -92,7 +92,16 @@ issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
 
 **Every detector of a claim matches the OLD wording as well as the new one, and dropping the old alternation is the one edit that fails silently.**
-The claim body said "paws off until I'm done" until 2026-08-24 and now says "please hold off ...".
+There were **three** retired wordings, not one, and enumerating them from the file in front of you is how the third was missed for a whole review round.
+`claim-pr`, `gi`, `st`, `pr-on-claim`, `post-merge` and `handoff` all said "paws off until I'm done"; [`ardi`](ardi.md) --- the corpus's highest-traffic claim emitter, run on every PR in every repo --- said "back off until done", and had done since 2026-06-17.
+All three now read "please hold off ...".
+
+Derive that set from history rather than from the current tree, which no longer contains any of them:
+
+```bash
+git log -p --all -- 'skills/*/SKILL.md' 'shared/workflow/claim-pr.md' \
+  | grep -oiE '^\+.*--(body|message) "[^"]*(off|claim)[^"]*"' | sort -u
+```
 Claims posted before that are still sitting on open PRs and issues, and a claim stays live on activity rather than on age --- so a thread claimed under the old wording and pushed to this morning is live right now.
 
 A detector narrowed to the new phrase alone still returns cleanly on such a thread.
@@ -102,16 +111,16 @@ Nothing in the output announces the miss: a claim search that finds no claim loo
 **Match the two-word invariant, never a whole sentence.**
 The claim body varies by target --- a PR claim says "please hold off on pushing to this branch until I'm done" and an issue claim says "please hold off until I'm done" --- so neither sentence contains the other, and a detector keyed on either one is blind to half the claims.
 Under the old single-string wording that distinction did not exist, which is exactly why it is easy to carry a whole-sentence matcher across the rename without noticing it has narrowed.
-`hold off` is the invariant; `paws off` is its predecessor.
+`hold off` is the invariant; `paws off` and `back off` are its predecessors, and a matcher naming only the first predecessor is the failure this very section describes, committed by the section itself.
 
 So match the alternation, case-insensitively, everywhere a claim is read:
 
 ```bash
 gh pr view <N> --json comments \
-  -q '.comments[] | select(.body | test("hold off|paws off"; "i"))'   # READ_PR_COMMENTS
+  -q '.comments[] | select(.body | test("hold off|paws off|back off"; "i"))'   # READ_PR_COMMENTS
 ```
 
-Keep the old alternative until no claim under the old wording can plausibly still be live --- which, given the 2-hour rule keys on activity and not on the comment's own age, means until every PR and issue open on 2026-08-24 has closed.
+Keep both old alternatives until no claim under a retired wording can plausibly still be live --- which, given the 2-hour rule keys on activity and not on the comment's own age, means until every PR and issue open on 2026-08-24 has closed.
 Removing it is a deliberate later edit, not tidying to do in passing.
 
 **Then check the same comment for a release term, because one release marker contains a claim invariant.**
@@ -119,10 +128,11 @@ The retired release wording is `... done --- paws off released.`, which matches 
 The sentence matcher this replaced did not collide, so the collision arrived with the fix.
 Treat a comment as a release rather than a claim when it also matches `unclaim|released|PR is free|now mergeable`, and derive that list rather than copying it: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
 
-- **Do:** match `hold off|paws off` case-insensitively wherever a claim is read, then exclude the comment if it also carries a release term.
-- **Do:** treat the old alternative as load-bearing until the threads carrying it have closed.
+- **Do:** match `hold off|paws off|back off` case-insensitively wherever a claim is read, then exclude the comment if it also carries a release term.
+- **Do:** treat both old alternatives as load-bearing until the threads carrying them have closed.
 - **Don't:** read an empty claim search as an unclaimed thread without first confirming the matcher covers both wordings --- the two results are identical.
-- **Don't:** drop the back-compat alternative as part of an unrelated change.
+- **Don't:** drop a back-compat alternative as part of an unrelated change.
+- **Don't:** enumerate the retired wordings from the files you happen to be editing --- `back off` was invisible to exactly that method for a full review round, because the one file that posted it was not one of the six that agreed with each other.
 
 **Verify a mid-task "already done" claim against real PR state before trusting or redoing it.**
 A PR you claimed and are actively driving can still gain commits from a **second, independently-running session** under the same account --- a `<github-webhook-activity>` review-comment-reply event can describe work ("Addressed...

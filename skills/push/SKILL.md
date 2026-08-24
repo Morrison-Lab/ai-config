@@ -98,13 +98,13 @@ that's your claim.)
 ```bash
 PR=$(gh pr view --json number,headRefName -q .number 2>/dev/null)   # VIEW_PR
 gh pr view "$PR" --json comments \
-  -q '.comments[] | select(.body | test("hold off|paws off|unclaim|released|PR is free|now mergeable"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
+  -q '.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
 The alternation is deliberate, and it covers RELEASES as well as claims.
 Claims posted before 2026-08-24 say "paws off", and a claim stays live on activity rather than on age, so an old-wording claim can be live right now.
 The release terms matter because the old wording made them free: `paws off released` contains `paws off`, so one grep surfaced both sides of the exchange.
-`claim released` contains neither claim term, so a claim-only query returns the claim and not its release --- and step 3 below asks whether the claim "hasn't been unclaimed", which that output cannot answer.
+`claim released` contains neither claim term, so a claim-only query returns the claim and not its release --- and this check asks whether the claim "hasn't been unclaimed", which a claim-only output cannot answer.
 A released PR would read as live-claimed, and this skill would refuse a legitimate push.
 Derive the release terms rather than copying this list, which is a snapshot of what the corpus posts today: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
 A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one --- see [`claim-pr`](../../shared/workflow/claim-pr.md).

@@ -59,24 +59,12 @@ The mistake was attributing an error to whichever file the loop happened to be t
 `MD049` defaults to `consistent`, so it fires only where the document already established asterisk emphasis --- which makes the linter a partial detector here rather than the check.
 
 **That `consistent` default cuts the other way too, and it is the sharper hazard.**
-The marker is underscore-emphasised, so a marker that escapes its fence into prose becomes the document's FIRST emphasis and sets the expectation to underscore --- whereupon every pre-existing `*asterisk*` in that file starts failing.
-Measured here: adding the marker to `skills/migrate-discussion/SKILL.md` at column 0 closed the fence and turned two untouched lines 70 lines below into `MD049` errors, which read as defects in prose nobody had edited.
-So the linter does catch this file, and it reports the wrong lines.
-So the source keeps its indentation and the query drops its anchor.
+The marker is underscore-emphasised, so a marker that escapes its fence into prose becomes the document's first emphasis and sets the expectation to underscore --- whereupon every pre-existing `*asterisk*` in that file starts failing, at line numbers far from the edit.
+`skills/migrate-discussion/SKILL.md` has exactly that shape, with two asterisk-emphasised lines around 165.
 
-**The searchable invariant is `(AI agent)`, not the full line.**
-`AGENTS.md` says to swap in your own agent's name and keep the rest verbatim, which leaves the literal full line unable to find a Codex- or Gemini-posted comment --- returning nothing, which is indistinguishable from an undisclosed thread.
-That is the same failure this rule's sibling diagnoses for the claim wording, one artifact over.
-`hooks/require-agent-disclosure.py` already encodes the invariant as `posted by .{0,40}\(ai agent\)`; match that, case-insensitively:
-
-```bash
-grep -rn -i "posted by .*(ai agent)" .
-```
-
-**The guard cannot see every body, and the gaps are worth knowing.**
-`hooks/require-agent-disclosure.py` reads the command text and the `mcp__github__*` comment tools, so it is silent on a body it cannot reach: a `--body-file`, an `--editor` session, an interpolated `$BODY`.
-It reports those as an **unreadable** body rather than as a missing marker, so its warning never asserts more than it observed --- but a `--body-file` comment that genuinely omits the marker draws only the weaker note.
-`skills/ard/SKILL.md`'s per-round summary is exactly that shape, which is why it states the requirement in its own text rather than relying on the guard.
+Do not rely on the linter to catch it, though.
+A re-measurement on 2026-08-24 could not reproduce an `MD049` there by the same method that reproduces the other three files' results exactly, so the structural hazard is real and the detector's coverage of it is not established.
+Treat marker indentation as something to get right rather than something a check will report.
 
 **Where the marker must NOT go: content that is not a comment.**
 A commit message, a title of any kind, an issue **body**, or a PR body has its own attribution conventions and its own consumers, and a trailing italic line in a commit message corrupts a changelog.

@@ -87,7 +87,7 @@ check both explicitly here).
 gh issue view <N> --json comments --jq '.comments | last | .body' | cat   # READ_ISSUE_COMMENTS
 ```
 
-Match the two-word invariant `hold off`, or the pre-2026-08-24 `paws off`, case-insensitively --- then **exclude the comment if it also carries a release term** (`unclaim|released|PR is free|now mergeable`), because the retired release wording `... done --- paws off released.` contains `paws off` and would otherwise read as a live claim.
+Match the two-word invariant `hold off`, or either retired wording `paws off` / `back off`, case-insensitively --- then **exclude the comment if it also carries a release term** (`unclaim|released|PR is free|now mergeable`), because the retired release wording `... done --- paws off released.` contains `paws off` and would otherwise read as a live claim.
 See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
 If a live claim stands, skip the issue --- unless the claim has expired: no push or comment on the issue in over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 An expired claim is taken over by posting your own claim comment, never silently.

@@ -52,7 +52,8 @@ Core walks the submitted model configuration, and for each property its schema m
 So the config carries a pointer and the secret lives in VS Code secret storage, backed on Windows by `%APPDATA%\Code\User\globalStorage\state.vscdb`.
 
 The consequence is operational: **a BYOK key cannot be seeded by editing a file.**
-There is no `settings.json` edit, no dotfile, no scripted install step that puts a working key in place; entering it is a UI-only action the user has to perform.
+There is no `settings.json` edit, no dotfile, no scripted install step that puts a working key in place.
+Entering it is a UI-only action the user has to perform.
 Any procedure that claims otherwise is describing the third-party extension route below, not this one.
 
 - **Do:** register BYOK models through the chat model picker's **Manage Models...** flow, and hand the key entry to the user as a manual step.
@@ -94,6 +95,7 @@ The two routes' vocabularies overlap almost completely -- both say "Copilot Chat
 Settle it by checking which extension is installed, not by matching the words in the request.
 
 - **Do:** check for the OAICopilot extension before applying its procedure, and fall to the core-BYOK route when it is absent.
-- **Don't:** treat "register these models in Copilot" as naming a route; the phrase fits both, and only the installed extension set decides.
+- **Don't:** treat "register these models in Copilot" as naming a route.
+  The phrase fits both, and only the installed extension set decides.
 
 (Measured 2026-08-23; tracked as [ai-config#2064](https://github.com/Morrison-Lab/ai-config/issues/2064).)

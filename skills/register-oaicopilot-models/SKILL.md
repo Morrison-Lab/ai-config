@@ -40,7 +40,8 @@ Absent means take the core-BYOK route instead, whose mechanics --- where the bui
 Note that route has no file to edit: the key reaches VS Code secret storage through the picker's UI, so it cannot be seeded by a config write.
 
 - **Do:** run the `find` above before Step 0, and switch routes when it returns nothing.
-- **Don't:** read "register these models in Copilot" as selecting this skill; the phrase fits both routes, and only the installed extension set decides.
+- **Don't:** read "register these models in Copilot" as selecting this skill.
+  The phrase fits both routes, and only the installed extension set decides.
 
 ## Step 0: Locate the config
 

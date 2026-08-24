@@ -9,7 +9,8 @@ General local-tool notes stay in `tools.md`.
 
 The Write/StrReplace tools, and a sandboxed Shell, refuse a file named
 `.cursorignore` with `operation not permitted`, including a tempfile of that
-name under `/tmp`. The filename is the trigger, not the destination.
+name under `/tmp`.
+The filename is the trigger, not the destination.
 
 - **Do:** write `.cursorignore` with Shell `required_permissions: ["all"]`.
 - **Don't:** retry Write or StrReplace after that denial, or conclude the

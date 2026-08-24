@@ -32,3 +32,9 @@ This document records the load-bearing operational rationale, synthetic-fixture 
 - **Inclusion of `DISMISSED` in Pre-Reduction Filter**: GitHub's dismiss action updates the existing review's state to `DISMISSED` without deleting the review object.
   Including `DISMISSED` in the filter ensures that an explicit dismissal supersedes a prior `CHANGES_REQUESTED`.
   A second synthetic fixture verified that omitting `DISMISSED` from the pre-reduction filter caused an old `CHANGES_REQUESTED` to permanently block even after being dismissed.
+
+## 4. Multi-Signal Next Step Decision Matrix
+
+- **Exhaustive Signal Evaluation**: The transition matrix evaluates all gathered dimensions (draft status, blocking human reviews, branch sync with main, CI checks, unresolved inline review threads, AI review findings, External review findings, and currency confirmation) before reaching the "fully clean" terminal state.
+  Treating AI review alone as the sole review branch allowed PRs with open External review findings or unconfirmed review currency (`Unverified` / `no verdict at head`) to erroneously declare readiness.
+  The matrix explicitly requires all reviews to be free of open findings and at least one verified clean review at head before transitioning to `Ready for self-merge` or `Ready for human review`.

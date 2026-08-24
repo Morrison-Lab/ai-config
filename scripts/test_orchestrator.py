@@ -468,6 +468,59 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertFalse(res.success)
         self.assertIn("Destructive truncation detected", res.error)
 
+    def test_extract_files_from_markdown_fallback_discards_all_stub_patterns(self):
+        from orchestrator.subagents import extract_files_from_markdown
+
+        for stub in ["...", "# ...", "// ...", "pass", "/* same */", "# same"]:
+            text = f"```scripts/check.py\n{stub}\n```"
+            res = extract_files_from_markdown(text, context_text="please fix scripts/check.py now")
+            self.assertEqual(res, {}, f"Failed to discard stub: {stub}")
+
+    def test_coder_subagent_path_traversal_context_injection_blocked(self):
+        from unittest.mock import MagicMock, patch
+        from orchestrator.subagents import CoderSubagent
+        from orchestrator.model_adapters import ModelProvider, ModelResponse
+
+        mock_router = MagicMock()
+        mock_adapter = MagicMock()
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="```scripts/safe.py\n# safe\nprint('ok')\n```",
+            model_used="mock-coder",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+        mock_router.route_task.return_value = (mock_adapter, "mock-coder")
+
+        mock_wt_mgr = MagicMock()
+        mock_wt_mgr.isolated_worktree.return_value.__enter__.return_value = Path(self.temp_dir.name)
+        mock_wt_mgr.isolated_worktree.return_value.__exit__.return_value = None
+
+        agent = CoderSubagent(model_router=mock_router, worktree_manager=mock_wt_mgr)
+        task = Task(
+            title="Fix bug with path traversal attempt",
+            role="coder",
+            payload={
+                "instruction": "Fix scripts/../../../../../../etc/passwd.txt vulnerability",
+                "use_worktree": True,
+                "branch_name": "task/path-traversal-test",
+                "dry_run": False,
+                "push_remote": False,
+            },
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        with patch("subprocess.run") as mock_proc:
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "ok"
+            mock_res.stderr = ""
+            mock_proc.return_value = mock_res
+            res = agent.execute(task, ctx)
+
+        # Should succeed without crashing or leaking sensitive file
+        self.assertTrue(res.success)
+        self.assertIn("scripts/safe.py", res.data["files_modified"])
+
 
 class TestOrchestratorEngineIntegration(unittest.TestCase):
     """End-to-end integration test of the multi-threaded orchestration engine."""

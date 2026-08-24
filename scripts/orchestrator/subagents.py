@@ -22,6 +22,39 @@ from .worktree_manager import WorktreeManager
 logger = logging.getLogger("orchestrator.subagents")
 
 
+CANDIDATE_FILE_REGEX = re.compile(
+    r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)"
+)
+STUB_PATTERNS = ("...", "# ...", "// ...", "pass", "/* same */", "# same", "/* ... */")
+
+
+def is_stub_or_self_referential(content: str, cand_path: str) -> bool:
+    """Return True if content is a placeholder stub or echoes the file path."""
+    clean_content = content.strip()
+    clean_cand = cand_path.strip("`'\" \t\r\n").replace("\\", "/")
+    cand_basename = clean_cand.split("/")[-1]
+
+    if clean_content in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
+        return True
+    if clean_content in STUB_PATTERNS and len(clean_content.splitlines()) <= 2:
+        return True
+    return False
+
+
+def find_candidate_file_paths(text: str) -> List[str]:
+    """Extract candidate repo-relative file paths mentioned in a text block."""
+    paths: List[str] = []
+    for raw in CANDIDATE_FILE_REGEX.findall(text):
+        cleaned = raw.strip("`'\" \t\r\n").replace("\\", "/")
+        if (
+            "." in cleaned
+            and not cleaned.startswith(("http://", "https://", ".git"))
+            and cleaned not in paths
+        ):
+            paths.append(cleaned)
+    return paths
+
+
 def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, str]:
     """Extract (file_path, content) pairs from markdown code blocks, ignoring stub/self-referential blocks."""
     files: Dict[str, str] = {}
@@ -32,28 +65,16 @@ def extract_files_from_markdown(text: str, context_text: str = "") -> Dict[str, 
             cand = parts[-1]
             if "." in cand and not cand.startswith(("http://", "https://")):
                 clean_cand = cand.strip("`'\" \t\r\n").replace("\\", "/")
-                clean_content = content.strip()
-                cand_basename = clean_cand.split("/")[-1]
-
-                # Discard self-referential stubs (e.g. ```memories/tools.md\nmemories/tools.md\n```)
-                if clean_content in (clean_cand, cand_basename, f"/{clean_cand}", f"./{clean_cand}"):
-                    continue
-                if clean_content in ("...", "# ...", "// ...", "pass", "/* same */", "# same") and len(clean_content.splitlines()) <= 2:
-                    continue
-                files[clean_cand] = content
+                if not is_stub_or_self_referential(content, clean_cand):
+                    files[clean_cand] = content
 
     # Fallback: if no path header found, but code blocks exist and context_text mentions a file path
     if not files and blocks and context_text:
-        candidates = re.findall(
-            r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
-            context_text,
-        )
-        for raw_cand in candidates:
-            target = raw_cand.strip("`'\" \t\r\n").replace("\\", "/")
-            cand_basename = target.split("/")[-1]
-            first_block_content = blocks[0][1].strip()
-            if first_block_content not in (target, cand_basename, "...", "pass"):
-                files[target] = blocks[0][1]
+        candidates = find_candidate_file_paths(context_text)
+        for target in candidates:
+            first_block_content = blocks[0][1]
+            if not is_stub_or_self_referential(first_block_content, target):
+                files[target] = first_block_content
                 break
 
     return files
@@ -230,30 +251,33 @@ class CoderSubagent(BaseSubagent):
                     files_to_write[target_file] = code_content
                 else:
                     # 2. Locate existing candidate files in worktree to provide context
-                    candidate_paths: List[str] = []
                     combined_context = f"{instruction}\n{issue_body}\n{task.payload.get('context_from_parent', '')}"
-                    for raw_cand in re.findall(
-                        r"(?:^|[\s`'\"])((?:scripts|hooks|skills|memories|shared|[a-zA-Z0-9_\-]+)/[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9_]+)(?:[\s`'\"]|$)",
-                        combined_context,
-                    ):
-                        cand_norm = raw_cand.strip("`'\" \t\r\n").replace("\\", "/")
-                        if cand_norm not in candidate_paths and "." in cand_norm and not cand_norm.startswith(("http://", "https://", ".git")):
-                            candidate_paths.append(cand_norm)
-
+                    candidate_paths = find_candidate_file_paths(combined_context)
                     existing_context_blocks: List[str] = []
-                    for rel in candidate_paths[:3]:
-                        p = (wt_path / rel).resolve()
-                        if p.exists() and p.is_file():
+                    wt_resolved = wt_path.resolve()
+
+                    max_context_files = task.payload.get("max_context_files", 3)
+                    max_context_lines = task.payload.get("max_context_lines", 400)
+
+                    for rel in candidate_paths[:max_context_files]:
+                        clean_rel = Path(rel)
+                        if clean_rel.is_absolute():
+                            clean_rel = Path(*clean_rel.parts[1:])
+                        file_path = (wt_path / clean_rel).resolve()
+                        if not file_path.is_relative_to(wt_resolved):
+                            logger.warning("Skipping candidate path escaping worktree root: %s", rel)
+                            continue
+                        if file_path.is_file():
                             try:
-                                cur_content = p.read_text(encoding="utf-8", errors="replace")
-                                ext = p.suffix.lstrip(".") or "text"
+                                cur_content = file_path.read_text(encoding="utf-8", errors="replace")
+                                ext = file_path.suffix.lstrip(".") or "text"
                                 cur_lines = cur_content.splitlines()
-                                snippet = "\n".join(cur_lines[:400])
-                                if len(cur_lines) > 400:
-                                    snippet += f"\n\n# ... ({len(cur_lines) - 400} remaining lines omitted) ..."
-                                existing_context_blocks.append(f"Current content of `{rel}`:\n```{ext}\n{snippet}\n```")
-                            except Exception:
-                                pass
+                                snippet = "\n".join(cur_lines[:max_context_lines])
+                                if len(cur_lines) > max_context_lines:
+                                    snippet += f"\n\n# ... ({len(cur_lines) - max_context_lines} remaining lines omitted) ..."
+                                existing_context_blocks.append(f"Current content of `{rel}`:\n````{ext}\n{snippet}\n````")
+                            except Exception as exc:
+                                logger.warning("Failed to read candidate context file %s: %s", rel, exc)
 
                     context_str = "\n\n".join(existing_context_blocks)
 
@@ -310,9 +334,13 @@ class CoderSubagent(BaseSubagent):
                         execution_time_seconds=time.time() - start_time,
                     )
 
-                # Write files into worktree with security and destructive-truncation validation
-                total_lines = 0
+                # Pass 1: Validate all target files (path escape + destructive truncation on model output)
                 wt_resolved = wt_path.resolve()
+                validated_edits: List[Tuple[Path, str, str]] = []
+                is_model_output = (result_data.get("model_used") != "direct_input")
+                min_truncation_orig_lines = task.payload.get("min_truncation_orig_lines", 20)
+                truncation_ratio = task.payload.get("truncation_ratio", 0.25)
+
                 for rel_path, content in files_to_write.items():
                     clean_rel = Path(rel_path)
                     if clean_rel.is_absolute():
@@ -326,12 +354,12 @@ class CoderSubagent(BaseSubagent):
                             execution_time_seconds=time.time() - start_time,
                         )
 
-                    # Destructive truncation guard on existing files
-                    if file_path.exists() and file_path.is_file():
+                    # Destructive truncation guard on model-generated outputs
+                    if is_model_output and file_path.is_file():
                         orig_text = file_path.read_text(encoding="utf-8", errors="replace")
                         orig_lines = len(orig_text.splitlines())
                         new_lines = len(content.splitlines())
-                        if orig_lines > 20 and new_lines < max(5, int(orig_lines * 0.25)):
+                        if orig_lines > min_truncation_orig_lines and new_lines < max(5, int(orig_lines * truncation_ratio)):
                             return SubagentResult(
                                 success=False,
                                 data=result_data,
@@ -342,13 +370,18 @@ class CoderSubagent(BaseSubagent):
                                 ),
                                 execution_time_seconds=time.time() - start_time,
                             )
+                    validated_edits.append((file_path, rel_path, content))
+
+                # Pass 2: Write all validated files
+                total_lines = 0
+                for file_path, rel_path, content in validated_edits:
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_text(content, encoding="utf-8")
                     total_lines += len(content.splitlines())
 
                 result_data["lines_changed"] = total_lines
-                result_data["files_modified"] = list(files_to_write.keys())
-                result_data["applied"] = bool(files_to_write)
+                result_data["files_modified"] = [rel for _, rel, _ in validated_edits]
+                result_data["applied"] = bool(validated_edits)
 
                 # Stage and commit
                 subprocess.run(["git", "add", "."], cwd=str(wt_path), capture_output=True, check=False)

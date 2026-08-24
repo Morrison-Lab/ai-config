@@ -1285,18 +1285,41 @@ def main() -> int:
     with patch.object(checker.subprocess, "run", lambda cmd, **kw: _NoneStderr()):
         try:
             checker.run_cmd(["gh", "api", "whatever"])
-            msg = "<returned normally>"
+            outcome = "returned normally"
+        except SystemExit as exc:
+            outcome = f"SystemExit:{exc.code}"
+        except RuntimeError:
+            outcome = "RuntimeError"
+        except AttributeError:
+            outcome = "AttributeError"
+    # A non-zero exit whose stderr could not be decoded is an ENVIRONMENT
+    # failure, so it must exit 2 rather than raise RuntimeError. RuntimeError
+    # would be caught by `_resolve_run_head_sha`'s `except RuntimeError: return
+    # None` and laundered into an ordinary "no review at this HEAD" finding --
+    # exit 1 with a bullet, the shape fully-clean.md's crash test cannot see.
+    check("a non-zero exit with undecodable stderr exits 2, not RuntimeError",
+          outcome == f"SystemExit:{checker.USAGE_EXIT}")
+
+    # Supporting assertion: a non-zero exit WITH readable stderr must still
+    # raise RuntimeError, so the fix above did not simply convert every command
+    # failure into a hard exit. Without this the assertion above passes for a
+    # script that dies on all failures, which would break callers entitled to
+    # degrade gracefully on a genuine 404.
+    class _RealStderr:
+        returncode = 1
+        stdout = ""
+        stderr = "gh: Not Found (HTTP 404)\n"
+
+    with patch.object(checker.subprocess, "run", lambda cmd, **kw: _RealStderr()):
+        try:
+            checker.run_cmd(["gh", "api", "whatever"])
+            outcome2 = "returned normally"
+        except SystemExit:
+            outcome2 = "SystemExit"
         except RuntimeError as exc:
-            msg = str(exc)
-        except AttributeError as exc:
-            msg = f"AttributeError: {exc}"
-    check("a non-zero exit with None stderr still raises RuntimeError",
-          msg.startswith("Command failed"))
-    # `getattr` with a default rather than attribute access: against a script
-    # lacking the constant this must FAIL informatively, not raise
-    # AttributeError and take the whole suite down with it.
-    check("negative control: and it names the unreadable stream, not 'None'",
-          getattr(checker, "STREAM_UNREADABLE", "<constant absent>") in msg)
+            outcome2 = f"RuntimeError:{exc}"
+    check("negative control: a readable-stderr failure still raises RuntimeError",
+          outcome2.startswith("RuntimeError:") and "404" in outcome2)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

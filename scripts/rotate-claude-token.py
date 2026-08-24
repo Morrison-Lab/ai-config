@@ -80,16 +80,33 @@ def gh(args: list[str], stdin: str | None = None) -> str:
     Never pass a secret value inside `args` -- use `stdin`.
     """
     try:
+        # `encoding` is load-bearing on Windows; see the long note in
+        # `check-pr-fully-clean.py`'s `run_cmd`. Without it the locale codec
+        # (cp1252) silently mojibakes most non-ASCII and hard-fails on five
+        # bytes, the latter killing subprocess's reader thread and leaving the
+        # stream as None with `returncode` unaffected. This script reads repo
+        # descriptions and org names, which carry arbitrary user text.
         proc = subprocess.run(
             ["gh", *args],
             input=stdin,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
         )
     except FileNotFoundError:
         sys.exit("gh is not on PATH; install the GitHub CLI to use this script.")
     if proc.returncode != 0:
+        if proc.stderr is None:
+            sys.exit(
+                f"gh {' '.join(args)} failed and its stderr could not be read "
+                "or decoded, so the reason is unavailable. This is an "
+                "environment failure."
+            )
         raise GhError(proc.stderr.strip() or f"gh {' '.join(args)} failed")
+    if proc.stdout is None:
+        sys.exit(
+            f"gh {' '.join(args)} produced no capturable stdout; its output "
+            "could not be read or decoded. This is an environment failure."
+        )
     return proc.stdout
 
 

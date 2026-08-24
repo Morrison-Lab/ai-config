@@ -419,5 +419,72 @@ check(
     "files (150): file1.txt, file2.txt, file3.txt, file4.txt, file5.txt, ... (+145 more)" in over_cap_rendered,
 )
 
+# A captured stream that came back None is an environment failure, not an empty
+# sweep. `fetch`'s own docstring promises to fail loudly rather than return an
+# empty set, and `json.loads(None)` would have raised TypeError instead. Pinned
+# here rather than only in test_check_pr_fully_clean.py, because the previous
+# round's finding was a fix generalized along one axis and left unguarded along
+# another -- a pin in a sibling suite proves nothing about this file.
+from unittest.mock import patch  # noqa: E402
+
+
+class _NoneStdout:
+    returncode = 0
+    stdout = None
+    stderr = ""
+
+
+with patch.object(pr_sweep.subprocess, "run", lambda *a, **kw: _NoneStdout()):
+    try:
+        pr_sweep.fetch("owner/name", 10)
+        outcome = "returned normally"
+    except SystemExit as exc:
+        outcome = f"SystemExit:{exc}"
+    except TypeError:
+        outcome = "TypeError"
+check(
+    "None stdout raises SystemExit naming an environment failure, not TypeError",
+    outcome.startswith("SystemExit:") and "environment failure" in outcome,
+)
+
+
+class _NoneStderr:
+    returncode = 1
+    stdout = ""
+    stderr = None
+
+
+with patch.object(pr_sweep.subprocess, "run", lambda *a, **kw: _NoneStderr()):
+    try:
+        pr_sweep.fetch("owner/name", 10)
+        outcome = "returned normally"
+    except SystemExit as exc:
+        outcome = f"SystemExit:{str(exc)[:60]}"
+    except AttributeError:
+        outcome = "AttributeError"
+check(
+    "undecodable stderr on a failed gh call does not raise AttributeError",
+    outcome.startswith("SystemExit:"),
+)
+
+recorded = {}
+
+
+class _Ok:
+    returncode = 0
+    stdout = '{"data": {"repository": {"pullRequests": {"nodes": []}}}}'
+    stderr = ""
+
+
+def _rec(cmd, **kwargs):
+    recorded.update(kwargs)
+    return _Ok()
+
+
+with patch.object(pr_sweep.subprocess, "run", _rec):
+    pr_sweep.fetch("owner/name", 10)
+check("fetch decodes gh output as UTF-8 explicitly",
+      recorded.get("encoding") == "utf-8")
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

@@ -36,11 +36,6 @@ USAGE_EXIT = 2
 MISMATCH_EXIT = 1
 CLEAN_EXIT = 0
 
-# Stand-in for a captured stream that came back None. Both stdout and stderr are
-# exposed to the same Windows reader-thread decode failure, so a diagnostic that
-# reads stderr must not itself crash on it.
-STREAM_UNREADABLE = "<stream could not be read or decoded>"
-
 
 def die(message: str) -> None:
     """Print an error message to stderr and exit with usage code 2."""
@@ -73,12 +68,19 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
             "This script requires git (and gh when querying pull requests)."
         )
     if res.returncode != 0:
-        # `stderr` is exposed to the same reader-thread decode failure as
-        # `stdout`, so it can be None here. Substituting rather than dying,
-        # because the command ALREADY failed and that is the news: crashing on
-        # the diagnostic would replace a real error with an AttributeError.
-        stderr = res.stderr if res.stderr is not None else STREAM_UNREADABLE
-        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {stderr.strip()}")
+        # See the long note in `check-pr-fully-clean.py`'s `run_cmd`. A non-zero
+        # exit with readable stderr is a fact about the command; a non-zero exit
+        # whose stderr could not be decoded is an environment failure, and only
+        # `die` (SystemExit, so it escapes the broad `except Exception` in
+        # `verify_pr_body_figures`) keeps it from being reported as UNVERIFIED
+        # and exiting 0.
+        if res.stderr is None:
+            die(
+                f"Command failed ({' '.join(cmd)}) and its stderr could not be "
+                "read or decoded, so the reason is unavailable. This is an "
+                "environment failure, not a finding about the PR."
+            )
+        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr.strip()}")
     if res.stdout is None:
         die(
             f"Command produced no capturable stdout ({' '.join(cmd)}); "

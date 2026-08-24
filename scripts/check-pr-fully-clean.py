@@ -54,11 +54,6 @@ if hasattr(sys.stdout, "reconfigure"):
 # reason.
 USAGE_EXIT = 2
 
-# Stand-in for a captured stream that came back None. Both stdout and stderr are
-# exposed to the same Windows reader-thread decode failure, so a diagnostic that
-# reads stderr must not itself crash on it, nor silently print "None".
-STREAM_UNREADABLE = "<stream could not be read or decoded>"
-
 
 def die(message: str) -> None:
     print(message, file=sys.stderr)
@@ -107,12 +102,26 @@ def run_cmd(cmd: List[str]) -> str:
         )
     if res.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as
-        # `stdout`, so it can be None here. This line does not call `.strip()`,
-        # so it never crashed -- it would just interpolate the literal "None"
-        # and report an empty reason for the failure, which is the same defect
-        # in quieter clothes. Named explicitly instead.
-        stderr = res.stderr if res.stderr is not None else STREAM_UNREADABLE
-        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {stderr}")
+        # `stdout`, so it can be None here even though the exit code arrived.
+        #
+        # Splitting the two cases rather than substituting a placeholder for
+        # both. A non-zero exit WITH readable stderr is a fact about the command
+        # -- a 404 on a deleted run, say -- and `_resolve_run_head_sha` is
+        # entitled to catch that RuntimeError and degrade to "cannot resolve the
+        # SHA". A non-zero exit with an UNREADABLE stderr is an environment
+        # failure, and routing it through RuntimeError would let that same catch
+        # launder it into "No review comment has been posted evaluating HEAD
+        # SHA ..." -- exit 1 with a finding bullet, which is the laundering this
+        # whole change exists to close. `die` exits 2 and raises SystemExit,
+        # which derives from BaseException and so escapes both that catch and
+        # the broad `except Exception` wrappers elsewhere.
+        if res.stderr is None:
+            die(
+                f"Command failed ({' '.join(cmd)}) and its stderr could not be "
+                "read or decoded, so the reason is unavailable. This is an "
+                "environment failure, not a verdict about the PR."
+            )
+        raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr.strip()}")
     if res.stdout is None:
         # Defence in depth for the reader-thread failure described above, and
         # for any future cause of it.

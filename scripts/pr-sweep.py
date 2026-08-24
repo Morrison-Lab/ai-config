@@ -55,11 +55,6 @@ from datetime import datetime, timezone
 # enough to catch the 73-minute and 26-minute gaps that motivated this
 # script. A parameter rather than a literal, per
 # `shared/coding/configurable-parameters.md`.
-# Stand-in for a captured stream that came back None. Both stdout and stderr are
-# exposed to the same Windows reader-thread decode failure, so a diagnostic that
-# reads stderr must not itself crash on it.
-STREAM_UNREADABLE = "<stream could not be read or decoded>"
-
 DEFAULT_STALE_MINUTES = 30
 
 # Maximum number of changed file paths to show individually in text output.
@@ -347,13 +342,20 @@ def fetch(repo, limit):
     )
     if proc.returncode != 0:
         # `stderr` is exposed to the same reader-thread decode failure as
-        # `stdout`, so it can be None here. Substituting rather than dying,
-        # because the command ALREADY failed and that is the news: crashing on
-        # the diagnostic would replace a real error with an AttributeError.
-        stderr = proc.stderr if proc.stderr is not None else STREAM_UNREADABLE
+        # `stdout`, so it can be None here. See the long note in
+        # `check-pr-fully-clean.py`'s `run_cmd`. Both branches already exit
+        # rather than raising a catchable error, so the split is only about
+        # saying which kind of failure it was.
+        if proc.stderr is None:
+            raise SystemExit(
+                f"pr-sweep: gh failed for {repo} (exit {proc.returncode}) and "
+                "its stderr could not be read or decoded, so the reason is "
+                "unavailable. This is an environment failure, not an empty "
+                "sweep."
+            )
         raise SystemExit(
             f"pr-sweep: gh failed for {repo} (exit {proc.returncode}): "
-            f"{stderr.strip()}"
+            f"{proc.stderr.strip()}"
         )
     if proc.stdout is None:
         raise SystemExit(

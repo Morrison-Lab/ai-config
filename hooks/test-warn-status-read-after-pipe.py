@@ -687,13 +687,23 @@ if mutant is not None:
 # correctly silent, and the natural response --- "fix" the guard until the
 # suite is green --- would install a real false positive.
 #
-# Two things keep the shipped set sound. `grep -q zzz /dev/null` is the
-# producer throughout: it exits 1, reads no input, and cannot SIGPIPE, so
-# nothing but `pipefail` moves the answer. And no case places a pipeline on
-# the left of a `&&` that gates the read.
+# What keeps the shipped set sound: `grep -q zzz /dev/null` is the producer
+# throughout --- it exits 1, reads no input, and cannot SIGPIPE, so nothing
+# but `pipefail` moves the answer.
+#
+# ONE shipped case does gate its read on a pipeline via `&&`:
+# `{PRODUCER} | cat && echo $?`. Under `pipefail` its guarded run prints
+# nothing (the `&&` short-circuits), so its "moved" verdict arrives through
+# control flow --- and it still scores correctly, because the read, when
+# reached, genuinely holds the pipeline's status, so oracle and guard
+# coincide. That coincidence is a property of THIS case, not of the shape:
+# `cmd | cat && true; echo $?` would read as a misread here while the guard
+# is correctly silent, since `$?` there is `true`'s.
 #
 # ADD A CASE ONLY IF: the read is reached unconditionally, and the only thing
-# `pipefail` can change is the value `$?` holds.
+# `pipefail` can change is the value `$?` holds. The `&&` case above predates
+# this rule and is kept because its two verdicts provably coincide; do not
+# add another gated case on its precedent.
 #
 # EXCEPTIONS are the guard's known limits, listed with the direction of each.
 # The point of naming them here rather than omitting the cases is that the

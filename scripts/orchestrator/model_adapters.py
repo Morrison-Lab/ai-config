@@ -713,7 +713,10 @@ class ModelRouter:
         is_confidential: bool = False,
         prior_author_model: Optional[str] = None,
     ) -> tuple[BaseModelAdapter, str]:
-        """Select best available adapter and model string for a given task requirement."""
+        """Select best available adapter and model string for a given task requirement,
+
+        prioritizing free and local models where feasible.
+        """
         # 1. Strict local confidentiality -> Ollama local model only
         if is_confidential:
             ollama = self.adapters[ModelProvider.OLLAMA]
@@ -722,41 +725,46 @@ class ModelRouter:
             # Fallback to mock if offline
             return self.adapters[ModelProvider.MOCK], "local-mock"
 
-        # 2. Adversarial Review -> Must use a different model family than author
+        # 2. Adversarial Review -> Must use a different model family than author,
+        # preferring local/free reviewers first.
         if tier == TaskTier.ADVERSARIAL_REVIEW:
             if prior_author_model and "claude" in prior_author_model.lower():
-                # Must not use Claude for review
-                if self.adapters[ModelProvider.OPENROUTER].is_available():
-                    return self.adapters[ModelProvider.OPENROUTER], "deepseek/deepseek-r1"
-                if self.adapters[ModelProvider.OPENCODE].is_available():
-                    return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+                # Must not use Claude for review; prioritize free/local
                 if self.adapters[ModelProvider.OLLAMA].is_available():
                     return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+                if self.adapters[ModelProvider.OPENCODE].is_available():
+                    return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+                if self.adapters[ModelProvider.OPENROUTER].is_available():
+                    return self.adapters[ModelProvider.OPENROUTER], "deepseek/deepseek-r1"
                 if self.adapters[ModelProvider.AGY].is_available():
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
             else:
-                # Review with Claude or OpenRouter
+                # Review with free/local first if independent, else Claude/OpenRouter
+                if self.adapters[ModelProvider.OPENCODE].is_available():
+                    return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
                 if self.adapters[ModelProvider.CLAUDE].is_available():
                     return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
                 if self.adapters[ModelProvider.OPENROUTER].is_available():
                     return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
 
-        # 3. Local Fast (bounded checks, formatting, link checks)
+        # 3. Local Fast (bounded checks, formatting, link checks) -> Local Ollama / Free
         if tier == TaskTier.LOCAL_FAST:
             if self.adapters[ModelProvider.OLLAMA].is_available():
                 return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
             if self.adapters[ModelProvider.OPENCODE].is_available():
                 return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
 
-        # 4. Free Hosted (survey, triage, broad sweep)
+        # 4. Free Hosted (survey, triage, broad sweep) -> Opencode free / Ollama
         if tier == TaskTier.FREE_HOSTED:
             if self.adapters[ModelProvider.OPENCODE].is_available():
                 return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+            if self.adapters[ModelProvider.OLLAMA].is_available():
+                return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "openrouter/free"
 
-        # 5. Frontier / Heavy (architecture, deep logic, coordination)
+        # 5. Frontier / Heavy (architecture, deep logic, coordination) -> Frontier models
         if tier == TaskTier.FRONTIER_HEAVY:
             if self.adapters[ModelProvider.CLAUDE].is_available():
                 return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
@@ -765,10 +773,14 @@ class ModelRouter:
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
 
-        # Default standard fallback
-        if self.adapters[ModelProvider.CLAUDE].is_available():
-            return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
+        # 6. Standard Code Tasks -> Prioritize local zero-cost Ollama, then free pools, then Claude CLI
         if self.adapters[ModelProvider.OLLAMA].is_available():
             return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
+        if self.adapters[ModelProvider.OPENCODE].is_available():
+            return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
+        if self.adapters[ModelProvider.CURSOR].is_available():
+            return self.adapters[ModelProvider.CURSOR], "cursor-agent"
+        if self.adapters[ModelProvider.CLAUDE].is_available():
+            return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
 
         return self.adapters[ModelProvider.MOCK], "mock-standard"

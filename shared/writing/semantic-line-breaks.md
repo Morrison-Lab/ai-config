@@ -266,6 +266,67 @@ The rejoin was reproduced directly rather than inferred: calling `reformat()`
 on `"...or agents.\nopencode instead reads..."` returns the two lines joined
 into one.)
 
+**The durable fix at such a boundary is to break the line AND give the opener a
+form both tools recognize.**
+The pair above ends on a prohibition, which holds only for as long as everyone
+remembers it.
+Choosing the opener retires the prohibition instead, so the break stops
+depending on a habit.
+
+The two tools recognize overlapping but unequal sets of openers.
+The reformatter carries only `_SENT_BREAK_RE`, whose lookahead class is
+``[A-Z"'`*\[]``.
+The gate carries that same branch plus `_SENT_BREAK_LOWER_RE`.
+Three cases fall out, and only the first is safe.
+
+- **An opener in that lookahead class** --- a capital letter, a backtick, an
+  asterisk, an opening bracket, or either quote --- is a boundary both tools
+  see.
+  The gate flags the unbroken line, and the reformatter leaves the break alone.
+- **A lowercase opener** is the trap the section above documents.
+  The gate flags it on its lower branch, and the reformatter rejoins the break.
+- **An opener in neither class**, such as a digit or an opening parenthesis, is
+  seen by neither.
+  The gate passes the unbroken two-sentence line, and the reformatter still
+  rejoins a break made there.
+
+The third case is the one worth naming, because both instruments go quiet at
+once.
+Nothing reports the violation and nothing preserves the fix, so a line packing
+two sentences survives every check this section describes.
+Choose an opener from the first case rather than leaving the gate to catch the
+mistake.
+
+Bold and a bracketed link both qualify and are ordinary in this corpus, so the
+edit is often free.
+`gha's README names ...` can become `` `gha`'s README names ... ``, which keeps
+the possessive, or `The gha README names ...`, which drops it.
+
+- **Do:** break at the period, then start the next line with a capital letter or
+  with markup --- a backtick, bold, or a link.
+- **Do:** confirm the break survived by re-running the reformatter and checking
+  that the two sentences still land on separate output lines, since its preview
+  is non-empty either way.
+- **Don't:** rely on the gate to catch an unbroken two-sentence line --- it is
+  silent when the second sentence opens with a digit or a parenthesis.
+- **Don't:** leave a bare break behind a lowercase opener as the finished fix,
+  since a `--write` run rejoins it while the paragraph is still in scope.
+
+(Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` and this repo's
+`scripts/semantic-line-breaks.py`.
+`classify_line` returns `sentence` for the unbroken line under a lowercase
+opener and under all six forms in the lookahead class, and `None` under a digit
+or an opening parenthesis.
+Calling `reformat()` on the broken pair rejoins it under a lowercase, digit, or
+parenthesis opener, and leaves it alone under all six of the class's forms.
+The case is
+[ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127), where
+`shared/workflow/upgrade-to-gha.md:64` at `7f352648` was flagged
+`Line packs more than one sentence`, and the fix at `7f352648` -> `d70465f5`
+both broke the line and reworded the opener to `The gha README names`.
+That file has since moved on, so read both line numbers against `7f352648`
+rather than against the current tree.)
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",
@@ -286,6 +347,52 @@ no base at all, reports a clean exit over a diff it never looked at.
 The local run does this when pointed at the wrong base ref.
 The push-triggered CI job does it unconditionally, as the section above
 records.
+
+**Reading that output means reading its summary count, because one failure's
+findings mix both rules.**
+A failing job prints one `##[error]` per finding and then a total, and the two
+rules interleave freely in that list.
+So a count of the annotations carrying one rule's wording under-reads the
+failure, and the shortfall invites a hunt for a finding the log never withheld.
+Take the size of the failure from the summary line, which states the total the
+job actually found, and read the findings under both wordings.
+
+Two details make the annotations easy to miscount.
+A finding's quoted line is elided only past 80 characters of the raw line, so a
+long line ends in a trailing `...` while a short one is quoted whole.
+The runner then adds an `##[error]` of its own reading
+`Process completed with exit code 1.`, so the annotation count sits one above
+the finding count.
+
+[`github-actions`](../../memories/github-actions.md) records a second way to
+under-read the same list, from the other end: a `grep -v` on `##[` strips the
+annotation lines, leaving the summary total with no findings beneath it.
+Both leave a reader reasoning about findings they never read.
+
+- **Do:** take a line-break failure's size from its `N line(s) need a semantic
+  break` summary line rather than from a count of matching annotations.
+- **Do:** search the annotations for both `mid-line semicolon` and
+  `packs more than one sentence`.
+- **Don't:** read a trailing `...` as a truncated list --- it elides one
+  finding's quoted line, and a short finding carries no ellipsis at all.
+- **Don't:** treat a count of one rule's annotations as the failure's total.
+
+(Measured 2026-08-24 on run
+[32751350901](https://github.com/Morrison-Lab/ai-config/actions/runs/32751350901),
+which printed 9 findings under a summary reading
+`9 line(s) need a semantic break`, 7 from the clause rule and 2 from the
+sentence rule, plus the runner's own tenth annotation.
+A hand-rolled sweep of the same diff for a long line carrying a semicolon
+returned 8 rather than 7, and the extra one was its own false positive:
+`shared/workflow/upgrade-to-gha.md:62` at `7f352648` is 144 characters raw and
+73 once
+`strip_inline_markup` removes its code spans and link targets, so it sits below
+`NLB_CLAUSE_MIN_LENGTH` and `classify_line` returns `None`.
+The two thresholds are separate measurements that happen to share a number: the
+elision above counts the raw line, while `NLB_CLAUSE_MIN_LENGTH` counts the
+stripped text and is inclusive at 80.
+Measuring the raw line rather than the stripped one is one way a hand-rolled
+matcher disagrees with the gate.)
 
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**
 `NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a
@@ -315,7 +422,12 @@ setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
 against a passing job's own log, which prints every `NLB_*` value it used).
 The practical consequence is worth stating in the safe direction: the clause
 check that catches a long line with a mid-line semicolon **is** on by default
-locally, so a local run cannot silently under-report that case.
+locally, so a local run **of `check-new-line-breaks.py`** cannot silently
+under-report that case.
+Naming the script matters only when this sentence is read out of its
+subsection, where "a local run" could otherwise be taken for
+`scripts/semantic-line-breaks.py` --- which has no semicolon rule, per "This
+repo's own reformatter is not that check" above.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

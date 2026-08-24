@@ -317,8 +317,8 @@ Compare remote-tracking refs to see if `main` has moved ahead of the branch:
 git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main
 ```
 
-- `0` — up to date with main.
-- `>0` — behind main by that many commits (offer `sync-pr-branch`).
+- `0` -- up to date with main.
+- `>0` -- behind main by that many commits (offer `sync-pr-branch`).
 
 ## Output
 
@@ -339,8 +339,8 @@ Render a **Review Summary Table** for the PR:
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
-  When AI review is clean but CI is failing or pending, display `— (CI in progress / failing)`.
-  When AI review is in-flight or unclean, display `— (AI review in progress)`.
+  When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
+  When AI review is in-flight or unclean, display `- (AI review in progress)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).

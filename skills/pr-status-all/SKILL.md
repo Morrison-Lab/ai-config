@@ -131,13 +131,14 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    An affirmative zero-findings read across every matched review means a genuine external verdict at the head.
 >    Findings in any of them mean `N open`.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending`.
-> 4. **Reviewers Requested & Author Awareness** -- check `.author.login` and `.reviewRequests`.
+> 4. **Reviewers Requested & Author Awareness** -- check `.author.login`, `.reviewRequests`, and human review status.
+>    - If human review has requested changes, report `❌ Changes requested by <login>`.
 >    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.
 >    - If AI review is clean/approved and CI is green:
 >      - If human reviewer is requested (e.g. `d-morrison`), report `d-morrison`.
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
->    - If AI review is clean/approved but CI is failing or pending, report `— (CI in progress / failing)`.
->    - If AI review is still in-flight or unclean, report `— (AI review in progress)`.
+>    - If AI review is clean/approved but CI is failing or pending, report `- (CI in progress / failing)`.
+>    - If AI review is still in-flight or unclean, report `- (AI review in progress)`.
 > 5. **Unresolved threads** -- count open inline review threads (`READ_PR_REVIEW_COMMENTS`).
 >    ```bash
 >    gh api graphql -f query='query {
@@ -166,7 +167,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
 >    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
@@ -189,8 +190,8 @@ A Markdown table, one row per open PR, with these columns:
 | [#101](url) | `d-morrison` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
 | [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 | [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
-| [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | — (AI review in progress) | Drive to clean (ARDI) |
-| [#105](url) (Draft) | `external-dev` | — | ⏳ Pending | — | Draft (Work in progress) |
+| [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
+| [#105](url) (Draft) | `external-dev` | - | ⏳ Pending | - | Draft (Work in progress) |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`, appended with `(Draft)` if `isDraft` is true.
 - **Author** --- author login.
@@ -203,8 +204,8 @@ A Markdown table, one row per open PR, with these columns:
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
-  When AI review is clean but CI is failing or pending, display `— (CI in progress / failing)`.
-  When AI review is in-flight or unclean, display `— (AI review in progress)`.
+  When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
+  When AI review is in-flight or unclean, display `- (AI review in progress)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).

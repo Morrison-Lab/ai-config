@@ -1,8 +1,8 @@
 # WSL platform quirks
 
-Satellite of `tools.md`, split at the 1200-line gate. Platform-level quirks of
-running agent tooling from WSL on this machine; per-tool entries stay in
-`tools.md` unless they are about the WSL layer itself.
+Satellite of `tools.md`, split at the 1200-line gate.
+Covers platform-level quirks of running agent tooling from WSL on this machine.
+Per-tool entries stay in `tools.md` unless they are about the WSL layer itself.
 
 ## On WSL, `npx` resolves to the Windows node and cannot see the checkout
 

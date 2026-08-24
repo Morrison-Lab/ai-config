@@ -87,7 +87,8 @@ In every session --- at session start, and again periodically during long sessio
 
 ## Verify changes before pushing
 
-No compiled app gates this repo; CI ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)) and pre-commit run the checks directly:
+No compiled app gates this repo.
+CI ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)) and pre-commit run the checks directly:
 
 ```sh
 python3 scripts/validate-skills.py    # SKILL.md frontmatter, codex-skills/ sync, manifests
@@ -125,7 +126,8 @@ Never activate a hook before its PR merges: writing and testing the script is au
 ## Context budget
 
 `CLAUDE.md` plus the transitive closure of its `@path` imports loads in full at every session start.
-The root file's character cap and a per-fragment cap gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR; prefer an on-demand memory file under `memories/`.
+The root file's character cap and a per-fragment cap gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR.
+Prefer an on-demand memory file under `memories/`.
 
 ## Worktree isolation
 
@@ -244,7 +246,8 @@ below).
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps --- committing to a branch, pushing, opening or updating PRs against Morrison-Lab repositories, running non-destructive Git and API reads, and editing the shared agent-config memory in this repo.
-Proceed with reasonable non-destructive steps and report them afterwards in the past tense; ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
+Proceed with reasonable non-destructive steps and report them afterwards in the past tense.
+Ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.
 This grants no merge authority: the strict merge policy below still applies.
 
 (User directive, 2026-08-23: "always yes".)

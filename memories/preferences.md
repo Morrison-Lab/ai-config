@@ -980,7 +980,7 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | Antigravity --- **retired, out of service** | none, and none is wanted --- the mechanics below are history |
+| `agy` (Google Antigravity) | Antigravity API --- **retired, out of service (interactive unaffected)** | none, and none is wanted --- the mechanics below are history |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.

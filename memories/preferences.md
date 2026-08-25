@@ -1193,6 +1193,7 @@ safer/preferred choice merely because the repo has external consumers.
     Only purge them from prose and generic placeholder flags.
 
 - **When reverting a merge, immediately reopen the corresponding issue(s).**
-  If you revert a PR or merge commit that previously closed one or more tracked issues, the bug or feature request is no longer solved on `main`. You must immediately locate the issues that were closed by the reverted merge and reopen them so the work is tracked again.
+  If you revert a PR or merge commit that previously closed one or more tracked issues, the bug or feature request is no longer solved on `main`.
+  You must immediately locate the issues that were closed by the reverted merge and reopen them so the work is tracked again.
   - **Do:** reopen the issues that were closed by the reverted merge.
   - **Don't:** leave issues closed when the fix that closed them has been reverted from `main`.

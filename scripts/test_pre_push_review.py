@@ -439,7 +439,7 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch.object(reviewer, "get_pr_head_sha")
-    def test_post_review_differing_head_sha_posts_comment(self, mock_get_sha, mock_subproc):
+    def test_post_review_differing_head_sha_fails_closed(self, mock_get_sha, mock_subproc):
         mock_get_sha.return_value = "remote_sha_9999"
         mock_res = MagicMock()
         mock_res.returncode = 0
@@ -451,15 +451,12 @@ class TestPrePushReview(unittest.TestCase):
             engine_name="OpenAI Codex",
             commit_sha="local_sha_1111",
         )
-        self.assertTrue(res)
-        # Verify gh pr comment was called, NOT gh pr review
-        cmd_called = mock_subproc.call_args[0][0]
-        self.assertIn("comment", cmd_called)
-        self.assertNotIn("review", cmd_called)
+        self.assertFalse(res)
+        mock_subproc.assert_not_called()
 
     @patch("subprocess.run")
     @patch.object(reviewer, "get_pr_head_sha")
-    def test_post_review_unresolved_remote_sha_posts_comment(self, mock_get_sha, mock_subproc):
+    def test_post_review_unresolved_remote_sha_fails_closed(self, mock_get_sha, mock_subproc):
         mock_get_sha.return_value = None  # Failed to fetch remote PR head SHA
         mock_res = MagicMock()
         mock_res.returncode = 0
@@ -471,15 +468,17 @@ class TestPrePushReview(unittest.TestCase):
             engine_name="OpenAI Codex",
             commit_sha="local_sha_1111",
         )
-        self.assertTrue(res)
-        # Verify gh pr comment was called, NOT gh pr review
-        cmd_called = mock_subproc.call_args[0][0]
-        self.assertIn("comment", cmd_called)
-        self.assertNotIn("review", cmd_called)
+        self.assertFalse(res)
+        mock_subproc.assert_not_called()
 
+    @patch("tempfile.NamedTemporaryFile")
     @patch("subprocess.run")
     @patch("shutil.which")
-    def test_runner_model_forwarding(self, mock_which, mock_subproc):
+    def test_runner_model_forwarding(self, mock_which, mock_subproc, mock_tf):
+        mock_file = MagicMock()
+        mock_file.name = "/tmp/mockfile"
+        mock_tf.return_value.__enter__.return_value = mock_file
+
         mock_which.return_value = "/opt/homebrew/bin/codex"
         valid_report = (
             "### Summary Verdict\nVerdict: Ready for merge\n\n"

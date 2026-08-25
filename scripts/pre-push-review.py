@@ -163,11 +163,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
         ("Critical Findings", ["### Critical Findings", "## Critical Findings"]),
-        ("Observations", ["### Observations", "## Observations"]),
-        ("Verification Steps", ["### Verification Steps", "## Verification Steps", "### Verification", "## Verification"]),
+        ("Observations", ["\n### Observations", "\n## Observations"]),
+        ("Verification Steps", ["\n### Verification Steps", "\n## Verification Steps", "\n### Verification", "\n## Verification"]),
     ]
     for section_name, patterns in required_sections:
-        if not any(pat in unfenced_report for pat in patterns):
+        if not any(pat in ("\n" + unfenced_report) for pat in patterns):
             return False, False, f"Missing required section: {section_name}"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
@@ -511,6 +511,17 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 
     if engine in ["alternate", "round-robin"]:
         available = detect_available_engines()
+        invoker = ""
+        if os.environ.get("CLAUDE_SESSION_ID"):
+            invoker = "claude"
+        elif os.environ.get("GEMINI_SESSION_ID") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
+            invoker = "antigravity"
+        elif "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
+            invoker = "cursor"
+
+        if invoker in available and len(available) > 1:
+            available.remove(invoker)
+
         if not available:
             log_error("No supported AI CLI found.")
             return None, "None"
@@ -572,13 +583,13 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
     remote_sha = get_pr_head_sha(pr_number)
-    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, note it
+    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, fail closed.
     if not remote_sha or (commit_sha and commit_sha != remote_sha):
-        print(
-            f"Notice: Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
-            f"({remote_sha[:8] if remote_sha else 'unresolved'}).",
-            file=sys.stderr,
+        log_error(
+            f"Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
+            f"({remote_sha[:8] if remote_sha else 'unresolved'}). Refusing to post verdict to the wrong revision."
         )
+        return False
 
     res_comment = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
@@ -646,12 +657,12 @@ def main():
     parser.add_argument(
         "--engine",
         choices=[
-            "auto", "alternate", "round-robin", "claude", "codex", "dtc",
+            "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
             "opencode", "dto", "opencode-claude", "opencode-zen", "ollama",
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",
@@ -678,13 +689,13 @@ def main():
 
     git_root = get_git_root()
     pr_num = args.pr or get_current_pr()
-    
+
     initial_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
     ).stdout.strip()
-    
+
     diff, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
     if not diff.strip():
@@ -695,13 +706,13 @@ def main():
     full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
 
     report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head)
-    
+
     current_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
     ).stdout.strip()
-    
+
     if current_head != initial_head:
         log_error(f"HEAD moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
         sys.exit(1)

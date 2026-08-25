@@ -67,11 +67,13 @@ def main() -> int:
 
     clean_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
+        "author": {"login": "github-actions"},
         "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nEverything looks great! No issues found.\n\nReviewed HEAD sha123.\n\nVerdict: Clean / Ready for merge."
     }
 
     findings_comment = {
         "createdAt": "2026-08-05T18:14:37Z",
+        "author": {"login": "github-actions"},
         "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nReviewed HEAD sha123.\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
     }
 
@@ -84,6 +86,7 @@ def main() -> int:
 
     no_major_changes_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
+        "author": {"login": "github-actions"},
         "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\nNo major changes requested. Everything looks clean and ready for merge."
     }
 
@@ -263,6 +266,34 @@ def main() -> int:
             (not sp_ok) and any("No automated review" in i for i in sp_issues),
         )
 
+    # Regression (PR #2180 round 6): comment with author: None (deleted account) cannot spoof review
+    spoofed_null_author_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "author": None,
+    }
+    mock_null_author = json.dumps({"comments": [spoofed_null_author_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_null_author):
+        null_ok, null_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "null-author comment with marker and HEAD SHA does not satisfy review admission",
+            (not null_ok) and any("No automated review" in i for i in null_issues),
+        )
+
+    # Regression (PR #2180 round 6): author with null login {"author": {"login": None}} does not crash _is_bot_author
+    spoofed_null_login_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "author": {"login": None},
+    }
+    mock_null_login = json.dumps({"comments": [spoofed_null_login_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_null_login):
+        nlog_ok, nlog_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "author with null login does not crash and does not satisfy review admission",
+            (not nlog_ok) and any("No automated review" in i for i in nlog_issues),
+        )
+
     # Regression (PR #2180 round 5): bot review with negated rejection phrased as
     # "not approved" fails check_review_comments as not-clean.
     negated_rejection_comment = {
@@ -289,6 +320,7 @@ def main() -> int:
     # #1160: clean verdict quoting `**Location:**` inside an inline code span.
     location_codespan_clean = {
         "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -307,6 +339,7 @@ def main() -> int:
     # #1167: clean verdict discussing "Needs more work" in double quotes.
     needs_work_quoted_clean = {
         "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -327,6 +360,7 @@ def main() -> int:
     # vocabulary only, not genuine (unquoted, uncode-spanned) finding labels.
     location_real_finding = {
         "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -347,6 +381,7 @@ def main() -> int:
     # it cannot silently hide a real finding (the unsafe direction).
     quoted_real_finding = {
         "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### 🤖 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -365,6 +400,7 @@ def main() -> int:
     # ensuring a genuine finding after an unclosed code block is still detected.
     unclosed_fence_finding = {
         "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -794,6 +830,7 @@ def main() -> int:
     # cannot go vacuous if a future edit makes some other check fail instead.
     needs_work_earlier_sha = {
         "createdAt": "2026-08-07T21:56:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD oldsha0.\n\n"
@@ -802,6 +839,7 @@ def main() -> int:
     }
     verification_no_verdict_at_head = {
         "createdAt": "2026-08-07T23:05:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -831,6 +869,7 @@ def main() -> int:
     # at HEAD. If this fails, the check is over-blocking every iterated PR.
     clean_verdict_at_head = {
         "createdAt": "2026-08-07T23:05:00Z",
+        "author": {"login": "github-actions"},
         "body": (
             "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
             "Reviewed HEAD sha123.\n\n"
@@ -854,6 +893,7 @@ def main() -> int:
     mock_out_of_order = json.dumps({
         "comments": [clean_verdict_at_head, {
             "createdAt": "2026-08-07T23:30:00Z",
+            "author": {"login": "github-actions"},
             "body": "### \ud83e\udd16 Report\n\nReviewed HEAD sha123.\n\nVerdict: Needs more work.",
         }],
         "reviews": [],
@@ -875,6 +915,7 @@ def main() -> int:
     # real input".
     real_round1 = {
         "createdAt": "2026-08-07T21:56:09Z",
+        "author": {"login": "github-actions"},
         "body": (
             "**Claude finished** --- adversarial review of the whole diff.\n\n"
             "### Verdict\n\n**Needs more work** --- 8 findings below."
@@ -882,6 +923,7 @@ def main() -> int:
     }
     real_round2 = {
         "createdAt": "2026-08-07T22:49:12Z",
+        "author": {"login": "github-actions"},
         "body": (
             "**Round-2 verification** --- adversarial re-check of all eight findings.\n\n"
             "### Verdict\n\n**Needs more work** --- the two items above are the only "
@@ -890,6 +932,7 @@ def main() -> int:
     }
     real_round3_no_verdict = {
         "createdAt": "2026-08-07T23:05:32Z",
+        "author": {"login": "github-actions"},
         "body": (
             "## Round 3 --- two corrections, three new learnings\n\n"
             "Head is now sha123.\n\n"

@@ -205,11 +205,14 @@ def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
     return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
-def _is_bot_author(login: str) -> bool:
+def _is_bot_author(login: Optional[str]) -> bool:
     """Return True if *login* belongs to an automated review bot."""
+    login_str = str(login or "")
+    if not login_str:
+        return False
     return (
-        login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-        or login.endswith("[bot]")
+        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        or login_str.endswith("[bot]")
     )
 
 
@@ -842,20 +845,14 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             continue
 
         is_bot_author = _is_bot_author(author_login)
-        is_human_author = bool(author_login and not is_bot_author)
-        # "**claude finished" and "### verdict" are the canonical review markers
-        # CLAUDE.md prescribes ("Completed runs start the body with
-        # `**Claude finished`").
-        is_review_header = has_review_body_marker(body)
         verdict = classify_verdict(body)
 
-        # Automated reviews must be authored by a recognized bot author (or untagged in test fixtures).
-        # Human/passerby comments are admitted only if they state a blocking (not-clean) verdict,
-        # ensuring that non-bot accounts cannot spoof an approved review.
-        if is_human_author:
-            if verdict == "not-clean":
-                all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
-        else:
+        # Automated reviews must be authored by a recognized bot author.
+        # A comment whose author is missing, null, or a non-bot account is admitted
+        # ONLY if it states a blocking (not-clean) verdict -- fail closed.
+        if is_bot_author:
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+        elif verdict == "not-clean":
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
 
     for r in reviews:

@@ -240,7 +240,7 @@ class PRClaimManager:
             r for r in reviews
             if r.get("state") == "APPROVED"
             and (r.get("authorAssociation") in ["OWNER", "MEMBER"]
-                 or (r.get("author") or {}).get("login") in ["claude[bot]", "d-morrison"])
+                 or (r.get("author") or {}).get("login") in ["claude", "claude[bot]", "d-morrison"])
             and (r.get("author") or {}).get("login") not in [pr_author_login, "dem-extra1"]
             and (not head_oid or not (r.get("commit") or {}).get("oid") or (r.get("commit") or {}).get("oid") == head_oid)
         ]
@@ -249,7 +249,7 @@ class PRClaimManager:
         comments = data.get("comments", [])
         claude_reviews = [
             c for c in comments
-            if (c.get("author") or {}).get("login") in ["github-actions", "claude[bot]"]
+            if (c.get("author") or {}).get("login") in ["github-actions", "claude", "claude[bot]"]
             and ("claude finished review" in c.get("body", "").lower()
                  or "**claude finished" in c.get("body", "").lower())
         ]
@@ -279,7 +279,14 @@ class PRClaimManager:
                 "blocked on human review",
                 "changes requested",
                 "not clean",
+                "not approved",
                 "not ready",
+                "not lgtm",
+                "isn't clean",
+                "isn't approved",
+                "isn't ready",
+                "unapproved",
+                "rejected",
                 "impasse",
                 "deadlock",
                 "finding 1 (blocking)",
@@ -291,15 +298,29 @@ class PRClaimManager:
                 if phrase in verdict_section:
                     return False, f"Latest AI review has blocking verdict ('{phrase}')"
 
-            # Require an explicit positive clean / approved verdict signal in the final verdict section
-            positive_verdict_phrases = [
-                r"\bclean\b",
-                r"\bapproved\b",
+            # Check structured clean / approved verdict patterns anchored to the verdict section
+            clean_patterns = [
+                r"^\s*[:\-\s]*(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
+                r"\b(?:verdict[:\s]+)(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
+                r"\bclean\s*/\s*approved\b",
                 r"\bready\s+for\s+merge\b",
-                r"\bready\b",
-                r"\blgtm\b",
             ]
-            if not any(re.search(pat, verdict_section) for pat in positive_verdict_phrases):
+            
+            # Extract non-empty lines from verdict_section
+            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
+            first_verdict_line = verdict_lines[0] if verdict_lines else ""
+
+            has_clean_signal = False
+            for pat in clean_patterns:
+                match = re.search(pat, first_verdict_line, re.IGNORECASE) or re.search(pat, verdict_section, re.IGNORECASE)
+                if match:
+                    # Check that the match is not preceded by a negation prefix in the verdict section
+                    prefix = verdict_section[max(0, match.start() - 30):match.start()]
+                    if not re.search(r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+(?:\w+\s+){0,2}$", prefix, re.IGNORECASE):
+                        has_clean_signal = True
+                        break
+
+            if not has_clean_signal:
                 return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
         return True, "PR is fully clean across CI and review"

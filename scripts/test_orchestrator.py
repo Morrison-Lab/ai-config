@@ -1363,6 +1363,46 @@ This has since been resolved after addressing the finding.
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
+        # 13. Negated verdict phrasing ("This PR is not approved yet") is REJECTED
+        not_approved_body = "**Claude finished** review\n\n### Verdict\n\nThis PR is **not approved** yet, two blocking findings remain."
+        not_approved_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": not_approved_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, not_approved_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
+        # 14. Negated verdict phrasing ("This isn't ready for merge") is REJECTED
+        not_ready_body = "**Claude finished** review\n\n### Verdict\n\nThis isn't ready for merge."
+        not_ready_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": not_ready_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, not_ready_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
+        # 15. Review comment posted by author login 'claude' is accepted
+        claude_login_body = "**Claude finished** review\n\n### Verdict\n\n**Approved** for merge"
+        claude_login_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "claude"}, "body": claude_login_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, claude_login_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

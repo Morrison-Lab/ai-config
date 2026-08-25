@@ -110,8 +110,8 @@ child `bc-61fbadd0`.)
 
 [`.github/workflows/jules-review.yml`](../.github/workflows/jules-review.yml)
 requires `author_association` in OWNER/MEMBER/COLLABORATOR.
-This Cloud session's comments post as `cursor[bot]` / `NONE`, so
-an `@jules review` comment from this session is skipped.
+Comments from a Cursor Cloud run post as `cursor[bot]` / `NONE`, so
+an `@jules review` comment from that identity is skipped.
 
 This is the same class as
 [`self-review-fallback.cases.md`](../shared/workflow/self-review-fallback.cases.md)
@@ -123,8 +123,8 @@ This is the same class as
 
 - **Do:** have a human OWNER/MEMBER/COLLABORATOR post the request
   (the workflow trigger is a trusted comment containing that bot mention).
-- **Don't:** re-post the same request from this Cloud session --- the gate
-  that skipped it skips the retry.
+- **Don't:** re-post the same request from a session whose comments post
+  as `cursor[bot]` / `NONE` --- the gate that skipped it skips the retry.
 
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)

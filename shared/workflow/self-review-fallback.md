@@ -224,8 +224,8 @@ usually an `author_association` allowlist, against a session whose comments post
 2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
 Cursor Cloud comments post as `cursor[bot]` / `NONE`, so `jules-review.yml`'s
 OWNER/MEMBER/COLLABORATOR gate skips the request.
-Do not re-post from that session; a human OWNER/MEMBER/COLLABORATOR comment
-is the unblock
+Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
+a human OWNER/MEMBER/COLLABORATOR comment is the unblock
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 The reviewer completing on somebody else's branch the same day settles that it is up.
 

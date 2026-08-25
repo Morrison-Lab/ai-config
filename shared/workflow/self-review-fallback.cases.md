@@ -41,14 +41,6 @@ repo owner, while comment **writes** landed as `claude[bot]` with
 `author_association: CONTRIBUTOR`.
 All three comment-triggered runs therefore reported `skipped`, not `failure`.
 
-2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
-Cursor Cloud comments post as `cursor[bot]` / `NONE`, so the same
-OWNER/MEMBER/COLLABORATOR allowlist on `jules-review.yml` skipped the
-request.
-Do not re-post from that session; a human OWNER/MEMBER/COLLABORATOR comment
-is the unblock
-(see [`memories/cursor.md`](../../memories/cursor.md)).
-
 Copilot was the one reviewer that was genuinely down --- requested
 successfully, then refused with "unable to review ... reached their quota
 limit" --- which is the case this fragment's fallback already covered, and
@@ -61,6 +53,14 @@ So the PR was reported blocked on an external verdict rather than ready, and
 was not merged, even though `Morrison-Lab/ai-config` carries a standing `mwc`
 grant --- that grant's scope limit is a **fully clean** PR, and a PR one human
 action short of a reachable reviewer is not one.)
+
+2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
+Cursor Cloud comments post as `cursor[bot]` / `NONE`, so the same
+OWNER/MEMBER/COLLABORATOR allowlist on `jules-review.yml` skipped the
+request.
+Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
+a human OWNER/MEMBER/COLLABORATOR comment is the unblock
+(see [`memories/cursor.md`](../../memories/cursor.md)).
 
 ## The stub-retry skipped on a sentinel denial count
 

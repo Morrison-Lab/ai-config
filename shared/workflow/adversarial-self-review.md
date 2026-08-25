@@ -113,7 +113,7 @@ A foreground `task_v2` named `adversarial-reviewer` (`bc-61fbadd0`) ran on
 `f71c02ea`.
 The posted comment was author-assembled via ManagePullRequest, labeled
 "Fallback self-review", and mixed a paraphrased
-`### Verdict: Ready for merge` with a 15-item
+`### Verdict: Ready for merge` with a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
 The parent `tool_result` held only `{agentId, cloudAgentBcId}` --- no review
 text.

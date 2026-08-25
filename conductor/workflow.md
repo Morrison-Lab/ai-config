@@ -416,15 +416,18 @@ A task is complete when:
 -   [ ] Database migrations ready
 -   [ ] Backup created
 
-### Deployment Steps
+### Deployment & Merge Steps
 
-1.  Merge feature branch to main
-2.  Tag release with version
-3.  Push to deployment service
-4.  Run database migrations
-5.  Verify deployment
-6.  Test critical paths
-7.  Monitor for errors
+> [!IMPORTANT]
+> **Strict Merge Control Policy (`AGENTS.md`):**
+> NEVER merge any Pull Request or feature branch to `main` without explicit user permission (e.g. `/mwc`, `/maw`, `/merge-it`).
+> Driving CI and review to clean does NOT grant merge authority.
+
+1.  Verify PR is fully clean across CI and adversarial review.
+2.  Obtain explicit user merge permission (`/mwc` / `/maw` / `/merge-it`).
+3.  Merge feature branch to `main`.
+4.  Tag release with version if applicable.
+5.  Verify post-merge state and cleanup worktrees.
 
 ### Post-Deployment
 

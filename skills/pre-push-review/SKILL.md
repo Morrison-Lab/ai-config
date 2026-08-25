@@ -58,5 +58,3 @@ Once clean, proceed with standard push guards.
   Run `pre-push-review` to inspect code quality, then `push` to safely push commits.
 - **`delegate-to-codex`** --- General offloading of heavy analysis tasks to Codex CLI.
 - **`ardi`** --- PR-level review iteration in GitHub Actions.
-
-

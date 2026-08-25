@@ -26,11 +26,11 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
 - Strict clean execution under repository validation linters and link checkers.
 
 ## Acceptance Criteria
-- [ ] `scripts/pre-push-review.py` handles auto-detection, fallback, and all engine modes cleanly.
-- [ ] PR posting includes standardized forge disclosure without robot emojis.
-- [ ] `scripts/test_pre_push_review.py` passes all unit tests.
-- [ ] `python3 scripts/validate-skills.py` and `python3 scripts/check-links.py` pass without errors.
-- [ ] Skill wrappers in `codex-skills/` are fully in sync.
+- [x] `scripts/pre-push-review.py` handles auto-detection, fallback, and all engine modes cleanly.
+- [x] PR posting includes standardized forge disclosure without robot emojis.
+- [x] `scripts/test_pre_push_review.py` passes all unit tests.
+- [x] `python3 scripts/validate-skills.py` and `python3 scripts/check-links.py` pass without errors.
+- [x] Skill wrappers in `codex-skills/` are fully in sync.
 
 ## Out of Scope
 - Automatic git pre-push hook installation (this is an on-demand skill/tool).

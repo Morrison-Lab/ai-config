@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Run local AI code review using desktop subscription quota (Antigravity / Claude / Codex).
+"""Run local AI code review using desktop subscription quota (Antigravity / Claude / Codex / OpenCode).
 
-Can run pre-push locally or post review comments/verdicts directly to GitHub PRs via gh CLI.
+Computes local outgoing diff against PR base or main, runs adversarial review across available
+subscription engines with automatic fallback, and optionally posts review verdicts to GitHub PRs.
 """
 
 import argparse
@@ -10,7 +11,14 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
+
+
+def log_error(msg: str):
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::error::{msg}", file=sys.stderr)
+    else:
+        print(f"Error: {msg}", file=sys.stderr)
 
 
 def get_git_root() -> str:
@@ -26,7 +34,9 @@ def get_git_root() -> str:
 
 
 def get_current_pr() -> Optional[int]:
-    """Auto-detect PR number for current branch if one exists."""
+    """Auto-detect PR number for current branch if one exists and gh CLI is available."""
+    if not shutil.which("gh"):
+        return None
     res = subprocess.run(
         ["gh", "pr", "view", "--json", "number"],
         capture_output=True,
@@ -41,19 +51,39 @@ def get_current_pr() -> Optional[int]:
     return None
 
 
-def resolve_diff(pr_number: Optional[int], explicit_base: str = "") -> Tuple[str, str]:
-    """Get the diff and the base reference string."""
-    if pr_number:
-        res = subprocess.run(
-            ["gh", "pr", "diff", str(pr_number)],
-            capture_output=True,
-            text=True,
-        )
-        if res.returncode == 0:
-            return res.stdout, f"PR #{pr_number}"
+def get_pr_base_branch(pr_number: int) -> Optional[str]:
+    """Get the target base branch of a GitHub PR."""
+    if not shutil.which("gh"):
+        return None
+    res = subprocess.run(
+        ["gh", "pr", "view", str(pr_number), "--json", "baseRefName"],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        try:
+            data = json.loads(res.stdout)
+            return data.get("baseRefName")
+        except Exception:
+            return None
+    return None
 
-    # Fallback to local git diff
+
+def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str]:
+    """Compute local git diff against the PR base branch or default main.
+
+    Always diffs local HEAD to include unpushed commits.
+    """
     base_ref = explicit_base
+    if not base_ref and pr_number:
+        pr_base = get_pr_base_branch(pr_number)
+        if pr_base:
+            for cand in [f"origin/{pr_base}", pr_base]:
+                r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
+                if r.returncode == 0:
+                    base_ref = cand
+                    break
+
     if not base_ref:
         for cand in ["origin/main", "origin/master", "main", "master"]:
             r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
@@ -69,7 +99,9 @@ def resolve_diff(pr_number: Optional[int], explicit_base: str = "") -> Tuple[str
     if diff_res.returncode != 0:
         log_error(f"Could not compute diff against {base_ref}: {diff_res.stderr}")
         sys.exit(1)
-    return diff_res.stdout, base_ref
+
+    label = f"{base_ref} (PR #{pr_number})" if pr_number else base_ref
+    return diff_res.stdout, label
 
 
 def get_repo_guidelines(root: str) -> str:
@@ -82,86 +114,136 @@ def get_repo_guidelines(root: str) -> str:
                 with open(p, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
-                        guidelines.append(f"--- Repository Guidelines ({fname}) ---\n{content[:4000]}")
-            except Exception:
-                pass
+                        # Include up to 16,000 characters to capture full merge, attribution, and delivery rules
+                        guidelines.append(f"--- Repository Guidelines ({fname}) ---\n{content[:16000]}")
+            except Exception as e:
+                print(f"Warning: could not read {p}: {e}", file=sys.stderr)
     return "\n\n".join(guidelines)
 
 
-def log_error(msg: str):
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        print(f"::error::{msg}", file=sys.stderr)
-    else:
-        print(f"Error: {msg}", file=sys.stderr)
-
-
-def run_antigravity_review(prompt: str, model: str = "") -> str:
+def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
     agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
-        log_error("Antigravity CLI (`agy`) not found. Ensure agy is in PATH.")
-        sys.exit(1)
+        return None
 
     cmd = [agy_path, "--dangerously-skip-permissions", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
-    print("Running local code review via Antigravity (Google AI Ultra quota)...")
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    print("Running local adversarial review via Google Antigravity...")
+    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        log_error(f"Antigravity review failed: {err}")
-        sys.exit(1)
+        print(f"Notice: Antigravity review returned nonzero ({err})", file=sys.stderr)
+        return None
     return res.stdout.strip()
 
 
-def run_claude_review(prompt: str, model: str = "") -> str:
+def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
     claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
-        log_error("Claude CLI (`claude`) not found. Ensure claude is in PATH.")
-        sys.exit(1)
+        return None
 
     cmd = [claude_path, "--dangerously-skip-permissions", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
     print("Running local adversarial review via Claude CLI...")
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        log_error(f"Claude review failed: {err}")
-        sys.exit(1)
+        print(f"Notice: Claude review returned nonzero ({err})", file=sys.stderr)
+        return None
     return res.stdout.strip()
 
 
-def run_codex_review(prompt: str) -> str:
+def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
     codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
-        log_error("Codex CLI (`codex`) not found.")
-        sys.exit(1)
+        return None
 
-    print("Running local code review via Codex CLI (ChatGPT subscription quota)...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", prompt]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    print("Running local adversarial review via OpenAI Codex (ChatGPT quota)...")
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check"]
+    if model:
+        cmd.extend(["-m", model])
+    cmd.append(prompt)
+
+    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        log_error(f"Codex review failed: {err}")
-        sys.exit(1)
+        print(f"Notice: Codex review returned nonzero ({err})", file=sys.stderr)
+        return None
     return res.stdout.strip()
 
 
-def detect_engine() -> Optional[str]:
-    """Auto-detect available local AI engine in priority order: agy -> claude -> codex."""
+def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
+    opencode_path = shutil.which("opencode") or os.path.expanduser("~/.local/bin/opencode")
+    if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
+        return None
+
+    print("Running local adversarial review via OpenCode...")
+    cmd = [opencode_path, "run", "--agent", "plan"]
+    if model:
+        cmd.extend(["-m", model])
+    cmd.append(prompt)
+
+    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    if res.returncode != 0:
+        err = res.stderr.strip() or res.stdout.strip()
+        print(f"Notice: OpenCode review returned nonzero ({err})", file=sys.stderr)
+        return None
+    return res.stdout.strip()
+
+
+def detect_available_engines() -> List[str]:
+    """Return all available local engines in priority order."""
+    engines = []
     if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
-        return "antigravity"
+        engines.append("antigravity")
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
-        return "claude"
+        engines.append("claude")
     if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
-        return "codex"
-    return None
+        engines.append("codex")
+    if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
+        engines.append("opencode")
+    return engines
+
+
+def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[str], str]:
+    """Execute review with specified engine or automatic fallback chain."""
+    engine_dispatch = {
+        "antigravity": (run_antigravity_review, "Google Antigravity"),
+        "agy": (run_antigravity_review, "Google Antigravity"),
+        "claude": (run_claude_review, "Claude Code (Local)"),
+        "codex": (run_codex_review, "OpenAI Codex"),
+        "opencode": (run_opencode_review, "OpenCode"),
+    }
+
+    if engine != "auto":
+        runner, label = engine_dispatch.get(engine, (None, engine))
+        if not runner:
+            log_error(f"Unknown engine: {engine}")
+            return None, engine
+        report = runner(prompt, model=model)
+        return report, label
+
+    available = detect_available_engines()
+    if not available:
+        log_error("No supported AI CLI found (`agy`, `claude`, `codex`, `opencode`).")
+        return None, "None"
+
+    for cand in available:
+        runner, label = engine_dispatch[cand]
+        report = runner(prompt, model=model)
+        if report:
+            return report, label
+        print(f"Engine '{label}' was unavailable or exhausted; falling back to next engine...")
+
+    return None, "Fallback Chain"
 
 
 def format_review_body(report: str, engine_name: str) -> str:
-    """Format the review report for GitHub PR posting adhering to lab disclosure policy."""
+    """Format review report for GitHub PR posting adhering to lab disclosure policy."""
     return (
         f"### Local Adversarial AI Review ({engine_name})\n\n"
         f"{report}\n\n"
@@ -170,8 +252,8 @@ def format_review_body(report: str, engine_name: str) -> str:
     )
 
 
-def post_review_to_github(pr_number: int, report: str, engine_name: str):
-    """Post the review report directly to GitHub PR via gh CLI."""
+def post_review_to_github(pr_number: int, report: str, engine_name: str) -> bool:
+    """Post review report directly to GitHub PR via gh CLI."""
     formatted_body = format_review_body(report, engine_name)
 
     res = subprocess.run(
@@ -180,8 +262,8 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str):
         text=True,
     )
     if res.returncode == 0:
-        print(f"✅ Successfully posted review to PR #{pr_number} via `gh pr review`!")
-        return
+        print(f"Successfully posted review to PR #{pr_number} via `gh pr review`.")
+        return True
 
     res_comment = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
@@ -189,67 +271,14 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str):
         text=True,
     )
     if res_comment.returncode == 0:
-        print(f"✅ Successfully posted review comment to PR #{pr_number} via `gh pr comment`!")
-    else:
-        log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
+        print(f"Successfully posted review comment to PR #{pr_number} via `gh pr comment`.")
+        return True
+
+    log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
+    return False
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run local AI code review using desktop subscriptions and optionally post to GitHub PR."
-    )
-    parser.add_argument(
-        "--pr",
-        type=int,
-        default=None,
-        help="Pull Request number to review and post to (auto-detected if omitted)",
-    )
-    parser.add_argument(
-        "--base",
-        default="",
-        help="Base git reference to diff against (defaults to PR base or origin/main)",
-    )
-    parser.add_argument(
-        "--engine",
-        choices=["auto", "antigravity", "agy", "claude", "codex"],
-        default="auto",
-        help="AI engine: 'auto' (default: agy -> claude -> codex), 'antigravity', 'claude', or 'codex'",
-    )
-    parser.add_argument(
-        "--model",
-        default="",
-        help="Model override (optional)",
-    )
-    parser.add_argument(
-        "--post",
-        action="store_true",
-        help="Post the review comment/verdict directly to the GitHub PR",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        default="",
-        help="Path to save the review markdown report locally",
-    )
-    args = parser.parse_args()
-
-    git_root = get_git_root()
-    pr_num = args.pr or get_current_pr()
-    diff, ref_name = resolve_diff(pr_num if args.pr else None, explicit_base=args.base)
-
-    if not diff.strip():
-        print(f"✅ Clean: No outgoing changes compared to {ref_name}.")
-        sys.exit(0)
-
-    engine = args.engine
-    if engine == "auto":
-        detected = detect_engine()
-        if not detected:
-            log_error("No supported AI CLI found (`agy`, `claude`, or `codex`).")
-            sys.exit(1)
-        engine = detected
-
-    guidelines = get_repo_guidelines(git_root)
+def build_review_prompt(diff: str, ref_name: str, guidelines: str) -> str:
     branch_name = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
         capture_output=True,
@@ -280,20 +309,67 @@ def main():
         prompt_parts.append(f"\nRepository Guidelines:\n{guidelines}")
 
     prompt_parts.append(f"\nDiff to Review:\n```diff\n{diff}\n```")
-    full_prompt = "\n\n".join(prompt_parts)
+    return "\n\n".join(prompt_parts)
 
-    if engine in ("antigravity", "agy"):
-        engine_label = "Google Antigravity"
-        report = run_antigravity_review(full_prompt, model=args.model)
-    elif engine == "claude":
-        engine_label = "Claude Code (Local)"
-        report = run_claude_review(full_prompt, model=args.model)
-    else:
-        engine_label = "OpenAI Codex"
-        report = run_codex_review(full_prompt)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Run local AI code review using desktop subscriptions and optionally post to GitHub PR."
+    )
+    parser.add_argument(
+        "--pr",
+        type=int,
+        default=None,
+        help="Pull Request number to review and post to (auto-detected if omitted)",
+    )
+    parser.add_argument(
+        "--base",
+        default="",
+        help="Base git reference to diff against (defaults to PR base or origin/main)",
+    )
+    parser.add_argument(
+        "--engine",
+        choices=["auto", "antigravity", "agy", "claude", "codex", "opencode"],
+        default="auto",
+        help="AI engine: 'auto' (default: agy -> claude -> codex -> opencode), or specific engine name",
+    )
+    parser.add_argument(
+        "--model",
+        default="",
+        help="Model override (optional)",
+    )
+    parser.add_argument(
+        "--post",
+        action="store_true",
+        help="Post the review comment/verdict directly to the GitHub PR",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        default="",
+        help="Path to save the review markdown report locally",
+    )
+    args = parser.parse_args()
+
+    git_root = get_git_root()
+    pr_num = args.pr or get_current_pr()
+    diff, ref_name = resolve_diff(pr_number=pr_num, explicit_base=args.base)
+
+    if not diff.strip():
+        print(f"Clean: No outgoing changes compared to {ref_name}.")
+        sys.exit(0)
+
+    guidelines = get_repo_guidelines(git_root)
+    full_prompt = build_review_prompt(diff, ref_name, guidelines)
+
+    report, engine_label = execute_review(args.engine, full_prompt, model=args.model)
+
+    if not report:
+        log_error("Adversarial review failed to produce a report across all attempted engines.")
+        sys.exit(1)
 
     print("\n" + "=" * 60)
-    print(f"📋 LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")
+    print(f"LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")
     print("=" * 60 + "\n")
     print(report)
     print("\n" + "=" * 60)
@@ -305,11 +381,12 @@ def main():
 
     if args.post:
         if not pr_num:
-            print("::warning::Could not determine PR number to post to. Use --pr <number>.", file=sys.stderr)
-        else:
-            post_review_to_github(pr_num, report, engine_label)
+            log_error("Could not determine PR number to post to. Use --pr <number>.")
+            sys.exit(1)
+        posted = post_review_to_github(pr_num, report, engine_label)
+        if not posted:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

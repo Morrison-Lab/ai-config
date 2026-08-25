@@ -12,7 +12,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -322,14 +321,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--mode", "plan", "-p", "-"]
+    cmd = [agy_path, "--print", prompt, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -350,14 +349,14 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "-p", "-"]
+    cmd = [claude_path, "-p", prompt, "--permission-mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
@@ -409,12 +408,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
 
-    cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
+    cmd = [opencode_path, "run", "--agent", "plan", "--pure", prompt]
     if model:
         cmd.extend(["-m", model])
 
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None

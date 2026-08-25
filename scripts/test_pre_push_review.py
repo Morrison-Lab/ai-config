@@ -625,31 +625,43 @@ class TestPrePushReview(unittest.TestCase):
         mock_res.stdout = valid_report
         mock_subproc.return_value = mock_res
 
-        # Test Claude runner
+        # Test Claude runner passes prompt positionally via -p
         mock_which.return_value = "/opt/homebrew/bin/claude"
-        out_claude = reviewer.run_claude_review("prompt", model="claude-3-5-sonnet", expected_commit_sha="abc12345")
+        out_claude = reviewer.run_claude_review("prompt_diff", model="claude-3-5-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_claude, valid_report)
         claude_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("-p", claude_cmd)
+        self.assertIn("prompt_diff", claude_cmd)
         self.assertIn("--model", claude_cmd)
         self.assertIn("claude-3-5-sonnet", claude_cmd)
 
-        # Test Antigravity runner
+        # Test Antigravity runner passes prompt immediately after --print
         mock_which.return_value = "/opt/homebrew/bin/agy"
-        out_agy = reviewer.run_antigravity_review("prompt", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
+        out_agy = reviewer.run_antigravity_review("prompt_diff", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_agy, valid_report)
         agy_cmd = mock_subproc.call_args[0][0]
+        print_idx = agy_cmd.index("--print")
+        self.assertEqual(agy_cmd[print_idx + 1], "prompt_diff")
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
-        # Test OpenCode runner uses tempfile stdin pipe and pure mode
+        # Test OpenCode runner passes prompt positionally
         mock_which.return_value = "/opt/homebrew/bin/opencode"
-        out_oc = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
+        out_oc = reviewer.run_opencode_review("prompt_diff", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertNotIn("prompt", oc_cmd)
+        self.assertIn("prompt_diff", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
+
+        # Test Codex runner passes prompt via stdin
+        mock_which.return_value = "/opt/homebrew/bin/codex"
+        out_codex = reviewer.run_codex_review("prompt_diff", model="gpt-5.6-sol", expected_commit_sha="abc12345")
+        self.assertEqual(out_codex, valid_report)
+        codex_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("-", codex_cmd)
+        self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt_diff")
 
     def test_get_next_alternate_engine_rotation(self):
         engines = ["claude", "codex", "opencode", "antigravity"]
@@ -681,7 +693,7 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
-    def test_opencode_direct_stdin_pipe(self, mock_which, mock_subproc):
+    def test_opencode_positional_prompt_delivery(self, mock_which, mock_subproc):
         mock_res = MagicMock()
         mock_res.returncode = 0
         mock_res.stdout = "output"
@@ -690,7 +702,8 @@ class TestPrePushReview(unittest.TestCase):
         with patch.object(reviewer, "validate_review_output", return_value=True):
             res = reviewer.run_opencode_review("prompt text", model="anthropic/claude-3.7-sonnet")
             self.assertEqual(res, "output")
-            self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt text")
+            cmd_args = mock_subproc.call_args[0][0]
+            self.assertIn("prompt text", cmd_args)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

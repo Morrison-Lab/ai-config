@@ -120,17 +120,20 @@ class TestPrePushReview(unittest.TestCase):
             self.assertFalse(is_valid)
             self.assertIn("Unrecognized", reason)
 
-        # Qualified verdicts with valid rationale are parsed correctly
-        rationale_report = (
-            "### Summary Verdict\n"
-            "Verdict: Ready for merge — all tests pass and documentation is verified.\n\n"
-            "### Critical Findings\n"
+    def test_validate_review_output_valid_reports(self):
+        commit = "12345678abcdef00"
+        report = (
+            "### Summary Verdict\n\n"
+            "Verdict: Ready for merge --- all tests pass and documentation is verified.\n\n"
+            "### Critical Findings\n\n"
             "None.\n\n"
-            "### Observations\nNone.\n\n"
-            "### Verification Steps\nNone.\n"
+            "### Observations\n\n"
+            "Looks good.\n\n"
+            "### Verification Steps\n\n"
+            "Checked all tests.\n"
             f"Reviewed-Commit: {commit}"
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(rationale_report, expected_commit_sha=commit)
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
@@ -206,7 +209,7 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\n"
             "None.\n\n"
             "### Summary Verdict\n"
-            "Verdict: Needs work — bug found\n\n"
+            "Verdict: Needs work --- bug found\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
@@ -233,7 +236,7 @@ class TestPrePushReview(unittest.TestCase):
         # Clean verdict with rationale containing 'no' (e.g. 'no blocking issues found') is accepted as clean
         clean_with_no_rationale = (
             "### Summary Verdict\n"
-            "Verdict: Ready for merge — no blocking issues found and CI passed cleanly.\n\n"
+            "Verdict: Ready for merge --- no blocking issues found and CI passed cleanly.\n\n"
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\nNone.\n\n"
@@ -271,6 +274,40 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(bold_once, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertFalse(is_clean)
+
+        # Conflicting qualifiers with negative instructions (e.g. 'do not merge') are parsed as Needs work
+        for neg_qual in [
+            "no blocking issues; do not merge",
+            "all tests pass; do not merge",
+            "no issues do not merge",
+        ]:
+            conflicting_report = (
+                "### Summary Verdict\n"
+                f"Verdict: Ready for merge --- {neg_qual}\n\n"
+                "### Critical Findings\n"
+                "None.\n\n"
+                "### Observations\nNone.\n\n"
+                "### Verification Steps\nNone.\n"
+                f"Reviewed-Commit: {commit}"
+            )
+            is_valid, is_clean, _ = reviewer.parse_review_verdict(conflicting_report, expected_commit_sha=commit)
+            self.assertTrue(is_valid)
+            self.assertFalse(is_clean)
+
+        # Observations mentioning benign diagnostic phrases stay clean
+        observations_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "Verified there is no data loss on the error path.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(observations_report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
 
         # Refusal phrases (e.g. 'unable to review' or 'rate limit') invalidate the report to trigger fallback
         refusal_report = (
@@ -565,7 +602,7 @@ class TestPrePushReview(unittest.TestCase):
         cmd_called = mock_subproc.call_args[0][0]
         self.assertIn("comment", cmd_called)
         self.assertIn("123", cmd_called)
-        self.assertIn("--body", cmd_called)
+        self.assertIn("--body-file", cmd_called)
 
     @patch("shutil.which", return_value=None)
     def test_post_review_missing_gh_returns_false(self, mock_which):
@@ -665,7 +702,6 @@ class TestPrePushReview(unittest.TestCase):
         out_oc = reviewer.run_opencode_review("prompt_diff", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
-        self.assertIn("--pure", oc_cmd)
         self.assertIn("-f", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
@@ -719,7 +755,6 @@ class TestPrePushReview(unittest.TestCase):
             self.assertEqual(res, "output")
             cmd_args = mock_subproc.call_args[0][0]
             self.assertIn("-f", cmd_args)
-            self.assertIn("--pure", cmd_args)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

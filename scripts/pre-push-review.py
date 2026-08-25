@@ -213,7 +213,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             ):
                 v_name = m.group(1).strip()
                 trailing = m.group(2).strip()
-                full_verdict_str = f"{v_name} — {trailing}" if trailing else v_name
+                full_verdict_str = f"{v_name} --- {trailing}" if trailing else v_name
                 bold_matches.append(full_verdict_str)
             if bold_matches:
                 v_in_sec = bold_matches
@@ -237,9 +237,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         "too many requests",
     ]
     for v_str in verdict_matches:
-        for pat in verdict_refusal_patterns:
-            if pat in v_str.lower():
-                return False, False, f"Engine refusal string detected in verdict: '{pat}'"
+        v_lower = v_str.lower().strip()
+        if not any(v_lower.startswith(w) for w in ["ready for merge", "needs work", "needs more work", "changes requested", "approve", "approved", "clean", "blocked", "unapproved", "disapproved"]):
+            for pat in verdict_refusal_patterns:
+                if pat in v_lower:
+                    return False, False, f"Engine refusal string detected in verdict: '{pat}'"
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {
@@ -254,15 +256,18 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     parsed_verdicts = []
     for v_str in verdict_matches:
         v_clean = re.sub(r"[\*`_]", "", v_str).strip()
-        v_split = re.split(r"\s*[-:—(]\s*", v_clean, maxsplit=1)
+        v_split = re.split(r"\s*(?:---|[-:—(])\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
         v_qual = v_split[1].strip().rstrip(").!") if len(v_split) > 1 else ""
 
         has_core_negation = bool(re.search(core_negation_pattern, v_core))
         has_qual_negation = bool(re.search(qual_negation_pattern, v_qual, flags=re.IGNORECASE))
+        has_qual_negative = bool(re.search(r"(?i)\b(?:do\s+not|don't|not|never|needs?\s+work|fail|failed|blocked|breaks|bug|defect|issue|error|data\s+loss)\b", v_qual))
 
         if v_core in clean_allowlist:
-            if has_core_negation or has_qual_negation or (v_qual and not re.match(r"^(?:no\s+(?:blocking|critical|issues|findings)|all\s+(?:checks|tests)\s+pass)", v_qual, flags=re.IGNORECASE)):
+            is_pure_clean_qual = bool(re.match(r"^(?:no\s+(?:blocking\s+|critical\s+)?(?:issues|findings|defects|regressions)(?:\s+(?:found|present|identified))?|all\s+(?:checks|tests|validation)\s+pass(?:ed)?)(?:\s+and\s+[a-z0-9\s,]+)?\.?$", v_qual.strip(), flags=re.IGNORECASE))
+            has_explicit_negation_in_qual = bool(re.search(r"(?i)\b(?:do\s+not\s+merge|do\s+not\s+approve|don't\s+merge|needs?\s+work|must\s+fix|requires?\s+changes)\b", v_qual))
+            if has_core_negation or has_qual_negation or has_explicit_negation_in_qual or (v_qual and not is_pure_clean_qual):
                 parsed_verdicts.append((True, False, f"Negated or qualified approval: '{v_str}'"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
@@ -302,7 +307,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # If verdict claims clean, verify that no explicit blocker or must-fix phrase appears anywhere in the report
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|\b(?:blocker|blocking)\s*:)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss)\b|\b(?:blocker|blocking)\s*:)"
         blocker_match = re.search(blocker_pattern, clean_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -407,21 +412,21 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         return None
 
     label_suffix = f" (model: {model})" if model else ""
-    print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
+    print(f"Running local adversarial review via OpenCode (plan agent){label_suffix}...")
 
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
-            tf.write(prompt)
             temp_path = tf.name
+            tf.write(prompt)
         os.chmod(temp_path, 0o600)
-        cmd = [
-            opencode_path, "run", "--agent", "plan", "--pure",
-            "-f", temp_path,
-            "Perform adversarial code review against the diff and instructions in the attached file.",
-        ]
+        cmd = [opencode_path, "run", "--agent", "plan"]
         if model:
             cmd.extend(["-m", model])
+        cmd.extend([
+            "-f", temp_path,
+            "Perform adversarial code review against the diff and instructions in the attached file.",
+        ])
 
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
@@ -511,7 +516,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         "opencode": (run_opencode_review, "OpenCode"),
         "dto": (run_opencode_review, "OpenCode"),
         "opencode-claude": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "anthropic/claude-3.7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via OpenCode"),
-        "opencode-zen": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "zen/free", expected_commit_sha=expected_commit_sha), "OpenCode Zen"),
+        "opencode-zen": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "opencode/deepseek-v4-flash-free", expected_commit_sha=expected_commit_sha), "OpenCode Zen"),
         "ollama": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest", expected_commit_sha=expected_commit_sha), "Local Ollama"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
@@ -586,11 +591,28 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
 
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
-    res = subprocess.run(
-        ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
-        capture_output=True,
-        text=True,
-    )
+    temp_body_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+            temp_body_path = tf.name
+            tf.write(formatted_body)
+        os.chmod(temp_body_path, 0o600)
+
+        res = subprocess.run(
+            ["gh", "pr", "comment", str(pr_number), "--body-file", temp_body_path],
+            capture_output=True,
+            text=True,
+        )
+    except Exception as e:
+        log_error(f"Failed to post to GitHub PR #{pr_number}: {e}")
+        return False
+    finally:
+        if temp_body_path:
+            try:
+                os.unlink(temp_body_path)
+            except OSError:
+                pass
+
     if res.returncode == 0:
         print(f"Successfully posted adversarial review note to PR #{pr_number} via `gh pr comment`.")
         return True

@@ -189,18 +189,18 @@ A Markdown table, one row per open PR, with these columns:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#101](url) | `the repository owner` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
-| [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
-| [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
-| [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
-| [#105](url) (Draft) | `external-dev` | - | ⏳ Pending (build) | - | Draft (Work in progress) |
+| [#101](url) | `the repository owner` | [✅ Approved (Authoring Session)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
+| [#102](url) | `external-dev` | [✅ Clean (Adversarial Review)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
+| [#103](url) | `external-dev` | Out of date | 🟢 All Green | ➖ None (Request human review) | Request human review |
+| [#104](url) | `external-dev` | [❌ Needs Work (Adversarial Review)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
+| [#105](url) (Draft) | `external-dev` | None | ⏳ Pending (build) | - | Draft (Work in progress) |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`, appended with `(Draft)` if `isDraft` is true.
 - **Author** --- author login.
-- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL.
   Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
-  If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
-  If no SHA is named, display `[⚠️ Unverified](url)`.
+  - Specify the reviewer type: e.g. `✅ Clean (Adversarial Review)` or `(Authoring Session)`. An adversarial review is performed by a distinct subagent (e.g. `claude[bot]`, or containing the phrase "adversarial review" if a local subagent fallback).
+  - If there's no review for the latest commit, the answer should be "none" or "out of date", depending on which it is. Use `None` if there is no AI review at all, and `Out of date` if an AI review exists but predates the latest commit.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.

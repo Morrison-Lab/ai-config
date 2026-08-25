@@ -195,7 +195,10 @@ def matcher_hits(matcher: str | None, tool_name: str) -> bool:
     return tool_name in names
 
 
-def cursor_to_claude_tool_names(cursor_name: str) -> list[str]:
+def cursor_to_claude_tool_names(
+    cursor_name: str,
+    subagent_type: str | None = None,
+) -> list[str]:
     """Candidate Claude tool_name values for one Cursor tool_name."""
     if not cursor_name:
         return []
@@ -203,7 +206,13 @@ def cursor_to_claude_tool_names(cursor_name: str) -> list[str]:
     if cursor_name == "Shell":
         names.append("Bash")
     elif cursor_name == "Task":
-        names.extend(["Agent", "Task"])
+        names.append("Task")
+        kind = (subagent_type or "").lower()
+        # Explore/Plan/shell are read-only on Claude; flag-unassigned-worktree
+        # is Agent-only so Task would not widen it. Cursor Explore launches
+        # still arrive as Task.
+        if kind not in ("explore", "plan", "shell"):
+            names.append("Agent")
     elif cursor_name.startswith("MCP:"):
         rest = cursor_name[4:]
         names.append(rest)
@@ -246,7 +255,7 @@ def claude_payload_for_pretool(cursor: dict[str, Any], claude_tool: str) -> dict
         tool_input["command"] = command
     if cursor.get("subagent_type") and "subagent_type" not in tool_input:
         tool_input["subagent_type"] = cursor["subagent_type"]
-    return {
+    payload = {
         "tool_name": claude_tool,
         "tool_input": tool_input,
         "transcript_path": translate_transcript_path(
@@ -259,6 +268,11 @@ def claude_payload_for_pretool(cursor: dict[str, Any], claude_tool: str) -> dict
         "cwd": cursor.get("cwd") or os.environ.get("CURSOR_PROJECT_DIR") or "",
         "hook_event_name": "PreToolUse",
     }
+    conv = conversation_id_of(cursor)
+    if conv:
+        payload["conversation_id"] = conv
+        payload["session_id"] = conv
+    return payload
 
 
 def claude_payload_for_transcript(cursor: dict[str, Any], event: str) -> dict[str, Any]:
@@ -271,6 +285,8 @@ def claude_payload_for_transcript(cursor: dict[str, Any], event: str) -> dict[st
         "transcript_path": translate_transcript_path(str(raw)),
         "cwd": os.environ.get("CURSOR_PROJECT_DIR") or "",
         "hook_event_name": event,
+        "conversation_id": conversation_id_of(cursor),
+        "session_id": conversation_id_of(cursor),
     }
 
 
@@ -650,7 +666,9 @@ def collect_plain_or_json_context(parsed: dict[str, Any] | None, text: str) -> s
 
 def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
     cursor_tool = str(cursor.get("tool_name") or "")
-    candidates = cursor_to_claude_tool_names(cursor_tool)
+    candidates = cursor_to_claude_tool_names(
+        cursor_tool, cursor.get("subagent_type"),
+    )
     extra_chunks: list[str] = []
     deny_reason = None
     ran_scripts: set[str] = set()
@@ -839,7 +857,7 @@ def main(argv: list[str] | None = None) -> int:
     cursor = read_stdin()
     key = payload_tick_key(event, cursor)
     replay = claim_or_replay_tick(
-        key, wait_s=float(WRAPPER_TIMEOUT_S.get(event, 60)),
+        key, wait_s=max(float(WRAPPER_TIMEOUT_S.get(event, 60)) - WRAPPER_SLACK_S, 1),
     )
     if replay is not None:
         sys.stdout.write(replay if replay.endswith("\n") else replay + "\n")

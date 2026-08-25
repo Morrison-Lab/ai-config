@@ -37,7 +37,7 @@ Cursor does not SIGKILL the wrapper mid-catalog.
 | Cursor `tool_name` | Claude `tool_name` values the adapter tries |
 |---|---|
 | `Shell` | `Bash` |
-| `Task` | `Task`, `Agent` |
+| `Task` | `Task`, and `Agent` unless `subagent_type` is `explore` / `plan` / `shell` |
 | `MCP:github-<id>` | `mcp__github__<id>` plus the raw suffix |
 | other `MCP:<id>` | `mcp__<id>` with hyphens folded to underscores |
 

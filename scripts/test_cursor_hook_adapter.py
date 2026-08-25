@@ -163,8 +163,40 @@ check(
     "Bash" in mod.cursor_to_claude_tool_names("Shell"),
 )
 check(
-    "Task maps to Agent and Task",
-    {"Agent", "Task"} <= set(mod.cursor_to_claude_tool_names("Task")),
+    "Task maps to Task",
+    "Task" in mod.cursor_to_claude_tool_names("Task"),
+)
+check(
+    "write Task also maps to Agent",
+    "Agent" in mod.cursor_to_claude_tool_names("Task", "generalPurpose"),
+)
+check(
+    "Task without subagent_type still maps to Agent",
+    "Agent" in mod.cursor_to_claude_tool_names("Task"),
+)
+check(
+    "explore Task does not map to Agent",
+    "Agent" not in mod.cursor_to_claude_tool_names("Task", "explore"),
+)
+pre_payload = mod.claude_payload_for_pretool(
+    {"conversation_id": "c-mwc", "session_id": "s-mwc", "tool_input": {}},
+    "Bash",
+)
+check(
+    "PreToolUse payload forwards conversation_id",
+    pre_payload.get("conversation_id") == "c-mwc",
+)
+check(
+    "PreToolUse payload forwards session_id",
+    pre_payload.get("session_id") == "c-mwc",
+)
+tx_payload = mod.claude_payload_for_transcript(
+    {"conversation_id": "c-mwc", "session_id": "s-mwc"},
+    "Stop",
+)
+check(
+    "Stop payload forwards session_id",
+    tx_payload.get("session_id") == "c-mwc",
 )
 check(
     "MCP:github-merge_pull_request maps to mcp__github__merge_pull_request",

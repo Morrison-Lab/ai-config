@@ -20,13 +20,15 @@ or **executable mode** (analyze a task and auto-recommend).
 
 ### Assess model fit (manual, procedural mode)
 
-1. **Identify the current model.** Check your session or settings.
+1. **Identify the current model.**
+   Check your session or settings.
    Common tiers:
    - Tier 1: Fable 5, Opus 4.8, Gemini Pro
    - Tier 2: Sonnet 5 / 4.6, Gemini Flash, Codex
    - Tier 3: Haiku 4.5, Gemini Flash-Lite
 
-2. **Score your task against these criteria.** A task needs escalation or orchestrator-worker delegation if it hits any of these:
+2. **Score your task against these criteria.**
+   A task needs escalation or orchestrator-worker delegation if it hits any of these:
    - **Deep multi-step reasoning:** more than 5 logical steps, complex dependencies, or
      architectural design decisions
    - **Code review rigor:** assessing code for subtle bugs, security gaps, performance,
@@ -40,12 +42,12 @@ or **executable mode** (analyze a task and auto-recommend).
 
 3. **Determine Orchestration Strategy:**
    - **Solo Executor (Tier 2/3):** The task is straightforward, bounded, well-specified, and single-purpose.
-   - **Orchestrator + Worker Delegation (Tier 1 Conductor + Tier 2 Workers):** The task is large, multi-stage, or complex. Use Tier 1 to plan and decompose into tasks with strict stop conditions, spawn Tier 2 workers to implement, and audit before merging.
+   - **Orchestrator + Worker Delegation (Tier 1 Conductor + Tier 2 Workers):** The task is large, multi-stage, or complex.
+     Use Tier 1 to plan and decompose into tasks with strict stop conditions, spawn Tier 2 workers to implement, and audit before merging.
    - **Escalate Model:** If the current model struggles with reasoning or loops on a bug, escalate immediately to Tier 1.
 
 4. **If escalation needed,** invoke `/select-model` to determine the target.
-   Describe your task, and `select-model` will recommend the optimal tier and suggest
-   a config update if desired.
+   Describe your task, and `select-model` will recommend the optimal tier and suggest a config update if desired.
 
 ### Executable mode (auto-analysis and auto-chaining)
 

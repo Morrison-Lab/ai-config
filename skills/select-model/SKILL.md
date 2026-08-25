@@ -53,8 +53,7 @@ When orchestrating complex or multi-step work:
    - YES → **Sonnet / Flash / Codex** (high-velocity executor)
    - NO → Continue
 
-3. **Does the task require high-level orchestration, deep design, or adversarial review?**
-   (architectural decisions, subtle bugs, security audit, orchestrator loop)
+3. **Does the task require high-level orchestration, deep design, or adversarial review?** (architectural decisions, subtle bugs, security audit, orchestrator loop)
    - YES → **Fable 5 / Opus / Gemini Pro** (most capable)
 
 ### Task → Model mapping

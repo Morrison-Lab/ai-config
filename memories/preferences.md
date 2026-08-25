@@ -978,12 +978,12 @@ CLIs drawing on user subscriptions and API keys (ChatGPT via `codex`, Claude Pro
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
 
-**Available subscriptions, balances, and delegation destinations:**
+**Available subscriptions, balances, and delegation destinations (measured 2026-08-25):**
 
 | CLI / Provider | Plan / Billing Tier | Skill / Entrypoint |
 |---|---|---|
 | `codex` | ChatGPT (Plus / Team / Enterprise) | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `opencode` | OpenCode Go subscription + Zen prepaid/free + local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
+| `opencode` | OpenCode Go ($10/mo subscription) + Zen free tier + local (`ollama`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | Configured in `opencode.jsonc` provider block or direct HTTP API |
 | `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
@@ -992,12 +992,12 @@ Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for c
 "Delegate first" means the current window, not abandoning Claude permanently.
 
 **`opencode` and `openrouter` expand non-metered, prepaid, and alternative frontier routes:**
-- **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and a fully local tier (`ollama`).
-  Its free/local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
-- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners.
-- **Local tier**: The local (`ollama/*`) tier is the only destination that keeps the payload on the machine for sensitive data.
+- **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and a local tier (`ollama`).
+  Its free and local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
+- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners (activated in config; measured 2026-08-23 on OpenCode 1.18.21).
+- **Local tier**: The local (`ollama/*`) tier keeps the payload on the machine for sensitive data **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
-The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
+The initial OpenCode tiers and version above were measured 2026-08-19 on OpenCode 1.18.15; active Go subscription and OpenRouter credit balance verified 2026-08-25.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
 **`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**

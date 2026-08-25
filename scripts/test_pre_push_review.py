@@ -365,7 +365,7 @@ class TestPrePushReview(unittest.TestCase):
         )
         is_valid, is_clean, reason = reviewer.parse_review_verdict(unterminated_html_comment, expected_commit_sha=commit)
         self.assertFalse(is_valid)
-        self.assertIn("Unterminated HTML comment", reason)
+        self.assertIn("unterminated html comment", reason.lower())
 
         # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
         adv_findings = (

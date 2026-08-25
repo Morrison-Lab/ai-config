@@ -153,19 +153,21 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
-    # Check for unterminated HTML comments
-    if "<!--" in report and "-->" not in report[report.find("<!--"):]:
-        return False, False, "Unterminated HTML comment detected."
-
-    # Strip HTML comments before parsing top-level structure to prevent hidden injections
-    uncommented_report = re.sub(r"(?s)<!--.*?-->", "", report)
-
     # Check for unbalanced or unclosed code fences using positional CommonMark rules
-    if count_unbalanced_fences(uncommented_report) > 0:
+    if count_unbalanced_fences(report) > 0:
         return False, False, "Unbalanced or unterminated markdown code fence detected."
 
     # Strip fenced code blocks using CommonMark rules (handles nested same-character fences correctly)
-    unfenced_report = strip_fences(uncommented_report)
+    unfenced_report = strip_fences(report)
+
+    # Check for unbalanced or unterminated HTML comments in remaining prose
+    count_open_html = len(re.findall(r"<!--", unfenced_report))
+    count_close_html = len(re.findall(r"-->", unfenced_report))
+    if count_open_html != count_close_html:
+        return False, False, "Unbalanced or unterminated HTML comment detected."
+
+    # Strip HTML comments from prose before parsing top-level structure
+    clean_report = re.sub(r"(?s)<!--.*?-->", "", unfenced_report)
 
     required_sections = [
         ("Summary Verdict", [r"(?im)^#{2,3}\s+Summary Verdict", r"(?im)^#{2,3}\s+Verdict"]),
@@ -174,12 +176,12 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         ("Verification Steps", [r"(?im)^#{2,3}\s+Verification Steps", r"(?im)^#{2,3}\s+Verification"]),
     ]
     for section_name, patterns in required_sections:
-        if not any(re.search(pat, unfenced_report) for pat in patterns):
+        if not any(re.search(pat, clean_report) for pat in patterns):
             return False, False, f"Missing required section: {section_name}"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        sha_matches = re.findall(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9A-F]+)\s*$", unfenced_report)
+        sha_matches = re.findall(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9A-F]+)\s*$", clean_report)
         if not sha_matches:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
@@ -194,7 +196,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 return False, False, f"Mismatched or contradictory Reviewed-Commit fingerprint: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
     # Extract all bounded Summary Verdict sections
-    summary_matches = list(re.finditer(r"(?ims)^#{2,3}\s+(?:Summary\s+)?Verdict[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report))
+    summary_matches = list(re.finditer(r"(?ims)^#{2,3}\s+(?:Summary\s+)?Verdict[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", clean_report))
     if not summary_matches:
         return False, False, "Missing required section: Summary Verdict"
 
@@ -256,7 +258,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     else:
         is_clean = True
 
-    findings_matches = list(re.finditer(r"(?ims)^#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report))
+    findings_matches = list(re.finditer(r"(?ims)^#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", clean_report))
     if not findings_matches:
         return False, False, "Missing required section: Critical Findings"
 
@@ -277,7 +279,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     # If verdict claims clean, verify that no explicit blocker or must-fix phrase appears anywhere in the report
     if is_clean:
         blocker_pattern = r"(?im)(?:\b(?:must\s+fix|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|\b(?:blocker|blocking)\s*:)"
-        blocker_match = re.search(blocker_pattern, unfenced_report)
+        blocker_match = re.search(blocker_pattern, clean_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
 
@@ -295,7 +297,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
 
 def validate_review_output(report: Optional[str], expected_commit_sha: str = "") -> bool:
-    is_valid, _, _ = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
+    is_valid, _, reason = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
+    if not is_valid:
+        print(f"Notice: Review output validation failed ({reason})", file=sys.stderr)
     return is_valid
 
 

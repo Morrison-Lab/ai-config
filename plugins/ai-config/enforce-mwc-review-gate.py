@@ -31,7 +31,7 @@ def main():
     try:
         pr_match = re.search(r'gh (?:pr|stack) merge (\S+)', cmd)
         pr_arg = pr_match.group(1) if pr_match else ""
-        if pr_arg and pr_arg.startswith("💰 **Cost:**"):
+        if pr_arg and pr_arg.startswith("-"):
             pr_arg = ""
         
         view_cmd = ["gh", "pr", "view", pr_arg, "--json", "reviews,comments"] if pr_arg else ["gh", "pr", "view", "--json", "reviews,comments"]

@@ -192,11 +192,16 @@ The routing rule above turns on where `ollama/*` actually points, whether cloud 
 `opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), and the check queries the daemon tags API:
 
 ```bash
-python3 - <<'PY'
+python3 - "qwen2.5-coder:3b" <<'PY'
 import ipaddress, json, os, socket, subprocess, sys, urllib.request
 from urllib.parse import urlparse
 
-target_model = sys.argv[1] if len(sys.argv) > 1 else ""
+if len(sys.argv) < 2 or not sys.argv[1].strip():
+    sys.exit("REFUSE: target model identifier is required as an argument (e.g. 'qwen2.5-coder:3b')")
+
+target_model = sys.argv[1].strip()
+clean_target = target_model.replace("ollama/", "")
+target_tag = clean_target if ":" in clean_target else f"{clean_target}:latest"
 
 try:
     raw = subprocess.run(
@@ -234,19 +239,17 @@ except Exception as exc:
 if not local_models:
     sys.exit(f"REFUSE: local Ollama daemon reports 0 resident models in /api/tags")
 
-if target_model:
-    clean_target = target_model.replace("ollama/", "")
-    matched = any(clean_target in m or m.startswith(clean_target) for m in local_models)
-    if not matched:
-        sys.exit(f"REFUSE: target model {target_model!r} is not locally resident (local models: {', '.join(local_models)})")
+matched = any(m == clean_target or m == target_tag for m in local_models)
+if not matched:
+    sys.exit(f"REFUSE: target model {target_model!r} (normalized {target_tag!r}) is not locally resident (local models: {', '.join(local_models)})")
 
 print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
-print(f"OK: verified local model residency ({len(local_models)} models present locally)")
-PY "qwen2.5-coder:3b"
+print(f"OK: verified local model residency for {target_tag} ({len(local_models)} resident models)")
+PY
 ```
 
-It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the model is locally resident.
-Every other outcome refuses: an unreadable or unparseable config, a missing `ollama` provider or `baseURL`, an off-machine endpoint, an unreachable tags API, zero resident models, or an absent target model.
+It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the specified target model is locally resident.
+Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unreachable tags API, zero resident models, or an uninstalled target model.
 Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md).
 This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
 

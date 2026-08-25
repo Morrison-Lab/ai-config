@@ -48,9 +48,10 @@ def main():
             has_ai_approval = False
             for c in comments:
                 body = c.get("body", "").upper()
-                if "VERDICT: GREEN" in body or "READY FOR MERGE" in body or "APPROVE" in body:
+                if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?)\b", body):
                     # Make sure it is from a bot
-                    if "bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") == "github-actions":
+                    author_login = c.get("author", {}).get("login", "")
+                    if "bot" in author_login.lower() or author_login in ["github-actions", "claude"]:
                         has_ai_approval = True
                         break
             

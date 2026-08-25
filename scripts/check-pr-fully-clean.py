@@ -683,6 +683,22 @@ def _sentence_remainder(text: str, start: int) -> str:
     return text[start:stop]
 
 
+def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
+    """Return True if match is marked on its line or located under a Verdict heading."""
+    line_start = scan.rfind("\n", 0, match_start) + 1
+    if BARE_CLEAN_MARKED.search(scan[line_start:match_start]):
+        return True
+    last_verdict = -1
+    for m in re.finditer(r"(?:^|\n)[ \t]*#{1,4}[ \t]*verdict\b", scan, re.IGNORECASE):
+        if m.start() < match_start:
+            last_verdict = m.start()
+    if last_verdict != -1:
+        between = scan[last_verdict:match_start]
+        if not list(re.finditer(r"\n[ \t]*#{1,4}[ \t]+(?!verdict\b)", between, re.IGNORECASE)):
+            return True
+    return False
+
+
 def classify_verdict(body: str, state: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
@@ -707,8 +723,7 @@ def classify_verdict(body: str, state: str = "") -> str:
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
             if pat in BARE_NOT_CLEAN_PATTERNS:
-                line_start = scan.rfind("\n", 0, match.start()) + 1
-                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                if not _is_marked_or_in_verdict_section(scan, match.start()):
                     continue
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
@@ -722,8 +737,7 @@ def classify_verdict(body: str, state: str = "") -> str:
             # the marking, and it already excludes a preceding negation by
             # adjacency.
             if pat in BARE_CLEAN_PATTERNS:
-                line_start = scan.rfind("\n", 0, match.start()) + 1
-                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                if not _is_marked_or_in_verdict_section(scan, match.start()):
                     continue
                 prefix = scan[max(0, match.start() - 40):match.start()]
                 if CLEAN_NEGATION_PREFIX.search(prefix):

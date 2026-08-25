@@ -395,10 +395,24 @@ def main() -> int:
         (non_head_round1["createdAt"], non_head_round1["author"]["login"], non_head_round1["body"], True, ""),
         (non_head_round2["createdAt"], non_head_round2["author"]["login"], non_head_round2["body"], True, ""),
     ]
-    nh_ok, nh_issues = checker.check_latest_verdict(items_non_head)
+    # Regression (PR #2180 round 10): non-HEAD unmarked prose rejection under ### Verdict
+    non_head_prose_round1 = {
+        "createdAt": "2026-08-05T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "This PR is not approved -- several blocking findings remain.\n\n"
+            "(reviewed at `abc1234`)"
+        ),
+    }
+    items_non_head_prose = [
+        (non_head_prose_round1["createdAt"], non_head_prose_round1["author"]["login"], non_head_prose_round1["body"], True, ""),
+        (non_head_round2["createdAt"], non_head_round2["author"]["login"], non_head_round2["body"], True, ""),
+    ]
+    nhp_ok, nhp_issues = checker.check_latest_verdict(items_non_head_prose)
     check(
-        "check_latest_verdict: non-HEAD negated rejection blocks clean verdict",
-        (not nh_ok) and any("NOT clean" in i for i in nh_issues),
+        "check_latest_verdict: non-HEAD unmarked prose rejection under ### Verdict blocks clean verdict",
+        (not nhp_ok) and any("NOT clean" in i for i in nhp_issues),
     )
 
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary

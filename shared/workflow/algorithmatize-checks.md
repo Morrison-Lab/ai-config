@@ -1045,6 +1045,76 @@ the check returned, you did not read its answer.
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "Tailing check-links.py reported clean over three broken links".
 
+**A sentence naming the WRONG exit status defeats that tell.**
+The tell just given is a sentence about an instrument that names no exit
+status, so it cannot catch a sentence that names one.
+A truncating pipe supplies exactly that: without `pipefail` the status belongs
+to the pipeline's rightmost command, so a trailing `head` answers instead of
+the instrument, and the number that prints is a real number produced by a real
+read.
+
+The mechanism, its two shapes, and its remedies belong to
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "A pipe
+discards the status of everything left of it" and the ad-hoc-chain section
+after it, which measure both.
+[`fail-fast.rationale`](../principles/fail-fast.rationale.md)'s "`$?` belongs
+to the last thing evaluated" separates this from the neighbouring case where a
+command substitution misdirects the read and `pipefail` changes nothing.
+Read those two fragments for the mechanism.
+The bullets below restate their remedies rather than replacing them, because a
+bare pointer is invisible to anyone who does not follow it, and the bullets add
+one measurement of their own.
+What is local to this fragment is the blind spot in its own tell, and which way
+that blind spot points: the rule's success is what produces the shape, since a
+reader who has internalized "always print the exit status" can satisfy that
+instruction with the pipe still in place.
+
+**The honest reason this became a guard is not that the corpus lacked a rule.**
+`errexit-is-not-uniform` already names this exact shape, with `head` named ---
+"pipe a verification check into `tail` or `head` for readability while its exit
+status is still gating what runs next" --- and carries a 2026-08-03 case record
+of the same defect.
+That rule was not consulted.
+A fourth prose site would not have been either, which is what makes the
+composition-time condition worth an instrument instead:
+[`hooks/warn-status-read-after-pipe.py`](../../hooks/warn-status-read-after-pipe.py)
+warns when a `$?` read directly follows a pipeline carrying no `pipefail`.
+It warns rather than blocks, since reading the last stage's status is correct
+under `pipefail` and correct whenever that stage is the one you meant.
+
+- **Do:** take the status before the pipe --- redirect to a file, read `$?`,
+  then trim --- which is the remedy that holds whatever the producer does.
+- **Do:** read `${PIPESTATUS[i]}` when you want stage `i` --- index `0` is the
+  leftmost command, which is usually the instrument.
+  `errexit-is-not-uniform` keeps splitting the pipeline as the alternative,
+  and that one needs no array indexing to read correctly.
+- **Don't:** read a printed exit status as evidence that the status was read
+  correctly --- the wrong command's prints exactly like the right one's.
+- **Don't:** reach for `set -o pipefail` first on a deliberately truncated
+  output.
+  A producer piped to `head` is SIGPIPEd once `head` has read enough, which
+  `pipefail` turns into a false failure --- measured on bash 5.3.15 (Darwin,
+  2026-08-24), `set -o pipefail; seq 1 200000 | head -20` gives `rc=141`,
+  where the same line without `pipefail` gives `0`.
+  It is producer-dependent: `seq 1 5 | head -20` exits `0` either way, since
+  the producer finishes before `head` stops reading.
+  `errexit-is-not-uniform` states this caveat where it prefers the
+  split-command remedy for an ad-hoc chain.
+
+(Measured 2026-08-24, driving `UCD-SERG/ucd-serg.github.io#111`.
+The misread is measured.
+The claim that this fragment's tell is what failed is inferred, and the
+competing explanation --- a correct rule elsewhere that nobody opened --- is
+the likelier one, stated above.
+
+```bash
+python3 scripts/check-pr-fully-clean.py 111 -R UCD-SERG/ucd-serg.github.io 2>&1 | head -20; echo "exit=$?"
+```
+
+reported `exit=0` while the checker itself exited 1, and the PR's cleanliness
+was reasoned from the wrong number.
+Tracked as ai-config#2149.)
+
 ## Put the discriminator at the producer, where it is exact
 
 A consumer classifying an artifact by its content is running an inference;

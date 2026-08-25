@@ -233,6 +233,10 @@ verdict, or not configured --- fall back per
 case.
 Another agent's clean verdict is worth more than nothing there, and it is still
 not Claude's; say which one you have.
+Note that merging autonomously under `mwc` (merge-when-confident) strictly requires
+a genuine clean automated Claude review verdict evaluating the HEAD commit;
+a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
+but NEVER satisfies the MWC autonomous merge gate.
 
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".

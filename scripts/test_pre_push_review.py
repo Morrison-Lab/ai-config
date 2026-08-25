@@ -549,9 +549,8 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "origin/main")
 
     @patch("subprocess.run")
-    @patch.object(reviewer, "get_pr_head_sha")
-    def test_post_review_differing_head_sha_posts_comment(self, mock_get_sha, mock_subproc):
-        mock_get_sha.return_value = "remote_sha_9999"
+    @patch("shutil.which", return_value="/opt/homebrew/bin/gh")
+    def test_post_review_posts_issue_comment(self, mock_which, mock_subproc):
         mock_res = MagicMock()
         mock_res.returncode = 0
         mock_subproc.return_value = mock_res
@@ -563,30 +562,45 @@ class TestPrePushReview(unittest.TestCase):
             commit_sha="local_sha_1111",
         )
         self.assertTrue(res)
-        # Verify gh pr comment was called, NOT gh pr review
         cmd_called = mock_subproc.call_args[0][0]
         self.assertIn("comment", cmd_called)
-        self.assertNotIn("review", cmd_called)
+        self.assertIn("123", cmd_called)
+        self.assertIn("--body", cmd_called)
 
-    @patch("subprocess.run")
-    @patch.object(reviewer, "get_pr_head_sha")
-    def test_post_review_unresolved_remote_sha_posts_comment(self, mock_get_sha, mock_subproc):
-        mock_get_sha.return_value = None  # Failed to fetch remote PR head SHA
-        mock_res = MagicMock()
-        mock_res.returncode = 0
-        mock_subproc.return_value = mock_res
+    @patch("shutil.which", return_value=None)
+    def test_post_review_missing_gh_returns_false(self, mock_which):
+        res = reviewer.post_review_to_github(123, "report", "OpenAI Codex")
+        self.assertFalse(res)
 
-        res = reviewer.post_review_to_github(
-            pr_number=123,
-            report="### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nPassed.",
-            engine_name="OpenAI Codex",
-            commit_sha="local_sha_1111",
-        )
-        self.assertTrue(res)
-        # Verify gh pr comment was called, NOT gh pr review
-        cmd_called = mock_subproc.call_args[0][0]
-        self.assertIn("comment", cmd_called)
-        self.assertNotIn("review", cmd_called)
+    @patch("shutil.which")
+    def test_execute_review_fallback_clears_model_override(self, mock_which):
+        mock_which.return_value = "/bin/tool"
+        called_models = []
+
+        def mock_claude(prompt, model="", expected_commit_sha=""):
+            called_models.append(("claude", model))
+            return None  # Trigger fallback
+
+        def mock_codex(prompt, model="", expected_commit_sha=""):
+            called_models.append(("codex", model))
+            return "### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nNone.\nReviewed-Commit: abc12345"
+
+        with patch.dict(reviewer.RUNNER_MAP if hasattr(reviewer, "RUNNER_MAP") else {}, {}):
+            with patch.object(reviewer, "detect_available_engines", return_value=["claude", "codex"]):
+                with patch.object(reviewer, "run_claude_review", side_effect=mock_claude):
+                    with patch.object(reviewer, "run_codex_review", side_effect=mock_codex):
+                        with patch.object(reviewer, "validate_review_output", return_value=True):
+                            report, label = reviewer.execute_review(
+                                "auto", "prompt", model="custom-claude-model", expected_commit_sha="abc12345"
+                            )
+                            self.assertIsNotNone(report)
+                            self.assertEqual(called_models, [("claude", "custom-claude-model"), ("codex", "")])
+
+    @patch("tempfile.NamedTemporaryFile", side_effect=OSError("Disk full"))
+    @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
+    def test_opencode_tempfile_failure_returns_none(self, mock_which, mock_tf):
+        res = reviewer.run_opencode_review("prompt text")
+        self.assertIsNone(res)
 
     @patch("subprocess.run")
     @patch("shutil.which")

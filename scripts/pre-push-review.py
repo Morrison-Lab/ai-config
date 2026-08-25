@@ -409,11 +409,11 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
-        tf.write(prompt)
-        temp_path = tf.name
-
+    temp_path = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+            tf.write(prompt)
+            temp_path = tf.name
         os.chmod(temp_path, 0o600)
         cmd = [
             opencode_path, "run", "--agent", "plan", "--pure",
@@ -431,10 +431,11 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
     finally:
-        try:
-            os.unlink(temp_path)
-        except OSError:
-            pass
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
@@ -529,11 +530,11 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         if report:
             record_successful_engine(cand)
             return report, label
-        # fallback to remaining engines without retrying cand
+        # fallback to remaining engines without retrying cand, clearing model override for fallback engines
         available = [c for c in available if c != cand]
         for rem_cand in available:
             rem_runner, rem_label = engine_dispatch[rem_cand]
-            rem_report = rem_runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
+            rem_report = rem_runner(prompt, model="", expected_commit_sha=expected_commit_sha)
             if rem_report:
                 record_successful_engine(rem_cand)
                 return rem_report, rem_label
@@ -553,9 +554,11 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         log_error("No supported AI CLI found (`claude`, `codex`, `opencode`, `agy`).")
         return None, "None"
 
-    for cand in available:
+    for idx, cand in enumerate(available):
         runner, label = engine_dispatch[cand]
-        report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
+        # Only pass explicit model override to the initial target engine; fallbacks use default models
+        engine_model = model if idx == 0 else ""
+        report = runner(prompt, model=engine_model, expected_commit_sha=expected_commit_sha)
         if report:
             return report, label
         print(f"Engine '{label}' was unavailable, exhausted, or produced invalid output; falling back...")

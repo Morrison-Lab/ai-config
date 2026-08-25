@@ -15,10 +15,11 @@ This adapter is the Cursor-schema command those events invoke. It:
 It never registers anything in `~/.claude/settings.json`, so it cannot
 double-bind the Claude plugin / `install-hooks.py` path.
 A per-payload sentinel still collapses a project-hook plus plugin-hook
-double fire of the *same* Cursor event.
+double fire of the *same* Cursor event by replaying the first JSON result.
 
-Fails open: a crash, timeout, or unreadable payload prints a Cursor
-allow/continue response (or empty JSON for observational events).
+Adapter-level crashes, wrapper timeouts, and unreadable payloads fail open.
+A missing catalog script fails closed for that script (Claude `python3`
+on a missing path exits 2, which PreToolUse treats as deny).
 """
 from __future__ import annotations
 
@@ -30,11 +31,15 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 ADAPTER = Path(__file__).resolve()
 REPO = ADAPTER.parent.parent.parent
+TICK_PENDING = "pending\n"
+TICK_REPLAY_WAIT_S = 5.0
 
 
 def hooks_dir() -> Path:
@@ -57,8 +62,10 @@ def stash_dir() -> Path:
         return Path(override)
     return Path(tempfile.gettempdir()) / "ai-config-cursor-hook-stash"
 
+
 # Claude event -> Cursor events that run those Claude scripts.
 # Keep this table in lockstep with docs/cursor-hook-mapping.md.
+# Values must be keys of HANDLERS; main() dispatches through HANDLERS.
 EVENT_MAPPING: dict[str, list[str]] = {
     "PreToolUse": ["preToolUse"],
     "Stop": ["stop"],
@@ -75,8 +82,8 @@ NO_CURSOR_ANALOG = (
 SPECIAL_MATCHER = re.compile(r"[^A-Za-z0-9_\- ,|]")
 
 
-def fail_open(event: str, extra: dict[str, Any] | None = None) -> int:
-    """Print a non-blocking Cursor response and exit 0."""
+def fail_open_payload(event: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Non-blocking Cursor response for adapter-level failure."""
     payload: dict[str, Any] = {}
     if event in ("preToolUse", "beforeShellExecution", "beforeMCPExecution",
                  "subagentStart"):
@@ -85,7 +92,12 @@ def fail_open(event: str, extra: dict[str, Any] | None = None) -> int:
         payload["continue"] = True
     if extra:
         payload.update(extra)
-    print(json.dumps(payload))
+    return payload
+
+
+def fail_open(event: str, extra: dict[str, Any] | None = None) -> int:
+    """Print a non-blocking Cursor response and exit 0."""
+    print(json.dumps(fail_open_payload(event, extra)))
     return 0
 
 
@@ -216,12 +228,14 @@ def parse_hook_stdout(raw: str) -> tuple[dict[str, Any] | None, str]:
 
 def run_script(script: str, payload: dict[str, Any], timeout: float) -> tuple[int, str, str]:
     path = hooks_dir() / script
-    if not path.is_file():
-        return 0, "", f"missing {script}"
     if script.endswith(".py"):
         argv = [sys.executable, str(path)]
     else:
         argv = ["sh", str(path)]
+    # Missing paths must fail closed. Claude `python3 missing.py` exits 2;
+    # `sh missing.sh` exits 127, which PreToolUse would otherwise allow.
+    if not path.is_file():
+        return 2, "", f"missing {script}"
     try:
         proc = subprocess.run(
             argv,
@@ -239,24 +253,71 @@ def run_script(script: str, payload: dict[str, Any], timeout: float) -> tuple[in
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def tick_already_ran(key: str) -> bool:
+def tick_sentinel(key: str) -> Path:
     base = stash_dir()
     base.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256(key.encode()).hexdigest()[:20]
-    sentinel = base / f"tick-{digest}"
-    if sentinel.exists():
-        return True
+    return base / f"tick-{digest}"
+
+
+def _tick_json(text: str) -> str | None:
+    stripped = text.strip()
+    if stripped.startswith("{"):
+        return stripped
+    return None
+
+
+def wait_for_tick_json(path: Path, timeout: float = TICK_REPLAY_WAIT_S) -> str:
+    deadline = time.time() + timeout
+    last = ""
+    while time.time() < deadline:
+        try:
+            last = path.read_text(encoding="utf-8")
+        except OSError:
+            last = ""
+        found = _tick_json(last)
+        if found is not None:
+            return found
+        time.sleep(0.05)
+    # First fire claimed the tick but stored no JSON. Do not emit a competing
+    # allow; replay empty observational JSON.
+    return "{}"
+
+
+def claim_or_replay_tick(key: str) -> str | None:
+    """Return stored JSON to replay, or None if this process owns the tick."""
+    path = tick_sentinel(key)
     try:
-        sentinel.write_text("1", encoding="utf-8")
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return wait_for_tick_json(path)
     except OSError:
-        return False
-    return False
+        if path.exists():
+            return wait_for_tick_json(path)
+        return None
+    try:
+        os.write(fd, TICK_PENDING.encode("utf-8"))
+    finally:
+        os.close(fd)
+    return None
+
+
+def store_tick_result(key: str, result: dict[str, Any]) -> None:
+    path = tick_sentinel(key)
+    try:
+        path.write_text(json.dumps(result), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def conversation_id_of(cursor: dict[str, Any]) -> str:
+    return str(cursor.get("conversation_id") or cursor.get("session_id") or "")
 
 
 def payload_tick_key(event: str, cursor: dict[str, Any]) -> str:
     return "|".join((
         event,
-        str(cursor.get("conversation_id") or ""),
+        conversation_id_of(cursor),
         str(cursor.get("generation_id") or ""),
         str(cursor.get("tool_use_id") or ""),
         str(cursor.get("loop_count") if cursor.get("loop_count") is not None else ""),
@@ -297,10 +358,19 @@ def take_stashed_context(tool_use_id: str) -> str:
         return ""
 
 
-def generation_ups_sentinel(generation_id: str) -> Path:
+def ups_key(cursor: dict[str, Any]) -> str:
+    return str(
+        cursor.get("generation_id")
+        or cursor.get("conversation_id")
+        or cursor.get("session_id")
+        or ""
+    )
+
+
+def generation_ups_sentinel(key: str) -> Path:
     base = stash_dir()
     base.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.sha256(generation_id.encode()).hexdigest()[:20]
+    digest = hashlib.sha256(key.encode()).hexdigest()[:20]
     return base / f"ups-{digest}"
 
 
@@ -358,16 +428,21 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
     candidates = cursor_to_claude_tool_names(cursor_tool)
     extra_chunks: list[str] = []
     deny_reason = None
+    ran_scripts: set[str] = set()
     for entry in entries:
         if entry["event"] != "PreToolUse":
+            continue
+        script = entry["script"]
+        if script in ran_scripts:
             continue
         hits = [name for name in candidates if matcher_hits(entry.get("matcher"), name)]
         if not hits:
             continue
+        ran_scripts.add(script)
         claude_tool = hits[0]
         payload = claude_payload_for_pretool(cursor, claude_tool)
         timeout = float(entry.get("timeout") or 10)
-        code, stdout, stderr = run_script(entry["script"], payload, timeout)
+        code, stdout, stderr = run_script(script, payload, timeout)
         if stderr:
             print(stderr, file=sys.stderr, end="" if stderr.endswith("\n") else "\n")
         parsed, text = parse_hook_stdout(stdout)
@@ -435,9 +510,9 @@ def handle_user_prompt_submit(
     entries: list[dict[str, Any]],
     once_per_generation: bool,
 ) -> str:
-    generation_id = str(cursor.get("generation_id") or cursor.get("conversation_id") or "")
-    if once_per_generation and generation_id:
-        sentinel = generation_ups_sentinel(generation_id)
+    key = ups_key(cursor)
+    if once_per_generation and key:
+        sentinel = generation_ups_sentinel(key)
         if sentinel.exists():
             return ""
         try:
@@ -480,6 +555,18 @@ def handle_post_tool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> d
     return {}
 
 
+HANDLERS: dict[str, Callable[[dict[str, Any], list[dict[str, Any]]], dict[str, Any]]] = {
+    "preToolUse": handle_pretool,
+    "stop": handle_stop,
+    "sessionStart": handle_session_start,
+    "postToolUse": handle_post_tool,
+}
+
+
+def mapped_cursor_events() -> set[str]:
+    return {name for events in EVENT_MAPPING.values() for name in events}
+
+
 def read_stdin() -> dict[str, Any]:
     try:
         raw = sys.stdin.read()
@@ -494,6 +581,12 @@ def read_stdin() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def emit_result(key: str, result: dict[str, Any]) -> int:
+    store_tick_result(key, result)
+    print(json.dumps(result))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -504,31 +597,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     event = args.event
     cursor = read_stdin()
-    if tick_already_ran(payload_tick_key(event, cursor)):
-        return fail_open(event)
+    key = payload_tick_key(event, cursor)
+    replay = claim_or_replay_tick(key)
+    if replay is not None:
+        sys.stdout.write(replay if replay.endswith("\n") else replay + "\n")
+        return 0
     try:
         entries = load_manifest()
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"adapt-claude-hooks: cannot load hooks.json ({exc})", file=sys.stderr)
-        return fail_open(event)
+        return emit_result(key, fail_open_payload(event))
 
+    handler = HANDLERS.get(event)
     try:
-        if event == "preToolUse":
-            result = handle_pretool(cursor, entries)
-        elif event == "stop":
-            result = handle_stop(cursor, entries)
-        elif event == "sessionStart":
-            result = handle_session_start(cursor, entries)
-        elif event == "postToolUse":
-            result = handle_post_tool(cursor, entries)
-        else:
-            result = {}
+        result = handler(cursor, entries) if handler is not None else {}
     except Exception as exc:  # fail open
         print(f"adapt-claude-hooks: {event} failed ({exc})", file=sys.stderr)
-        return fail_open(event)
+        return emit_result(key, fail_open_payload(event))
 
-    print(json.dumps(result))
-    return 0
+    return emit_result(key, result)
 
 
 if __name__ == "__main__":

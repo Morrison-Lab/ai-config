@@ -17,15 +17,16 @@ It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude p
 | Claude Code event | Cursor event | Cloud agent | Notes |
 |---|---|---|---|
 | `PreToolUse` | `preToolUse` | yes | Covers Shell (Claude `Bash`), Task/Agent, and MCP tools. Matcher translation lives in the adapter. |
-| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `null` so a block can retry like Claude. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. |
+| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `5` (Cursor's default) so a block can retry a few times without an unbounded follow-up loop. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. |
 | `UserPromptSubmit` | `sessionStart` | no | Cursor `sessionStart` can inject `additional_context`. Cloud agents do not load `sessionStart`. |
-| `UserPromptSubmit` | `postToolUse` | yes | First `postToolUse` of a generation injects the same stdout / `additionalContext` the Claude UPS path would have added before the turn. Late by one tool call. `inject-local-time.sh` therefore lands after the first tool, not before the first token. |
+| `UserPromptSubmit` | `postToolUse` | yes | First `postToolUse` of a generation injects the same stdout / `additionalContext` the Claude UPS path would have added before the turn. A cloud turn that never calls a tool never fires `postToolUse`, so UPS context is dropped, not delayed. `inject-local-time.sh` therefore lands after the first tool when there is one, and not at all on a tool-less turn. |
 | `UserPromptSubmit` | `beforeSubmitPrompt` | yes, but unused | Cursor `beforeSubmitPrompt` can only `continue` / block. It cannot inject context. No UPS hook here currently blocks, so this event is unbound. |
 | `PreToolUse` matcher `SendMessage` | (none) | n/a | `remind-brief-premises.py` also binds `Agent` and `Task`, which Cursor maps. The SendMessage-only slice has no analog. |
 | `PreToolUse` MCP | `preToolUse` (`MCP:` prefix) | yes | Cursor Cloud does not load `beforeMCPExecution` / `afterMCPExecution`. `preToolUse` is the cloud path. |
 | `SessionStart` / `SessionEnd` / `PreCompact` | unused | mixed | This catalog does not register those Claude events. |
 
 The adapter's `EVENT_MAPPING` table is the machine-readable copy of the first three rows.
+`main()` dispatches through `HANDLERS`, and every `EVENT_MAPPING` value must be a `HANDLERS` key.
 `scripts/test_cursor_hook_adapter.py` asserts every Claude event in `hooks/hooks.json` appears there.
 
 ## Tool-name mapping

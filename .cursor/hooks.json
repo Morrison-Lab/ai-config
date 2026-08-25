@@ -4,26 +4,26 @@
     "preToolUse": [
       {
         "command": "python3 .cursor/hooks/adapt-claude-hooks.py --event preToolUse",
-        "timeout": 30
+        "timeout": 60
       }
     ],
     "postToolUse": [
       {
         "command": "python3 .cursor/hooks/adapt-claude-hooks.py --event postToolUse",
-        "timeout": 30
+        "timeout": 120
       }
     ],
     "stop": [
       {
         "command": "python3 .cursor/hooks/adapt-claude-hooks.py --event stop",
-        "timeout": 30,
-        "loop_limit": null
+        "timeout": 120,
+        "loop_limit": 5
       }
     ],
     "sessionStart": [
       {
         "command": "python3 .cursor/hooks/adapt-claude-hooks.py --event sessionStart",
-        "timeout": 30
+        "timeout": 60
       }
     ]
   }

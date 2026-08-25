@@ -75,6 +75,17 @@ check(
     "SendMessage is an explicit no-analog, not an omitted mapping",
     "SendMessage" in mod.NO_CURSOR_ANALOG,
 )
+check(
+    "EVENT_MAPPING values are HANDLERS keys",
+    mod.mapped_cursor_events() <= set(mod.HANDLERS),
+)
+check(
+    "HANDLERS covers every Cursor event in the project hooks.json",
+    set(json.loads(CURSOR_HOOKS.read_text(encoding="utf-8")).get("hooks", {}))
+    <= set(mod.HANDLERS),
+)
+live_entries = mod.load_manifest()
+check("live catalog load_manifest is non-empty", len(live_entries) >= 40)
 
 # --- Cursor manifest is native schema, not Claude's ---
 cursor_cfg = json.loads(CURSOR_HOOKS.read_text(encoding="utf-8"))
@@ -95,12 +106,38 @@ for event, hooks in cursor_cfg.get("hooks", {}).items():
         f"{event} command invokes the adapter",
         all("adapt-claude-hooks.py" in c and f"--event {event}" in c for c in cmds),
     )
+stop_hook = cursor_cfg["hooks"]["stop"][0]
+check("stop loop_limit is 5", stop_hook.get("loop_limit") == 5)
+check(
+    "preToolUse wrapper timeout is 60",
+    cursor_cfg["hooks"]["preToolUse"][0].get("timeout") == 60,
+)
+check(
+    "postToolUse wrapper timeout is 120",
+    cursor_cfg["hooks"]["postToolUse"][0].get("timeout") == 120,
+)
+check(
+    "stop wrapper timeout is 120",
+    stop_hook.get("timeout") == 120,
+)
+
+
+def hooks_field_points_at_claude(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = os.path.normpath(value).replace("\\", "/")
+    return normalized.endswith("hooks/hooks.json")
+
+
+check(
+    "path normalizer rejects ../hooks/hooks.json",
+    hooks_field_points_at_claude("../hooks/hooks.json"),
+)
 
 plugin = json.loads(PLUGIN.read_text(encoding="utf-8"))
 check(
     "Cursor plugin.json does not point hooks at Claude hooks/hooks.json",
-    plugin.get("hooks") != "hooks/hooks.json"
-    and plugin.get("hooks") != "./hooks/hooks.json",
+    not hooks_field_points_at_claude(plugin.get("hooks")),
 )
 
 # --- unit: tool-name and matcher translation ---
@@ -169,6 +206,16 @@ ups_sh = """\
 echo "local time: 2026-08-25 10:00 PDT"
 """
 
+count_py = """\
+#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+p = Path(os.environ["COUNT_FILE"])
+n = int(p.read_text()) if p.exists() else 0
+p.write_text(str(n + 1))
+print(json.dumps({}))
+"""
+
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)
     hooks = tmp / "hooks"
@@ -177,6 +224,7 @@ with tempfile.TemporaryDirectory() as raw:
     write_hook(hooks, "warn-isolation.py", warn_py)
     write_hook(hooks, "block-stop.py", stop_py)
     write_hook(hooks, "inject-time.sh", ups_sh)
+    write_hook(hooks, "count-task.py", count_py)
     manifest = {
         "hooks": {
             "PreToolUse": [
@@ -186,7 +234,14 @@ with tempfile.TemporaryDirectory() as raw:
                 },
                 {
                     "matcher": "Agent",
-                    "hooks": [{"script": "warn-isolation.py", "timeout": 5}],
+                    "hooks": [
+                        {"script": "warn-isolation.py", "timeout": 5},
+                        {"script": "count-task.py", "timeout": 5},
+                    ],
+                },
+                {
+                    "matcher": "Task",
+                    "hooks": [{"script": "count-task.py", "timeout": 5}],
                 },
             ],
             "Stop": [
@@ -205,6 +260,8 @@ with tempfile.TemporaryDirectory() as raw:
     env["AI_CONFIG_HOOKS_DIR"] = str(hooks)
     env["AI_CONFIG_HOOKS_JSON"] = str(manifest_path)
     env["AI_CONFIG_CURSOR_HOOK_STASH"] = str(stash)
+    count_file = tmp / "task-count.txt"
+    env["COUNT_FILE"] = str(count_file)
 
     denied = run_adapter(
         "preToolUse",
@@ -219,6 +276,21 @@ with tempfile.TemporaryDirectory() as raw:
     )
     check("Shell merge is denied", denied.get("permission") == "deny")
     check("deny reason is forwarded", "merge blocked" in str(denied.get("agent_message")))
+    denied_again = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "gh pr merge 1"},
+            "tool_use_id": "deny-1",
+            "conversation_id": "c1",
+            "generation_id": "g-deny",
+        },
+        env,
+    )
+    check(
+        "double-fire replays the first deny rather than a competing allow",
+        denied_again.get("permission") == "deny",
+    )
 
     allowed = run_adapter(
         "preToolUse",
@@ -245,6 +317,10 @@ with tempfile.TemporaryDirectory() as raw:
         env,
     )
     check("warn-only Agent launch is allowed", warned.get("permission") == "allow")
+    check(
+        "Task runs a dual Agent/Task script once",
+        count_file.read_text() == "1",
+    )
     replayed = run_adapter(
         "postToolUse",
         {
@@ -312,12 +388,83 @@ with tempfile.TemporaryDirectory() as raw:
         "sessionStart injects UPS additional_context",
         "10:00 PDT" in str(session.get("additional_context")),
     )
+    session_id_only = run_adapter(
+        "sessionStart",
+        {"session_id": "sid-only"},
+        env,
+    )
+    check(
+        "session_id alone keys UPS injection",
+        "10:00 PDT" in str(session_id_only.get("additional_context")),
+    )
 
     # Fail-open: missing manifest
     bad_env = env.copy()
     bad_env["AI_CONFIG_HOOKS_JSON"] = str(tmp / "nope.json")
     open_fail = run_adapter("preToolUse", {"tool_name": "Shell"}, bad_env)
     check("missing manifest fail-open allows", open_fail.get("permission") == "allow")
+
+    miss_manifest = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [{"script": "no-such-guard.py", "timeout": 5}],
+                },
+            ],
+            "Stop": [],
+            "UserPromptSubmit": [],
+        }
+    }
+    miss_path = tmp / "missing-hooks.json"
+    miss_path.write_text(json.dumps(miss_manifest), encoding="utf-8")
+    miss_env = env.copy()
+    miss_env["AI_CONFIG_HOOKS_JSON"] = str(miss_path)
+    miss_env["AI_CONFIG_CURSOR_HOOK_STASH"] = str(tmp / "stash-missing")
+    missing = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "git status"},
+            "tool_use_id": "missing-1",
+            "conversation_id": "c-missing",
+            "generation_id": "g-missing",
+        },
+        miss_env,
+    )
+    check("missing catalog script fail-closed denies", missing.get("permission") == "deny")
+
+# --- live catalog, not the fixture ---
+with tempfile.TemporaryDirectory() as live_raw:
+    live_stash = Path(live_raw)
+    live_env = os.environ.copy()
+    live_env.pop("AI_CONFIG_HOOKS_DIR", None)
+    live_env.pop("AI_CONFIG_HOOKS_JSON", None)
+    live_env["AI_CONFIG_CURSOR_HOOK_STASH"] = str(live_stash)
+    live_allow = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "git status"},
+            "tool_use_id": "live-allow-1",
+            "conversation_id": "live-c",
+            "generation_id": "live-g-allow",
+        },
+        live_env,
+    )
+    check("live catalog allows git status", live_allow.get("permission") == "allow")
+    live_deny = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "gh pr merge 1"},
+            "tool_use_id": "live-deny-1",
+            "conversation_id": "live-c",
+            "generation_id": "live-g-deny",
+        },
+        live_env,
+    )
+    check("live catalog denies gh pr merge", live_deny.get("permission") == "deny")
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

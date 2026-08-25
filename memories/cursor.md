@@ -66,6 +66,8 @@ already consume.
 The event mapping is [docs/cursor-hook-mapping.md](../docs/cursor-hook-mapping.md).
 
 User-level `~/.cursor/hooks.json` is not available to cloud agents.
-`sessionStart` injection is desktop-only; cloud agents get
-`UserPromptSubmit` context on the first `postToolUse` of a generation.
+`sessionStart` injection is desktop-only.
+Cloud agents get `UserPromptSubmit` context on the first `postToolUse`
+of a generation; a tool-less cloud turn drops that context rather than
+delaying it, because `beforeSubmitPrompt` cannot inject.
 

@@ -21,7 +21,7 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
    - Discover via `.agents/skills.json` directory registration and validate with `scripts/validate-skills.py`.
 
 ## Non-Functional & Quality Requirements
-- Zero reliance on cloud API keys; purely local CLI execution.
+- Purely local CLI execution using configured user desktop tools and subscriptions.
 - High test fidelity: Comprehensive test suite in `scripts/test_pre_push_review.py` verifying diff extraction, fallback logic, CLI arguments, and formatting.
 - Strict clean execution under repository validation linters and link checkers.
 

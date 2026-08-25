@@ -253,6 +253,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if is_clean and not is_clean_findings:
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
+    # If verdict claims clean, verify that no explicit blocker or must-fix phrase appears anywhere in the report
+    if is_clean:
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|\b(?:blocker|blocking)\s*:)"
+        blocker_match = re.search(blocker_pattern, unfenced_report)
+        if blocker_match:
+            return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
+
     refusal_patterns = [
         "hit your weekly limit",
         "prepayment credits depleted",

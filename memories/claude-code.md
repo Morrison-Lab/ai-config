@@ -1108,7 +1108,7 @@ Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/toolResultS
   with the exact disk path for subsequent `FileRead` retrieval.
 - **Batch limit**:
   Combined tool outputs across parallel tool executions in a single turn are capped at `MAX_TOOL_RESULTS_PER_MESSAGE_CHARS = 200_000` characters.
-  Thresholds are subject to GrowthBook override (`tengu_satin_quoll`) and release changes.
+  Thresholds are subject to harness configuration and release changes.
 
 ## Token budgeting directives
 

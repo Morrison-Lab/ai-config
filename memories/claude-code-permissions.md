@@ -177,12 +177,12 @@ re-verify before relying on these internal pipeline stages:
   Tracks consecutive and total denials via `denialTracking.ts` (`DENIAL_LIMITS.maxConsecutive` / `maxTotal`).
   Exceeding thresholds falls back to user prompts or aborts headless runs.
 
-## OS sandbox filesystem invariants
+## OS sandbox filesystem invariants & customization lockdown paths
 
-Measured 2026-08 under `@anthropic-ai/sandbox-runtime` (`src/utils/sandbox/sandbox-adapter.ts`, commit `eb0840e`):
+Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/sandbox/sandbox-adapter.ts` and managed policy handlers, commit `eb0840e`):
 
 - `sandbox.autoAllowBashIfSandboxed: true` auto-approves safe commands inside Seatbelt/Bubblewrap/WSL2.
 - **Protected paths**:
-  Writes to `.claude/skills`, `.claude/commands`, `.claude/agents`, `settings.json`,
+  Writes to customization directories (`~/.claude`, `.claude/skills`, `.claude/commands`, `.claude/agents`, `settings.json`, `.mcp.json`)
   and bare git repository control files (`HEAD`, `objects`, `refs`, `hooks`, `config`)
-  are hard-blocked by the sandbox adapter to prevent sandbox escapes.
+  are restricted under sandboxed and managed customization lockdown modes to prevent escape vectors.

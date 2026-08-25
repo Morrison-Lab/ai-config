@@ -10,7 +10,8 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
 
 
 ## WebFetch answers with a SUMMARY, so read the source when the answer is an exact literal
-- `WebFetch` parses HTML into Markdown via `TurndownService` (capped at 100,000 characters) and runs `applyPromptToMarkdown` using `queryHaiku` (Claude 3.5 Haiku) to synthesize an answer.
+- `WebFetch` parses HTML into Markdown via `TurndownService` (capped at 100,000 characters)
+  and runs `applyPromptToMarkdown` using `queryHaiku` (which resolves dynamically to the harness's default Haiku model) to synthesize an answer.
   For "what does this do" that is the point.
   For "what exactly does it write" it is a paraphrase of the thing you asked
   for, and a paraphrase can silently change a character.

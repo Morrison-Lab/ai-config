@@ -186,12 +186,8 @@
 - If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse.
   Don't loop forever and don't unilaterally override.
 - After creating or pushing to a PR, always subscribe when `subscribe_pr_activity` is available **and** immediately arm a persistent loop (`/loop`, a `schedule` timer, or a monitored local shell loop with `notify_on_output`) --- without asking first.
-  Keep following until the PR is merged or closed (or I say stop).
+  Keep following until the PR is merged or closed (or I say stop), and treat a "are you monitoring?" question as a status check that starts the loop if it is not running rather than as a reason to stay idle.
   Don't ask "want me to watch it?"; just do it.
-  A one-shot status poll is not babysitting.
-  If I ask whether you are monitoring, start the loop if it is not running, then answer.
-  Do not bake auto-merge into the loop prompt unless I have granted merge permission for that PR.
-  (User directive, 2026-08-25, Lacaedemon/sparta#1397: "always start a persistent loop".)
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
   If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).
   If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md).

@@ -20,6 +20,8 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
         if result.returncode != 0:
             err_msg = result.stderr.strip() if result.stderr else f"process exited with code {result.returncode}"
             print(f"claude-hook-adapter: hook failed: {err_msg}", file=sys.stderr)
+        elif result.stderr:
+            print(f"claude-hook-adapter: hook stderr: {result.stderr.strip()}", file=sys.stderr)
         return result
     except subprocess.TimeoutExpired:
         print(f"claude-hook-adapter: hook timed out after {timeout_val}s", file=sys.stderr)
@@ -147,6 +149,8 @@ def main():
             if raw_subagents is not None and not isinstance(raw_subagents, list):
                 print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
+            if len(subagents) > 50:
+                print(f"claude-hook-adapter: invoke_subagent exceeded max fanout cap (50/{len(subagents)})", file=sys.stderr)
             # Enforce max fanout cap of 50 subagents to prevent unbounded synchronous execution
             for idx, sub in enumerate(subagents[:50]):
                 if not isinstance(sub, dict):

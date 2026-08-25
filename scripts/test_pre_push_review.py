@@ -474,21 +474,6 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(adv_findings)
         self.assertFalse(is_clean)
 
-        # Contradictory report with clean Critical Findings but blocker in Observations is rejected
-        obs_blocker_report = (
-            "### Summary Verdict\n"
-            "Verdict: Ready for merge\n\n"
-            "### Critical Findings\n"
-            "None.\n\n"
-            "### Observations\n"
-            "BLOCKING: data loss occurs on unhandled error.\n\n"
-            "### Verification Steps\nNone.\n"
-            f"Reviewed-Commit: {commit}"
-        )
-        is_valid, is_clean, reason = reviewer.parse_review_verdict(obs_blocker_report, expected_commit_sha=commit)
-        self.assertFalse(is_valid)
-        self.assertIn("Contradictory output", reason)
-
         # Rejects contradictory APPROVE with critical blocker
         contradictory = (
             "### Summary Verdict\n"

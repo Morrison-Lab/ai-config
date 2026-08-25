@@ -547,6 +547,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
     r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
 # Applies to EVERY not-clean pattern, not to one named member.
@@ -597,6 +598,7 @@ BARE_CLEAN_PATTERNS = {
 }
 BARE_NOT_CLEAN_PATTERNS = {
     r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -955,7 +957,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-                if pat in BARE_NOT_CLEAN_PATTERNS:
+                if pat in BARE_NOT_CLEAN_PATTERNS and "clean|approved|ready" not in pat:
                     line_start = scan_body.rfind("\n", 0, match.start()) + 1
                     if not BARE_CLEAN_MARKED.search(scan_body[line_start:match.start()]):
                         continue

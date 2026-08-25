@@ -372,6 +372,35 @@ def main() -> int:
                 (not rej_ok) and len(rej_issues) > 0,
             )
 
+    # Regression (PR #2180 round 9): non-HEAD negated rejection caught by check_latest_verdict
+    non_head_round1 = {
+        "createdAt": "2026-08-05T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "**Not approved** -- several blocking findings remain.\n\n"
+            "(reviewed at `abc1234`)"
+        ),
+    }
+    non_head_round2 = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "I examined the diff and left some notes below, but got cut short before concluding.\n\n"
+            "(reviewed at `def5678f`)"
+        ),
+    }
+    items_non_head = [
+        (non_head_round1["createdAt"], non_head_round1["author"]["login"], non_head_round1["body"], True, ""),
+        (non_head_round2["createdAt"], non_head_round2["author"]["login"], non_head_round2["body"], True, ""),
+    ]
+    nh_ok, nh_issues = checker.check_latest_verdict(items_non_head)
+    check(
+        "check_latest_verdict: non-HEAD negated rejection blocks clean verdict",
+        (not nh_ok) and any("NOT clean" in i for i in nh_issues),
+    )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.
@@ -637,7 +666,7 @@ def main() -> int:
     )
     check(
         "classify_verdict: 'Verdict: Not Ready' is not clean",
-        checker.classify_verdict("Verdict: Not Ready") == "",
+        checker.classify_verdict("Verdict: Not Ready") in ("", "not-clean"),
     )
     # Adversative connectors, which the round-1 word lists missed entirely.
     # Note two of them separate the qualifier with a comma or a dash rather

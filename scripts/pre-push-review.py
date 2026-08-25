@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -349,14 +350,14 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "-p", prompt, "--permission-mode", "plan"]
+    cmd = [claude_path, "-p", "--permission-mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
@@ -408,11 +409,20 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
 
-    cmd = [opencode_path, "run", "--agent", "plan", "--pure", prompt]
-    if model:
-        cmd.extend(["-m", model])
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as tf:
+        tf.write(prompt)
+        temp_path = tf.name
 
     try:
+        os.chmod(temp_path, 0o600)
+        cmd = [
+            opencode_path, "run", "--agent", "plan", "--pure",
+            "-f", temp_path,
+            "Perform adversarial code review against the diff and instructions in the attached file.",
+        ]
+        if model:
+            cmd.extend(["-m", model])
+
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
@@ -420,6 +430,11 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
+    finally:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
@@ -561,47 +576,23 @@ def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> s
 
 
 def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_sha: str = "") -> bool:
-    """Post review report directly to GitHub PR via gh CLI."""
-    formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
-
-    remote_sha = get_pr_head_sha(pr_number)
-    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, post as comment note
-    if not remote_sha or (commit_sha and commit_sha != remote_sha):
-        print(
-            f"Notice: Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
-            f"({remote_sha[:8] if remote_sha else 'unresolved'}). Posting as local PR comment note.",
-            file=sys.stderr,
-        )
-        res_comment = subprocess.run(
-            ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
-            capture_output=True,
-            text=True,
-        )
-        if res_comment.returncode == 0:
-            print(f"Successfully posted review note to PR #{pr_number} via `gh pr comment`.")
-            return True
-        log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
+    """Post review report directly to GitHub PR issue comments via gh CLI."""
+    if not shutil.which("gh"):
+        log_error("gh CLI is not installed or not in PATH; cannot post review to GitHub.")
         return False
 
-    res = subprocess.run(
-        ["gh", "pr", "review", str(pr_number), "--comment", "--body", formatted_body],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        print(f"Successfully posted review to PR #{pr_number} via `gh pr review`.")
-        return True
+    formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
-    res_comment = subprocess.run(
+    res = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
         capture_output=True,
         text=True,
     )
-    if res_comment.returncode == 0:
-        print(f"Successfully posted review comment to PR #{pr_number} via `gh pr comment`.")
+    if res.returncode == 0:
+        print(f"Successfully posted adversarial review note to PR #{pr_number} via `gh pr comment`.")
         return True
 
-    log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
+    log_error(f"Failed to post to GitHub PR #{pr_number}: {res.stderr.strip() or res.stdout.strip()}")
     return False
 
 

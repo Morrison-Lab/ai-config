@@ -625,15 +625,16 @@ class TestPrePushReview(unittest.TestCase):
         mock_res.stdout = valid_report
         mock_subproc.return_value = mock_res
 
-        # Test Claude runner passes prompt positionally via -p
+        # Test Claude runner passes prompt via stdin with -p
         mock_which.return_value = "/opt/homebrew/bin/claude"
         out_claude = reviewer.run_claude_review("prompt_diff", model="claude-3-5-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_claude, valid_report)
         claude_cmd = mock_subproc.call_args[0][0]
         self.assertIn("-p", claude_cmd)
-        self.assertIn("prompt_diff", claude_cmd)
+        self.assertIn("--permission-mode", claude_cmd)
         self.assertIn("--model", claude_cmd)
         self.assertIn("claude-3-5-sonnet", claude_cmd)
+        self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt_diff")
 
         # Test Antigravity runner passes prompt immediately after --print
         mock_which.return_value = "/opt/homebrew/bin/agy"
@@ -645,13 +646,13 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
-        # Test OpenCode runner passes prompt positionally
+        # Test OpenCode runner passes prompt via secure tempfile (-f)
         mock_which.return_value = "/opt/homebrew/bin/opencode"
         out_oc = reviewer.run_opencode_review("prompt_diff", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertIn("prompt_diff", oc_cmd)
+        self.assertIn("-f", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
@@ -693,7 +694,7 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
-    def test_opencode_positional_prompt_delivery(self, mock_which, mock_subproc):
+    def test_opencode_tempfile_prompt_delivery(self, mock_which, mock_subproc):
         mock_res = MagicMock()
         mock_res.returncode = 0
         mock_res.stdout = "output"
@@ -703,7 +704,8 @@ class TestPrePushReview(unittest.TestCase):
             res = reviewer.run_opencode_review("prompt text", model="anthropic/claude-3.7-sonnet")
             self.assertEqual(res, "output")
             cmd_args = mock_subproc.call_args[0][0]
-            self.assertIn("prompt text", cmd_args)
+            self.assertIn("-f", cmd_args)
+            self.assertIn("--pure", cmd_args)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

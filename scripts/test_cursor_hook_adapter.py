@@ -474,6 +474,34 @@ with tempfile.TemporaryDirectory() as raw:
         "sessionStart injects UPS additional_context",
         "10:00 PDT" in str(session.get("additional_context")),
     )
+    after_typed_session = run_adapter(
+        "postToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_use_id": "after-typed-session",
+            "conversation_id": "c-session",
+            "generation_id": "g-first-user",
+        },
+        env,
+    )
+    check(
+        "postToolUse after sessionStart with generation_id does not repeat UPS",
+        "10:00 PDT" not in str(after_typed_session.get("additional_context") or ""),
+    )
+    later_typed = run_adapter(
+        "postToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_use_id": "later-typed",
+            "conversation_id": "c-session",
+            "generation_id": "g-second-user",
+        },
+        env,
+    )
+    check(
+        "later generation after typed sessionStart still gets UPS",
+        "10:00 PDT" in str(later_typed.get("additional_context") or ""),
+    )
     session_id_only = run_adapter(
         "sessionStart",
         {"session_id": "sid-only"},

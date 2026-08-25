@@ -535,12 +535,13 @@ def take_stashed_context(tool_use_id: str) -> str:
         return ""
 
 
-def claim_ups_slot(cursor: dict[str, Any]) -> bool:
+def claim_ups_slot(cursor: dict[str, Any], event: str) -> bool:
     """True when this event should run UserPromptSubmit scripts.
 
-    sessionStart often has only session_id. postToolUse has generation_id.
-    If sessionStart already injected, skip the first postToolUse of that
-    conversation and still inject on later generations.
+    sessionStart often has only session_id; Cursor may also send a bootstrap
+    generation_id. Write a conversation sentinel there so the first
+    postToolUse of that conversation does not inject again, even when its
+    generation_id differs. Later generations still inject.
     """
     conv = conversation_id_of(cursor)
     gen = str(cursor.get("generation_id") or "")
@@ -548,7 +549,24 @@ def claim_ups_slot(cursor: dict[str, Any]) -> bool:
         return True
     gen_sentinel = generation_ups_sentinel(f"{conv}|{gen}") if gen else None
     conv_sentinel = generation_ups_sentinel(f"{conv}|") if conv else None
+    if event == "sessionStart":
+        if conv_sentinel is not None:
+            try:
+                conv_sentinel.write_text("1", encoding="utf-8")
+            except OSError:
+                pass
+        if gen_sentinel is not None:
+            try:
+                gen_sentinel.write_text("1", encoding="utf-8")
+            except OSError:
+                pass
+        return True
     if gen_sentinel is not None and gen_sentinel.exists():
+        if conv_sentinel is not None and conv_sentinel.exists():
+            try:
+                conv_sentinel.unlink()
+            except OSError:
+                pass
         return False
     if conv_sentinel is not None and conv_sentinel.exists():
         if gen_sentinel is not None:
@@ -556,15 +574,19 @@ def claim_ups_slot(cursor: dict[str, Any]) -> bool:
                 gen_sentinel.write_text("1", encoding="utf-8")
             except OSError:
                 pass
-            try:
-                conv_sentinel.unlink()
-            except OSError:
-                pass
-        return False
-    target = gen_sentinel if gen_sentinel is not None else conv_sentinel
-    if target is not None:
         try:
-            target.write_text("1", encoding="utf-8")
+            conv_sentinel.unlink()
+        except OSError:
+            pass
+        return False
+    if gen_sentinel is not None:
+        try:
+            gen_sentinel.write_text("1", encoding="utf-8")
+        except OSError:
+            pass
+    elif conv_sentinel is not None:
+        try:
+            conv_sentinel.write_text("1", encoding="utf-8")
         except OSError:
             pass
     return True
@@ -726,7 +748,7 @@ def handle_user_prompt_submit(
     once_per_generation: bool,
     event: str = "postToolUse",
 ) -> str:
-    if once_per_generation and not claim_ups_slot(cursor):
+    if once_per_generation and not claim_ups_slot(cursor, event):
         return ""
     payload = claude_payload_for_transcript(cursor, "UserPromptSubmit")
     chunks: list[str] = []

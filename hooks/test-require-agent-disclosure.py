@@ -47,9 +47,17 @@ CASES = [
     # --- must NOT warn -------------------------------------------------------
     ("marker present",
      f'gh pr comment 12 --body "Working on this.\n\n{MARKER}"', False),
+    # The NAME substitutes; the rest of the line stays verbatim, per AGENTS.md.
+    # This fixture used to carry an invented tail ("-- not a human._"), which
+    # encoded a laxness the rule forbids -- and which the prefix-only MARKER_RE
+    # happened to accept. Tightening the matcher against marker forgery is what
+    # exposed it.
     ("marker with another agent name",
-     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) -- not a human._"',
-     False),
+     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) --- not '
+     'written by a human._"', False),
+    ("an invented marker tail does not disclose",
+     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) -- not a '
+     'human._"', "missing"),
     ("dependabot rebase is exempt",
      'gh pr comment 12 --repo o/r --body "@dependabot rebase"', False),
     ("dependabot squash is exempt",
@@ -267,9 +275,19 @@ CASES = [
      'gh pr review 12 --comment \\\n  --body-file /tmp/r.md', None),
 
     # --- round-5: naming a mutation is not posting ---------------------------
-    ("a command that merely NAMES the mutation posts nothing",
+    # SUPERSEDED by the #2185 cross-vendor round. This asserted silence for
+    # `--input payload.json` on the strength of the mutation name appearing in
+    # a trailing SHELL COMMENT -- reading that comment as evidence the command
+    # posts nothing. It is not evidence: `--input` supplies the whole payload
+    # from a file, so the command may post a comment and the check cannot see
+    # it. "Cannot read the body" is the honest verdict, and it asserts nothing.
+    # The corpus writes no such command, so the cost is nil.
+    ("gh api graphql --input hides its mutation inside the file",
      'gh api graphql --input payload.json  # addDiscussionComment payload',
-     False),
+     None),
+    # The genuine mention-only case: nothing supplies a payload at all.
+    ("naming the mutation with no payload flag posts nothing",
+     'echo "see addDiscussionComment in the docs"', False),
 
     # --- round-5: the `--body=` equals form is inline, not unreadable --------
     ("--body= equals form is a visible body",
@@ -304,8 +322,8 @@ CASES = [
     ("a GraphQL mutation whose body is not in a body= field",
      "gh api graphql --input p.json -f query='mutation { addDiscussionComment(x) }'",
      None),
-    ("a comment mentioning the mutation posts nothing",
-     'gh api graphql --input p.json  # addDiscussionComment payload', False),
+    ("a bare gh api graphql with no payload flag posts nothing",
+     'gh api graphql -f query="query { viewer { login } }"', False),
 
     # --- round-6: properties that survived mutation with the suite green -----
     ("command substitution is a command position",
@@ -403,8 +421,10 @@ CASES = [
     ("an ampersand in an earlier flag does not hide --comment",
      'gh issue close 5 -R o/r --duplicate-of "A & B" --comment "bare"',
      "missing"),
+    # `-R` rather than `--title`: gh has no `--title` on `pr close`, so the old
+    # fixture exercised the regex against a command the CLI would reject.
     ("a pipe in an earlier flag does not hide --comment",
-     'gh pr close 5 -R o/r --title "a|b" --comment "bare"', "missing"),
+     'gh pr close 5 -R "o/r|fork" --comment "bare"', "missing"),
     ("the same command WITH the marker stays silent",
      'gh issue close 5 -R o/r --duplicate-of "see #3; also #4" '
      '--comment "Closing.\n\n' + MARKER + '"', False),
@@ -460,6 +480,38 @@ CASES = [
      'gh pr review 12 --request-changes -b"Findings, undisclosed."', "missing"),
     ("gh pr review with an attached -b body WITH marker",
      'gh pr review 12 --request-changes -b"Findings.\n\n' + MARKER + '"',
+     False),
+
+    # --- #2185 cross-vendor round -------------------------------------------
+    #
+    # A same-vendor reviewer cleared this file twice before these were found.
+    ("a forged suffix after the marker does not disclose",
+     'gh pr comment 1 --body "Done.\n\n' + MARKER + ' forged"', "missing"),
+    ("gh pr review's --comment is BOOLEAN, so --body is not its value",
+     'gh pr review 12 --comment --body "Done.\n\n' + MARKER + '"', False),
+    ("the same review flags in the other order",
+     'gh pr review 12 --body "Done.\n\n' + MARKER + '" --comment', False),
+    ("a quoted bot example inside a human body is not exempt",
+     'gh pr comment 1 --body "Tell humans to run --body \'@dependabot rebase\' '
+     'now."', "missing"),
+    ("glab mr note list posts nothing", 'glab mr note list 12', False),
+    ("glab mr note delete posts nothing",
+     'glab mr note delete 12 --note-id 5', False),
+    ("gh pr comment --delete-last posts nothing",
+     'gh pr comment 12 --delete-last --yes', False),
+    ("an issue create whose BODY mentions /comments is not a comment post",
+     "gh api repos/o/r/issues -f body='Please use the /comments endpoint.'",
+     False),
+    ("-fbody= attached is a body field",
+     'gh api repos/o/r/issues/12/comments -fbody=bare', "missing"),
+    ("--raw-field=body= is a body field",
+     'gh api repos/o/r/issues/12/comments --raw-field=body=bare', "missing"),
+    ("-XGET attached is still a read",
+     'gh api repos/o/r/issues/12/comments -XGET -f per_page=100', False),
+    ("--method=GET is still a read",
+     'gh api repos/o/r/issues/12/comments --method=GET -f per_page=100', False),
+    ("a lowercase heredoc delimiter still discloses",
+     "gh pr comment 1 --body-file - <<'eof'\nHi.\n\n" + MARKER + "\n\neof",
      False),
 
     # --- unreadable vs missing must not be confused (review finding 9) -------

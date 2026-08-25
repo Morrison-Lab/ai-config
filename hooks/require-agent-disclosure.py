@@ -99,8 +99,10 @@ _POST_CMDS = (
     # where the whole command is already in hand.
     r"gh\s+pr\s+review\b",
     # `glab ... comment` is a real alias of `... note`; both spellings ship.
-    r"glab\s+mr\s+(?:note|comment)",
-    r"glab\s+issue\s+(?:note|comment)",
+    # NOT a bare `glab mr note` prefix: current glab exposes `list`, `resolve`,
+    # `delete` and `update` as subcommands, none of which posts anything.
+    r"glab\s+mr\s+(?:note|comment)(?!\s+(?:list|resolve|delete|update)\b)",
+    r"glab\s+issue\s+(?:note|comment)(?!\s+(?:list|resolve|delete|update)\b)",
     # `--comment` on a state change posts a real comment. Missed for eleven
     # review rounds because the command word is `close`/`reopen`, so nothing
     # about it reads as commenting -- and `skills/rescue-closed/SKILL.md`
@@ -135,7 +137,7 @@ API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # (`request-pr-review`'s `-f "reviewers[]=<r>"`). Without it the registry line
 # this change annotates was completely invisible to the guard.
 API_BODY_FIELD_RE = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)\s+[\"']?body="
+    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body="
     # `--form` is glab's flag, not gh's -- both appear because the detector
     # matches `(?:gh|glab) api`.
     # `--input <file>` supplies the whole payload, body included. The body is
@@ -152,11 +154,78 @@ API_COMMENT_TARGET_RE = re.compile(
     r"|addDiscussionComment|addComment", re.IGNORECASE)
 
 
+# The endpoint argument of a `gh api` / `glab api` call.
+#
+# Tokenized rather than pattern-matched. A regex expecting flags-then-endpoint
+# broke the order-independent form `gh api -f body="..." <url>`, which is valid
+# and which an earlier round added a fixture for. Tokenizing respects quoting,
+# so a body containing spaces or a `/comments` mention stays one token and
+# cannot be mistaken for the path.
+def _tokens(text):
+    """Whitespace-split *text*, keeping quoted runs together."""
+    out, cur, quote = [], [], None
+    esc = False
+    for ch in text:
+        if esc:
+            cur.append(ch); esc = False; continue
+        if ch == "\\" and quote != "'":
+            esc = True; continue
+        if quote:
+            if ch == quote:
+                quote = None
+            else:
+                cur.append(ch)
+            continue
+        if ch in "\"'":
+            quote = ch; continue
+        if ch.isspace():
+            if cur:
+                out.append("".join(cur)); cur = []
+            continue
+        cur.append(ch)
+    if cur:
+        out.append("".join(cur))
+    return out
+
+
+def api_endpoint(segment):
+    """The endpoint argument of an api call, or None.
+
+    A path-shaped token: it contains `/` and no `=`, so a `body=...` field --
+    even one whose text mentions `/comments` -- is never mistaken for it.
+    `graphql` is the one endpoint with no slash.
+    """
+    toks = _tokens(segment)
+    for i, t in enumerate(toks):
+        if t in ("api",) and i + 1 < len(toks):
+            for u in toks[i + 1:]:
+                if u == "graphql":
+                    return u
+                if "/" in u and "=" not in u and not u.startswith("-"):
+                    return u
+            return None
+    return None
+
+
 def is_api_post(segment):
     """True when this segment posts a comment through a raw forge API."""
     if not API_CMD_RE.search("\n" + segment):
         return False
-    if not API_COMMENT_TARGET_RE.search(segment):
+    # Match the ENDPOINT, not the whole segment. Searching the segment let
+    # `gh api repos/o/r/issues -f body='Please use the /comments endpoint.'` --
+    # an issue creation -- read as a comment post, because the body mentioned
+    # the path. GraphQL has no path, so it keeps the segment-wide test below.
+    endpoint = api_endpoint(segment)
+    is_graphql = bool(endpoint and endpoint.strip("\"'") == "graphql")
+    target_text = segment if is_graphql else (endpoint or "")
+    # A GraphQL call whose payload comes from `--input` hides its mutation name
+    # in the file, so neither the command nor the endpoint can say whether it
+    # posts a comment. Treat it as a post with an unreadable body: the note says
+    # "this check cannot read the body", which is true and asserts nothing, and
+    # the corpus writes no such command today so the cost is nil.
+    if is_graphql and re.search(r"--input\b", segment):
+        return True
+    if not API_COMMENT_TARGET_RE.search(target_text):
         return False
     # A GraphQL target is a mutation NAME, which a comment can merely mention.
     # `--input` satisfies the body-field test below, so without this the name
@@ -168,7 +237,7 @@ def is_api_post(segment):
     # An explicit read is not a post, however many fields it carries. `gh api`
     # infers POST from the presence of a field, so only an explicit GET (or a
     # method that is not a create) can be ruled out here.
-    if re.search(r"(?:-X|--method)\s+(?:GET|HEAD|PATCH|PUT|DELETE)\b",
+    if re.search(r"(?:-X|--method)[\s=]*(?:GET|HEAD|PATCH|PUT|DELETE)\b",
                  segment, re.IGNORECASE):
         return False
     # A GraphQL comment mutation may carry its body inside the query text or in
@@ -212,8 +281,14 @@ ANY_BODY_FLAG_RE = re.compile(
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 
+# `gh pr comment --delete-last` deletes a comment rather than posting one.
+DELETING_RE = re.compile(r"--delete-last\b|--delete\b")
+
+
 def is_post_segment(segment):
     """True when this segment posts a forge comment by any route."""
+    if DELETING_RE.search(segment):
+        return False
     if POST_RE.search("\n" + segment):
         # `gh pr review` is the one named verb that may carry no body at all.
         if (REVIEW_ONLY_RE.search("\n" + segment)
@@ -251,7 +326,13 @@ HEREDOC_RE = re.compile(
 # The required marker, matched loosely enough to survive an agent-name swap
 # ("Posted by Codex (AI agent) ...") but tightly enough not to match prose that
 # merely mentions agents.
-MARKER_RE = re.compile(r"posted by .{0,40}\(ai agent\)", re.IGNORECASE)
+# The WHOLE marker, not its prefix. Matching `posted by ... (ai agent)` alone
+# meant `_Posted by Claude Code (AI agent) bogus` satisfied the check, and
+# `<marker> forged` did too -- so the guard could be discharged by text that is
+# not the marker. The agent name stays substitutable; the rest is fixed.
+MARKER_RE = re.compile(
+    r"posted by .{0,40}\(ai agent\)[^\n]{0,12}not written by a human",
+    re.IGNORECASE)
 
 ROBOT = "\U0001f916"
 # Only a body that both carries the emoji AND reads as an attribution is
@@ -495,9 +576,23 @@ def bodies_for(segment, bodies):
 _FLAG_BEFORE_VALUE = re.compile(
     r"(?:--(?:body|message|comment)[\s=]+|(?<![\w-])-(?:b|m|c)[\s=]*)")
 _FIELD_QUOTED = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)\s+([\"'])body=")
+    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*([\"'])body=")
 _FIELD_BARE = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)\s+body=")
+    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*body=")
+
+
+def _looks_like_flag(value):
+    """True when an extracted 'value' is really the next flag.
+
+    `--comment` takes a value on `gh issue|pr close|reopen` and is a BOOLEAN
+    action flag on `gh pr review`, so a flag-name list cannot settle it. What
+    settles it is the value: no comment body begins with `--`, so an extraction
+    that yields one has consumed a boolean flag and read the next token.
+    Without this, `gh pr review 12 --comment --body "...<marker>"` extracted
+    `--body` as the body and warned on a compliant comment, while the same
+    flags in the other order passed.
+    """
+    return bool(value) and value.startswith("-") and len(value) > 1
 
 
 def _read_quoted(text, i):
@@ -544,7 +639,16 @@ def inline_body(segment):
         candidates.append((m.start(), "flag", m))
     if not candidates:
         return None
-    _, kind, m = min(candidates, key=lambda c: c[0])
+    candidates.sort(key=lambda c: c[0])
+    for idx, (_, kind, m) in enumerate(candidates):
+        value = _extract(segment, kind, m)
+        if not _looks_like_flag(value):
+            return value
+        # This candidate consumed a boolean flag; try the next one along.
+    return None
+
+
+def _extract(segment, kind, m):
     if kind == "field_quoted":
         # The quote opened BEFORE `body=`, so the value runs to its partner.
         quote = m.group(1)
@@ -565,7 +669,10 @@ def discloses(text):
     # A heredoc body arrives with its terminator line still attached, so strip a
     # trailing all-caps delimiter before anchoring -- otherwise a blank line
     # before `EOF` reads as the body continuing past the marker.
-    text = re.sub(r"\n\s*[A-Z_][A-Z0-9_]*\s*$", "", text)
+    # Delimiters are case-free in shell (`<<'eof'` is as valid as `<<'EOF'`),
+    # and HEREDOC_RE already accepts both -- so stripping only an uppercase
+    # terminator warned on a compliant lowercase-delimited body.
+    text = re.sub(r"\n[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*$", "", text)
     tail = text.rstrip().rstrip("\"'").rstrip()
     m = None
     for m in MARKER_RE.finditer(tail):
@@ -578,8 +685,12 @@ def discloses(text):
     # deliberately: a trailing signature or a wrapped marker line is common, and
     # refusing it would warn on compliant comments, which is the costlier error
     # for a warn-only guard.
-    after = tail[m.end():].rstrip()
-    return "\n\n" not in after and len(after) <= 60
+    # Only the marker's own closing punctuation may follow -- `._`, a quote, a
+    # heredoc terminator already stripped above. The previous 60-character
+    # allowance was there for a trailing signature, and it also admitted
+    # `<marker> forged`, which is the whole point of anchoring.
+    after = tail[m.end():].strip()
+    return bool(re.fullmatch(r"[.\s_*'\"`)\]]*", after))
 
 
 def judge_segment(segment, extra):
@@ -592,7 +703,13 @@ def judge_segment(segment, extra):
     provide, defeated by the argument meant to support it.
     """
     text = segment + "\n" + extra
-    if BOT_COMMAND_RE.search(segment):
+    # Tested against the EXTRACTED BODY, not the segment. Searching the segment
+    # let `--body "Tell humans to run --body '@dependabot rebase' now."` take the
+    # exemption, because the quoted example matched anywhere in the command.
+    _body_for_bot = inline_body(segment)
+    if _body_for_bot is not None and BOT_BODY_RE.match(_body_for_bot.strip()):
+        return None
+    if _body_for_bot is None and BOT_COMMAND_RE.search(segment):
         return None
     body = inline_body(segment)
     if body is not None and not extra:

@@ -85,13 +85,23 @@ check both explicitly here).
 ```bash
 # GitHub -- read the claim/release exchange, not just the newest comment:
 gh issue view <N> --json comments \
-  --jq '[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | "\(.author.login): \(.body)"'   # READ_ISSUE_COMMENTS
+  --jq '[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | "\(.createdAt) \(.author.login): \(.body)"'   # READ_ISSUE_COMMENTS
+gh issue view <N> --json updatedAt --jq .updatedAt   # VIEW_ISSUE -- latest activity
 ```
 
 **Reading only `.comments | last` is the bug this replaces.**
 A claim is live for two hours from the most recent *activity*, so any unrelated comment posted after it --- a status note, a bot's build result, a question --- becomes the last comment while the claim is still binding.
 The claim then goes invisible and this check reports the issue free, which is the parallel-session collision the whole convention exists to prevent.
 Filter to the exchange and take the last member of *that*.
+
+**Both timestamps are needed, which is why the second command is there.**
+The claim's own `createdAt` says when it was made; the issue's `updatedAt` says
+when the thread last saw activity, and the 2-hour rule expires on *activity*,
+not on the claim's age.
+A day-old claim followed by a comment thirty minutes ago is **live**; the same
+claim with nothing after it is **expired**.
+Reading only the claim's body cannot tell those apart, so it cannot decide the
+question the step is asking.
 
 Match the two-word invariant `hold off`, or either retired wording `paws off` / `back off`, case-insensitively --- then **exclude the comment if it also carries a release term** (`unclaim|released|PR is free|now mergeable`), because the retired release wording `... done --- paws off released.` contains `paws off` and would otherwise read as a live claim.
 See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".

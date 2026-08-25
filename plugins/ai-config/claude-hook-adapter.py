@@ -49,10 +49,12 @@ def parse_timeout(val):
         return None
 
 def extract_hook_list(groups_or_hooks):
-    """Support both grouped ({'hooks': [...]}) and flat ([{'command': ...}]) hook lists."""
+    """Support grouped ({'hooks': [...]}), flat ([{'command': ...}]), and single group dicts."""
+    if isinstance(groups_or_hooks, dict):
+        groups_or_hooks = [groups_or_hooks]
+    elif not isinstance(groups_or_hooks, list):
+        return []
     out = []
-    if not isinstance(groups_or_hooks, list):
-        return out
     for item in groups_or_hooks:
         if isinstance(item, dict):
             if "hooks" in item and isinstance(item["hooks"], list):
@@ -119,7 +121,7 @@ def main():
         tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args") or {}
-        tool_cwd = args.get("Cwd") or os.getcwd()
+        tool_cwd = args.get("Cwd") or repo_root
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         tasks_to_run = []
@@ -133,7 +135,7 @@ def main():
                 bash_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Bash"):
-                    tasks_to_run.append((extract_hook_list([group]), bash_payload, tool_cwd, "run_command"))
+                    tasks_to_run.append((extract_hook_list(group), bash_payload, tool_cwd, "run_command"))
 
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
@@ -162,7 +164,7 @@ def main():
                     agent_payload["transcript_path"] = transcript_path
                 for group in pre_tool_groups:
                     if matches_tool(group.get("matcher", ""), "Agent"):
-                        tasks_to_run.append((extract_hook_list([group]), agent_payload, repo_root, f"invoke_subagent ({agent_name})"))
+                        tasks_to_run.append((extract_hook_list(group), agent_payload, repo_root, f"invoke_subagent ({agent_name})"))
 
         elif tool_name == "send_message":
             send_payload = {
@@ -176,7 +178,7 @@ def main():
                 send_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "SendMessage"):
-                    tasks_to_run.append((extract_hook_list([group]), send_payload, repo_root, "send_message"))
+                    tasks_to_run.append((extract_hook_list(group), send_payload, repo_root, "send_message"))
 
         elif tool_name == "define_subagent":
             task_payload = {
@@ -191,7 +193,7 @@ def main():
                 task_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Task"):
-                    tasks_to_run.append((extract_hook_list([group]), task_payload, repo_root, "define_subagent"))
+                    tasks_to_run.append((extract_hook_list(group), task_payload, repo_root, "define_subagent"))
 
         else:
             generic_payload = {
@@ -202,7 +204,7 @@ def main():
                 generic_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), tool_name):
-                    tasks_to_run.append((extract_hook_list([group]), generic_payload, tool_cwd, tool_name))
+                    tasks_to_run.append((extract_hook_list(group), generic_payload, tool_cwd, tool_name))
 
         # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
         for hooks_list, c_payload, cwd, desc in tasks_to_run:

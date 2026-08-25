@@ -105,6 +105,24 @@ The author is the one party who cannot: the session that wrote the diff knows wh
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
 
+**The posted comment is that reviewer's report, not a recap the author writes around it.**
+Dispatching and then composing a different comment is the same failure as
+reviewing inline, one step later.
+See [`adversarial-self-review`](adversarial-self-review.md)
+("The posted fallback comment is the reviewer's report")
+and [`memories/cursor.md`](../../memories/cursor.md).
+
+- **Do:** post the dispatched reviewer's structured report
+  (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
+- **Don't:** wrap the verdict in the authoring session's ARD round-history
+  recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
+
 **Self-review is the immediate fallback so the PR never stalls --
 but declaring the PR clean still requires an external verdict whenever one is reachable.**
 Don't wait to self-review: post it right away, same as above.
@@ -206,7 +224,7 @@ A reviewer that is up and unreachable-by-you hands it to **a human**, in one ste
 The tell is a **permission or identity** answer rather than a capacity one:
 a `403 Resource not accessible by integration` on a dispatch (the token lacks `actions: write`),
 or a comment-triggered run reporting **skipped** rather than failed, which means its job `if:` rejected you ---
-usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR`.
+usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR` or `NONE`.
 The reviewer completing on somebody else's branch the same day settles that it is up.
 
 Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).

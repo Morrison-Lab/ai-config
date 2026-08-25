@@ -54,6 +54,14 @@ was not merged, even though `Morrison-Lab/ai-config` carries a standing `mwc`
 grant --- that grant's scope limit is a **fully clean** PR, and a PR one human
 action short of a reachable reviewer is not one.)
 
+2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
+Cursor Cloud comments post as `cursor[bot]` / `NONE`, so the same
+OWNER/MEMBER/COLLABORATOR allowlist on `jules-review.yml` skipped the
+request.
+Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
+a human OWNER/MEMBER/COLLABORATOR comment is the unblock
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+
 ## The stub-retry skipped on a sentinel denial count
 
 (Morrison-Lab/ai-config, 2026-08-20: two PRs, [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724)

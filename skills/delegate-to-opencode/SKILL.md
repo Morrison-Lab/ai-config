@@ -139,19 +139,16 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, and `opencode`.
+`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, `opencode`, and `openrouter`.
 Read it there rather than re-deriving it here.
 
-Two things follow from opencode not being a metered plan at all, and they are what make its position unlike the other two:
+OpenCode spans multiple cost structures:
+- **Free Zen & local Ollama tiers**: Consume no metered window or API tokens.
+  For mechanical work a small model can perform, free/local tiers go ahead of Codex and Claude on cost.
+- **OpenCode Go subscription ($10/mo)**: Active monthly tier providing access to additional hosted models without per-token charges.
+- **OpenRouter prepaid balance**: Billed per token; used when a task specifically benefits from frontier or stealth models not carried by desktop subscription quotas.
 
-- **It consumes no window, so there is no budget to conserve by skipping it.**
-  For work a small model can do, it goes ahead of codex and agy rather than behind them.
-- **Capability is the binding constraint instead, and it is unmeasured here.**
-  The local ids carry their parameter counts, 2B to 30B as of 2026-08-19.
-  The hosted ids are preview names this corpus has not benchmarked.
-  So every figure one returns gets re-derived, per the same treatment `preferences.md` records for `agy` after it read a file correctly and miscounted its lines.
-
-The practical shape is a filter rather than a queue: send what opencode can do to opencode, send what it cannot to codex or agy, and keep Claude for orchestration and the residue.
+The practical shape is a filter rather than a queue: send mechanical bounded work to OpenCode's free/local tiers first, utilize active Go subscription and Codex windows next, draw on OpenRouter for specialized frontier/stealth models or fallback, and keep Claude for high-level orchestration and synthesis.
 
 ## Procedure
 

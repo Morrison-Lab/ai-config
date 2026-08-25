@@ -988,11 +988,12 @@ This is a standing default across all sessions, including ultracode/Workflow fan
 | `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
 
-Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
-"Delegate first" means the current window, not abandoning Claude permanently.
+Exhaust the *current usage window* of each metered subscription CLI --- roughly 5 hours for Codex --- then fall back to Claude until it resets.
+Prepaid credit balances (OpenRouter) do not have a recurring time window; they are drawn on per token for workloads that specifically benefit from frontier/stealth models not carried by desktop subscription tiers, or as fallback when subscription windows are depleted.
+"Delegate first" means spending available subscription windows and free tiers before drawing on Claude's orchestrator tokens or prepaid API credits.
 
 **`opencode` and `openrouter` expand non-metered, prepaid, and alternative frontier routes:**
-- **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and a local tier (`ollama`).
+- **OpenCode**: Reaches an active OpenCode Go subscription ($10/mo), the free/hosted gateway (`opencode Zen`), and a local tier (`ollama`).
   Its free and local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
 - **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners (activated in config; measured 2026-08-23 on OpenCode 1.18.21).
 - **Local tier**: The local (`ollama/*`) tier keeps the payload on the machine for sensitive data **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).

@@ -685,33 +685,6 @@ class ReviewerSubagent(BaseSubagent):
                     is_clean = False
                     findings.append({"level": "WARN", "message": resp.content[:300]})
 
-        # Post adversarial review comment to GitHub PR if pr_number is in payload
-        pr_number = task.payload.get("pr_number")
-        repo_slug = task.payload.get("repo_slug")
-        if pr_number and not dry_run and shutil.which("gh"):
-            try:
-                cmd_pr = ["gh", "pr", "comment", str(pr_number)]
-                if repo_slug:
-                    cmd_pr.extend(["-R", repo_slug])
-                if is_clean:
-                    review_body = (
-                        f"### Adversarial Self-Review Verdict: APPROVED\n\n"
-                        f"Independent subagent adversarial review (`{model_used}`) verified:\n"
-                        f"- Implementation diff audited against repository standards and security guidelines.\n"
-                        f"- Clean verdict issued with 0 blocking findings."
-                    )
-                else:
-                    findings_summary = "\n".join(f"- {f.get('level', 'WARN')}: {f.get('message', '')}" for f in findings)
-                    review_body = (
-                        f"### Adversarial Self-Review Verdict: BLOCKED / NEEDS_WORK\n\n"
-                        f"Independent subagent adversarial review (`{model_used}`) identified findings:\n"
-                        f"{findings_summary}"
-                    )
-                cmd_pr.extend(["--body", review_body])
-                subprocess.run(cmd_pr, capture_output=True, text=True, check=False)
-            except Exception as exc:
-                logger.warning("Failed to post adversarial review comment to PR #%s: %s", pr_number, exc)
-
         elapsed = time.time() - start_time
         return SubagentResult(
             success=is_clean,

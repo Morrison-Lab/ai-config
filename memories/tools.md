@@ -1117,3 +1117,12 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
+
+## `subprocess.run(text=True)` on Windows destroys UTF-8 output
+
+On Windows, Python's `subprocess.run(..., text=True)` defaults to the system locale encoding (often `cp1252`), rather than UTF-8. If the CLI tool you are calling (like `gh pr view --json`) outputs UTF-8 containing emojis or special characters, reading it with `text=True` alone will corrupt the characters (mojibake) and break string matching or parsing. You must explicitly set `encoding="utf-8"` when capturing UTF-8 stdout on Windows. For example: `subprocess.run(["gh", ...], capture_output=True, text=True, encoding="utf-8")`.
+
+## PowerShell `echo ... > file.txt` writes UTF-16LE, corrupting GitHub API payloads
+
+On Windows PowerShell (5.1 and earlier), `echo` (alias for `Write-Output`) redirected with `>` writes text using UTF-16LE encoding (with a BOM) by default. If this file is subsequently fed to a CLI tool that expects UTF-8 (like `gh pr create --body-file` or `gh api -F "body=@file"`), the payload will be mangled with null bytes (`^@`).
+**Fix**: Use the GitHub API or CLI with direct inline strings (e.g., `--body "..."` or `-f body="..."`) or explicitly specify UTF-8 encoding without a BOM (which requires .NET `[System.IO.File]::WriteAllText` in older PowerShell, as `Out-File -Encoding utf8` still writes a BOM that can interfere with some APIs).

@@ -290,6 +290,23 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(mixed_fence_report, expected_commit_sha=commit)
         self.assertFalse(is_valid)
 
+        # Nested same-character fences (4-backtick outer wrapping 3-backtick inner) are rejected
+        nested_same_char_report = (
+            "````markdown\n"
+            "```markdown\n"
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}\n"
+            "```\n"
+            "````"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(nested_same_char_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+
         # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
         adv_findings = (
             "### Summary Verdict\n"

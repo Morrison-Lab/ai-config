@@ -13,7 +13,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 from typing import List, Optional, Tuple
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.fences import count_unbalanced_fences, strip_fences
 
 
 def log_error(msg: str):
@@ -149,15 +153,12 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
-    # Check for unbalanced code fences (backticks and tildes) to reject unterminated blocks
-    bt_fences = len(re.findall(r"(?m)^`{3,}", report))
-    tilde_fences = len(re.findall(r"(?m)^~{3,}", report))
-    if bt_fences % 2 != 0 or tilde_fences % 2 != 0:
+    # Check for unbalanced or unclosed code fences using positional CommonMark rules
+    if count_unbalanced_fences(report) > 0:
         return False, False, "Unbalanced or unterminated markdown code fence detected."
 
-    # Strip markdown code blocks separately (backtick blocks and tilde blocks) so backtick blocks cannot close with tildes and vice versa
-    unfenced_report = re.sub(r"(?s)```.*?```", "", report)
-    unfenced_report = re.sub(r"(?s)~~~.*?~~~", "", unfenced_report)
+    # Strip fenced code blocks using CommonMark rules (handles nested same-character fences correctly)
+    unfenced_report = strip_fences(report)
 
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),

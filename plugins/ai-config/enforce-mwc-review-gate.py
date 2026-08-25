@@ -52,6 +52,20 @@ def main():
                 if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", last_bot_body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?|NEEDS MORE WORK|REQUEST_CHANGES|NOT YET READY FOR MERGE|DON'T APPROVE|CAN'T APPROVE)\b", last_bot_body):
                     has_ai_approval = True            
 
+                        # Check CI status (Never ignore red CI)
+            status_cmd = ["gh", "pr", "view", pr_arg, "--json", "statusCheckRollup"] if pr_arg else ["gh", "pr", "view", "--json", "statusCheckRollup"]
+            status_result = subprocess.run(status_cmd, cwd=cwd, capture_output=True, text=True)
+            if status_result.returncode == 0:
+                status_data = json.loads(status_result.stdout)
+                status_rollup = status_data.get("statusCheckRollup") or []
+                failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED"]]
+                if failures:
+                    print(json.dumps({
+                        "decision": "deny",
+                        "reason": f"Strict Merge Control Policy: Cannot merge with failing CI checks: {', '.join(failures)}. Make sure you NEVER ignore red CI."
+                    }))
+                    return
+
             # If no reviews, or if Claude didn't review and no human reviewed
             if not has_human_review and not has_ai_approval and len(reviews) == 0:
                 print(json.dumps({

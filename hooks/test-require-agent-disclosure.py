@@ -408,12 +408,33 @@ CASES = [
     ("the same command WITH the marker stays silent",
      'gh issue close 5 -R o/r --duplicate-of "see #3; also #4" '
      '--comment "Closing.\n\n' + MARKER + '"', False),
+    # Without `(?<![\w-])` on COMMENT_FLAG_RE, the `-c` inside a hyphenated word
+    # in an earlier flag's value reads as the comment flag -- so a close that
+    # posts NOTHING is warned about. A false positive on a command that posts no
+    # comment at all is the worst shape for a warn-only guard.
+    ("a hyphenated word containing -c is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "close-candidate #3"', False),
+    ("the same close WITH a real -c still warns",
+     'gh issue close 5 -R o/r --duplicate-of "close-candidate #3" -c "bare"',
+     "missing"),
     ("close with no --comment posts nothing",
      'gh issue close 5 -R o/r --duplicate-of "see #3"', False),
     ("reopen with no --comment posts nothing",
      'gh issue reopen 5 -R o/r', False),
     ("the -c short flag is a comment flag",
      'gh issue close 5 -R o/r -c "bare"', "missing"),
+    ("the -c short flag with equals syntax is a comment flag",
+     'gh issue close 5 -R o/r -c="Closing without disclosure."', "missing"),
+    ("the -c short flag with attached quote is a comment flag",
+     'gh issue close 5 -R o/r -c"Closing without disclosure."', "missing"),
+    ("the -c short flag with equals syntax and marker discloses",
+     'gh issue close 5 -R o/r -c="Closing.\n\n' + MARKER + '"', False),
+    ("the -c short flag with attached quote and marker discloses",
+     'gh issue close 5 -R o/r -c"Closing.\n\n' + MARKER + '"', False),
+    ("the -b short flag with equals syntax is a body flag",
+     'gh pr comment 12 -b="bare"', "missing"),
+    ("the -b short flag with attached quote is a body flag",
+     'gh pr comment 12 -b"bare"', "missing"),
 
     # --- #2185 round 2: pflag attaches a shorthand value with no space -------
     #

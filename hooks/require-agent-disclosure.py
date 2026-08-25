@@ -194,14 +194,21 @@ REVIEW_ONLY_RE = re.compile(_ANCHOR + r"gh\s+pr\s+review\b", re.MULTILINE)
 # quote awareness, so a `;` inside an earlier flag's value cannot truncate it.
 CLOSE_REOPEN_RE = re.compile(
     _ANCHOR + r"gh\s+(?:issue|pr)\s+(?:close|reopen)\b", re.MULTILINE)
-# `-c\S` rather than `-c\s`: `gh` is a pflag CLI, whose documented shorthand
-# syntax attaches a value with no separator (`-cvalue`) or with an equals
-# (`-c=value`). Requiring whitespace missed both, on the exact posting surface
-# this file was extended to cover.
-COMMENT_FLAG_RE = re.compile(r"--comment\b|(?<![\w-])-c(?:[\s=]|[\"\']|[A-Za-z0-9])")
+# `gh` is a pflag CLI, whose documented shorthand syntax attaches a value with
+# no separator (`-cvalue`) or with an equals (`-c=value`). Requiring whitespace
+# missed both, on the exact posting surface this file was extended to cover.
+#
+# `(?<![\w-])` is the half a concurrent session's fix on this same branch did
+# not carry, and it is load-bearing: without it `-c` matches INSIDE
+# `--request-changes`, so `inline_body` returns "hanges" and a COMPLIANT
+# disclosed comment warns. A false positive on a compliant comment is the worst
+# outcome available to a warn-only guard, and the whole corpus is about to start
+# appending this marker.
+COMMENT_FLAG_RE = re.compile(
+    r"--comment\b|--comment=|(?<![\w-])-c(?:[\s=]|[\"\']|[A-Za-z0-9])")
 ANY_BODY_FLAG_RE = re.compile(
-    r"--body\b|--body=|--body-file|--message\b|--message=|-F\s"
-    r"|(?<![\w-])-(?:b|m)(?:[\s=]|[\"\']|[A-Za-z0-9])"
+    r"--body\b|--body=|--body-file\b|--message\b|--message="
+    r"|(?<![\w-])-(?:b|m|F)(?:[\s=]|[\"\']|[A-Za-z0-9])"
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 

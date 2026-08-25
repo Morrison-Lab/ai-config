@@ -120,6 +120,8 @@ Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state ter
 confirm a genuine all-clear review is posted at the current head from an external reviewer, if one is reachable --
 a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
 doesn't satisfy this once an external verdict is obtainable.
+Merging autonomously under `mwc` (merge-when-confident) unconditionally requires an automated clean Claude review verdict evaluating the HEAD commit;
+a fallback self-review allows iteration and unblocks PR progress, but NEVER authorizes autonomous merge under MWC.
 
 **Weight two reviewers' agreement by whether they share a vendor, and prefer a cross-vendor second reviewer over a second run of the same one.**
 The section above says to check whether a *different* configured reviewer is reachable, and treats every second reviewer as interchangeable.

@@ -46,15 +46,11 @@ def main():
             
             # Check for bot approvals in comments (e.g. Claude Code, OpenCode)
             has_ai_approval = False
-            for c in comments:
-                body = c.get("body", "").upper()
-                if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?)\b", body):
-                    # Make sure it is from a bot
-                    author_login = c.get("author", {}).get("login", "")
-                    if "bot" in author_login.lower() or author_login in ["github-actions", "claude"]:
-                        has_ai_approval = True
-                        break
-            
+            bot_comments = [c for c in comments if "bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") in ["github-actions", "claude"]]
+            if bot_comments:
+                last_bot_body = bot_comments[-1].get("body", "").upper()
+                if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", last_bot_body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?|NEEDS MORE WORK|REQUEST_CHANGES|NOT YET READY FOR MERGE|DON'T APPROVE|CAN'T APPROVE)\b", last_bot_body):
+                    has_ai_approval = True            
 
             # If no reviews, or if Claude didn't review and no human reviewed
             if not has_human_review and not has_ai_approval and len(reviews) == 0:

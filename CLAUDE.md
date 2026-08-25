@@ -792,11 +792,13 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+   In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 

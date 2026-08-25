@@ -167,7 +167,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         found_sha = sha_match.group(1).lower()
         exp_sha = expected_commit_sha.lower()
-        if not (found_sha.startswith(exp_sha[:8]) or exp_sha.startswith(found_sha[:8])):
+        if len(found_sha) < 7 or len(exp_sha) < 7:
+            return False, False, f"Fingerprint SHA too short: found {found_sha!r}, expected {exp_sha!r}."
+        if not (found_sha.startswith(exp_sha[:7]) or exp_sha.startswith(found_sha[:7])):
             return False, False, f"Mismatched Reviewed-Commit fingerprint: found {found_sha[:8]}, expected {exp_sha[:8]}."
 
     verdict_match = re.search(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", report)
@@ -185,21 +187,17 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not verdict_str:
         return False, False, "No valid anchored verdict line found."
 
-    v_upper = verdict_str.upper()
-    is_clean = any(
-        term in v_upper
-        for term in ["READY FOR MERGE", "APPROVE"]
-    ) and not any(
-        term in v_upper
-        for term in ["READY AFTER ADDRESSING FINDINGS", "NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
-    )
-    is_needs_work = any(
-        term in v_upper
-        for term in ["READY AFTER ADDRESSING FINDINGS", "NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
-    )
+    v_lower = verdict_str.lower()
+    negative_terms = [
+        "not approved", "disapproved", "unapproved", "needs work", "needs more work",
+        "changes requested", "blocked", "ready after addressing findings", "unable to review",
+        "refuse", "rejected", "conditional", "do not merge", "fail", "failed"
+    ]
+    has_negative_verdict = any(re.search(r"\b" + re.escape(term) + r"\b", v_lower) for term in negative_terms)
 
-    if not (is_clean or is_needs_work):
-        return False, False, f"Unrecognized verdict text: '{verdict_str}'"
+    positive_match = bool(re.search(r"\b(?:ready for merge|approve|approved|clean)\b", v_lower))
+    is_clean = positive_match and not has_negative_verdict
+    is_needs_work = has_negative_verdict or not positive_match
 
     if is_clean and is_needs_work:
         return False, False, "Contradictory verdict statement."
@@ -207,15 +205,20 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     findings_match = re.search(r"(?is)#{2,3}\s+Critical Findings\s*\n(.*?)(?=\n#{2,3}\s+|\Z)", report)
     if findings_match:
         findings_body = findings_match.group(1).strip()
-        first_line = findings_body.split("\n")[0].strip().lower() if findings_body else ""
-        is_clean_first_line = re.match(r"^(none(?:\.|\b)|n/a|zero(?:\b|\s+critical)|no(?:\s+(?:critical|blocking|issues)))\b", first_line)
+        is_clean_findings = bool(
+            re.match(
+                r"^\s*(?:none(?:\.|\b)|n/a|zero(?:\s+critical)?|no(?:\s+(?:critical|blocking|issues|findings))(?:\s+found)?\.?)\s*$",
+                findings_body,
+                flags=re.IGNORECASE,
+            )
+        )
         has_list_item = bool(re.search(r"(?im)^\s*(?:1\.|-|\*)\s+", findings_body))
         has_blocker_phrase = any(
             term in findings_body.lower()
-            for term in ["blocking bug", "critical finding", "severe regression", "must fix before merge", "must fix"]
+            for term in ["blocking", "critical", "regression", "must fix", "severe", "bug", "fails", "fail", "broken", "issue"]
         )
-        if is_clean and (has_list_item or has_blocker_phrase) and not is_clean_first_line:
-            return False, False, "Contradictory output: clean verdict but numbered/critical findings listed."
+        if is_clean and (not is_clean_findings or has_list_item or has_blocker_phrase):
+            return False, False, "Contradictory output: clean verdict but critical findings body contains issues/blockers."
 
     refusal_patterns = [
         "hit your weekly limit",
@@ -235,19 +238,19 @@ def validate_review_output(report: Optional[str], expected_commit_sha: str = "")
     return is_valid
 
 
-def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
+def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
     agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--mode", "plan", "-p", prompt]
+    cmd = [agy_path, "--mode", "plan", "-p", "-"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -260,22 +263,22 @@ def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
         print(f"Notice: Antigravity review returned nonzero ({err})", file=sys.stderr)
         return None
     out = res.stdout.strip()
-    return out if validate_review_output(out) else None
+    return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
-def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
+def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
     claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "-p", prompt]
+    cmd = [claude_path, "--permission-mode", "plan", "-p", "-"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
@@ -288,23 +291,22 @@ def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
         print(f"Notice: Claude review returned nonzero ({err})", file=sys.stderr)
         return None
     out = res.stdout.strip()
-    return out if validate_review_output(out) else None
+    return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
-def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
+def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
     codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
         return None
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
     print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check"]
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "-"]
     if model:
         cmd.extend(["-m", model])
-    cmd.append(prompt)
 
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None
@@ -317,10 +319,10 @@ def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
         print(f"Notice: Codex review returned nonzero ({err})", file=sys.stderr)
         return None
     out = res.stdout.strip()
-    return out if validate_review_output(out) else None
+    return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
-def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
+def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
     opencode_path = shutil.which("opencode") or os.path.expanduser("~/.local/bin/opencode")
     if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
         return None
@@ -346,7 +348,7 @@ def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
         print(f"Notice: OpenCode review returned nonzero ({err})", file=sys.stderr)
         return None
     out = res.stdout.strip()
-    return out if validate_review_output(out) else None
+    return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
 def detect_available_engines() -> List[str]:
@@ -363,7 +365,7 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
-def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[str], str]:
+def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "") -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
         "claude": (run_claude_review, "Claude Code (Local)"),
@@ -371,12 +373,12 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         "dtc": (run_codex_review, "OpenAI Codex"),
         "opencode": (run_opencode_review, "OpenCode"),
         "dto": (run_opencode_review, "OpenCode"),
-        "opencode-claude": (lambda p, model="": run_opencode_review(p, model=model or "anthropic/claude-3.7-sonnet"), "Claude via OpenCode"),
-        "opencode-zen": (lambda p, model="": run_opencode_review(p, model=model or "zen/free"), "OpenCode Zen"),
-        "ollama": (lambda p, model="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest"), "Local Ollama"),
+        "opencode-claude": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "anthropic/claude-3.7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via OpenCode"),
+        "opencode-zen": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "zen/free", expected_commit_sha=expected_commit_sha), "OpenCode Zen"),
+        "ollama": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest", expected_commit_sha=expected_commit_sha), "Local Ollama"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
-        "agy-claude": (lambda p, model="": run_antigravity_review(p, model=model or "claude-3-7-sonnet"), "Claude via Antigravity"),
+        "agy-claude": (lambda p, model="", expected_commit_sha="": run_antigravity_review(p, model=model or "claude-3-7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via Antigravity"),
     }
 
     if engine in ["alternate", "round-robin"]:
@@ -389,14 +391,14 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         cand = available[idx]
         runner, label = engine_dispatch[cand]
         print(f"Alternating review engine: Selected '{label}' ({cand}).")
-        report = runner(prompt, model=model)
+        report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
         if report:
             return report, label
         # fallback to remaining engines without retrying cand
         available = [c for c in available if c != cand]
         for rem_cand in available:
             rem_runner, rem_label = engine_dispatch[rem_cand]
-            rem_report = rem_runner(prompt, model=model)
+            rem_report = rem_runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
             if rem_report:
                 return rem_report, rem_label
             print(f"Engine '{rem_label}' was unavailable, exhausted, or produced invalid output; falling back...")
@@ -407,7 +409,7 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         if not runner:
             log_error(f"Unknown engine: {engine}")
             return None, engine
-        report = runner(prompt, model=model)
+        report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
         return report, label
 
     available = detect_available_engines()
@@ -417,7 +419,7 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
 
     for cand in available:
         runner, label = engine_dispatch[cand]
-        report = runner(prompt, model=model)
+        report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
         if report:
             return report, label
         print(f"Engine '{label}' was unavailable, exhausted, or produced invalid output; falling back...")
@@ -442,10 +444,11 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
     remote_sha = get_pr_head_sha(pr_number)
-    if commit_sha and remote_sha and commit_sha != remote_sha:
+    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, post as comment note
+    if not remote_sha or (commit_sha and commit_sha != remote_sha):
         print(
-            f"Notice: Local commit ({commit_sha[:8]}) differs from remote PR head ({remote_sha[:8]}). "
-            "Posting as local PR comment note.",
+            f"Notice: Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
+            f"({remote_sha[:8] if remote_sha else 'unresolved'}). Posting as local PR comment note.",
             file=sys.stderr,
         )
         res_comment = subprocess.run(
@@ -574,16 +577,22 @@ def main():
         print(f"Clean: No outgoing changes compared to {ref_name}.")
         sys.exit(0)
 
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
     guidelines = get_repo_guidelines(git_root)
     full_prompt = build_review_prompt(diff, ref_name, guidelines)
 
-    report, engine_label = execute_review(args.engine, full_prompt, model=args.model)
+    report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=head_sha)
 
     if not report:
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")
         sys.exit(1)
 
-    is_valid, is_clean, verdict_reason = parse_review_verdict(report)
+    is_valid, is_clean, verdict_reason = parse_review_verdict(report, expected_commit_sha=head_sha)
 
     print("\n" + "=" * 60)
     print(f"LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")
@@ -601,11 +610,6 @@ def main():
         if not pr_num:
             log_error("Could not determine PR number to post to. Use --pr <number>.")
             sys.exit(1)
-        head_sha = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
         posted = post_review_to_github(pr_num, report, engine_label, commit_sha=head_sha)
         if not posted:
             sys.exit(1)

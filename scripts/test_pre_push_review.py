@@ -62,17 +62,45 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("Mismatched", reason)
 
-        # UNAPPROVED is structurally valid, but NOT clean
-        unapproved = (
+        # Short fingerprint SHA rejected
+        short_sha_report = (
             "### Summary Verdict\n"
-            "Verdict: UNAPPROVED\n\n"
+            "Verdict: Ready for merge\n\n"
             "### Critical Findings\n"
-            "1. Major breaking regression in parser.\n\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            "Reviewed-Commit: b"
+        )
+        is_valid, _, reason = reviewer.parse_review_verdict(short_sha_report, expected_commit_sha="b2c4191f")
+        self.assertFalse(is_valid)
+        self.assertIn("short", reason)
+
+        # NOT APPROVED and DISAPPROVED are NOT clean
+        for neg in ["NOT APPROVED", "DISAPPROVED", "UNAPPROVED", "BLOCKED", "NEEDS WORK", "CHANGES REQUESTED"]:
+            neg_report = (
+                f"### Summary Verdict\n"
+                f"Verdict: {neg}\n\n"
+                "### Critical Findings\n"
+                "1. Bug found.\n\n"
+                "### Observations\nNone.\n\n"
+                "### Verification Steps\nNone."
+            )
+            is_valid, is_clean, _ = reviewer.parse_review_verdict(neg_report)
+            self.assertTrue(is_valid)
+            self.assertFalse(is_clean)
+
+        # None. followed by numbered blocker is NOT clean
+        sneaky_findings = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n"
+            "1. Must fix before merge: data loss.\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone."
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(unapproved)
-        self.assertTrue(is_valid)
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(sneaky_findings)
         self.assertFalse(is_clean)
 
         # Ready after addressing findings is NOT clean
@@ -208,6 +236,26 @@ class TestPrePushReview(unittest.TestCase):
     @patch.object(reviewer, "get_pr_head_sha")
     def test_post_review_differing_head_sha_posts_comment(self, mock_get_sha, mock_subproc):
         mock_get_sha.return_value = "remote_sha_9999"
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_subproc.return_value = mock_res
+
+        res = reviewer.post_review_to_github(
+            pr_number=123,
+            report="### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nPassed.",
+            engine_name="OpenAI Codex",
+            commit_sha="local_sha_1111",
+        )
+        self.assertTrue(res)
+        # Verify gh pr comment was called, NOT gh pr review
+        cmd_called = mock_subproc.call_args[0][0]
+        self.assertIn("comment", cmd_called)
+        self.assertNotIn("review", cmd_called)
+
+    @patch("subprocess.run")
+    @patch.object(reviewer, "get_pr_head_sha")
+    def test_post_review_unresolved_remote_sha_posts_comment(self, mock_get_sha, mock_subproc):
+        mock_get_sha.return_value = None  # Failed to fetch remote PR head SHA
         mock_res = MagicMock()
         mock_res.returncode = 0
         mock_subproc.return_value = mock_res

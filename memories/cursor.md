@@ -87,15 +87,19 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud Task `tool_result` is identity-only
 
-A Cursor Cloud `task_v2` return is `{agentId, isBackground, cloudAgentBcId}`
-only --- no review text, even when the child ran in the foreground.
-The parent `tool_result` therefore cannot satisfy
+A Cursor Cloud `task_v2` JSON `tool_result` carries identity fields
+(`agentId`, `cloudAgentBcId`) and no review body, even when the child
+ran in the foreground.
+The parent JSON therefore cannot satisfy
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s
 rule that a verdict is admitted from the reviewer's `tool_result`.
+The harness may still paste the child's final message into the parent
+transcript; quote that paste or fetch the child transcript, and do not
+treat a thinking paraphrase as the report.
 
 Fetch the child transcript via cursor-cloud `batch-fetch-details`
 (`includeTranscripts: true`) using that `cloudAgentBcId` before posting a
-fallback review.
+fallback review when the pasted report is absent.
 
 - **Do:** fetch the child transcript from `cloudAgentBcId` before posting
   the fallback comment, and quote that report.
@@ -121,8 +125,8 @@ This is the same class as
 `claude[bot]` / `CONTRIBUTOR`).
 2nd occurrence, 2026-08-25, #2234; the association this time is `NONE`.
 
-- **Do:** have a human OWNER/MEMBER/COLLABORATOR post the request
-  (the workflow trigger is a trusted comment containing that bot mention).
+- **Do:** have a human OWNER/MEMBER/COLLABORATOR post `@jules review`
+  (the workflow trigger is a trusted comment containing that mention).
 - **Don't:** re-post the same request from a session whose comments post
   as `cursor[bot]` / `NONE` --- the gate that skipped it skips the retry.
 

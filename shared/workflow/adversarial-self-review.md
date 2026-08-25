@@ -115,8 +115,7 @@ The posted comment was author-assembled via ManagePullRequest, labeled
 "Fallback self-review", and mixed a paraphrased
 `### Verdict: Ready for merge` with a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
-The parent `tool_result` held only
-`{agentId, isBackground, cloudAgentBcId}` --- no review text.
+The parent JSON `tool_result` carried identity fields and no review body.
 On Cursor Cloud that identity-only return is expected; fetch the child
 transcript before posting (see [`memories/cursor.md`](../../memories/cursor.md)).
 

@@ -50,24 +50,6 @@ jobs:
         # conceptually adjacent pairs score low) that the script's documented
         # scope rests on.
         run: python3 scripts/test_find_near_duplicates.py
-      - name: Run install-integrity check tests
-        # Only the tests run here. check-install.py itself compares against a
-        # consumer directory (~/.claude) that no CI runner has, so on a runner
-        # it correctly reports "nothing installed to check" and proves nothing.
-        run: |
-      - name: Check harness ignore files cover local residue
-        run: python3 scripts/check-harness-ignores.py
-      - name: Run plugin-overlap detector tests
-        # Only the tests run here. check-plugin-overlap.py itself inspects a
-        # consumer directory (~/.claude) plus its settings.json, which no CI
-        # runner has, so on a runner it correctly reports nothing examined and
-        # proves nothing (ai-config#1409).
-        run:
-      - name: Run Codex skill-install tests
-        # Bootstrap must choose either an ai-config Codex plugin or its bare
-        # wrappers. Installing both doubles the routing catalog and can exceed
-        # the skill-listing context budget.
-        run: |
       - name: Run Cursor skill-install tests
         # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
         run: |

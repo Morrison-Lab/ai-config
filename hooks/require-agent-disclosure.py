@@ -74,6 +74,9 @@ _ANCHOR = (
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
 )
 
+# Tail of one command, for a lookahead that must cross a line continuation.
+_SEG_TAIL = r"(?:[^\n;&|]|\\\n)*"
+
 # The named CLI verbs, where the command word alone settles it.
 _POST_CMDS = (
     r"gh\s+pr\s+comment",
@@ -92,6 +95,15 @@ _POST_CMDS = (
     # `glab ... comment` is a real alias of `... note`; both spellings ship.
     r"glab\s+mr\s+(?:note|comment)",
     r"glab\s+issue\s+(?:note|comment)",
+    # `--comment` on a state change posts a real comment. Missed for eleven
+    # review rounds because the command word is `close`/`reopen`, so nothing
+    # about it reads as commenting -- and `skills/rescue-closed/SKILL.md`
+    # carries a live undisclosed one.
+    r"gh\s+issue\s+(?:close|reopen)\b(?=" + _SEG_TAIL + r"(?:--comment\b|-c\s))",
+    # NOT `gh pr merge`: its `-b/--body` is the MERGE-COMMIT body and it has no
+    # `--comment` at all (`gh pr merge --help`), so that alternative could never
+    # fire. Verified against gh 2.98.0.
+    r"gh\s+pr\s+(?:close|reopen)\b(?=" + _SEG_TAIL + r"(?:--comment\b|-c\s))",
 )
 POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")", re.MULTILINE)
 
@@ -116,7 +128,11 @@ API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # quoted-whole-argument spelling for sibling flags too
 # (`request-pr-review`'s `-f "reviewers[]=<r>"`). Without it the registry line
 # this change annotates was completely invisible to the guard.
-API_BODY_FIELD_RE = re.compile(r"(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
+API_BODY_FIELD_RE = re.compile(
+    r"(?:-f|-F|--field|--raw-field|--form)\s+[\"']?body="
+    # `--input <file>` supplies the whole payload, body included. The body is
+    # then unreadable rather than absent, which is what the caller reports.
+    r"|--input\b")
 # The comment-bearing endpoints, and the GraphQL comment mutations.
 # No `/replies` alternative. GitHub's reply route is
 # `POST /repos/{o}/{r}/pulls/{n}/comments/{id}/replies`, so it always contains
@@ -133,6 +149,19 @@ def is_api_post(segment):
     if not API_CMD_RE.search("\n" + segment):
         return False
     if not API_COMMENT_TARGET_RE.search(segment):
+        return False
+    # A GraphQL target is a mutation NAME, which a comment can merely mention.
+    # `--input` satisfies the body-field test below, so without this the name
+    # alone would classify `# addDiscussionComment payload` as a post.
+    if (re.search(r"addDiscussionComment|addComment", segment, re.IGNORECASE)
+            and not re.search(r"/comments|/notes|/discussions", segment)
+            and not re.search(r"\bmutation\b", segment)):
+        return False
+    # An explicit read is not a post, however many fields it carries. `gh api`
+    # infers POST from the presence of a field, so only an explicit GET (or a
+    # method that is not a create) can be ruled out here.
+    if re.search(r"(?:-X|--method)\s+(?:GET|HEAD|PATCH|PUT|DELETE)\b",
+                 segment, re.IGNORECASE):
         return False
     # A GraphQL comment mutation may carry its body inside the query text or in
     # an `--input` file rather than in a `body=` field, so the field test alone
@@ -214,14 +243,14 @@ EMOJI_DISCLOSURE_RE = re.compile(
 # different flags spelled alike, so both shapes are listed rather than one
 # being assumed to cover the other.
 UNREADABLE_RE = re.compile(
-    r"--body-file|--description-file|--editor\b|--web\b"
+    r"--body-file|--description-file|--editor\b|--web\b|--input\b"
     # `-F <file>` is gh pr comment's own body-file shorthand. Matched as a token
     # with NO `=` in it, rather than by a negative lookahead after an optional
     # quote: the optional quote gave the engine a backtracking path where it
     # skipped the quote, failed to find `key=` starting at `"`, and so satisfied
     # the negation -- which made `-F "in_reply_to=5"` look like a file.
     r"|(?<!-)-F\s+[\"']?[^\s\"'=]+[\"']?(?:\s|$)"
-    r"|--(?:body|message)[\s=]+(?:\"[^\"]*\$|'[^']*\$|\$)"
+    r"|--(?:body|message|comment)[\s=]+(?:\"[^\"]*\$|'[^']*\$|\$)"
     # The short forms expand identically, and they DO need their own clause.
     # A round-6 edit deleted this on the theory that `HAS_INLINE_BODY_RE` had
     # taken it over -- but that pattern only rejects a value BEGINNING with `$`,
@@ -243,7 +272,7 @@ UNREADABLE_RE = re.compile(
 # which invites no correction. `-F body=` and `--raw-field body=` were accepted
 # as posting routes and omitted here, so they drew exactly that.
 HAS_INLINE_BODY_RE = re.compile(
-    r"--(?:body|message)[\s=]+[\"']?[^\s\"'$]|-(?:b|m)\s+[\"']?[^\s\"'$]"
+    r"--(?:body|message|comment)[\s=]+[\"']?[^\s\"'$]|-(?:b|m|c)\s+[\"']?[^\s\"'$]"
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
@@ -267,11 +296,25 @@ _BOT_HANDLES = "|".join(["dependabot", "renovate", "copilot", "cl" + "aude"])
 # rebase"   # COMMENT_PR` has a trailing comment, and `--body "..." --repo o/r`
 # has a trailing flag. Acting on that warning would mean appending prose to a
 # body Dependabot parses, which is the harm the exemption exists to avoid.
-BOT_COMMAND_RE = re.compile(
-    r"--(?:body|message)\s+([\"'])\s*@(?:" + _BOT_HANDLES + r")\b"
-    r"[ \w-]{0,40}\s*\1",
-    re.IGNORECASE,
+# The command vocabulary these bots actually accept. An earlier version allowed
+# any 40 characters of word-or-hyphen after the handle, which admitted
+# `@dependabot rebase please humans` -- human-directed prose taking an exemption
+# meant for a body no human reads. A closed vocabulary is narrower than the real
+# grammar, and that is the safe direction for a warn-only guard: an unlisted bot
+# command draws a note rather than escaping one.
+_BOT_VERBS = (
+    r"rebase|recreate|merge|squash and merge|cancel merge|reopen|close"
+    r"|ignore this (?:major|minor|patch) version|ignore this dependency"
+    r"|show [\w./-]+ ignore conditions|unignore [\w./-]+"
+    r"|review|retry"
 )
+_BOT_BODY = r"@(?:" + _BOT_HANDLES + r")\s+(?:" + _BOT_VERBS + r")\s*"
+# Every body-bearing spelling the detector accepts as a POSTING route must be
+# accepted here too, or a compliant bot command warns. `--body=`, `-b` and the
+# `--comment` flag this change just added as a surface were all missing.
+BOT_COMMAND_RE = re.compile(
+    r"--(?:body|message|comment)[\s=]+([\"'])\s*" + _BOT_BODY + r"\1"
+    r"|-(?:b|m|c)\s+([\"'])\s*" + _BOT_BODY + r"\2", re.IGNORECASE)
 
 # The same exemption tested against a RAW body, with no shell syntax around it.
 # `verdict_mcp` used to synthesize `--body "<body>"` so it could reuse the
@@ -279,8 +322,7 @@ BOT_COMMAND_RE = re.compile(
 # argument early, and `@dependabot rebase" and a long note for the humans ...`
 # took the exemption. Reconstructing syntax to reuse a matcher is what reopened
 # a hole the Bash path had a fixture against.
-BOT_BODY_RE = re.compile(
-    r"^\s*@(?:" + _BOT_HANDLES + r")\b[ \w-]{0,40}\s*$", re.IGNORECASE)
+BOT_BODY_RE = re.compile(r"^\s*" + _BOT_BODY + r"$", re.IGNORECASE)
 
 
 # MCP comment-posting tools.
@@ -324,8 +366,9 @@ EMOJI = (
     "instead:\n\n    " + MARKER_TEXT + "\n\n"
     "scripts/check-pr-fully-clean.py matches the robot emoji as a "
     "REVIEW_BODY_MARKERS entry, so a comment carrying it is admitted into the "
-    "fully-clean verdict scan as a review -- and a claim or status comment "
-    "carries no findings, so it scans as a CLEAN one. " + SEE
+    "fully-clean verdict scan as a review. Admission is not the whole story -- the "
+    "comment must also name the head SHA to count -- but the emoji removes the "
+    "one filter standing between a claim comment and that scan. " + SEE
 )
 
 
@@ -406,6 +449,108 @@ def bodies_for(segment, bodies):
                       if int(i) < len(bodies))
 
 
+# The inline body value, when the segment carries one. Needed because searching
+# the whole segment for the marker accepts it ANYWHERE -- including in a
+# trailing shell comment, in a `--repo` value, or followed by more human prose
+# after the marker. Each of those is a body that does not disclose, passed by a
+# check that says it does.
+# The inline body value, when the segment carries one. Needed because searching
+# the whole segment for the marker accepts it ANYWHERE -- including in a
+# trailing shell comment, in a `--repo` value, or followed by more human prose
+# after the marker. Each of those is a body that does not disclose, passed by a
+# check that says it does.
+#
+# Written as explicit cases rather than one regex. A single pattern got all
+# three quoting shapes wrong at once: it read `$'...'` as the bare token
+# `$'Done,`, and it read `-f "body=X"` -- where the quote precedes `body=` --
+# as the bare token `X` truncated at the first space.
+_FLAG_BEFORE_VALUE = re.compile(
+    r"(?:--(?:body|message|comment)[\s=]+|-(?:b|m|c)\s+)")
+_FIELD_QUOTED = re.compile(
+    r"(?:-f|-F|--field|--raw-field|--form)\s+([\"'])body=")
+_FIELD_BARE = re.compile(
+    r"(?:-f|-F|--field|--raw-field|--form)\s+body=")
+
+
+def _read_quoted(text, i):
+    """Value starting at *i*, honouring '...', "...", $'...', or a bare token."""
+    if text.startswith("$'", i):
+        i += 2
+        quote = "'"
+    elif i < len(text) and text[i] in "\"'":
+        quote = text[i]
+        i += 1
+    else:
+        m = re.compile(r"\S+").match(text, i)
+        return m.group(0) if m else None
+    out = []
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\" and i + 1 < len(text):
+            out.append(text[i + 1]); i += 2; continue
+        if ch == quote:
+            return "".join(out)
+        out.append(ch); i += 1
+    return "".join(out)
+
+
+def inline_body(segment):
+    """The segment's inline body value, or None when it has no readable one.
+
+    Candidates are ranked by POSITION, not by pattern order. Trying the field
+    patterns first meant a `--body`-supplied body that merely mentioned
+    `-f body=` -- an ordinary thing to say in a comment about this very feature
+    -- had that inner text taken as the body, so a compliant comment warned.
+    A false positive on a compliant comment is the worst outcome available to a
+    warn-only guard, since the whole corpus is about to start appending markers.
+    """
+    candidates = []
+    m = _FIELD_QUOTED.search(segment)
+    if m:
+        candidates.append((m.start(), "field_quoted", m))
+    m = _FIELD_BARE.search(segment)
+    if m:
+        candidates.append((m.start(), "field_bare", m))
+    m = _FLAG_BEFORE_VALUE.search(segment)
+    if m:
+        candidates.append((m.start(), "flag", m))
+    if not candidates:
+        return None
+    _, kind, m = min(candidates, key=lambda c: c[0])
+    if kind == "field_quoted":
+        # The quote opened BEFORE `body=`, so the value runs to its partner.
+        quote = m.group(1)
+        rest = segment[m.end():]
+        j = rest.find(quote)
+        return rest if j < 0 else rest[:j]
+    return _read_quoted(segment, m.end())
+
+
+def discloses(text):
+    """True when *text* ENDS with the disclosure marker.
+
+    Anchored at the end rather than searched, because the marker's whole job is
+    to be the last thing a reader sees. A marker followed by further prose reads
+    as a quotation of the convention rather than as a disclosure, and a marker
+    in a trailing shell comment is not in the body at all.
+    """
+    # A heredoc body arrives with its terminator line still attached, so strip a
+    # trailing all-caps delimiter before anchoring -- otherwise a blank line
+    # before `EOF` reads as the body continuing past the marker.
+    text = re.sub(r"\n\s*[A-Z_][A-Z0-9_]*\s*$", "", text)
+    tail = text.rstrip().rstrip("\"'").rstrip()
+    m = None
+    for m in MARKER_RE.finditer(tail):
+        pass
+    if m is None:
+        return False
+    # Only the remainder of the marker line may follow. A blank line after it,
+    # or a long trailing run, means the body continues past the disclosure --
+    # which reads as quoting the convention rather than as disclosing.
+    after = tail[m.end():].rstrip()
+    return "\n\n" not in after and len(after) <= 60
+
+
 def judge_segment(segment, extra):
     """Return a warning for one command-position segment, or None.
 
@@ -418,8 +563,16 @@ def judge_segment(segment, extra):
     text = segment + "\n" + extra
     if BOT_COMMAND_RE.search(segment):
         return None
-    if MARKER_RE.search(text):
-        return None
+    body = inline_body(segment)
+    if body is not None and not extra:
+        # A readable body settles it on its own terms: the marker must END it.
+        if discloses(body):
+            return None
+    elif MARKER_RE.search(text):
+        # No readable inline body (a heredoc supplies it, say), so fall back to
+        # the segment-wide search this cannot improve on.
+        if discloses(text):
+            return None
     if EMOJI_DISCLOSURE_RE.search(text):
         return EMOJI
     # A heredoc body we actually READ settles it: the body is in hand and
@@ -429,7 +582,14 @@ def judge_segment(segment, extra):
     # same misdiagnosis the `-F <file>` case produced.
     if extra:
         return MISSING
-    if UNREADABLE_RE.search(segment) or not HAS_INLINE_BODY_RE.search(segment):
+    # `inline_body` is the single authority on whether a body is readable, and
+    # `HAS_INLINE_BODY_RE` is consulted only for the shapes it cannot parse.
+    # Keeping two independent flag lists is what let `--form body=` be extracted
+    # correctly and then reported as unreadable anyway -- the same drift that
+    # made `-F body=` and `--raw-field body=` misreport two rounds earlier.
+    if UNREADABLE_RE.search(segment):
+        return UNREADABLE
+    if body is None and not HAS_INLINE_BODY_RE.search(segment):
         return UNREADABLE
     return MISSING
 
@@ -464,7 +624,12 @@ def verdict_mcp(tool_name, tool_input):
         return None
     if BOT_BODY_RE.match(body):
         return None
-    if MARKER_RE.search(body):
+    # `discloses`, not `MARKER_RE.search`. The end-anchoring fix landed on the
+    # Bash path and not here -- on the easier case, where the raw body is
+    # already in hand -- so the MCP route accepted a marker followed by more
+    # human prose. That is the population this branch exists for: a remote
+    # session has no `gh`, so MCP is its only route.
+    if discloses(body):
         return None
     if EMOJI_DISCLOSURE_RE.search(body):
         return EMOJI

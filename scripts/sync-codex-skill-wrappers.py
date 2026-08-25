@@ -165,7 +165,15 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 > [!IMPORTANT]
 > **Every comment-posting operation below carries the agent-disclosure marker in
 > its body**, on its own line after a blank line:
-> `_Posted by Claude Code (AI agent) --- not written by a human._`
+> `_Posted by <your agent> (AI agent) --- not written by a human._`
+>
+> Substitute your own agent's name --- this registry is read by every model, so a
+> hard-coded `Claude Code` would have a Codex or Gemini session misattribute its
+> own comment.
+> Keep the rest of the line verbatim.
+> Check the substituted name against `scripts/check-pr-fully-clean.py`'s
+> `REVIEW_BODY_MARKERS` too --- `code review` is one of them, so an agent named
+> for code review would reintroduce the false-clean the emoji ban prevents.
 >
 > This registry is the substitution point for remote/web sessions, which have no
 > `gh` at all --- so a marker-free template here is a marker-free comment there, in

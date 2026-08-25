@@ -322,6 +322,73 @@ CASES = [
     ("the review-thread reply route is a comment target",
      'gh api "repos/o/r/pulls/1/comments/9/replies" -f body="bare"', True),
 
+    # --- cross-vendor round: the marker must END THE BODY --------------------
+    #
+    # Eleven same-vendor rounds accepted a marker found ANYWHERE in the command.
+    # A cross-vendor reviewer supplied all four of these on its first pass.
+    ("a marker in a trailing shell comment is not in the body",
+     'gh pr comment 1 --body "bare"  # ' + MARKER, "missing"),
+    ("a marker followed by more human prose does not disclose",
+     'gh pr comment 1 --body "Done.\n\n' + MARKER
+     + '\n\nAlso, a human note."', "missing"),
+    ("a partial marker does not disclose",
+     'gh pr comment 1 --body "Done.\n\n_Posted by Claude Code_"', "missing"),
+
+    # --- cross-vendor round: posting surfaces that are not named "comment" ----
+    ("gh issue reopen --comment posts a comment",
+     'gh issue reopen 5 -R o/r --comment "Reviving: still matters."', "missing"),
+    ("gh issue close --comment posts a comment",
+     'gh issue close 5 -R o/r --comment "Superseded."', "missing"),
+    ("gh pr close --comment posts a comment",
+     'gh pr close 5 -R o/r --comment "Superseded."', "missing"),
+    ("gh issue reopen --comment WITH marker",
+     'gh issue reopen 5 -R o/r --comment "Reviving.\n\n' + MARKER + '"', False),
+
+    # --- cross-vendor round: --input and --form ------------------------------
+    ("gh api --input supplies an unreadable body",
+     'gh api repos/o/r/issues/1/comments --input payload.json', None),
+    ("glab api --form body= is a post",
+     'glab api projects/:id/merge_requests/1/notes --form body="bare"',
+     "missing"),
+
+    # --- cross-vendor round: the bot exemption is a command vocabulary -------
+    ("prose after a real bot verb is not exempt",
+     'gh pr comment 1 --body "@dependabot rebase please humans"', "missing"),
+    ("an explicit GET is not a post",
+     'gh api repos/o/r/issues/1/comments -X GET -f per_page=100', False),
+
+    # --- push-gate round: the extractor must not warn on a COMPLIANT comment --
+    #
+    # A body that merely MENTIONS a field flag had that inner text taken as the
+    # body, so a compliant comment about this very feature warned. A false
+    # positive on a compliant comment is the worst outcome for a warn-only
+    # guard.
+    ("a compliant body that quotes -f body= is not a false positive",
+     'gh pr comment 2130 --body "Addressed: inline_body now handles -f body= '
+     'and --form body=.\n\n' + MARKER + '"', False),
+    ("a compliant body that quotes -F body=@file",
+     'gh pr comment 2130 --body "Rebutted: the canonical reply is -F '
+     'body=@file, so the quote comes first.\n\n' + MARKER + '"', False),
+
+    # --- push-gate round: the exemption across every accepted spelling -------
+    ("bot command via --body=", 'gh pr comment 5 --body="@dependabot rebase"',
+     False),
+    ("bot command via -b", 'gh pr comment 5 -b "@dependabot rebase"', False),
+    ("bot command via --comment",
+     'gh issue close 5 -R o/r --comment "@dependabot close"', False),
+
+    # --- push-gate round: a heredoc keeps its terminator line ----------------
+    ("heredoc with a blank line before its terminator still discloses",
+     "gh pr comment 5 --body-file - <<'EOF'\nHi.\n\n" + MARKER + "\n\nEOF",
+     False),
+    ("heredoc where prose follows the marker does not disclose",
+     "gh pr comment 5 --body-file - <<'EOF'\nHi.\n\n" + MARKER
+     + "\n\nAnd more human prose.\nEOF", "missing"),
+
+    # --- push-gate round: gh pr merge has no --comment -----------------------
+    ("gh pr merge --body is a merge-commit body, not a comment",
+     'gh pr merge 5 -R o/r --body "merge commit body"', False),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),
@@ -470,6 +537,16 @@ def run():
          "Bare review body.", True),
         ("MCP discussion comment", "mcp__github__discussion_comment_write",
          "Bare discussion reply.", True),
+        # The end-anchoring fix landed on the Bash path only, and no MCP
+        # fixture covered it -- 121 green cases did not catch a marker followed
+        # by human prose on the route a remote session must use.
+        ("MCP marker followed by human prose does not disclose",
+         "mcp__github__add_issue_comment",
+         "Working on this.\n\n" + MARKER + "\n\nAlso: please look at CI.",
+         True),
+        ("MCP marker first, prose after, does not disclose",
+         "mcp__github__add_issue_comment",
+         MARKER + "\n\nWorking on this, and a long human paragraph.", True),
         ("MCP discussion comment WITH marker",
          "mcp__github__discussion_comment_write",
          "Reply.\n\n" + MARKER, False),
@@ -485,7 +562,7 @@ def run():
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 11
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 13
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

@@ -13,7 +13,15 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 > [!IMPORTANT]
 > **Every comment-posting operation below carries the agent-disclosure marker in
 > its body**, on its own line after a blank line:
-> `_Posted by Claude Code (AI agent) --- not written by a human._`
+> `_Posted by <your agent> (AI agent) --- not written by a human._`
+>
+> Substitute your own agent's name --- this registry is read by every model, so a
+> hard-coded `Claude Code` would have a Codex or Gemini session misattribute its
+> own comment.
+> Keep the rest of the line verbatim.
+> Check the substituted name against `scripts/check-pr-fully-clean.py`'s
+> `REVIEW_BODY_MARKERS` too --- `code review` is one of them, so an agent named
+> for code review would reintroduce the false-clean the emoji ban prevents.
 >
 > This registry is the substitution point for remote/web sessions, which have no
 > `gh` at all --- so a marker-free template here is a marker-free comment there, in
@@ -61,7 +69,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `CREATE_ISSUE` | Open a new issue. | `gh issue create` | `mcp__github__issue_write (method=create)` |
 | `COMMENT_ISSUE` | Post a comment on an issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh issue comment "<N>" --body "..."` | `mcp__github__add_issue_comment` |
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close "<N>" --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
-| `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen "<N>" --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
+| `REOPEN_ISSUE` | Reopen a closed issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md). | `gh issue reopen "<N>" --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
 | `LABEL_ISSUE` | Set an issue's labels. The two behave differently and are not interchangeable: `--add-label` ADDS to the existing set, while the MCP path REPLACES the whole set, so pass the union of existing and new labels there. The MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit "<N>" --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
 | `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh api "repos/<owner>/<repo>/labels/<name>"` | `mcp__github__get_label` |
 | `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | `mcp__github__list_discussions` |

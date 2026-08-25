@@ -362,10 +362,17 @@
               "scripts/check-pr-fully-clean.py matches that emoji as a",
               "REVIEW_BODY_MARKERS entry, so a disclosed claim comment would be",
               "admitted into the fully-clean verdict scan as a review -- and a claim",
-              "carries no findings, so it would scan as a CLEAN one. That is the",
+              "carries no findings, so nothing blocking is found there. That is the",
               "false-clean failure shared/workflow/fully-clean.md already records for",
               "a human-authored self-review, arriving through the very mechanism",
-              "added to make authorship legible."
+              "added to make authorship legible.",
+              "",
+              "Admission is necessary and not sufficient: the comment must",
+              "also name the head SHA to count toward criterion 2. The emoji",
+              "removes the one filter standing between a claim comment and",
+              "that scan, rather than single-handedly manufacturing a clean",
+              "verdict. Corrected after a cross-vendor review; the fragment",
+              "and the hook's user-facing warning say the same thing now."
             ],
             "_note_cannot_see_every_body": [
               "--body-file, --editor, `-F <file>` and an interpolated $BODY all put the",

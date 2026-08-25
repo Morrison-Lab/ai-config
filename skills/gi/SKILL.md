@@ -80,12 +80,18 @@ issue. Two signals must **both** be clear (`gh issue list` in step 1 returns
 titles, labels, and assignees but neither comment text nor linked PRs, so
 check both explicitly here).
 
-**(1) No "Working on this" claim in the most recent comment:**
+**(1) No live "Working on this" claim on the issue:**
 
 ```bash
-# GitHub — read the issue's latest comment:
-gh issue view <N> --json comments --jq '.comments | last | .body' | cat   # READ_ISSUE_COMMENTS
+# GitHub -- read the claim/release exchange, not just the newest comment:
+gh issue view <N> --json comments \
+  --jq '[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | "\(.author.login): \(.body)"'   # READ_ISSUE_COMMENTS
 ```
+
+**Reading only `.comments | last` is the bug this replaces.**
+A claim is live for two hours from the most recent *activity*, so any unrelated comment posted after it --- a status note, a bot's build result, a question --- becomes the last comment while the claim is still binding.
+The claim then goes invisible and this check reports the issue free, which is the parallel-session collision the whole convention exists to prevent.
+Filter to the exchange and take the last member of *that*.
 
 Match the two-word invariant `hold off`, or either retired wording `paws off` / `back off`, case-insensitively --- then **exclude the comment if it also carries a release term** (`unclaim|released|PR is free|now mergeable`), because the retired release wording `... done --- paws off released.` contains `paws off` and would otherwise read as a live claim.
 See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
@@ -115,8 +121,8 @@ If an open PR already exists for the issue:
 
 ### 5. Check history
 
-Before implementing, invoke the `check-history` skill to review merged
-MRs/PRs that touched the same area. Don't undo past progress.
+Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area.
+Don't undo past progress.
 
 ### 6. Claim the issue
 

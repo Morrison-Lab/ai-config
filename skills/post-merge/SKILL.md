@@ -312,7 +312,15 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    "A conflict your sweep found is not a conflict your merge caused"
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
-   Read the most recent comment.
+   Read the most recent comment **of the claim/release exchange**, not the most recent comment overall:
+
+   ```bash
+   gh pr view <N> --json comments \
+     --jq '[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | .body'   # READ_PR_COMMENTS
+   ```
+
+   Any unrelated comment posted after a claim --- a status note, a bot result --- becomes the newest comment while the claim is still live, since a claim expires on activity rather than on age.
+   Reading the newest comment alone therefore reports a claimed PR as free.
    Match the two-word invariant, `hold off` or either retired wording `paws off` / `back off`, case-insensitively --- never a whole sentence.
    The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own claim emitter (step 4), so a quoted prefix misses claims this very skill posts.
    See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".

@@ -22,8 +22,10 @@ A per-payload sentinel still collapses a project-hook plus plugin-hook
 double fire of the *same* Cursor event by replaying the first JSON result.
 
 Adapter-level crashes, wrapper timeouts, and unreadable payloads fail open.
-A missing catalog script fails closed for that script (Claude `python3`
-on a missing path exits 2, which PreToolUse treats as deny).
+A missing catalog script, or a catalog script that times out or cannot
+exec, fails closed for that script (exit 2, which PreToolUse treats as
+deny). Cursor `failClosed` stays unset so an adapter crash does not
+lock every tool in the session.
 """
 from __future__ import annotations
 
@@ -476,9 +478,9 @@ def run_script(
             env=env,
         )
     except subprocess.TimeoutExpired:
-        return 0, "", f"timeout {script}"
+        return 2, "", f"timeout {script}"
     except OSError as exc:
-        return 0, "", f"exec {script}: {exc}"
+        return 2, "", f"exec {script}: {exc}"
     return proc.returncode, proc.stdout, proc.stderr
 
 

@@ -462,7 +462,7 @@ with tempfile.TemporaryDirectory() as raw:
         "preToolUse",
         {
             "tool_name": "Shell",
-            "tool_input": {"command": "gh pr merge 1"},
+            "tool_input": {"command": "git status"},
             "tool_use_id": "deny-1",
             "conversation_id": "c1",
             "generation_id": "g-deny",
@@ -707,6 +707,42 @@ with tempfile.TemporaryDirectory() as raw:
         miss_env,
     )
     check("missing catalog script fail-closed denies", missing.get("permission") == "deny")
+    hang_py = """\
+#!/usr/bin/env python3
+import time
+time.sleep(30)
+print("{}")
+"""
+    write_hook(hooks, "hang-guard.py", hang_py)
+    hang_manifest = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [{"script": "hang-guard.py", "timeout": 1}],
+                },
+            ],
+            "Stop": [],
+            "UserPromptSubmit": [],
+        }
+    }
+    hang_path = tmp / "hang-hooks.json"
+    hang_path.write_text(json.dumps(hang_manifest), encoding="utf-8")
+    hang_env = env.copy()
+    hang_env["AI_CONFIG_HOOKS_JSON"] = str(hang_path)
+    hang_env["AI_CONFIG_CURSOR_HOOK_STASH"] = str(tmp / "stash-hang")
+    hung = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "git status"},
+            "tool_use_id": "hang-1",
+            "conversation_id": "c-hang",
+            "generation_id": "g-hang",
+        },
+        hang_env,
+    )
+    check("hung catalog script fail-closed denies", hung.get("permission") == "deny")
     old_hooks_dir = os.environ.get("AI_CONFIG_HOOKS_DIR")
     os.environ["AI_CONFIG_HOOKS_DIR"] = str(hooks)
     try:

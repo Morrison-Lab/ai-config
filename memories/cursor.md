@@ -65,15 +65,19 @@ translates Cursor events into the payload the existing `hooks/` scripts
 already consume.
 The event mapping is [docs/cursor-hook-mapping.md](../docs/cursor-hook-mapping.md).
 Cursor JSONL omitted `tool_result` as of 2026-04-13 (Cursor staff);
-three fail-closed Stop/PreToolUse scripts are skipped until that changes.
+three fail-closed Stop/PreToolUse scripts are skipped until that changes
+([#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)).
 Warn-only Claude Stop `systemMessage` maps to Cursor `followup_message`
 because `stop` has no warn-only field.
+`postToolUse.additional_context` is emitted; Cloud consumption is
+unmeasured as of 2026-08-25 (desktop through 3.7.x discarded it).
 
 User-level `~/.cursor/hooks.json` is not available to cloud agents.
 `sessionStart` injection is desktop-only.
-Cloud agents get `UserPromptSubmit` context on the first `postToolUse`
-of a generation; a tool-less cloud turn drops that context rather than
-delaying it, because `beforeSubmitPrompt` cannot inject.
+Cloud agents emit `UserPromptSubmit` context on the first `postToolUse`
+of a generation; whether the model sees it is unmeasured on Cloud.
+A tool-less cloud turn drops that context rather than delaying it,
+because `beforeSubmitPrompt` cannot inject.
 Desktop Cursor with third-party Claude hooks enabled also loads
 `~/.claude/settings.json`; do not pair that with this project adapter
 (both sources run; measured against Cursor's third-party hook docs on

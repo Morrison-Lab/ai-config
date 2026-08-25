@@ -378,6 +378,8 @@ because Cursor JSONL omits tool output (Cursor staff, 2026-04-13;
 re-verify on a harness bump):
 `no-push-without-self-review.py`, `no-unreviewed-pr.py`, and
 `no-unmonitored-pr.py`.
+Reconstructing `tool_result` from Cursor `postToolUse.tool_output` is
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 
 | hook | event | enforces |

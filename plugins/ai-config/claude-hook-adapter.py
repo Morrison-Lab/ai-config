@@ -145,15 +145,16 @@ def main():
             if raw_subagents is not None and not isinstance(raw_subagents, list):
                 print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
-            for sub in subagents:
+            # Enforce max fanout cap of 50 subagents to prevent unbounded synchronous execution
+            for sub in subagents[:50]:
                 if not isinstance(sub, dict):
                     continue
                 agent_payload = {
                     "tool_name": "Agent",
                     "tool_input": {
-                        "subagent_type": sub.get("TypeName"),
-                        "isolation": sub.get("Workspace"),
-                        "prompt": sub.get("Prompt")
+                        "subagent_type": sub.get("TypeName") or sub.get("typeName"),
+                        "isolation": sub.get("Workspace") or sub.get("workspace"),
+                        "prompt": sub.get("Prompt") or sub.get("prompt")
                     }
                 }
                 if transcript_path:
@@ -166,8 +167,8 @@ def main():
             send_payload = {
                 "tool_name": "SendMessage",
                 "tool_input": {
-                    "recipient": args.get("Recipient"),
-                    "message": args.get("Message")
+                    "recipient": args.get("Recipient") or args.get("recipient"),
+                    "message": args.get("Message") or args.get("message")
                 }
             }
             if transcript_path:
@@ -180,9 +181,9 @@ def main():
             task_payload = {
                 "tool_name": "Task",
                 "tool_input": {
-                    "name": args.get("name"),
-                    "description": args.get("description"),
-                    "system_prompt": args.get("system_prompt")
+                    "name": args.get("name") or args.get("Name"),
+                    "description": args.get("description") or args.get("Description"),
+                    "system_prompt": args.get("system_prompt") or args.get("systemPrompt") or args.get("SystemPrompt")
                 }
             }
             if transcript_path:

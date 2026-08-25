@@ -250,7 +250,8 @@ That reconstruction preserves whatever the author reads as the rule's *point* an
 - **Do:** copy a required string into the fixture from the rule that defines it, and name that rule's file beside it, rather than composing a case that looks like it complies.
 - **Do:** diff a fixture's expected value against the rule's text character for character when the rule specifies a literal, since a shortened dash or a dropped word reads as identical.
 - **Don't:** read a fixture passing as evidence its expected value is conformant --- a loose matcher and a non-conformant fixture agree.
-- **Don't:** restate a rule's literal text from memory inside a fixture; the divergence is the defect the matcher then has to tolerate, in whichever direction the paraphrase drifted.
+- **Don't:** restate a rule's literal text from memory inside a fixture;
+  the divergence is the defect the matcher then has to tolerate, in whichever direction the paraphrase drifted.
 
 (Measured 2026-08-24 Pacific on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185).)
 

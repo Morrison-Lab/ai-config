@@ -166,7 +166,8 @@ The rule never needed the rest: what makes this the third occurrence is that fou
 - **Do:** execute each revision of a matcher you are writing up and quote what it matched, rather than describing what its diff appears to do.
 - **Do:** run `git merge-base --is-ancestor <claimed-cause> <claimed-response>` before writing that one commit responded to another, and drop the causal claim rather than reconstructing it when that exits **1** --- read any other non-zero status as the check having failed to run, per [`errexit-is-not-uniform`](errexit-is-not-uniform.md), and note that the operand order decides the answer, so a reversed test licenses the claim it was meant to refute.
 - **Don't:** read a widening and a narrowing as different classes --- both are the same pattern failing to locate a token, and a widening that forces a narrowing is already the second edit the rule above warns about.
-- **Don't:** count a boundary test that *generalizes* an earlier one as having changed layers; it is still the same construct answering a question it cannot decide.
+- **Don't:** count a boundary test that *generalizes* an earlier one as having changed layers;
+  it is still the same construct answering a question it cannot decide.
 
 (Dates Pacific; the commits are timestamped 2026-08-25 UTC.)
 

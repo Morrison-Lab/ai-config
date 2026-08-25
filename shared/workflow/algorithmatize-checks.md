@@ -758,12 +758,14 @@ The mutation was fine and the **suite** was the defect, so the remedy was a new 
 That is the pass-condition entry above, which is explicit that such a case reads as "an unmeasured clause rather than a robust one".
 
 So read this entry's ordering as a **default** rather than a rule, and settle which of the two you have by asking the two questions in order: did the artifact change, and if it did, did the designated case reach the mutated code.
-The first separates an inapplicable mutation from everything else; the second is the pass-condition entry's own identity check, and it is what separates a faulty mutation from a suite that cannot see a good one.
+The first separates an inapplicable mutation from everything else;
+the second is the pass-condition entry's own identity check, and it is what separates a faulty mutation from a suite that cannot see a good one.
 
 The one thing worth adding is **when** to check the anchor.
 It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.
 What that section does not say is that a mutation harness is where the check has to move earlier.
-There the tell is a match that inexplicably fails, and you react to it; here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
+There the tell is a match that inexplicably fails, and you react to it;
+here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
 
 - **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you --- the fourth outcome's `Do` above already says to build the mutation from a raw literal or a written file, and this is the check for an anchor that reached you through a transport you did not choose.
 - **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- that is the second of the two questions above, and asking it first is what misread the row that belonged to the first.

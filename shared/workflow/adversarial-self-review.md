@@ -90,7 +90,8 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 - **Do:** quote back the sentences in a verdict that cite the PR's history rather than the diff, and say what independent evidence is left once they are set aside.
 - **Do:** label a regression case with the property it pins rather than the round that found it, so the comment is a specification a reviewer can check instead of a report that scrutiny already happened.
 - **Don't:** read a long visible review history as coverage --- it is a record of what was found, and every entry marks a place a defect once lived.
-- **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round; that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
+- **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round;
+  that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
 ## Its findings are findings
 

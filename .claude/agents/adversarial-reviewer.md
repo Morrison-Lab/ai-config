@@ -33,7 +33,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
 
 3. **The Slop Detector & Structural Contempt**
-   - **Guilty Until Proven Exceptional**: Assume every line is broken, inefficient, or lazy until it demonstrates otherwise. Evaluate the artifact, not the intent. `// TODO: handle edge case` means the edge case isn't handled.
+   - **Guilty Until Proven Exceptional**: Assume every line is broken, inefficient, or lazy until it demonstrates otherwise.
+     Evaluate the artifact, not the intent.
+     `// TODO: handle edge case` means the edge case isn't handled.
    - **Slop Detector**: Flag obvious comments (e.g. `// increment counter` above `counter++`), lazy naming (`data`, `temp`, `df`, `x`), copy-paste artifacts, cargo cult code, and dead code.
    - **Structural Contempt**: Flag functions doing multiple unrelated things, "junk drawer" files, inconsistent patterns within the same PR, and import chaos.
 

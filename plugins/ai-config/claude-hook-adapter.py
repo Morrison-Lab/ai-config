@@ -348,16 +348,16 @@ def main():
                     except Exception:
                         pass
                     if text_out:
-                        # Cap single injected message at 10KB and total cumulative bytes at 30KB
-                        chunk = text_out[:10000]
-                        chunk_bytes = len(chunk.encode("utf-8"))
+                        # Cap single injected message at 10KB (in UTF-8 bytes) and total cumulative bytes at 30KB
+                        raw_bytes = text_out.encode("utf-8")[:10000]
+                        chunk = raw_bytes.decode("utf-8", errors="ignore")
+                        chunk_bytes = len(raw_bytes)
                         if total_injected_bytes + chunk_bytes <= 30000:
                             injected_messages.append(chunk)
                             total_injected_bytes += chunk_bytes
                         elif total_injected_bytes < 30000:
                             remaining_bytes = 30000 - total_injected_bytes
-                            # Trim to fit remaining byte budget
-                            encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
+                            encoded_trimmed = raw_bytes[:remaining_bytes]
                             injected_messages.append(encoded_trimmed.decode("utf-8", errors="ignore"))
                             total_injected_bytes = 30000
 

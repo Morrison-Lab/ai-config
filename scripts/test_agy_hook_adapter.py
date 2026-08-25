@@ -382,6 +382,33 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_ambiguous_tool_call_and_invocation_num_payload(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "ls"}
+            },
+            "invocationNum": 1
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        # PreToolUse takes priority when toolCall is present
+        self.assertEqual(out.get("decision"), "allow")
+        self.assertNotIn("injectSteps", out)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_pre_invocation_zero_invocation_num(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Zero step"}), stderr="")
         mock_run.return_value = mock_result

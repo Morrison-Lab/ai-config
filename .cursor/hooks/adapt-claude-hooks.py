@@ -461,16 +461,16 @@ def wait_for_tick_json(path: Path, timeout: float = TICK_REPLAY_WAIT_S) -> str:
     return "{}"
 
 
-def claim_or_replay_tick(key: str) -> str | None:
+def claim_or_replay_tick(key: str, wait_s: float = TICK_REPLAY_WAIT_S) -> str | None:
     """Return stored JSON to replay, or None if this process owns the tick."""
     path = tick_sentinel(key)
     try:
         fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        return wait_for_tick_json(path)
+        return wait_for_tick_json(path, timeout=wait_s)
     except OSError:
         if path.exists():
-            return wait_for_tick_json(path)
+            return wait_for_tick_json(path, timeout=wait_s)
         return None
     try:
         os.write(fd, TICK_PENDING.encode("utf-8"))
@@ -535,13 +535,39 @@ def take_stashed_context(tool_use_id: str) -> str:
         return ""
 
 
-def ups_key(cursor: dict[str, Any]) -> str:
-    return str(
-        cursor.get("generation_id")
-        or cursor.get("conversation_id")
-        or cursor.get("session_id")
-        or ""
-    )
+def claim_ups_slot(cursor: dict[str, Any]) -> bool:
+    """True when this event should run UserPromptSubmit scripts.
+
+    sessionStart often has only session_id. postToolUse has generation_id.
+    If sessionStart already injected, skip the first postToolUse of that
+    conversation and still inject on later generations.
+    """
+    conv = conversation_id_of(cursor)
+    gen = str(cursor.get("generation_id") or "")
+    if not conv and not gen:
+        return True
+    gen_sentinel = generation_ups_sentinel(f"{conv}|{gen}") if gen else None
+    conv_sentinel = generation_ups_sentinel(f"{conv}|") if conv else None
+    if gen_sentinel is not None and gen_sentinel.exists():
+        return False
+    if conv_sentinel is not None and conv_sentinel.exists():
+        if gen_sentinel is not None:
+            try:
+                gen_sentinel.write_text("1", encoding="utf-8")
+            except OSError:
+                pass
+            try:
+                conv_sentinel.unlink()
+            except OSError:
+                pass
+        return False
+    target = gen_sentinel if gen_sentinel is not None else conv_sentinel
+    if target is not None:
+        try:
+            target.write_text("1", encoding="utf-8")
+        except OSError:
+            pass
+    return True
 
 
 def generation_ups_sentinel(key: str) -> Path:
@@ -700,15 +726,8 @@ def handle_user_prompt_submit(
     once_per_generation: bool,
     event: str = "postToolUse",
 ) -> str:
-    key = ups_key(cursor)
-    if once_per_generation and key:
-        sentinel = generation_ups_sentinel(key)
-        if sentinel.exists():
-            return ""
-        try:
-            sentinel.write_text("1", encoding="utf-8")
-        except OSError:
-            pass
+    if once_per_generation and not claim_ups_slot(cursor):
+        return ""
     payload = claude_payload_for_transcript(cursor, "UserPromptSubmit")
     chunks: list[str] = []
     deadline = event_deadline(event)
@@ -797,7 +816,9 @@ def main(argv: list[str] | None = None) -> int:
     event = args.event
     cursor = read_stdin()
     key = payload_tick_key(event, cursor)
-    replay = claim_or_replay_tick(key)
+    replay = claim_or_replay_tick(
+        key, wait_s=float(WRAPPER_TIMEOUT_S.get(event, 60)),
+    )
     if replay is not None:
         sys.stdout.write(replay if replay.endswith("\n") else replay + "\n")
         return 0

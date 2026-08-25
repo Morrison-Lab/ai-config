@@ -483,6 +483,36 @@ with tempfile.TemporaryDirectory() as raw:
         "session_id alone keys UPS injection",
         "10:00 PDT" in str(session_id_only.get("additional_context")),
     )
+    after_session = run_adapter(
+        "postToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_use_id": "after-session",
+            "conversation_id": "sid-only",
+            "session_id": "sid-only",
+            "generation_id": "g-after-session",
+        },
+        env,
+    )
+    check(
+        "first postToolUse does not repeat sessionStart UPS",
+        "10:00 PDT" not in str(after_session.get("additional_context") or ""),
+    )
+    later_gen = run_adapter(
+        "postToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_use_id": "later-ups",
+            "conversation_id": "sid-only",
+            "session_id": "sid-only",
+            "generation_id": "g-later",
+        },
+        env,
+    )
+    check(
+        "later generation still gets UPS after sessionStart",
+        "10:00 PDT" in str(later_gen.get("additional_context") or ""),
+    )
 
     # Fail-open: missing manifest
     bad_env = env.copy()

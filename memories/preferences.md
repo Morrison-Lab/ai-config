@@ -195,7 +195,6 @@
   Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer.
   (User directive / CAI, 2026-08-17.)
 
-
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
   The answer is a standing yes.
   This removes the extra "should I continue?" pause between already-scoped steps; it does NOT override holding for genuinely ambiguous or architecturally significant decisions.
@@ -320,6 +319,8 @@
   The existing instruction already covered this; the gap was execution discipline in a fast multi-merge loop, not missing guidance --- re-read this bullet at the top of every "pick the next backlog item" cycle.
   In a multi-AGENT pipeline, UMS runs at BOTH levels: each subagent runs UMS once ITS PR merges (it stops after reporting CLEAN, so the coordinator resumes it post-merge with a "your PR merged, run UMS" nudge --- or the agent-launch spec bakes in a final UMS step), and the coordinator runs its own UMS for the cross-PR orchestration learnings no single subagent can see (merge-order sequencing, conflict-cascade handling, pipeline mechanics).
   Each agent writes its OWN memory file plus one MEMORY.md index line to keep the conflict surface small; avoid rewriting shared memory bodies concurrently. (Learned on sparta 2026-07-01.)
+- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus`).
+  For any PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
 - Keep it simple.
   Don't over-explain or ask permission for straightforward fixes --- just do them.
 - Don't re-ask a decision that's already settled and built.
@@ -439,7 +440,6 @@
   - **Don't:** leave a file unstaged for hours on an untested belief about who owns it.
   (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
-
 
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.

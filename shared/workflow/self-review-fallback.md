@@ -176,7 +176,7 @@ Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, whic
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "Where the cross-vendor directive came from".
 
 **A CLEAN same-vendor verdict is the state this rule most applies to, and the one where nothing prompts it.**
-Every trigger named above is a *failure* of the primary --- quota-skipped, stubbed, unreachable, or contradicting itself.
+Every trigger named above is a *failure* of the primary.
 None of them fires on the case that leaves nothing outstanding: the primary answers, finds nothing, and reports the PR ready.
 A clean verdict closes the loop and reads as permission to stop, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s "a clean verdict discharges the round, and it does not discharge your own probing" arriving one reviewer further out.
 There the unsearched space belongs to one reviewer's attention; here it belongs to a whole vendor's blind spot, so no amount of attention inside that vendor reaches it.

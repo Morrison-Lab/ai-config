@@ -158,7 +158,7 @@ The layer change is **filed rather than shipped**, as [ai-config#2189](https://g
 
 **The paragraph above makes no claim about which form answered which, deliberately.**
 Two of the commits are concurrent siblings merged back together (see [`claim-pr`](../workflow/claim-pr.md)'s second-occurrence entry), so listing order does not carry the causal order there, and successive review rounds each refuted a different reconstruction of it.
-The one attribution it does make --- the preceding quote that `(?<![\w\-"'])` was written against --- is safe on both counts: `93363481` is a linear successor of `cf195e46`, and the reason is quoted from `93363481`'s own commit message.
+The one attribution it does make --- that `(?<![\w\-"'])` was written against a **quote character** sitting immediately before the flag token --- is safe on both counts: `cf195e46` is an ancestor of `93363481` (`--is-ancestor` exits 0), and the reason is quoted from `93363481`'s own commit message, "a flag token is never preceded by a quote".
 The rule never needed the rest: what makes this the third occurrence is that four edits to one matcher all ask where a token's boundaries are, which is a property of the forms rather than of their sequence.
 
 - **Do:** write down the one question a run of fixes shares, before writing the next pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.

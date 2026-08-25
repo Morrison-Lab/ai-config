@@ -1,6 +1,6 @@
 ---
 name: testing-r-packages
-description: Best practices for writing R package tests using testthat version 3+. Use when writing, organizing, or improving tests for R packages. Covers test structure, expectations, fixtures, snapshots, mocking, and modern testthat 3 patterns including self-sufficient tests, proper cleanup with withr, and snapshot testing.
+description: R package testing best practices with testthat 3+.
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.1"

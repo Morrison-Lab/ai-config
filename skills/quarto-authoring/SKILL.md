@@ -1,6 +1,6 @@
 ---
 name: quarto-authoring
-description: Use when the user is explicitly working with Quarto, .qmd files, _quarto.yml, Quarto projects, or Quarto features such as callouts, cross-references, citations, Mermaid diagrams, extensions, websites, books, presentations, and reports. Also use for explicit migration from or comparison with R Markdown, bookdown, blogdown, xaringan, distill, or Jupyter notebooks to Quarto. Do not use for general R Markdown or related-format questions unless Quarto or migration to Quarto is explicitly mentioned.
+description: Quarto document authoring and markdown conversion.
 metadata:
   author: Mickaël Canouil (@mcanouil)
   version: "1.4"

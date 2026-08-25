@@ -1,6 +1,6 @@
 ---
 name: brand-yml
-description: "Create and use brand.yml files for consistent branding across Shiny apps and Quarto documents. Covers: (1) Creating new _brand.yml files, (2) Applying to Shiny (R and Python), (3) Using in Quarto, (4) Modifying existing files, and (5) Troubleshooting. Includes complete specifications and integration guides."
+description: Create and apply brand.yml files across Shiny and Quarto.
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.1"

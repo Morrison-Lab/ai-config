@@ -1,6 +1,6 @@
 ---
 name: r-package-development
-description: R package development with devtools, testthat, and roxygen2. Use when the user is working on an R package, running tests, writing documentation, or building package infrastructure.
+description: R package dev with devtools, testthat, and roxygen2.
 metadata:
   author: Simon P. Couch (@simonpcouch)
   version: "1.2"

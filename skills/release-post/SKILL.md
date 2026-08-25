@@ -1,12 +1,6 @@
 ---
 name: release-post
-description: >
-  Create professional package release blog posts following Tidyverse or Shiny blog conventions.
-  Use when the user needs to: (1) Write a release announcement blog post for an R or Python package
-  for tidyverse.org or shiny.posit.co, (2) Transform NEWS/changelog content into blog format,
-  (3) Generate acknowledgments sections with contributor lists, (4) Format posts following specific
-  blog platform requirements. Supports both Tidyverse (hugodown) and Shiny (Quarto) blog formats with
-  automated contributor fetching and comprehensive style guidance.
+description: Create professional package release blog posts for Tidyverse/Shiny.
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.0"
@@ -224,8 +218,7 @@ slug: package-x-y-z
 title: package x.y.z
 date: YYYY-MM-DD
 author: Your Name
-description: >
-    Brief description
+description: Create professional package release blog posts for Tidyverse/Shiny.
 photo:
   url: https://unsplash.com/photos/id
   author: Photographer Name
@@ -255,8 +248,7 @@ A big thank you to all the folks who helped make this release happen:
 ````markdown
 ---
 title: Package Name x.y.z
-description: &desc |
-  Brief description of the release.
+description: Create professional package release blog posts for Tidyverse/Shiny.
 author: "Your Name"
 date: "YYYY-MM-DD"
 
@@ -264,10 +256,10 @@ image: feature.png
 
 open-graph:
   image: feature.png
-  description: *desc
+  description: Create professional package release blog posts for Tidyverse/Shiny.
 twitter-card:
   image: feature.png
-  description: *desc
+  description: Create professional package release blog posts for Tidyverse/Shiny.
 ---
 
 # package x.y.z

@@ -297,25 +297,30 @@ class PRClaimManager:
 
         # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
         clean_first_line_pat = re.compile(
-            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved(?:\s+for\s+merge)?|ready(?:\s+for\s+merge)?|lgtm|clean\s*/\s*approved)\b",
+            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\([^)]*\))?(?:\*\*|__)?\s*[.!]*\s*$",
             re.IGNORECASE,
         )
         if not clean_first_line_pat.search(first_verdict_line):
             return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
-        # Check for qualifiers anywhere in the verdict section (e.g. conditional approvals or trailing caveats)
-        clean_qualifier = re.compile(
-            r"\b(?:once|after|when|if|unless|pending|provided|assuming"
-            r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
-            r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+        # 3. Allowlist of recognized benign trailing metadata lines
+        # Any other un-allowlisted prose in the verdict section fails closed
+        benign_trailer_pattern = re.compile(
+            r"^(?:"
+            r"reviewed\s+commit:\s*[0-9a-f]{7,40}"
+            r"|commit:\s*[0-9a-f]{7,40}"
+            r"|reviewed\s+by\b.*"
+            r"|_(?:posted\s+by|automated\s+review).*"
+            r"|posted\s+by\b.*"
+            r"|💰.*"
+            r"|<!--.*-->"
+            r"|(?:\*\*|__)?\s*(?:ready(?:\s+for\s+merge)?|approved(?:\s+for\s+merge)?|clean|lgtm)\b(?:\s*\([^)]*\))?(?:\*\*|__)?\s*[.!]*"
+            r")\s*$",
             re.IGNORECASE,
         )
-        for line in verdict_lines:
-            # Skip trailer metadata lines like "Reviewed commit: <sha>" or disclosure markers
-            if re.match(r"^(?:reviewed\s+commit:|_posted\s+by)", line, re.IGNORECASE):
-                continue
-            if clean_qualifier.search(line):
-                return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
+        for line in verdict_lines[1:]:
+            if not benign_trailer_pattern.match(line):
+                return False, f"Latest AI review verdict section contains trailing unrecognized prose ('{line[:60]}')"
 
         return True, "PR is fully clean across CI and review"
 

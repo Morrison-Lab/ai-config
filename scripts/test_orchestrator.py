@@ -1507,8 +1507,8 @@ This has since been resolved after addressing the finding.
         # 23. Code fence containing fake needs work heading does not spoof real clean verdict
         code_fence_clean_body = (
             "**Claude finished** review\n\n"
-            "### Verdict\n\n**Clean**\n\n"
-            "Prior output was:\n```markdown\n### Verdict\n\n**Needs more work**\n```"
+            "Prior output was:\n```markdown\n### Verdict\n\n**Needs more work**\n```\n\n"
+            "### Verdict\n\n**Clean**"
         )
         code_fence_clean_json = json.dumps({
             "statusCheckRollup": [
@@ -1593,7 +1593,73 @@ This has since been resolved after addressing the finding.
         mgr._run_cmd = MagicMock(return_value=(0, qualified_verdict_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("qualifier", reason.lower())
+        self.assertIn("trailing unrecognized prose", reason.lower())
+
+        # 28. Multi-line verdict with trailing un-allowlisted contradiction ("2 blocking findings") is strictly rejected
+        contradiction_1_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "Clean\n\n"
+                    "There are 2 blocking findings that remain unresolved and must be fixed prior to merge."
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, contradiction_1_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("trailing unrecognized prose", reason.lower())
+
+        # 29. Multi-line verdict with trailing un-allowlisted contradiction ("Do not merge") is strictly rejected
+        contradiction_2_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "LGTM\n\n"
+                    "Do not merge -- there is a security vulnerability."
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, contradiction_2_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("trailing unrecognized prose", reason.lower())
+
+        # 30. Multi-line verdict with trailing un-allowlisted contradiction ("This should not be merged yet") is strictly rejected
+        contradiction_3_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "Approved\n\n"
+                    "This should not be merged yet."
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, contradiction_3_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("trailing unrecognized prose", reason.lower())
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser

@@ -195,7 +195,6 @@
   Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer.
   (User directive / CAI, 2026-08-17.)
 
-
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
   The answer is a standing yes.
   This removes the extra "should I continue?" pause between already-scoped steps; it does NOT override holding for genuinely ambiguous or architecturally significant decisions.

@@ -296,11 +296,19 @@ def main():
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
         prompt_val = payload.get("prompt") or payload.get("userPrompt") or payload.get("message") or ""
         if not prompt_val and isinstance(payload.get("messages"), list) and payload["messages"]:
-            last_msg = payload["messages"][-1]
-            if isinstance(last_msg, dict):
-                prompt_val = last_msg.get("content") or last_msg.get("text") or ""
-            elif isinstance(last_msg, str):
-                prompt_val = last_msg
+            for msg in reversed(payload["messages"]):
+                if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
+                    prompt_val = msg.get("content") or msg.get("text") or ""
+                    break
+                elif isinstance(msg, str):
+                    prompt_val = msg
+                    break
+            if not prompt_val and payload["messages"]:
+                last_msg = payload["messages"][-1]
+                if isinstance(last_msg, dict):
+                    prompt_val = last_msg.get("content") or last_msg.get("text") or ""
+                elif isinstance(last_msg, str):
+                    prompt_val = last_msg
                 
         if isinstance(prompt_val, list):
             prompt_val = " ".join(str(p.get("text", p) if isinstance(p, dict) else p) for p in prompt_val)
@@ -341,7 +349,7 @@ def main():
                         injected_messages.append(text_out[:10000])
 
         if injected_messages:
-            steps = [{"ephemeralMessage": msg} for msg in injected_messages]
+            steps = [{"ephemeralMessage": msg} for msg in injected_messages[:20]]
             print(json.dumps({"injectSteps": steps}))
         else:
             print(json.dumps({"injectSteps": []}))

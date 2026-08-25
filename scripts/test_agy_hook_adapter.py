@@ -328,6 +328,31 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_pre_invocation_role_filtering(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Injected context"}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "invocationNum": 1,
+            "messages": [
+                {"role": "user", "content": "The real user prompt"},
+                {"role": "assistant", "content": "The assistant response"}
+            ]
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["prompt"], "The real user prompt")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_pre_invocation_list_content_coercion(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout="A" * 15000, stderr="")
         mock_run.return_value = mock_result

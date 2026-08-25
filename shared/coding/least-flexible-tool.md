@@ -143,24 +143,26 @@ leaving the next.
 
 **Third occurrence, 2026-08-24, after #1947 and #1973 above --- and the shape the `Don't` above does not literally name.**
 That `Don't` fires on a second *widening*.
-Here one widening forced three successive **narrowings**, which is the same rule from the other side: a pattern that cannot decide the question is equally unable to decide it in either direction.
+Here one widening forced three successive **narrowings**, which is the same rule from the other side: a pattern that cannot locate a token is equally unable to decide either direction.
 
 `COMMENT_FLAG_RE` in `hooks/require-agent-disclosure.py` decides whether a `gh issue|pr close|reopen` segment posts a comment, which it does only when `--comment` or its shorthand `-c` is present.
-On [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) it began as `-c\s`, matching only the whitespace-separated spelling.
-Widening it to cover the attached and `=` forms that `gh` also accepts (`-cvalue`, `-c=value`) is what made `-c` match **mid-word**, so `--request-changes` and `ai-config` both scored as the comment flag and a **compliant** comment warned.
-Three rounds then patched the boundary: `cf195e46` added a `(?<![\w-])` lookbehind; `93363481` extended it to `(?<![\w\-"'])`, because a preceding quote still slipped past, so `"-config"` scored; and `15b63d91` replaced the forbidden-character list outright with a positive whitespace boundary, `(?<![^\s])-c(?:[\s=]|["']|[A-Za-z0-9])`.
+On [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) its short-flag alternative went from `-c\s` to `(?<![^\s])-c(?:[\s=]|["']|[A-Za-z0-9])`.
+Accepting the attached and `=` spellings `gh` also takes is what put `-c` within reach of the middle of a word, so a **compliant** `gh issue close 5 -R Morrison-Lab/ai-config` warned.
+The boundary condition guarding against that was then rewritten three times --- `(?<![\w-])`, then `(?<![\w\-"'])` once a preceding quote was found to slip past it, then `(?<![^\s])`.
 
-The increment over the rule above is the **diagnosis** rather than the count.
-Every one of those four edits asks one question --- where does a token begin and end --- so they are one finding about tokenization wearing four costumes, and the last round answered it by hand-rolling a boundary test rather than by asking what already computes one.
+Reading those as a sequence is what four review rounds kept getting wrong, because two of the commits are concurrent siblings rather than successors (see [`claim-pr`](../workflow/claim-pr.md)'s second-occurrence entry).
+The count survives the ordering being unrecoverable, which is the point: whatever order they landed in, **every one of those edits asks where a token begins**, so they are one finding about tokenization wearing four costumes.
+The last of them answered it by hand-rolling a boundary test rather than by asking what already computes one.
 `shlex` is in the standard library and nine hooks in this repo already import it, so the layer that answers the question was reachable from the first widening.
-Note that the layer change is **filed rather than shipped**, as [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189), so this records a diagnosis rather than a demonstrated repair.
+The layer change is **filed rather than shipped**, as [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189), so this records a diagnosis rather than a demonstrated repair.
 
 - **Do:** write down the one question a run of fixes shares, before writing the next pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.
 - **Do:** name the construct you are hand-rolling when a fix adds a boundary test, an escape check, or a quote check to a regex, and search the standard library for it before writing it.
+- **Do:** count edits to one matcher rather than reconstructing which caused which, when concurrent sessions make the order unrecoverable --- the count is what the rule keys on and it is the part you can derive.
 - **Don't:** read a widening and a narrowing as different classes --- both are the same pattern failing to locate a token, and a widening that forces a narrowing is already the second edit the rule above warns about.
 - **Don't:** count a boundary test that *generalizes* two earlier ones as having changed layers; it is still the same construct answering a question it cannot decide.
 
-(Dates Pacific; the commits above are timestamped 2026-08-25 UTC.)
+(Dates Pacific; the commits are timestamped 2026-08-25 UTC.)
 
 ## In review
 

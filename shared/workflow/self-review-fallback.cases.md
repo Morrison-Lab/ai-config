@@ -241,6 +241,4 @@ The third is a **different threshold**: that same verdict scopes its findings li
 It is the one of the three with a cheap remedy, since a bar can be stated in the request.
 Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.
 
-The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177), which also carries the mechanism recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the PR's visible history in its own justification for finding nothing.
-That makes the two halves of this case one story: the same-vendor rounds did not merely fail to add breadth, they entered the later verdict's reasoning as evidence that none was needed.
-Note that this is a claim about the verdict's *justification* and not about its effort, which its nine verification steps contradict --- see that section for the distinction.
+The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).

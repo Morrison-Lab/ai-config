@@ -745,9 +745,17 @@ misdiagnosis recurred three times in one review session, on one PR
 "A predicate a fix adds needs mutation in both directions" section.
 Each time the mutation, not the test, turned out to be at fault.)
 
-**Recurred twice more on 2026-08-24, on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), both under outcomes already listed above and both read as coverage gaps first.**
-Recording the count rather than a new outcome, per [`ums`](../../skills/ums/SKILL.md)'s recurrence step: the outcomes were right, and the reading of `MISSED` is what failed.
-One instance belonged to the outcome headed "The harness that performs those mutations needs the same scrutiny", whose `Do` is to verify each mutation changed the artifact --- here the anchor matched nothing, so it did not; the other was the pass-condition entry above, a fixture routed down a sibling code path (`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE`) and so unable to observe the mutation aimed at it.
+**Two more `MISSED` rows misdiagnosed on 2026-08-24, on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) --- one of them this entry's own thesis, the other its exception.**
+Recording the pair rather than a new outcome, per [`ums`](../../skills/ums/SKILL.md)'s recurrence step.
+
+The first belongs here: it fell under the outcome headed "The harness that performs those mutations needs the same scrutiny", whose `Do` is to verify each mutation changed the artifact.
+The anchor matched nothing, so it did not, and the mutation was at fault exactly as this entry says.
+
+The second is the case the entry's `Do` sends you the wrong way on, and it is worth separating rather than folding in.
+`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE` and could not observe the mutation aimed at it.
+The mutation was fine and the **suite** was the defect, so the remedy was a new discriminating fixture rather than any further scrutiny of the mutant.
+That is the pass-condition entry above, which is explicit that such a case reads as "an unmeasured clause rather than a robust one".
+So read this entry's ordering as a **default** rather than a rule: doubt the mutation first, and let the pass-condition entry's identity check settle which of the two you have, since it is the one question that separates them.
 
 The one thing worth adding is **when** to check the anchor.
 It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.

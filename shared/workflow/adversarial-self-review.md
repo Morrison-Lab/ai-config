@@ -74,7 +74,7 @@ The repo's own reviewer returned **Ready for merge** and named the history in it
 A cross-vendor pass on that same head then returned 11 findings, 8 of them blocking (see [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A clean same-vendor verdict over eight blocking cross-vendor findings").
 
 **State what is observable, which is narrower than it first looks.**
-That verdict also lists nine verification steps it ran, so "it probed less" is a claim about effort that its own evidence denies, and at least one other explanation fits --- the reviewer probed normally and the diff was, in its own words, "almost entirely prose/documentation plus one well-isolated, warn-only hook with unusually thorough self-testing".
+That verdict also lists nine verification steps it ran, so "it probed less" is a claim about effort that those steps weigh against, and at least one other explanation fits --- the reviewer probed normally and the diff was, in its own words, "almost entirely prose/documentation plus one well-isolated, warn-only hook with unusually thorough self-testing".
 What is observable is that **the history entered the justification**: a reason for finding nothing was supplied by the artifact rather than derived from the diff.
 That is enough, because a verdict resting partly on prior rounds is partly a re-reading of those rounds, so it is worth less as corroboration than its independence suggests --- however hard it worked.
 
@@ -83,7 +83,7 @@ It records that one defect was found there once.
 It says nothing about the family that defect belonged to, and reading it as evidence of scrutiny inverts its meaning: a line that needed three rounds to get right is the line most likely to still be wrong.
 
 **The loop is self-reinforcing, which is what makes it a rule rather than a matter of care.**
-More rounds produce a more reassuring history, which is available as a reason to stop, and a diff that accumulates many rounds is by construction one complex enough to need more.
+More rounds produce a more reassuring history, which is available as a reason to stop, and a diff that accumulates many rounds is often one complex enough to need more.
 So the effect is strongest exactly where it is most costly.
 That is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence rule reaching a reviewer who never ran the earlier rounds: there a series narrows its own search space by inheriting findings, and here a *fresh* reviewer inherits the narrowing from the artifact instead.
 

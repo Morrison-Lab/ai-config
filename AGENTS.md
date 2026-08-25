@@ -49,7 +49,15 @@ larger in-scope outcome clear.
 
 ## Status and diagnostic requests do not make issues report-only
 
-Treat any request for status or diagnostic inquiry ("why did X happen?", "why did you do Y?", "did you do Z?") as a mandate to inspect live state, diagnose the root cause, and complete every safe, in-scope, concrete repair in that very same turn. A report or explanation is the recap after the work is shipped, not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt. When an issue cannot be fixed directly in the session, carry it forward with an actual next action (filing a tracking issue). File it before reporting it.
+Treat any request for status or diagnostic inquiry
+("why did X happen?", "why did you do Y?", "did you do Z?")
+as a mandate to inspect live state, diagnose the root cause,
+and complete every safe, in-scope, concrete repair in that very same turn.
+A report or explanation is the recap after the work is shipped,
+not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt.
+When an issue cannot be fixed directly in the session,
+carry it forward with an actual next action (filing a tracking issue).
+File it before reporting it.
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 
@@ -296,12 +304,27 @@ This grants no merge authority: the strict merge policy below still applies.
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **AI review triggers automatically on push**: Where `.github/workflows/claude-review.yml` (or equivalent) includes `pull_request: [opened, synchronize, ready_for_review]`, pushing code or opening the PR triggers the AI review automatically. Do **not** post redundant manual `@claude review` comments on push, as doing so cancels in-flight review runs. In repos without automated PR review workflows, dispatch `claude-review.yml` or request review explicitly after all code pushes are complete.
-2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
-3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
+1. **AI review triggers automatically on push**:
+   Where `.github/workflows/claude-review.yml` (or equivalent) includes `pull_request: [opened, synchronize, ready_for_review]`,
+   pushing code or opening the PR triggers the AI review automatically.
+   Do **not** post redundant manual `@claude review` comments on push,
+   as doing so cancels in-flight review runs.
+   In repos without automated PR review workflows,
+   dispatch `claude-review.yml` or request review explicitly after all code pushes are complete.
+2. **Drive to clean**:
+   Run `ardi` / the review-and-iterate loop to ensure CI passes
+   and all review findings are addressed until the PR reaches a clean verdict.
+3. **Request human review only after AI approval or deadlock**:
+   Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md),
+   request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`)
+   **only after** the AI review produces a clean/approved verdict,
+   or if an impasse/deadlock occurs.
 
-- **Do:** rely on automatic CI review triggers on push, and request human review only after the AI review is clean/approved (or upon an impasse).
-- **Don't:** post redundant manual `@claude review` comments when the review workflow is already automated on push, don't request human review when the PR is first opened empty, and don't request human review before code pushes are complete or before the AI review has passed.
+- **Do:** rely on automatic CI review triggers on push,
+  and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** post redundant manual `@claude review` comments when the review workflow is already automated on push,
+  don't request human review when the PR is first opened empty,
+  and don't request human review before code pushes are complete or before the AI review has passed.
 
 ## Cursor Cloud specific instructions
 

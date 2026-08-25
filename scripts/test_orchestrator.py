@@ -1146,7 +1146,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 2. Clean PR with approved GitHub review from trusted OWNER/MEMBER on current HEAD
+        # 2. Formal GitHub review approval without Claude Code Review is REJECTED under mwc
         clean_gh_review_json = json.dumps({
             "headRefOid": "commit123",
             "statusCheckRollup": [
@@ -1157,7 +1157,8 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         })
         mgr._run_cmd = MagicMock(return_value=(0, clean_gh_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertTrue(is_clean)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 2b. Formal GitHub review approval from random passerby (NONE / CONTRIBUTOR) is REJECTED
         passerby_review_json = json.dumps({
@@ -1171,7 +1172,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, passerby_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 2c. Formal GitHub review self-approval (dem-extra1) is REJECTED
         self_review_json = json.dumps({
@@ -1186,7 +1187,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, self_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 2d. Stale formal GitHub review (commit.oid != headRefOid) is REJECTED
         stale_review_json = json.dumps({
@@ -1200,7 +1201,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, stale_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 3. Passing CI but NO review or comment -> MUST NOT MERGE
         no_review_json = json.dumps({
@@ -1213,6 +1214,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, no_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 3. Failing CI check
         dirty_ci_json = json.dumps({
@@ -1240,7 +1242,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, self_comment_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 5. Null author dictionary does not crash and is rejected
         null_author_json = json.dumps({
@@ -1255,7 +1257,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, null_author_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 6. Blocking AI review verdict ("Needs more work")
         dirty_review_json = json.dumps({
@@ -1322,7 +1324,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("does not contain a recognized positive clean/approved verdict", reason)
 
-        # 11. PR authored by d-morrison where d-morrison submits formal APPROVED review is REJECTED (self-approval)
+        # 11. PR without Claude Code Review where human submits formal APPROVED review is REJECTED under mwc
         dm_self_review_json = json.dumps({
             "author": {"login": "d-morrison"},
             "statusCheckRollup": [
@@ -1334,7 +1336,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         mgr._run_cmd = MagicMock(return_value=(0, dm_self_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
+        self.assertIn("no independent external claude code review found", reason.lower())
 
         # 12. Multi-verdict comment (prior round's 'Needs more work' cited before final 'Clean' verdict)
         multi_verdict_body = """**Claude finished** review

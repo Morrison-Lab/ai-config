@@ -232,20 +232,6 @@ class PRClaimManager:
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
-        # 4. Check for formal GitHub review approvals (from trusted OWNER/MEMBER humans or approved bots)
-        # Stale reviews (commit != headRefOid), random passerby approvals, or self-reviews are strictly ignored!
-        head_oid = data.get("headRefOid", "")
-        pr_author_login = (data.get("author") or {}).get("login", "")
-        trusted_reviews = [
-            r for r in reviews
-            if r.get("state") == "APPROVED"
-            and (r.get("authorAssociation") in ["OWNER", "MEMBER"]
-                 or (r.get("author") or {}).get("login") in ["claude", "claude[bot]", "d-morrison"])
-            and (r.get("author") or {}).get("login") not in [pr_author_login, "dem-extra1"]
-            and (not head_oid or not (r.get("commit") or {}).get("oid") or (r.get("commit") or {}).get("oid") == head_oid)
-        ]
-        has_approved_review = bool(trusted_reviews)
-
         comments = data.get("comments", [])
         claude_reviews = [
             c for c in comments
@@ -253,83 +239,81 @@ class PRClaimManager:
             and ("claude finished review" in c.get("body", "").lower()
                  or "**claude finished" in c.get("body", "").lower())
         ]
-        if not (has_approved_review or claude_reviews):
-            return False, "No independent approved external review or GitHub approval found on PR"
+        if not claude_reviews:
+            return False, "No independent external Claude Code Review found on PR"
 
-        if claude_reviews:
-            body = claude_reviews[-1].get("body", "")
-            lower_body = (
-                body.lower()
-                .replace("\u2014", "--")
-                .replace("\u2013", "--")
-            )
+        body = claude_reviews[-1].get("body", "")
+        lower_body = (
+            body.lower()
+            .replace("\u2014", "--")
+            .replace("\u2013", "--")
+        )
+        # Strip fenced code blocks to prevent code examples or quoted text from spoofing headings
+        stripped_body = re.sub(r"```[\s\S]*?```", " ", lower_body)
 
-            # Strip fenced code blocks to prevent code examples or quoted text from spoofing headings
-            stripped_body = re.sub(r"```[\s\S]*?```", " ", lower_body)
+        # 1. Check for not-clean / blocking patterns throughout the ENTIRE stripped review body
+        not_clean_patterns = [
+            r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+            r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
+            r"\bchanges\s+requested\b",
+            r"\bblocked\s+on\s+human\s+review\b",
+            r"\b(?:not|isn't|cannot\s+be|can't\s+be|nowhere\s+near|far\s+from)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+            r"\b(?:unapproved|rejected|deadlock|impasse)\b",
+            r"\bfinding\s+(?:\d+\s+)?\(blocking\)",
+            r"\bno\s+action\s+--\s+pr\s+is\s+(?:closed|merged)\b",
+        ]
+        not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
-            # 1. Check for not-clean / blocking patterns throughout the ENTIRE stripped review body
-            not_clean_patterns = [
-                r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-                r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
-                r"\bchanges\s+requested\b",
-                r"\bblocked\s+on\s+human\s+review\b",
-                r"\b(?:not|isn't|cannot\s+be|can't\s+be|nowhere\s+near|far\s+from)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
-                r"\b(?:unapproved|rejected|deadlock|impasse)\b",
-                r"\bfinding\s+(?:\d+\s+)?\(blocking\)",
-                r"\bno\s+action\s+--\s+pr\s+is\s+(?:closed|merged)\b",
-            ]
-            not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
+        for pat in not_clean_patterns:
+            for match in re.finditer(pat, stripped_body, re.IGNORECASE | re.MULTILINE):
+                prefix = stripped_body[max(0, match.start() - 25):match.start()]
+                if not_clean_negation_prefix.search(prefix):
+                    continue
+                return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
 
-            for pat in not_clean_patterns:
-                for match in re.finditer(pat, stripped_body, re.IGNORECASE | re.MULTILINE):
-                    prefix = stripped_body[max(0, match.start() - 25):match.start()]
-                    if not_clean_negation_prefix.search(prefix):
-                        continue
-                    return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
+        # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
+        heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
+        if heading_matches:
+            verdict_section = stripped_body[heading_matches[-1].end():]
+        else:
+            verdict_section = stripped_body
 
-            # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
-            heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
-            if heading_matches:
-                verdict_section = stripped_body[heading_matches[-1].end():]
-            else:
-                verdict_section = stripped_body
+        # Extract non-empty lines from the verdict section
+        verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
+        if not verdict_lines:
+            return False, "Latest AI review verdict section is empty"
 
-            # Extract non-empty lines from the verdict section
-            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
-            if not verdict_lines:
-                return False, "Latest AI review verdict section is empty"
+        first_verdict_line = verdict_lines[0]
 
-            first_verdict_line = verdict_lines[0]
+        # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
+        clean_first_line_pat = re.compile(
+            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved(?:\s+for\s+merge)?|ready(?:\s+for\s+merge)?|lgtm|clean\s*/\s*approved)\b",
+            re.IGNORECASE,
+        )
+        clean_negation_prefix = re.compile(
+            r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
+            r"|nowhere\s+near|close\s+to|far\s+from)\s+(?:\w+\s+){0,2}$",
+            re.IGNORECASE,
+        )
+        clean_qualifier = re.compile(
+            r"\b(?:once|after|when|if|unless|pending|provided|assuming"
+            r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
+            r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+            re.IGNORECASE,
+        )
 
-            # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
-            clean_first_line_pat = re.compile(
-                r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved(?:\s+for\s+merge)?|ready(?:\s+for\s+merge)?|lgtm|clean\s*/\s*approved)\b",
-                re.IGNORECASE,
-            )
-            clean_negation_prefix = re.compile(
-                r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
-                r"|nowhere\s+near|close\s+to|far\s+from)\s+(?:\w+\s+){0,2}$",
-                re.IGNORECASE,
-            )
-            clean_qualifier = re.compile(
-                r"\b(?:once|after|when|if|unless|pending|provided|assuming"
-                r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
-                r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
-                re.IGNORECASE,
-            )
+        match = clean_first_line_pat.search(first_verdict_line)
+        if not match:
+            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
-            match = clean_first_line_pat.search(first_verdict_line)
-            if not match:
-                return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
+        prefix = first_verdict_line[:match.start()]
+        if clean_negation_prefix.search(prefix):
+            return False, "Latest AI review verdict is negated"
 
-            prefix = first_verdict_line[:match.start()]
-            if clean_negation_prefix.search(prefix):
-                return False, "Latest AI review verdict is negated"
-
-            remainder = first_verdict_line[match.end():min(len(first_verdict_line), match.end() + 60)]
-            remainder_sentence = re.split(r"[.!?]", remainder)[0]
-            if clean_qualifier.search(remainder_sentence):
-                return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
+        remainder = first_verdict_line[match.end():min(len(first_verdict_line), match.end() + 60)]
+        remainder_sentence = re.split(r"[.!?]", remainder)[0]
+        if clean_qualifier.search(remainder_sentence):
+            return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
 
         return True, "PR is fully clean across CI and review"
 

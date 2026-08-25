@@ -5,7 +5,7 @@ topically; this stays a separate satellite file for two consumer-side
 findings rather than a merge into that file.
 Both were hit migrating a hand-rolled
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
-`Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).
+`Morrison-Lab/gha`'s reusable versions (`the repository owner/qwt#135`).
 
 ## A permissions-mismatch startup_failure is invisible outside a browser
 
@@ -18,8 +18,8 @@ under-permissioned job is `if:`-skipped, and the sibling trap where an
 rather than inheriting anything -- both ending in the same "copy the
 `permissions:` block from the matching `examples/<name>.yml` verbatim"
 remedy this file would otherwise just repeat. Hit the identical shape again
-migrating `d-morrison/qwt`'s `claude-code-review.yml` caller (`issues: read`
-where the nested `claude-review` job needs `issues: write`; `d-morrison/qwt#135`),
+migrating `the repository owner/qwt`'s `claude-code-review.yml` caller (`issues: read`
+where the nested `claude-review` job needs `issues: write`; `the repository owner/qwt#135`),
 and confirmed a gap that section doesn't cover: **how you actually see the
 error.**
 
@@ -50,7 +50,7 @@ completes with `startup_failure` and an empty `jobs` array.
   `get_check_runs` or `get_job_logs`. `WebFetch` on the run's `html_url`
   reliably surfaced the Annotations text verbatim -- "The nested job
   'claude-review' is requesting 'actions: read', but is only allowed
-  'actions: none'." -- confirming this isn't `d-morrison/qwt`-specific and
+  'actions: none'." -- confirming this isn't `the repository owner/qwt`-specific and
   that a plain `WebFetch` (not just a dedicated `get_page_text` browser
   tool) is sufficient to read it. (Morrison-Lab/psw#43/#44, 2026-08-10.)
   This exact `actions: read` gap -- same four granted permissions, same
@@ -58,7 +58,7 @@ completes with `startup_failure` and an empty `jobs` array.
   in `ai-config` itself rather than a downstream consumer
   ([`github-actions.md`](github-actions.md), ai-config#224).
   So this is the third occurrence, not the second, and "not
-  `d-morrison/qwt`-specific" above undersells it -- the gap recurs
+  `the repository owner/qwt`-specific" above undersells it -- the gap recurs
   independently of which repo is calling `Morrison-Lab/gha`, ai-config's
   own repo included.
 

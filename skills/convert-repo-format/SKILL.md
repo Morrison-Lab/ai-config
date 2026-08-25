@@ -21,7 +21,7 @@ for what that format's files, config, and CI look like:
 | R package | [`rpt`](https://github.com/UCD-SERG/rpt) | — (no `_quarto.yml`) | altdoc site | Yes — full package |
 | Quarto website | [`qwt`](https://github.com/UCD-SERG/qwt) | `website` | `_site` | Yes — light package |
 | Quarto book | [`qbt`](https://github.com/UCD-SERG/qbt) | `book` | `docs` | No (`Type: Book`) |
-| Quarto manuscript | [`qmt`](https://github.com/d-morrison/qmt) | `manuscript` | `_manuscript` | Yes — light package |
+| Quarto manuscript | [`qmt`](https://github.com/the repository owner/qmt) | `manuscript` | `_manuscript` | Yes — light package |
 
 The core move is **diff against the target template, not rewrite from scratch.**
 The four formats share most of their scaffolding (R tooling, spell/lint/link
@@ -74,7 +74,7 @@ Work against the **actual** target template, not memory — the templates evolve
 - Otherwise fetch files over raw HTTP (works for public repos even when `gh`/MCP
   aren't scoped to them):
   `https://raw.githubusercontent.com/<owner>/<template>/main/<path>`
-  (`UCD-SERG` for `rpt`/`qwt`/`qbt`, `d-morrison` for `qmt`).
+  (`UCD-SERG` for `rpt`/`qwt`/`qbt`, `the repository owner` for `qmt`).
 - List the target's `.github/workflows/` and top-level files first so you know
   the full target shape.
 
@@ -89,7 +89,7 @@ strings only):
   `CODE_OF_CONDUCT.md`.
 - Shared CI: `.github/workflows/` `claude.yml`, `claude-code-review.yml`,
   `copilot-setup-steps.yml`, `check-spelling.yaml`. Most workflows are thin
-  callers of the reusable workflows in [`d-morrison/gha`](https://github.com/d-morrison/gha)
+  callers of the reusable workflows in [`the repository owner/gha`](https://github.com/the repository owner/gha)
   pinned `@v1`, so "convert the CI" mostly means copying the target template's
   `.github/workflows/` and updating repo-specific inputs — not rewriting logic.
 
@@ -113,7 +113,7 @@ Add what the target needs; remove what only the source needed. Per target:
 - Docs are built by **altdoc** (not pkgdown, no `_quarto.yml`) via the
   `docs.yaml` workflow. The `rpt` template uses the lab's own altdoc config —
   a committed `altdoc/` directory (`altdoc/quarto_website.yml`, `_extensions/`,
-  `scripts/`) plus a custom `d-morrison/altdoc` fork — so `render_docs()`
+  `scripts/`) plus a custom `the repository owner/altdoc` fork — so `render_docs()`
   generates `.qmd` files into `altdoc/man/` from `man/*.Rd` at build time (not
   committed), then renders the site. Mirror `rpt`'s `altdoc/` directory rather
   than configuring altdoc from scratch.
@@ -192,7 +192,7 @@ the body, and ARDI it to clean.
 - **`macros/` is a git submodule** in `qwt`/`qbt` — add it with
   `git submodule add <url> macros`, don't copy the files. Read `<url>` from the
   target template's `.gitmodules` (currently
-  `https://github.com/d-morrison/macros`).
+  `https://github.com/the repository owner/macros`).
 - **Generated files** (`man/`, `NAMESPACE`, `README.md`, `_site/`/`docs/`/
   `_manuscript/`) are build outputs — regenerate them, don't hand-edit.
 - When the conversion is between the two **light-package** Quarto formats

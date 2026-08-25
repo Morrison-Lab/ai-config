@@ -224,8 +224,8 @@ glab api -X PUT "projects/:id/merge_requests/<N>/discussions/<discussion_id>?res
   latest review didn't re-raise**, before dispositioning the new findings. If
   you and the reviewer reach an impasse (your rebuttal didn't convince them,
   their re-raise didn't convince you), **escalate to a human reviewer** —
-  request `d-morrison` via the `request-pr-review` skill (or
-  `gh pr edit <N> --add-reviewer d-morrison`, which bypasses that skill and so
+  request `the repository owner` via the `request-pr-review` skill (or
+  `gh pr edit <N> --add-reviewer the repository owner`, which bypasses that skill and so
   does **not** inherit its `Lacaedemon/sparta` exception --- in sparta, escalate
   to the user in chat instead of requesting a reviewer) and `@`-mention them
   with the impasse --- rather than resolving unilaterally or looping forever.
@@ -324,7 +324,7 @@ The loop continues until the PR/MR is **fully clean** — zero findings, all CI
 workflows green, and every inline review thread resolved (the only open
 conversation being the final all-clear exchange — the reviewer's all-clear and
 your reply to it). A rebuttal counts only once it convinces the reviewer; on an
-impasse, escalate to a human reviewer (`d-morrison`; see step 4b for how).
+impasse, escalate to a human reviewer (`the repository owner`; see step 4b for how).
 
 ## Edge cases
 

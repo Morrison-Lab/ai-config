@@ -202,7 +202,7 @@ regex had been hiding.)
 methodology vignette formalized the score and Hessian as
 `$$\score(\lambda) \eqdef \llik'(\lambda)$$` and
 `$$\hess(\lambda) \eqdef \llik''(\lambda)$$`.
-The vendored `d-morrison/macros` submodule defines `\def\llik{\ell}` at
+The vendored `the repository owner/macros` submodule defines `\def\llik{\ell}` at
 `macros.qmd:143`, `\def\score{\ell'}` at 165, and `\def\hess{\llik''}` at 170,
 so both lines rendered as a symbol defined as itself.
 Two automated review rounds passed over them, and so did I --- having verified

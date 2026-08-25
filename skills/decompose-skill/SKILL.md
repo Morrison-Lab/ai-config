@@ -159,7 +159,7 @@ python3 scripts/check-links.py
 python3 scripts/check-vendored-drift.py
 ```
 
-Branch + PR (not direct to `main`), request `d-morrison` as reviewer
+Branch + PR (not direct to `main`), request `the repository owner` as reviewer
 (`request-pr-review`), then **ARDI to clean** (`ardi`). If a new sibling
 skill was added, bump `skills.qmd`'s "All N+ canonical skills" count to the
 *actual* directory count (`ls -d skills/*/ | wc -l`), not a manual +1 — see

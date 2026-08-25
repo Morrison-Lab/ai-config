@@ -38,7 +38,7 @@ weight to give the finding when you are the reviewer in the first place.
 count -- don't reflow to 80 columns thinking the check demands it.**
 The 60-to-80 range above is guidance for a human writing prose.
 The automated check backing it (`check-new-line-breaks`, a reusable
-workflow in [`d-morrison/gha`](https://github.com/d-morrison/gha); formerly
+workflow in [`the repository owner/gha`](https://github.com/the repository owner/gha); formerly
 ai-config's own `scripts/check-new-line-breaks.py`, retired in ai-config#703)
 tests something narrower, against each **newly added** prose line in the diff.
 Its primary rule flags a line holding more than one sentence.
@@ -228,7 +228,7 @@ The two tools carry different sentence-boundary rules.
 lookahead demands an uppercase letter or markup after the period, so a sentence
 ending in `.` before a lowercase word is no boundary to it.
 The gate carries that same branch plus a second one the reformatter lacks,
-`_SENT_BREAK_LOWER_RE` (reported in `d-morrison/gha` #389, added by gha#425), matching
+`_SENT_BREAK_LOWER_RE` (reported in `the repository owner/gha` #389, added by gha#425), matching
 `(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
 then a space, then a lowercase word.
 So `...rules, or agents. opencode instead reads...` is one line to the
@@ -260,7 +260,7 @@ and this is the **sentence** rule.
 (Both mechanisms verified by source, read on 2026-08-21:
 the reformatter's single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
 and the gate's `_SENT_BREAK_LOWER_RE` at `check-new-line-breaks.py:140` in a
-fresh clone of `d-morrison/gha`, whose own `CLAUDE.md` records that gha#425
+fresh clone of `the repository owner/gha`, whose own `CLAUDE.md` records that gha#425
 closed gha#389 by adding that branch.
 The rejoin was reproduced directly rather than inferred: calling `reformat()`
 on `"...or agents.\nopencode instead reads..."` returns the two lines joined
@@ -329,7 +329,7 @@ rather than against the current tree.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
-`d-morrison/gha@e91b8bf` ("fail by default when violations are found",
+`the repository owner/gha@e91b8bf` ("fail by default when violations are found",
 gha#508/#509) flipped `_DEFAULT_FAIL` to `True`, and this repo's `validate.yml`
 passes `NLB_FAIL: true` besides, so a violation now reddens the check rather
 than annotating a green one.
@@ -433,7 +433,7 @@ scan naturally applies one length floor to both and then passes a line the
 gate rejects --- which is the specific way this was rediscovered, on the PR
 that added this very paragraph.
 Run it locally before pushing and fix what it names --- the script lives in a
-[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
+[`the repository owner/gha`](https://github.com/the repository owner/gha) checkout, at
 `check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:
 
 ```bash
@@ -449,7 +449,7 @@ they are machine-written and nobody is going to line-break them.
 Everything else the workflow passes is already the script's own default, so
 setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
 `NLB_CLAUSE_BREAKS` to true, and `NLB_CLAUSE_MIN_LENGTH` to 80 (read off
-`check-new-line-breaks.py` at `d-morrison/gha` `430393d`, and confirmed
+`check-new-line-breaks.py` at `the repository owner/gha` `430393d`, and confirmed
 against a passing job's own log, which prints every `NLB_*` value it used).
 The practical consequence is worth stating in the safe direction: the clause
 check that catches a long line with a mid-line semicolon **is** on by default

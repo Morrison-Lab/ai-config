@@ -44,7 +44,7 @@ quota problem needing a fix.)
 
 ## "`status` itself can be stale" --- duration from log timestamps
 
-(`d-morrison/altdoc#96`, 2026-07-30: `claude-review` had failed six times
+(`the repository owner/altdoc#96`, 2026-07-30: `claude-review` had failed six times
    in ~26 seconds each, the signature of the model call failing at auth.
    A re-run was polled twice, three minutes apart, and read `in_progress`
    both times --- reported as "the reviewer has recovered", and acted on by
@@ -263,7 +263,7 @@ after a clean `Ready for merge` verdict on an otherwise all-green head.)
 
 ## One finding can own two threads
 
-(`d-morrison/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
+(`the repository owner/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
 parameter opened `PRRT_...TyfeQ` alongside the original `PRRT_...TyeRc`;
 resolving the original left the re-raise outstanding, caught only by a
 mechanical sweep of all seven threads.)
@@ -343,7 +343,7 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`the repository owner/gha#312`](https://github.com/the repository owner/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 
@@ -376,7 +376,7 @@ Jules returned `VERDICT: approve` on the new head about four minutes later.)
 
 ## The cross-repo test that localizes a durable credential failure
 
-(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+(the repository owner/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
 times across those two PRs -- six on #96, one on #95 -- each run finishing in
 the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
 permission denials.
@@ -384,9 +384,9 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 `04:07:37Z -> 04:08:12Z`, and the same reviewer returned a full
 `Ready for merge` verdict on Morrison-Lab/ai-config#858 over
 `04:08:50Z -> 04:11:41Z`.
-So the service was fine and the `d-morrison` credential was not, which no
+So the service was fine and the `the repository owner` credential was not, which no
 number of re-runs would have shown.
-Tracked in d-morrison/altdoc#99.)
+Tracked in the repository owner/altdoc#99.)
 
 ## The zero-cost signature is necessary, not sufficient, for "quota"
 
@@ -446,7 +446,7 @@ agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
 Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
 and then failed
 `Command failed: git fetch origin --depth=20 pull/77/head:main`.
-`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`the repository owner/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
 
@@ -896,7 +896,7 @@ verdict.)
 
 (Morrison-Lab/gha#520 / #521, 2026-08-19.)
 
-`d-morrison/rme#1072`'s `review / claude-review` check was red.
+`the repository owner/rme#1072`'s `review / claude-review` check was red.
 The cause was in the run's result object rather than in the PR.
 Abridged below --- it also carried `terminal_reason: "api_error"` and `permission_denials_count: 42`.
 
@@ -977,12 +977,12 @@ $ echo $?
 ```
 
 No reviewer had produced a verdict on that PR at any head.
-The PR carried seven comments: five identical 363-character `claude-review` skip notices from `github-actions`, and two from `d-morrison` at 4226 and 4804 characters.
+The PR carried seven comments: five identical 363-character `claude-review` skip notices from `github-actions`, and two from `the repository owner` at 4226 and 4804 characters.
 The notice reads "**Claude review skipped --- API credential or quota unavailable.**" followed by a `View run` link, and it is that link the checker resolves --- the run's `head_sha` equals HEAD, so a comment stating explicitly that no review happened is admitted as a review evaluating HEAD.
 It carries none of `finding_patterns`, so the HEAD-matching half prints its tick, and `check_latest_verdict()` returns `True` because an empty verdict is not `not-clean`.
 
 Six items rather than seven is the second finding, and it names which loop admits what.
-Matching the comment loop's marker tuple against each body shows five admitted on author and exactly one on body text: the 4804-character `d-morrison` comment, whose first line is
+Matching the comment loop's marker tuple against each body shows five admitted on author and exactly one on body text: the 4804-character `the repository owner` comment, whose first line is
 
 ```
 ## ARD --- cross-vendor review (Codex / GPT-5.1, `### Verdict: Needs more work`)

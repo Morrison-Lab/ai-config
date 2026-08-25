@@ -12,7 +12,7 @@ The `@claude` bot's own behaviour lives in
   Single-quoted scalars preserve backslashes as-is (e.g. `'foo\.bar'` for that same
   single backslash), which is usually easier to reason about in workflow templates.
   This applies to `branches-or-tags-to-list` / regex inputs in reusable-workflow YAML.
-  (d-morrison/altdoc#30.)
+  (the repository owner/altdoc#30.)
 - **YAML scalar escaping in composite action metadata:** Output descriptions in `action.yml`
   (and workflow inputs) containing single quotes inside single-quoted strings (e.g.
   `'description: 'true' if head repo...'`) fail strict YAML parsing in GitHub Actions unless
@@ -69,14 +69,14 @@ The `@claude` bot's own behaviour lives in
   own workflow (dogfooding), false for every other consumer, which gets
   `No such file or directory`. A step inside `claude-code-review.yml` (the CALLEE) read
   `${{ github.workflow_ref }}` and it evaluated to
-  `d-morrison/gha/.github/workflows/claude-review.yml@refs/pull/191/merge` — the
+  `the repository owner/gha/.github/workflows/claude-review.yml@refs/pull/191/merge` — the
   CALLER's stub file (`claude-review.yml`), not the callee's own
   (`claude-code-review.yml`) — confirmed straight from the job's log output (gha#191,
   run 28628848306, job 84901231352, the `selfmod` step's `WORKFLOW_REF` env dump). This
   contradicts a naive reading of GitHub's docs (which describe `workflow_ref` simply as
   "the ref path to the [running] workflow" without spelling out the reusable-workflow
   case), so trust the log evidence over the doc summary if they seem to disagree.
-  (d-morrison/gha#190/#191: `claude-code-review.yml`'s fail-check guard broke
+  (the repository owner/gha#190/#191: `claude-code-review.yml`'s fail-check guard broke
   for every consumer after its logic was extracted from inline shell into a standalone
   script, landing right after the last known-good run.)
   **`github.job_workflow_ref` is NOT a reliable fix for this — correcting an earlier
@@ -89,14 +89,14 @@ The `@claude` bot's own behaviour lives in
   site, crashing the step with a bare `usage: ...` error (gha#196). The earlier "green CI
   = confirmed working" inference was wrong — the green run just hadn't exercised the
   cross-repo path yet. A second, independent investigation (gha#194, a same-repo
-  dogfooding failure on `d-morrison/gha` reviewing its own PR) found a documented
+  dogfooding failure on `the repository owner/gha` reviewing its own PR) found a documented
   explanation: per [github/community discussions #31054](https://github.com/orgs/community/discussions/31054)
   and [github/community discussions #45342](https://github.com/orgs/community/discussions/45342),
   `github.job_workflow_ref` is a **known no-op for a SAME-repository**
   reusable-workflow call — it only reliably populates for a genuine cross-repo
   `owner/repo/...@ref` call. That explains the same-repo dogfooding failure cleanly, but
   doesn't fully explain gha#196's original *cross-repo* failure (`Lacaedemon/sparta`
-  calling `d-morrison/gha`) — so treat "populates correctly for cross-repo, no-op for
+  calling `the repository owner/gha`) — so treat "populates correctly for cross-repo, no-op for
   same-repo" as the documented claim, not as fully reconciled with every observed
   failure; don't re-litigate it, just don't rely on the value being non-empty in ANY
   case. **The robust fix:** don't resolve-and-checkout at all — move the logic into a
@@ -104,7 +104,7 @@ The `@claude` bot's own behaviour lives in
   composite action's own files are always reachable through `github.action_path`
   regardless of how the calling reusable workflow was invoked (`workflow_call`, a
   re-dispatched `workflow_dispatch`, automatic `pull_request`, same-repo or cross-repo),
-  with no conditional branching on `job_workflow_ref` needed. (d-morrison/gha#197,
+  with no conditional branching on `job_workflow_ref` needed. (the repository owner/gha#197,
   `.github/actions/run-review-guard/`.)
   **The checkout half of this recurred in a brand-new reusable workflow, not
   an existing one that broke in production.** A `workflow_call` reusable
@@ -147,7 +147,7 @@ The `@claude` bot's own behaviour lives in
   not just a missed check. **Fix: reach the sibling composite's script directly via
   `${{ github.action_path }}/../other-composite/script.py`, never via a nested `uses:`**
   -- `github.action_path` is correct regardless of caller context, the same principle
-  #197 (above) established for `job_workflow_ref`. (d-morrison/gha#284, rounds 1-3 fixed
+  #197 (above) established for `job_workflow_ref`. (the repository owner/gha#284, rounds 1-3 fixed
   other genuine bugs first; this one wasn't caught until round 4.)
 - **An unrelated open PR can independently patch the same root cause as an incidental,
   second commit — without ever linking the issue — surfacing only as a merge conflict
@@ -305,7 +305,7 @@ The `@claude` bot's own behaviour lives in
   an ordinary `render_docs()`. An unrecognized `$ALTDOC_*` variable is left in
   the settings file verbatim rather than dropped, so pointing
   `include-in-header` at one before the altdoc pin supports it fails the Quarto
-  build outright rather than degrading. (`d-morrison/altdoc#103`/`#104`,
+  build outright rather than degrading. (`the repository owner/altdoc#103`/`#104`,
   `ucdavis/bcs#528`, `UCD-SERG/serocalculator#626`.)
 - **`NEWS.md` section headers need a blank line before them.** A bullet that ends
   immediately before a `## Next-section` heading (no blank line) can cause
@@ -462,7 +462,7 @@ The `@claude` bot's own behaviour lives in
   `continue-on-error`, the exact fix #350's own body lists under "Two things
   that look like fixes but are not".)
 
-## Changelog section ordering in d-morrison/gha
+## Changelog section ordering in the repository owner/gha
 
 - **The established order in `CHANGELOG.md` is: Added → Changed → Fixed → Security.**
   Match this when adding new `## [Unreleased]` entries or when resolving merge
@@ -470,7 +470,7 @@ The `@claude` bot's own behaviour lives in
 
 ## A repo/org rename breaks Actions `uses:` refs -- and repointing the owner is not the fix
 
-`d-morrison/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
+`the repository owner/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
 recurs for any renamed owner.
 GitHub Actions does **not** follow repository-rename redirects when resolving a
 `uses:` ref, so every caller naming the old owner fails at run preparation,
@@ -485,7 +485,7 @@ Three things to know, in the order they bite.
   Repointing the caller's owner is not sufficient on its own.
   `Morrison-Lab/gha@v1` resolved fine as a tag, but that tag's
   `claude-code-review.yml:155` and `claude.yml:288` still called
-  `d-morrison/gha/.github/actions/checkout-submodules@v1`, so both workflows
+  `the repository owner/gha/.github/actions/checkout-submodules@v1`, so both workflows
   failed identically after the "fix".
   Read what the pinned tag *contains* --
   `curl -sS https://raw.githubusercontent.com/<new-owner>/<repo>/<tag>/<path> | grep -n 'uses:'`
@@ -513,7 +513,7 @@ Three things to know, in the order they bite.
 Before any blanket find-and-replace, establish **which** repos actually moved --
 see `github.md`'s note on `raw.githubusercontent.com` following rename
 redirects, which is the probe that answers it.
-In the ucdavis/bcs sweep exactly two of nine `d-morrison/*` references had
+In the ucdavis/bcs sweep exactly two of nine `the repository owner/*` references had
 moved, so a blanket replace would have broken the other seven.
 Historical references in a changelog are a separate case: they record what was
 true when written, so leave them alone.
@@ -697,7 +697,7 @@ It is a caller, and a pin freezes the caller's own text while saying nothing
 about the refs that text resolves at run time.
 
 The pinned workflow above delegated in turn to
-`d-morrison/gha/check-new-line-breaks@v2`: a **floating tag**, in what was then
+`the repository owner/gha/check-new-line-breaks@v2`: a **floating tag**, in what was then
 a different org, so neither the SHA nor the ownership boundary held.
 Measured 2026-08-24, the two artifacts were 340 lines with four knobs and 637
 lines with a clause-break rule on by default, and on one branch they gave

@@ -49,12 +49,15 @@ python3 scripts/pre-push-review.py -o review.md
 
 ## Integration with `push` skill
 
-Before executing `git push`, run `pre-push-review` to verify that no logical bugs, edge cases,
-or guideline regressions exist. Once clean, proceed with standard push guards.
+Before executing `git push`, run `pre-push-review` to verify that no logical bugs,
+edge cases, or guideline regressions exist.
+Once clean, proceed with standard push guards.
 
 ## Relationship to other skills
 
-- **`push`** --- The pre-push collision guard. Run `pre-push-review` to inspect code quality, then `push` to safely push commits.
+- **`push`** --- The pre-push collision guard.
+  Run `pre-push-review` to inspect code quality, then `push` to safely push commits.
 - **`delegate-to-codex`** --- General offloading of heavy analysis tasks to Codex CLI.
 - **`ardi`** --- PR-level review iteration in GitHub Actions.
+
 

@@ -121,8 +121,8 @@ That is the literal signature the test above calls blocked --- request gone, no 
 
 The auto-requesting ruleset was offered as the likeliest reconciliation, and it is now **ruled out as the general explanation**.
 `Morrison-Lab/ai-config` produces the identical signature while carrying no `copilot_code_review` rule at all, at either repository or organization scope.
-Measured 2026-08-06 on PR #1219: the POST returned `HTTP/2.0 201 Created` with a `Location` header, and a read five seconds later returned `["d-morrison"]` with Copilot absent, reproduced twice.
-A separately-issued `d-morrison` request persisted in that same list, so nothing is wiping the list structurally --- only Copilot's entry goes.
+Measured 2026-08-06 on PR #1219: the POST returned `HTTP/2.0 201 Created` with a `Location` header, and a read five seconds later returned `["the repository owner"]` with Copilot absent, reproduced twice.
+A separately-issued `the repository owner` request persisted in that same list, so nothing is wiping the list structurally --- only Copilot's entry goes.
 
 *Why* the entry disappears is still unexplained, and this section deliberately declines to name a replacement mechanism.
 What is measured is the disappearance, and nothing yet accounts for it.

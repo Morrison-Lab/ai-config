@@ -74,7 +74,7 @@ Work against the **actual** target template, not memory — the templates evolve
 - Otherwise fetch files over raw HTTP (works for public repos even when `gh`/MCP
   aren't scoped to them):
   `https://raw.githubusercontent.com/<owner>/<template>/main/<path>`
-  (`UCD-SERG` for `rpt`/`qwt`/`qbt`, `d-morrison` for `qmt`).
+  (`UCD-SERG` for `rpt`/`qwt`/`qbt`, `the repository owner` for `qmt`).
 - List the target's `.github/workflows/` and top-level files first so you know
   the full target shape.
 

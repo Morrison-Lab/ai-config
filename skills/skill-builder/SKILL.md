@@ -308,7 +308,7 @@ persist and fire across all contexts even when the skill isn't invoked.
 
 Skills and memories all live in the ai-config repo — never leave changes
 local-only. Commit via a **branch + PR** (not direct to main), request
-`d-morrison` as reviewer, then **ARDI to clean**.
+`the repository owner` as reviewer, then **ARDI to clean**.
 
 > **In a worktree session, the repo toplevel below is the MAIN checkout, not
 > your worktree.** `~/.claude/skills` symlinks into the main `ai-config`

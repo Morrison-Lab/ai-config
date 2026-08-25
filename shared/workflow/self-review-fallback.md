@@ -1,5 +1,5 @@
 When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict --- whether because it was **skipped for quota** or because it **ran to completion but never stated a verdict** (a "stub review") --- don't stall the ARDI loop waiting for it --- **do the review yourself and post it** as a PR comment.
-Apply the same review standards the bot would (the SERG lab manual and d-morrison's modular/idiomatic priorities), then keep iterating to fully-clean on your own findings.
+Apply the same review standards the bot would (the SERG lab manual and the repository owner's modular/idiomatic priorities), then keep iterating to fully-clean on your own findings.
 Neither failure mode is an approval --- an unreviewed PR stays unreviewed regardless of why the bot didn't weigh in.
 
 **Never write the bot's at-mention in that comment.**

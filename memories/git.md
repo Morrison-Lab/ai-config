@@ -488,7 +488,7 @@ Verify with `git ls-remote --heads origin <branch>` after any deletion
 attempt, and when it survives, hand the deletion to the user (GitHub UI
 Branches page) instead of retrying. (ucdavis/rampp, 2026-07-17: deleting the
 orphaned `claude/split-survival` stack branch per its tracking issue no-op'd
-twice; delegated to d-morrison in the issue-close comment.)
+twice; delegated to the repository owner in the issue-close comment.)
 
 ## A diff-scoped local check silently no-ops on an empty/uncommitted diff — commit before running it, not after
 

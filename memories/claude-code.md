@@ -446,9 +446,9 @@ The log then says both things on adjacent lines:
 ```
 Adding marketplace: https://github.com/d-morrison/ai-config.git
 ✔ Successfully added marketplace: Morrison-Lab (declared in user settings)
-Installing plugin: ai-config@d-morrison
-✘ Failed to install plugin "ai-config@d-morrison": Plugin "ai-config" not
-  found in marketplace "d-morrison".
+Installing plugin: ai-config@the repository owner
+✘ Failed to install plugin "ai-config@the repository owner": Plugin "ai-config" not
+  found in marketplace "the repository owner".
 ```
 
 Only the name lookup fails, and it fails hard: `claude-code-action` aborts
@@ -482,7 +482,7 @@ Grep for the old `<plugin>@<marketplace>` string across both layers.
   on byte-for-byte, so any edit to it needs every consumer grepped first,
   not just an org move.
 
-(2026-07-29: ai-config renamed its declared marketplace from `d-morrison` to
+(2026-07-29: ai-config renamed its declared marketplace from `the repository owner` to
 `Morrison-Lab`.
 Both consumers broke; the gha fix shipped when `v2` was slid to `c50e847`.)
 

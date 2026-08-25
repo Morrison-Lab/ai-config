@@ -2,7 +2,7 @@
 """Verify data-locality guarantees for local Ollama delegation via OpenCode.
 
 Verifies:
-1. Endpoint loopback resolution (baseURL host resolves strictly to 127.0.0.1 or ::1, redirects disabled).
+1. Direct loopback endpoint (literal loopback host, proxies disabled, redirects disabled).
 2. Live daemon local-only state (checked directly against running Ollama daemon /api/status, requiring cloud.disabled == true).
 3. Target model local residency on-device (checked against Ollama /api/tags, refusing remote/cloud models).
 """
@@ -28,7 +28,8 @@ class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 
 def _safe_fetch_json(url: str, timeout: int = 5) -> Tuple[dict, str]:
-    opener = urllib.request.build_opener(NoRedirectHandler)
+    # Disable all system/environment proxies and redirects for locality safety
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler)
     req = urllib.request.Request(url, headers={"User-Agent": "opencode-locality-check"})
     with opener.open(req, timeout=timeout) as resp:
         final_url = resp.geturl()
@@ -70,11 +71,23 @@ def verify_locality(
     except Exception as exc:
         return False, f"Cannot read or parse opencode configuration: {exc}"
 
-    # 2. Verify loopback host resolution
+    # 2. Verify literal loopback endpoint
     parsed_url = urlparse(url)
     host = parsed_url.hostname
     if not host:
         return False, f"No host in ollama baseURL {url!r}"
+
+    # Require literal loopback identifier
+    is_literal_loopback = (host == "localhost")
+    if not is_literal_loopback:
+        try:
+            ip = ipaddress.ip_address(host)
+            is_literal_loopback = ip.is_loopback
+        except ValueError:
+            is_literal_loopback = False
+
+    if not is_literal_loopback:
+        return False, f"Ollama baseURL host {host!r} is not a literal loopback address ('localhost', '127.0.0.1', or '::1')."
 
     try:
         addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
@@ -106,22 +119,29 @@ def verify_locality(
     try:
         tags_url = f"{base_endpoint}/api/tags"
         tags_data, _ = _safe_fetch_json(tags_url, timeout=5)
-        model_entries = tags_data.get("models", [])
     except Exception as exc:
         return False, f"Cannot verify local model residency from Ollama tags API ({exc})"
 
-    if not model_entries:
+    if not isinstance(tags_data, dict):
+        return False, f"Unexpected response schema from {tags_url}: expected JSON object."
+
+    model_entries = tags_data.get("models")
+    if not isinstance(model_entries, list) or not model_entries:
         return False, "Local Ollama daemon reports 0 resident models in /api/tags."
 
-    # Identify remote-backed or cloud models
-    remote_models = {
-        m.get("name", "") for m in model_entries
-        if m.get("remote_model") or m.get("remote_host")
-    }
-    local_models = [
-        m.get("name", "") for m in model_entries
-        if m.get("name") and m.get("name") not in remote_models and m.get("digest") and m.get("size", 0) > 0
-    ]
+    # Validate model entries defensively
+    remote_models = set()
+    local_models = []
+    for m in model_entries:
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name", ""))
+        if not name:
+            continue
+        if m.get("remote_model") or m.get("remote_host"):
+            remote_models.add(name)
+        elif m.get("digest") and isinstance(m.get("size"), (int, float)) and m.get("size", 0) > 0:
+            local_models.append(name)
 
     matched = any(m == clean_target or m == target_tag for m in local_models)
     if not matched:
@@ -129,7 +149,7 @@ def verify_locality(
             return False, f"Target model {target_model!r} is backed by remote/cloud infrastructure."
         return False, f"Target model {target_model!r} (normalized {target_tag!r}) is not locally resident (local models: {', '.join(local_models)})."
 
-    return True, f"OK: Verified loopback endpoint ({url}, {', '.join(sorted(addrs))}), daemon local-only mode (cloud.disabled=true), and on-device residency for {target_tag} ({len(local_models)} local models)."
+    return True, f"OK: Verified loopback endpoint ({url}, {', '.join(sorted(addrs))}), direct connection (proxies disabled), daemon local-only mode (cloud.disabled=true), and on-device residency for {target_tag} ({len(local_models)} local models)."
 
 
 def main():

@@ -60,19 +60,24 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Cannot read", msg)
 
-    @patch("socket.getaddrinfo")
-    def test_non_loopback_host_refuses(self, mock_getaddrinfo):
-        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("192.168.1.100", 11434))]
+    def test_non_literal_loopback_host_refuses(self):
         cfg = json.dumps({
             "provider": {
                 "ollama": {
                     "options": {
-                        "baseURL": "http://lan-gpu:11434/v1"
+                        "baseURL": "http://gpu-box.local:11434/v1"
                     }
                 }
             }
         })
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", cfg)
+        self.assertFalse(ok)
+        self.assertIn("not a literal loopback address", msg)
+
+    @patch("socket.getaddrinfo")
+    def test_non_loopback_resolved_host_refuses(self, mock_getaddrinfo):
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("192.168.1.100", 11434))]
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
         self.assertIn("resolves off-machine", msg)
 
@@ -133,32 +138,30 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
     @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_remote_backed_model_in_tags_refuses(self, mock_getaddrinfo, mock_open):
+    def test_malformed_tags_elements_handled_defensively(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
         status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
         status_resp.geturl.return_value = "http://localhost:11434/api/status"
         status_resp.__enter__.return_value = status_resp
 
-        remote_tags = json.dumps({
+        malformed_tags = json.dumps({
             "models": [
-                {
-                    "name": "remote-cloud-model:latest",
-                    "remote_model": "cloud/model",
-                    "remote_host": "https://cloud.ollama.ai"
-                }
+                "string_entry_not_dict",
+                {"name": "missing_size", "digest": "sha256:123"},
+                {"name": "invalid_size", "digest": "sha256:456", "size": "not_int"},
             ]
         }).encode("utf-8")
         tags_resp = MagicMock()
-        tags_resp.read.return_value = remote_tags
+        tags_resp.read.return_value = malformed_tags
         tags_resp.geturl.return_value = "http://localhost:11434/api/tags"
         tags_resp.__enter__.return_value = tags_resp
 
         mock_open.side_effect = [status_resp, tags_resp]
 
-        ok, msg = checker.verify_locality("remote-cloud-model", self.valid_config)
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
-        self.assertIn("remote/cloud infrastructure", msg)
+        self.assertIn("not locally resident", msg)
 
     @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")

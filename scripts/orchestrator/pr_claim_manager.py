@@ -264,13 +264,15 @@ class PRClaimManager:
                 .replace("\u2013", "--")
             )
 
-            # Per fully-clean.md: anchor on the last `### Verdict` heading in the comment
-            if "### verdict" in lower_body:
-                verdict_section = lower_body.rsplit("### verdict", 1)[-1]
-            elif "verdict:" in lower_body:
-                verdict_section = lower_body.rsplit("verdict:", 1)[-1]
+            # Strip fenced code blocks to prevent code examples or quoted text from spoofing headings
+            stripped_body = re.sub(r"```[\s\S]*?```", " ", lower_body)
+
+            # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
+            heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
+            if heading_matches:
+                verdict_section = stripped_body[heading_matches[-1].end():]
             else:
-                verdict_section = lower_body
+                verdict_section = stripped_body
 
             # Extract non-empty lines from the verdict section
             verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]

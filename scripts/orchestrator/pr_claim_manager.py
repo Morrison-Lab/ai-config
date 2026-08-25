@@ -300,30 +300,22 @@ class PRClaimManager:
             r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved(?:\s+for\s+merge)?|ready(?:\s+for\s+merge)?|lgtm|clean\s*/\s*approved)\b",
             re.IGNORECASE,
         )
-        clean_negation_prefix = re.compile(
-            r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
-            r"|nowhere\s+near|close\s+to|far\s+from)\s+(?:\w+\s+){0,2}$",
-            re.IGNORECASE,
-        )
+        if not clean_first_line_pat.search(first_verdict_line):
+            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
+
+        # Check for qualifiers anywhere in the verdict section (e.g. conditional approvals or trailing caveats)
         clean_qualifier = re.compile(
             r"\b(?:once|after|when|if|unless|pending|provided|assuming"
             r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
             r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
             re.IGNORECASE,
         )
-
-        match = clean_first_line_pat.search(first_verdict_line)
-        if not match:
-            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
-
-        prefix = first_verdict_line[:match.start()]
-        if clean_negation_prefix.search(prefix):
-            return False, "Latest AI review verdict is negated"
-
-        remainder = first_verdict_line[match.end():min(len(first_verdict_line), match.end() + 60)]
-        remainder_sentence = re.split(r"[.!?]", remainder)[0]
-        if clean_qualifier.search(remainder_sentence):
-            return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
+        for line in verdict_lines:
+            # Skip trailer metadata lines like "Reviewed commit: <sha>" or disclosure markers
+            if re.match(r"^(?:reviewed\s+commit:|_posted\s+by)", line, re.IGNORECASE):
+                continue
+            if clean_qualifier.search(line):
+                return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
 
         return True, "PR is fully clean across CI and review"
 

@@ -1572,6 +1572,29 @@ This has since been resolved after addressing the finding.
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
 
+        # 27. Multi-line verdict with subsequent line qualification / condition is strictly rejected
+        qualified_verdict_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "**Clean**\n\n"
+                    "However, do not merge until human signoff is obtained.\n\n"
+                    "Reviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, qualified_verdict_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("qualifier", reason.lower())
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

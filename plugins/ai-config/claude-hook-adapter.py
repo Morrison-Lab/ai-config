@@ -61,7 +61,7 @@ def extract_hook_list(groups_or_hooks):
         if isinstance(item, dict):
             if "hooks" in item and isinstance(item["hooks"], list):
                 out.extend(item["hooks"])
-            elif "command" in item:
+            elif "command" in item or "script" in item:
                 out.append(item)
             else:
                 print(f"claude-hook-adapter: ignoring unrecognized hook item: {item}", file=sys.stderr)

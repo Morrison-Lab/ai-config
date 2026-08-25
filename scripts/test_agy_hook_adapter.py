@@ -382,6 +382,87 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_pre_invocation_thirty_kb_exact_boundary(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # 4 hooks, each returning 10KB of text
+        four_hooks = {
+            "hooks": {
+                "UserPromptSubmit": [
+                    {"hooks": [{"command": f"cmd_{i}"} for i in range(4)]}
+                ]
+            }
+        }
+        mock_file.return_value.read.return_value = json.dumps(four_hooks)
+        mock_result = MagicMock(returncode=0, stdout="B" * 10000, stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        total_len = sum(len(step["ephemeralMessage"].encode("utf-8")) for step in out.get("injectSteps", []))
+        self.assertEqual(total_len, 30000)
+        self.assertEqual(len(out.get("injectSteps", [])), 3)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_event_unrecognized_decision_falls_through(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "abort"}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {"terminationReason": "completed"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out, {})
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_run_command_cwd_fallback_to_repo_root(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "ls"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        # cwd passed to subprocess.run is repo_root when Cwd is absent
+        self.assertTrue(os.path.isabs(mock_run.call_args_list[0].kwargs['cwd']))
+
+    def test_extract_hook_list_supports_script_key(self):
+        item = [{"script": "python3 /path/to/script.py"}]
+        res = self.adapter.extract_hook_list(item)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["script"], "python3 /path/to/script.py")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_ambiguous_tool_call_and_invocation_num_payload(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result

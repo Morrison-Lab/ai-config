@@ -141,9 +141,13 @@ def main():
 
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
-            if isinstance(raw_subagents, str):
+            if isinstance(raw_subagents, dict):
+                raw_subagents = [raw_subagents]
+            elif isinstance(raw_subagents, str):
                 try:
                     raw_subagents = json.loads(raw_subagents)
+                    if isinstance(raw_subagents, dict):
+                        raw_subagents = [raw_subagents]
                 except Exception:
                     pass
             if raw_subagents is not None and not isinstance(raw_subagents, list):

@@ -33,16 +33,16 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
 
 ## When NOT to delegate
 
-- **The task needs strong reasoning, judgment, or long-context synthesis.**
-  This is the exception with no codex analogue, so check it first.
-  A wrong answer from a small model costs more to detect than the quota it saved.
+- **The task needs strong reasoning, judgment, or long-context synthesis --- unless explicitly routed to a frontier model.**
+  Free models hosted via Zen and local Ollama models are small, unbenchmarked ids where a wrong answer costs more to detect than the quota saved.
+  When delegating judgment-bearing work, route explicitly to OpenRouter stealth/frontier models or capable OpenCode Go tiers.
 - **The critical-path edit the rest of the work waits on.**
   Do it inline, in this session, so progress does not block on a round-trip.
 - **The result must conform to a schema and you have no cheap validator.**
   `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
-- **The hosted tier is rate-limited, or the ollama daemon is down.**
-  Neither is a window running out, because neither tier has a window.
-  This is availability, not budget, and what it licenses depends on whether a data trigger applies.
+- **The destination tier is unavailable or exhausted.**
+  OpenCode Go operates on windowed request limits (similar to 5-hour subscription windows); when exhausted, fall back to Codex or OpenRouter per the ladder.
+  Zen free tier rate-limiting and Ollama daemon reachability are availability states rather than window exhaustion.
 
 The first two transfer from `delegate-to-codex`, but for a reason that skill does not have.
 There, work shape and model capability were independent.
@@ -139,13 +139,13 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, `opencode`, and `openrouter`.
+`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `opencode`, and `openrouter` (`agy` API dispatch is out of service).
 Read it there rather than re-deriving it here.
 
 OpenCode spans multiple cost structures:
-- **Free Zen & local Ollama tiers**: Consume no metered window or API tokens.
+- **Free models via Zen (`zen/free`) & local Ollama tiers**: Consume no metered window or API tokens.
   For mechanical work a small model can perform, free/local tiers go ahead of Codex and Claude on cost.
-- **OpenCode Go subscription ($10/mo)**: Active monthly tier providing access to additional hosted models without per-token charges.
+- **OpenCode Go subscription ($10/mo)**: Active monthly windowed tier providing access to additional hosted models without per-token charges.
 - **OpenRouter prepaid balance**: Billed per token.
   Used when a task specifically benefits from frontier or stealth models not carried by desktop subscription quotas.
 

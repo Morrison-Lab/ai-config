@@ -568,7 +568,8 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
-    r"^\s*[:.\-]*\s*(?:none\b|no\b|nothing\b|0\b|n/a\b)", re.IGNORECASE
+    r"^\s*[:.\-]*\s*(?:none\b(?!\s+of\b)|nothing\b|0\b|n/a\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|\bnone\s+identified\b|\bnone\s+remaining\b|\bno\s+new\b)",
+    re.IGNORECASE,
 )
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
@@ -733,9 +734,10 @@ def classify_verdict(body: str, state: str = "") -> str:
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
-            suffix = scan[match.end():match.end() + 25]
-            if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
-                continue
+            if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
+                suffix = scan[match.end():match.end() + 60]
+                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                    continue
             return "not-clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:
@@ -985,9 +987,17 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 prefix = scan_body[max(0, match.start() - 25):match.start()]
                 if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                     continue
-                suffix = scan_body[match.end():match.end() + 25]
-                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
-                    continue
+                if pat in (
+                    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+                    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+                    r"\*\*Actionable Findings\*\*",
+                    r"\*\*Detailed Findings\*\*",
+                    r"#+\s*Issues",
+                    r"#+\s*Remaining",
+                ):
+                    suffix = scan_body[match.end():match.end() + 60]
+                    if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                        continue
                 if pat == r"changes\s+requested\b":
                     start = match.start()
                     pfx = scan_body[max(0, start - 25):start].lower()

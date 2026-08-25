@@ -486,6 +486,49 @@ def main() -> int:
             fn_ok and fn_issues == [],
         )
 
+    # Regression (PR #2180 round 14): 'none of' after rejection keywords does NOT negate the rejection
+    rej_none_of_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "Rejected: none of the fixes from the last round were applied.\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_rno = json.dumps({"comments": [rej_none_of_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_rno):
+        rno_ok, rno_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: 'Rejected: none of...' fails as not clean",
+            (not rno_ok) and any("contains findings" in i for i in rno_issues),
+        )
+    check(
+        "classify_verdict: 'Rejected: none of...' classifies as not-clean",
+        checker.classify_verdict(rej_none_of_comment["body"]) == "not-clean",
+    )
+
+    not_ready_none_of_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "This PR is not ready: none of the required tests pass.\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nrn = json.dumps({"comments": [not_ready_none_of_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nrn):
+        nrn_ok, nrn_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: 'not ready: none of...' fails as not clean",
+            (not nrn_ok) and any("contains findings" in i for i in nrn_issues),
+        )
+    check(
+        "classify_verdict: 'not ready: none of...' classifies as not-clean",
+        checker.classify_verdict(not_ready_none_of_comment["body"]) == "not-clean",
+    )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

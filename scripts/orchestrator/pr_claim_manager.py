@@ -262,15 +262,16 @@ class PRClaimManager:
 
         # Check for commit-staleness: if headRefOid is present, require that the review comment
         # cites a reviewed commit SHA matching the current PR headRefOid.
-        reviewed_commit_match = re.search(
+        # Use the LAST match from stripped_body to avoid earlier decoy commit mentions in review prose.
+        reviewed_commit_matches = list(re.finditer(
             r"(?:reviewed\s+(?:commit(?::)?|at\b(?::)?)|commit:)\s*(?:\*\*|__)?\s*`?([0-9a-f]{7,40})`?",
-            body,
+            stripped_body,
             re.IGNORECASE,
-        )
+        ))
         if head_oid:
-            if not reviewed_commit_match:
+            if not reviewed_commit_matches:
                 return False, "Latest AI review does not cite the reviewed commit SHA (cannot verify freshness against PR head)"
-            reviewed_sha = reviewed_commit_match.group(1).lower()
+            reviewed_sha = reviewed_commit_matches[-1].group(1).lower()
             if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
                 return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
 

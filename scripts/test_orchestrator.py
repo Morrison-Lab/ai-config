@@ -1851,6 +1851,51 @@ This has since been resolved after addressing the finding.
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
 
+        # 40. Earlier mention of HEAD in review prose does not mask a stale trailing Reviewed commit citation
+        decoy_sha_stale_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "Note: an earlier related fix landed in commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f, unrelated to this review's own target.\n\n"
+                    "### Verdict\n\n"
+                    "**Clean**\n\n"
+                    "Reviewed commit: 0000000000000000000000000000000000000000"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, decoy_sha_stale_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("is stale", reason.lower())
+
+        # 41. Earlier mention of an old SHA in review prose does not block a fresh trailing Reviewed commit citation
+        decoy_sha_fresh_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "Compared against commit: 0000000000000000000000000000000000000000.\n\n"
+                    "### Verdict\n\n"
+                    "**Clean**\n\n"
+                    "Reviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, decoy_sha_fresh_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

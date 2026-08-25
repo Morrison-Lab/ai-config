@@ -1198,4 +1198,4 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
-- **End-of-Session PR Dashboard**: When you end a turn or stop your work, always run the `pr-status-all` skill (or recommend the `/pr-status-all` slash command to the user) to provide a dashboard of all open PRs. (User directive / CAI, 2026-08-25)
+- **End-of-Session PR Dashboard**: When ending a session or reaching a clean stopping point (not on every conversational turn), always run the `pr-status-all` skill (or recommend the `/pr-status-all` slash command) to provide a dashboard of all open PRs. (User directive / CAI, 2026-08-25)

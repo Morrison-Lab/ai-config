@@ -158,6 +158,7 @@ def main():
                 return
             for idx, sub in enumerate(subagents):
                 if not isinstance(sub, dict):
+                    print(f"claude-hook-adapter: invoke_subagent skipping non-dict subagent item: {type(sub).__name__}", file=sys.stderr)
                     continue
                 agent_name = sub.get("TypeName") or sub.get("typeName") or f"subagent_{idx}"
                 agent_payload = {
@@ -212,7 +213,7 @@ def main():
                 generic_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), tool_name):
-                    tasks_to_run.append((extract_hook_list(group), generic_payload, tool_cwd, tool_name))
+                    tasks_to_run.append((extract_hook_list(group), generic_payload, repo_root, tool_name))
 
         # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
         for hooks_list, c_payload, cwd, desc in tasks_to_run:

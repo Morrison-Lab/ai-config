@@ -669,13 +669,24 @@ def generation_ups_sentinel(key: str) -> Path:
     return base / f"ups-{digest}"
 
 
-def pretool_decision(parsed: dict[str, Any], returncode: int) -> tuple[str | None, str]:
+def pretool_decision(
+    parsed: dict[str, Any],
+    returncode: int,
+    stderr: str = "",
+) -> tuple[str | None, str]:
     """Return (deny-reason or None, additional context)."""
-    if returncode == 2:
-        return parsed.get("user_message") or parsed.get("reason") or "denied by hook", ""
     hso = parsed.get("hookSpecificOutput")
     if not isinstance(hso, dict):
         hso = {}
+    if returncode == 2:
+        reason = (
+            parsed.get("user_message")
+            or parsed.get("reason")
+            or hso.get("permissionDecisionReason")
+            or (stderr.strip() or None)
+            or "denied by hook"
+        )
+        return str(reason), ""
     if (
         parsed.get("permission") == "deny"
         or hso.get("permissionDecision") == "deny"
@@ -752,7 +763,7 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
         parsed, text = parse_hook_stdout(stdout)
         if parsed is None:
             parsed = {}
-        reason, extra = pretool_decision(parsed, code)
+        reason, extra = pretool_decision(parsed, code, stderr)
         if extra:
             extra_chunks.append(extra)
         if text.strip():
@@ -805,6 +816,7 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
                 or hso.get("reason")
                 or parsed.get("followup_message")
                 or text.strip()
+                or (stderr.strip() or None)
                 or "blocked by hook"
             )
             followups.append(str(reason))

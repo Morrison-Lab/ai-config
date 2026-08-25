@@ -137,6 +137,16 @@ check(
         for event in mod.WRAPPER_TIMEOUT_S
     ),
 )
+for event, hooks in cursor_cfg.get("hooks", {}).items():
+    for hook in hooks:
+        check(
+            f"{event} failClosed is unset so an adapter crash fail-opens",
+            hook.get("failClosed") in (None, False),
+        )
+        check(
+            f"{event} has no matcher so Task/MCP catalog rows still run",
+            "matcher" not in hook,
+        )
 
 
 def hooks_field_points_at_claude(value: object) -> bool:
@@ -788,6 +798,10 @@ with tempfile.TemporaryDirectory() as raw:
         miss_env,
     )
     check("missing catalog script fail-closed denies", missing.get("permission") == "deny")
+    check(
+        "missing catalog script names the script",
+        "missing" in str(missing.get("agent_message") or ""),
+    )
     hang_py = """\
 #!/usr/bin/env python3
 import time
@@ -824,6 +838,10 @@ print("{}")
         hang_env,
     )
     check("hung catalog script fail-closed denies", hung.get("permission") == "deny")
+    check(
+        "hung catalog script names the timeout",
+        "timeout" in str(hung.get("agent_message") or ""),
+    )
     old_hooks_dir = os.environ.get("AI_CONFIG_HOOKS_DIR")
     os.environ["AI_CONFIG_HOOKS_DIR"] = str(hooks)
     try:

@@ -36,7 +36,10 @@ The adapter parses leading `KEY=VALUE` tokens from each catalog `command`
 (the Stop registration of `no-mistake-without-a-hook.py` needs
 `AI_CONFIG_STOP=1`) and runs each script with a remaining-time budget so
 Cursor does not SIGKILL the wrapper mid-catalog.
-A catalog script that times out or cannot exec fails closed (exit 2).
+A catalog script that times out or cannot exec fails closed on
+`preToolUse` / `stop` (exit 2).
+UserPromptSubmit / `postToolUse` injection ignores that status: a missing
+or hung UPS script is a silent drop, not a deny.
 The wrapper itself still fail-opens: `.cursor/hooks.json` does not set
 `failClosed`, because an adapter crash would otherwise deny every tool.
 `main()` dispatches through `HANDLERS`, and every `EVENT_MAPPING` value must be a `HANDLERS` key.

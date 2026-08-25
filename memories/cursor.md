@@ -71,6 +71,8 @@ Warn-only Claude Stop `systemMessage` maps to Cursor `followup_message`
 because `stop` has no warn-only field.
 `postToolUse.additional_context` is emitted; Cloud consumption is
 unmeasured as of 2026-08-25 (desktop through 3.7.x discarded it).
+Stop scanners still read JSONL, not that field
+([#2245](https://github.com/Morrison-Lab/ai-config/issues/2245)).
 
 User-level `~/.cursor/hooks.json` is not available to cloud agents.
 `sessionStart` injection is desktop-only.

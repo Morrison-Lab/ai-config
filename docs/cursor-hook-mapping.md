@@ -17,7 +17,7 @@ It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude p
 | Claude Code event | Cursor event | Cloud agent | Notes |
 |---|---|---|---|
 | `PreToolUse` | `preToolUse` | yes | Covers Shell (Claude `Bash`), Task/Agent, and MCP tools. Matcher translation lives in the adapter. |
-| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `5` (Cursor's default) so a block can retry a few times without an unbounded follow-up loop. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. |
+| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `5` (Cursor's default) so a block can retry a few times without an unbounded follow-up loop. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. The adapter rewrites a Cursor JSONL (`role` + `Shell`) into the Claude shape (`type` + `Bash`) before the catalog reads it. Cursor transcripts omit tool *results*, so a discharge that needs output cannot see it. |
 | `UserPromptSubmit` | `sessionStart` | no | Cursor `sessionStart` can inject `additional_context`. Cloud agents do not load `sessionStart`. |
 | `UserPromptSubmit` | `postToolUse` | yes | First `postToolUse` of a generation injects the same stdout / `additionalContext` the Claude UPS path would have added before the turn. A cloud turn that never calls a tool never fires `postToolUse`, so UPS context is dropped, not delayed. `inject-local-time.sh` therefore lands after the first tool when there is one, and not at all on a tool-less turn. |
 | `UserPromptSubmit` | `beforeSubmitPrompt` | yes, but unused | Cursor `beforeSubmitPrompt` can only `continue` / block. It cannot inject context. No UPS hook here currently blocks, so this event is unbound. |
@@ -25,7 +25,10 @@ It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude p
 | `PreToolUse` MCP | `preToolUse` (`MCP:` prefix) | yes | Cursor Cloud does not load `beforeMCPExecution` / `afterMCPExecution`. `preToolUse` is the cloud path. |
 | `SessionStart` / `SessionEnd` / `PreCompact` | unused | mixed | This catalog does not register those Claude events. |
 
-The adapter's `EVENT_MAPPING` table is the machine-readable copy of the first three rows.
+The adapter parses leading `KEY=VALUE` tokens from each catalog `command`
+(the Stop registration of `no-mistake-without-a-hook.py` needs
+`AI_CONFIG_STOP=1`) and runs each script with a remaining-time budget so
+Cursor does not SIGKILL the wrapper mid-catalog.
 `main()` dispatches through `HANDLERS`, and every `EVENT_MAPPING` value must be a `HANDLERS` key.
 `scripts/test_cursor_hook_adapter.py` asserts every Claude event in `hooks/hooks.json` appears there.
 

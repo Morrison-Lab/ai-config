@@ -370,8 +370,11 @@ the rule is consulted when it is *read* and broken when a message is
 *composed*.
 `hooks/` ships the harness hooks that close those gaps.
 Claude Code loads them from [`hooks/hooks.json`](hooks/hooks.json).
-Cursor loads the same scripts through [`.cursor/hooks.json`](.cursor/hooks.json);
-the event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
+Cursor loads the same scripts through [`.cursor/hooks.json`](.cursor/hooks.json)
+after [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py)
+translates Cursor events, tool names, and transcript JSONL into the payload
+those scripts already consume.
+The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 
 | hook | event | enforces |
 |---|---|---|

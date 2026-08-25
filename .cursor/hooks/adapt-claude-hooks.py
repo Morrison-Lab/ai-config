@@ -40,6 +40,16 @@ ADAPTER = Path(__file__).resolve()
 REPO = ADAPTER.parent.parent.parent
 TICK_PENDING = "pending\n"
 TICK_REPLAY_WAIT_S = 5.0
+# Must match .cursor/hooks.json. Slack keeps sequential catalog runs
+# from being SIGKILL'd by Cursor, which fail-opens the whole event.
+WRAPPER_TIMEOUT_S = {
+    "preToolUse": 300,
+    "postToolUse": 180,
+    "stop": 180,
+    "sessionStart": 120,
+}
+WRAPPER_SLACK_S = 10
+ENV_PREFIX = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(\S+)\s+")
 
 
 def hooks_dir() -> Path:
@@ -95,6 +105,18 @@ def fail_open_payload(event: str, extra: dict[str, Any] | None = None) -> dict[s
     return payload
 
 
+def event_deadline(event: str) -> float:
+    budget = WRAPPER_TIMEOUT_S.get(event, 60) - WRAPPER_SLACK_S
+    return time.time() + max(budget, 1)
+
+
+def remaining_timeout(deadline: float, advertised: float) -> float | None:
+    left = deadline - time.time()
+    if left <= 0:
+        return None
+    return min(advertised, left)
+
+
 def fail_open(event: str, extra: dict[str, Any] | None = None) -> int:
     """Print a non-blocking Cursor response and exit 0."""
     print(json.dumps(fail_open_payload(event, extra)))
@@ -121,8 +143,26 @@ def load_manifest(path: Path | None = None) -> list[dict[str, Any]]:
                     entry["matcher"] = matcher
                 if hook.get("timeout"):
                     entry["timeout"] = hook["timeout"]
+                extra_env = env_prefix_from_command(hook.get("command"))
+                if extra_env:
+                    entry["env"] = extra_env
                 entries.append(entry)
     return entries
+
+
+def env_prefix_from_command(command: str | None) -> dict[str, str]:
+    """Leading KEY=VALUE tokens from a hooks.json command string."""
+    if not command:
+        return {}
+    rest = command.lstrip()
+    env: dict[str, str] = {}
+    while True:
+        match = ENV_PREFIX.match(rest)
+        if not match:
+            break
+        env[match.group(1)] = match.group(2).strip("\"'")
+        rest = rest[match.end():]
+    return env
 
 
 def matcher_hits(matcher: str | None, tool_name: str) -> bool:
@@ -190,10 +230,12 @@ def claude_payload_for_pretool(cursor: dict[str, Any], claude_tool: str) -> dict
     return {
         "tool_name": claude_tool,
         "tool_input": tool_input,
-        "transcript_path": (
-            cursor.get("transcript_path")
-            or os.environ.get("CURSOR_TRANSCRIPT_PATH")
-            or ""
+        "transcript_path": translate_transcript_path(
+            str(
+                cursor.get("transcript_path")
+                or os.environ.get("CURSOR_TRANSCRIPT_PATH")
+                or ""
+            )
         ),
         "cwd": cursor.get("cwd") or os.environ.get("CURSOR_PROJECT_DIR") or "",
         "hook_event_name": "PreToolUse",
@@ -201,15 +243,104 @@ def claude_payload_for_pretool(cursor: dict[str, Any], claude_tool: str) -> dict
 
 
 def claude_payload_for_transcript(cursor: dict[str, Any], event: str) -> dict[str, Any]:
+    raw = (
+        cursor.get("transcript_path")
+        or os.environ.get("CURSOR_TRANSCRIPT_PATH")
+        or ""
+    )
     return {
-        "transcript_path": (
-            cursor.get("transcript_path")
-            or os.environ.get("CURSOR_TRANSCRIPT_PATH")
-            or ""
-        ),
+        "transcript_path": translate_transcript_path(str(raw)),
         "cwd": os.environ.get("CURSOR_PROJECT_DIR") or "",
         "hook_event_name": event,
     }
+
+
+def claude_tool_name_for_cursor(name: str) -> str:
+    if name == "Shell":
+        return "Bash"
+    if name.startswith("MCP:"):
+        mapped = cursor_to_claude_tool_names(name)
+        mcp = [item for item in mapped if item.startswith("mcp__")]
+        if mcp:
+            return mcp[0]
+    return name
+
+
+def translate_content_block(block: Any) -> Any:
+    if not isinstance(block, dict):
+        return block
+    out = dict(block)
+    if out.get("type") == "tool_use" and isinstance(out.get("name"), str):
+        out["name"] = claude_tool_name_for_cursor(out["name"])
+    return out
+
+
+def cursor_record_to_claude(record: dict[str, Any]) -> dict[str, Any]:
+    out = dict(record)
+    if "type" not in out and out.get("role") in ("user", "assistant"):
+        out["type"] = out["role"]
+    message = out.get("message")
+    if isinstance(message, dict) and isinstance(message.get("content"), list):
+        out["message"] = dict(message)
+        out["message"]["content"] = [
+            translate_content_block(block) for block in message["content"]
+        ]
+    return out
+
+
+def transcript_needs_translation(path: Path) -> bool:
+    try:
+        with path.open(encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if record.get("type") == "turn_ended":
+                    continue
+                if record.get("role") in ("user", "assistant") and "type" not in record:
+                    return True
+                return False
+    except OSError:
+        return False
+    return False
+
+
+def translate_transcript_path(raw: str) -> str:
+    """Point Stop/UPS scripts at a Claude-shaped JSONL when Cursor wrote it."""
+    if not raw:
+        return raw
+    path = Path(raw)
+    if not path.is_file() or not transcript_needs_translation(path):
+        return raw
+    dest = stash_dir() / (
+        f"tx-{hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:20]}.jsonl"
+    )
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        lines: list[str] = []
+        with path.open(encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    lines.append(line if line.endswith("\n") else line + "\n")
+                    continue
+                if isinstance(record, dict):
+                    record = cursor_record_to_claude(record)
+                    lines.append(json.dumps(record) + "\n")
+                else:
+                    lines.append(line if line.endswith("\n") else line + "\n")
+        dest.write_text("".join(lines), encoding="utf-8")
+    except OSError:
+        return raw
+    return str(dest)
 
 
 def parse_hook_stdout(raw: str) -> tuple[dict[str, Any] | None, str]:
@@ -226,7 +357,12 @@ def parse_hook_stdout(raw: str) -> tuple[dict[str, Any] | None, str]:
     return None, text
 
 
-def run_script(script: str, payload: dict[str, Any], timeout: float) -> tuple[int, str, str]:
+def run_script(
+    script: str,
+    payload: dict[str, Any],
+    timeout: float,
+    extra_env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     path = hooks_dir() / script
     if script.endswith(".py"):
         argv = [sys.executable, str(path)]
@@ -236,6 +372,9 @@ def run_script(script: str, payload: dict[str, Any], timeout: float) -> tuple[in
     # `sh missing.sh` exits 127, which PreToolUse would otherwise allow.
     if not path.is_file():
         return 2, "", f"missing {script}"
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
     try:
         proc = subprocess.run(
             argv,
@@ -244,7 +383,7 @@ def run_script(script: str, payload: dict[str, Any], timeout: float) -> tuple[in
             capture_output=True,
             timeout=timeout,
             cwd=str(os.environ.get("CURSOR_PROJECT_DIR") or REPO),
-            env=os.environ,
+            env=env,
         )
     except subprocess.TimeoutExpired:
         return 0, "", f"timeout {script}"
@@ -429,6 +568,7 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
     extra_chunks: list[str] = []
     deny_reason = None
     ran_scripts: set[str] = set()
+    deadline = event_deadline("preToolUse")
     for entry in entries:
         if entry["event"] != "PreToolUse":
             continue
@@ -438,11 +578,15 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
         hits = [name for name in candidates if matcher_hits(entry.get("matcher"), name)]
         if not hits:
             continue
+        timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
+        if timeout is None:
+            break
         ran_scripts.add(script)
         claude_tool = hits[0]
         payload = claude_payload_for_pretool(cursor, claude_tool)
-        timeout = float(entry.get("timeout") or 10)
-        code, stdout, stderr = run_script(script, payload, timeout)
+        code, stdout, stderr = run_script(
+            script, payload, timeout, entry.get("env"),
+        )
         if stderr:
             print(stderr, file=sys.stderr, end="" if stderr.endswith("\n") else "\n")
         parsed, text = parse_hook_stdout(stdout)
@@ -469,11 +613,16 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
 def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
     payload = claude_payload_for_transcript(cursor, "Stop")
     followups: list[str] = []
+    deadline = event_deadline("stop")
     for entry in entries:
         if entry["event"] != "Stop":
             continue
-        timeout = float(entry.get("timeout") or 10)
-        code, stdout, stderr = run_script(entry["script"], payload, timeout)
+        timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
+        if timeout is None:
+            break
+        code, stdout, stderr = run_script(
+            entry["script"], payload, timeout, entry.get("env"),
+        )
         if stderr:
             print(stderr, file=sys.stderr, end="" if stderr.endswith("\n") else "\n")
         parsed, text = parse_hook_stdout(stdout)
@@ -509,6 +658,7 @@ def handle_user_prompt_submit(
     cursor: dict[str, Any],
     entries: list[dict[str, Any]],
     once_per_generation: bool,
+    event: str = "postToolUse",
 ) -> str:
     key = ups_key(cursor)
     if once_per_generation and key:
@@ -521,11 +671,16 @@ def handle_user_prompt_submit(
             pass
     payload = claude_payload_for_transcript(cursor, "UserPromptSubmit")
     chunks: list[str] = []
+    deadline = event_deadline(event)
     for entry in entries:
         if entry["event"] != "UserPromptSubmit":
             continue
-        timeout = float(entry.get("timeout") or 10)
-        _code, stdout, stderr = run_script(entry["script"], payload, timeout)
+        timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
+        if timeout is None:
+            break
+        _code, stdout, stderr = run_script(
+            entry["script"], payload, timeout, entry.get("env"),
+        )
         if stderr:
             print(stderr, file=sys.stderr, end="" if stderr.endswith("\n") else "\n")
         parsed, text = parse_hook_stdout(stdout)
@@ -536,7 +691,9 @@ def handle_user_prompt_submit(
 
 
 def handle_session_start(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
-    extra = handle_user_prompt_submit(cursor, entries, once_per_generation=True)
+    extra = handle_user_prompt_submit(
+        cursor, entries, once_per_generation=True, event="sessionStart",
+    )
     if extra:
         return {"additional_context": extra}
     return {}
@@ -547,7 +704,9 @@ def handle_post_tool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> d
     stashed = take_stashed_context(str(cursor.get("tool_use_id") or ""))
     if stashed:
         parts.append(stashed)
-    extra = handle_user_prompt_submit(cursor, entries, once_per_generation=True)
+    extra = handle_user_prompt_submit(
+        cursor, entries, once_per_generation=True, event="postToolUse",
+    )
     if extra:
         parts.append(extra)
     if parts:

@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -86,6 +87,15 @@ check(
 )
 live_entries = mod.load_manifest()
 check("live catalog load_manifest is non-empty", len(live_entries) >= 40)
+check(
+    "live Stop no-mistake-without-a-hook carries AI_CONFIG_STOP",
+    any(
+        e["script"] == "no-mistake-without-a-hook.py"
+        and e["event"] == "Stop"
+        and (e.get("env") or {}).get("AI_CONFIG_STOP") == "1"
+        for e in live_entries
+    ),
+)
 
 # --- Cursor manifest is native schema, not Claude's ---
 cursor_cfg = json.loads(CURSOR_HOOKS.read_text(encoding="utf-8"))
@@ -109,16 +119,23 @@ for event, hooks in cursor_cfg.get("hooks", {}).items():
 stop_hook = cursor_cfg["hooks"]["stop"][0]
 check("stop loop_limit is 5", stop_hook.get("loop_limit") == 5)
 check(
-    "preToolUse wrapper timeout is 60",
-    cursor_cfg["hooks"]["preToolUse"][0].get("timeout") == 60,
+    "preToolUse wrapper timeout is 300",
+    cursor_cfg["hooks"]["preToolUse"][0].get("timeout") == 300,
 )
 check(
-    "postToolUse wrapper timeout is 120",
-    cursor_cfg["hooks"]["postToolUse"][0].get("timeout") == 120,
+    "postToolUse wrapper timeout is 180",
+    cursor_cfg["hooks"]["postToolUse"][0].get("timeout") == 180,
 )
 check(
-    "stop wrapper timeout is 120",
-    stop_hook.get("timeout") == 120,
+    "stop wrapper timeout is 180",
+    stop_hook.get("timeout") == 180,
+)
+check(
+    "WRAPPER_TIMEOUT_S matches project hooks.json",
+    all(
+        cursor_cfg["hooks"][event][0].get("timeout") == mod.WRAPPER_TIMEOUT_S[event]
+        for event in mod.WRAPPER_TIMEOUT_S
+    ),
 )
 
 
@@ -165,6 +182,29 @@ check(
     "regex matcher misses Bash",
     not mod.matcher_hits("mcp__github__.*", "Bash"),
 )
+check(
+    "command env prefix extracts AI_CONFIG_STOP",
+    mod.env_prefix_from_command(
+        'AI_CONFIG_STOP=1 python3 "${CLAUDE_PLUGIN_ROOT}/hooks/x.py"'
+    ) == {"AI_CONFIG_STOP": "1"},
+)
+check(
+    "command without env prefix is empty",
+    mod.env_prefix_from_command('python3 "hooks/x.py"') == {},
+)
+cursor_asst = {
+    "role": "assistant",
+    "message": {"content": [
+        {"type": "text", "text": "hi"},
+        {"type": "tool_use", "name": "Shell", "input": {"command": "git status"}},
+    ]},
+}
+translated = mod.cursor_record_to_claude(cursor_asst)
+check("Cursor role becomes Claude type", translated.get("type") == "assistant")
+check(
+    "Cursor Shell tool_use becomes Bash",
+    translated["message"]["content"][1].get("name") == "Bash",
+)
 
 # --- subprocess fixtures ---
 deny_py = """\
@@ -201,6 +241,15 @@ payload = json.load(sys.stdin)
 print(json.dumps({"decision": "block", "reason": "empty promise"}))
 """
 
+stop_env_py = """\
+#!/usr/bin/env python3
+import json, os, sys
+if os.environ.get("AI_CONFIG_STOP") == "1":
+    print(json.dumps({"decision": "block", "reason": "mistake needs a hook"}))
+else:
+    print("plain reminder")
+"""
+
 ups_sh = """\
 #!/bin/sh
 echo "local time: 2026-08-25 10:00 PDT"
@@ -223,6 +272,7 @@ with tempfile.TemporaryDirectory() as raw:
     write_hook(hooks, "deny-merge.py", deny_py)
     write_hook(hooks, "warn-isolation.py", warn_py)
     write_hook(hooks, "block-stop.py", stop_py)
+    write_hook(hooks, "block-stop-env.py", stop_env_py)
     write_hook(hooks, "inject-time.sh", ups_sh)
     write_hook(hooks, "count-task.py", count_py)
     manifest = {
@@ -245,7 +295,14 @@ with tempfile.TemporaryDirectory() as raw:
                 },
             ],
             "Stop": [
-                {"hooks": [{"script": "block-stop.py", "timeout": 5}]},
+                {"hooks": [
+                    {"script": "block-stop.py", "timeout": 5},
+                    {
+                        "script": "block-stop-env.py",
+                        "timeout": 5,
+                        "command": "AI_CONFIG_STOP=1 python3 block-stop-env.py",
+                    },
+                ]},
             ],
             "UserPromptSubmit": [
                 {"hooks": [{"script": "inject-time.sh", "timeout": 5}]},
@@ -348,6 +405,10 @@ with tempfile.TemporaryDirectory() as raw:
     check(
         "Stop block becomes followup_message",
         "empty promise" in str(stopped.get("followup_message")),
+    )
+    check(
+        "Stop catalog command env prefix is forwarded",
+        "mistake needs a hook" in str(stopped.get("followup_message")),
     )
 
     injected = run_adapter(
@@ -465,6 +526,36 @@ with tempfile.TemporaryDirectory() as live_raw:
         live_env,
     )
     check("live catalog denies gh pr merge", live_deny.get("permission") == "deny")
+    nonce = str(time.time_ns())
+    cursor_tx = live_stash / "cursor-offer.jsonl"
+    cursor_tx.write_text(
+        json.dumps({
+            "role": "assistant",
+            "message": {"content": [
+                {
+                    "type": "text",
+                    "text": f"Want me to file an issue for that ({nonce})?",
+                },
+            ]},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    live_stop = run_adapter(
+        "stop",
+        {
+            "status": "completed",
+            "loop_count": 0,
+            "conversation_id": "live-c",
+            "generation_id": "live-g-stop",
+            "transcript_path": str(cursor_tx),
+        },
+        live_env,
+    )
+    check(
+        "live Stop reads a Cursor-shaped transcript",
+        "offers to file" in str(live_stop.get("followup_message") or "").lower()
+        or "want me to file" in str(live_stop.get("followup_message") or "").lower(),
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

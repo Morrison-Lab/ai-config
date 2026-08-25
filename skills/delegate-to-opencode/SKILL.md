@@ -193,14 +193,14 @@ The routing rule above turns on where `ollama/*` actually points, whether cloud 
 
 ```bash
 python3 - "qwen2.5-coder:3b" <<'PY'
-import ipaddress, json, os, socket, subprocess, sys, urllib.request
+import ipaddress, json, os, re, socket, subprocess, sys, urllib.request
 from urllib.parse import urlparse
 
 if len(sys.argv) < 2 or not sys.argv[1].strip():
     sys.exit("REFUSE: target model identifier is required as an argument (e.g. 'qwen2.5-coder:3b')")
 
 target_model = sys.argv[1].strip()
-clean_target = target_model.replace("ollama/", "")
+clean_target = re.sub(r"^ollama/", "", target_model)
 target_tag = clean_target if ":" in clean_target else f"{clean_target}:latest"
 
 try:
@@ -232,24 +232,36 @@ try:
     req = urllib.request.Request(tags_url, headers={'User-Agent': 'opencode-locality-check'})
     with urllib.request.urlopen(req, timeout=5) as resp:
         data = json.loads(resp.read().decode('utf-8'))
-        local_models = [m.get('name', '') for m in data.get('models', [])]
+        model_entries = data.get('models', [])
 except Exception as exc:
     sys.exit(f"REFUSE: cannot verify local model residency from Ollama tags API ({exc})")
 
-if not local_models:
-    sys.exit(f"REFUSE: local Ollama daemon reports 0 resident models in /api/tags")
+if not model_entries:
+    sys.exit("REFUSE: local Ollama daemon reports 0 resident models in /api/tags")
+
+# Reject any remote-backed entries (remote_model or remote_host)
+remote_models = {
+    m.get('name', '') for m in model_entries
+    if m.get('remote_model') or m.get('remote_host')
+}
+local_models = [
+    m.get('name', '') for m in model_entries
+    if m.get('name') and m.get('name') not in remote_models
+]
 
 matched = any(m == clean_target or m == target_tag for m in local_models)
 if not matched:
+    if any(m == clean_target or m == target_tag for m in remote_models):
+        sys.exit(f"REFUSE: target model {target_model!r} is backed by remote/cloud infrastructure")
     sys.exit(f"REFUSE: target model {target_model!r} (normalized {target_tag!r}) is not locally resident (local models: {', '.join(local_models)})")
 
 print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
-print(f"OK: verified local model residency for {target_tag} ({len(local_models)} resident models)")
+print(f"OK: verified local on-device residency for {target_tag} ({len(local_models)} local models)")
 PY
 ```
 
-It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the specified target model is locally resident.
-Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unreachable tags API, zero resident models, or an uninstalled target model.
+It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the specified target model is strictly locally resident (refusing any remote-backed or cloud models).
+Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.
 Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md).
 This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
 

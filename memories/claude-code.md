@@ -1095,3 +1095,26 @@ the unquoted-delimiter case was written down nowhere.
 
 - **Do:** use a quoted heredoc delimiter (`<<'PY'`) whenever the body carries backticks or dollar signs, pass dynamic values in via a separately-exported environment variable or a placeholder substitution, and grep the emitted file for the expected spans afterwards.
 - **Don't:** choose an unquoted delimiter for the convenience of variable interpolation when the body carries markdown code spans --- each backtick span becomes a command substitution and vanishes silently on success.
+
+## Tool result persistence & disk spillover threshold
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
+
+- **Default size threshold**:
+  Tool outputs exceeding `DEFAULT_MAX_RESULT_SIZE_CHARS = 50_000` characters (or 100,000 tokens)
+  are written to disk under `~/.claude/projects/<project>/<session_id>/tool-results/<tool_use_id>`.
+- **Model preview**:
+  When persisted to disk, the model receives a preview wrapped in `<persisted-output>` XML tags
+  with the exact disk path for subsequent `FileRead` retrieval.
+- **Batch limit**:
+  Combined tool outputs across parallel tool executions in a single turn are capped at `MAX_TOOL_RESULTS_PER_MESSAGE_CHARS = 200_000` characters.
+  Thresholds are subject to harness configuration and release changes.
+
+## Token budgeting directives
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
+
+- Shorthand forms (`+500k`, `+2m`, `+1b`) and verbose phrases (`spend 2M tokens`, `use 100k tokens`)
+  are parsed into session token budgets.
+- When an active budget is detected, the harness injects budget-monitoring instructions
+  into dynamic system prompt sections and issues continuation prompts if the model finishes before expending the requested effort.

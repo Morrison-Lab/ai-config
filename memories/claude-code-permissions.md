@@ -158,3 +158,31 @@ it forecloses the correct next step for every later reader who takes it at face 
 - **Do:** treat "I haven't verified the mechanism" as a reason to write "cause unknown" rather than a plausible-sounding guess, when a comment or memory entry will be read later as authoritative.
 - **Don't:** generalize an observed failure ("the write didn't happen") into a specific, unverified mechanism ("sandbox hard block") and then let that mechanism claim stand as the reason a fix wasn't attempted.
 - **Don't:** treat a wrong mechanism as merely a wrong fact with no further cost --- weigh it as actively blocking whatever fix the correct mechanism would have suggested.
+
+## Auto-mode YOLO classifier pipeline & denial circuit breakers
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
+Classifier models, prompt evaluations, and safety thresholds are actively updated by upstream providers;
+re-verify before relying on these internal pipeline stages:
+
+- **Bypass-immune safety checks**:
+  Sensitive directories (`.git/`, `.claude/`, shell RC files) cannot be auto-approved by the classifier unless explicitly marked `classifierApprovable`.
+- **Fast paths**:
+  Read-only safe tools (`isAutoModeAllowlistedTool`) and actions allowed under `acceptEdits` (excluding `Agent` and `REPL`) bypass the classifier API and auto-allow immediately.
+- **Two-stage classifier**:
+  - Stage 1: Fast classifier.
+  - Stage 2: Thinking classifier (invoked only if stage 1 is uncertain).
+  - Fail-closed gate: If the classifier API fails, execution fails closed with retry guidance.
+- **Denial limits**:
+  Tracks consecutive and total denials (default thresholds: 3 consecutive, 20 total).
+  Exceeding thresholds falls back to user prompts or aborts headless runs.
+
+## OS sandbox filesystem invariants & customization lockdown paths
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236) and managed policy behavior:
+
+- `sandbox.autoAllowBashIfSandboxed: true` auto-approves safe commands inside Seatbelt/Bubblewrap/WSL2.
+- **Protected paths**:
+  Writes to customization directories (`~/.claude`, `.claude/skills`, `.claude/commands`, `.claude/agents`, `settings.json`, `.mcp.json`)
+  and bare git repository control files (`HEAD`, `objects`, `refs`, `hooks`, `config`)
+  are restricted under sandboxed and managed customization lockdown modes to prevent escape vectors.

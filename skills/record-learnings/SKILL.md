@@ -89,9 +89,15 @@ For standing instructions that should always be in context:
 2. **Categorize** — is it user-wide, repo-specific, or a reusable workflow?
 3. **Check existing notes** — read the target file first to avoid duplicates
    and maintain organization
-4. **Write concisely** — bullet points, not prose. Include the *why* not just
-   the *what*. If you created a *new* file under `/memories/`, also add a row
-   for it to `memories/MEMORY.md` (the index)
+4. **Write concisely with temporal qualifications** — bullet points, not
+   prose.
+   Include the *why* not just the *what*.
+   When recording facts about any software, tools, APIs, harnesses, or technologies,
+   always attach explicit temporal bounds and provenance
+   (e.g. `Measured YYYY-MM against version X / snapshot reference`)
+   and state that third-party behavior evolves across releases.
+   If you created a *new* file under `/memories/`, also add a row for it to
+   `memories/MEMORY.md` (the index)
 5. **Deliver, per where step 2/3 routed it:**
    - **Repository-specific fact, a repo we own** — commit it to that repo's
      own agent docs via a PR (`CLAUDE.md`, `.github/copilot-instructions.md`,
@@ -179,3 +185,4 @@ After adding or updating any skill file, always commit and push to origin:
 - ❌ Editing skills locally without committing and pushing to origin
 - ❌ Duplicating information already in a skill file
 - ❌ Forgetting to check if a note already exists before adding
+- ❌ Recording software or technology facts as timeless present-tense truths without temporal bounds (date/version/snapshot)

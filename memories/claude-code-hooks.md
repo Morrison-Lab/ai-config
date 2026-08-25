@@ -241,3 +241,64 @@ Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\-
 - **Correct syntax:** Use `"mcp__github__.*"` (JavaScript regex syntax) to match all tools from the `mcp__github__` MCP server prefix.
 - **Incorrect syntax:** Do not use `"mcp__github__*"` (shell glob syntax), which evaluates as regex matching `mcp__github` followed by 0 or more `_` characters.
 - **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]` and aggregates multiple matcher groups for the same script and event.
+
+## Complete hook lifecycle catalog (27 events)
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
+Harness behavior and event definitions evolve across releases;
+re-verify against current runtime behavior rather than treating this snapshot as permanent.
+
+The v2.1 hook schema supports 27 distinct lifecycle events:
+- **Tool lifecycle:**
+  `PreToolUse` (match query: `tool_name`),
+  `PostToolUse` (`tool_name`),
+  `PostToolUseFailure` (`tool_name`).
+- **Prompt & turn lifecycle:**
+  `UserPromptSubmit`,
+  `Stop`,
+  `StopFailure` (`error`).
+- **Session & environment:**
+  `SessionStart` (match query: `source`),
+  `SessionEnd` (`reason`),
+  `Setup` (`trigger`),
+  `ConfigChange` (`source`),
+  `InstructionsLoaded` (`load_reason`),
+  `CwdChanged`,
+  `FileChanged` (`basename(file_path)`),
+  `WorktreeCreate`,
+  `WorktreeRemove`.
+- **Subagents & tasks:**
+  `SubagentStart` (`agent_type`),
+  `SubagentStop` (`agent_type`),
+  `TeammateIdle`,
+  `TaskCreated`,
+  `TaskCompleted`.
+- **Compaction:**
+  `PreCompact` (`trigger`),
+  `PostCompact` (`trigger`).
+- **Permissions & MCP:**
+  `PermissionRequest` (`tool_name`),
+  `PermissionDenied` (`tool_name`),
+  `Elicitation` (`mcp_server_name`),
+  `ElicitationResult` (`mcp_server_name`),
+  `Notification` (`notification_type`).
+
+## Advanced hook capabilities in the native schema
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
+
+- **In-process pre-filtering (`if: "..."`)**:
+  Hooks can declare `"if": "Bash(git *)"` or `"if": "Read(*.ts)"` to evaluate permission expressions in-process,
+  bypassing process spawning overhead when conditions are not met.
+- **Input mutation (`updatedInput`)**:
+  `PreToolUse` and `PermissionRequest` hooks can return `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {...}}}` to rewrite tool arguments dynamically before execution.
+- **MCP output rewrite (`updatedMCPToolOutput`)**:
+  `PostToolUse` hooks can rewrite results returned from MCP tools.
+- **Dynamic environment exports (`CLAUDE_ENV_FILE`)**:
+  Bash hooks matching `SessionStart`, `Setup`, `CwdChanged`, and `FileChanged` receive a path in `$CLAUDE_ENV_FILE`.
+  Environment variables exported to this file are sourced into subsequent Bash sessions.
+- **Prompt elicitation protocol**:
+  A command hook can output `{"prompt": "<id>", "message": "...", "options": [...]}` to prompt the user interactively,
+  receiving `{"prompt_response": "<id>", "selected": "..."}` back on stdin.
+- **`asyncRewake` execution**:
+  Background hooks can run asynchronously and wake the model only if exit code 2 (blocking error) occurs.

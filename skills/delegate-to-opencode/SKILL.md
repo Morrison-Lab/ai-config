@@ -182,18 +182,18 @@ An `ollama/*` id appearing in that list only says the config declares it, not th
 ```bash
 opencode run -m ollama/qwen2.5-coder:3b "Reply with exactly the word: PONG"
 opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PONG"
-opencode run -m opencode-go/claude-3-5-sonnet "Reply with exactly the word: PONG"
+opencode run -m opencode-go/deepseek-r1 "Reply with exactly the word: PONG"
 ```
 
-Measured 2026-08-19 on opencode 1.18.15: both returned `PONG`, in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
+Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
 
 **Before any data-triggered work, verify endpoint, daemon local mode, and model residency.**
 The routing rule above turns on where `ollama/*` actually points and whether cloud offloading is disabled, so it gets checked rather than assumed.
-`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value:
+`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value and confirms daemon residency:
 
 ```bash
 python3 - <<'PY'
-import ipaddress, json, socket, subprocess, sys
+import ipaddress, json, socket, subprocess, sys, urllib.request
 from urllib.parse import urlparse
 
 try:
@@ -218,7 +218,19 @@ remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
 if remote:
     sys.exit(f"REFUSE: ollama baseURL {url} resolves off-machine: {', '.join(remote)}")
 
+# Verify Ollama daemon local residency and tags API
+try:
+    base_api = url[:-3] if url.endswith('/v1') else url.rstrip('/')
+    tags_url = base_api.rstrip('/') + '/api/tags'
+    req = urllib.request.Request(tags_url, headers={'User-Agent': 'opencode-locality-check'})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
+        local_models = [m.get('name', '') for m in data.get('models', [])]
+except Exception as exc:
+    sys.exit(f"REFUSE: cannot verify local model residency from Ollama tags API ({exc})")
+
 print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
+print(f"OK: verified local model residency ({len(local_models)} models present locally)")
 PY
 ```
 

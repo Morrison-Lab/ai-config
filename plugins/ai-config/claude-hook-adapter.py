@@ -82,7 +82,7 @@ def main():
         event_type = "PreToolUse"
     elif payload.get("terminationReason") is not None:
         event_type = "Stop"
-    elif payload.get("invocationNum") is not None:
+    elif isinstance(payload.get("invocationNum"), (int, float)) and not isinstance(payload.get("invocationNum"), bool):
         event_type = "PreInvocation"
 
     if not event_type:
@@ -324,6 +324,7 @@ def main():
             ups_payload["transcript_path"] = transcript_path
 
         injected_messages = []
+        total_injected_bytes = 0
         hooks_to_run = extract_hook_list(ups_groups)
         for hook in hooks_to_run:
             cmd = hook.get("command")
@@ -345,8 +346,15 @@ def main():
                     except Exception:
                         pass
                     if text_out:
-                        # Cap injected message length at 10KB to prevent unbounded context growth
-                        injected_messages.append(text_out[:10000])
+                        # Cap single injected message at 10KB and total cumulative bytes at 30KB
+                        chunk = text_out[:10000]
+                        if total_injected_bytes + len(chunk) <= 30000:
+                            injected_messages.append(chunk)
+                            total_injected_bytes += len(chunk)
+                        elif total_injected_bytes < 30000:
+                            remaining = 30000 - total_injected_bytes
+                            injected_messages.append(chunk[:remaining])
+                            total_injected_bytes += remaining
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages[:20]]

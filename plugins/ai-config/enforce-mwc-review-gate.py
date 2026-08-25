@@ -7,30 +7,28 @@ def main():
     payload = json.load(sys.stdin)
     tool_call = payload.get("toolCall", {})
     if tool_call.get("name") != "run_command":
-        print(json.dumps({}))
+        print(json.dumps({"decision": "allow"}))
         return
 
     cmd = tool_call.get("args", {}).get("CommandLine", "")
     
     # Check if this is a merge command
     if not re.search(r'\b(gh pr merge|gh stack merge|git merge origin/main)\b', cmd):
-        print(json.dumps({}))
+        print(json.dumps({"decision": "allow"}))
+        return
+        
+    # Block chained commands that include merge. Merging must be done as a standalone command
+    # so we can reliably inspect the state of the PR before the command executes.
+    if ";" in cmd or "&&" in cmd:
+        print(json.dumps({
+            "decision": "deny",
+            "reason": "Merge commands (gh pr merge, etc) must be executed sequentially on their own. Do not chain them with other commands like 'gh pr create ; gh pr merge' because the hook cannot dynamically evaluate the PR's review status mid-execution."
+        }))
         return
 
-    # For a robust implementation, we would check the PR review status via gh pr view --json reviews.
-    # But since mwc cannot bypass a blocked review, we will just force a prompt for all merges unless they are explicitly authorized.
-    # Actually, the user specifically asked to "make it impossible to do THAT again" (bypassing human review when AI skips).
-    # If we force an ask on EVERY merge, they will always have to click "Allow". 
-    # But wait! If they click "Always Allow" in the UI, it caches it and allows it next time!
-    # If we use "force_ask", they ALWAYS have to click it, bypassing the cache.
-    # But if they use /mwc, they don't want to click it. 
-    # So we should run gh pr checks and gh pr view to see if there is a skipped AI review without a human review!
-    
     workspace = payload.get("workspacePaths", ["."])[0]
     
     try:
-        # Get the reviews
-        # If there's a PR number in the command, use it, else default to current branch
         pr_match = re.search(r'gh (?:pr|stack) merge (\d+)', cmd)
         pr_arg = pr_match.group(1) if pr_match else ""
         
@@ -41,21 +39,32 @@ def main():
             data = json.loads(result.stdout)
             reviews = data.get("reviews", [])
             
-            # If reviews are empty, or if Claude didn't review, AND no human reviewed
             has_human_review = any(r.get("author", {}).get("login") != "claude" and "bot" not in r.get("author", {}).get("login", "").lower() for r in reviews)
             
-            # If there's no human review, we must deny if we are trying to merge under mwc!
+            # If no reviews, or if Claude didn't review and no human reviewed
             if not has_human_review and len(reviews) == 0:
                 print(json.dumps({
                     "decision": "deny",
                     "reason": "Strict Merge Control Policy: AI reviewer skipped or deadlocked, and no human review is present. You cannot use mwc to bypass the review boundary. Request human review from the repository owner."
                 }))
                 return
+        else:
+            # gh pr view failed (e.g. PR doesn't exist)
+            print(json.dumps({
+                "decision": "deny",
+                "reason": f"Hook failed to fetch PR reviews (gh pr view returned non-zero). Ensure the PR exists and is checked out. Output: {result.stderr}"
+            }))
+            return
+            
     except Exception as e:
-        pass
+        print(json.dumps({
+            "decision": "deny",
+            "reason": f"Hook exception during PR review check: {str(e)}"
+        }))
+        return
 
-    # Default: do not block
-    print(json.dumps({}))
+    # Default: allow if we passed the checks (has human review or AI passed)
+    print(json.dumps({"decision": "allow"}))
 
 if __name__ == '__main__':
     main()

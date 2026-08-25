@@ -216,3 +216,6 @@ Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.
 Repeat this until all available providers have signed off with a clean verdict on the exact same commit.
+
+If zero providers are available, the requirement is not vacuously met; you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
+If providers give irreconcilably contradictory requirements (forming an infinite loop), halt the review process and escalate the conflict to the user for a tie-breaking decision.

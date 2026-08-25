@@ -47,14 +47,9 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
-## Status requests do not make issues report-only
+## Status and diagnostic requests do not make issues report-only
 
-Treat a request for status as a request to inspect live state and finish every
-safe, in-scope, concrete action that inspection reveals. A report is the recap
-after the work, not a substitute for it. When an issue cannot be fixed
-directly, carry it forward with an actual next action. Every issue noticed,
-however small or outside the current task's scope, must at minimum be filed in
-the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
+Treat any request for status or diagnostic inquiry ("why did X happen?", "why did you do Y?", "did you do Z?") as a mandate to inspect live state, diagnose the root cause, and complete every safe, in-scope, concrete repair in that very same turn. A report or explanation is the recap after the work is shipped, not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt. When an issue cannot be fixed directly in the session, carry it forward with an actual next action (filing a tracking issue). File it before reporting it.
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 

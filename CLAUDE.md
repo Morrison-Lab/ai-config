@@ -125,26 +125,16 @@ larger in-scope outcome clear.
 - **Don't:** stop at a narrow literal reading that leaves the requested outcome
   only partially achieved.
 
-## Status requests do not make issues report-only
+## Status and diagnostic requests do not make issues report-only
 
-Treat a request for status as a request to inspect live state and finish every
-safe, in-scope, concrete action that inspection reveals. A report is the recap
-after the work, not a substitute for it. When an issue cannot be fixed
-directly, carry it forward with an actual next action. **Every issue noticed,
-however small or outside the current task's scope, must at minimum be filed in
-the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
-it; use the correct private tracker and redact sensitive details when needed.
+Treat any request for status or diagnostic inquiry ("why did X happen?", "why did you do Y?", "did you do Z?") as a mandate to inspect live state, diagnose the root cause, and finish every safe, in-scope, concrete action that inspection reveals in that very same turn. A report or explanation is the recap after the work, not a substitute for it or an intermediate stop waiting for a follow-up "fix it" prompt. When an issue cannot be fixed directly, carry it forward with an actual next action. **Every issue noticed, however small or outside the current task's scope, must at minimum be filed in the owning GitHub, GitLab, or equivalent tracker.** File it before reporting it; use the correct private tracker and redact sensitive details when needed.
 
-- **Do:** fix an actionable CI defect, review finding, or configuration gap
-  before reporting it as status; revalidate and continue the sweep.
-- **Do:** turn an issue outside current authority into a filed/routed blocker,
-  not an unowned observation.
-- **Do:** file every noticed issue in its owning tracker, even when it is
-  trivial, already fixed locally, or outside the active task.
-- **Don't:** interpret "status" as report-only after discovering a concrete,
-  safe, in-scope repair.
-- **Don't:** end with "this failed" or "this needs a fix" when the fix is
-  available to perform in the same turn.
+- **Do:** fix an actionable CI defect, review finding, instruction bug, or configuration gap before reporting it as status; revalidate and continue the sweep.
+- **Do:** treat diagnostic questions about a defect as an instruction to ship the fix in that turn and recap what was done.
+- **Do:** turn an issue outside current authority into a filed/routed blocker, not an unowned observation.
+- **Do:** file every noticed issue in its owning tracker, even when it is trivial, already fixed locally, or outside the active task.
+- **Don't:** interpret "status" or diagnostic questions as report-only after discovering a concrete, safe, in-scope repair.
+- **Don't:** end with "this failed" or "this is why I did that" without shipping the fix in the same turn.
 - **Don't:** leave a noticed issue as chat prose because it seems too small or
   too far outside the current scope to track.
 

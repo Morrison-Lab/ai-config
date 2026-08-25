@@ -125,28 +125,26 @@ larger in-scope outcome clear.
 - **Don't:** stop at a narrow literal reading that leaves the requested outcome
   only partially achieved.
 
-## Status and diagnostic requests do not make issues report-only
+## Status requests do not make issues report-only
 
-Treat any request for status or diagnostic inquiry
-("why did X happen?", "why did you do Y?", "did you do Z?")
-as a mandate to inspect live state, diagnose the root cause,
-and finish every safe, in-scope, concrete action that inspection reveals in that very same turn.
-A report or explanation is the recap after the work,
-not a substitute for it or an intermediate stop waiting for a follow-up "fix it" prompt.
-When an issue cannot be fixed directly,
-carry it forward with an actual next action.
-**Every issue noticed, however small or outside the current task's scope,
-must at minimum be filed in the owning GitHub, GitLab, or equivalent tracker.**
-File it before reporting it;
-use the correct private tracker and redact sensitive details when needed.
+Treat a request for status as a request to inspect live state and finish every
+safe, in-scope, concrete action that inspection reveals. A report is the recap
+after the work, not a substitute for it. When an issue cannot be fixed
+directly, carry it forward with an actual next action. **Every issue noticed,
+however small or outside the current task's scope, must at minimum be filed in
+the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
+it; use the correct private tracker and redact sensitive details when needed.
 
-- **Do:** fix an actionable CI defect, review finding, instruction bug, or configuration gap before reporting it as status;
-  revalidate and continue the sweep.
-- **Do:** treat diagnostic questions about a defect as an instruction to ship the fix in that turn and recap what was done.
-- **Do:** turn an issue outside current authority into a filed/routed blocker, not an unowned observation.
-- **Do:** file every noticed issue in its owning tracker, even when it is trivial, already fixed locally, or outside the active task.
-- **Don't:** interpret "status" or diagnostic questions as report-only after discovering a concrete, safe, in-scope repair.
-- **Don't:** end with "this failed" or "this is why I did that" without shipping the fix in the same turn.
+- **Do:** fix an actionable CI defect, review finding, or configuration gap
+  before reporting it as status; revalidate and continue the sweep.
+- **Do:** turn an issue outside current authority into a filed/routed blocker,
+  not an unowned observation.
+- **Do:** file every noticed issue in its owning tracker, even when it is
+  trivial, already fixed locally, or outside the active task.
+- **Don't:** interpret "status" as report-only after discovering a concrete,
+  safe, in-scope repair.
+- **Don't:** end with "this failed" or "this needs a fix" when the fix is
+  available to perform in the same turn.
 - **Don't:** leave a noticed issue as chat prose because it seems too small or
   too far outside the current scope to track.
 
@@ -222,22 +220,22 @@ Only the model change costs them a step.
 
 ## Keep a running on-disk session lab notebook
 
-Maintain a "lab notebook" for each session --- a dated, append-only file written to *as work happens*, not only when pausing --- so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.
+Maintain a "lab notebook" for each session — a dated, append-only file written to *as work happens*, not only when pausing — so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.
 The whole point is surviving an interruption that never gives you a clean stop, so the file must live on disk and be updated frequently, not held in context and flushed at the end.
 
 **Where.** In the session's project auto-memory directory, as a `session-YYYY-MM-DD[-slug].md` file, with a one-line pointer added to that directory's `MEMORY.md` like any other memory.
 One notebook per session; start it near session start and keep appending.
 
-**Cadence --- frequently, and to disk right away.** Append a short, timestamped entry at each state change worth resuming from: a task or subtask started, a decision made or a question I answered, a PR/issue opened, a branch cut, a job launched (SLURM/background/CI, with its id), a blocker hit, a checkpoint reached.
-Not every tool call --- that's noise --- but every step whose loss would cost real reconstruction.
+**Cadence — frequently, and to disk right away.** Append a short, timestamped entry at each state change worth resuming from: a task or subtask started, a decision made or a question I answered, a PR/issue opened, a branch cut, a job launched (SLURM/background/CI, with its id), a blocker hit, a checkpoint reached.
+Not every tool call — that's noise — but every step whose loss would cost real reconstruction.
 
 **What each entry carries.** Enough for a cold reader to resume without this conversation: what we're doing and why, what's done versus in flight (branches, open PRs/issues, running jobs and their ids), open questions and decisions, and the next concrete step.
 
 **Relationship to the pause-time and context conventions.** The notebook is the *running recorder*; the others are point-in-time:
 
-- `handoff` writes a single snapshot *when you pause cleanly* --- the notebook is its always-current substrate, so a handoff can finalize or point at the notebook instead of rebuilding state from scratch.
-- `compress-session` distills the *conversation context* to survive compaction --- the notebook is a durable on-disk trail, not a context-window optimization.
-- The `/clear` flag above is about *choosing* a clean stop --- the notebook is insurance for the stops you don't choose.
+- `handoff` writes a single snapshot *when you pause cleanly* — the notebook is its always-current substrate, so a handoff can finalize or point at the notebook instead of rebuilding state from scratch.
+- `compress-session` distills the *conversation context* to survive compaction — the notebook is a durable on-disk trail, not a context-window optimization.
+- The `/clear` flag above is about *choosing* a clean stop — the notebook is insurance for the stops you don't choose.
 
 Fold a finished session's notebook into durable memory (or prune it) during UMS once its content is captured elsewhere, so the memory directory doesn't accumulate stale logs.
 
@@ -250,7 +248,7 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 ## Timestamp recaps in local time
 
-When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
+When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
 This makes "as of when" unambiguous when the user reads the recap later.
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
@@ -258,12 +256,12 @@ A single honest measurement earlier in the session is what most easily licenses 
 **Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
 If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.
 Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.
-Note the output format differs from the bash command --- it's a raw `DateTime` with no timezone-abbreviation field, so format it yourself if you need the `PDT`/`PST` suffix or a compact form.
+Note the output format differs from the bash command — it's a raw `DateTime` with no timezone-abbreviation field, so format it yourself if you need the `PDT`/`PST` suffix or a compact form.
 
 ## State the actual time when reporting a scheduled check-in
 
 When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or an equivalent poll-later mechanism), state the clock time it fires at, not just the relative delay or a bare "I scheduled a check-in."
-The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08:22:00") --- surface that time in the chat reply instead of dropping it, converting to Pacific local time per the "Timestamp recaps in local time" section above if the returned time is in a different zone.
+The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08:22:00") — surface that time in the chat reply instead of dropping it, converting to Pacific local time per the "Timestamp recaps in local time" section above if the returned time is in a different zone.
 "Scheduled a check-in to continue monitoring both" leaves the user unable to tell whether that's one minute away or twenty; "I'll check back at 08:22 PT (~4 min)" does not.
 
 ## Bare keyword directives
@@ -273,7 +271,7 @@ Two families of slash skill read as directives when I write them **without** the
 ### Queue commands
 
 I maintain a family of slash skills for managing the task queue and amending requests: `/also`, `/first`, `/next`, `/before`, `/last`, `/and`, `/remember`, `/always`, and `/cascade`.
-When I write one of these keywords **without the leading slash** as a directive --- e.g. "also fix the test", "remember that ...", "always link PRs in tables", "and bold it", "next, run the spellcheck", "first, revert that" --- interpret it using the corresponding skill's semantics rather than as ordinary prose. (`/remember` and `/always` both route to the `memorize` skill; "cascade" means merge stacked PRs' base branches into the PRs stacked on top of them --- including main into unstacked PRs --- never the PRs into main; see the `cascade` skill.)
+When I write one of these keywords **without the leading slash** as a directive — e.g. "also fix the test", "remember that ...", "always link PRs in tables", "and bold it", "next, run the spellcheck", "first, revert that" — interpret it using the corresponding skill's semantics rather than as ordinary prose. (`/remember` and `/always` both route to the `memorize` skill; "cascade" means merge stacked PRs' base branches into the PRs stacked on top of them — including main into unstacked PRs — never the PRs into main; see the `cascade` skill.)
 When the word is genuinely just part of a sentence (ambiguous), fall back to the plain reading.
 
 ### Judgment grants
@@ -289,7 +287,7 @@ See [`dmmhyh`](skills/dmmhyh/SKILL.md).
 
 ## Link PRs in tables
 
-When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL --- `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 The plain text form forces the user to copy/paste; the linked form lets them open the PR in one click.
 
 ## Tag chat output by category so long recaps stay scannable
@@ -298,15 +296,15 @@ Recaps get long across many parallel tracks, so tag categories of output with a 
 Terminal markdown can't force text color, so the emoji plus the `===` frame plus the bold label *is* the signal.
 Readers skim past a question or a flag buried mid-paragraph; a marked, set-apart block is harder to miss.
 
-Reserve a **`===` box** for the output a user is waiting on --- something they must respond to (a question, an offer, a blocker) or the headline answer they asked for --- and use a lighter **emoji-prefix** (bold label, no box) for informational categories they can skim.
+Reserve a **`===` box** for the output a user is waiting on — something they must respond to (a question, an offer, a blocker) or the headline answer they asked for — and use a lighter **emoji-prefix** (bold label, no box) for informational categories they can skim.
 Boxing everything defeats the purpose, so keep the box meaningful.
 
 Boxed (a `===` line above and below the labeled block):
 
-- ❓ **QUESTION** --- need the user's input. For a real either/or, prefer the AskUserQuestion picker over a boxed question. When a question is posed inline in chat prose rather than through a box, still set it apart --- its own paragraph (blank line before and after, since a bare newline collapses back into the surrounding paragraph), in bold.
-- 💡 **OFFER** --- optional work I can do if they want it.
-- 🛑 **BLOCKER** --- stopped; need their call.
-- ✅ **ANSWER** --- the headline answer to a question they asked (put nuance below the box).
+- ❓ **QUESTION** — need the user's input. For a real either/or, prefer the AskUserQuestion picker over a boxed question. When a question is posed inline in chat prose rather than through a box, still set it apart — its own paragraph (blank line before and after, since a bare newline collapses back into the surrounding paragraph), in bold.
+- 💡 **OFFER** — optional work I can do if they want it.
+- 🛑 **BLOCKER** — stopped; need their call.
+- ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
 - 🧭 **RECOMMENDATION** --- the course of action I think they should take,
   when the decision is theirs.
   Distinct from the two categories it is most easily confused with:
@@ -335,10 +333,10 @@ Boxed (a `===` line above and below the labeled block):
 
 Prefixed, no box (informational, frequent):
 
-- 📊 **UPDATE** --- status or progress.
-- ⚠️ **FLAG** --- non-blocking heads-up or risk.
-- ✔️ **DONE** --- a completed action.
-- 🟢 **ALL CLEAR** --- nothing needs the user right now; work continues in the background. The recap's standing sign-off.
+- 📊 **UPDATE** — status or progress.
+- ⚠️ **FLAG** — non-blocking heads-up or risk.
+- ✔️ **DONE** — a completed action.
+- 🟢 **ALL CLEAR** — nothing needs the user right now; work continues in the background. The recap's standing sign-off.
 
 Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
@@ -508,21 +506,21 @@ Don't batch several decisions into one message or one multi-question `AskUserQue
 
 Two reasons.
 The answer to the first question often changes or moots the later ones, so a batch makes me answer against stale premises.
-And a wall of questions invites a partial reply that leaves the rest silently unanswered --- the exact failure mode `prompt-me` / `prompt-me-all` exist to recover from.
+And a wall of questions invites a partial reply that leaves the rest silently unanswered — the exact failure mode `prompt-me` / `prompt-me-all` exist to recover from.
 
 Mechanics:
 
-- Rank by how blocking each decision is, most pressing first (the same ranking `prompt-me` uses), and pose only the top one --- via a single-question `AskUserQuestion` call for a real either/or, or one boxed ❓ **QUESTION** otherwise.
+- Rank by how blocking each decision is, most pressing first (the same ranking `prompt-me` uses), and pose only the top one — via a single-question `AskUserQuestion` call for a real either/or, or one boxed ❓ **QUESTION** otherwise.
 - Say how many more are queued behind it ("2 more decisions after this one"), so the backlog is visible without being posed.
 - Fold each answer into the framing of the next question, and silently drop any queued question the answer mooted.
 - Keep working on whatever the pending decision doesn't block while waiting.
 
-This changes how decisions are *posed*, not whether to ask at all: `research-before-asking` still gates each question, and an `away` grant still means don't block on questions --- resolve them by judgment, or skip-and-note, per that skill's scope.
-And it yields to an explicit request for the full backlog --- `prompt-me-all` / "ask me everything at once" is the user opting into a batch view.
+This changes how decisions are *posed*, not whether to ask at all: `research-before-asking` still gates each question, and an `away` grant still means don't block on questions — resolve them by judgment, or skip-and-note, per that skill's scope.
+And it yields to an explicit request for the full backlog — `prompt-me-all` / "ask me everything at once" is the user opting into a batch view.
 
 ## Title Claude sessions with the PR/issue number
 
-Name each Claude Code session (the title shown in the web/app session sidebar) `#NNN brief description` --- the number of the PR or issue the session is working, then a short description.
+Name each Claude Code session (the title shown in the web/app session sidebar) `#NNN brief description` — the number of the PR or issue the session is working, then a short description.
 Don't prefix it with "PR" or "Issue"; just the bare `#NNN`.
 So `#316 session title convention`, not `PR #316 session title convention` or `PR session title convention`.
 
@@ -532,7 +530,7 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 The same fetch applies to any other question about that live PR
 ("why didn't you wait", "did you fix it", "why haven't you responded").
 Don't answer from chat context alone.
-Don't trust an earlier "verdict" you've cached --- a new review may have been posted since (by the @claude bot, by a human, or by a re-trigger), and that newer review may contain findings the old one missed.
+Don't trust an earlier "verdict" you've cached — a new review may have been posted since (by the @claude bot, by a human, or by a re-trigger), and that newer review may contain findings the old one missed.
 
 Specifically: when scanning checks (`gh pr checks`) shows green or "no failures", that's about CI state, **not** review verdict.
 Always pull the latest review comment and parse it for any "Findings", "Issues", "Remaining" sections before declaring a PR ready.
@@ -555,14 +553,14 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 
 `memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
-**Also check formal GitHub reviews, not just issue-style comments --- a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** --- the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
+**Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
 ```
 gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUESTED") | "\(.author.login) \(.submittedAt)"'
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
-A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" --- that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" — that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
 
-(A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
+(A specific case of the standing **never assume; always verify** rule in `memories/preferences.md` — confirm the verdict with a fresh query, don't recall it.)
 
 ## Post in-chat feedback to the PR
 
@@ -576,7 +574,7 @@ _Posted by Claude Code (AI agent) --- not written by a human._"
 
 One to three sentences is enough.
 The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
-Don't quote verbatim --- paraphrase so it reads naturally in the PR thread.
+Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
 
 This makes context visible to future @claude sessions, other reviewers, and contributors who only see the PR thread.
@@ -639,7 +637,7 @@ When a short `CLAUDE.md` names a fuller document as the actual authority --- `.g
 
 @shared/workflow/pr-on-claim.md
 
-The strong form of the claim: after claiming an issue you're about to work, open the PR right away --- before implementing --- from an empty commit, kept as a draft until the implementation lands.
+The strong form of the claim: after claiming an issue you're about to work, open the PR right away — before implementing — from an empty commit, kept as a draft until the implementation lands.
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
@@ -699,11 +697,11 @@ Actionable work is an issue.
 An open-ended policy question whose deliverable is a decision, and which has a real do-nothing option, is a discussion --- in an answerable category (`Q&A`) so the resolution can be marked as the answer.
 Its second half is the general principle: best practice outranks repo precedent when choosing venue or method, and "the board is unused, so nobody would find it there" is circular reasoning that can never permit anyone to start using it.
 
-## If you see something, say something --- file an issue for every noticed mistake
+## If you see something, say something — file an issue for every noticed mistake
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
-The proactive counterpart to issue-first above: when a mistake shows up in any medium --- code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else --- even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
+The proactive counterpart to issue-first above: when a mistake shows up in any medium — code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else — even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 
@@ -733,7 +731,7 @@ Step 3 (own-repo fallback) is not covered by `sup`; use `gh issue create` in the
 
 ## Wrap up a merged PR with UMS
 
-When a PR/MR you were working on **merges**, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout `main`, pull, `git branch -d`), confirm any deferred items have follow-up issues, then run **UMS** to capture what the PR's review lifecycle taught --- recurring review findings, corrections, and guidance given along the way.
+When a PR/MR you were working on **merges**, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout `main`, pull, `git branch -d`), confirm any deferred items have follow-up issues, then run **UMS** to capture what the PR's review lifecycle taught — recurring review findings, corrections, and guidance given along the way.
 A merge is the natural checkpoint to bank lessons before the context is lost.
 
 This is not the *first* checkpoint, though, and it should rarely be the one carrying the whole backlog.
@@ -741,14 +739,14 @@ Per "Run UMS proactively" above, the pass already ran when the review verdict ca
 Run it regardless: a short pass that finds nothing new is the expected outcome when the verdict-time pass did its job, not a reason to skip the step.
 
 "merge it" / "merge this" / "merge the PR" as bare directives (no slash) trigger the `merge-it` skill: when the PR isn't merged yet, it merges the ready PR (squash by default) **then** chains straight into `post-merge` (tidy + UMS); when the PR is already merged it goes directly to `post-merge`.
-Either way the post-merge wrap-up --- including the UMS follow-up PR --- runs **automatically, without asking**.
+Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.
 If the phrase is clearly part of ordinary prose rather than a standalone directive, treat it as such.
 
 ## What "fully clean" means
 
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -763,20 +761,20 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
-## Watch and ARDI every PR you touch --- don't ask first
+## Watch and ARDI every PR you touch — don't ask first
 
-When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
+When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
 That answer is a standing yes across all PRs and all repos.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
+This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
 
-## Babysit PRs efficiently --- batch pushes, trust CI's own reports, skip redundant lookups
+## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 
 [shared/workflow/efficient-pr-babysitting.md](shared/workflow/efficient-pr-babysitting.md)
 
@@ -789,12 +787,11 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 [`shared/workflow/address-every-comment.md`](shared/workflow/address-every-comment.md)
 
-If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** --- request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse --- for the final call rather than looping.
+If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse — for the final call rather than looping.
 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-
 1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
    In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
@@ -803,6 +800,7 @@ Whenever starting or working on a Pull Request:
 - **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
 - **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
+
 
 ## Check the remote immediately before every push
 
@@ -823,7 +821,7 @@ A `stale info` refusal is not a reason to force either: `memories/git.md` record
 
 [`shared/workflow/sync-with-main.md`](shared/workflow/sync-with-main.md)
 
-(Another instance of **never assume; always verify** --- `git fetch` to check main's actual position instead of assuming the branch is current.
+(Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
 The `sync-pr-branch` / `merge-main` skill runs this.)
 
 ## Batch merge and resolve, always
@@ -1129,9 +1127,9 @@ When adding a coding or review rule, place it under the principle it serves.
 
 [shared/principles/README.md](shared/principles/README.md)
 
-## Don't reinvent the wheel (DRW) --- in dev and in review
+## Don't reinvent the wheel (DRW) — in dev and in review
 
-Before implementing a new function or feature, check that it hasn't already been done --- in one of our own repos, or in a trustworthy external source we could depend on instead (base R, r-lib, tidyverse, a well-maintained CRAN package).
+Before implementing a new function or feature, check that it hasn't already been done — in one of our own repos, or in a trustworthy external source we could depend on instead (base R, r-lib, tidyverse, a well-maintained CRAN package).
 Prefer forking and/or contributing to an existing external source over re-building the functionality from scratch.
 Apply this in review too: a hand-rolled equivalent of functionality that already exists is a review finding, the same weight as any other standing review check.
 
@@ -1155,7 +1153,7 @@ The fragment carries the rest: taking the inventory from gha's README table rath
 
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
 
-## Fail fast --- no silent failures
+## Fail fast — no silent failures
 
 Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.
 Apply this in review too: error handling that hides failure is a review finding, the same weight as any other standing review check.
@@ -1248,7 +1246,7 @@ prevents the expansion.
 <!-- Not yet shared with the lab manual; edit shared/coding/tidy-code.md, not here. -->
 [shared/coding/tidy-code.md](shared/coding/tidy-code.md)
 
-Apply this both when writing code and when reviewing it --- flag base R or
+Apply this both when writing code and when reviewing it — flag base R or
 `{rlang}` verbosity in review the same way `per-operation-grouping` flags a
 persistent `group_by()` that `.by` would replace.
 
@@ -1262,7 +1260,7 @@ persistent `group_by()` that `.by` would replace.
 <!-- Not yet shared with the lab manual; edit shared/coding/one-function-per-file.md, not here. -->
 [shared/coding/one-function-per-file.md](shared/coding/one-function-per-file.md)
 
-Apply this both when writing new code and when reviewing it --- a new function
+Apply this both when writing new code and when reviewing it — a new function
 added inline to an existing multi-function file is a review finding, the
 same weight as the other modularity checks above.
 
@@ -1359,7 +1357,7 @@ self-review confirms the claim, which was never the defect.
 
 [`shared/writing/fact-check-prose.md`](shared/writing/fact-check-prose.md)
 
-When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review --- those skills don't name it internally, but this CLAUDE.md directive governs regardless.
+When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review — those skills don't name it internally, but this CLAUDE.md directive governs regardless.
 
 ## Writing style: timestamp factual claims about conditions that can change
 
@@ -1399,12 +1397,12 @@ Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongs
 ## Remove forward-pointing phrases from prose, not just crossref divs
 
 The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.
-The same problem shows up more broadly as plain-text signposting --- "as discussed below", "in the following section", "we'll cover this later" --- pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
+The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
 [shared/writing/forward-references.md](shared/writing/forward-references.md)
 
 Unlike `definition-crossrefs.md` above, `forward-references.md` has a dedicated actionable skill: the `fix-forward-references` skill (alias `ffr`) detects these with a grep-for-directional-word heuristic and rearranges (or rewords) the prose to fix them.
-Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a prose diff, alongside the other prose-review rules in this file.
+Run it — or apply its check inline — wherever `ard`/`ardi` reviews a prose diff, alongside the other prose-review rules in this file.
 
 ## Rearranging sections, paragraphs, and content across documents is part of editing prose
 
@@ -1485,7 +1483,7 @@ artifact in hand could show it.
 
 [shared/workflow/challenge-unnecessary-complexity.md](shared/workflow/challenge-unnecessary-complexity.md)
 
-When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review --- those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).
+When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review — those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).
 
 ## Useful prompt formats for coding agents
 
@@ -1495,7 +1493,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 ## Review with Copilot before requesting human review
 
 This is shared lab guidance on getting an automated review before asking a human reviewer.
-When *I* iterate a PR, the ARDI loop above is the mechanism --- it already addresses whatever the `@claude` or Copilot reviewer flags --- so read this as the lab-member-facing statement of the same principle, not a second loop to run.
+When *I* iterate a PR, the ARDI loop above is the mechanism — it already addresses whatever the `@claude` or Copilot reviewer flags — so read this as the lab-member-facing statement of the same principle, not a second loop to run.
 
 <!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/copilot-review-before-human.md](shared/vendored/copilot-review-before-human.md)
@@ -1531,7 +1529,7 @@ Open the PR.
 
 ## PowerShell CLI Command Safety
 
-- **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character --- `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. --- so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.
+- **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character — `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. — so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.
 - **Use body files for GitHub PR descriptions**: Write multi-line PR descriptions to a temp file and pass `--body-file <file>` to `gh pr create`/`gh pr edit`, or `gh api -F body=@<file>` for raw API calls. This avoids terminal string-escaping corruption for any content with backticks or other shell-special characters.
 - **The hazard is not PowerShell-specific, and not limited to PR descriptions**: bash and zsh double-quoted strings run backtick spans as command substitution, so `gh pr comment`, `gh issue comment`, `gh api .../comments -f body="..."` / `.../replies -f body="..."`, and `git commit -m "..."` corrupt a backtick-carrying body exactly as `gh pr create --body "..."` does (a `` `ms.` `` code span runs `ms.` as a command and vanishes). Use `--body-file` / `-F body=@<file>` for comment and review-reply bodies too, in any shell, and `git commit -F <file>` for a commit message. See `memories/git.md`'s "`gh pr comment` / `gh api ... -f body=` run backtick spans too" and "`git commit -m "..."` runs backtick spans as shell commands" sections.
 - **`git commit -m` is the surface that enumeration hides**, because every other entry posts to GitHub, so a commit message reads as a different kind of thing while the shell treats it identically.
@@ -1643,10 +1641,6 @@ recurred immediately in a `jq` filter reading a PR review body.)
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
-- **Revert premature or defective merges immediately.**
-  If a PR is merged incorrectly, prematurely, or without clean external review approval,
-  open a revert PR on `main` immediately and continue on the original PR branch per
-  [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

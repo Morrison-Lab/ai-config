@@ -56,7 +56,9 @@ and complete every safe, in-scope, concrete repair in that very same turn.
 A report or explanation is the recap after the work is shipped,
 not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt.
 When an issue cannot be fixed directly in the session,
-carry it forward with an actual next action (filing a tracking issue).
+carry it forward with an actual next action.
+Every issue noticed, however small or outside the current task's scope,
+must at minimum be filed in the owning GitHub, GitLab, or equivalent tracker.
 File it before reporting it.
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit

@@ -150,9 +150,10 @@ def main():
                 print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
             if len(subagents) > 50:
-                print(f"claude-hook-adapter: invoke_subagent exceeded max fanout cap (50/{len(subagents)})", file=sys.stderr)
-            # Enforce max fanout cap of 50 subagents to prevent unbounded synchronous execution
-            for idx, sub in enumerate(subagents[:50]):
+                reason = f"invoke_subagent exceeded maximum supported fanout limit of 50 subagents (received {len(subagents)})"
+                print(json.dumps({"decision": "deny", "reason": reason}))
+                return
+            for idx, sub in enumerate(subagents):
                 if not isinstance(sub, dict):
                     continue
                 agent_name = sub.get("TypeName") or sub.get("typeName") or f"subagent_{idx}"

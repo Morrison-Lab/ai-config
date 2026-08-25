@@ -429,7 +429,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
-    def test_invoke_subagent_fanout_cap_warning(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+    def test_invoke_subagent_fanout_cap_denial(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         subagents = [{"TypeName": f"agent{i}", "Workspace": "share", "Prompt": f"p{i}"} for i in range(55)]
         payload = {
             "toolCall": {
@@ -443,8 +443,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.adapter.main()
         
         out = json.loads(mock_stdout.getvalue())
-        self.assertEqual(out.get("decision"), "allow")
-        self.assertIn("exceeded max fanout cap (50/55)", mock_stderr.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertIn("exceeded maximum supported fanout limit of 50 subagents", out.get("reason", ""))
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

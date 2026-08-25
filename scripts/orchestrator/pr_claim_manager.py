@@ -295,11 +295,23 @@ class PRClaimManager:
             # 2. Check for positive clean / approved verdict patterns in the verdict section
             clean_patterns = [
                 r"\bready\s+for\s+merge\b",
-                r"verdict:\s*(?:clean|approved|ready)\b",
                 r"\bapproved\s+for\s+merge\b",
                 r"\bclean\s*/\s*approved\b",
-                r"^\s*[:\-\s]*(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
+                r"\bclean(?!-)\b",
+                r"\bapproved\b",
+                r"verdict:\s*(?:clean(?!-)|approved|ready)\b",
             ]
+            bare_clean_patterns = {
+                r"\bready\s+for\s+merge\b",
+                r"\bapproved\s+for\s+merge\b",
+                r"\bclean\s*/\s*approved\b",
+                r"\bclean(?!-)\b",
+                r"\bapproved\b",
+            }
+            bare_clean_marked = re.compile(
+                r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+                re.IGNORECASE,
+            )
             clean_negation_prefix = re.compile(
                 r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
                 r"|nowhere\s+near|close\s+to|far\s+from)\s+(?:\w+\s+){0,2}$",
@@ -315,9 +327,14 @@ class PRClaimManager:
             has_clean_verdict = False
             for pat in clean_patterns:
                 for match in re.finditer(pat, verdict_section, re.IGNORECASE | re.MULTILINE):
-                    prefix = verdict_section[max(0, match.start() - 40):match.start()]
-                    if clean_negation_prefix.search(prefix):
-                        continue
+                    if pat in bare_clean_patterns:
+                        line_start = verdict_section.rfind("\n", 0, match.start()) + 1
+                        line_prefix = verdict_section[line_start:match.start()]
+                        if not bare_clean_marked.search(line_prefix):
+                            continue
+                        prefix = verdict_section[max(0, match.start() - 40):match.start()]
+                        if clean_negation_prefix.search(prefix):
+                            continue
                     remainder = verdict_section[match.end():min(len(verdict_section), match.end() + 60)]
                     remainder_sentence = re.split(r"[.!?]|\n[ \t]*\n", remainder)[0]
                     if clean_qualifier.search(remainder_sentence):

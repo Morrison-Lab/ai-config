@@ -1429,6 +1429,36 @@ This has since been resolved after addressing the finding.
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
 
+        # 18. Prose mentioning 'ready for merge' in a blocking description is rejected
+        prose_mention_body = (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "This PR still has one blocking issue (SQL injection in the query builder, see\n"
+            "finding above) standing between it and being ready for merge."
+        )
+        prose_mention_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": prose_mention_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, prose_mention_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
+        # 19. Clean-up needed in file X before merging is rejected
+        cleanup_body = "**Claude finished** review\n\n### Verdict\n\nClean-up needed in file X before merging."
+        cleanup_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": cleanup_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, cleanup_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

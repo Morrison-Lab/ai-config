@@ -73,7 +73,8 @@ When orchestrating complex or multi-step work:
 ### Model selection factors
 
 - **Reasoning depth:** Tier 3 < Tier 2 < Tier 1
-- **Code generation:** Tier 2 provides optimal throughput/cost balance; Tier 1 handles architectural nuance
+- **Code generation:** Tier 2 provides optimal throughput/cost balance;
+  Tier 1 handles architectural nuance
 - **Code review:** Tier 1 recommended for adversarial passes
 - **Token efficiency:** Use Tier 1 for judgment and Tier 2/3 for generation
 

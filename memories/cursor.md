@@ -64,6 +64,10 @@ Cursor Cloud loads project hooks from [`.cursor/hooks.json`](../.cursor/hooks.js
 translates Cursor events into the payload the existing `hooks/` scripts
 already consume.
 The event mapping is [docs/cursor-hook-mapping.md](../docs/cursor-hook-mapping.md).
+Cursor JSONL omitted `tool_result` as of 2026-04-13 (Cursor staff);
+three fail-closed Stop/PreToolUse scripts are skipped until that changes.
+Warn-only Claude Stop `systemMessage` maps to Cursor `followup_message`
+because `stop` has no warn-only field.
 
 User-level `~/.cursor/hooks.json` is not available to cloud agents.
 `sessionStart` injection is desktop-only.

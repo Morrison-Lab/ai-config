@@ -364,7 +364,10 @@ def record_needs_translation(record: dict[str, Any]) -> bool:
             and isinstance(block.get("name"), str)
         ):
             src = block["name"]
-            if CURSOR_TO_CLAUDE_TOOLS.get(src, src) != src:
+            # Use the same mapper transcript translation applies, so
+            # MCP: names (and any later Cursor-only aliases) qualify
+            # even when the record already has type=assistant.
+            if claude_tool_name_for_cursor(src) != src:
                 return True
             inp = block.get("input")
             if isinstance(inp, dict) and (
@@ -785,9 +788,15 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
                 or "blocked by hook"
             )
             followups.append(str(reason))
-        # Warn-only Stop hooks emit systemMessage and must not auto-continue.
+        # Cursor stop has no systemMessage field. Warn-only Claude Stop
+        # hooks emit systemMessage so the agent sees the warning; map
+        # that onto followup_message. Cursor then continues the turn
+        # (loop_limit 5). A warning that only goes to stderr is
+        # indistinguishable from a guard that never fired.
         sys_msg = parsed.get("systemMessage")
-        if sys_msg:
+        if sys_msg and not blocked:
+            followups.append(str(sys_msg))
+        elif sys_msg:
             print(str(sys_msg), file=sys.stderr)
     if followups:
         return {"followup_message": "\n\n".join(followups)}

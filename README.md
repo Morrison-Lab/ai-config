@@ -374,7 +374,8 @@ Cursor Cloud loads that catalog through [`.cursor/hooks.json`](.cursor/hooks.jso
 and [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py),
 which translates Cursor events, tool names, and transcript JSONL.
 Three scripts that fail closed without a `tool_result` are skipped there,
-because Cursor JSONL omits tool output:
+because Cursor JSONL omits tool output (Cursor staff, 2026-04-13;
+re-verify on a harness bump):
 `no-push-without-self-review.py`, `no-unreviewed-pr.py`, and
 `no-unmonitored-pr.py`.
 The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).

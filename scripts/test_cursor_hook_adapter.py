@@ -302,6 +302,26 @@ check(
     "typed Cursor record with Shell still needs translation",
     mod.record_needs_translation(typed_shell),
 )
+typed_mcp = {
+    "type": "assistant",
+    "role": "assistant",
+    "message": {"content": [
+        {
+            "type": "tool_use",
+            "name": "MCP:github-create_issue",
+            "input": {"title": "x"},
+        },
+    ]},
+}
+check(
+    "typed Cursor record with MCP: still needs translation",
+    mod.record_needs_translation(typed_mcp),
+)
+mcp_translated = mod.translate_content_block(typed_mcp["message"]["content"][0])
+check(
+    "translated MCP: tool_use uses a Claude mcp__ name",
+    str(mcp_translated.get("name", "")).startswith("mcp__"),
+)
 
 # --- subprocess fixtures ---
 deny_py = """\
@@ -347,6 +367,12 @@ else:
     print("plain reminder")
 """
 
+stop_warn_py = """\
+#!/usr/bin/env python3
+import json, sys
+print(json.dumps({"systemMessage": "cop-out offer on the tail"}))
+"""
+
 ups_sh = """\
 #!/bin/sh
 echo "local time: 2026-08-25 10:00 PDT"
@@ -370,6 +396,7 @@ with tempfile.TemporaryDirectory() as raw:
     write_hook(hooks, "warn-isolation.py", warn_py)
     write_hook(hooks, "block-stop.py", stop_py)
     write_hook(hooks, "block-stop-env.py", stop_env_py)
+    write_hook(hooks, "warn-stop.py", stop_warn_py)
     write_hook(hooks, "inject-time.sh", ups_sh)
     write_hook(hooks, "count-task.py", count_py)
     manifest = {
@@ -399,6 +426,7 @@ with tempfile.TemporaryDirectory() as raw:
                         "timeout": 5,
                         "command": "AI_CONFIG_STOP=1 python3 block-stop-env.py",
                     },
+                    {"script": "warn-stop.py", "timeout": 5},
                 ]},
             ],
             "UserPromptSubmit": [
@@ -532,6 +560,10 @@ with tempfile.TemporaryDirectory() as raw:
     check(
         "Stop catalog command env prefix is forwarded",
         "mistake needs a hook" in str(stopped.get("followup_message")),
+    )
+    check(
+        "warn-only Stop systemMessage becomes followup_message",
+        "cop-out offer on the tail" in str(stopped.get("followup_message")),
     )
 
     injected = run_adapter(
@@ -702,6 +734,14 @@ with tempfile.TemporaryDirectory() as raw:
             "unskipped missing Stop script still fail-closes",
             bool(missing_stop.get("followup_message")),
         )
+        warn_only = mod.handle_stop(
+            {"conversation_id": "warn-only-stop"},
+            [{"event": "Stop", "script": "warn-stop.py", "timeout": 5}],
+        )
+        check(
+            "warn-only Stop alone still follows up",
+            "cop-out offer on the tail" in str(warn_only.get("followup_message") or ""),
+        )
     finally:
         if old_hooks_dir is None:
             os.environ.pop("AI_CONFIG_HOOKS_DIR", None)
@@ -783,6 +823,38 @@ with tempfile.TemporaryDirectory() as live_raw:
         "live Stop reads a Cursor-shaped transcript",
         "offers to file" in str(live_stop.get("followup_message") or "").lower()
         or "want me to file" in str(live_stop.get("followup_message") or "").lower(),
+    )
+    copout_nonce = str(time.time_ns())
+    copout_tx = live_stash / "cursor-copout.jsonl"
+    copout_tx.write_text(
+        json.dumps({
+            "role": "assistant",
+            "message": {"content": [
+                {
+                    "type": "text",
+                    "text": (
+                        f"The branch is ready ({copout_nonce}).\n\n"
+                        "Say the word and I'll push."
+                    ),
+                },
+            ]},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    live_warn_stop = run_adapter(
+        "stop",
+        {
+            "status": "completed",
+            "loop_count": 0,
+            "conversation_id": "live-c",
+            "generation_id": "live-g-copout",
+            "transcript_path": str(copout_tx),
+        },
+        live_env,
+    )
+    check(
+        "live warn-only Stop cop-out becomes followup_message",
+        "closes on an offer" in str(live_warn_stop.get("followup_message") or "").lower(),
     )
 
 print(f"\n{passes} passed, {failures} failed")

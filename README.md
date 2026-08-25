@@ -4,7 +4,7 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-Each top-level subdir is symlinked into the appropriate consumer directory
+This repository relies on native plugin configuration architectures for installation.
 by `bootstrap.sh`.
 
 ## Setup on a new machine
@@ -202,65 +202,6 @@ session (or prefix with `claude ` to run them in a terminal):
 
 No `version` is pinned, so every commit to this repo counts as a new version —
 sessions with marketplace auto-update pick up the latest automatically.
-
-### The plugin install and the symlink install are alternatives, not complements
-
-Both routes serve the same corpus,
-so a machine that ran `bootstrap.sh` (bare names, `/ardi`) **and** enables an
-`ai-config@*` plugin (prefixed names, `/ai-config:ardi`) lists every skill
-twice.
-The skill listing is budgeted at roughly 1% of the context window,
-and past that budget descriptions are truncated and skill routing degrades ---
-measured ~3.8x over budget on one doubly-installed machine (ai-config#1409).
-Pick one route.
-The checked-in catalog is capped at 9,000 characters (about 2,250 tokens) by
-`scripts/validate-skills.py`.
-Keep descriptions concise and put procedural detail in the skill body.
-That cap is a stopgap rather than headroom: the budget is consumed by entry
-count, not by verbose descriptions, so the lever that scales is fewer entries
-(ai-config#1852).
-On a `bootstrap.sh` machine, leave the plugin disabled;
-the symlinked copy already serves every skill.
-
-For Codex, `bootstrap.sh` detects an enabled `ai-config@*` plugin, skips the
-bare wrappers, and removes only stale wrapper symlinks that point to the same
-checkout. Re-run it after enabling or disabling the plugin.
-
-The same goes for enabling the plugin from **more than one marketplace**:
-both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
-named `ai-config` from the same repo, so only one entry can own the
-`ai-config:` namespace and the rest are no-op collisions.
-Enable at most one.
-
-`bootstrap.sh` runs `scripts/check-plugin-overlap.py` at the end of an
-install and warns when it detects either overlap;
-run it standalone any time to re-check a machine.
-
-A consumer repo's checked-in `.claude/settings.json` marketplace block (the
-JSON above) is correct for a teammate cloning fresh with no ai-config
-checkout, and redundant for anyone who ran `bootstrap.sh`.
-The latter group opts out in **`.claude/settings.local.json`**, not in
-`~/.claude/settings.json`:
-
-```json
-{
-  "enabledPlugins": {
-    "ai-config@Morrison-Lab": false
-  }
-}
-```
-
-The file matters, and the intuitive choice is the wrong one.
-Claude Code resolves settings
-managed > command line > `.claude/settings.local.json` > `.claude/settings.json` > `~/.claude/settings.json`,
-so the **user** scope is the lowest of the five rather than a personal
-override --- a `false` there loses to the repo's checked-in `true`.
-`enabledPlugins` resolves by precedence rather than by union, so the `false`
-in the local file does switch the plugin off.
-(See [Claude Code settings](https://code.claude.com/docs/en/settings),
-"How scopes interact" and `enabledPlugins`; read 2026-08-12.
-A plugin force-enabled by enterprise managed settings cannot be disabled this
-way at all.)
 
 ## Use these skills with this repo's own `@claude` bot
 

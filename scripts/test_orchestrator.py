@@ -1146,12 +1146,13 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 2. Clean PR with approved GitHub review from trusted OWNER/MEMBER
+        # 2. Clean PR with approved GitHub review from trusted OWNER/MEMBER on current HEAD
         clean_gh_review_json = json.dumps({
+            "headRefOid": "commit123",
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
-            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER"}],
+            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER", "commit": {"oid": "commit123"}}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, clean_gh_review_json, ""))
@@ -1160,10 +1161,11 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         # 2b. Formal GitHub review approval from random passerby (NONE / CONTRIBUTOR) is REJECTED
         passerby_review_json = json.dumps({
+            "headRefOid": "commit123",
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
-            "reviews": [{"state": "APPROVED", "author": {"login": "random-passerby"}, "authorAssociation": "NONE"}],
+            "reviews": [{"state": "APPROVED", "author": {"login": "random-passerby"}, "authorAssociation": "NONE", "commit": {"oid": "commit123"}}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, passerby_review_json, ""))
@@ -1173,14 +1175,29 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         # 2c. Formal GitHub review self-approval (dem-extra1) is REJECTED
         self_review_json = json.dumps({
+            "headRefOid": "commit123",
             "author": {"login": "dem-extra1"},
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
-            "reviews": [{"state": "APPROVED", "author": {"login": "dem-extra1"}, "authorAssociation": "COLLABORATOR"}],
+            "reviews": [{"state": "APPROVED", "author": {"login": "dem-extra1"}, "authorAssociation": "COLLABORATOR", "commit": {"oid": "commit123"}}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, self_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
+
+        # 2d. Stale formal GitHub review (commit.oid != headRefOid) is REJECTED
+        stale_review_json = json.dumps({
+            "headRefOid": "commit456_new",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER", "commit": {"oid": "commit123_old"}}],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, stale_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("no independent approved external review", reason.lower())

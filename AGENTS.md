@@ -302,6 +302,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+- **Revert premature or defective merges immediately.**
+  If a PR is merged incorrectly, prematurely, or without clean external review approval,
+  revert it immediately on `main` and continue on the original PR branch per
+  [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
 
 ## Request review and drive every started PR to clean
 

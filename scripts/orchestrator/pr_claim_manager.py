@@ -202,7 +202,7 @@ class PRClaimManager:
     def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
         """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
         effective_repo = self.get_effective_repo_slug(repo_slug)
-        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,author"]
+        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,author,headRefOid"]
         if effective_repo:
             cmd.extend(["-R", effective_repo])
 
@@ -233,7 +233,8 @@ class PRClaimManager:
             return False, "PR has CHANGES_REQUESTED review"
 
         # 4. Check for formal GitHub review approvals (from trusted OWNER/MEMBER humans or approved bots)
-        # Random passerby approvals (authorAssociation: NONE/CONTRIBUTOR) or self-reviews are strictly ignored!
+        # Stale reviews (commit != headRefOid), random passerby approvals, or self-reviews are strictly ignored!
+        head_oid = data.get("headRefOid", "")
         pr_author_login = (data.get("author") or {}).get("login", "")
         trusted_reviews = [
             r for r in reviews
@@ -241,6 +242,7 @@ class PRClaimManager:
             and (r.get("authorAssociation") in ["OWNER", "MEMBER"]
                  or (r.get("author") or {}).get("login") in ["claude[bot]", "d-morrison"])
             and (r.get("author") or {}).get("login") not in [pr_author_login, "dem-extra1"]
+            and (not head_oid or not (r.get("commit") or {}).get("oid") or (r.get("commit") or {}).get("oid") == head_oid)
         ]
         has_approved_review = bool(trusted_reviews)
 

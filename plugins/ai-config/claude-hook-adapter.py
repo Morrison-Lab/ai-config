@@ -78,11 +78,11 @@ def main():
 
     # Determine Antigravity event type
     event_type = None
-    if "toolCall" in payload:
+    if payload.get("toolCall") is not None:
         event_type = "PreToolUse"
-    elif "terminationReason" in payload:
+    elif payload.get("terminationReason") is not None:
         event_type = "Stop"
-    elif "invocationNum" in payload:
+    elif payload.get("invocationNum") is not None:
         event_type = "PreInvocation"
 
     if not event_type:
@@ -265,7 +265,7 @@ def main():
                 try:
                     hook_out = json.loads(result.stdout)
                     decision = str(hook_out.get("decision", "")).strip().lower()
-                    if decision in ("block", "deny"):
+                    if decision in ("block", "deny", "continue"):
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return

@@ -56,6 +56,21 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(valid, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
+        
+        # Test various explicit clean findings strings
+        clean_findings = [
+            "No critical findings.",
+            "No blocking issues found.",
+            "No issues found.",
+            "Zero critical findings.",
+            "None.",
+            "No."
+        ]
+        for cf in clean_findings:
+            cf_report = valid.replace("None.\n\n", cf + "\n\n")
+            is_valid_cf, is_clean_cf, _ = reviewer.parse_review_verdict(cf_report, expected_commit_sha=commit)
+            self.assertTrue(is_valid_cf, f"Failed on clean findings string: {cf}")
+            self.assertTrue(is_clean_cf, f"Failed on clean findings string: {cf}")
 
         # Missing fingerprint when expected
         is_valid, _, reason = reviewer.parse_review_verdict(valid, expected_commit_sha="99999999")
@@ -532,9 +547,16 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("-m", cmd_args)
         self.assertIn("gpt-5.6-sol", cmd_args)
 
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("os.unlink")
+    @patch("tempfile.NamedTemporaryFile")
     @patch("subprocess.run")
     @patch("shutil.which")
-    def test_all_runners_cli_contracts(self, mock_which, mock_subproc):
+    def test_all_runners_cli_contracts(self, mock_which, mock_subproc, mock_tf, mock_unlink, mock_file_open):
+        mock_file = MagicMock()
+        mock_file.name = "/tmp/mockfile"
+        mock_tf.return_value.__enter__.return_value = mock_file
+        
         valid_report = (
             "### Summary Verdict\nVerdict: Ready for merge\n\n"
             "### Critical Findings\nNone.\n\n"

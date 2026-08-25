@@ -21,8 +21,13 @@ Runs a local adversarial AI code review on outgoing branch commits using an alte
 Run the `pre-push-review.py` script with the `--engine alternate` flag to rotate through available models, or specify a specific engine.
 
 ```bash
-# Resolve the review script relative to the installed skill
-REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills/adv', '~/.gemini/skills/adv', '~/.cursor/skills/adv', '~/.codex/skills/adv'] if os.path.exists(os.path.expanduser(f))), 'skills/adv'); print(os.path.abspath(os.path.join(os.path.dirname(p), '..', 'scripts', 'pre-push-review.py')))")
+# Resolve the review script relative to the installed skill or local worktree
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/scripts/pre-push-review.py" ]; then
+  REVIEW_SCRIPT="$GIT_ROOT/scripts/pre-push-review.py"
+else
+  REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills/adv', '~/.gemini/skills/adv', '~/.cursor/skills/adv', '~/.codex/skills/adv'] if os.path.exists(os.path.expanduser(f))), 'skills/adv'); print(os.path.abspath(os.path.join(os.path.dirname(p), '..', 'scripts', 'pre-push-review.py')))")
+fi
 
 python3 "$REVIEW_SCRIPT" --engine alternate
 

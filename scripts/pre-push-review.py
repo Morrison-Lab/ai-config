@@ -246,7 +246,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
         is_clean_findings = bool(
             re.match(
-                r"^\s*(?:none(?:\.|\b)|n/a|zero(?:\s+critical)?|no(?:\s+(?:critical|blocking|issues|findings))(?:\s+found)?\.?)\s*$",
+                r"^\s*(?:none(?:\.|\b)|n/a|(?:zero|no)(?:\s+(?:critical|blocking))?(?:\s+(?:issues|findings|bugs|problems))?(?:\s+found)?\.?)\s*$",
                 findings_body,
                 flags=re.IGNORECASE,
             )

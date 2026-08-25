@@ -1098,13 +1098,23 @@ the unquoted-delimiter case was written down nowhere.
 
 ## Tool result persistence & disk spillover threshold
 
-In `src/utils/toolResultStorage.ts` and `src/constants/toolLimits.ts`:
-- **Default size threshold**: Tool outputs exceeding `DEFAULT_MAX_RESULT_SIZE_CHARS = 50_000` characters (or 100,000 tokens) are written to disk under `~/.claude/projects/<project>/<session_id>/tool-results/<tool_use_id>`.
-- **Model preview**: When persisted to disk, the model receives a preview wrapped in `<persisted-output>` XML tags with the exact disk path for subsequent `FileRead` retrieval.
-- **Batch limit**: Combined tool outputs across parallel tool executions in a single turn are capped at `MAX_TOOL_RESULTS_PER_MESSAGE_CHARS = 200_000` characters.
+Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/toolResultStorage.ts` and `src/constants/toolLimits.ts`, commit `eb0840e`):
+
+- **Default size threshold**:
+  Tool outputs exceeding `DEFAULT_MAX_RESULT_SIZE_CHARS = 50_000` characters (or 100,000 tokens)
+  are written to disk under `~/.claude/projects/<project>/<session_id>/tool-results/<tool_use_id>`.
+- **Model preview**:
+  When persisted to disk, the model receives a preview wrapped in `<persisted-output>` XML tags
+  with the exact disk path for subsequent `FileRead` retrieval.
+- **Batch limit**:
+  Combined tool outputs across parallel tool executions in a single turn are capped at `MAX_TOOL_RESULTS_PER_MESSAGE_CHARS = 200_000` characters.
+  Thresholds are subject to GrowthBook override (`tengu_satin_quoll`) and release changes.
 
 ## Token budgeting directives
 
-In `src/utils/tokenBudget.ts`:
-- Shorthand forms (`+500k`, `+2m`, `+1b`) and verbose phrases (`spend 2M tokens`, `use 100k tokens`) are parsed into session token budgets.
-- When an active budget is detected, the harness injects budget-monitoring instructions into dynamic system prompt sections and issues continuation prompts if the model finishes before expending the requested effort.
+Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/tokenBudget.ts`, commit `eb0840e`):
+
+- Shorthand forms (`+500k`, `+2m`, `+1b`) and verbose phrases (`spend 2M tokens`, `use 100k tokens`)
+  are parsed into session token budgets.
+- When an active budget is detected, the harness injects budget-monitoring instructions
+  into dynamic system prompt sections and issues continuation prompts if the model finishes before expending the requested effort.

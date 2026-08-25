@@ -244,19 +244,61 @@ Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\-
 
 ## Complete hook lifecycle catalog (27 events)
 
-The harness source (`src/entrypoints/sdk/coreTypes.ts`) defines 27 hook events:
-- **Tool lifecycle:** `PreToolUse` (match query: `tool_name`), `PostToolUse` (`tool_name`), `PostToolUseFailure` (`tool_name`).
-- **Prompt & turn lifecycle:** `UserPromptSubmit`, `Stop`, `StopFailure` (`error`).
-- **Session & environment:** `SessionStart` (match query: `source`), `SessionEnd` (`reason`), `Setup` (`trigger`), `ConfigChange` (`source`), `InstructionsLoaded` (`load_reason`), `CwdChanged`, `FileChanged` (`basename(file_path)`), `WorktreeCreate`, `WorktreeRemove`.
-- **Subagents & tasks:** `SubagentStart` (`agent_type`), `SubagentStop` (`agent_type`), `TeammateIdle`, `TaskCreated`, `TaskCompleted`.
-- **Compaction:** `PreCompact` (`trigger`), `PostCompact` (`trigger`).
-- **Permissions & MCP:** `PermissionRequest` (`tool_name`), `PermissionDenied` (`tool_name`), `Elicitation` (`mcp_server_name`), `ElicitationResult` (`mcp_server_name`), `Notification` (`notification_type`).
+Measured 2026-08 against Claude Code v2.1 harness source snapshot (`src/entrypoints/sdk/coreTypes.ts`, commit `eb0840e`).
+Harness behavior and event definitions evolve across releases;
+re-verify against current runtime behavior rather than treating this snapshot as permanent.
+
+The snapshot defines 27 hook events:
+- **Tool lifecycle:**
+  `PreToolUse` (match query: `tool_name`),
+  `PostToolUse` (`tool_name`),
+  `PostToolUseFailure` (`tool_name`).
+- **Prompt & turn lifecycle:**
+  `UserPromptSubmit`,
+  `Stop`,
+  `StopFailure` (`error`).
+- **Session & environment:**
+  `SessionStart` (match query: `source`),
+  `SessionEnd` (`reason`),
+  `Setup` (`trigger`),
+  `ConfigChange` (`source`),
+  `InstructionsLoaded` (`load_reason`),
+  `CwdChanged`,
+  `FileChanged` (`basename(file_path)`),
+  `WorktreeCreate`,
+  `WorktreeRemove`.
+- **Subagents & tasks:**
+  `SubagentStart` (`agent_type`),
+  `SubagentStop` (`agent_type`),
+  `TeammateIdle`,
+  `TaskCreated`,
+  `TaskCompleted`.
+- **Compaction:**
+  `PreCompact` (`trigger`),
+  `PostCompact` (`trigger`).
+- **Permissions & MCP:**
+  `PermissionRequest` (`tool_name`),
+  `PermissionDenied` (`tool_name`),
+  `Elicitation` (`mcp_server_name`),
+  `ElicitationResult` (`mcp_server_name`),
+  `Notification` (`notification_type`).
 
 ## Advanced hook capabilities in the native schema
 
-- **In-process pre-filtering (`if: "..."`)**: Hooks can declare `"if": "Bash(git *)"` or `"if": "Read(*.ts)"` to evaluate permission expressions in-process, bypassing process spawning overhead when conditions are not met.
-- **Input mutation (`updatedInput`)**: `PreToolUse` and `PermissionRequest` hooks can return `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {...}}}` to rewrite tool arguments dynamically before execution.
-- **MCP output rewrite (`updatedMCPToolOutput`)**: `PostToolUse` hooks can rewrite results returned from MCP tools.
-- **Dynamic environment exports (`CLAUDE_ENV_FILE`)**: Bash hooks matching `SessionStart`, `Setup`, `CwdChanged`, and `FileChanged` receive a path in `$CLAUDE_ENV_FILE`. Environment variables exported to this file are sourced into subsequent Bash sessions.
-- **Prompt elicitation protocol**: A command hook can output `{"prompt": "<id>", "message": "...", "options": [...]}` to prompt the user interactively, receiving `{"prompt_response": "<id>", "selected": "..."}` back on stdin.
-- **`asyncRewake` execution**: Background hooks can run asynchronously and wake the model only if exit code 2 (blocking error) occurs.
+Measured 2026-08 against Claude Code v2.1 harness source:
+
+- **In-process pre-filtering (`if: "..."`)**:
+  Hooks can declare `"if": "Bash(git *)"` or `"if": "Read(*.ts)"` to evaluate permission expressions in-process,
+  bypassing process spawning overhead when conditions are not met.
+- **Input mutation (`updatedInput`)**:
+  `PreToolUse` and `PermissionRequest` hooks can return `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "updatedInput": {...}}}` to rewrite tool arguments dynamically before execution.
+- **MCP output rewrite (`updatedMCPToolOutput`)**:
+  `PostToolUse` hooks can rewrite results returned from MCP tools.
+- **Dynamic environment exports (`CLAUDE_ENV_FILE`)**:
+  Bash hooks matching `SessionStart`, `Setup`, `CwdChanged`, and `FileChanged` receive a path in `$CLAUDE_ENV_FILE`.
+  Environment variables exported to this file are sourced into subsequent Bash sessions.
+- **Prompt elicitation protocol**:
+  A command hook can output `{"prompt": "<id>", "message": "...", "options": [...]}` to prompt the user interactively,
+  receiving `{"prompt_response": "<id>", "selected": "..."}` back on stdin.
+- **`asyncRewake` execution**:
+  Background hooks can run asynchronously and wake the model only if exit code 2 (blocking error) occurs.

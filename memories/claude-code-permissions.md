@@ -161,17 +161,28 @@ it forecloses the correct next step for every later reader who takes it at face 
 
 ## Auto-mode YOLO classifier pipeline & denial circuit breakers
 
-When running in `auto` permission mode (`src/utils/permissions/permissions.ts`):
-- **Bypass-immune safety checks**: Sensitive directories (`.git/`, `.claude/`, shell RC files) cannot be auto-approved by the classifier unless explicitly marked `classifierApprovable`.
-- **Fast paths**: Read-only safe tools (`isAutoModeAllowlistedTool`) and actions allowed under `acceptEdits` (excluding `Agent` and `REPL`) bypass the classifier API and auto-allow immediately.
+Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/permissions/permissions.ts`, commit `eb0840e`).
+Classifier models, prompt evaluations, and safety thresholds are actively updated by upstream providers;
+re-verify before relying on these internal pipeline stages:
+
+- **Bypass-immune safety checks**:
+  Sensitive directories (`.git/`, `.claude/`, shell RC files) cannot be auto-approved by the classifier unless explicitly marked `classifierApprovable`.
+- **Fast paths**:
+  Read-only safe tools (`isAutoModeAllowlistedTool`) and actions allowed under `acceptEdits` (excluding `Agent` and `REPL`) bypass the classifier API and auto-allow immediately.
 - **Two-stage classifier**:
   - Stage 1: Fast classifier.
   - Stage 2: Thinking classifier (invoked only if stage 1 is uncertain).
   - Fail-closed gate: If the classifier API fails, execution fails closed with retry guidance.
-- **Denial limits**: Tracks consecutive and total denials via `denialTracking.ts` (`DENIAL_LIMITS.maxConsecutive` / `maxTotal`). Exceeding thresholds falls back to user prompts or aborts headless runs.
+- **Denial limits**:
+  Tracks consecutive and total denials via `denialTracking.ts` (`DENIAL_LIMITS.maxConsecutive` / `maxTotal`).
+  Exceeding thresholds falls back to user prompts or aborts headless runs.
 
 ## OS sandbox filesystem invariants
 
-When running under `@anthropic-ai/sandbox-runtime` (`src/utils/sandbox/sandbox-adapter.ts`):
+Measured 2026-08 under `@anthropic-ai/sandbox-runtime` (`src/utils/sandbox/sandbox-adapter.ts`, commit `eb0840e`):
+
 - `sandbox.autoAllowBashIfSandboxed: true` auto-approves safe commands inside Seatbelt/Bubblewrap/WSL2.
-- **Protected paths**: Writes to `.claude/skills`, `.claude/commands`, `.claude/agents`, `settings.json`, and bare git repository control files (`HEAD`, `objects`, `refs`, `hooks`, `config`) are hard-blocked by the sandbox adapter to prevent sandbox escapes.
+- **Protected paths**:
+  Writes to `.claude/skills`, `.claude/commands`, `.claude/agents`, `settings.json`,
+  and bare git repository control files (`HEAD`, `objects`, `refs`, `hooks`, `config`)
+  are hard-blocked by the sandbox adapter to prevent sandbox escapes.

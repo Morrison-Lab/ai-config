@@ -33,9 +33,13 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   adjacent one, and asking it to "quote exactly" does not make it a
   transcription tool.
 - **Preflight domain safety and egress checks (`api.anthropic.com/api/web/domain_info`)**:
-  Before fetching, `WebFetch` checks domain safety against Anthropic's preflight endpoint (cached for 5 minutes, 128 domain LRU).
-  Domains in `PREAPPROVED_HOSTS` (`docs.python.org`, `go.dev`, `react.dev`, `en.cppreference.com`, `agentskills.io`, etc.) or sessions with `skipWebFetchPreflight` bypass this step.
+  Measured 2026-08 against Claude Code v2.1 harness source (`src/tools/WebFetchTool/utils.ts`, commit `eb0840e`).
+  Before fetching, `WebFetch` checks domain safety against Anthropic's preflight endpoint
+  (cached for 5 minutes, 128 domain LRU).
+  Domains in `PREAPPROVED_HOSTS` (`docs.python.org`, `go.dev`, `react.dev`, `en.cppreference.com`, `agentskills.io`, etc.)
+  or sessions with `skipWebFetchPreflight` bypass this step.
   Redirects are capped at 10 hops and restricted to same-origin (or www-prefix changes).
+  Endpoints and allowed host lists are server-configured and subject to provider change.
 - **Do:** raw-fetch the source (per the section below) when the answer is a
   pattern list, a default value, a flag name, a version string, or anything
   else you are about to copy character-for-character.

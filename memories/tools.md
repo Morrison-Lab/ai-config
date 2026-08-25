@@ -1118,15 +1118,18 @@ while `_selftest.yml` was green on `main`.)
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
 
-## `subprocess.run(text=True)` on Windows destroys UTF-8 output
+## `subprocess.run(text=True)` on Windows with Python <3.15 defaults to locale encoding
 
-On Windows, Python's `subprocess.run(..., text=True)` defaults to the system locale encoding (often `cp1252`), rather than UTF-8.
-If the CLI tool you are calling (like `gh pr view --json`) outputs UTF-8 containing emojis or special characters, reading it with `text=True` alone will corrupt the characters (mojibake) and break string matching or parsing.
-You must explicitly set `encoding="utf-8"` when capturing UTF-8 stdout on Windows.
-For example: `subprocess.run(["gh", ...], capture_output=True, text=True, encoding="utf-8")`.
+Prior to Python 3.15 (PEP 686; measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
+When a CLI tool (such as `gh pr view --json`) outputs UTF-8 text containing non-ASCII characters or emojis, reading stdout with `text=True` without specifying an encoding corrupts characters (mojibake) or raises `UnicodeDecodeError`.
 
-## PowerShell `echo ... > file.txt` writes UTF-16LE, corrupting GitHub API payloads
+- **Do:** specify `encoding="utf-8"` explicitly when capturing text stdout on Windows: `subprocess.run(["gh", ...], capture_output=True, text=True, encoding="utf-8")`.
+- **Don't:** rely on `text=True` alone without `encoding="utf-8"` when reading CLI output containing non-ASCII text.
 
-On Windows PowerShell (5.1 and earlier), `echo` (alias for `Write-Output`) redirected with `>` writes text using UTF-16LE encoding (with a BOM) by default.
-If this file is subsequently fed to a CLI tool that expects UTF-8 (like `gh pr create --body-file` or `gh api -F "body=@file"`), the payload will be mangled with null bytes (`^@`).
-**Fix**: Use the GitHub API or CLI with direct inline strings (e.g., `--body "..."` or `-f body="..."`) or explicitly specify UTF-8 encoding without a BOM (which requires .NET `[System.IO.File]::WriteAllText` in older PowerShell, as `Out-File -Encoding utf8` still writes a BOM that can interfere with some APIs).
+## Windows PowerShell 5.1 `>` redirection writes UTF-16LE, corrupting `--body-file` payloads
+
+In Windows PowerShell 5.1 and earlier (measured 2026-08-25 on Windows 11), `echo` / `Write-Output` redirected with `>` writes UTF-16LE with a byte order mark (BOM) by default.
+Passing such a file to CLI tools expecting UTF-8 via `--body-file` or `gh api -F "body=@file"` corrupts the payload with null bytes (`^@`).
+
+- **Do:** write payload files as BOM-free UTF-8 using .NET (`[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`) or Python before passing to `--body-file` or `-F body=@<file>`.
+- **Don't:** redirect output with `>` in PowerShell 5.1 for API payload files, and don't pass multi-line or Markdown text inline via `--body "..."` or `-f body="..."` where shells expand backticks.

@@ -56,6 +56,15 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Fix**: After any correction, immediately record it in `mistake-patterns.md` (or the appropriate memory file) with enough context that a cold reader can avoid it.
   Don't wait to be told to learn --- the correction IS the instruction.
 
+## Pattern 5e: Assuming Universal Rules Do Not Exist Because The File Is Missing Locally
+- **Mistake**: When `AGENTS.md` is missing from the local repository, assuming there are no universal instructions and failing to check `ai-config` or apply standing core policies (like "Default to action" or "Adversarial review").
+- **Example**: 2026-08-25 session working on `gha`: `AGENTS.md` was missing locally.
+  I assumed there were no instructions to follow, asked for permission for non-destructive git commands, pushed without an adversarial self-review, and omitted the agent disclosure comment.
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) applies across all Morrison-Lab repositories.
+  "Generalize instructions to every AI agent by default."
+- **Fix**: If `AGENTS.md` doesn't exist locally, read it from the `ai-config` repository.
+  Always follow the standing Universal AI Agent Instructions (Adversarial Self-Review, Default to action, Agent disclosure) everywhere.
+
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
 - **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.
@@ -108,12 +117,3 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
 - **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
   Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.
-
-## Pattern 5e: Assuming Universal Rules Do Not Exist Because The File Is Missing Locally
-- **Mistake**: When `AGENTS.md` is missing from the local repository, assuming there are no universal instructions and failing to check `ai-config` or apply standing core policies (like "Default to action" or "Adversarial review").
-- **Example**: 2026-08-25 session working on `gha`: `AGENTS.md` was missing locally.
-  I assumed there were no instructions to follow, asked for permission for non-destructive git commands, pushed without an adversarial self-review, and omitted the agent disclosure comment.
-- **Canonical Rule**: `AGENTS.md` applies across all Morrison-Lab repositories.
-  "Generalize instructions to every AI agent by default."
-- **Fix**: If `AGENTS.md` doesn't exist locally, read it from the `ai-config` repository.
-  Always follow the standing Universal AI Agent Instructions (Adversarial Self-Review, Default to action, Agent disclosure) everywhere.

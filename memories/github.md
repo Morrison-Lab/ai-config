@@ -53,10 +53,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Note `statusCheckRollup.contexts` needs inline fragments, since a
   `CheckRun` and a legacy `StatusContext` carry different fields
   (`name`/`status`/`conclusion` versus `context`/`state`).
-  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round
-  with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD
-  summary, and clean-state verification all went through GraphQL, and
-  `core` reset 11 minutes later.)
+  `CheckRun.status` (`CheckStatusState` enum: `QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED`; measured 2026-08-25) includes non-terminal states like `REQUESTED` and `WAITING` before a run is queued; gating code must treat any status other than `COMPLETED` (and any `StatusContext.state` other than a terminal state) as still running rather than allow-listing expected pending values. (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
 - **A session's egress proxy can block GraphQL entirely, as a session-scoped
   policy rather than an account-level quota --- distinct from the rate-limit
   case above, and easy to conflate with it.**
@@ -1192,8 +1189,4 @@ interpolation), same as `--body-file` on the porcelain command.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows
-session; the REST PATCH succeeded immediately on the same body file.)
-- **The GitHub GraphQL CheckStatusState enum has six values, including five non-terminal states.**
-  When checking a PR's CI status via statusCheckRollup, a check's status can be one of QUEUED, IN_PROGRESS, REQUESTED, WAITING, PENDING, or COMPLETED.
-  If you are blocking a merge on incomplete CI (e.g. in a gate hook), you must check for all five non-terminal states, especially REQUESTED which is specific to GitHub Actions runs that haven't yet been queued.
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session; the REST PATCH succeeded immediately on the same body file.)

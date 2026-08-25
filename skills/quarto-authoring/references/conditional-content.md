@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Conditional Content
 
 Quarto allows content to be shown or hidden based on output format, metadata, or profiles.
@@ -193,7 +194,8 @@ quarto render --profile development
 
 ### With QUARTO_EXECUTE_INFO
 
-Quarto creates a JSON file with execution context information. Read it to conditionally execute code in any language.
+Quarto creates a JSON file with execution context information.
+Read it to conditionally execute code in any language.
 
 #### R
 

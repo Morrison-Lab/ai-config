@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Advanced Testing Topics
 
 ## Skipping Tests

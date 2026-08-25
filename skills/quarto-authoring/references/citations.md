@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Citations and Footnotes
 
 Quarto uses Pandoc's citation system with support for BibTeX, CSL styles, and flexible citation formatting.
@@ -125,7 +126,8 @@ csl: vancouver.csl
 
 ## Bibliography Placement
 
-By default, bibliography appears at end. Control placement:
+By default, bibliography appears at end.
+Control placement:
 
 ````markdown
 ## References

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Progress Indicators
 
 ## Table of Contents

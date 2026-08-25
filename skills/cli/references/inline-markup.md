@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # CLI Inline Markup Reference
 
 ## Table of Contents
@@ -28,7 +29,8 @@ Read this file when you need to:
 - Optimize performance for high-frequency messaging
 - Troubleshoot unexpected formatting behavior
 
-Inline markup classes format text within cli messages using `{.class content}` syntax. They integrate with glue string interpolation and work across all cli functions: `cli_text()`, `cli_abort()`, `cli_warn()`, `cli_inform()`, `cli_alert_*()`, etc.
+Inline markup classes format text within cli messages using `{.class content}` syntax.
+They integrate with glue string interpolation and work across all cli functions: `cli_text()`, `cli_abort()`, `cli_warn()`, `cli_inform()`, `cli_alert_*()`, etc.
 
 ## Basic Syntax
 

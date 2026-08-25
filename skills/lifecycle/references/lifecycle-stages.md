@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Lifecycle Stages Reference
 
 ## Table of Contents
@@ -21,7 +22,8 @@ Lifecycle stages apply to packages, functions, arguments, or specific argument v
 
 ## Stable
 
-The default stage. Functions are stable when the author is satisfied with the interface.
+The default stage.
+Functions are stable when the author is satisfied with the interface.
 
 **Promises:**
 - Breaking changes avoided where possible
@@ -33,7 +35,8 @@ The default stage. Functions are stable when the author is satisfied with the in
 
 ## Experimental
 
-For functions released without long-term stability promises. Author reserves the right to make breaking changes without deprecation cycle.
+For functions released without long-term stability promises.
+Author reserves the right to make breaking changes without deprecation cycle.
 
 **Guidelines:**
 - Packages with version < 1.0.0 are at least somewhat experimental
@@ -56,7 +59,8 @@ Function has a better alternative and is scheduled for removal.
 
 ## Superseded
 
-Function has a known better alternative but won't be removed. Receives only critical bug fixes.
+Function has a known better alternative but won't be removed.
+Receives only critical bug fixes.
 
 **Key difference from deprecated:**
 - No warning emitted

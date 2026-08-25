@@ -40,7 +40,8 @@ This skill supports two blog platforms with different formatting requirements:
 
 ## General Workflow
 
-These steps apply to both platforms. Content guidelines are based on Tidyverse best practices but adapt them as needed for Shiny posts.
+These steps apply to both platforms.
+Content guidelines are based on Tidyverse best practices but adapt them as needed for Shiny posts.
 
 ### Step 1: Gather Information
 

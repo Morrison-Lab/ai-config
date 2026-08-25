@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Content Guidelines for Release Posts
 
-General best practices for release post content, regardless of blog platform. These guidelines are based primarily on Tidyverse blog conventions, which provide a principled approach to announcing package updates.
+General best practices for release post content, regardless of blog platform.
+These guidelines are based primarily on Tidyverse blog conventions, which provide a principled approach to announcing package updates.
 
 ## Table of Contents
 
@@ -45,7 +47,8 @@ Standard structure for release posts:
 
 Start with an announcement that establishes the package's core purpose:
 
-> "We're [pleased/chuffed/stoked/thrilled/delighted/excited/...] to announce the release of [package] [version]. [Package] [core purpose description in one sentence]."
+> "We're [pleased/chuffed/stoked/thrilled/delighted/excited/...] to announce the release of [package] [version].
+> [Package] [core purpose description in one sentence]."
 
 **Examples:**
 - "We're chuffed to announce the release of testthat 3.3.0. testthat makes it easy to turn your existing informal tests into formal, automated tests"
@@ -87,7 +90,8 @@ Brief overview of the release following installation:
 - Link to full release notes when available
 - Highlight focus areas: "This release focuses on [key themes]"
 - Set expectations: "This is a [major/minor] release with [X main features]"
-- Acknowledge breaking changes: "This release includes a number of new features... Some of these changes may require you to update your existing code"
+- Acknowledge breaking changes: "This release includes a number of new features...
+  Some of these changes may require you to update your existing code"
 
 ## Section Organization
 
@@ -249,7 +253,8 @@ state server-side without URL size limitations.
 
 ### Avoiding Marketing Speak
 
-Release posts should be friendly and instructional, not advertising. Watch for and remove:
+Release posts should be friendly and instructional, not advertising.
+Watch for and remove:
 
 **Superlatives and promotional adjectives:**
 - ❌ "powerful set of features", "rich, interactive displays", "beautiful interface"

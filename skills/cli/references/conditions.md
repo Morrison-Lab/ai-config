@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # CLI Conditions Reference
 
 ## Table of Contents
@@ -14,7 +15,8 @@
 
 ## CLI Conditions Overview
 
-CLI conditions (cli_abort(), cli_warn(), cli_inform()) provide formatted alternatives to base R's stop(), warning(), and message(). They offer:
+CLI conditions (cli_abort(), cli_warn(), cli_inform()) provide formatted alternatives to base R's stop(), warning(), and message().
+They offer:
 
 **Key Benefits:**
 

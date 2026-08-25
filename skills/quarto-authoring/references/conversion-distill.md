@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Converting distill to Quarto
 
 Guide for converting distill articles and blogs to Quarto format.

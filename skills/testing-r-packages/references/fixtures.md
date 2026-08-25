@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Test Fixtures and Data Management
 
 Test fixtures arrange the environment into a known state for testing. testthat provides several approaches for managing test data and state.

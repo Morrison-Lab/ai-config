@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # BDD-Style Testing with describe() and it()
 
 Behavior-Driven Development (BDD) testing uses `describe()` and `it()` to create specification-style tests that read like natural language descriptions of behavior.

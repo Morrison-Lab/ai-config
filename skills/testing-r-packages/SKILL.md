@@ -212,7 +212,8 @@ Write tests assuming they will fail and need debugging:
 
 ### 4. Repetition is Acceptable
 
-Repeat setup code in tests rather than factoring it out. Test clarity is more important than avoiding duplication.
+Repeat setup code in tests rather than factoring it out.
+Test clarity is more important than avoiding duplication.
 
 ### 5. Use `devtools::load_all()` Workflow
 
@@ -224,7 +225,8 @@ During development:
 
 ## Snapshot Testing
 
-For complex output that's difficult to verify programmatically, use snapshot tests. See [references/snapshots.md](references/snapshots.md) for complete guide.
+For complex output that's difficult to verify programmatically, use snapshot tests.
+See [references/snapshots.md](references/snapshots.md) for complete guide.
 
 **Basic pattern:**
 
@@ -250,14 +252,16 @@ testthat::snapshot_accept('name')   # Accept changes
 
 Three approaches for test data:
 
-**1. Constructor functions** - Create data on-demand:
+**1.
+Constructor functions** - Create data on-demand:
 ```r
 new_sample_data <- function(n = 10) {
   data.frame(id = seq_len(n), value = rnorm(n))
 }
 ```
 
-**2. Local functions with cleanup** - Handle side effects:
+**2.
+Local functions with cleanup** - Handle side effects:
 ```r
 local_temp_csv <- function(data, env = parent.frame()) {
   path <- withr::local_tempfile(fileext = ".csv", .local_envir = env)
@@ -266,7 +270,8 @@ local_temp_csv <- function(data, env = parent.frame()) {
 }
 ```
 
-**3. Static fixture files** - Store in `fixtures/` directory:
+**3.
+Static fixture files** - Store in `fixtures/` directory:
 ```r
 data <- readRDS(test_path("fixtures", "sample_data.rds"))
 ```
@@ -275,7 +280,8 @@ See [references/fixtures.md](references/fixtures.md) for detailed fixture patter
 
 ## Mocking
 
-Replace external dependencies during testing using `local_mocked_bindings()`. See [references/mocking.md](references/mocking.md) for comprehensive mocking strategies.
+Replace external dependencies during testing using `local_mocked_bindings()`.
+See [references/mocking.md](references/mocking.md) for comprehensive mocking strategies.
 
 **Basic pattern:**
 
@@ -424,4 +430,4 @@ When working with testthat 3 code, prefer modern patterns:
 
 **Find slow tests:** `devtools::test(reporter = "slow")`
 
-**Shuffle tests:** `devtools::test(shuffle = TRUE)`
+**Shuffle tests:** `devtools::test(shuffle = TRUE)` . .

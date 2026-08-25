@@ -1,10 +1,12 @@
+<!-- markdownlint-disable MD024 -->
 # Using brand.yml in R
 
 Guide for using brand.yml in R projects beyond Shiny, including R Markdown documents, theming functions for plots and tables, and programmatic access to brand data.
 
 ## Overview
 
-The brand.yml R package provides tools for applying brand styling to R visualizations and documents. These tools work in any R context, including R Markdown documents, Quarto, standalone scripts, and Shiny applications.
+The brand.yml R package provides tools for applying brand styling to R visualizations and documents.
+These tools work in any R context, including R Markdown documents, Quarto, standalone scripts, and Shiny applications.
 
 ## Installation
 
@@ -93,7 +95,8 @@ Use programmatically accessed brand data to:
 
 ## Branded Theming Functions
 
-The brand.yml package includes helper functions to apply brand colors to plots and tables from popular R packages. These functions work in any R context (scripts, R Markdown, Quarto, Shiny).
+The brand.yml package includes helper functions to apply brand colors to plots and tables from popular R packages.
+These functions work in any R context (scripts, R Markdown, Quarto, Shiny).
 
 ### theme_brand_ggplot2()
 

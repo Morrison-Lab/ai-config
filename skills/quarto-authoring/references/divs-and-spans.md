@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Divs and Spans
 
 Divs and spans are Pandoc's fenced syntax for applying classes, IDs, and attributes to blocks and inline content.
@@ -310,17 +311,20 @@ The [key term]{.term} is defined as...
 Press [Ctrl]{.kbd}+[C]{.kbd} to copy.
 ````
 
-Custom CSS classes defined in your stylesheet can be applied via `.class` on divs/spans. Common attributes: `.class`, `#id`, `style="..."`, `width`, `height`, `data-*`.
+Custom CSS classes defined in your stylesheet can be applied via `.class` on divs/spans.
+Common attributes: `.class`, `#id`, `style="..."`, `width`, `height`, `data-*`.
 
 ## Format-Specific Considerations
 
 ### HTML
 
-Full CSS styling support. All classes and attributes render directly.
+Full CSS styling support.
+All classes and attributes render directly.
 
 ### PDF (LaTeX)
 
-Limited styling. Some classes map to LaTeX commands:
+Limited styling.
+Some classes map to LaTeX commands:
 
 - `.unnumbered` - Removes section numbering
 - `.unlisted` - Excludes from TOC

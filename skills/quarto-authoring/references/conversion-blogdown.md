@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Converting blogdown to Quarto
 
 Guide for converting blogdown (Hugo-based) sites to Quarto websites or blogs.

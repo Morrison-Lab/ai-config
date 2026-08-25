@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Using brand.yml with Quarto
 
 Guide for applying brand.yml styling to Quarto documents, presentations, websites, and PDFs.
@@ -213,7 +214,8 @@ Access colors in Typst templates:
 
 ### Typst Font Handling
 
-Quarto automatically downloads Google Fonts and caches them for Typst. Check fonts:
+Quarto automatically downloads Google Fonts and caches them for Typst.
+Check fonts:
 
 ```bash
 quarto typst fonts --ignore-system-fonts --font-path .quarto/typst-font-cache/

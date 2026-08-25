@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Extensions
 
 Quarto extensions add custom functionality including shortcodes, filters, formats, and RevealJS plugins.
@@ -120,7 +121,8 @@ rm -rf _extensions/extension-name
 
 ### Project-Wide
 
-Install in project root. Available to all documents:
+Install in project root.
+Available to all documents:
 
 ```txt
 project/
@@ -262,7 +264,8 @@ ERROR: Extension not found
 
 ### Trust Warning
 
-When installing, Quarto asks about trust. Extensions run code during render.
+When installing, Quarto asks about trust.
+Extensions run code during render.
 
 ### Conflicts
 

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # YAML Front Matter
 
 YAML front matter configures document metadata, format options, and execution settings.

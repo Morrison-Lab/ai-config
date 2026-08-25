@@ -43,7 +43,8 @@ air format .
 
 * Always run `air format .` after generating code.
 * Use the base pipe operator (`|>`) not the magrittr pipe (`%>%`).
-* Use `\() ...` for single-line anonymous functions. For all other cases, use `function() {...}`.
+* Use `\() ...` for single-line anonymous functions.
+  For all other cases, use `function() {...}`.
 
 ## Testing
 
@@ -52,7 +53,8 @@ air format .
 - If there are existing tests, place new tests next to similar existing tests.
 - Strive to keep tests minimal with few comments.
 - Avoid `expect_true()` and `expect_false()` in favour of a specific expectation which will give a better failure message.
-- When testing errors and warnings, don't use `expect_error()` or `expect_warning()`. Instead, use `expect_snapshot(error = TRUE)` for errors and `expect_snapshot()` for warnings because these allow the user to review the full text of the output.
+- When testing errors and warnings, don't use `expect_error()` or `expect_warning()`.
+  Instead, use `expect_snapshot(error = TRUE)` for errors and `expect_snapshot()` for warnings because these allow the user to review the full text of the output.
 
 ## Documentation
 
@@ -65,8 +67,10 @@ air format .
 
 ## `NEWS.md`
 
-- Every user-facing change should be given a bullet in `NEWS.md`. Do not add bullets for small documentation changes or internal refactorings.
+- Every user-facing change should be given a bullet in `NEWS.md`.
+  Do not add bullets for small documentation changes or internal refactorings.
 - Each bullet should briefly describe the change to the end user.
 - If the change is related to a function, put the name of the function early in the bullet.
 - If the bullet is related to a GitHub issue or pull request, reference it by number in parentheses before the final period: `(#123).`.
-- Order bullets alphabetically by function name. Put all bullets that don't mention function names at the beginning.
+- Order bullets alphabetically by function name.
+  Put all bullets that don't mention function names at the beginning.

@@ -13,7 +13,8 @@ Create and use `_brand.yml` files for consistent branding across Shiny applicati
 
 ## What is brand.yml?
 
-brand.yml is a YAML-based format that translates brand guidelines into a machine-readable file usable across Shiny and Quarto. A single `_brand.yml` file defines:
+brand.yml is a YAML-based format that translates brand guidelines into a machine-readable file usable across Shiny and Quarto.
+A single `_brand.yml` file defines:
 
 - **Colors** - Palette and semantic colors (primary, success, warning, etc.)
 - **Typography** - Fonts, sizes, weights, line heights
@@ -368,7 +369,8 @@ color:
   primary: brand-blue
 ```
 
-Include Bootstrap color names when possible, either defined directly or as aliases: `blue`, `indigo`, `purple`, `pink`, `red`, `orange`, `yellow`, `green`, `teal`, `cyan`, `white`, `black`. This is useful for consistency and these colors are picked up automatically by tools that use brand.yml.
+Include Bootstrap color names when possible, either defined directly or as aliases: `blue`, `indigo`, `purple`, `pink`, `red`, `orange`, `yellow`, `green`, `teal`, `cyan`, `white`, `black`.
+This is useful for consistency and these colors are picked up automatically by tools that use brand.yml.
 
 ## Tips
 

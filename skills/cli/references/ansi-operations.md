@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # ANSI Operations and Advanced Features
 
 ## Table of Contents
@@ -21,7 +22,8 @@
 
 ## ANSI String Operations
 
-All base R string functions break when applied to ANSI-formatted text because they count escape codes as characters. The cli package provides ANSI-aware versions of common string operations.
+All base R string functions break when applied to ANSI-formatted text because they count escape codes as characters.
+The cli package provides ANSI-aware versions of common string operations.
 
 ### Character Counting
 
@@ -252,7 +254,8 @@ expect_equal(ansi_strip(my_output()), "expected plain text")
 
 ## Hyperlinks
 
-Modern terminals support hyperlinks via ANSI escape codes. The cli package provides several link types through inline markup.
+Modern terminals support hyperlinks via ANSI escape codes.
+The cli package provides several link types through inline markup.
 
 ### Terminal Support Detection
 
@@ -374,7 +377,8 @@ suggest_function <- function() {
 
 ### .run Links - Executable Code
 
-**Security Warning:** `.run` links execute arbitrary code when clicked. Use with extreme caution.
+**Security Warning:** `.run` links execute arbitrary code when clicked.
+Use with extreme caution.
 
 ```r
 # Simple command

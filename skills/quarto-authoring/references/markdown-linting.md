@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Markdown Linting
 
-Quarto documents should follow standard [markdownlint](https://github.com/markdownlint/markdownlint) rules. This file covers only Quarto-specific allowances and configuration — refer to the markdownlint docs for general rules.
+Quarto documents should follow standard [markdownlint](https://github.com/markdownlint/markdownlint) rules.
+This file covers only Quarto-specific allowances and configuration — refer to the markdownlint docs for general rules.
 
 ## Quarto-Specific Allowances
 

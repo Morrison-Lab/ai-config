@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Jupyter Notebook (.ipynb) and Quarto (.qmd) Interoperability
 
 ## Direct Rendering

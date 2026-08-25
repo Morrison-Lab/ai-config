@@ -13,53 +13,37 @@ license: MIT
 
 ## When to Use What
 
-Task: Write a new Quarto document
-Use: Follow "QMD Essentials" below, then see specific reference files
+Task: Write a new Quarto document Use: Follow "QMD Essentials" below, then see specific reference files
 
-Task: Add cross-references
-Use: [references/cross-references.md](references/cross-references.md)
+Task: Add cross-references Use: [references/cross-references.md](references/cross-references.md)
 
-Task: Configure code cells
-Use: [references/code-cells.md](references/code-cells.md)
+Task: Configure code cells Use: [references/code-cells.md](references/code-cells.md)
 
-Task: Add figures with captions
-Use: [references/figures.md](references/figures.md)
+Task: Add figures with captions Use: [references/figures.md](references/figures.md)
 
-Task: Create tables
-Use: [references/tables.md](references/tables.md)
+Task: Create tables Use: [references/tables.md](references/tables.md)
 
-Task: Add citations and bibliography
-Use: [references/citations.md](references/citations.md)
+Task: Add citations and bibliography Use: [references/citations.md](references/citations.md)
 
-Task: Add callout blocks
-Use: [references/callouts.md](references/callouts.md)
+Task: Add callout blocks Use: [references/callouts.md](references/callouts.md)
 
-Task: Add diagrams (Mermaid, Graphviz)
-Use: [references/diagrams.md](references/diagrams.md)
+Task: Add diagrams (Mermaid, Graphviz) Use: [references/diagrams.md](references/diagrams.md)
 
-Task: Control page layout
-Use: [references/layout.md](references/layout.md)
+Task: Control page layout Use: [references/layout.md](references/layout.md)
 
-Task: Use shortcodes
-Use: [references/shortcodes.md](references/shortcodes.md)
+Task: Use shortcodes Use: [references/shortcodes.md](references/shortcodes.md)
 
-Task: Add conditional content
-Use: [references/conditional-content.md](references/conditional-content.md)
+Task: Add conditional content Use: [references/conditional-content.md](references/conditional-content.md)
 
-Task: Use divs and spans
-Use: [references/divs-and-spans.md](references/divs-and-spans.md)
+Task: Use divs and spans Use: [references/divs-and-spans.md](references/divs-and-spans.md)
 
-Task: Configure YAML front matter
-Use: [references/yaml-front-matter.md](references/yaml-front-matter.md)
+Task: Configure YAML front matter Use: [references/yaml-front-matter.md](references/yaml-front-matter.md)
 
-Task: Find and use extensions
-Use: [references/extensions.md](references/extensions.md)
+Task: Find and use extensions Use: [references/extensions.md](references/extensions.md)
 
-Task: Apply markdown linting rules
-Use: [references/markdown-linting.md](references/markdown-linting.md)
+Task: Apply markdown linting rules Use: [references/markdown-linting.md](references/markdown-linting.md)
 
-Task: Choose or configure a compute engine (knitr, jupyter, julia)
-Use: [references/engines.md](references/engines.md)
+Task: Choose or configure a compute engine (knitr, jupyter, julia) Use: [references/engines.md](references/engines.md)
 
 ### Migration (only when converting an existing project)
 
@@ -116,7 +100,8 @@ Details: [references/divs-and-spans.md](references/divs-and-spans.md)
 A code cell starts with triple backticks and a language identifier between curly braces.
 Code cells are code blocks that can be executed to produce output.
 
-Quarto uses the language's comment symbol + `|` for cell options. Options use **dashes, not dots** (e.g., `fig-cap` not `fig.cap`).
+Quarto uses the language's comment symbol + `|` for cell options.
+Options use **dashes, not dots** (e.g., `fig-cap` not `fig.cap`).
 
 - R, Python, Julia: `#|`
 - Mermaid: `%%|`
@@ -154,7 +139,8 @@ Details: [references/code-cells.md](references/code-cells.md)
 
 ### Cross-References
 
-Labels must start with a type prefix. Reference with `@`:
+Labels must start with a type prefix.
+Reference with `@`:
 
 - Figure: `fig-` prefix, e.g., `#| label: fig-plot` → `@fig-plot`
 - Table: `tbl-` prefix, e.g., `#| label: tbl-data` → `@tbl-data`

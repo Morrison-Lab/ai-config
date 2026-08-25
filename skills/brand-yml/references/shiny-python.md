@@ -1,10 +1,12 @@
+<!-- markdownlint-disable MD024 -->
 # Using brand.yml with Shiny for Python
 
 Guide for applying brand.yml styling to Shiny for Python applications using ui.Theme.
 
 ## Overview
 
-Shiny for Python integrates brand.yml through the `ui.Theme.from_brand()` method, which creates custom themes from `_brand.yml` files. This enables consistent branding across Shiny apps with minimal configuration.
+Shiny for Python integrates brand.yml through the `ui.Theme.from_brand()` method, which creates custom themes from `_brand.yml` files.
+This enables consistent branding across Shiny apps with minimal configuration.
 
 ## Installation
 
@@ -39,7 +41,7 @@ Then use `ui.Theme.from_brand()`:
 ```python
 from shiny.express import ui
 
-ui.page_opts(theme=ui.Theme.from_brand(__file__))
+ui.page_opts(theme=ui.Theme.from_brand(**file**))
 
 # ... rest of app
 ```
@@ -50,7 +52,7 @@ ui.page_opts(theme=ui.Theme.from_brand(__file__))
 from shiny import App, ui
 
 app_ui = ui.page_fluid(
-    ui.Theme.from_brand(__file__),
+    ui.Theme.from_brand(**file**),
     ui.h2("My App"),
     # ... rest of UI
 )
@@ -72,8 +74,8 @@ The `brand` parameter accepts:
 ### File Path (Most Common)
 
 ```python
-# Use __file__ for app directory
-ui.Theme.from_brand(__file__)
+# Use **file** for app directory
+ui.Theme.from_brand(**file**)
 
 # Explicit file path
 ui.Theme.from_brand("path/to/_brand.yml")
@@ -93,7 +95,7 @@ ui.Theme.from_brand(brand)
 
 ## Search Behavior
 
-When given `__file__` or a directory path, the method searches for `_brand.yml`:
+When given `**file**` or a directory path, the method searches for `_brand.yml`:
 
 1. In the specified directory
 2. In `_brand/` subdirectory
@@ -109,7 +111,7 @@ from shiny.express import input, render, ui
 
 ui.page_opts(
     title="My Dashboard",
-    theme=ui.Theme.from_brand(__file__)
+    theme=ui.Theme.from_brand(**file**)
 )
 
 with ui.sidebar():
@@ -137,7 +139,7 @@ app_ui = ui.page_sidebar(
     ),
     ui.output_plot("histogram"),
     title="My Dashboard",
-    theme=ui.Theme.from_brand(__file__)
+    theme=ui.Theme.from_brand(**file**)
 )
 
 def server(input, output, session):
@@ -176,13 +178,13 @@ from shiny import App, ui
 
 # page_fluid
 app_ui = ui.page_fluid(
-    theme=ui.Theme.from_brand(__file__),
+    theme=ui.Theme.from_brand(**file**),
     # ... content
 )
 
 # page_sidebar
 app_ui = ui.page_sidebar(
-    theme=ui.Theme.from_brand(__file__),
+    theme=ui.Theme.from_brand(**file**),
     ui.sidebar(
         # ... sidebar content
     ),
@@ -194,12 +196,12 @@ app_ui = ui.page_navbar(
     ui.nav_panel("Tab 1", # ...),
     ui.nav_panel("Tab 2", # ...),
     title="My App",
-    theme=ui.Theme.from_brand(__file__)
+    theme=ui.Theme.from_brand(**file**)
 )
 
 # page_fillable
 app_ui = ui.page_fillable(
-    theme=ui.Theme.from_brand(__file__),
+    theme=ui.Theme.from_brand(**file**),
     # ... content
 )
 ```
@@ -212,7 +214,7 @@ Extend brand.yml themes with custom Sass:
 from shiny.express import ui
 
 theme = (
-    ui.Theme.from_brand(__file__)
+    ui.Theme.from_brand(**file**)
     .add_rules("""
         .custom-card {
             border-radius: 0.5rem;
@@ -338,7 +340,7 @@ typography:
 
 ## Tips
 
-- **Use __file__**: Most reliable way to locate `_brand.yml` in app directory
+- **Use **file****: Most reliable way to locate `_brand.yml` in app directory
 - **Start simple**: Begin with colors and one font
 - **Test paths**: If brand doesn't apply, try explicit paths
 - **Version control**: Include `_brand.yml` in git repository
@@ -346,10 +348,10 @@ typography:
 
 ```python
 # Development
-theme = ui.Theme.from_brand(__file__)
+theme = ui.Theme.from_brand(**file**)
 
 # Production (precompile)
-theme_css = ui.Theme.from_brand(__file__).to_css()
+theme_css = ui.Theme.from_brand(**file**).to_css()
 # Save to static/theme.css, then reference in production
 ```
 

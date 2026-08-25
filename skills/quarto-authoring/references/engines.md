@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Compute Engines
 
 Quarto separates the authoring layer (YAML front matter, hashpipe options, cross-references, layouts) from the compute engine that executes code cells.

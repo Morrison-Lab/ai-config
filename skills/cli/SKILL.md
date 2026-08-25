@@ -11,47 +11,33 @@ license: MIT
 
 ## When to Use What
 
-task: Display error with context and formatting
-use: `cli_abort()` with inline markup and bullet lists
+task: Display error with context and formatting use: `cli_abort()` with inline markup and bullet lists
 
-task: Show warning with formatting
-use: `cli_warn()` with inline markup
+task: Show warning with formatting use: `cli_warn()` with inline markup
 
-task: Display informative message
-use: `cli_inform()` with inline markup
+task: Display informative message use: `cli_inform()` with inline markup
 
-task: Show progress for counted operations
-use: `cli_progress_bar()` with total count
+task: Show progress for counted operations use: `cli_progress_bar()` with total count
 
-task: Show simple progress steps
-use: `cli_progress_step()` with status messages
+task: Show simple progress steps use: `cli_progress_step()` with status messages
 
-task: Format code or function names
-use: `{.code ...}` or `{.fn package::function}`
+task: Format code or function names use: `{.code ...}` or `{.fn package::function}`
 
-task: Format file paths
-use: `{.file path/to/file}`
+task: Format file paths use: `{.file path/to/file}`
 
-task: Format package names
-use: `{.pkg packagename}`
+task: Format package names use: `{.pkg packagename}`
 
-task: Format variable names
-use: `{.var variable_name}`
+task: Format variable names use: `{.var variable_name}`
 
-task: Format values
-use: `{.val value}`
+task: Format values use: `{.val value}`
 
-task: Handle singular/plural text
-use: `{?s}` or `{?y/ies}` with pluralization
+task: Handle singular/plural text use: `{?s}` or `{?y/ies}` with pluralization
 
-task: Create headers
-use: `cli_h1()`, `cli_h2()`, `cli_h3()`
+task: Create headers use: `cli_h1()`, `cli_h2()`, `cli_h3()`
 
-task: Create alerts
-use: `cli_alert_success()`, `cli_alert_danger()`, `cli_alert_warning()`, `cli_alert_info()`
+task: Create alerts use: `cli_alert_success()`, `cli_alert_danger()`, `cli_alert_warning()`, `cli_alert_info()`
 
-task: Create lists
-use: `cli_ul()`, `cli_ol()`, `cli_dl()` with `cli_li()`
+task: Create lists use: `cli_ul()`, `cli_ol()`, `cli_dl()` with `cli_li()`
 
 ## Inline Markup Essentials
 

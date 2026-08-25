@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Layout
 
 Quarto provides column classes for controlling content width and placement, including margin content.
@@ -298,7 +299,8 @@ Content 2.
 
 ### Complex Layouts
 
-Use layout array for precise control. Values represent relative widths:
+Use layout array for precise control.
+Values represent relative widths:
 
 ```markdown
 ::: {layout="[[1,1], [1]]"}
@@ -397,7 +399,8 @@ More main text.
 
 ## PDF Layout
 
-PDF uses different layout system. Key options:
+PDF uses different layout system.
+Key options:
 
 ```yaml
 format:

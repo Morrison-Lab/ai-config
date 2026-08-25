@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Snapshot Testing
 
-Snapshot tests record expected output in human-readable files rather than inline code. They are ideal for:
+Snapshot tests record expected output in human-readable files rather than inline code.
+They are ideal for:
 
 - Complex output that's difficult to verify programmatically
 - User-facing messages, warnings, and errors

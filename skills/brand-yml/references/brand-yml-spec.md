@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # brand.yml Specification
 
 Complete specification for creating valid `_brand.yml` files for the brand.yml project.
@@ -10,7 +11,8 @@ Complete specification for creating valid `_brand.yml` files for the brand.yml p
 
 ## File Structure
 
-All fields are **optional**. Only include fields directly relevant to the brand.
+All fields are **optional**.
+Only include fields directly relevant to the brand.
 
 ```yaml
 meta:           # Company/project identity information
@@ -300,7 +302,8 @@ typography:
     decoration: underline
 ```
 
-**Note**: Base text color uses `color.foreground` by default. Do not specify color in base unless overriding.
+**Note**: Base text color uses `color.foreground` by default.
+Do not specify color in base unless overriding.
 
 ### Complete Example
 
@@ -332,7 +335,8 @@ typography:
 
 ## Defaults Section
 
-Framework-specific customizations. Use sparingly - only when brand requirements cannot be met through the standard sections above.
+Framework-specific customizations.
+Use sparingly - only when brand requirements cannot be met through the standard sections above.
 
 ### Structure
 

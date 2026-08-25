@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Figures
 
 Quarto provides comprehensive support for figures including sizing, layout, subfigures, and accessibility features.
@@ -127,7 +128,8 @@ See @fig-comparison, particularly @fig-first.
 
 ## Figure Layouts
 
-For arranging multiple figures, use layout divs. See [layout.md](layout.md) for full layout options.
+For arranging multiple figures, use layout divs.
+See [layout.md](layout.md) for full layout options.
 
 ### Basic Layout
 

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Callouts
 
 Callouts are specially formatted blocks for notes, warnings, tips, and other highlighted content.
@@ -64,7 +65,9 @@ Hidden content revealed on click.
 :::
 ```
 
-`collapse="true"` starts collapsed. `collapse="false"` starts expanded but is collapsible. Without `collapse`, the callout is not collapsible.
+`collapse="true"` starts collapsed.
+`collapse="false"` starts expanded but is collapsible.
+Without `collapse`, the callout is not collapsible.
 
 ## Icons
 

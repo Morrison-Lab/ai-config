@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Diagrams
 
 Quarto natively supports Mermaid and Graphviz diagrams, rendering them automatically across output formats.
@@ -80,7 +81,8 @@ digraph G {
 ```
 ````
 
-Use `digraph` for directed graphs, `graph` for undirected. Standard DOT features (subgraphs, node styling, rank direction) all work.
+Use `digraph` for directed graphs, `graph` for undirected.
+Standard DOT features (subgraphs, node styling, rank direction) all work.
 
 ## Graphviz Cell Options
 
@@ -123,7 +125,8 @@ See @fig-process for the workflow.
 
 ## Sizing
 
-Use `%%| fig-width` and `%%| fig-height` cell options. Diagrams are responsive by default in HTML; disable with `%%| fig-responsive: false`.
+Use `%%| fig-width` and `%%| fig-height` cell options.
+Diagrams are responsive by default in HTML; disable with `%%| fig-responsive: false`.
 
 ## Theming
 

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Code Cells
 
 Quarto uses a hashpipe (`#|`) syntax for code cell options, providing a clean, YAML-based approach that works across R, Python, Julia, and other languages.
@@ -18,9 +19,11 @@ Code cell options are specified with `#|` at the start of lines within the code 
 ```
 ````
 
-**Important:** Options use **dashes, not dots**. Use `fig-cap` not `fig.cap`, `fig-width` not `fig.width`.
+**Important:** Options use **dashes, not dots**.
+Use `fig-cap` not `fig.cap`, `fig-width` not `fig.width`.
 
-The hashpipe prefix is `#|` for R, Python, and Julia; diagram cells use a different prefix. See [engines.md](engines.md) for the full table.
+The hashpipe prefix is `#|` for R, Python, and Julia; diagram cells use a different prefix.
+See [engines.md](engines.md) for the full table.
 
 ## Execution Options
 
@@ -269,7 +272,11 @@ Show a filename above the code block:
 
 ## R Markdown Migration
 
-R Markdown uses dots (`.`), Quarto uses dashes (`-`): `fig.cap` → `fig-cap`, `fig.width` → `fig-width`. Options move from chunk header to `#|` lines. `results="asis"` becomes `output: asis`. Setup chunks with `knitr::opts_chunk$set(...)` become `execute:` in YAML. See [conversion-rmarkdown.md](conversion-rmarkdown.md) for full details.
+R Markdown uses dots (`.`), Quarto uses dashes (`-`): `fig.cap` → `fig-cap`, `fig.width` → `fig-width`.
+Options move from chunk header to `#|` lines.
+`results="asis"` becomes `output: asis`.
+Setup chunks with `knitr::opts_chunk$set(...)` become `execute:` in YAML.
+See [conversion-rmarkdown.md](conversion-rmarkdown.md) for full details.
 
 ## Resources
 

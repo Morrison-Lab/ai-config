@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Mocking in testthat
 
 Mocking temporarily replaces function implementations during testing, enabling tests when dependencies are unavailable or impractical (databases, APIs, file systems, expensive computations).

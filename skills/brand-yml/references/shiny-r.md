@@ -1,10 +1,12 @@
+<!-- markdownlint-disable MD024 -->
 # Using brand.yml with Shiny for R
 
 Guide for applying brand.yml styling to Shiny applications using the bslib package.
 
 ## Overview
 
-The bslib package integrates brand.yml to provide unified visual theming across Shiny applications. Define colors, fonts, and logos once in `_brand.yml`, and bslib automatically applies them to your Shiny app UI.
+The bslib package integrates brand.yml to provide unified visual theming across Shiny applications.
+Define colors, fonts, and logos once in `_brand.yml`, and bslib automatically applies them to your Shiny app UI.
 
 ## Installation
 
@@ -67,7 +69,8 @@ The `brand` parameter controls how branding is applied:
 theme = bs_theme()
 ```
 
-Searches for `_brand.yml` and applies it if found. No error if file doesn't exist.
+Searches for `_brand.yml` and applies it if found.
+No error if file doesn't exist.
 
 ### Required Brand
 
@@ -75,7 +78,8 @@ Searches for `_brand.yml` and applies it if found. No error if file doesn't exis
 theme = bs_theme(brand = TRUE)
 ```
 
-Requires `_brand.yml` to exist. Throws error if not found.
+Requires `_brand.yml` to exist.
+Throws error if not found.
 
 ### Explicit Path
 
@@ -83,7 +87,8 @@ Requires `_brand.yml` to exist. Throws error if not found.
 theme = bs_theme(brand = "path/to/my-brand.yml")
 ```
 
-Uses specific brand file. Path can be:
+Uses specific brand file.
+Path can be:
 - Relative to app directory: `"branding/company-brand.yml"`
 - Absolute: `"/Users/name/brands/company.yml"`
 - Directory (auto-finds `_brand.yml`): `"branding/"`
@@ -155,7 +160,8 @@ ui <- page_fillable(
 
 ## Branded Plots and Tables in Shiny
 
-Use theming functions from the brand.yml package to style plots and tables within Shiny apps. See `brand-yml-in-r.md` for complete documentation of theming functions.
+Use theming functions from the brand.yml package to style plots and tables within Shiny apps.
+See `brand-yml-in-r.md` for complete documentation of theming functions.
 
 ### Basic Example
 

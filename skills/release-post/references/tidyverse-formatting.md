@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Tidyverse Blog Formatting Conventions
 
-Tidyverse-specific formatting requirements for blog posts on tidyverse.org. These conventions are for the hugodown-based Tidyverse blog.
+Tidyverse-specific formatting requirements for blog posts on tidyverse.org.
+These conventions are for the hugodown-based Tidyverse blog.
 
 ## Workflow for tidyverse.org Blog
 
@@ -40,8 +42,8 @@ When creating a blog post for the official `tidyverse/tidyverse.org` repository,
    ```
    Lists all `.Rmd`s that need to be re-rendered.
 
-6. **Add a photo**:
-   Every blog post must be accompanied by a photo. If you don't have one in mind, try:
+6. **Add a photo**: Every blog post must be accompanied by a photo.
+   If you don't have one in mind, try:
    - <https://unsplash.com>
    - <https://pexels.com>
    - Jenny Bryan's [free photo](https://github.com/jennybc/free-photos) link collection
@@ -128,7 +130,8 @@ The main title uses a simple format with space between package name and version:
 # packagename 1.2.0
 ```
 
-No "released" or "version" prefix. Just the package name and version number.
+No "released" or "version" prefix.
+Just the package name and version number.
 
 ## Code Formatting
 

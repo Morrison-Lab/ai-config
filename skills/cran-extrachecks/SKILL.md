@@ -28,7 +28,9 @@ Work through these items systematically:
 2. **Create cran-comments.md**: Run `usethis::use_cran_comments()` if not already present
 3. **Review README**:
    - Ensure it includes install instructions that will be valid when the package is accepted to CRAN (usually `install.packages("pkgname")`).
-   - Check that it does not contain relative links. This works on GitHub but will be flagged by CRAN. Use full URLs to package documentation or remove the links.
+   - Check that it does not contain relative links.
+     This works on GitHub but will be flagged by CRAN.
+     Use full URLs to package documentation or remove the links.
    - Does the README clearly explain the package purpose and functionality?
    - **Important**: If README.Rmd exists, edit ONLY README.Rmd (README.md will be overwritten), then run `devtools::build_readme()` to re-render README.md
 4. **Proofread DESCRIPTION**: Carefully review `Title:` and `Description:` fields (see detailed guidance below)
@@ -43,7 +45,8 @@ Work through these items systematically:
 
 **Return Value Documentation (Strictly Enforced)**
 
-CRAN now strictly requires `@return` documentation for all exported functions. Use the roxygen2 tag `@return` to document what the function returns.
+CRAN now strictly requires `@return` documentation for all exported functions.
+Use the roxygen2 tag `@return` to document what the function returns.
 
 - Required even for functions marked `@keywords internal`
 - Required even if function returns nothing - document as `@return None` or similar
@@ -80,7 +83,8 @@ print_msg <- function(msg) {
 
 **Examples for Exported Functions**
 
-If your exported function has a meaningful return value, it will almost definitely require an `@examples` section. Use the roxygen2 tag `@examples`.
+If your exported function has a meaningful return value, it will almost definitely require an `@examples` section.
+Use the roxygen2 tag `@examples`.
 
 - Required even for functions marked `@keywords internal`
 - Exceptions exist for functions used purely for side effects (e.g., creating directories)
@@ -110,7 +114,8 @@ If you write roxygen examples for un-exported functions, you must either:
 #' # my_function(x)  # Don't do this!
 ```
 
-CRAN's guidance: "Examples/code lines in examples should never be commented out. Ideally find toy examples that can be regularly executed and checked."
+CRAN's guidance: "Examples/code lines in examples should never be commented out.
+Ideally find toy examples that can be regularly executed and checked."
 
 **Guarding Examples with Suggested Packages**
 
@@ -137,7 +142,8 @@ CRAN enforces strict Title requirements:
 
 **Use Title Case**
 
-Capitalize all words except articles like 'a', 'the'. Use `tools::toTitleCase()` to help format.
+Capitalize all words except articles like 'a', 'the'.
+Use `tools::toTitleCase()` to help format.
 
 **Avoid Redundancy**
 
@@ -194,7 +200,8 @@ Description: Render slides to different formats including HTML and PDF.
 
 **Expand to 3-4 Sentences**
 
-Single-sentence descriptions are insufficient. Provide a broader description of:
+Single-sentence descriptions are insufficient.
+Provide a broader description of:
 - What the package does
 - Why it may be useful
 - Types of problems it helps solve
@@ -220,7 +227,8 @@ Description: Uses 'case_when()' to process data.
 Description: Uses case_when() to process data with 'dplyr'.
 ```
 
-Software, package, and API names get single quotes (including 'R'). Function names do not.
+Software, package, and API names get single quotes (including 'R').
+Function names do not.
 
 **Expand All Acronyms**
 
@@ -251,7 +259,8 @@ Description: Handles dates like the first Monday of December.
 
 **All URLs Must Use HTTPS**
 
-CRAN requires `https://` protocol for all URLs. HTTP links will be rejected.
+CRAN requires `https://` protocol for all URLs.
+HTTP links will be rejected.
 
 ```r
 # BAD
@@ -263,7 +272,8 @@ URL: https://paleobiodb.org/
 
 **No Redirecting URLs**
 
-CRAN rejects URLs that redirect to other locations. Example rejection:
+CRAN rejects URLs that redirect to other locations.
+Example rejection:
 
 ```
 Found the following (possibly) invalid URLs:
@@ -283,18 +293,21 @@ urlchecker::url_update()
 
 **Ignore URLs That Will Exist After Publication**
 
-Some URLs that don't currently resolve will exist once the package is published on CRAN. These should NOT be changed:
+Some URLs that don't currently resolve will exist once the package is published on CRAN.
+These should NOT be changed:
 
 - CRAN badge URLs (e.g., `https://cran.r-project.org/package=pkgname`)
 - CRAN status badges (e.g., `https://www.r-pkg.org/badges/version/pkgname`)
 - CRAN check results (e.g., `https://cranchecks.info/badges/pkgname`)
 - Package documentation URLs on r-universe or pkgdown sites that deploy after release
 
-When `urlchecker::url_check()` flags these URLs, leave them as-is. They are aspirational URLs that will work once the package is on CRAN.
+When `urlchecker::url_check()` flags these URLs, leave them as-is.
+They are aspirational URLs that will work once the package is on CRAN.
 
 **Check for Invalid File URIs**
 
-Relative links in README must exist after package build. Common issue:
+Relative links in README must exist after package build.
+Common issue:
 
 ```
 Found the following (possibly) invalid file URI:
@@ -302,7 +315,8 @@ Found the following (possibly) invalid file URI:
        From: README.md
 ```
 
-This occurs when files are in `.Rbuildignore`. Solutions:
+This occurs when files are in `.Rbuildignore`.
+Solutions:
 1. Remove file from `.Rbuildignore`
 2. Use `usethis::use_code_of_conduct()` which generates sections without relative links
 
@@ -345,7 +359,8 @@ CRAN may ask:
 
 > If there are references describing the methods in your package, please add these in the description field...
 
-If there are no references, reply to the email explaining this. Consider adding a preemptive note in `cran-comments.md`:
+If there are no references, reply to the email explaining this.
+Consider adding a preemptive note in `cran-comments.md`:
 
 ```markdown
 ## Method References
@@ -361,7 +376,8 @@ Work through these files systematically:
 - **DESCRIPTION**: Title, Description, Authors@R, URLs, License year
 - **R/*.R**: Function documentation (`@return`, `@examples`, `@examplesIf`, `@noRd`)
 - **README.Rmd** (if exists): Edit this file (NOT README.md), then run `devtools::build_readme()`
-- **README.md**: Review for install instructions, relative links, URLs. Only edit directly if no README.Rmd exists
+- **README.md**: Review for install instructions, relative links, URLs.
+  Only edit directly if no README.Rmd exists
 - **cran-comments.md**: Preemptive notes for reviewers
 - **NEWS.md**: Version notes for this release
 - **.Rbuildignore**: Files referenced in README

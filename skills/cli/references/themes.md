@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # CLI Themes and Styling
 
 ## Table of Contents
@@ -15,7 +16,8 @@
 
 ## Theme Basics
 
-CLI uses a CSS-like theming system to style console output. Themes consist of selectors that match elements and properties that define their appearance.
+CLI uses a CSS-like theming system to style console output.
+Themes consist of selectors that match elements and properties that define their appearance.
 
 ### How Themes Work
 
@@ -46,7 +48,8 @@ cli_end()
 
 ## Container Functions
 
-Containers create themed regions and manage element hierarchy. They auto-close when the function exits or can be closed explicitly with `cli_end()`.
+Containers create themed regions and manage element hierarchy.
+They auto-close when the function exits or can be closed explicitly with `cli_end()`.
 
 ### General Containers
 

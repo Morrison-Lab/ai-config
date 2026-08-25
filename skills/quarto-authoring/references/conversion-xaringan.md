@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Converting xaringan to Quarto RevealJS
 
 Guide for converting xaringan presentations to Quarto RevealJS format.

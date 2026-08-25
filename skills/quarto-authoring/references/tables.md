@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Tables
 
 Quarto supports multiple table formats including pipe tables, list tables, and computational tables with extensive styling options.
@@ -81,7 +82,8 @@ tbl-colwidths: auto
 
 ## List Tables
 
-For complex content including multiple paragraphs, lists, and code blocks. Quarto natively supports pandoc list table syntax.
+For complex content including multiple paragraphs, lists, and code blocks.
+Quarto natively supports pandoc list table syntax.
 
 ### Basic Syntax
 
@@ -187,7 +189,8 @@ Tables generated from code:
 **Engine note — table rendering differs by engine:**
 
 - **knitr engine**: Recognised table objects are rendered automatically (e.g. a data frame is printed as a markdown table without extra configuration).
-- **jupyter engine**: Cells that return a display-protocol object auto-display as HTML in HTML output only. For portable output across all formats, print a markdown table string and set `output: asis`:
+- **jupyter engine**: Cells that return a display-protocol object auto-display as HTML in HTML output only.
+  For portable output across all formats, print a markdown table string and set `output: asis`:
 
 ````markdown
 ```{language}
@@ -304,9 +307,11 @@ Available classes:
 | `.sm`         | Smaller text           |
 | `.responsive` | Horizontal scroll      |
 
-Combine multiple classes: `::: {#tbl-name .striped .hover .bordered}`. Use `classes: plain` in code cells to disable default striping.
+Combine multiple classes: `::: {#tbl-name .striped .hover .bordered}`.
+Use `classes: plain` in code cells to disable default striping.
 
-Quarto also processes HTML tables with `data-qmd` attribute for markdown content. Disable with `html-table-processing: none`.
+Quarto also processes HTML tables with `data-qmd` attribute for markdown content.
+Disable with `html-table-processing: none`.
 
 ## Table Layouts
 

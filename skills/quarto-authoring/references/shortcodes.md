@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Shortcodes
 
-Shortcodes are special commands that expand into content at render time. Quarto provides several built-in shortcodes.
+Shortcodes are special commands that expand into content at render time.
+Quarto provides several built-in shortcodes.
 
 ## Syntax
 
@@ -267,7 +269,8 @@ Rearrange document content:
 {{< contents heading >}}
 ````
 
-Shows content under a specific heading. Useful for reorganizing included content.
+Shows content under a specific heading.
+Useful for reorganizing included content.
 
 ## Conditional Shortcodes
 
@@ -285,7 +288,8 @@ See video at: https://example.com/video
 
 ## Custom Shortcodes
 
-Create custom shortcodes via extensions. Example extension structure:
+Create custom shortcodes via extensions.
+Example extension structure:
 
 ```txt
 _extensions/

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Converting bookdown to Quarto
 
 Guide for converting bookdown projects to Quarto book format.

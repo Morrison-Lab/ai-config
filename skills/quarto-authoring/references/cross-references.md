@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD024 -->
 # Cross-References
 
 Quarto provides a unified cross-reference system for figures, tables, equations, sections, theorems, and more.

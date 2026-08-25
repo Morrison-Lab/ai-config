@@ -1,10 +1,12 @@
+<!-- markdownlint-disable MD024 -->
 # Converting R Markdown to Quarto
 
 Guide for converting R Markdown (.Rmd) documents to Quarto (.qmd).
 
 ## Overview
 
-Most R Markdown documents can be rendered by Quarto with minimal changes. The main differences are:
+Most R Markdown documents can be rendered by Quarto with minimal changes.
+The main differences are:
 
 1. YAML structure (output → format)
 2. Chunk options (inline → hashpipe)
@@ -304,7 +306,8 @@ Note: Quarto uses `tbl-` prefix (not `tab-`).
 
 ## Package Dependencies
 
-Quarto doesn't require `rmarkdown` or `knitr`, but `knitr` remains useful for tables and chunk processing. Most R Markdown features (`knitr::kable()`, `knitr::include_graphics()`) work in Quarto without changes.
+Quarto doesn't require `rmarkdown` or `knitr`, but `knitr` remains useful for tables and chunk processing.
+Most R Markdown features (`knitr::kable()`, `knitr::include_graphics()`) work in Quarto without changes.
 
 Note: Quarto can render `.Rmd` files directly (`quarto render document.Rmd`) using R Markdown compatibility mode, which allows incremental migration.
 

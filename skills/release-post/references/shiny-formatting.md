@@ -1,6 +1,8 @@
+<!-- markdownlint-disable MD024 -->
 # Shiny Blog Formatting Conventions
 
-Shiny-specific formatting requirements for blog posts on shiny.posit.co. These conventions are for the Quarto-based Shiny blog.
+Shiny-specific formatting requirements for blog posts on shiny.posit.co.
+These conventions are for the Quarto-based Shiny blog.
 
 ## Frontmatter Format
 
@@ -329,7 +331,8 @@ We've added a [complete branded theming example](https://shinylive.io/py/example
 
 ## Acknowledgements Section
 
-Less consistent in Shiny posts. When present, variations include:
+Less consistent in Shiny posts.
+When present, variations include:
 
 ### Variation 1: Simple Thanks
 
@@ -377,9 +380,7 @@ Or just reference the generator in code:
 
 ```markdown
 ```{r}
-#| echo: false
-#| eval: false
-usethis::use_tidy_thanks("rstudio/bslib", from = "v0.6.1")
+#| echo: false #| eval: false usethis::use_tidy_thanks("rstudio/bslib", from = "v0.6.1")
 ```
 ```
 
@@ -443,7 +444,8 @@ We're excited about [brand.yml] support!
 
 ## Multi-Language Support (R and Python)
 
-The Shiny blog often covers packages released for both R and Python (e.g., shiny, shinychat). Unlike Tidyverse posts which are language-specific, Shiny posts should show examples in both languages using Quarto tabsets.
+The Shiny blog often covers packages released for both R and Python (e.g., shiny, shinychat).
+Unlike Tidyverse posts which are language-specific, Shiny posts should show examples in both languages using Quarto tabsets.
 
 ### Use Tabsets Consistently
 
@@ -517,7 +519,8 @@ my_tool._display = {"title": "My Tool", "icon": "star"}
 
 ### Version Information
 
-Package versions often differ between R and Python. Be explicit:
+Package versions often differ between R and Python.
+Be explicit:
 
 - "Available in shinychat for R (v0.3.0) and shinychat for Python (v0.2.0 or later)"
 - Link to both language-specific documentation

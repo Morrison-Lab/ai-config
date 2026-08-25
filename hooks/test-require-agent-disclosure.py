@@ -415,6 +415,32 @@ CASES = [
     ("the -c short flag is a comment flag",
      'gh issue close 5 -R o/r -c "bare"', "missing"),
 
+    # --- #2185 round 2: pflag attaches a shorthand value with no space -------
+    #
+    # `gh` is a pflag CLI, so `-cvalue` and `-c=value` are valid alongside
+    # `-c value`. Every short-flag pattern here required whitespace, so all of
+    # them missed the attached forms -- including the pre-existing `-b`/`-m`
+    # ones, which predate this branch. The first repair used `-c\S`, which fixed
+    # the attached forms and broke the spaced one; all three need matching.
+    ("-c=value is a comment flag",
+     'gh issue close 5 -R o/r -c="Closing without disclosure."', "missing"),
+    ("-c\"value\" attached is a comment flag",
+     'gh issue close 5 -R o/r -c"Closing without disclosure."', "missing"),
+    ("-c=value WITH the marker stays silent",
+     'gh issue close 5 -R o/r -c="Closing.\n\n' + MARKER + '"', False),
+    ("-b\"value\" attached on gh pr comment", 'gh pr comment 5 -b"bare"',
+     "missing"),
+    ("-m=value attached on glab mr note", 'glab mr note 5 -m="bare"', "missing"),
+    # ANY_BODY_FLAG_RE is consulted ONLY for `gh pr review`, so the two fixtures
+    # above go through POST_RE and cannot pin it. Mutation testing caught that:
+    # reverting it to whitespace-only left the suite green. This is the case
+    # that discriminates.
+    ("gh pr review with an attached -b body",
+     'gh pr review 12 --request-changes -b"Findings, undisclosed."', "missing"),
+    ("gh pr review with an attached -b body WITH marker",
+     'gh pr review 12 --request-changes -b"Findings.\n\n' + MARKER + '"',
+     False),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

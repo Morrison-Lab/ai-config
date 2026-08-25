@@ -1,6 +1,6 @@
-# the repository owner/gha reusable workflows
+# d-morrison/gha reusable workflows
 
-Check `the repository owner/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
 The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
 
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
@@ -49,7 +49,7 @@ Generic Actions-authoring material stays there.
 - **`lint-changed-lines.yml@v2`** (gha#276) --- runs `lintr` on changed R files but filters the reported lints down to only the lines a PR **adds or modifies**, so a repo can adopt or tighten a lint rule *incrementally*: new and edited code must comply while untouched legacy code is left alone.
   This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" --- don't disable the linter or reformat everything at once;
   adopt via this workflow and let the rule migrate file-by-file as code is touched.
-  Caller stub is ~8 lines (`uses: the repository owner/gha/.github/workflows/lint-changed-lines.yml@v2`).
+  Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
   Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
   serocalculator#564 is the first consumer.
 - **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
@@ -72,7 +72,7 @@ Generic Actions-authoring material stays there.
 - **`@v1` can trail `main` in practice --- verify against the TAGGED file, not `main` or `examples/`.**
   Observed: `main`'s `claude.yml` / `claude-code-review.yml` both declare an `ANTHROPIC_API_KEY` secret in their `workflow_call: secrets:` block, and `examples/claude.yml` / `examples/claude-code-review.yml` (also on `main`) show passing it --- but the `@v1` tag's copy of both reusable workflows only declares `CLAUDE_CODE_OAUTH_TOKEN`, `SUBMODULES_TOKEN`, and (for `claude.yml`) `WORKFLOW_TOKEN`.
   A caller that copies the example verbatim and pins `@v1` gets a `startup_failure`: `Invalid secret, ANTHROPIC_API_KEY is not defined in the referenced workflow.` Before trusting an `examples/` template (or `main`'s workflow file) for a `secrets:`/`with:` block passed to an `@v1` call, fetch the actual `@v1`-tagged file (`mcp__github__get_file_contents` with `ref: refs/tags/v1`, or `git show v1:.github/workflows/<file>`) and diff its `workflow_call:` section against what you're about to pass.
-  Filed as gha#179; worked around in `the repository owner/altdoc`#14 by omitting `ANTHROPIC_API_KEY` until `@v1` catches up.
+  Filed as gha#179; worked around in `d-morrison/altdoc`#14 by omitting `ANTHROPIC_API_KEY` until `@v1` catches up.
 - **A `workflow_call` reusable-workflow ref (`@v1`/`@v2`) resolves ONCE, at the run's original creation time, and stays pinned to that SHA across every re-run of that same run --- even after the tag has since moved to a fix.**
   So if a consumer PR's `claude-code-review.yml` run first ran while `@v2` still pointed at a broken gha commit, re-running that same run (whether via the Actions UI "Re-run failed jobs" or a bot re-dispatch that happens to target the existing run rather than creating a new one) reproduces the identical pre-fix failure forever, no matter how many times you retry or how long ago the tag was fixed.
   **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` --- compare against when the fix landed), then read `referenced_workflows[].sha` in the same response --- it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
@@ -115,7 +115,7 @@ Generic Actions-authoring material stays there.
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under `on: workflow_call: inputs:`.
-  2. Forward it in the reusable workflow's `uses: the repository owner/gha/<name>@v1` step's `with:` block.
+  2. Forward it in the reusable workflow's `uses: d-morrison/gha/<name>@v1` step's `with:` block.
   3. Update `examples/<name>.yml` (the caller stub) if the input is consumer-visible.
   4. Update the README table row for `<name>.yml` to list the new input under "Key inputs".
   Missing any of these leaves the input wired only partway --- consumers can't pass it through the reusable workflow even though it exists in the composite.
@@ -174,4 +174,4 @@ Generic Actions-authoring material stays there.
   - **Don't:** carry a setting across from one gha workflow's caller to another's --- `setup-r` alone defaults opposite ways in two of them.
   - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
 
-  (Measured 2026-08-24 migrating [the repository owner/macros#83](https://github.com/the repository owner/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)
+  (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)

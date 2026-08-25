@@ -33,7 +33,7 @@ Worked-example case records for the rules below live in
 - In CI, a step that can fail should fail the job, not
   `continue-on-error` its way to a green check.
   The exception is a deliberate pattern that re-checks the outcome
-  downstream (e.g. `the repository owner/gha`'s `continue-on-error` review
+  downstream (e.g. `d-morrison/gha`'s `continue-on-error` review
   attempts feeding a single resolve-outcome step that still fails the
   job when neither attempt succeeded) --- the failure is deferred and
   handled, not ignored.

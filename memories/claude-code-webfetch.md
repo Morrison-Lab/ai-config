@@ -59,7 +59,7 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   likely anti-scraping), even though the plain-text/markdown **source** it was
   built from is a public file in a public repo and fetches fine via
   `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`.
-  This isn't `the repository owner/gha`-specific (that repo's own `CLAUDE.md` documents it
+  This isn't `d-morrison/gha`-specific (that repo's own `CLAUDE.md` documents it
   for the lab manual) — it generalizes to any Quarto/Docusaurus-style site,
   including third-party tool docs with no relation to our own repos.
 - **When the exact source path isn't obvious** (unlike the lab-manual case

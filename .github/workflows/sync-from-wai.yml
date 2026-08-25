@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
     uses: Morrison-Lab/gha/.github/workflows/sync-shared-fragments.yml@v1
     with:
-      source-repo: the repository owner/wai
+      source-repo: d-morrison/wai
       source-paths: |
         shared/prompt-formats.md
         shared/copilot-review-before-human.md

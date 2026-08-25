@@ -150,7 +150,7 @@ Don't assume it's fabricated or injected, and don't reflexively redo the same fi
 If a commit with that SHA genuinely exists, authored close to when the event arrived, treat it as confirmation a live parallel session owns this PR right now --- stop pushing further speculative fixes yourself, and, if genuinely in doubt, ask whether to keep driving or step back, rather than racing the other session's pushes.
 This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing.
 
-(`the repository owner/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `the repository owner`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
+(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `d-morrison`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
 It was verified real via `get_commits` before proceeding --- a second live session, not injection.)
 
 **The git-level variant of that check: a rejected push whose remote commit is byte-for-byte what you were about to push.**

@@ -71,14 +71,14 @@
   Guessing is the failure worth naming: a version comment is a factual claim
   sitting next to an opaque sha, so a wrong one is both undetectable at a
   glance and exactly what a later reader will trust.
-  (the repository owner/altdoc#65, 2026-07-26: `quarto-dev/quarto-actions@v2` resolved to
+  (d-morrison/altdoc#65, 2026-07-26: `quarto-dev/quarto-actions@v2` resolved to
   a commit carrying `v2`, `v2.2`, and `v2.2.0` --- only `# v2.2.0` was worth
   writing, and no amount of reasoning about the `@v2` in the workflow would
   have produced it.)
 - This is an [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
   case: two commands decide it exactly, so never write a pin from recollection
   or from a ref listing you did not check the peel state of.
-  (the repository owner/altdoc#57, 2026-07-25: SHA-pinning `etiennebacher/setup-jarl`.
+  (d-morrison/altdoc#57, 2026-07-25: SHA-pinning `etiennebacher/setup-jarl`.
   The tag was lightweight so `--refs` happened to give the right answer --- the
   trap only bites on annotated tags, which is exactly why it is worth checking
   every time rather than when something looks off.)

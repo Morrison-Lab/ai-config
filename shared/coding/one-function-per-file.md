@@ -29,7 +29,7 @@ obligated to split every pre-existing function out --- that's a separate,
 larger refactor with its own cost/benefit call. Do put the **new** function
 in its own file, so at least new code follows the convention going forward.
 
-(Corrected on `the repository owner/altdoc#21`, 2026-07-09: two new functions --
+(Corrected on `d-morrison/altdoc#21`, 2026-07-09: two new functions --
 `.rewrite_self_links()` and its helper `.rewrite_self_links_one()` -- were
 initially added inline to an existing multi-function file,
 `R/settings_quarto_website.R`, placed right after the function that calls

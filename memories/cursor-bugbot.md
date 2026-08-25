@@ -47,7 +47,7 @@ Individual/Pro Bugbot only reviews PRs whose author is the GitHub account
 linked to the Cursor account that owns the run.
 
 Measured on [Morrison-Lab/gha#597](https://github.com/Morrison-Lab/gha/pull/597)
-(author `the repository owner`):
+(author `d-morrison`):
 
 - Comment `bugbot run` from `dem-extra1`
   ([comment](https://github.com/Morrison-Lab/gha/pull/597#issuecomment-5391377690)):
@@ -55,7 +55,7 @@ Measured on [Morrison-Lab/gha#597](https://github.com/Morrison-Lab/gha/pull/597)
   ("The GitHub account linked to your Cursor account does not match the PR author
   ... or run Bugbot from a team that covers this repository.").
   No `Cursor Bugbot` check appeared (polled 4 minutes).
-- The same phrase on the same PR from **`the repository owner`**:
+- The same phrase on the same PR from **`d-morrison`**:
   check [run 97340670384](https://github.com/Morrison-Lab/gha/runs/97340670384)
   completed **success** in ~7.5 minutes
   ("no issues found"), and Bugbot posted

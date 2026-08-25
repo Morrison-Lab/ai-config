@@ -65,9 +65,9 @@ What is added here is the tell, and the step from *the same idea worded differen
 - **Don't:** read the closedness test above as clearing a derived list --- it answers whether the set can grow, not whether your pattern found all of it.
 - **Don't:** treat a non-empty result as evidence the pattern was wide enough; an incomplete match looks exactly like a complete one.
 
-(Morrison-Lab/ai-config#1178, 2026-08-06: encoding a repo-scoped reviewer exception, `git grep -n 'add-reviewer the repository owner' -- skills/` returned eight hits across six files, including sites a reviewer's own enumeration had missed --- which is this fragment's rule working, and is why the list was trusted.
-It also missed `skills/claude-agent-workflow/SKILL.md:118`, which requests the same reviewer as `gh api -X POST repos/.../pulls/$PR_NUMBER/requested_reviewers -f "reviewers[]=the repository owner"`.
-A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squashed into `7a5b2ce0` --- and widened the sweep prescribed in `skills/request-pr-review/SKILL.md` to `add-reviewer the repository owner|requested_reviewers.*the repository owner`, so until then the incomplete pattern had been the corpus's own documented derivation.
+(Morrison-Lab/ai-config#1178, 2026-08-06: encoding a repo-scoped reviewer exception, `git grep -n 'add-reviewer d-morrison' -- skills/` returned eight hits across six files, including sites a reviewer's own enumeration had missed --- which is this fragment's rule working, and is why the list was trusted.
+It also missed `skills/claude-agent-workflow/SKILL.md:118`, which requests the same reviewer as `gh api -X POST repos/.../pulls/$PR_NUMBER/requested_reviewers -f "reviewers[]=d-morrison"`.
+A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squashed into `7a5b2ce0` --- and widened the sweep prescribed in `skills/request-pr-review/SKILL.md` to `add-reviewer d-morrison|requested_reviewers.*d-morrison`, so until then the incomplete pattern had been the corpus's own documented derivation.
 The alternatives were already enumerated twice in the same repository: `hooks/no-unreviewed-pr.py` matches five command forms for this one effect --- `gh pr create --reviewer/-r`, `gh pr edit --add-reviewer`, a `-X POST` to the `requested_reviewers` endpoint, and two `request_copilot_review` tool names --- and `tool-mappings.yml` is an effect-to-command registry whose `REQUEST_COPILOT_REVIEW` row carries the REST form outright.
 So the corpus's code already knew the effect had several spellings while the grep searched for one.)
 
@@ -90,12 +90,12 @@ accepted review findings of this shape, in one afternoon:
   and missed the same command in a sibling `github_mcp:` field and embedded
   mid-value after `git log` (Morrison-Lab/ai-config#1476, round 1: 6 sites
   claimed, 8 real).
-- An owner-rename sweep derived from the literal `the repository owner/ai-config` and
-  missed the dead `the repository owner.github.io/ai-config` domain in `_quarto.yml`'s
+- An owner-rename sweep derived from the literal `d-morrison/ai-config` and
+  missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
   `site-url` --- a genuinely broken reference, not mere staleness, invisible
   to the slash form (Morrison-Lab/ai-config#1482, round 1).
-  The broken plugin refs (`ai-config@the repository owner`) and marketplace key
-  (`"the repository owner"`) had needed their own second pattern in the same sweep for
+  The broken plugin refs (`ai-config@d-morrison`) and marketplace key
+  (`"d-morrison"`) had needed their own second pattern in the same sweep for
   the same reason.
 
 So before publishing an identity sweep's site list, enumerate the identity's
@@ -262,7 +262,7 @@ And base-versus-delta is one instance of a general shape: any two figures in one
 (Morrison-Lab/ai-config#1437, 2026-08-12, review finding 1.
 The case record directly above shipped reading "Ten PRs were open at merge time, seven of them under the same account", and now reads "eight of them".
 The total was derived against #1435's merge instant, `21:50:27Z`, and was right.
-The subset was not: at that instant `the repository owner` held eight of the ten (#1393, #1411, #1413, #1417, #1420, #1421, #1422, #1436), with `claude[bot]` holding #1427 and #1434.
+The subset was not: at that instant `d-morrison` held eight of the ten (#1393, #1411, #1413, #1417, #1420, #1421, #1422, #1436), with `claude[bot]` holding #1427 and #1434.
 Seven is the same-account count of a **different** population --- the nine PRs left after #1436 merged at `21:54:09Z`, four minutes later --- so it was a real figure, correctly derived, about a moment the sentence was not describing.
 Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not.)
 

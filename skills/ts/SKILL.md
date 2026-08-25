@@ -78,7 +78,7 @@ echo "Confirmed: $(git log --oneline -1 v2)"
 
 ## Determining the tag
 
-- Default: `v2` (the repository owner's HACtions floating tag — substitute your repo's floating tag name if different)
+- Default: `v2` (d-morrison's HACtions floating tag — substitute your repo's floating tag name if different)
 - If the user specifies a different tag (e.g., "ts v3"), use that instead
 - If the repo doesn't use floating tags, skip the slide step and just
   report test results (effectively degrades to the `test` skill)

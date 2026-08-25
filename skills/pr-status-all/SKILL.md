@@ -133,9 +133,9 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); report `🟢 All Green` or `❌ Failing (<check-name>)` or `⏳ Pending (<check-name>)`.
 > 4. **Reviewers Requested & Author Awareness** -- check `.author.login`, `.reviewRequests`, and human review status.
 >    - If human review has requested changes, report `❌ Changes requested by <login>`.
->    - If `.author.login` is the current user / repo owner (`the repository owner`), report `*Self-authored* (GitHub prevents requesting review from author)`.
+>    - If `.author.login` is the current user / repo owner (`d-morrison`), report `*Self-authored* (GitHub prevents requesting review from author)`.
 >    - If AI review is clean/approved and CI is green:
->      - If human reviewer is requested (e.g. `the repository owner`), report `the repository owner`.
+>      - If human reviewer is requested (e.g. `d-morrison`), report `d-morrison`.
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
 >    - If AI review is clean/approved but CI is failing or pending, report `- (CI in progress / failing)`.
 >    - If AI review is still in-flight or unclean, report `- (AI review in progress)`.
@@ -167,7 +167,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
 >    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`the repository owner` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`d-morrison` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
@@ -187,8 +187,8 @@ A Markdown table, one row per open PR, with these columns:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#101](url) | `the repository owner` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
-| [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
+| [#101](url) | `d-morrison` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
+| [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 | [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
 | [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
 | [#105](url) (Draft) | `external-dev` | - | ⏳ Pending (build) | - | Draft (Work in progress) |
@@ -203,7 +203,7 @@ A Markdown table, one row per open PR, with these columns:
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
-  When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
+  When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
 - **Next Step** --- computed deterministically using the full state matrix:
@@ -217,8 +217,8 @@ A Markdown table, one row per open PR, with these columns:
   - If CI is pending: `Wait for CI (<pending-check>)`.
   - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
   - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
-    - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
-    - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
+    - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.
+    - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.
 
 ### Extended Technical Dashboard (Optional / On Request)

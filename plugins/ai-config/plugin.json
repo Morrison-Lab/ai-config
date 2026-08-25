@@ -1,7 +1,7 @@
 {
   "name": "ai-config",
-  "description": "the repository owner's personal AI agent skills (PR/review workflow, grading, reprexes, R-package helpers), rules, and workflows for Antigravity and Gemini CLI.",
+  "description": "d-morrison's personal AI agent skills (PR/review workflow, grading, reprexes, R-package helpers), rules, and workflows for Antigravity and Gemini CLI.",
   "author": {
-    "name": "the repository owner"
+    "name": "d-morrison"
   }
 }

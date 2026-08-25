@@ -575,6 +575,15 @@ CASES = [
     ("a slash before a hyphenated value",
      'gh issue close 5 -R o/r --duplicate-of "foo/-config"', False),
 
+    # --- #2185 round 4: multiple fields where one quotes a flag name ---------
+    #
+    # Tracked by #2189: the regex-based tokenization matches `-m` inside the
+    # title's value, extracting the word after it ("flag") as the body, and
+    # reporting the real (correctly disclosed) body as missing its marker.
+    # This is a known false positive to be fixed by the #2189 rewrite.
+    ("a short flag inside a prior field's value false-positives (tracked in #2189)",
+     'gh api repos/o/r/issues/5/comments -f title="Fix -m flag parsing" -f body="' + MARKER + '"', "missing"),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

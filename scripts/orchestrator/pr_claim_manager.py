@@ -240,9 +240,9 @@ class PRClaimManager:
         comments = data.get("comments", [])
         external_review_comments = [
             c for c in comments
-            if c.get("author", {}).get("login") in ["github-actions", "claude[bot]"]
+            if (c.get("author") or {}).get("login") in ["github-actions", "claude[bot]"]
             and ("claude finished review" in c.get("body", "").lower()
-                 or "### verdict" in c.get("body", "").lower())
+                 or ("### verdict" in c.get("body", "").lower() and "code review" in c.get("body", "").lower()))
         ]
 
         has_approved_external_comment = False

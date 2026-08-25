@@ -1275,6 +1275,21 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("blocking verdict", reason.lower())
 
+        # 10. Comment with null author (e.g. deleted GitHub account) does not crash
+        null_author_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [
+                {"author": None, "body": "random comment"},
+                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean**"},
+            ],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, null_author_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

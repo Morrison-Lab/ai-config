@@ -25,7 +25,12 @@ It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude p
 | `PreToolUse` MCP | `preToolUse` (`MCP:` prefix) | yes | Cursor Cloud does not load `beforeMCPExecution` / `afterMCPExecution`. `preToolUse` is the cloud path. |
 | `SessionStart` / `SessionEnd` / `PreCompact` | unused | mixed | This catalog does not register those Claude events. |
 
-The adapter parses leading `KEY=VALUE` tokens from each catalog `command`
+A per-payload tick sentinel collapses two adapter processes of the same
+Cursor event. The waiter uses the wrapper timeout minus slack so it can
+emit JSON before Cursor SIGKILLs the command. An overlapping first
+process that crashes still yields empty JSON, and Cursor fail-opens
+`preToolUse` in that latent case (no second Cursor-schema source is
+bound today).
 (the Stop registration of `no-mistake-without-a-hook.py` needs
 `AI_CONFIG_STOP=1`) and runs each script with a remaining-time budget so
 Cursor does not SIGKILL the wrapper mid-catalog.
@@ -37,7 +42,9 @@ Cursor does not SIGKILL the wrapper mid-catalog.
 | Cursor `tool_name` | Claude `tool_name` values the adapter tries |
 |---|---|
 | `Shell` | `Bash` |
-| `Task` | `Task`, and `Agent` unless `subagent_type` is `explore` / `plan` / `shell` |
+| `Task` | `Task`, and `Agent` unless `subagent_type` is `explore` / `plan` / `shell` (top-level or in `tool_input`) |
+| `StrReplace` | `Edit` (transcript translation so Stop guards see a write) |
+| `EditNotebook` | `NotebookEdit` |
 | `MCP:github-<id>` | `mcp__github__<id>` plus the raw suffix |
 | other `MCP:<id>` | `mcp__<id>` with hyphens folded to underscores |
 

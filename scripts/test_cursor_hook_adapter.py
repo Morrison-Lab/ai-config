@@ -251,6 +251,25 @@ check(
     "Cursor Shell tool_use becomes Bash",
     translated["message"]["content"][1].get("name") == "Bash",
 )
+check(
+    "Cursor StrReplace becomes Edit",
+    mod.claude_tool_name_for_cursor("StrReplace") == "Edit",
+)
+check(
+    "Cursor EditNotebook becomes NotebookEdit",
+    mod.claude_tool_name_for_cursor("EditNotebook") == "NotebookEdit",
+)
+typed_strreplace = {
+    "type": "assistant",
+    "role": "assistant",
+    "message": {"content": [
+        {"type": "tool_use", "name": "StrReplace", "input": {"path": "memories/x.md"}},
+    ]},
+}
+check(
+    "typed Cursor record with StrReplace still needs translation",
+    mod.record_needs_translation(typed_strreplace),
+)
 typed_shell = {
     "type": "assistant",
     "role": "assistant",
@@ -447,6 +466,32 @@ with tempfile.TemporaryDirectory() as raw:
     )
     ctx = replayed.get("additional_context") or ""
     check("warn-only PreToolUse context replays on postToolUse", "assign isolation" in ctx)
+    explored = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Task",
+            "tool_input": {"prompt": "look around", "subagent_type": "explore"},
+            "tool_use_id": "explore-1",
+            "conversation_id": "c1",
+            "generation_id": "g-explore",
+        },
+        env,
+    )
+    check("explore Task is allowed", explored.get("permission") == "allow")
+    explore_replay = run_adapter(
+        "postToolUse",
+        {
+            "tool_name": "Task",
+            "tool_use_id": "explore-1",
+            "conversation_id": "c1",
+            "generation_id": "g-explore",
+        },
+        env,
+    )
+    check(
+        "explore Task does not run Agent-only warn-isolation",
+        "assign isolation" not in str(explore_replay.get("additional_context") or ""),
+    )
 
     stopped = run_adapter(
         "stop",

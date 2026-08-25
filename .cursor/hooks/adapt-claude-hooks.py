@@ -66,6 +66,12 @@ GITHUB_MCP_HINT = re.compile(
     r"(issue|pull_request|pull-request|pr_comment|merge_pull)",
     re.I,
 )
+# Cursor transcript / tool_use names that Claude scripts key as something else.
+CURSOR_TO_CLAUDE_TOOLS = {
+    "Shell": "Bash",
+    "StrReplace": "Edit",
+    "EditNotebook": "NotebookEdit",
+}
 
 
 def hooks_dir() -> Path:
@@ -291,11 +297,12 @@ def claude_payload_for_transcript(cursor: dict[str, Any], event: str) -> dict[st
 
 
 def claude_tool_name_for_cursor(name: str) -> str:
-    if name == "Shell":
-        return "Bash"
+    mapped = CURSOR_TO_CLAUDE_TOOLS.get(name)
+    if mapped:
+        return mapped
     if name.startswith("MCP:"):
-        mapped = cursor_to_claude_tool_names(name)
-        mcp = [item for item in mapped if item.startswith("mcp__")]
+        mapped_names = cursor_to_claude_tool_names(name)
+        mcp = [item for item in mapped_names if item.startswith("mcp__")]
         if mcp:
             return mcp[0]
     return name
@@ -337,9 +344,11 @@ def record_needs_translation(record: dict[str, Any]) -> bool:
         if (
             isinstance(block, dict)
             and block.get("type") == "tool_use"
-            and block.get("name") == "Shell"
+            and isinstance(block.get("name"), str)
         ):
-            return True
+            src = block["name"]
+            if CURSOR_TO_CLAUDE_TOOLS.get(src, src) != src:
+                return True
     return False
 
 
@@ -666,8 +675,9 @@ def collect_plain_or_json_context(parsed: dict[str, Any] | None, text: str) -> s
 
 def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
     cursor_tool = str(cursor.get("tool_name") or "")
+    nested = coerce_tool_input(cursor.get("tool_input")).get("subagent_type")
     candidates = cursor_to_claude_tool_names(
-        cursor_tool, cursor.get("subagent_type"),
+        cursor_tool, cursor.get("subagent_type") or nested,
     )
     extra_chunks: list[str] = []
     deny_reason = None

@@ -137,6 +137,11 @@ def main():
 
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
+            if isinstance(raw_subagents, str):
+                try:
+                    raw_subagents = json.loads(raw_subagents)
+                except Exception:
+                    pass
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
             for sub in subagents:
                 if not isinstance(sub, dict):

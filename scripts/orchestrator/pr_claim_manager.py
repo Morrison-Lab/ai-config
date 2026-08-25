@@ -232,8 +232,17 @@ class PRClaimManager:
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
-        # 4. Check for formal GitHub review approvals (from humans or approved external bots)
-        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
+        # 4. Check for formal GitHub review approvals (from trusted OWNER/MEMBER humans or approved bots)
+        # Random passerby approvals (authorAssociation: NONE/CONTRIBUTOR) or self-reviews are strictly ignored!
+        pr_author_login = (data.get("author") or {}).get("login", "")
+        trusted_reviews = [
+            r for r in reviews
+            if r.get("state") == "APPROVED"
+            and (r.get("authorAssociation") in ["OWNER", "MEMBER"]
+                 or (r.get("author") or {}).get("login") in ["claude[bot]", "d-morrison"])
+            and (r.get("author") or {}).get("login") not in [pr_author_login, "dem-extra1"]
+        ]
+        has_approved_review = bool(trusted_reviews)
 
         # 5. Check external review comments (posted by github-actions / claude[bot] review workflow)
         # IMPORTANT: Self-posted comments authored by user/collaborator accounts (e.g. dem-extra1) do NOT satisfy the gate!

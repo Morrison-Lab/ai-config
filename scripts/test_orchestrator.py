@@ -1148,17 +1148,44 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 2. Clean PR with approved GitHub review
+        # 2. Clean PR with approved GitHub review from trusted OWNER/MEMBER
         clean_gh_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
-            "reviews": [{"state": "APPROVED"}],
+            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER"}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, clean_gh_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
+
+        # 2b. Formal GitHub review approval from random passerby (NONE / CONTRIBUTOR) is REJECTED
+        passerby_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [{"state": "APPROVED", "author": {"login": "random-passerby"}, "authorAssociation": "NONE"}],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, passerby_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
+
+        # 2c. Formal GitHub review self-approval (dem-extra1) is REJECTED
+        self_review_json = json.dumps({
+            "author": {"login": "dem-extra1"},
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [{"state": "APPROVED", "author": {"login": "dem-extra1"}, "authorAssociation": "COLLABORATOR"}],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, self_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
 
         # 3. Passing CI but NO review or comment -> MUST NOT MERGE
         no_review_json = json.dumps({
@@ -1176,7 +1203,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
             ],
-            "reviews": [{"state": "APPROVED"}],
+            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER"}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))

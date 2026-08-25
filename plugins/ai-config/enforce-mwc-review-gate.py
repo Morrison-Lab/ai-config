@@ -46,7 +46,7 @@ def main():
             
             # Check for bot approvals in comments (e.g. Claude Code, OpenCode)
             has_ai_approval = False
-            bot_comments = [c for c in comments if "bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") in ["github-actions", "claude"]]
+            bot_comments = [c for c in comments if ("bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") in ["github-actions", "claude"]) and not c.get("body", "").startswith("💰 **Cost:**")]
             if bot_comments:
                 last_bot_body = bot_comments[-1].get("body", "").upper()
                 if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", last_bot_body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?|NEEDS MORE WORK|REQUEST_CHANGES|NOT YET READY FOR MERGE|DON'T APPROVE|CAN'T APPROVE)\b", last_bot_body):

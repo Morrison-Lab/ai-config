@@ -525,6 +525,27 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
+    def test_invoke_subagent_non_dict_item_denial(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {"Subagents": ["invalid-string-item"]}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertIn("must be an object", out.get("reason", ""))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
     def test_invoke_subagent_malformed_subagents_list(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         payload = {
             "toolCall": {

@@ -78,7 +78,7 @@ def main():
 
     # Determine Antigravity event type
     event_type = None
-    if payload.get("toolCall") is not None:
+    if isinstance(payload.get("toolCall"), dict):
         event_type = "PreToolUse"
     elif payload.get("terminationReason") is not None:
         event_type = "Stop"
@@ -166,8 +166,9 @@ def main():
                 return
             for idx, sub in enumerate(subagents):
                 if not isinstance(sub, dict):
-                    print(f"claude-hook-adapter: invoke_subagent skipping non-dict subagent item: {type(sub).__name__}", file=sys.stderr)
-                    continue
+                    reason = f"invoke_subagent Subagents item at index {idx} must be an object (received {type(sub).__name__})"
+                    print(json.dumps({"decision": "deny", "reason": reason}))
+                    return
                 agent_name = sub.get("TypeName") or sub.get("typeName") or f"subagent_{idx}"
                 agent_payload = {
                     "tool_name": "Agent",

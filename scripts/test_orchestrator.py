@@ -1705,6 +1705,71 @@ This has since been resolved after addressing the finding.
         self.assertFalse(is_clean)
         self.assertIn("trailing unrecognized prose", reason.lower())
 
+        # 33. Parenthetical with qualifier on first line ('Clean (pending manual review)') is strictly rejected
+        parenthetical_qualifier_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "**Clean** (pending manual review)\n\n"
+                    "Reviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, parenthetical_qualifier_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("does not contain a recognized positive clean/approved verdict", reason.lower())
+
+        # 34. Parenthetical with non-zero findings count on first line ('Clean (2 blocking findings remain)') is strictly rejected
+        non_zero_parenthetical_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "**Clean** (2 blocking findings remain)\n\n"
+                    "Reviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, non_zero_parenthetical_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("does not contain a recognized positive clean/approved verdict", reason.lower())
+
+        # 35. Parenthetical with valid zero findings count on first line ('Clean (0 blocking findings)') is accepted
+        zero_findings_parenthetical_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": (
+                    "**Claude finished** review\n\n"
+                    "### Verdict\n\n"
+                    "**Clean** (0 blocking findings)\n\n"
+                    "Reviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f"
+                ),
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, zero_findings_parenthetical_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

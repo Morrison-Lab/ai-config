@@ -297,7 +297,7 @@ class PRClaimManager:
 
         # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
         clean_first_line_pat = re.compile(
-            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\([^)]*\))?(?:\*\*|__)?\s*[.!]*\s*$",
+            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*\s*$",
             re.IGNORECASE,
         )
         if not clean_first_line_pat.search(first_verdict_line):
@@ -312,7 +312,7 @@ class PRClaimManager:
             r"|_(?:posted\s+by|automated\s+review)\b.*?_"
             r"|💰\s*\*\*cost:\*\*.*"
             r"|<!--.*-->"
-            r"|(?:\*\*|__)?\s*(?:ready(?:\s+for\s+merge)?|approved(?:\s+for\s+merge)?|clean|lgtm)\b(?:\s*\([^)]*\))?(?:\*\*|__)?\s*[.!]*"
+            r"|(?:\*\*|__)?\s*(?:ready(?:\s+for\s+merge)?|approved(?:\s+for\s+merge)?|clean|lgtm)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*"
             r")\s*$",
             re.IGNORECASE,
         )

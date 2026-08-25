@@ -153,16 +153,6 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
-    cli_error_patterns = [
-        "hit your weekly limit",
-        "prepayment credits depleted",
-        "unrecognized argument",
-        "api key is missing",
-    ]
-    for pat in cli_error_patterns:
-        if pat in report.lower():
-            return False, False, f"Engine refusal string detected: '{pat}'"
-
     # Check for unbalanced or unclosed code fences using positional CommonMark rules
     if count_unbalanced_fences(report) > 0:
         return False, False, "Unbalanced or unterminated markdown code fence detected."

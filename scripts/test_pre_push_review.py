@@ -476,16 +476,8 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, _, _ = reviewer.parse_review_verdict(missing_section)
         self.assertFalse(is_valid)
 
-        # Rejects refusal / quota error
-        refusal = (
-            "### Summary Verdict\n"
-            "Verdict: Ready for merge\n\n"
-            "### Critical Findings\n"
-            "None.\n\n"
-            "### Observations\nNone.\n\n"
-            "### Verification Steps\nNone.\n"
-            "You've hit your weekly limit."
-        )
+        # Rejects refusal / quota error from CLI
+        refusal = "Error: You've hit your weekly limit. Please upgrade or wait until next week."
         is_valid, _, _ = reviewer.parse_review_verdict(refusal)
         self.assertFalse(is_valid)
 

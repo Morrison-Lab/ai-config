@@ -130,8 +130,11 @@ def main():
                     tasks_to_run.append((extract_hook_list([group]), bash_payload))
 
         elif tool_name == "invoke_subagent":
-            subagents = args.get("Subagents") or []
+            raw_subagents = args.get("Subagents")
+            subagents = raw_subagents if isinstance(raw_subagents, list) else []
             for sub in subagents:
+                if not isinstance(sub, dict):
+                    continue
                 agent_payload = {
                     "tool_name": "Agent",
                     "tool_input": {

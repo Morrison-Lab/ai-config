@@ -262,7 +262,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('subprocess.run')
     def test_pre_invocation_multi_message_steps(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
-        res2 = MagicMock(returncode=0, stdout="Message 2\n", stderr="")
+        res2 = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Message 2"}), stderr="")
         mock_run.side_effect = [res1, res2]
         
         payload = {"invocationNum": 1, "transcriptPath": "/tmp/transcript.jsonl"}
@@ -348,6 +348,26 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
         self.assertEqual(out.get("reason"), "Agent 2 not permitted")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_invoke_subagent_malformed_subagents_list(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {"Subagents": "not-a-list"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

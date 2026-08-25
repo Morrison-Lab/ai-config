@@ -18,8 +18,10 @@ touching the sentence itself:
 
 - Software, tools, APIs, harnesses, and platforms --- "package X is on CRAN",
   "feature Y is supported", "the API doesn't expose Z", "the flag default is N".
-  All facts about third-party software behavior, configuration options,
-  runtime thresholds, and architecture are empirical observations, not timeless definitions.
+  All facts about third-party software behavior,
+  configuration options, runtime thresholds,
+  and architecture are empirical observations,
+  not timeless definitions.
 - "Current", "latest", "now", "recently", "still" claims --- a version number,
   a default, a "the newest model is ...".
 - Counts, prices, dates, and roster facts --- "there are N consumers", "it

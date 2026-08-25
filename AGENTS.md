@@ -173,10 +173,17 @@ Each reading expires immediately: run the command fresh for every recap rather t
 
 ## Temporal limitations on software and technology facts
 
-Facts about software, platforms, libraries, APIs, harnesses, CLI tools, and runtime platforms are empirical observations of a specific version, release, or commit snapshot, not timeless definitions.
-When recording facts about any software or technology across memories, documentation, PR descriptions, commit messages, or comments:
-- Qualify them with explicit temporal bounds and provenance (date measured, version number, commit SHA, or execution environment).
-- State the vintage explicitly so future readers and sessions know when the fact was verified and to re-verify against current state rather than treating it as permanent.
+Facts about software, platforms, libraries, APIs, harnesses, CLI tools,
+and runtime platforms are empirical observations
+of a specific version, release, or snapshot,
+not timeless definitions.
+When recording facts about any software or technology across memories,
+documentation, PR descriptions, commit messages, or comments:
+- Qualify them with explicit temporal bounds and provenance
+  (date measured, version number, or execution environment).
+- State the vintage explicitly so future readers and sessions know
+  when the fact was verified
+  and to re-verify against current state rather than treating it as permanent.
 - See [`shared/writing/timestamp-volatile-claims.md`](shared/writing/timestamp-volatile-claims.md).
 
 ## Every comment you post to a forge says an agent posted it

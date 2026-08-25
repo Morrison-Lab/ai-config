@@ -768,9 +768,10 @@ This section is only the Claude-specific half: how this harness wakes, and how i
 
 When you open, push to, or are handed a PR/MR, subscribe with `subscribe_pr_activity` when that tool exists.
 A subscription does not replace the persistent loop.
-Webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
+This subscription never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 

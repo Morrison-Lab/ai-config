@@ -335,7 +335,7 @@ When you open, push to, or are handed a PR, arm a persistent monitoring loop if 
 Keep it running until the PR merges, closes, or the user says stop.
 A one-shot status poll is not babysitting.
 A PR-activity subscription is not a loop.
-Webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+PR-activity webhooks (`subscribe_pr_activity`) do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
 Subscribe when that tool exists, and re-arm a periodic check-in on a `/loop`, `send_later`, `CronCreate`, or schedule timer.
 A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
 Start the loop if it is not already running, then answer.
@@ -344,8 +344,6 @@ Do not bake auto-merge into the loop prompt unless the user has granted merge pe
 
 - **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
 - **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
-
-(Corrected 2026-08-25, `Lacaedemon/sparta#1397`: a session answered that it was not monitoring and declined to arm a loop because the user had only asked whether monitoring was happening.)
 
 ## Request review and drive every started PR to clean
 

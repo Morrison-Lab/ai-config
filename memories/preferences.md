@@ -185,8 +185,8 @@
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).
 - If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse.
   Don't loop forever and don't unilaterally override.
-- After creating or pushing to a PR, immediately arm a persistent monitoring loop using whatever wake this session has, without asking first.
-  Keep following until the PR is merged or closed (or I say stop).
+- After creating, pushing to, or being handed a PR, immediately arm a persistent monitoring loop using whatever wake this session has, without asking first.
+  A PR-activity subscription is not a loop.
   Treat a "are you monitoring?" question as a status check that starts the loop if it is not running.
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
   If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).

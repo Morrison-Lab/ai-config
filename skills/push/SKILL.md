@@ -109,7 +109,7 @@ A released PR would read as live-claimed, and this skill would refuse a legitima
 Derive the release terms rather than copying this list, which is a snapshot of what the corpus posts today: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
 A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one --- see [`claim-pr`](../../shared/workflow/claim-pr.md).
 
-If the latest claim comment is from someone **other than you**, hasn't been unclaimed, and is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**
+The query returns the whole claim/release exchange, newest last, so read its **last** member: if that is a *claim* rather than a release, and it is from someone **other than you**, and it is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**
 Ask the user.
 An expired claim (over 2 idle hours) no longer blocks on its own, but take it over with a fresh claim comment and run this skill's other checks (branch-head advance, `@claude` run in flight) before pushing.
 

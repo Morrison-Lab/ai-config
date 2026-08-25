@@ -392,9 +392,15 @@ def main() -> int:
         ),
     }
     items_non_head = [
-        (non_head_round1["createdAt"], non_head_round1["author"]["login"], non_head_round1["body"], True, ""),
-        (non_head_round2["createdAt"], non_head_round2["author"]["login"], non_head_round2["body"], True, ""),
+        ("comment", non_head_round1["createdAt"], non_head_round1["body"], "", "", non_head_round1["author"]["login"]),
+        ("comment", non_head_round2["createdAt"], non_head_round2["body"], "", "", non_head_round2["author"]["login"]),
     ]
+    nh_ok, nh_issues = checker.check_latest_verdict(items_non_head)
+    check(
+        "check_latest_verdict: non-HEAD marked rejection blocks clean verdict",
+        (not nh_ok) and any("NOT clean" in i for i in nh_issues),
+    )
+
     # Regression (PR #2180 round 10): non-HEAD unmarked prose rejection under ### Verdict
     non_head_prose_round1 = {
         "createdAt": "2026-08-05T00:00:00Z",
@@ -406,13 +412,25 @@ def main() -> int:
         ),
     }
     items_non_head_prose = [
-        (non_head_prose_round1["createdAt"], non_head_prose_round1["author"]["login"], non_head_prose_round1["body"], True, ""),
-        (non_head_round2["createdAt"], non_head_round2["author"]["login"], non_head_round2["body"], True, ""),
+        ("comment", non_head_prose_round1["createdAt"], non_head_prose_round1["body"], "", "", non_head_prose_round1["author"]["login"]),
+        ("comment", non_head_round2["createdAt"], non_head_round2["body"], "", "", non_head_round2["author"]["login"]),
     ]
     nhp_ok, nhp_issues = checker.check_latest_verdict(items_non_head_prose)
     check(
         "check_latest_verdict: non-HEAD unmarked prose rejection under ### Verdict blocks clean verdict",
         (not nhp_ok) and any("NOT clean" in i for i in nhp_issues),
+    )
+
+    # Regression: check_latest_verdict sorts by createdAt timestamp (field index 1),
+    # not by author login or other fields.
+    items_diff_login = [
+        ("comment", "2026-08-05T00:00:00Z", "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**", "", "", "zzz-bot"),
+        ("comment", "2026-08-06T00:00:00Z", "**Claude finished** review\n\n### Verdict\n\n**Not approved**, blocking.", "", "", "aaa-bot"),
+    ]
+    dl_ok, dl_issues = checker.check_latest_verdict(items_diff_login)
+    check(
+        "check_latest_verdict: sorts by timestamp when later item has alphabetically earlier login",
+        (not dl_ok) and any("NOT clean" in i for i in dl_issues),
     )
 
     # Regression (PR #2180 round 11): incidental prose negation outside verdict section does not fail

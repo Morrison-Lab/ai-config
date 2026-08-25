@@ -153,6 +153,27 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
+    refusal_patterns = [
+        "hit your weekly limit",
+        "prepayment credits depleted",
+        "unrecognized argument",
+        "api key is missing",
+        "unable to review",
+        "cannot review",
+        "refuse to review",
+        "review cannot be performed",
+        "cannot perform",
+        "not able to review",
+        "rate limit",
+        "quota exhausted",
+        "usage limit",
+        "overloaded",
+        "too many requests",
+    ]
+    for pat in refusal_patterns:
+        if pat in report.lower():
+            return False, False, f"Engine refusal string detected: '{pat}'"
+
     # Check for unbalanced or unclosed code fences using positional CommonMark rules
     if count_unbalanced_fences(report) > 0:
         return False, False, "Unbalanced or unterminated markdown code fence detected."
@@ -206,10 +227,15 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         sbody = s_match.group(1).strip()
         v_in_sec = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", sbody)
         if not v_in_sec:
-            bold_matches = re.findall(
-                r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
+            bold_matches = []
+            for m in re.finditer(
+                r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*(.*)$",
                 sbody,
-            )
+            ):
+                v_name = m.group(1).strip()
+                trailing = m.group(2).strip()
+                full_verdict_str = f"{v_name} — {trailing}" if trailing else v_name
+                bold_matches.append(full_verdict_str)
             if bold_matches:
                 v_in_sec = bold_matches
         verdict_matches.extend(v_in_sec)
@@ -220,12 +246,12 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {
         "needs work", "needs more work", "changes requested", "unapproved", "not approved",
-        "disapproved", "blocked", "ready after addressing findings", "unable to review",
-        "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve",
+        "disapproved", "blocked", "ready after addressing findings",
+        "rejected", "do not merge", "fail", "failed", "cannot approve",
         "not ready for merge", "do not approve", "never approve"
     }
     core_negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
-    qual_negation_pattern = r"(?i)\b(?:except|unless|conditional|subject\s+to|pending|after\s+addressing|with\s+(?:caveat|exception|reservation)|deletes|breaks|causes\s+data\s+loss)\b"
+    qual_negation_pattern = r"(?i)\b(?:except|unless|conditional|subject\s+to|pending|after\s+addressing|with\s+(?:caveat|exception|reservation)|deletes|breaks|causes\s+data\s+loss|once|if|when|provided\s+that|assuming|requiring|requiring\s+changes|after\s+fixing|after\s+resolving)\b"
 
     parsed_verdicts = []
     for v_str in verdict_matches:
@@ -238,7 +264,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         has_qual_negation = bool(re.search(qual_negation_pattern, v_qual, flags=re.IGNORECASE))
 
         if v_core in clean_allowlist:
-            if has_core_negation or has_qual_negation:
+            if has_core_negation or has_qual_negation or (v_qual and not re.match(r"^(?:no\s+(?:blocking|critical|issues|findings)|all\s+(?:checks|tests)\s+pass)", v_qual, flags=re.IGNORECASE)):
                 parsed_verdicts.append((True, False, f"Negated or qualified approval: '{v_str}'"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
@@ -282,16 +308,6 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         blocker_match = re.search(blocker_pattern, clean_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
-
-    refusal_patterns = [
-        "hit your weekly limit",
-        "prepayment credits depleted",
-        "unrecognized argument",
-        "api key is missing",
-    ]
-    for pat in refusal_patterns:
-        if pat in report.lower():
-            return False, False, f"Engine refusal string detected: '{pat}'"
 
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 
@@ -698,6 +714,19 @@ def main():
     full_prompt = build_review_prompt(diff, ref_name, guidelines)
 
     report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=head_sha)
+
+    # Re-verify local HEAD immediately before validating, saving, or posting
+    fresh_head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if fresh_head_sha != head_sha:
+        log_error(
+            f"Local HEAD mutated during review execution (started at {head_sha[:8]}, now at {fresh_head_sha[:8]}). "
+            "Invalidating review result to prevent TOCTOU unreviewed push."
+        )
+        sys.exit(1)
 
     if not report:
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")

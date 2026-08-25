@@ -244,6 +244,48 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
+        # Bold approval with trailing conditional qualifier is parsed as Needs work
+        bold_conditional = (
+            "### Summary Verdict\n"
+            "**Ready for merge** pending integration tests.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(bold_conditional, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
+
+        # Bold approval with 'once tests pass' qualifier is parsed as Needs work
+        bold_once = (
+            "### Summary Verdict\n"
+            "**Ready for merge** once tests pass.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(bold_once, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
+
+        # Refusal phrases (e.g. 'unable to review' or 'rate limit') invalidate the report to trigger fallback
+        refusal_report = (
+            "### Summary Verdict\n"
+            "Verdict: Unable to review due to rate limit.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(refusal_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("Engine refusal string detected", reason)
+
         # Report entirely inside a backtick code fence is rejected as missing top-level structure
         fenced_report = (
             "```markdown\n"

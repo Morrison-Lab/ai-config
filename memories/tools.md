@@ -1117,3 +1117,6 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
+## \subprocess.run(text=True)\ on Windows destroys UTF-8 output
+
+On Windows, Python's \subprocess.run(..., text=True)\ defaults to the system locale encoding (often \cp1252\), rather than UTF-8. If the CLI tool you are calling (like \gh pr view --json\) outputs UTF-8 containing emojis or special characters, reading it with \	ext=True\ alone will corrupt the characters (mojibake) and break string matching or parsing. You must explicitly set \encoding="utf-8"\ when capturing UTF-8 stdout on Windows. For example: \subprocess.run(["gh", ...], capture_output=True, text=True, encoding="utf-8")\.

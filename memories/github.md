@@ -1194,3 +1194,4 @@ interpolation), same as `--body-file` on the porcelain command.
 
 (Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows
 session; the REST PATCH succeeded immediately on the same body file.)
+- **The GitHub GraphQL CheckStatusState enum has six values, including five non-terminal states.** When checking a PR's CI status via statusCheckRollup, a check's status can be one of QUEUED, IN_PROGRESS, REQUESTED, WAITING, PENDING, or COMPLETED. If you are blocking a merge on incomplete CI (e.g. in a gate hook), you must check for all five non-terminal states, especially REQUESTED which is specific to GitHub Actions runs that haven't yet been queued.

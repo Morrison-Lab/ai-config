@@ -1198,4 +1198,8 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
-- **End-of-Session PR Dashboard**: When ending a session or reaching a clean stopping point, always run the `pr-status-all` skill to provide a dashboard of all open PRs. Note: This is an explicit user mandate (User directive / CAI, 2026-08-25) that deliberately overrides `pr-status-all`'s normal localized trigger scope and default fan-out cost constraints. Do not merely recommend the slash command; actually run the skill. To prevent quota exhaustion, safety cap this to run only if there are 10 or fewer open PRs.
+- **End-of-Session PR Dashboard**: When ending a session or reaching a clean stopping point, execute the `pr-status-all` skill.
+  This is a user mandate (2026-08-25) to provide a whole-queue dashboard before yielding.
+  Do not merely recommend the slash command.
+  To prevent quota exhaustion on large repositories, run `gh pr list --state open` first.
+  If there are more than 10 open PRs, skip the dashboard entirely.

@@ -275,7 +275,11 @@ class PRClaimManager:
             if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
                 return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
 
-        # 1. Check for not-clean / blocking patterns throughout the ENTIRE stripped review body
+        # 1. Check for not-clean / blocking patterns throughout review body (with code and quoted spans blanked)
+        scan_body = re.sub(r"`[^`\n]*`", " ", stripped_body)
+        scan_body = re.sub(r'"[^"\n]*"', " ", scan_body)
+        scan_body = re.sub(r"\u201c[^\u201d\n]*\u201d", " ", scan_body)
+
         not_clean_patterns = [
             r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
             r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
@@ -289,8 +293,8 @@ class PRClaimManager:
         not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
         for pat in not_clean_patterns:
-            for match in re.finditer(pat, stripped_body, re.IGNORECASE | re.MULTILINE):
-                prefix = stripped_body[max(0, match.start() - 25):match.start()]
+            for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+                prefix = scan_body[max(0, match.start() - 25):match.start()]
                 if not_clean_negation_prefix.search(prefix):
                     continue
                 return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
@@ -311,11 +315,20 @@ class PRClaimManager:
 
         # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
         clean_first_line_pat = re.compile(
-            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*\s*$",
+            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*\s*(?:(?:---|--|[\u2014\u2013—–-]|:)\s*.*)?$",
             re.IGNORECASE,
         )
         if not clean_first_line_pat.search(first_verdict_line):
             return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
+
+        clean_qualifier = re.compile(
+            r"\b(?:once|after|when|if|unless|pending|provided|assuming"
+            r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
+            r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+            re.IGNORECASE,
+        )
+        if clean_qualifier.search(first_verdict_line):
+            return False, f"Latest AI review verdict contains qualifier ('{first_verdict_line[:60]}')"
 
         # 3. Allowlist of recognized benign trailing metadata lines
         # Any other un-allowlisted prose in the verdict section fails closed

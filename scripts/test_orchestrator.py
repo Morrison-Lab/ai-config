@@ -1849,7 +1849,7 @@ This has since been resolved after addressing the finding.
         })
         mgr._run_cmd = MagicMock(return_value=(0, alt_sha_format_clean_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertTrue(is_clean)
+        self.assertTrue(is_clean, f"Failed with reason: {reason}")
 
         # 40. Earlier mention of HEAD in review prose does not mask a stale trailing Reviewed commit citation
         decoy_sha_stale_json = json.dumps({

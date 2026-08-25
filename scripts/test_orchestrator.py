@@ -1177,7 +1177,20 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("Repository could not be resolved", reason)
 
-        # 4. Explicit repo slug override threaded to check-pr-fully-clean.py
+        # 4. Post-print crash (out contains banner, err contains actual traceback) prefers err
+        banner_out = "Checking ARDI / fully-clean status for Morrison-Lab/ai-config#999...\n"
+        tb_err = (
+            "Traceback (most recent call last):\n"
+            "  File 'check-pr-fully-clean.py', line 123, in <module>\n"
+            "RuntimeError: Command failed (gh pr view): GraphQL: Could not resolve to a PullRequest"
+        )
+        mgr._run_cmd = MagicMock(return_value=(1, banner_out, tb_err))
+        is_clean, reason = mgr.is_pr_fully_clean(999)
+        self.assertFalse(is_clean)
+        self.assertIn("RuntimeError: Command failed", reason)
+        self.assertNotIn("Checking ARDI", reason)
+
+        # 5. Explicit repo slug override threaded to check-pr-fully-clean.py
         mgr._run_cmd = MagicMock(return_value=(0, "clean", ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112, repo_slug="OtherOrg/other-repo")
         self.assertTrue(is_clean)

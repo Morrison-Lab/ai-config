@@ -215,14 +215,23 @@ class PRClaimManager:
         if rc == 0:
             return True, "PR is fully clean across CI and review"
 
-        output = (out or err or "").strip()
-        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        out_lines = [line.strip() for line in (out or "").splitlines() if line.strip()]
         blocking_reasons = []
-        for line in lines:
+        for line in out_lines:
             if line.startswith("- ") and not line.startswith("- NOTE:"):
                 blocking_reasons.append(line[2:])
-        reason = "; ".join(blocking_reasons) if blocking_reasons else (lines[-1] if lines else "PR is not clean")
-        return False, reason
+
+        if blocking_reasons:
+            return False, "; ".join(blocking_reasons)
+
+        err_lines = [line.strip() for line in (err or "").splitlines() if line.strip()]
+        if err_lines:
+            return False, err_lines[-1]
+
+        if out_lines:
+            return False, out_lines[-1]
+
+        return False, f"check-pr-fully-clean exited with code {rc}"
 
     def merge_pr_under_mwc(
         self,

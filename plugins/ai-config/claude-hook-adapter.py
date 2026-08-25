@@ -2,11 +2,13 @@ import sys
 import json
 import subprocess
 import os
+import traceback
 
 def main():
     try:
         payload = json.load(sys.stdin)
-    except Exception:
+    except Exception as exc:
+        print(f"claude-hook-adapter: failed to read payload: {exc}", file=sys.stderr)
         print(json.dumps({"decision": "allow"}))
         return
 
@@ -15,7 +17,9 @@ def main():
         print(json.dumps({"decision": "allow"}))
         return
 
-    command = tool_call.get("args", {}).get("CommandLine", "")
+    args = tool_call.get("args", {})
+    command = args.get("CommandLine", "")
+    cwd = args.get("Cwd") or os.getcwd()
     
     # Construct Claude Code payload
     claude_payload = {
@@ -29,13 +33,15 @@ def main():
     hooks_json_path = os.path.join(repo_root, "hooks", "hooks.json")
     
     if not os.path.exists(hooks_json_path):
+        print(f"claude-hook-adapter: {hooks_json_path} not found", file=sys.stderr)
         print(json.dumps({"decision": "allow"}))
         return
 
     try:
         with open(hooks_json_path, "r") as f:
             hooks_def = json.load(f)
-    except Exception:
+    except Exception as exc:
+        print(f"claude-hook-adapter: failed to load {hooks_json_path}: {exc}", file=sys.stderr)
         print(json.dumps({"decision": "allow"}))
         return
         
@@ -54,6 +60,13 @@ def main():
         # Replace ${CLAUDE_PLUGIN_ROOT} with repo_root
         cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
         
+        timeout_val = hook.get("timeout")
+        if timeout_val is not None:
+            try:
+                timeout_val = float(timeout_val)
+            except ValueError:
+                timeout_val = None
+
         try:
             result = subprocess.run(
                 cmd, 
@@ -61,7 +74,9 @@ def main():
                 input=json.dumps(claude_payload), 
                 text=True, 
                 capture_output=True,
-                env=os.environ
+                env=os.environ,
+                cwd=cwd,
+                timeout=timeout_val
             )
             
             if result.returncode == 0 and result.stdout:
@@ -76,11 +91,20 @@ def main():
                         }))
                         return
                     if hso.get("additionalContext"):
-                        print(f"Warning from {hook.get('script')}: {hso.get('additionalContext')}", file=sys.stderr)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                        print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
+                except Exception as exc:
+                    print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
+                    if result.stderr:
+                        print(f"stderr was: {result.stderr}", file=sys.stderr)
+            elif result.returncode != 0:
+                print(f"claude-hook-adapter: hook {cmd} failed with exit code {result.returncode}", file=sys.stderr)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+
+        except subprocess.TimeoutExpired:
+            print(f"claude-hook-adapter: hook {cmd} timed out after {timeout_val}s", file=sys.stderr)
+        except Exception as exc:
+            print(f"claude-hook-adapter: execution of {cmd} failed: {exc}", file=sys.stderr)
 
     print(json.dumps({"decision": "allow"}))
 

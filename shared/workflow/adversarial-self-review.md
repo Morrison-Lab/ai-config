@@ -207,3 +207,9 @@ waiting for?".
 Five commits were sitting unpushed behind a self-imposed review queue while
 the branch's conflict with `main` had to be re-resolved twice.
 The honest answer to the question was "nothing".)
+
+## Query all available providers sequentially
+
+When obtaining adversarial reviews, we need a clean verdict from **every** available provider (e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
+Do not stop after one provider returns clean. Query them sequentially, one at a time.
+Once one provider gives a clean review, move on to the next one, until all available providers have signed off with a clean verdict on the same commit.

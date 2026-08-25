@@ -232,6 +232,29 @@ actually covers, against the specification rather than against the code.
 That is one comparison and it separates them exactly: data outside the valid
 regime means the fixture was wrong, data inside it means the fix is.
 
+### When the specification is a written RULE, quote it into the fixture
+
+The paragraph above says to settle both readings against the specification rather than against the code, and leaves "the specification" to whatever the domain supplies.
+Where the guard enforces a **written rule in this corpus** --- a disclosure format, a claim wording, a required marker --- that phrase has a concrete and easily-skipped referent: the rule's own text.
+
+The failure is that a plausible variant reads as compliant.
+`AGENTS.md` specifies the disclosure line as `_Posted by Claude Code (AI agent) --- not written by a human._`, with the agent's name substituted and the rest kept verbatim.
+A fixture asserting that `_Posted by Codex (AI agent) -- not a human._` satisfies that rule looks exactly like a compliant example, and is not one: the substitution is correct and the *verbatim* half was rewritten, `---` shortened to `--` and `not written by a human` to `not a human`.
+The fixture passed because the matcher anchored the prefix `posted by ... (ai agent)` and examined nothing after it, so neither deviation was in anything's field of view, and tightening the matcher to require the tail is what exposed it --- which is the forced-fixture-change tell above, arriving from a rule rather than from a bug.
+
+Note which way this differs from the section it sits in.
+There the fixture agrees with a defect in *code*, so reading the code cannot find it.
+Here the fixture agrees with a laxness in the *matcher*, and the thing that would have found it is one paste from a document nobody thought to open, because the fixture's author was reconstructing the rule from a memory of what it means rather than from what it says.
+That reconstruction preserves whatever the author reads as the rule's *point* and loses the rest, so the divergence lands wherever the literal text was doing work the paraphrase does not notice --- which is exactly where a matcher then has to be loose.
+
+- **Do:** copy a required string into the fixture from the rule that defines it, and name that rule's file beside it, rather than composing a case that looks like it complies.
+- **Do:** diff a fixture's expected value against the rule's text character for character when the rule specifies a literal, since a shortened dash or a dropped word reads as identical.
+- **Don't:** read a fixture passing as evidence its expected value is conformant --- a loose matcher and a non-conformant fixture agree.
+- **Don't:** restate a rule's literal text from memory inside a fixture;
+  the divergence is the defect the matcher then has to tolerate, in whichever direction the paraphrase drifted.
+
+(Measured 2026-08-24 Pacific on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185).)
+
 ### Prove the new fixtures catch the old bug
 
 A fixture edited until the fix passes is otherwise only a fixture edited until

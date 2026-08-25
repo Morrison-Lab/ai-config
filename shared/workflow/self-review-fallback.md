@@ -175,6 +175,26 @@ Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, whic
 
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "Where the cross-vendor directive came from".
 
+**A CLEAN same-vendor verdict is the state this rule most applies to, and the one where nothing prompts it.**
+Every trigger named above is a *failure* of the primary.
+None of them fires on the case that leaves nothing outstanding: the primary answers, finds nothing, and reports the PR ready.
+A clean verdict closes the loop and reads as permission to stop, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s "a clean verdict discharges the round, and it does not discharge your own probing" arriving one reviewer further out.
+There the unsearched space belongs to one reviewer's attention;
+here it belongs to a whole vendor's blind spot, so no amount of attention inside that vendor reaches it.
+
+The asymmetry is what decides it.
+A same-vendor clean verdict is evidence that the diff survives the checks that vendor's models are good at, and it is not evidence of absence, because the defects a shared blind spot hides are exactly the ones no same-vendor round can report.
+So same-vendor rounds do not accumulate into coverage.
+Eleven rounds and one round make the same claim about whatever the vendor's models are poor at, which is why a round count reads as thoroughness while measuring only how much of the vendor's reachable region was covered.
+
+- **Do:** run the cross-vendor pass on a clean same-vendor verdict, not only on a failed one.
+- **Do:** report a same-vendor round count as coverage inside one vendor's reachable region, and say which reviewers supplied it, rather than as a bare measure of how thoroughly the diff was reviewed.
+- **Don't:** read "the reviewer found nothing" as a reason the cross-vendor pass is unnecessary --- that is the reading the linked case record falsifies.
+- **Don't:** treat many same-vendor rounds as substituting for one cross-vendor round;
+  they are not the same measurement.
+
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A clean same-vendor verdict over eight blocking cross-vendor findings".
+
 **"Reachable" is a property of the session as well as of the reviewer, and the second kind is not a fallback case at all.**
 Everything above treats reachability as a fact about the *reviewer* --- quota-exhausted, unlicensed, rate-limited, not configured --- so the remedy is always to re-check it later, on the reasonable assumption that whatever ails it may lift.
 There is a fourth state that wording does not reach, and it never lifts on its own: the reviewer is working perfectly, and **this session** cannot summon it.

@@ -677,6 +677,7 @@ including gaining its own independent addition that collides with yours
 before reporting a PR ready, not just trust the last green run.
 
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

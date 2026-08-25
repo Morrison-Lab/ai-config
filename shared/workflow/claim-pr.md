@@ -217,7 +217,7 @@ fixes.)
 
 **Second occurrence, 2026-08-24, with DIFFERENT parents --- the same lesson in the case the section above does not describe.**
 Both branches of the rule above turn on the parents matching, which happens when two sessions resolve the same `main`-merge.
-The commoner collision has no merge in it at all: two sessions independently fix the **same review round's findings** on one branch, five minutes apart, so the two commits share only their base and the divergence is ordinary.
+The commoner collision has no merge *between the two fixes*: two sessions independently fix the **same review round's findings** on one branch, five minutes apart, so the two commits share only their base and the divergence is ordinary.
 
 What carries over is the part that is not about parents.
 "They addressed the same findings" is exactly the belief that makes a reset feel safe, and it is the same interchangeability assumption the `Don't` above rejects.

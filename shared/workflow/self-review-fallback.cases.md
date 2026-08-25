@@ -217,24 +217,28 @@ It read the reviewed head, and it answered clean.
 
 Measured 2026-08-24 Pacific on [ai-config#2131](https://github.com/Morrison-Lab/ai-config/pull/2131), at head `b744d6a2`.
 
-Read the two same-vendor readings carefully, because only one of them is a reading of *that head*:
+Read the two same-vendor readings carefully, because only one of them read *that head*:
 
 | reader | rounds | what it read |
 | --- | --- | --- |
 | the repo's own `claude-review` | 1 | `b744d6a2` itself; **Ready for merge** |
-| dispatched `adversarial-reviewer` subagent | 11, pre-push | a state four substantive commits earlier |
+| dispatched `adversarial-reviewer` subagent | 11, pre-push | a sequence of states ending at `5aa36bbe` |
 
-The eleven rounds are same-vendor depth on the same work rather than a second verdict on the reviewed commit, and saying otherwise would inflate exactly the total this record's argument turns on.
+Each of those eleven rounds read a different state, and the branch's own commit messages name them (`594fdce9`: "One blocking finding on `5aa36bbe`").
+So the last one is one small branch commit --- `594fdce9`, nine insertions and four deletions --- plus the `origin/main` merge away from the reviewed head.
+That gap is narrow, which cuts *for* this record rather than against it: the eleven rounds had substantially read the work `codex` then found eight blocking defects in, and they still are not a verdict on `b744d6a2`.
+Say it that way rather than counting them alongside the one verdict that did read it, which would inflate the same-vendor total this record's argument turns on.
+
 `claude-review`'s own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.
 Quote it that way rather than as "no findings": [`fully-clean`](fully-clean.md) is explicit that "non-blocking", "nit", and "minor" are prioritization labels rather than a pass, and softening the qualifier here would strengthen this record's own argument, which is the direction to be most careful about.
 
 A `codex` pass on the same head then returned 11 findings, 8 of them blocking, and every one was verified real before being accepted.
 
-Two readings are ruled out by the record itself.
+Two explanations are ruled out by the record itself.
 It is not that the primary was flaky, since it completed and produced a real, reasoned verdict at cost.
 It is not that the cross-vendor reviewer was noisier, since the findings were checked individually rather than taken on its word.
 
-Three remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
+Three explanations remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
 The first is that theory: two readings that share a vendor share their blind spots, so their agreement measures the blind spot.
 The second is **contamination**, recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the eleven prior rounds in its own justification, so the two same-vendor readings were not independent samples and part of their agreement is explained by the second having read about the first.
 That confound bears on the one verdict this record rests on, since the eleven pre-push rounds are what it cited.
@@ -243,4 +247,3 @@ Its remedy is the cheapest to state, since a bar can be named in the request; th
 Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.
 
 The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).
-Note throughout that the contamination reading is a claim about the later verdict's *justification* rather than about its effort, which its nine enumerated verification steps weigh against.

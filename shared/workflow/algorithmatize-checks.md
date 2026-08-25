@@ -753,7 +753,7 @@ It fell under the outcome headed "The harness that performs those mutations need
 The anchor matched nothing, so the mutation never applied, and doubting the coverage would have been the wrong move exactly as this entry says.
 
 The second is the exception, and it is worth separating rather than folding in.
-`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE` and could not observe the mutation aimed at it.
+`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE` and could not observe the mutation aimed at `ANY_BODY_FLAG_RE`.
 The mutation was fine and the **suite** was the defect, so the remedy was a new discriminating fixture.
 That is the pass-condition entry above, which is explicit that such a case reads as "an unmeasured clause rather than a robust one".
 

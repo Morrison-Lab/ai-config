@@ -151,15 +151,15 @@ It began as `-c\s`, matching only the spaced spelling.
 `-c(?:\s|=|\S)` accepts the attached and `=` spellings `gh` also takes, and puts `-c` within reach of the middle of a word --- executed against a **compliant** `gh issue close 5 -R Morrison-Lab/ai-config`, it is the one of the five that warns, on the `-co` inside `ai-config`.
 Then three left-boundary conditions, in that order: `(?<![\w-])`, `(?<![\w\-"'])` once a preceding quote was found to slip past, and `(?<![^\s])` at `15b63d91`.
 
-Every one of those four edits asks where a token begins, so they are one finding about tokenization wearing four costumes.
+Every one of those four edits asks where a token's boundaries are, so they are one finding about tokenization wearing four costumes.
 The last of them answered it by hand-rolling a boundary test rather than by asking what already computes one.
 `shlex` is in the standard library and nine hooks in this repo already imported it at the first of those forms, so the layer that would answer the question was reachable throughout.
 The layer change is **filed rather than shipped**, as [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189), so this records a diagnosis rather than a demonstrated repair.
 
 **The paragraph above makes no claim about which form answered which, deliberately.**
 Two of the commits are concurrent siblings merged back together (see [`claim-pr`](../workflow/claim-pr.md)'s second-occurrence entry), so listing order does not carry the causal order there, and successive review rounds each refuted a different reconstruction of it.
-The one attribution it does make --- the preceding quote that `(?<![\w\-"'])` was written against --- is a linear successor and quotes that commit's own message.
-The rule never needed the rest: what makes this the third occurrence is that four edits to one matcher all ask where a token begins, which is a property of the forms rather than of their sequence.
+The one attribution it does make --- the preceding quote that `(?<![\w\-"'])` was written against --- is safe on both counts: `93363481` is a linear successor of `cf195e46`, and the reason is quoted from `93363481`'s own commit message.
+The rule never needed the rest: what makes this the third occurrence is that four edits to one matcher all ask where a token's boundaries are, which is a property of the forms rather than of their sequence.
 
 - **Do:** write down the one question a run of fixes shares, before writing the next pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.
 - **Do:** name the construct you are hand-rolling when a fix adds a boundary test, an escape check, or a quote check to a regex, and search the standard library for it before writing it.

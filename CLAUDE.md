@@ -746,7 +746,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 

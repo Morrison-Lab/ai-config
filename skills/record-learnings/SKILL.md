@@ -79,7 +79,7 @@ For standing instructions that should always be in context:
 | Tool quirk | "glab has no GITLAB_TOKEN env var" | The matching topical file -- `/memories/github.md` here; see `memories/MEMORY.md` |
 | Codebase fact | "CI only runs on branch pushes, not PR events" | That repo's own agent docs (or staging) |
 | Workflow | "Always run r-pkg-spellcheck before push" | Skill file |
-| Preference | "Always request d-morrison as reviewer" | `/memories/preferences.md` |
+| Preference | "Always request the repository owner as reviewer" | `/memories/preferences.md` |
 | Failed approach | "Don't use merge_request_event with $CI_OPEN_MERGE_REQUESTS" | That repo's own agent docs (or staging) |
 
 ## Process

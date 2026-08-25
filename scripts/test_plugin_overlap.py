@@ -45,14 +45,14 @@ def check(name, condition):
 # --- enabled_ai_config_plugins: known positives first ------------------------
 
 both = {"enabledPlugins": {"ai-config@Morrison-Lab": True,
-                           "ai-config@d-morrison": True}}
+                           "ai-config@the repository owner": True}}
 check("two marketplaces' entries are BOTH returned, in order",
       po.enabled_ai_config_plugins(both)
-      == ["ai-config@Morrison-Lab", "ai-config@d-morrison"])
+      == ["ai-config@Morrison-Lab", "ai-config@the repository owner"])
 
-one = {"enabledPlugins": {"ai-config@d-morrison": True, "oss@other": True}}
+one = {"enabledPlugins": {"ai-config@the repository owner": True, "oss@other": True}}
 check("a single enabled entry is returned, unrelated plugins ignored",
-      po.enabled_ai_config_plugins(one) == ["ai-config@d-morrison"])
+      po.enabled_ai_config_plugins(one) == ["ai-config@the repository owner"])
 
 # --- enabled_ai_config_plugins: negatives ------------------------------------
 
@@ -65,8 +65,8 @@ check("a disabled (false) entry does not count",
 check("ai_config_entries keeps an explicit false, which the name list drops",
       po.ai_config_entries(
           {"enabledPlugins": {"ai-config@Morrison-Lab": False,
-                              "ai-config@d-morrison": True}})
-      == {"ai-config@Morrison-Lab": False, "ai-config@d-morrison": True})
+                              "ai-config@the repository owner": True}})
+      == {"ai-config@Morrison-Lab": False, "ai-config@the repository owner": True})
 check("ai_config_entries still ignores non-ai-config names",
       po.ai_config_entries({"enabledPlugins": {"oss@x": True}}) == {})
 
@@ -92,8 +92,8 @@ check("resolve_enabled over one scope matches the single-scope helper",
       po.resolve_enabled([both]) == po.enabled_ai_config_plugins(both))
 check("first-seen order is preserved across scopes",
       po.resolve_enabled([{"enabledPlugins": {"ai-config@Morrison-Lab": True}},
-                          {"enabledPlugins": {"ai-config@d-morrison": True}}])
-      == ["ai-config@Morrison-Lab", "ai-config@d-morrison"])
+                          {"enabledPlugins": {"ai-config@the repository owner": True}}])
+      == ["ai-config@Morrison-Lab", "ai-config@the repository owner"])
 check("no scopes at all resolves to nothing enabled",
       po.resolve_enabled([]) == [])
 check("a name merely CONTAINING ai-config does not count",
@@ -143,7 +143,7 @@ with tempfile.TemporaryDirectory() as tmp:
     lines = po.describe_overlap([p], symlink_install_live=True)
     check("plugin + live symlink reports the stacked install",
           len(lines) == 1 and "BOTH live" in lines[0]
-          and "ai-config@d-morrison" in lines[0])
+          and "ai-config@the repository owner" in lines[0])
 
     # Known positive: two marketplaces -> namespace-collision warning.
     b = settings_file(tmp, "both.json", both)
@@ -151,7 +151,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("two marketplace entries report the namespace collision",
           len(lines) == 1 and "namespace" in lines[0]
           and "ai-config@Morrison-Lab" in lines[0]
-          and "ai-config@d-morrison" in lines[0])
+          and "ai-config@the repository owner" in lines[0])
 
     # Both defects at once -> both warnings.
     lines = po.describe_overlap([b], symlink_install_live=True)

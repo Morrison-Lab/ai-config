@@ -5,7 +5,7 @@ the reply once it is written.
 Satellite of [`claude-bot-workflows.md`](claude-bot-workflows.md), which owns
 what a run does once it starts, split at the 1200-line gate.
 
-## Re-triggering the @claude PR *review* (d-morrison Quarto / R-pkg repos, e.g. `psw`)
+## Re-triggering the @claude PR *review* (the repository owner Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
   `Morrison-Lab/psw`, moved there from `d-morrison/psw`): the review workflow
   is `.github/workflows/claude-code-review.yml`

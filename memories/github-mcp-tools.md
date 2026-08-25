@@ -10,7 +10,7 @@ above 1200 lines, so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
 - In remote/web sessions the authenticated GitHub identity **can be** the repo
-  owner (`d-morrison`), in which case requesting `d-morrison` as a PR reviewer
+  owner (`the repository owner`), in which case requesting `the repository owner` as a PR reviewer
   fails with `422 Review cannot be requested from pull request author`.
   Harmless --- the PR is still created; the reviewer just isn't added. Don't
   treat the 422 as a failure to retry (it's expected per the standing
@@ -226,7 +226,7 @@ See ai-config#694 for the precedent.
   Say so when handing off, rather than leaving someone to wonder why the new
   labels look unstyled.
 - **Comments/replies you post via the GitHub MCP tools echo back into the session's `<github-webhook-activity>` events under the human account's identity, not a bot identity.**
-  `add_reply_to_pull_request_comment` and `add_issue_comment` authenticate as the human who owns the session (e.g. `d-morrison`), so a webhook event for your own just-posted reply shows `Author: d-morrison` (or whichever human), never a recognizable bot name like `claude[bot]`.
+  `add_reply_to_pull_request_comment` and `add_issue_comment` authenticate as the human who owns the session (e.g. `the repository owner`), so a webhook event for your own just-posted reply shows `Author: the repository owner` (or whichever human), never a recognizable bot name like `claude[bot]`.
   Don't use the author field to decide "is this my own echo, skip it."
   This is easy to get wrong at a glance since a same-author event looks exactly like a genuine human reply demanding a response.
   **Since 2026-08-24 every agent-posted comment also ends with `_Posted by Claude Code (AI agent) --- not written by a human._`**, which is the corpus-wide marker the `mcp__github__*` comment tools carry --- see [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md).
@@ -240,7 +240,7 @@ See ai-config#694 for the precedent.
   wording looks familiar. (Hit repeatedly on
   `UCD-SERG/serocalculator#503`, 2026-07-24: several
   `add_reply_to_pull_request_comment` calls immediately produced a webhook
-  event attributed to `d-morrison` quoting the reply verbatim --- each one
+  event attributed to `the repository owner` quoting the reply verbatim --- each one
   a self-echo, not a new human comment, confirmed each time by re-reading
   the body rather than checking for the footer directly.)
   - **Scope that to the question it answers: is this a self-echo or a
@@ -669,9 +669,9 @@ See ai-config#694 for the precedent.
   is the node's own repository, so that comparison would have matched.
   Why that first comparison fails where string-addressed calls follow the
   redirect was not established.
-  Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
+  Measured on `Morrison-Lab/ai-config` (transferred from `the repository owner`),
   2026-07-31, against PR #975 --- two different gates, one per spelling:
-  - `owner: d-morrison` --- `Access denied: review thread
+  - `owner: the repository owner` --- `Access denied: review thread
     PRRT_kwDOShagnM6VdO1_ does not belong to the declared repo
     "d-morrison/ai-config".`
   - `owner: Morrison-Lab` --- `Access denied: repository
@@ -683,7 +683,7 @@ See ai-config#694 for the precedent.
   start, and `add_repo` refuses a cross-owner add --- so this is **not
   transient**, and re-testing it each polling round buys nothing.
   Every other tool used in that session worked normally under
-  `owner: d-morrison`: `pull_request_read` (every method),
+  `owner: the repository owner`: `pull_request_read` (every method),
   `add_issue_comment`, `add_reply_to_pull_request_comment`,
   `update_pull_request`, `request_copilot_review`, and
   `subscribe_pr_activity`.
@@ -910,9 +910,9 @@ See ai-config#694 for the precedent.
   has to be re-checked per org rather than per session.
 
   Note also that `GET /user` answered `dem-extra1` here, where sparta's entry
-  records `d-morrison` for that same raw-API read.
+  records `the repository owner` for that same raw-API read.
   Read that against the table carefully: the table's rows are WRITES, so its
-  raw-API row is `claude[bot]`, and the `d-morrison` figure for a raw-API read
+  raw-API row is `claude[bot]`, and the `the repository owner` figure for a raw-API read
   lives in that entry's prose instead --- which is the disagreement it cites
   as its reason for ruling `GET /user` out as an identity signal at all.
   That is the entry behaving as its own caveat says: the measurements are
@@ -931,7 +931,7 @@ See ai-config#694 for the precedent.
   table itself says to trust.**
   `Lacaedemon/sparta`'s `.claude/memories/sparta.md` carries an identity table
   under "A session writes under TWO identities here", mapping each client to
-  the login its writes are attributed to: MCP tools to `d-morrison`, the raw
+  the login its writes are attributed to: MCP tools to `the repository owner`, the raw
   API to `claude[bot]`, and the `gh` CLI to `dem-extra1`.
   Its framing is already careful --- "the client makes the identity, not the
   session", and do not generalize a row to a client you did not measure.
@@ -950,7 +950,7 @@ See ai-config#694 for the precedent.
   | --- | --- | --- |
   | `Morrison-Lab/ai-config#1539` opened | `mcp__github__create_pull_request` | `dem-extra1` |
 
-  The table predicts `d-morrison` for that client and got `dem-extra1`, on the
+  The table predicts `the repository owner` for that client and got `dem-extra1`, on the
   one surface the sparta entry names as reliable.
   So the varying axis is the **container**, not only the client, and a row
   read out of that table is a measurement with an expiry rather than a lookup.
@@ -958,14 +958,14 @@ See ai-config#694 for the precedent.
   **The practical cost is a skipped reviewer request, which is why this is
   worth more than a footnote.**
   That same sparta entry records, correctly for its own container, that
-  requesting `d-morrison` on a `d-morrison`-authored PR returns `422`, since
+  requesting `the repository owner` on a `the repository owner`-authored PR returns `422`, since
   GitHub rejects a review request naming the PR's own author --- and tells you
   not to spend a round diagnosing it.
   Carried into a container where MCP writes as `dem-extra1`, that reads as
   "the reviewer request will be rejected", and the natural response is to skip
   it.
   Measured instead, on `Lacaedemon/sparta#1303` (author `dem-extra1`):
-  `POST .../pulls/1303/requested_reviewers` with `d-morrison` returned **201**.
+  `POST .../pulls/1303/requested_reviewers` with `the repository owner` returned **201**.
   The `422` is a fact about the author-equals-reviewer collision, not about the
   client --- so it fires only when the container's own MCP identity happens to
   be the reviewer you are requesting.

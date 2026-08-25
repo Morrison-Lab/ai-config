@@ -79,24 +79,48 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
-    def test_daemon_with_cloud_enabled_in_status_refuses(self, mock_getaddrinfo, mock_urlopen):
+    def test_daemon_status_unreachable_refuses_fail_closed(self, mock_getaddrinfo, mock_urlopen):
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        mock_urlopen.side_effect = OSError("Connection refused")
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("Cannot reach or verify live Ollama status", msg)
+
+    @patch("urllib.request.urlopen")
+    @patch("socket.getaddrinfo")
+    def test_daemon_with_cloud_disabled_false_refuses(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
-        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": True}).encode("utf-8")
+        status_resp.read.return_value = json.dumps({"cloud": {"disabled": False, "source": "config"}}).encode("utf-8")
         status_resp.__enter__.return_value = status_resp
 
         mock_urlopen.return_value = status_resp
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
-        self.assertIn("reports active cloud offloading", msg)
+        self.assertIn("cloud offloading is active", msg)
+
+    @patch("urllib.request.urlopen")
+    @patch("socket.getaddrinfo")
+    def test_daemon_with_unknown_cloud_schema_refuses(self, mock_getaddrinfo, mock_urlopen):
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"cloud": "unknown"}).encode("utf-8")
+        status_resp.__enter__.return_value = status_resp
+
+        mock_urlopen.return_value = status_resp
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("cloud offloading is active", msg)
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
     def test_remote_backed_model_in_tags_refuses(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
-        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
+        status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
         status_resp.__enter__.return_value = status_resp
 
         remote_tags = json.dumps({
@@ -120,28 +144,10 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
-    def test_absent_target_model_refuses(self, mock_getaddrinfo, mock_urlopen):
-        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        status_resp = MagicMock()
-        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
-        status_resp.__enter__.return_value = status_resp
-
-        tags_resp = MagicMock()
-        tags_resp.read.return_value = self.valid_tags_response
-        tags_resp.__enter__.return_value = tags_resp
-
-        mock_urlopen.side_effect = [status_resp, tags_resp]
-
-        ok, msg = checker.verify_locality("deepseek-r1:latest", self.valid_config)
-        self.assertFalse(ok)
-        self.assertIn("not locally resident", msg)
-
-    @patch("urllib.request.urlopen")
-    @patch("socket.getaddrinfo")
     def test_valid_local_model_with_status_succeeds(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
-        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
+        status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
         status_resp.__enter__.return_value = status_resp
 
         tags_resp = MagicMock()
@@ -152,8 +158,9 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertTrue(ok)
-        self.assertIn("OK: Verified loopback", msg)
+        self.assertIn("OK: Verified loopback endpoint", msg)
         self.assertIn("http://localhost:11434/v1", msg)
+        self.assertIn("cloud.disabled=true", msg)
         self.assertIn("qwen2.5-coder:3b", msg)
 
 

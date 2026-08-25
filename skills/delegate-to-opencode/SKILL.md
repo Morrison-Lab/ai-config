@@ -199,10 +199,10 @@ python3 ~/.claude/skills/delegate-to-opencode/scripts/check-ollama-locality.py "
 
 It exits 0 and prints the confirmation only when:
 1. Every address `options.baseURL` resolves to is loopback (`127.0.0.1` or `::1`).
-2. Local-only mode is verified (`OLLAMA_NO_CLOUD=1` in daemon environment or `disable_ollama_cloud: true` in `~/.ollama/server.json`).
+2. Live daemon local-only mode is verified directly from the running daemon via `GET /api/status` (`cloud.disabled: true`).
 3. The specified target model is strictly locally resident in `/api/tags` (refusing any remote-backed, cloud, or absent models).
 
-Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unverified local-only mode, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.
+Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unverified or unreachable live daemon status, active cloud offloading, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.
 Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md).
 This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
 

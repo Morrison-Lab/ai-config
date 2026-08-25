@@ -3,7 +3,7 @@
 
 Verifies:
 1. Endpoint loopback resolution (baseURL host resolves strictly to 127.0.0.1 or ::1).
-2. Live daemon local-only state (checked directly against running Ollama daemon /api/status).
+2. Live daemon local-only state (checked directly against running Ollama daemon /api/status, requiring cloud.disabled == true).
 3. Target model local residency on-device (checked against Ollama /api/tags, refusing remote/cloud models).
 """
 
@@ -71,28 +71,22 @@ def verify_locality(
         req_status = urllib.request.Request(status_url, headers={"User-Agent": "opencode-locality-check"})
         with urllib.request.urlopen(req_status, timeout=5) as resp:
             status_data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        status_data = None
+    except Exception as exc:
+        return False, f"Cannot reach or verify live Ollama status at {base_endpoint}/api/status ({exc}). Refusing: running daemon must confirm cloud is disabled."
 
-    if status_data is not None:
-        # If daemon reports explicit cloud status, verify cloud is disabled
-        cloud_active = status_data.get("cloud") is True or status_data.get("cloud_enabled") is True or status_data.get("cloud") == "enabled"
-        if cloud_active:
-            return False, f"Running Ollama daemon at {url} reports active cloud offloading in /api/status."
+    if not isinstance(status_data, dict):
+        return False, f"Unexpected response schema from {base_endpoint}/api/status: expected JSON object."
+
+    cloud_obj = status_data.get("cloud")
+    if isinstance(cloud_obj, dict):
+        cloud_disabled = cloud_obj.get("disabled") is True
+    elif isinstance(cloud_obj, bool):
+        cloud_disabled = (cloud_obj is False)
     else:
-        # Fallback: check daemon-level configuration file if /api/status is unavailable
-        server_cfg_file = os.path.expanduser("~/.ollama/server.json")
-        server_cloud_disabled = False
-        if os.path.isfile(server_cfg_file):
-            try:
-                with open(server_cfg_file, "r", encoding="utf-8") as f:
-                    scfg = json.load(f)
-                    if scfg.get("disable_ollama_cloud") is True or str(scfg.get("OLLAMA_NO_CLOUD", "")) == "1":
-                        server_cloud_disabled = True
-            except Exception:
-                pass
-        if not server_cloud_disabled and os.environ.get("OLLAMA_NO_CLOUD") != "1":
-            return False, "Ollama local-only mode not verified (running daemon did not confirm cloud-disabled status in /api/status or ~/.ollama/server.json)."
+        cloud_disabled = False
+
+    if not cloud_disabled:
+        return False, f"Running Ollama daemon at {url} reports cloud offloading is active (status: {json.dumps(status_data)}). Refusing."
 
     # 4. Verify local model residency via /api/tags
     try:
@@ -123,7 +117,7 @@ def verify_locality(
             return False, f"Target model {target_model!r} is backed by remote/cloud infrastructure."
         return False, f"Target model {target_model!r} (normalized {target_tag!r}) is not locally resident (local models: {', '.join(local_models)})."
 
-    return True, f"OK: Verified loopback endpoint ({url}, {', '.join(sorted(addrs))}), daemon local-only mode, and on-device residency for {target_tag} ({len(local_models)} local models)."
+    return True, f"OK: Verified loopback endpoint ({url}, {', '.join(sorted(addrs))}), daemon local-only mode (cloud.disabled=true), and on-device residency for {target_tag} ({len(local_models)} local models)."
 
 
 def main():

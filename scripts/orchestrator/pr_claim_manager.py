@@ -202,7 +202,7 @@ class PRClaimManager:
     def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
         """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
         effective_repo = self.get_effective_repo_slug(repo_slug)
-        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments"]
+        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,author"]
         if effective_repo:
             cmd.extend(["-R", effective_repo])
 
@@ -255,12 +255,20 @@ class PRClaimManager:
             return False, "No independent approved external review or GitHub approval found on PR"
 
         if claude_reviews:
-            latest_review = (
-                claude_reviews[-1].get("body", "")
-                .lower()
+            body = claude_reviews[-1].get("body", "")
+            lower_body = (
+                body.lower()
                 .replace("\u2014", "--")
                 .replace("\u2013", "--")
             )
+
+            # Per fully-clean.md: anchor on the last `### Verdict` heading in the comment
+            if "### verdict" in lower_body:
+                verdict_section = lower_body.rsplit("### verdict", 1)[-1]
+            elif "verdict:" in lower_body:
+                verdict_section = lower_body.rsplit("verdict:", 1)[-1]
+            else:
+                verdict_section = lower_body
 
             blocking_phrases = [
                 "needs more work",
@@ -274,49 +282,22 @@ class PRClaimManager:
                 "deadlock",
                 "finding 1 (blocking)",
                 "finding (blocking)",
-                "verdict\n\n**needs more work",
-                "verdict\n\n**needs work",
                 "no action -- pr is closed",
                 "no action -- pr is merged",
             ]
             for phrase in blocking_phrases:
-                if phrase in latest_review:
+                if phrase in verdict_section:
                     return False, f"Latest AI review has blocking verdict ('{phrase}')"
 
-            # Require an explicit positive clean / approved verdict signal
+            # Require an explicit positive clean / approved verdict signal in the final verdict section
             positive_verdict_phrases = [
-                "verdict:\n\n**ready",
-                "verdict:\n\n**clean",
-                "verdict:\n\n**approved",
-                "verdict:\nready",
-                "verdict:\nclean",
-                "verdict:\napproved",
-                "verdict\n\nclean",
-                "verdict\n\napproved",
-                "verdict\n\nready",
-                "clean / approved",
-                "clean/approved",
-                "ready for merge",
-                "approved for merge",
-                "### verdict\n\nclean",
-                "### verdict\n\napproved",
-                "### verdict\n\nready",
-                "### verdict\nclean",
-                "### verdict\napproved",
-                "### verdict\nready",
-                "### verdict\n\n**clean",
-                "### verdict\n\n**approved",
-                "### verdict\n\n**ready",
-                "### verdict\n**clean",
-                "### verdict\n**approved",
-                "### verdict\n**ready",
-                "verdict:\n\nclean",
-                "verdict:\n\nready",
-                "verdict:\n**clean",
-                "verdict:\n**approved",
-                "verdict:\n**ready",
+                r"\bclean\b",
+                r"\bapproved\b",
+                r"\bready\s+for\s+merge\b",
+                r"\bready\b",
+                r"\blgtm\b",
             ]
-            if not any(phrase in latest_review for phrase in positive_verdict_phrases):
+            if not any(re.search(pat, verdict_section) for pat in positive_verdict_phrases):
                 return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
         return True, "PR is fully clean across CI and review"

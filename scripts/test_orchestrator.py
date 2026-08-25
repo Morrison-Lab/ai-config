@@ -1305,6 +1305,47 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("does not contain a recognized positive clean/approved verdict", reason)
 
+        # 11. PR authored by d-morrison where d-morrison submits formal APPROVED review is REJECTED (self-approval)
+        dm_self_review_json = json.dumps({
+            "author": {"login": "d-morrison"},
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [{"state": "APPROVED", "author": {"login": "d-morrison"}, "authorAssociation": "OWNER"}],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, dm_self_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
+
+        # 12. Multi-verdict comment (prior round's 'Needs more work' cited before final 'Clean' verdict)
+        multi_verdict_body = """**Claude finished** review
+
+The prior review's verdict:
+
+### Verdict
+
+**Needs more work**
+
+This has since been resolved after addressing the finding.
+
+### Verdict
+
+**Clean** (0 blocking findings)
+"""
+        multi_verdict_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": multi_verdict_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, multi_verdict_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

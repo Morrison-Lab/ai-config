@@ -20,7 +20,7 @@ def get_git_root() -> str:
         text=True,
     )
     if res.returncode != 0:
-        print("::error::Not inside a git repository.", file=sys.stderr)
+        log_error("Not inside a git repository.")
         sys.exit(1)
     return res.stdout.strip()
 
@@ -67,7 +67,7 @@ def resolve_diff(pr_number: Optional[int], explicit_base: str = "") -> Tuple[str
     base_sha = mb_res.stdout.strip() if mb_res.returncode == 0 else base_ref
     diff_res = subprocess.run(["git", "diff", base_sha, "HEAD"], capture_output=True, text=True)
     if diff_res.returncode != 0:
-        print(f"::error::Could not compute diff against {base_ref}: {diff_res.stderr}", file=sys.stderr)
+        log_error(f"Could not compute diff against {base_ref}: {diff_res.stderr}")
         sys.exit(1)
     return diff_res.stdout, base_ref
 
@@ -88,21 +88,28 @@ def get_repo_guidelines(root: str) -> str:
     return "\n\n".join(guidelines)
 
 
+def log_error(msg: str):
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::error::{msg}", file=sys.stderr)
+    else:
+        print(f"Error: {msg}", file=sys.stderr)
+
+
 def run_antigravity_review(prompt: str, model: str = "") -> str:
     agy_path = shutil.which("agy") or os.path.expanduser("~/.local/bin/agy")
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
-        print("::error::Antigravity CLI (`agy`) not found. Ensure agy is in PATH.", file=sys.stderr)
+        log_error("Antigravity CLI (`agy`) not found. Ensure agy is in PATH.")
         sys.exit(1)
 
     cmd = [agy_path, "--dangerously-skip-permissions", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
-    print("🤖 Running local code review via Antigravity (Google AI Ultra quota)...")
+    print("Running local code review via Antigravity (Google AI Ultra quota)...")
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        print(f"::error::Antigravity review failed: {err}", file=sys.stderr)
+        log_error(f"Antigravity review failed: {err}")
         sys.exit(1)
     return res.stdout.strip()
 
@@ -110,18 +117,18 @@ def run_antigravity_review(prompt: str, model: str = "") -> str:
 def run_claude_review(prompt: str, model: str = "") -> str:
     claude_path = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
-        print("::error::Claude CLI (`claude`) not found. Ensure claude is in PATH.", file=sys.stderr)
+        log_error("Claude CLI (`claude`) not found. Ensure claude is in PATH.")
         sys.exit(1)
 
     cmd = [claude_path, "--dangerously-skip-permissions", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
-    print("🤖 Running local adversarial review via Claude CLI...")
+    print("Running local adversarial review via Claude CLI...")
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        print(f"::error::Claude review failed: {err}", file=sys.stderr)
+        log_error(f"Claude review failed: {err}")
         sys.exit(1)
     return res.stdout.strip()
 
@@ -129,15 +136,15 @@ def run_claude_review(prompt: str, model: str = "") -> str:
 def run_codex_review(prompt: str) -> str:
     codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
-        print("::error::Codex CLI (`codex`) not found.", file=sys.stderr)
+        log_error("Codex CLI (`codex`) not found.")
         sys.exit(1)
 
-    print("🤖 Running local code review via Codex CLI (ChatGPT subscription quota)...")
+    print("Running local code review via Codex CLI (ChatGPT subscription quota)...")
     cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", prompt]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        print(f"::error::Codex review failed: {err}", file=sys.stderr)
+        log_error(f"Codex review failed: {err}")
         sys.exit(1)
     return res.stdout.strip()
 
@@ -184,7 +191,7 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str):
     if res_comment.returncode == 0:
         print(f"✅ Successfully posted review comment to PR #{pr_number} via `gh pr comment`!")
     else:
-        print(f"::error::Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}", file=sys.stderr)
+        log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
 
 
 def main():
@@ -238,7 +245,7 @@ def main():
     if engine == "auto":
         detected = detect_engine()
         if not detected:
-            print("::error::No supported AI CLI found (`agy`, `claude`, or `codex`).", file=sys.stderr)
+            log_error("No supported AI CLI found (`agy`, `claude`, or `codex`).")
             sys.exit(1)
         engine = detected
 

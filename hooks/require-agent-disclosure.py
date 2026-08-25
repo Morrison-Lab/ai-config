@@ -601,7 +601,7 @@ def _looks_like_flag(value):
     `--body` as the body and warned on a compliant comment, while the same
     flags in the other order passed.
     """
-    return bool(value) and value.startswith("-") and len(value) > 1
+    return bool(value) and value.startswith("--") and len(value) > 2
 
 
 def _read_quoted(text, i):

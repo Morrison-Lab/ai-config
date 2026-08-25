@@ -491,6 +491,10 @@ CASES = [
      'gh pr review 12 --comment --body "Done.\n\n' + MARKER + '"', False),
     ("the same review flags in the other order",
      'gh pr review 12 --body "Done.\n\n' + MARKER + '" --comment', False),
+    ("a body starting with a hyphen before another flag is not a flag",
+     'gh pr comment --body "- bullet" --repo o/r', "missing"),
+    ("a body starting with a hyphen before another flag WITH marker",
+     'gh pr comment --body "- bullet\n\n' + MARKER + '" --repo o/r', False),
     ("a quoted bot example inside a human body is not exempt",
      'gh pr comment 1 --body "Tell humans to run --body \'@dependabot rebase\' '
      'now."', "missing"),

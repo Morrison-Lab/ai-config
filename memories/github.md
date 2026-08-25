@@ -623,6 +623,10 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `7b006485`, whose `review / claude-review` check run carries
   `conclusion: cancelled` while its dependent `review / require-review` carries
   `conclusion: failure`.)
+- **`gh run list -w "Workflow Name"` fails if multiple workflow files share the same `name:` field in their YAML.**
+  The command exits 1 with `could not resolve to a unique workflow; found: workflow-a.yml workflow-b.yml`.
+  This happens commonly when reusable workflows (like a review action) are called by multiple caller workflows, or when two different files just happen to use the same `name`.
+  The fix is to query by the **exact filename** instead of the display name: `gh run list -w workflow-b.yml`.
 
 ## gh — stale remote URL causes cryptic `gh pr create` failure
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).

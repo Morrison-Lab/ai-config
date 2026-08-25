@@ -47,9 +47,17 @@ CASES = [
     # --- must NOT warn -------------------------------------------------------
     ("marker present",
      f'gh pr comment 12 --body "Working on this.\n\n{MARKER}"', False),
+    # The NAME substitutes; the rest of the line stays verbatim, per AGENTS.md.
+    # This fixture used to carry an invented tail ("-- not a human._"), which
+    # encoded a laxness the rule forbids -- and which the prefix-only MARKER_RE
+    # happened to accept. Tightening the matcher against marker forgery is what
+    # exposed it.
     ("marker with another agent name",
-     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) -- not a human._"',
-     False),
+     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) --- not '
+     'written by a human._"', False),
+    ("an invented marker tail does not disclose",
+     'gh pr comment 12 --body "Done.\n\n_Posted by Codex (AI agent) -- not a '
+     'human._"', "missing"),
     ("dependabot rebase is exempt",
      'gh pr comment 12 --repo o/r --body "@dependabot rebase"', False),
     ("dependabot squash is exempt",
@@ -267,9 +275,19 @@ CASES = [
      'gh pr review 12 --comment \\\n  --body-file /tmp/r.md', None),
 
     # --- round-5: naming a mutation is not posting ---------------------------
-    ("a command that merely NAMES the mutation posts nothing",
+    # SUPERSEDED by the #2185 cross-vendor round. This asserted silence for
+    # `--input payload.json` on the strength of the mutation name appearing in
+    # a trailing SHELL COMMENT -- reading that comment as evidence the command
+    # posts nothing. It is not evidence: `--input` supplies the whole payload
+    # from a file, so the command may post a comment and the check cannot see
+    # it. "Cannot read the body" is the honest verdict, and it asserts nothing.
+    # The corpus writes no such command, so the cost is nil.
+    ("gh api graphql --input hides its mutation inside the file",
      'gh api graphql --input payload.json  # addDiscussionComment payload',
-     False),
+     None),
+    # The genuine mention-only case: nothing supplies a payload at all.
+    ("naming the mutation with no payload flag posts nothing",
+     'echo "see addDiscussionComment in the docs"', False),
 
     # --- round-5: the `--body=` equals form is inline, not unreadable --------
     ("--body= equals form is a visible body",
@@ -304,8 +322,8 @@ CASES = [
     ("a GraphQL mutation whose body is not in a body= field",
      "gh api graphql --input p.json -f query='mutation { addDiscussionComment(x) }'",
      None),
-    ("a comment mentioning the mutation posts nothing",
-     'gh api graphql --input p.json  # addDiscussionComment payload', False),
+    ("a bare gh api graphql with no payload flag posts nothing",
+     'gh api graphql -f query="query { viewer { login } }"', False),
 
     # --- round-6: properties that survived mutation with the suite green -----
     ("command substitution is a command position",
@@ -322,11 +340,274 @@ CASES = [
     ("the review-thread reply route is a comment target",
      'gh api "repos/o/r/pulls/1/comments/9/replies" -f body="bare"', True),
 
+    # --- cross-vendor round: the marker must END THE BODY --------------------
+    #
+    # Eleven same-vendor rounds accepted a marker found ANYWHERE in the command.
+    # A cross-vendor reviewer supplied all four of these on its first pass.
+    ("a marker in a trailing shell comment is not in the body",
+     'gh pr comment 1 --body "bare"  # ' + MARKER, "missing"),
+    ("a marker followed by more human prose does not disclose",
+     'gh pr comment 1 --body "Done.\n\n' + MARKER
+     + '\n\nAlso, a human note."', "missing"),
+    ("a partial marker does not disclose",
+     'gh pr comment 1 --body "Done.\n\n_Posted by Claude Code_"', "missing"),
+
+    # --- cross-vendor round: posting surfaces that are not named "comment" ----
+    ("gh issue reopen --comment posts a comment",
+     'gh issue reopen 5 -R o/r --comment "Reviving: still matters."', "missing"),
+    ("gh issue close --comment posts a comment",
+     'gh issue close 5 -R o/r --comment "Superseded."', "missing"),
+    ("gh pr close --comment posts a comment",
+     'gh pr close 5 -R o/r --comment "Superseded."', "missing"),
+    ("gh issue reopen --comment WITH marker",
+     'gh issue reopen 5 -R o/r --comment "Reviving.\n\n' + MARKER + '"', False),
+
+    # --- cross-vendor round: --input and --form ------------------------------
+    ("gh api --input supplies an unreadable body",
+     'gh api repos/o/r/issues/1/comments --input payload.json', None),
+    ("glab api --form body= is a post",
+     'glab api projects/:id/merge_requests/1/notes --form body="bare"',
+     "missing"),
+
+    # --- cross-vendor round: the bot exemption is a command vocabulary -------
+    ("prose after a real bot verb is not exempt",
+     'gh pr comment 1 --body "@dependabot rebase please humans"', "missing"),
+    ("an explicit GET is not a post",
+     'gh api repos/o/r/issues/1/comments -X GET -f per_page=100', False),
+
+    # --- push-gate round: the extractor must not warn on a COMPLIANT comment --
+    #
+    # A body that merely MENTIONS a field flag had that inner text taken as the
+    # body, so a compliant comment about this very feature warned. A false
+    # positive on a compliant comment is the worst outcome for a warn-only
+    # guard.
+    ("a compliant body that quotes -f body= is not a false positive",
+     'gh pr comment 2130 --body "Addressed: inline_body now handles -f body= '
+     'and --form body=.\n\n' + MARKER + '"', False),
+    ("a compliant body that quotes -F body=@file",
+     'gh pr comment 2130 --body "Rebutted: the canonical reply is -F '
+     'body=@file, so the quote comes first.\n\n' + MARKER + '"', False),
+
+    # --- push-gate round: the exemption across every accepted spelling -------
+    ("bot command via --body=", 'gh pr comment 5 --body="@dependabot rebase"',
+     False),
+    ("bot command via -b", 'gh pr comment 5 -b "@dependabot rebase"', False),
+    ("bot command via --comment",
+     'gh issue close 5 -R o/r --comment "@dependabot close"', False),
+
+    # --- push-gate round: a heredoc keeps its terminator line ----------------
+    ("heredoc with a blank line before its terminator still discloses",
+     "gh pr comment 5 --body-file - <<'EOF'\nHi.\n\n" + MARKER + "\n\nEOF",
+     False),
+    ("heredoc where prose follows the marker does not disclose",
+     "gh pr comment 5 --body-file - <<'EOF'\nHi.\n\n" + MARKER
+     + "\n\nAnd more human prose.\nEOF", "missing"),
+
+    # --- push-gate round: gh pr merge has no --comment -----------------------
+    ("gh pr merge --body is a merge-commit body, not a comment",
+     'gh pr merge 5 -R o/r --body "merge commit body"', False),
+
+    # --- #2185 review: the close/reopen gate must be QUOTE-AWARE -------------
+    #
+    # The first version used a lookahead over a raw `[^\n;&|]` tail, so a `;`
+    # inside an EARLIER flag's quoted value ended the tail before `--comment`
+    # and the command went undetected. `gh issue close` really does take a
+    # free-text `--duplicate-of`, so this is a shape the corpus can produce.
+    # Every other matcher in the guard routes through `split_segments` for this
+    # reason; these now do too.
+    ("a semicolon in an earlier flag does not hide --comment",
+     'gh issue close 5 -R o/r --duplicate-of "see issue #3; also #4" '
+     '--comment "Closing without disclosure."', "missing"),
+    ("an ampersand in an earlier flag does not hide --comment",
+     'gh issue close 5 -R o/r --duplicate-of "A & B" --comment "bare"',
+     "missing"),
+    # `-R` rather than `--title`: gh has no `--title` on `pr close`, so the old
+    # fixture exercised the regex against a command the CLI would reject.
+    ("a pipe in an earlier flag does not hide --comment",
+     'gh pr close 5 -R "o/r|fork" --comment "bare"', "missing"),
+    ("the same command WITH the marker stays silent",
+     'gh issue close 5 -R o/r --duplicate-of "see #3; also #4" '
+     '--comment "Closing.\n\n' + MARKER + '"', False),
+    # Without `(?<![\w-])` on COMMENT_FLAG_RE, the `-c` inside a hyphenated word
+    # in an earlier flag's value reads as the comment flag -- so a close that
+    # posts NOTHING is warned about. A false positive on a command that posts no
+    # comment at all is the worst shape for a warn-only guard.
+    ("a hyphenated word containing -c is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "close-candidate #3"', False),
+    ("the same close WITH a real -c still warns",
+     'gh issue close 5 -R o/r --duplicate-of "close-candidate #3" -c "bare"',
+     "missing"),
+    ("close with no --comment posts nothing",
+     'gh issue close 5 -R o/r --duplicate-of "see #3"', False),
+    ("reopen with no --comment posts nothing",
+     'gh issue reopen 5 -R o/r', False),
+    ("the -c short flag is a comment flag",
+     'gh issue close 5 -R o/r -c "bare"', "missing"),
+    ("the -c short flag with equals syntax is a comment flag",
+     'gh issue close 5 -R o/r -c="Closing without disclosure."', "missing"),
+    ("the -c short flag with attached quote is a comment flag",
+     'gh issue close 5 -R o/r -c"Closing without disclosure."', "missing"),
+    ("the -c short flag with equals syntax and marker discloses",
+     'gh issue close 5 -R o/r -c="Closing.\n\n' + MARKER + '"', False),
+    ("the -c short flag with attached quote and marker discloses",
+     'gh issue close 5 -R o/r -c"Closing.\n\n' + MARKER + '"', False),
+    ("the -b short flag with equals syntax is a body flag",
+     'gh pr comment 12 -b="bare"', "missing"),
+    ("the -b short flag with attached quote is a body flag",
+     'gh pr comment 12 -b"bare"', "missing"),
+
+    # --- #2185 round 2: pflag attaches a shorthand value with no space -------
+    #
+    # `gh` is a pflag CLI, so `-cvalue` and `-c=value` are valid alongside
+    # `-c value`. Every short-flag pattern here required whitespace, so all of
+    # them missed the attached forms -- including the pre-existing `-b`/`-m`
+    # ones, which predate this branch. The first repair used `-c\S`, which fixed
+    # the attached forms and broke the spaced one; all three need matching.
+    ("-c=value is a comment flag",
+     'gh issue close 5 -R o/r -c="Closing without disclosure."', "missing"),
+    ("-c\"value\" attached is a comment flag",
+     'gh issue close 5 -R o/r -c"Closing without disclosure."', "missing"),
+    ("-c=value WITH the marker stays silent",
+     'gh issue close 5 -R o/r -c="Closing.\n\n' + MARKER + '"', False),
+    ("-b\"value\" attached on gh pr comment", 'gh pr comment 5 -b"bare"',
+     "missing"),
+    ("-m=value attached on glab mr note", 'glab mr note 5 -m="bare"', "missing"),
+    # ANY_BODY_FLAG_RE is consulted ONLY for `gh pr review`, so the two fixtures
+    # above go through POST_RE and cannot pin it. Mutation testing caught that:
+    # reverting it to whitespace-only left the suite green. This is the case
+    # that discriminates.
+    ("gh pr review with an attached -b body",
+     'gh pr review 12 --request-changes -b"Findings, undisclosed."', "missing"),
+    ("gh pr review with an attached -b body WITH marker",
+     'gh pr review 12 --request-changes -b"Findings.\n\n' + MARKER + '"',
+     False),
+
+    # --- #2185 cross-vendor round -------------------------------------------
+    #
+    # A same-vendor reviewer cleared this file twice before these were found.
+    ("a forged suffix after the marker does not disclose",
+     'gh pr comment 1 --body "Done.\n\n' + MARKER + ' forged"', "missing"),
+    ("gh pr review's --comment is BOOLEAN, so --body is not its value",
+     'gh pr review 12 --comment --body "Done.\n\n' + MARKER + '"', False),
+    ("the same review flags in the other order",
+     'gh pr review 12 --body "Done.\n\n' + MARKER + '" --comment', False),
+    ("a body starting with a hyphen before another flag is not a flag",
+     'gh pr comment --body "- bullet" --repo o/r', "missing"),
+    ("a body starting with a hyphen before another flag WITH marker",
+     'gh pr comment --body "- bullet\n\n' + MARKER + '" --repo o/r', False),
+    ("a quoted bot example inside a human body is not exempt",
+     'gh pr comment 1 --body "Tell humans to run --body \'@dependabot rebase\' '
+     'now."', "missing"),
+    ("glab mr note list posts nothing", 'glab mr note list 12', False),
+    ("glab mr note delete posts nothing",
+     'glab mr note delete 12 --note-id 5', False),
+    ("gh pr comment --delete-last posts nothing",
+     'gh pr comment 12 --delete-last --yes', False),
+    ("an issue create whose BODY mentions /comments is not a comment post",
+     "gh api repos/o/r/issues -f body='Please use the /comments endpoint.'",
+     False),
+    ("-fbody= attached is a body field",
+     'gh api repos/o/r/issues/12/comments -fbody=bare', "missing"),
+    ("--raw-field=body= is a body field",
+     'gh api repos/o/r/issues/12/comments --raw-field=body=bare', "missing"),
+    ("-XGET attached is still a read",
+     'gh api repos/o/r/issues/12/comments -XGET -f per_page=100', False),
+    ("--method=GET is still a read",
+     'gh api repos/o/r/issues/12/comments --method=GET -f per_page=100', False),
+    ("a lowercase heredoc delimiter still discloses",
+     "gh pr comment 1 --body-file - <<'eof'\nHi.\n\n" + MARKER + "\n\neof",
+     False),
+
+    # --- a short flag's letters at the START of another flag's VALUE ---------
+    #
+    # A dedicated category, at the reviewer's suggestion, because this exact
+    # false-positive class has now surfaced in three consecutive rounds on this
+    # file: `-c`/`-b`/`-m` matching text that is not the flag.
+    #
+    # Round A: unanchored, so `-R Morrison-Lab/ai-config` matched mid-word.
+    # Round B: `(?<![\w-])` fixed mid-word -- and a value BEGINNING with `-c`
+    #          still matched, because the character before it is a quote, which
+    #          the class did not exclude. Necessary, not sufficient.
+    # A real flag token is never immediately preceded by a quote: `"-config"` is
+    # an argument whose text happens to start with a hyphen.
+    #
+    # Each of these posts NO comment at all, so a warning is purely spurious --
+    # and a warn-only guard that cries wolf is one nobody reads.
+    ("a value beginning with -c is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "-cool, closing"', False),
+    ("a value beginning with -config is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "-config issue, see #3"', False),
+    ("a value beginning with -b is not a body flag",
+     'gh issue close 5 -R o/r --reason "-basically done"', False),
+    ("a value beginning with -m is not a message flag",
+     'gh issue close 5 -R o/r --duplicate-of "-merge later"', False),
+    ("a repo name containing -c is not the comment flag",
+     'gh issue close 5 -R Morrison-Lab/ai-config --reason "not planned"', False),
+    # ...and the real flags must survive all of that.
+    ("a real -c still posts", 'gh issue close 5 -R o/r -c "bare"', "missing"),
+    ("a real -c= still posts", 'gh issue close 5 -R o/r -c="bare"', "missing"),
+    ("a real -c disclosed stays silent",
+     'gh issue close 5 -R o/r -c "Closing.\n\n' + MARKER + '"', False),
+
+    # --- #2185 round 3: --form's @file and $VAR forms -----------------------
+    #
+    # `--form` was added to three field patterns and not to UNREADABLE_RE, so a
+    # `--form body=@file` comment -- whose content the check cannot see -- was
+    # reported as CONFIDENTLY missing its marker. Flagged in two consecutive
+    # rounds. Fixed structurally: one `_FIELD_FLAGS` constant, used everywhere,
+    # since the four independent lists had now drifted three separate times.
+    ("--form body=@file is unreadable, not missing",
+     'glab api projects/:id/merge_requests/1/notes --form body=@/tmp/reply.md',
+     None),
+    ("--form body=$VAR is unreadable, not missing",
+     'glab api projects/:id/merge_requests/1/notes --form body=$BODY', None),
+    ("--form with a literal body is readable",
+     'glab api projects/:id/merge_requests/1/notes --form body="bare"',
+     "missing"),
+
+    # --- #2185 round 3: ANY punctuation before a hyphenated value ------------
+    #
+    # Enumerating excluded characters was always going to leak. Round B excluded
+    # word characters, round C added quotes, and comma/paren/slash still matched.
+    # The boundary is now POSITIVE -- a flag token starts after whitespace or at
+    # the start of the segment -- which closes the class rather than the last
+    # reported instance of it.
+    ("a comma before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo,-cool comment"', False),
+    ("a paren before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo (-cool)"', False),
+    ("a slash before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo/-config"', False),
+
+    # --- #2185 round 4: multiple fields where one quotes a flag name ---------
+    #
+    # Tracked by #2189: the regex-based tokenization matches `-m` inside the
+    # title's value, extracting the word after it ("flag") as the body, and
+    # reporting the real (correctly disclosed) body as missing its marker.
+    # This is a known false positive to be fixed by the #2189 rewrite.
+    ("a short flag inside a prior field's value false-positives (tracked in #2189)",
+     'gh api repos/o/r/issues/5/comments -f title="Fix -m flag parsing" -f body="' + MARKER + '"', "missing"),
+
+    # Tracked by #2189: a comment body legitimately opening with a literal `--` or `---`
+    # (e.g. an em-dash) is misclassified by `_looks_like_flag` as a boolean flag, which
+    # causes `inline_body` to drop it and fall back to the segment-wide check. If another
+    # flag follows it, the segment-wide check fails because the marker is no longer at
+    # the exact end of the command string.
+    ("a body starting with a double hyphen false-positives if a flag follows (tracked in #2189)",
+     'gh pr comment 1 --body "--- see the linked issue for context.\\n\\n' + MARKER + '\" --repo o/r', "missing"),
+
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),
     ("--editor is unreadable",
      'gh pr comment 12 --editor', None),
+    ("glab api --form body= with marker discloses",
+     'glab api projects/1/merge_requests/2/notes --form body="Done.\n\n' + MARKER + '"',
+     False),
+    ("glab api --form body= bare misses marker",
+     'glab api projects/1/merge_requests/2/notes --form body="Done."',
+     "missing"),
 ]
 
 # --- the emoji branch --------------------------------------------------------
@@ -337,7 +618,11 @@ ROBOT_CASE = (
 INDIRECT_CASES = [
     ("body-file", 'gh pr comment 12 --body-file /tmp/b.md'),
     ("api body file", 'gh pr comment 12 -F body=@/tmp/b.md'),
+    ("glab api body file", 'glab api projects/1/merge_requests/2/notes --form body=@/tmp/b.md'),
+    ("glab api quoted body file", 'glab api projects/1/merge_requests/2/notes --form body="@/tmp/b.md"'),
     ("variable body", 'gh pr comment 12 --body "$BODY"'),
+    ("glab api variable body", 'glab api projects/1/merge_requests/2/notes --form body=$BODY'),
+    ("glab api quoted variable body", 'glab api projects/1/merge_requests/2/notes --form body="$BODY"'),
 ]
 
 
@@ -470,6 +755,16 @@ def run():
          "Bare review body.", True),
         ("MCP discussion comment", "mcp__github__discussion_comment_write",
          "Bare discussion reply.", True),
+        # The end-anchoring fix landed on the Bash path only, and no MCP
+        # fixture covered it -- 121 green cases did not catch a marker followed
+        # by human prose on the route a remote session must use.
+        ("MCP marker followed by human prose does not disclose",
+         "mcp__github__add_issue_comment",
+         "Working on this.\n\n" + MARKER + "\n\nAlso: please look at CI.",
+         True),
+        ("MCP marker first, prose after, does not disclose",
+         "mcp__github__add_issue_comment",
+         MARKER + "\n\nWorking on this, and a long human paragraph.", True),
         ("MCP discussion comment WITH marker",
          "mcp__github__discussion_comment_write",
          "Reply.\n\n" + MARKER, False),
@@ -485,7 +780,7 @@ def run():
         print(f"{'PASS' if ok else 'FAIL'}: {label} "
               f"(warned={got}, expected={expect})")
 
-    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 11
+    total = len(CASES) + 2 + len(INDIRECT_CASES) + 1 + 4 + 13
     print(f"\n{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 

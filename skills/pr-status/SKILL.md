@@ -16,7 +16,10 @@ re-trigger), and it may carry findings the old one missed.
 ## When this fires
 
 - "what's the status of PR #N", "is #N ready to merge", "is the review clean".
-- Before you state, anywhere, that a PR is mergeable / clean / ready.
+- Before you would state, anywhere, that a PR is mergeable / clean / ready.
+  GitHub `mergeable` / `mergeStateStatus: CLEAN` is conflict-freedom, not mergeable.
+  Do not describe a PR as mergeable, ready to merge, or "green and mergeable"
+  unless the latest commit has an authentic clean review verdict.
 - Any other question about a live PR this session is driving, even when
   the user never said "status": "why didn't you wait", "did you fix it",
   "why haven't you responded to that comment".
@@ -358,4 +361,7 @@ Render a **Review Summary Table** for the PR:
 
 State, plainly: the latest review's verdict, who/what posted it, and the list of any open findings (or "none").
 If you read `null`, say the filter didn't match a reviewer login — don't report it as clean.
+A PR without a clean review verdict on the latest commit is not mergeable.
+Do not describe it as mergeable.
+Report it as blocked on review.
 Extended operational rationale and empirical measurement histories live in [`pr-status-all.rationale.md`](../pr-status-all/pr-status-all.rationale.md).

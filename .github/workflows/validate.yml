@@ -79,6 +79,7 @@ jobs:
           python3 scripts/test_cursor_plugin_enabled.py
           python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
+          python3 scripts/test_cursor_hook_adapter.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must

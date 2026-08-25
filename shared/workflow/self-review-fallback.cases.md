@@ -226,8 +226,18 @@ Only one of the two same-vendor passes examined *that head*:
 
 Each of those eleven rounds read a different state, and the branch's own commit messages name them (`594fdce9`: "One blocking finding on `5aa36bbe`").
 So the last one is one small branch commit --- `594fdce9`, nine insertions and four deletions --- plus the `origin/main` merge away from the reviewed head.
-That gap cuts *for* this record rather than against it, and it is derivable rather than a judgment: every file `codex` raised a blocking finding in --- `hooks/require-agent-disclosure.py`, `skills/gi/SKILL.md`, `skills/post-merge/SKILL.md`, `tool-mappings.md`, `AGENTS.md` --- is byte-identical at `5aa36bbe` and at `b744d6a2` (`git diff --name-only 5aa36bbe b744d6a2 --` over those paths is empty).
-So the eleven rounds read exactly the code the eight blocking findings were about, and they still are not a verdict on `b744d6a2`.
+That gap cuts *for* this record rather than against it, and it is derivable rather than a judgment.
+Take the files [#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) changed to address those findings as the set the findings were about, and intersect it with the files that moved after the last state the rounds read:
+
+```bash
+comm -12 <(gh pr diff 2185 --name-only | sort) \
+         <(git diff --name-only 5aa36bbe 594fdce9 | sort)
+```
+
+That returns nothing.
+Only the `origin/main` merge in `b744d6a2` touches any of them, and only `hooks/hooks.json`, from somebody else's work rather than this branch's.
+So the eleven rounds read the code the eight blocking findings were about, and they still are not a verdict on `b744d6a2`.
+
 Say it that way rather than counting them alongside the one verdict that did examine that head, which would inflate the same-vendor total this record's argument turns on.
 
 `claude-review`'s own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.

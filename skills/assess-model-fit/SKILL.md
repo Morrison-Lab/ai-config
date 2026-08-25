@@ -20,12 +20,13 @@ or **executable mode** (analyze a task and auto-recommend).
 
 ### Assess model fit (manual, procedural mode)
 
-1. **Identify the current model.** Check your Claude Code session or settings.json.
-   Common models: Fable 5 (`claude-fable-5`), Haiku 4.5 (`claude-haiku-4-5-20251001`),
-   Sonnet 4.6 (`claude-sonnet-4-6`), Opus 4.8 (`claude-opus-4-8`).
+1. **Identify the current model.** Check your session or settings.
+   Common tiers:
+   - Tier 1: Fable 5, Opus 4.8, Gemini Pro
+   - Tier 2: Sonnet 5 / 4.6, Gemini Flash, Codex
+   - Tier 3: Haiku 4.5, Gemini Flash-Lite
 
-2. **Score your task against these criteria.** A task needs escalation (higher model)
-   if it hits any of these red flags:
+2. **Score your task against these criteria.** A task needs escalation or orchestrator-worker delegation if it hits any of these:
    - **Deep multi-step reasoning:** more than 5 logical steps, complex dependencies, or
      architectural design decisions
    - **Code review rigor:** assessing code for subtle bugs, security gaps, performance,
@@ -37,17 +38,14 @@ or **executable mode** (analyze a task and auto-recommend).
    - **Uncertain scope:** task requirements are vague and need clarification by reasoning
    - **Novel problem:** no standard solution applies; requires creative or exploratory thinking
 
-3. **Make a go/no-go decision:**
-   - **Current model is adequate** if:
-     - Task is straightforward, well-specified, and mostly single-purpose
-     - Reasoning is shallow (1–3 steps) and the path is clear
-     - Code generation or simple Q&A, not deep review or design
-     - Context is small (single file, short query)
-   - **Escalate to higher model** if you checked yes on any red flag above
+3. **Determine Orchestration Strategy:**
+   - **Solo Executor (Tier 2/3):** The task is straightforward, bounded, well-specified, and single-purpose.
+   - **Orchestrator + Worker Delegation (Tier 1 Conductor + Tier 2 Workers):** The task is large, multi-stage, or complex. Use Tier 1 to plan and decompose into tasks with strict stop conditions, spawn Tier 2 workers to implement, and audit before merging.
+   - **Escalate Model:** If the current model struggles with reasoning or loops on a bug, escalate immediately to Tier 1.
 
 4. **If escalation needed,** invoke `/select-model` to determine the target.
-   Describe your task, and `select-model` will recommend Sonnet or Opus and suggest
-   a config update if you want it.
+   Describe your task, and `select-model` will recommend the optimal tier and suggest
+   a config update if desired.
 
 ### Executable mode (auto-analysis and auto-chaining)
 

@@ -19,74 +19,64 @@ best for your task. Runs in **procedural mode** (decision tree reference) or
 
 ### Model tiers at a glance
 
-**Fable 5** (`claude-fable-5`)
-- Fastest, lowest cost
-- Minimal reasoning, narrow focus
-- Best for: Trivial tasks, high-volume throughput, cost optimization
-- Not recommended for: Complex reasoning, multi-step planning, code review
+**Fable 5 / Opus 4.8 / Gemini Pro** (Tier 1: Conductor & Deep Reasoning)
+- Highest reasoning depth, strategic planning, adversarial review
+- Handles ambiguous requirements, complex architectural refactors, multi-step dependencies
+- Best for: Orchestrator session conductor, adversarial self-review, subtle debugging, security analysis
+- Strategy: Use for high-leverage judgment, planning, and final auditing
 
-**Haiku 4.5** (`claude-haiku-4-5-20251001`)
-- Speed + focused reasoning
-- Handles simple queries and straightforward code tasks
-- Best for: Simple Q&A, basic code generation, narrow-scope work
-- Limitations: Shallow reasoning (1–2 steps), limited code review depth
+**Sonnet 5 / 4.6 / Gemini Flash / Codex** (Tier 2: High-Velocity Execution)
+- Balanced: strong coding capability, fast execution, cost-effective
+- Handles task execution, test generation, refactoring, boilerplate
+- Best for: Subagent worker execution, feature implementation from clear specs, documentation
+- Strategy: Delegate bounded implementation sub-tasks to maximize speed and token efficiency
 
-**Sonnet 4.6** (`claude-sonnet-4-6`)
-- Balanced: good reasoning + acceptable speed
-- Handles multi-step tasks and moderate code review
-- Best for: Multi-step problem solving, code review (medium rigor), refactoring, multi-file tasks
-- Limitations: Not ideal for deep architectural design or subtle security analysis
+**Haiku 4.5 / Gemini Flash-Lite** (Tier 3: Fast Verification & Scans)
+- Speed + lightweight focused reasoning
+- Best for: Simple queries, single-file regex/syntax checks, triage, shallow unit tests
+- Limitations: Not suited for cross-file architecture or deep review
 
-**Opus 4.8** (`claude-opus-4-8`)
-- Deepest reasoning, most thorough analysis
-- Excels at design, complex decomposition, sophisticated code review
-- Best for: Complex architecture, multi-file refactors with design decisions, R&D, subtle bugs
-- Trade-off: Slower, higher cost (justified for hard problems)
+### Orchestrator-Worker Delegation Pattern
+
+When orchestrating complex or multi-step work:
+1. **Conductor (Tier 1):** Breaks down the objective into modular, bounded sub-tasks with strict checklists and unambiguous acceptance criteria.
+2. **Workers (Tier 2/3):** Subagents execute bounded tasks with tight stop conditions (preventing open-ended token burns or side quests).
+3. **Verification (Tier 1):** Conductor audits worker diffs and runs adversarial review before committing.
 
 ### Decision tree: Pick your model
 
-1. **Is the task trivial?** (single query, no reasoning)
-   - YES → **Fable 5** (save cost)
+1. **Is the task trivial or a fast scan?** (single query, shallow check)
+   - YES → **Haiku 4.5 / Flash-Lite** (save cost)
    - NO → Continue
 
-2. **Does the task fit in a narrow scope?** (single file, simple logic, <5 steps)
-   - YES → **Haiku 4.5** (fast, focused)
+2. **Is the task bounded implementation from a clear spec?** (writing code, generating tests, refactoring)
+   - YES → **Sonnet / Flash / Codex** (high-velocity executor)
    - NO → Continue
 
-3. **Does the task involve multi-step reasoning or moderate complexity?**
-   (refactoring, multi-file changes, moderate code review)
-   - YES → **Sonnet 4.6** (balanced tier)
-   - NO → Continue
-
-4. **Does the task require deep reasoning, sophisticated design, or rigorous review?**
-   (architecture, complex refactor, subtle bugs, security analysis)
-   - YES → **Opus 4.8** (most capable)
+3. **Does the task require high-level orchestration, deep design, or adversarial review?**
+   (architectural decisions, subtle bugs, security audit, orchestrator loop)
+   - YES → **Fable 5 / Opus / Gemini Pro** (most capable)
 
 ### Task → Model mapping
 
-| Task Category | Complexity | Recommended | Rationale |
+| Task Category | Complexity | Recommended Tier | Rationale |
 |---|---|---|---|
-| Simple query | ⭐ | Fable or Haiku | Minimal reasoning; speed matters |
-| Code snippet gen | ⭐ | Haiku | Straightforward; Haiku is fast enough |
-| Bug fix (obvious) | ⭐ | Haiku | Clear problem, known fix pattern |
-| Refactor (small scope) | ⭐⭐ | Haiku or Sonnet | If single file + clear pattern → Haiku; else → Sonnet |
-| Multi-file refactor | ⭐⭐ | Sonnet | Needs coordination across files; Sonnet handles this well |
-| Moderate code review | ⭐⭐ | Sonnet | Checks logic, style, obvious bugs |
-| Complex refactor | ⭐⭐⭐ | Sonnet or Opus | If risky or touches architecture → Opus |
-| Architecture design | ⭐⭐⭐ | Opus | Needs deep reasoning; Opus's strength |
-| Subtle bug hunt | ⭐⭐⭐ | Opus | Requires deep analysis, lateral thinking |
-| Security review | ⭐⭐⭐ | Opus | Risk of missing subtle vulns with lower models |
-| Research/exploration | ⭐⭐⭐ | Opus | Ambiguous scope; Opus excels at decomposition |
+| Simple query / scan | ⭐ | Tier 3 (Haiku / Flash-Lite) | Minimal reasoning; speed matters |
+| Code snippet / boilerplate | ⭐ | Tier 2 (Sonnet / Codex) | Fast and accurate generation |
+| Bug fix (clear pattern) | ⭐ | Tier 2 (Sonnet / Flash) | Clear problem, straightforward fix |
+| Refactor (bounded) | ⭐⭐ | Tier 2 (Sonnet / Flash) | Follows established architecture |
+| Subagent execution | ⭐⭐ | Tier 2 (Sonnet / Flash / Codex) | High throughput, token efficient |
+| Multi-file architecture | ⭐⭐⭐ | Tier 1 (Fable / Opus / Pro) | Needs high reasoning; conductor tier |
+| Subtle bug hunt | ⭐⭐⭐ | Tier 1 (Fable / Opus / Pro) | Deep lateral reasoning required |
+| Adversarial review | ⭐⭐⭐ | Tier 1 (Fable / Opus / Pro) | Strict verification against subtle issues |
+| Orchestration & planning | ⭐⭐⭐ | Tier 1 (Fable / Opus / Pro) | Decomposes task DAGs with stop criteria |
 
 ### Model selection factors
 
-- **Context window:** All models have large windows, but Opus handles complex multi-file reasoning best
-- **Reasoning depth:** Fable < Haiku < Sonnet < Opus (in that order)
-- **Code generation:** Haiku and Sonnet both strong; Opus overkill for boilerplate
-- **Code review:** Haiku weak at subtle issues; Sonnet good; Opus best
-- **Multi-step planning:** Haiku struggles; Sonnet solid; Opus excellent
-- **Speed:** Fable > Haiku > Sonnet > Opus (tradeoff with capability)
-- **Cost:** Fable < Haiku < Sonnet < Opus
+- **Reasoning depth:** Tier 3 < Tier 2 < Tier 1
+- **Code generation:** Tier 2 provides optimal throughput/cost balance; Tier 1 handles architectural nuance
+- **Code review:** Tier 1 recommended for adversarial passes
+- **Token efficiency:** Use Tier 1 for judgment and Tier 2/3 for generation
 
 ### Executable mode (auto-recommend and config update)
 

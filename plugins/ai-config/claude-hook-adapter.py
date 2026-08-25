@@ -87,6 +87,8 @@ def main():
         print(f"claude-hook-adapter: {claude_hooks_json_path} not found", file=sys.stderr)
         if event_type == "PreInvocation":
             print(json.dumps({"injectSteps": []}))
+        elif event_type == "Stop":
+            print(json.dumps({}))
         else:
             print(json.dumps({"decision": "allow"}))
         return
@@ -98,13 +100,14 @@ def main():
         print(f"claude-hook-adapter: failed to load {claude_hooks_json_path}: {exc}", file=sys.stderr)
         if event_type == "PreInvocation":
             print(json.dumps({"injectSteps": []}))
+        elif event_type == "Stop":
+            print(json.dumps({}))
         else:
             print(json.dumps({"decision": "allow"}))
         return
 
     # Common fields for Claude payload
     transcript_path = payload.get("transcriptPath")
-    cwd = repo_root
 
     if event_type == "PreToolUse":
         tool_call = payload.get("toolCall", {})
@@ -166,7 +169,6 @@ def main():
                     tasks_to_run.append((extract_hook_list([group]), task_payload))
 
         else:
-            # Generic tool (e.g. mcp__*, view_file, etc.)
             generic_payload = {
                 "tool_name": tool_name,
                 "tool_input": args
@@ -221,18 +223,20 @@ def main():
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
             timeout_val = parse_timeout(hook.get("timeout"))
             
-            result = run_hook_command(cmd, stop_payload, cwd, timeout_val)
+            result = run_hook_command(cmd, stop_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 try:
                     hook_out = json.loads(result.stdout)
-                    if hook_out.get("decision") == "block":
+                    decision = str(hook_out.get("decision", "")).strip().lower()
+                    if decision == "block":
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
-        print(json.dumps({"decision": "allow"}))
+        # Standard Antigravity response to allow stopping is an empty JSON object
+        print(json.dumps({}))
         return
 
     elif event_type == "PreInvocation":
@@ -253,7 +257,7 @@ def main():
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
             timeout_val = parse_timeout(hook.get("timeout"))
             
-            result = run_hook_command(cmd, ups_payload, cwd, timeout_val)
+            result = run_hook_command(cmd, ups_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
                 if text_out:

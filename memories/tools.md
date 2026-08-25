@@ -1,10 +1,10 @@
 # Local tools & CLIs
 
-## Available subscriptions & model providers
+### Available subscriptions & model providers
 
-Workstation configurations and delegation capabilities draw on multiple active subscriptions:
-- **OpenCode**: Reaches an active OpenCode subscription, free hosted gateway (`opencode Zen`), and local (`ollama`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
-- **OpenRouter**: Backed by an active OpenRouter subscription / API tier, reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or direct API access.
+Workstation configurations and delegation capabilities draw on multiple active subscriptions and API balances:
+- **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and local (`ollama`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
+- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or direct API access.
 - **OpenAI ChatGPT**: Backed by ChatGPT Plus/Team/Enterprise via OpenAI Codex (`codex` CLI, see [`skills/delegate-to-codex`](../skills/delegate-to-codex/SKILL.md)).
 - **Anthropic Claude**: Backed by Claude Pro/Team via Claude Code (`claude` CLI).
 - **Google AI Ultra**: Backed by Google Antigravity / Gemini desktop subscription (`agy` CLI).

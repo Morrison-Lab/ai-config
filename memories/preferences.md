@@ -974,27 +974,27 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
-CLIs drawing on active user subscriptions (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, and OpenRouter) provide high-throughput capacity.
+CLIs drawing on user subscriptions and API keys (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, and OpenRouter) provide high-throughput capacity.
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
 
-**Available subscriptions and delegation destinations:**
+**Available subscriptions, balances, and delegation destinations:**
 
-| CLI / Provider | Plan / Subscription | Skill / Entrypoint |
+| CLI / Provider | Plan / Billing Tier | Skill / Entrypoint |
 |---|---|---|
 | `codex` | ChatGPT (Plus / Team / Enterprise) | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `opencode` | OpenCode subscription + free hosted (Zen) + local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
-| OpenRouter | OpenRouter subscription / API tier (frontier & stealth models) | Configured in `opencode.jsonc` provider block or direct HTTP API |
+| `opencode` | OpenCode Go subscription + Zen prepaid/free + local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
+| OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | Configured in `opencode.jsonc` provider block or direct HTTP API |
 | `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
 
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
 
-**`opencode` and `openrouter` expand the non-metered and alternative frontier routes:**
-- **OpenCode**: Reaches an active OpenCode subscription, a free hosted gateway (`opencode Zen`), and a fully local tier (`ollama`).
+**`opencode` and `openrouter` expand non-metered, prepaid, and alternative frontier routes:**
+- **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and a fully local tier (`ollama`).
   Its free/local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
-- **OpenRouter**: Backed by an active OpenRouter subscription / API key, reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom script runners.
+- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners.
 - **Local tier**: The local (`ollama/*`) tier is the only destination that keeps the payload on the machine for sensitive data.
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
 The tiers and version above were measured 2026-08-19 on opencode 1.18.15.

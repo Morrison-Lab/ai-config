@@ -155,7 +155,7 @@ operations:
     cli: gh issue close "<N>" --reason "..."
     github_mcp: mcp__github__issue_write (method=update, state=closed, state_reason=...)
   - id: REOPEN_ISSUE
-    description: Reopen a closed issue.
+    description: Reopen a closed issue. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh issue reopen "<N>" --comment "..."
     github_mcp: mcp__github__issue_write (method=update, state=open)
   - id: LABEL_ISSUE

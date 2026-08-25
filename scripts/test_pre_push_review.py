@@ -242,6 +242,21 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("cannot be empty", reason)
 
+        # Report with an unbalanced/unterminated code fence is rejected
+        unterminated_fence_report = (
+            "```markdown\n"
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(unterminated_fence_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("Unbalanced or unterminated", reason)
+
         # Report entirely inside a tilde code fence is also rejected
         tilde_fenced_report = (
             "~~~markdown\n"
@@ -478,9 +493,31 @@ class TestPrePushReview(unittest.TestCase):
 
     def test_get_next_alternate_engine_rotation(self):
         engines = ["claude", "codex", "opencode", "antigravity"]
-        with patch("builtins.open", mock_open()) as mock_file, patch("os.path.isfile", return_value=False), patch("os.makedirs"):
+        # When no prior state exists, starts with first available engine
+        with patch("os.path.isfile", return_value=False):
             e1 = reviewer.get_next_alternate_engine(engines)
             self.assertEqual(e1, "claude")
+
+        # When last engine was claude, next is codex
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "claude"}')):
+            e2 = reviewer.get_next_alternate_engine(engines)
+            self.assertEqual(e2, "codex")
+
+        # When last engine was codex, next is opencode
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "codex"}')):
+            e3 = reviewer.get_next_alternate_engine(engines)
+            self.assertEqual(e3, "opencode")
+
+        # When last engine was antigravity, wraps around to claude
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "antigravity"}')):
+            e4 = reviewer.get_next_alternate_engine(engines)
+            self.assertEqual(e4, "claude")
+
+        # When next engine in order is not available, skips to next available
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "claude"}')):
+            subset_engines = ["claude", "antigravity"]
+            e5 = reviewer.get_next_alternate_engine(subset_engines)
+            self.assertEqual(e5, "antigravity")
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

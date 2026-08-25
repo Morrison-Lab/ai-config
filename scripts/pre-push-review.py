@@ -106,9 +106,6 @@ def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tu
     return diff_res.stdout, label
 
 
-import re
-
-
 def get_repo_guidelines(root: str) -> str:
     """Load universal repository guidelines from AGENTS.md per instruction-layering rules."""
     p = os.path.join(root, "AGENTS.md")
@@ -151,6 +148,12 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     """
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
+
+    # Check for unbalanced code fences (backticks and tildes) to reject unterminated blocks
+    bt_fences = len(re.findall(r"(?m)^`{3,}", report))
+    tilde_fences = len(re.findall(r"(?m)^~{3,}", report))
+    if bt_fences % 2 != 0 or tilde_fences % 2 != 0:
+        return False, False, "Unbalanced or unterminated markdown code fence detected."
 
     # Strip markdown code blocks (backtick and tilde fences) before parsing top-level structure to prevent fenced injection
     unfenced_report = re.sub(r"(?s)(?:```|~~~).*?(?:```|~~~)", "", report)
@@ -403,6 +406,9 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
+ENGINE_ROTATION_ORDER = ["claude", "codex", "opencode", "antigravity"]
+
+
 def get_next_alternate_engine(available_engines: List[str]) -> str:
     """Select the next engine in persistent round-robin order across successive invocations."""
     if not available_engines:
@@ -411,24 +417,36 @@ def get_next_alternate_engine(available_engines: List[str]) -> str:
         return available_engines[0]
 
     state_file = os.path.expanduser("~/.gemini/pre_push_review_state.json")
-    last_idx = -1
+    last_engine = ""
     try:
         if os.path.isfile(state_file):
             with open(state_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                last_idx = int(data.get("last_engine_index", -1))
+                last_engine = str(data.get("last_engine_name", ""))
     except Exception:
         pass
 
-    next_idx = (last_idx + 1) % len(available_engines)
+    start_idx = 0
+    if last_engine in ENGINE_ROTATION_ORDER:
+        start_idx = (ENGINE_ROTATION_ORDER.index(last_engine) + 1) % len(ENGINE_ROTATION_ORDER)
+
+    for i in range(len(ENGINE_ROTATION_ORDER)):
+        cand = ENGINE_ROTATION_ORDER[(start_idx + i) % len(ENGINE_ROTATION_ORDER)]
+        if cand in available_engines:
+            return cand
+
+    return available_engines[0]
+
+
+def record_successful_engine(engine_name: str):
+    """Persist the identity of the successful review engine."""
+    state_file = os.path.expanduser("~/.gemini/pre_push_review_state.json")
     try:
         os.makedirs(os.path.dirname(state_file), exist_ok=True)
         with open(state_file, "w", encoding="utf-8") as f:
-            json.dump({"last_engine_index": next_idx}, f)
+            json.dump({"last_engine_name": engine_name}, f)
     except Exception:
         pass
-
-    return available_engines[next_idx]
 
 
 def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "") -> Tuple[Optional[str], str]:
@@ -457,6 +475,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         print(f"Alternating review engine: Selected '{label}' ({cand}).")
         report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
         if report:
+            record_successful_engine(cand)
             return report, label
         # fallback to remaining engines without retrying cand
         available = [c for c in available if c != cand]
@@ -464,6 +483,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             rem_runner, rem_label = engine_dispatch[rem_cand]
             rem_report = rem_runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
             if rem_report:
+                record_successful_engine(rem_cand)
                 return rem_report, rem_label
             print(f"Engine '{rem_label}' was unavailable, exhausted, or produced invalid output; falling back...")
         return None, "Fallback Chain"

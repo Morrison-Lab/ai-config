@@ -182,19 +182,21 @@ An `ollama/*` id appearing in that list only says the config declares it, not th
 ```bash
 opencode run -m ollama/qwen2.5-coder:3b "Reply with exactly the word: PONG"
 opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PONG"
-opencode run -m opencode-go/deepseek-r1 "Reply with exactly the word: PONG"
+opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 ```
 
 Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
 
 **Before any data-triggered work, verify endpoint, daemon local mode, and model residency.**
-The routing rule above turns on where `ollama/*` actually points and whether cloud offloading is disabled, so it gets checked rather than assumed.
-`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value and confirms daemon residency:
+The routing rule above turns on where `ollama/*` actually points, whether cloud offloading is disabled, and whether the targeted model is present on-device.
+`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), and the check queries the daemon tags API:
 
 ```bash
 python3 - <<'PY'
-import ipaddress, json, socket, subprocess, sys, urllib.request
+import ipaddress, json, os, socket, subprocess, sys, urllib.request
 from urllib.parse import urlparse
+
+target_model = sys.argv[1] if len(sys.argv) > 1 else ""
 
 try:
     raw = subprocess.run(
@@ -229,14 +231,23 @@ try:
 except Exception as exc:
     sys.exit(f"REFUSE: cannot verify local model residency from Ollama tags API ({exc})")
 
+if not local_models:
+    sys.exit(f"REFUSE: local Ollama daemon reports 0 resident models in /api/tags")
+
+if target_model:
+    clean_target = target_model.replace("ollama/", "")
+    matched = any(clean_target in m or m.startswith(clean_target) for m in local_models)
+    if not matched:
+        sys.exit(f"REFUSE: target model {target_model!r} is not locally resident (local models: {', '.join(local_models)})")
+
 print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
 print(f"OK: verified local model residency ({len(local_models)} models present locally)")
-PY
+PY "qwen2.5-coder:3b"
 ```
 
-It exits 0 and prints the endpoint only when every address the host resolves to is loopback.
-Every other outcome refuses: an unreadable or unparseable config, a missing `ollama` provider or `baseURL`, a host that will not resolve, or any resolved address that is not loopback.
-Refusing on an unreadable config is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md): a config you could not read is not evidence that anything is local, so it must not reach the pass branch.
+It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the model is locally resident.
+Every other outcome refuses: an unreadable or unparseable config, a missing `ollama` provider or `baseURL`, an off-machine endpoint, an unreachable tags API, zero resident models, or an absent target model.
+Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md).
 This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
 
 ### 2. Prepare the prompt

@@ -1185,3 +1185,9 @@ safer/preferred choice merely because the repo has external consumers.
   reviewer the row existed.
   The next review round found the gap and the top-level reply needed a public
   correction.)
+
+- **Never hardcode usernames in instructions/prose:**
+  When writing instructions, skills, or agent memories, use generic role-based descriptors (e.g. "the repository owner", "a human reviewer") rather than hardcoding a specific username (e.g. `octocat`).
+  Hardcoded usernames in shared config cause cross-user/fork breakages.
+  - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. `Morrison-Lab/ai-config`), submodules, flag names, and values that must resolve to a real remote/account.
+    Only purge them from prose and generic placeholder flags.

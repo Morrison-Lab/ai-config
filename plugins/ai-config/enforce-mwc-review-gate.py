@@ -54,7 +54,7 @@ def main():
 
             # Check CI status (Never ignore red CI)
             status_rollup = data.get("statusCheckRollup") or []
-            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED"]]
+            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"]]
             if failures:
                 print(json.dumps({
                     "decision": "deny",

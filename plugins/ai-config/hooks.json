@@ -2,7 +2,7 @@
   "enforce-merge-control": {
     "PreToolUse": [
       {
-        "matcher": "run_command",
+        "matcher": "run_command|invoke_subagent|send_message|define_subagent|mcp__github__.*",
         "hooks": [
           {
             "type": "command",
@@ -13,6 +13,18 @@
             "command": "python3 ./claude-hook-adapter.py"
           }
         ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 ./claude-hook-adapter.py"
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 ./claude-hook-adapter.py"
       }
     ]
   }

@@ -263,6 +263,10 @@ the self-review had run the structural checks and not `fact-check-prose`.)
 
 (Hit on ai-config#406: posting the mention right after a push canceled the review and cost three extra polling rounds to recover.)
 
+(Corrected 2026-08-25, Lacaedemon/sparta#1397: after a line-break fix the session answered "no, I was not monitoring" and declined to start a persistent loop because the user had only asked a status question.
+Subscribe-or-babysit plus a one-shot poll still read as compliance from the inside.
+The standing yes is to arm a persistent `/loop` in the same turn.)
+
 ## Use subagents when helpful --- and delegate rather than queue --- Research and reading are dispatchable by default, and the test is the size of the...
 
 (2026-07-30, a `ucdavis/bcs` session: recaps repeatedly closed with "I still owe you a PR for X" and "I owe a UMS pass", carried across many turns, with the user having to ask again before several of them started.

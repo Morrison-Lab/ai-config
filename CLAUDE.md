@@ -765,7 +765,14 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 
 When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
 That answer is a standing yes across all PRs and all repos.
-Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
+Subscribe with the `subscribe_pr_activity` tool when it exists (GitHub MCP in remote/web sessions) **and immediately arm a persistent loop** so the session keeps waking after this turn ends.
+Webhooks do not deliver CI-success or merge-conflict transitions, so a subscription without a loop is not babysitting, and a one-shot `gh pr checks` poll is not either.
+
+The loop mechanism follows the session's `/loop` skill: a cloud subscription timer, or locally a monitored shell loop with `notify_on_output`.
+Arm it in the same turn you open, push, or are handed the PR — do not wait to be asked whether you are monitoring.
+A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
+Start the loop if it is not already running, then answer.
+Do not bake auto-merge into the loop prompt unless the user has granted merge permission for that PR (`mwc` / "merge this").
 
 This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
@@ -773,6 +780,14 @@ Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
+
+- **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and keep it running until the PR merges, closes, or the user says stop.
+- **Do:** answer a "are you monitoring?" question by starting the loop if it is not running, then reporting status.
+- **Don't:** treat a one-shot status poll as babysitting and then go quiet until the user pings.
+- **Don't:** refuse to start a loop because the latest user message only asked about status.
+
+(Corrected 2026-08-25: after a line-break fix on `Lacaedemon/sparta#1397`, the session answered that it was not monitoring and declined to arm a loop because the user had only asked whether monitoring was happening.
+The correction was "always start a persistent loop".)
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 

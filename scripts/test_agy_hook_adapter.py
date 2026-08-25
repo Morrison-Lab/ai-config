@@ -328,6 +328,60 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_pre_invocation_twenty_message_cap(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # 25 hooks returning distinct messages
+        many_hooks = {
+            "hooks": {
+                "UserPromptSubmit": [
+                    {"hooks": [{"command": f"cmd_{i}"} for i in range(25)]}
+                ]
+            }
+        }
+        mock_file.return_value.read.return_value = json.dumps(many_hooks)
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "test message"}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        # Capped at exactly 20 injected steps
+        self.assertEqual(len(out.get("injectSteps", [])), 20)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_mcp_github_tool_regex_matching(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "toolCall": {
+                "name": "mcp__github__create_pull_request",
+                "args": {"title": "New PR"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        self.assertEqual(mock_run.call_count, 2)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_pre_invocation_zero_invocation_num(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Zero step"}), stderr="")
         mock_run.return_value = mock_result

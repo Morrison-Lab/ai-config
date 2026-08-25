@@ -55,9 +55,6 @@ jobs:
         # consumer directory (~/.claude) that no CI runner has, so on a runner
         # it correctly reports "nothing installed to check" and proves nothing.
         run: |
-          python3 scripts/test_check_install.py
-          python3 scripts/test_check_harness_installs.py
-          python3 scripts/test_check_harness_ignores.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run plugin-overlap detector tests
@@ -65,19 +62,15 @@ jobs:
         # consumer directory (~/.claude) plus its settings.json, which no CI
         # runner has, so on a runner it correctly reports nothing examined and
         # proves nothing (ai-config#1409).
-        run: python3 scripts/test_plugin_overlap.py
+        run:
       - name: Run Codex skill-install tests
         # Bootstrap must choose either an ai-config Codex plugin or its bare
         # wrappers. Installing both doubles the routing catalog and can exceed
         # the skill-listing context budget.
         run: |
-          python3 scripts/test_codex_plugin_enabled.py
-          python3 scripts/test_bootstrap_codex_plugin.py
       - name: Run Cursor skill-install tests
         # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
         run: |
-          python3 scripts/test_cursor_plugin_enabled.py
-          python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a

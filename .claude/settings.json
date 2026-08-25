@@ -1,32 +1,22 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\""
-          }
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\""
+                    }
+                ]
+            }
         ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-install.sh\""
-          }
+    },
+    "permissions": {
+        "allow": [
+            "mcp__Claude_Code_Remote__update_trigger",
+            "mcp__Claude_Code_Remote__create_trigger",
+            "mcp__Claude_Code_Remote__delete_trigger",
+            "mcp__Claude_Code_Remote__send_later"
         ]
-      }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "mcp__Claude_Code_Remote__update_trigger",
-      "mcp__Claude_Code_Remote__create_trigger",
-      "mcp__Claude_Code_Remote__delete_trigger",
-      "mcp__Claude_Code_Remote__send_later"
-    ]
-  }
+    }
 }

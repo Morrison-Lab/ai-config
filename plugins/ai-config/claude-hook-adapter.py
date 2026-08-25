@@ -16,6 +16,8 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
             cwd=cwd,
             timeout=timeout_val
         )
+        if result.returncode != 0 and result.stderr:
+            print(f"claude-hook-adapter: hook {cmd} exited with code {result.returncode}: {result.stderr}", file=sys.stderr)
         return result
     except subprocess.TimeoutExpired:
         print(f"claude-hook-adapter: hook {cmd} timed out after {timeout_val}s", file=sys.stderr)
@@ -88,8 +90,6 @@ def main():
         cwd = args.get("Cwd") or os.getcwd()
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
-        
-        # Prepare list of (hooks_list, claude_payload) pairs to execute
         tasks_to_run = []
         
         if tool_name == "run_command":
@@ -105,7 +105,6 @@ def main():
 
         elif tool_name == "invoke_subagent":
             subagents = args.get("Subagents", [])
-            # Evaluate each invoked subagent against Agent hooks
             for sub in subagents:
                 agent_payload = {
                     "tool_name": "Agent",
@@ -154,7 +153,7 @@ def main():
                 if matches_tool(group.get("matcher", ""), tool_name):
                     tasks_to_run.append((group.get("hooks", []), mcp_payload))
 
-        # Execute PreToolUse hooks
+        # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
         for hooks_list, c_payload in tasks_to_run:
             for hook in hooks_list:
                 cmd = hook.get("command")
@@ -176,15 +175,17 @@ def main():
                             print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
                     except Exception as exc:
                         print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
-                        if result.stderr:
-                            print(f"stderr was: {result.stderr}", file=sys.stderr)
 
         print(json.dumps({"decision": "allow"}))
         return
 
     elif event_type == "Stop":
         stop_groups = hooks_def.get("hooks", {}).get("Stop", [])
-        stop_payload = {}
+        stop_payload = {
+            "termination_reason": payload.get("terminationReason"),
+            "fully_idle": payload.get("fullyIdle"),
+            "error": payload.get("error")
+        }
         if transcript_path:
             stop_payload["transcript_path"] = transcript_path
             
@@ -206,15 +207,16 @@ def main():
                             return
                     except Exception as exc:
                         print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
-                        if result.stderr:
-                            print(f"stderr was: {result.stderr}", file=sys.stderr)
 
         print(json.dumps({"decision": "allow"}))
         return
 
     elif event_type == "PreInvocation":
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
-        ups_payload = {}
+        ups_payload = {
+            "invocation_num": payload.get("invocationNum"),
+            "initial_num_steps": payload.get("initialNumSteps")
+        }
         if transcript_path:
             ups_payload["transcript_path"] = transcript_path
 

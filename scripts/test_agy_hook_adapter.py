@@ -17,6 +17,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ADAPTER_SCRIPT = os.path.join(ROOT, "plugins", "ai-config", "claude-hook-adapter.py")
 
 def load_adapter():
+    if not os.path.isfile(ADAPTER_SCRIPT):
+        raise FileNotFoundError(f"Adapter script not found at {ADAPTER_SCRIPT}")
     spec = importlib.util.spec_from_file_location("claude_hook_adapter", ADAPTER_SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -29,7 +31,12 @@ MOCK_HOOKS_DEF = {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-prompt.py\"",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-prompt1.py\"",
+                        "timeout": 10
+                    },
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-prompt2.py\"",
                         "timeout": 10
                     }
                 ]
@@ -83,6 +90,7 @@ MOCK_HOOKS_DEF = {
 
 class TestAgyHookAdapter(unittest.TestCase):
     def setUp(self):
+        self.assertTrue(os.path.isfile(ADAPTER_SCRIPT), f"Adapter script missing at {ADAPTER_SCRIPT}")
         self.adapter = load_adapter()
 
     @patch('os.path.exists', return_value=True)
@@ -91,11 +99,11 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_pre_invocation_event(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "UMS reminder: do not forget to check X\n"
-        mock_run.return_value = mock_result
+    def test_pre_invocation_multi_message_join(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Return two distinct injected messages from the two hooks
+        res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
+        res2 = MagicMock(returncode=0, stdout="Message 2\n", stderr="")
+        mock_run.side_effect = [res1, res2]
         
         payload = {"invocationNum": 1, "transcriptPath": "/tmp/transcript.jsonl"}
         mock_stdin.write(json.dumps(payload))
@@ -106,8 +114,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertIn("injectSteps", out)
         self.assertEqual(len(out["injectSteps"]), 1)
-        self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "UMS reminder: do not forget to check X")
-        mock_run.assert_called_once()
+        self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "Message 1\n\nMessage 2")
+        self.assertEqual(mock_run.call_count, 2)
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -130,6 +138,10 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "continue")
         self.assertEqual(out.get("reason"), "Missing self-review")
+        
+        # Verify termination_reason was forwarded in payload
+        input_payload = json.loads(mock_run.call_args.kwargs['input'])
+        self.assertEqual(input_payload.get("termination_reason"), "model_stop")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -137,15 +149,11 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_multi_subagent_fanout(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = json.dumps({
-            "hookSpecificOutput": {
-                "additionalContext": "Warning: isolation mode recommended"
-            }
-        })
-        mock_run.return_value = mock_result
+    def test_multi_subagent_fanout_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # First agent allowed with warning, second agent denied
+        res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"additionalContext": "Warn 1"}}), stderr="")
+        res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
+        mock_run.side_effect = [res1, res2]
         
         payload = {
             "toolCall": {
@@ -163,9 +171,12 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         self.adapter.main()
         
-        # Verify subprocess.run was called for BOTH subagents
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "Agent 2 not permitted")
         self.assertEqual(mock_run.call_count, 2)
-        call_inputs = [json.loads(c[1]['input']) for c in mock_run.call_args_list]
+        
+        call_inputs = [json.loads(c.kwargs['input']) for c in mock_run.call_args_list]
         self.assertEqual(call_inputs[0]["tool_input"]["subagent_type"], "agent1")
         self.assertEqual(call_inputs[1]["tool_input"]["subagent_type"], "agent2")
 
@@ -176,9 +187,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_mcp_regex_matching(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = json.dumps({"hookSpecificOutput": {}})
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result
         
         payload = {
@@ -193,7 +202,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.adapter.main()
         
         mock_run.assert_called_once()
-        call_input = json.loads(mock_run.call_args[1]['input'])
+        call_input = json.loads(mock_run.call_args.kwargs['input'])
         self.assertEqual(call_input["tool_name"], "mcp__github__create_pull_request")
 
 if __name__ == "__main__":

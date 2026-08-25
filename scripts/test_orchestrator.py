@@ -1403,6 +1403,32 @@ This has since been resolved after addressing the finding.
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
+        # 16. Multiline review where first line says Ready but followed by cant be called ready
+        cant_be_ready_body = "**Claude finished** review\n\n### Verdict\n\nReady.\nThis PR can't be called ready for merge because 2 blocking findings remain."
+        cant_be_ready_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": cant_be_ready_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, cant_be_ready_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
+        # 17. Far from ready is rejected
+        far_from_ready_body = "**Claude finished** review\n\n### Verdict\n\nThis PR is far from ready for merge."
+        far_from_ready_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": far_from_ready_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, far_from_ready_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

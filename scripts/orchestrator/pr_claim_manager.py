@@ -272,55 +272,62 @@ class PRClaimManager:
             else:
                 verdict_section = lower_body
 
-            blocking_phrases = [
-                "needs more work",
-                "needs work",
-                "blocked",
-                "blocked on human review",
-                "changes requested",
-                "not clean",
-                "not approved",
-                "not ready",
-                "not lgtm",
-                "isn't clean",
-                "isn't approved",
-                "isn't ready",
-                "unapproved",
-                "rejected",
-                "impasse",
-                "deadlock",
-                "finding 1 (blocking)",
-                "finding (blocking)",
-                "no action -- pr is closed",
-                "no action -- pr is merged",
+            # 1. Check for not-clean / blocking patterns in the verdict section
+            not_clean_patterns = [
+                r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+                r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
+                r"\bchanges\s+requested\b",
+                r"\bblocked\s+on\s+human\s+review\b",
+                r"\b(?:not|isn't|cannot\s+be|can't\s+be|nowhere\s+near|far\s+from)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+                r"\b(?:unapproved|rejected|deadlock|impasse)\b",
+                r"\bfinding\s+(?:\d+\s+)?\(blocking\)",
+                r"\bno\s+action\s+--\s+pr\s+is\s+(?:closed|merged)\b",
             ]
-            for phrase in blocking_phrases:
-                if phrase in verdict_section:
-                    return False, f"Latest AI review has blocking verdict ('{phrase}')"
+            not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
-            # Check structured clean / approved verdict patterns anchored to the verdict section
+            for pat in not_clean_patterns:
+                for match in re.finditer(pat, verdict_section, re.IGNORECASE | re.MULTILINE):
+                    prefix = verdict_section[max(0, match.start() - 25):match.start()]
+                    if not_clean_negation_prefix.search(prefix):
+                        continue
+                    return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
+
+            # 2. Check for positive clean / approved verdict patterns in the verdict section
             clean_patterns = [
-                r"^\s*[:\-\s]*(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
-                r"\b(?:verdict[:\s]+)(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
-                r"\bclean\s*/\s*approved\b",
                 r"\bready\s+for\s+merge\b",
+                r"verdict:\s*(?:clean|approved|ready)\b",
+                r"\bapproved\s+for\s+merge\b",
+                r"\bclean\s*/\s*approved\b",
+                r"^\s*[:\-\s]*(?:\*\*|__)?\s*(?:clean|approved|ready\s+for\s+merge|ready|lgtm)\b",
             ]
-            
-            # Extract non-empty lines from verdict_section
-            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
-            first_verdict_line = verdict_lines[0] if verdict_lines else ""
+            clean_negation_prefix = re.compile(
+                r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
+                r"|nowhere\s+near|close\s+to|far\s+from)\s+(?:\w+\s+){0,2}$",
+                re.IGNORECASE,
+            )
+            clean_qualifier = re.compile(
+                r"\b(?:once|after|when|if|unless|pending|provided|assuming"
+                r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
+                r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+                re.IGNORECASE,
+            )
 
-            has_clean_signal = False
+            has_clean_verdict = False
             for pat in clean_patterns:
-                match = re.search(pat, first_verdict_line, re.IGNORECASE) or re.search(pat, verdict_section, re.IGNORECASE)
-                if match:
-                    # Check that the match is not preceded by a negation prefix in the verdict section
-                    prefix = verdict_section[max(0, match.start() - 30):match.start()]
-                    if not re.search(r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+(?:\w+\s+){0,2}$", prefix, re.IGNORECASE):
-                        has_clean_signal = True
-                        break
+                for match in re.finditer(pat, verdict_section, re.IGNORECASE | re.MULTILINE):
+                    prefix = verdict_section[max(0, match.start() - 40):match.start()]
+                    if clean_negation_prefix.search(prefix):
+                        continue
+                    remainder = verdict_section[match.end():min(len(verdict_section), match.end() + 60)]
+                    remainder_sentence = re.split(r"[.!?]|\n[ \t]*\n", remainder)[0]
+                    if clean_qualifier.search(remainder_sentence):
+                        continue
+                    has_clean_verdict = True
+                    break
+                if has_clean_verdict:
+                    break
 
-            if not has_clean_signal:
+            if not has_clean_verdict:
                 return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
         return True, "PR is fully clean across CI and review"

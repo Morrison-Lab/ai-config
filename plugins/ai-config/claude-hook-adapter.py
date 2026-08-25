@@ -329,6 +329,8 @@ def main():
         total_injected_bytes = 0
         hooks_to_run = extract_hook_list(ups_groups)
         for hook in hooks_to_run:
+            if len(injected_messages) >= 20:
+                break
             cmd = hook.get("command")
             if not cmd:
                 continue
@@ -351,15 +353,16 @@ def main():
                         # Cap single injected message at 10KB (in UTF-8 bytes) and total cumulative bytes at 30KB
                         raw_bytes = text_out.encode("utf-8")[:10000]
                         chunk = raw_bytes.decode("utf-8", errors="ignore")
-                        chunk_bytes = len(raw_bytes)
+                        chunk_bytes = len(chunk.encode("utf-8"))
                         if total_injected_bytes + chunk_bytes <= 30000:
                             injected_messages.append(chunk)
                             total_injected_bytes += chunk_bytes
                         elif total_injected_bytes < 30000:
                             remaining_bytes = 30000 - total_injected_bytes
-                            encoded_trimmed = raw_bytes[:remaining_bytes]
-                            injected_messages.append(encoded_trimmed.decode("utf-8", errors="ignore"))
-                            total_injected_bytes = 30000
+                            encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
+                            trimmed_chunk = encoded_trimmed.decode("utf-8", errors="ignore")
+                            injected_messages.append(trimmed_chunk)
+                            total_injected_bytes += len(trimmed_chunk.encode("utf-8"))
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages[:20]]

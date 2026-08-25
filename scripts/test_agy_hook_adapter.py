@@ -16,6 +16,7 @@ from unittest.mock import patch, MagicMock, mock_open
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ADAPTER_SCRIPT = os.path.join(ROOT, "plugins", "ai-config", "claude-hook-adapter.py")
+PLUGIN_HOOKS_JSON = os.path.join(ROOT, "plugins", "ai-config", "hooks.json")
 
 def load_adapter():
     if not os.path.isfile(ADAPTER_SCRIPT):
@@ -143,6 +144,16 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertTrue(os.path.isfile(ADAPTER_SCRIPT), f"Adapter script missing at {ADAPTER_SCRIPT}")
         self.adapter = load_adapter()
 
+    def test_plugins_hooks_json_valid_json(self):
+        self.assertTrue(os.path.isfile(PLUGIN_HOOKS_JSON), f"Manifest missing at {PLUGIN_HOOKS_JSON}")
+        with open(PLUGIN_HOOKS_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertIn("enforce-merge-control", data)
+        bundle = data["enforce-merge-control"]
+        self.assertIn("PreToolUse", bundle)
+        self.assertIn("Stop", bundle)
+        self.assertIn("PreInvocation", bundle)
+
     @patch('os.path.exists', return_value=False)
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -257,7 +268,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
-        self.assertEqual(out.get("reason"), "Messaging not permitted")
+        self.assertEqual(out.get("reason"), "[send_message] Messaging not permitted")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -286,7 +297,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
-        self.assertEqual(out.get("reason"), "Agent definition denied")
+        self.assertEqual(out.get("reason"), "[define_subagent] Agent definition denied")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -359,9 +370,10 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_multi_subagent_fanout_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"additionalContext": "Warn 1"}}), stderr="")
-        res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
-        mock_run.side_effect = [res1, res2, MagicMock(), MagicMock()]
+        res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        res3 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
+        mock_run.side_effect = [res1, res2, res3, MagicMock()]
         
         payload = {
             "toolCall": {
@@ -381,7 +393,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
-        self.assertEqual(out.get("reason"), "Agent 2 not permitted")
+        self.assertEqual(out.get("reason"), "[invoke_subagent (agent2)] Agent 2 not permitted")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

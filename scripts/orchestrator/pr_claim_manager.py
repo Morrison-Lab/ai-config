@@ -309,10 +309,8 @@ class PRClaimManager:
             r"^(?:"
             r"reviewed\s+commit:\s*[0-9a-f]{7,40}"
             r"|commit:\s*[0-9a-f]{7,40}"
-            r"|reviewed\s+by\b.*"
-            r"|_(?:posted\s+by|automated\s+review).*"
-            r"|posted\s+by\b.*"
-            r"|💰.*"
+            r"|_(?:posted\s+by|automated\s+review)\b.*?_"
+            r"|💰\s*\*\*cost:\*\*.*"
             r"|<!--.*-->"
             r"|(?:\*\*|__)?\s*(?:ready(?:\s+for\s+merge)?|approved(?:\s+for\s+merge)?|clean|lgtm)\b(?:\s*\([^)]*\))?(?:\*\*|__)?\s*[.!]*"
             r")\s*$",

@@ -146,18 +146,59 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(sneaky_findings)
         self.assertFalse(is_clean)
 
-        # Ready after addressing findings is NOT clean
-        conditional = (
-            "### Summary Verdict\n"
-            "Verdict: Ready after addressing findings\n\n"
-            "### Critical Findings\n"
-            "1. Must fix the edge case.\n\n"
-            "### Observations\nNone.\n\n"
-            "### Verification Steps\nNone."
+        # Full-length fingerprint mismatch with 7 matching chars but differing suffix is rejected
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            "### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nNone.\nReviewed-Commit: 1234567fdeadbeef",
+            expected_commit_sha="12345678abcdef00",
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(conditional)
+        self.assertFalse(is_valid)
+        self.assertIn("Mismatched", reason)
+
+        # Clean verdict followed by Needs work verdict yields is_clean=False
+        multiple_verdicts_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Summary Verdict\n"
+            "Verdict: Needs work — bug found\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(multiple_verdicts_report, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertFalse(is_clean)
+
+        # Initial clean Critical Findings followed by a second blocking Critical Findings yields is_clean=False
+        multiple_findings_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Critical Findings\n"
+            "1. Major regression in workflow.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(multiple_findings_report, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+
+        # Report entirely inside a code fence is rejected as missing top-level structure
+        fenced_report = (
+            "```markdown\n"
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}\n"
+            "```"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(fenced_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
 
         # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
         adv_findings = (

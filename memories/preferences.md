@@ -1200,4 +1200,3 @@ safer/preferred choice merely because the repo has external consumers.
   - **Don't:** Leave closed issues pointing at reverted work.
 - **End-of-Session PR Dashboard**: When ending a session or reaching a clean stopping point, execute the `pr-status-all` skill.
   This is a user mandate (2026-08-25) to provide a whole-queue dashboard before yielding.
-  Do not merely recommend the slash command.

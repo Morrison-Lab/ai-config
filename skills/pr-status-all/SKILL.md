@@ -53,7 +53,7 @@ calls in one message) so they run at once. The fan-out is read-only, so it
 needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
-**Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out. Unbounded concurrent subagents will exhaust the session's token quota. Instead, unconditionally fall back to the series implementation defined in the *Graceful degradation to series* section.
+**Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out. Unbounded concurrent subagents will exhaust the session's token quota, and falling back to a sequential loop will block the session with massive latency. Instead, abort the operation, warn the user that the queue is too large for a full dashboard, and suggest they use standard `gh pr list` or review a smaller subset.
 
 Give each subagent its PR number, `headRefName`, and `isDraft`, and have it gather the **seven independent signals** below and return one structured row.
 Carry the disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST review* will silently misreport:

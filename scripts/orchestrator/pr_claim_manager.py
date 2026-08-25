@@ -243,6 +243,16 @@ class PRClaimManager:
             return False, "No independent external Claude Code Review found on PR"
 
         body = claude_reviews[-1].get("body", "")
+        head_oid = (data.get("headRefOid") or "").strip()
+
+        # Check for commit-staleness: if the review comment cites a specific reviewed SHA,
+        # verify that it matches the current PR headRefOid.
+        reviewed_commit_match = re.search(r"reviewed\s+commit:\s*([0-9a-f]{7,40})", body, re.IGNORECASE)
+        if reviewed_commit_match and head_oid:
+            reviewed_sha = reviewed_commit_match.group(1).lower()
+            if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
+                return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
+
         lower_body = (
             body.lower()
             .replace("\u2014", "--")

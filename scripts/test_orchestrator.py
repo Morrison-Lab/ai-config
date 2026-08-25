@@ -1539,6 +1539,39 @@ This has since been resolved after addressing the finding.
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
 
+        # 25. Stale Claude review (reviewed an older commit than PR headRefOid) is strictly rejected
+        stale_claude_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": "**Claude finished** review\n\n### Verdict\n\n**Clean**\n\nReviewed commit: 74d3f8c1b60dc25cf5c06d882027177ca54d45a0",
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, stale_claude_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("stale", reason.lower())
+
+        # 26. Matching commit Claude review (reviewed current PR headRefOid) is accepted
+        matching_claude_json = json.dumps({
+            "headRefOid": "c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{
+                "author": {"login": "github-actions"},
+                "body": "**Claude finished** review\n\n### Verdict\n\n**Clean**\n\nReviewed commit: c1427642ddf8ae431b7b920d01bfd9c5b270ae4f",
+            }],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, matching_claude_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

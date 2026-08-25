@@ -186,17 +186,27 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             if found_sha[:min_len] != exp_sha[:min_len]:
                 return False, False, f"Mismatched or contradictory Reviewed-Commit fingerprint: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
-    verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", unfenced_report)
-    if not verdict_matches:
-        bold_matches = re.findall(
-            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
-            unfenced_report,
-        )
-        if bold_matches:
-            verdict_matches = bold_matches
+    # Extract all bounded Summary Verdict sections
+    summary_matches = list(re.finditer(r"(?is)#{2,3}\s+(?:Summary\s+)?Verdict[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report))
+    if not summary_matches:
+        return False, False, "Missing required section: Summary Verdict"
+
+    # Extract verdict lines strictly from Summary Verdict section bodies
+    verdict_matches = []
+    for s_match in summary_matches:
+        sbody = s_match.group(1).strip()
+        v_in_sec = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", sbody)
+        if not v_in_sec:
+            bold_matches = re.findall(
+                r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
+                sbody,
+            )
+            if bold_matches:
+                v_in_sec = bold_matches
+        verdict_matches.extend(v_in_sec)
 
     if not verdict_matches:
-        return False, False, "No valid anchored verdict line found."
+        return False, False, "No valid anchored verdict line found in Summary Verdict section."
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {
@@ -206,18 +216,21 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         "not ready for merge", "do not approve", "never approve"
     }
     core_negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
+    qual_negation_pattern = r"(?i)\b(?:except|unless|conditional|subject\s+to|pending|after\s+addressing|with\s+(?:caveat|exception|reservation)|deletes|breaks|causes\s+data\s+loss)\b"
 
     parsed_verdicts = []
     for v_str in verdict_matches:
         v_clean = re.sub(r"[\*`_]", "", v_str).strip()
         v_split = re.split(r"\s*[-:—(]\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
+        v_qual = v_split[1].strip().rstrip(").!") if len(v_split) > 1 else ""
 
         has_core_negation = bool(re.search(core_negation_pattern, v_core))
+        has_qual_negation = bool(re.search(qual_negation_pattern, v_qual, flags=re.IGNORECASE))
 
         if v_core in clean_allowlist:
-            if has_core_negation:
-                parsed_verdicts.append((True, False, "Negated approval"))
+            if has_core_negation or has_qual_negation:
+                parsed_verdicts.append((True, False, f"Negated or qualified approval: '{v_str}'"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
         elif v_core in needs_work_allowlist or any(v_core.startswith(nw) for nw in needs_work_allowlist) or has_core_negation:
@@ -375,26 +388,14 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     if model:
         cmd.extend(["-m", model])
 
-    prompt_file = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tf:
-            tf.write(prompt)
-            prompt_file = tf.name
-
-        with open(prompt_file, "r", encoding="utf-8") as pf:
-            res = subprocess.run(cmd, stdin=pf, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
-    finally:
-        if prompt_file:
-            try:
-                os.remove(prompt_file)
-            except OSError:
-                pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()

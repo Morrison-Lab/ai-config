@@ -134,6 +134,35 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
+        # Verdict placed in Observations while Summary Verdict has no decision is rejected as invalid
+        misplaced_verdict_report = (
+            "### Summary Verdict\n"
+            "No decision here.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "Verdict: Ready for merge\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(misplaced_verdict_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("Summary Verdict", reason)
+
+        # Qualified verdict with negative/blocking exception is parsed as Needs Work (is_clean=False)
+        qualified_negative_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge (except the implementation deletes user records)\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(qualified_negative_report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
+
         # None. followed by numbered blocker is NOT clean
         sneaky_findings = (
             "### Summary Verdict\n"
@@ -569,11 +598,18 @@ class TestPrePushReview(unittest.TestCase):
             e5 = reviewer.get_next_alternate_engine(subset_engines)
             self.assertEqual(e5, "antigravity")
 
-    @patch("tempfile.NamedTemporaryFile", side_effect=OSError("No usable temporary directory found"))
+    @patch("subprocess.run")
     @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
-    def test_opencode_tempfile_failure_handling(self, mock_which, mock_tf):
-        res = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet")
-        self.assertIsNone(res)
+    def test_opencode_direct_stdin_pipe(self, mock_which, mock_subproc):
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_res.stdout = "output"
+        mock_subproc.return_value = mock_res
+
+        with patch.object(reviewer, "validate_review_output", return_value=True):
+            res = reviewer.run_opencode_review("prompt text", model="anthropic/claude-3.7-sonnet")
+            self.assertEqual(res, "output")
+            self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt text")
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

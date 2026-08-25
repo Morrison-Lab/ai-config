@@ -29,7 +29,7 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
 def matches_tool(matcher_pattern, tool_name):
     if not matcher_pattern:
         return False
-    if matcher_pattern == "*" or matcher_pattern == ".*":
+    if matcher_pattern == "*":
         return True
     if matcher_pattern == tool_name:
         return True
@@ -239,6 +239,8 @@ def main():
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
+                    if hook_out.get("additionalContext"):
+                        print(f"Warning from Stop hook: {hook_out.get('additionalContext')}", file=sys.stderr)
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
@@ -268,7 +270,14 @@ def main():
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
                 if text_out:
-                    injected_messages.append(text_out)
+                    try:
+                        parsed = json.loads(text_out)
+                        if isinstance(parsed, dict):
+                            text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or text_out
+                    except Exception:
+                        pass
+                    if text_out:
+                        injected_messages.append(text_out)
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages]

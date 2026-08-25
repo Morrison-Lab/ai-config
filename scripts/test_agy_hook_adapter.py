@@ -240,7 +240,6 @@ class TestAgyHookAdapter(unittest.TestCase):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result
         
-        # Test SendMessage mapping
         payload_send = {
             "toolCall": {
                 "name": "send_message",
@@ -298,6 +297,26 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(out.get("decision"), "continue")
         self.assertEqual(out.get("reason"), "Flat stop block")
         mock_run.assert_called_once()
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_event_block_returns_continue(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "block", "reason": "Uncommitted work detected"}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {"terminationReason": "model_stop"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "continue")
+        self.assertEqual(out.get("reason"), "Uncommitted work detected")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

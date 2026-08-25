@@ -136,33 +136,22 @@ def main():
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
-            if not subagents:
-                empty_agent_payload = {
+            for sub in subagents:
+                if not isinstance(sub, dict):
+                    continue
+                agent_payload = {
                     "tool_name": "Agent",
-                    "tool_input": {}
+                    "tool_input": {
+                        "subagent_type": sub.get("TypeName"),
+                        "isolation": sub.get("Workspace"),
+                        "prompt": sub.get("Prompt")
+                    }
                 }
                 if transcript_path:
-                    empty_agent_payload["transcript_path"] = transcript_path
+                    agent_payload["transcript_path"] = transcript_path
                 for group in pre_tool_groups:
                     if matches_tool(group.get("matcher", ""), "Agent"):
-                        tasks_to_run.append((extract_hook_list([group]), empty_agent_payload))
-            else:
-                for sub in subagents:
-                    if not isinstance(sub, dict):
-                        continue
-                    agent_payload = {
-                        "tool_name": "Agent",
-                        "tool_input": {
-                            "subagent_type": sub.get("TypeName"),
-                            "isolation": sub.get("Workspace"),
-                            "prompt": sub.get("Prompt")
-                        }
-                    }
-                    if transcript_path:
-                        agent_payload["transcript_path"] = transcript_path
-                    for group in pre_tool_groups:
-                        if matches_tool(group.get("matcher", ""), "Agent"):
-                            tasks_to_run.append((extract_hook_list([group]), agent_payload))
+                        tasks_to_run.append((extract_hook_list([group]), agent_payload))
 
         elif tool_name == "send_message":
             send_payload = {
@@ -211,7 +200,9 @@ def main():
                 if not cmd:
                     continue
                 cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-                timeout_val = parse_timeout(hook.get("timeout")) or 30.0
+                timeout_val = parse_timeout(hook.get("timeout"))
+                if timeout_val is None:
+                    timeout_val = 30.0
                 
                 result = run_hook_command(cmd, c_payload, cwd, timeout_val)
                 if result and result.returncode == 0 and result.stdout:
@@ -246,7 +237,9 @@ def main():
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout")) or 30.0
+            timeout_val = parse_timeout(hook.get("timeout"))
+            if timeout_val is None:
+                timeout_val = 30.0
             
             result = run_hook_command(cmd, stop_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:
@@ -283,7 +276,9 @@ def main():
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout")) or 30.0
+            timeout_val = parse_timeout(hook.get("timeout"))
+            if timeout_val is None:
+                timeout_val = 30.0
             
             result = run_hook_command(cmd, ups_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:

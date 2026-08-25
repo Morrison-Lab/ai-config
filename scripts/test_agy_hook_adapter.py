@@ -236,9 +236,14 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_send_message_and_define_subagent(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        mock_run.return_value = mock_result
+    def test_send_message_allow_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_deny = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Messaging not permitted"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_deny
         
         payload_send = {
             "toolCall": {
@@ -250,9 +255,38 @@ class TestAgyHookAdapter(unittest.TestCase):
         mock_stdin.seek(0)
         self.adapter.main()
         
-        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
-        self.assertEqual(call_input["tool_name"], "SendMessage")
-        self.assertEqual(call_input["tool_input"]["recipient"], "agent-123")
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "Messaging not permitted")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_define_subagent_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_deny = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Agent definition denied"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_deny
+        
+        payload_def = {
+            "toolCall": {
+                "name": "define_subagent",
+                "args": {"name": "sub1", "description": "desc", "system_prompt": "prompt"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload_def))
+        mock_stdin.seek(0)
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "Agent definition denied")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

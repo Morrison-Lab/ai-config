@@ -508,7 +508,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         payload = {
             "toolCall": {
                 "name": "invoke_subagent",
-                "args": {"Subagents": "not-a-list"}
+                "args": {"Subagents": "not-a-json-list"}
             }
         }
         mock_stdin.write(json.dumps(payload))
@@ -517,7 +517,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.adapter.main()
         
         out = json.loads(mock_stdout.getvalue())
-        self.assertEqual(out.get("decision"), "allow")
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertIn("malformed JSON string", out.get("reason", ""))
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

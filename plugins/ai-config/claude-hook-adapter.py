@@ -148,9 +148,13 @@ def main():
                     parsed_sub = json.loads(raw_subagents)
                     raw_subagents = [parsed_sub] if isinstance(parsed_sub, dict) else parsed_sub
                 except Exception as exc:
-                    print(f"claude-hook-adapter: invoke_subagent failed to parse Subagents string: {exc}", file=sys.stderr)
+                    reason = f"invoke_subagent received malformed JSON string for Subagents: {exc}"
+                    print(json.dumps({"decision": "deny", "reason": reason}))
+                    return
             if raw_subagents is not None and not isinstance(raw_subagents, list):
-                print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
+                reason = f"invoke_subagent Subagents argument must be a list (received {type(raw_subagents).__name__})"
+                print(json.dumps({"decision": "deny", "reason": reason}))
+                return
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
             if len(subagents) > 50:
                 reason = f"invoke_subagent exceeded maximum supported fanout limit of 50 subagents (received {len(subagents)})"

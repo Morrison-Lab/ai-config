@@ -145,11 +145,10 @@ def main():
                 raw_subagents = [raw_subagents]
             elif isinstance(raw_subagents, str):
                 try:
-                    raw_subagents = json.loads(raw_subagents)
-                    if isinstance(raw_subagents, dict):
-                        raw_subagents = [raw_subagents]
-                except Exception:
-                    pass
+                    parsed_sub = json.loads(raw_subagents)
+                    raw_subagents = [parsed_sub] if isinstance(parsed_sub, dict) else parsed_sub
+                except Exception as exc:
+                    print(f"claude-hook-adapter: invoke_subagent failed to parse Subagents string: {exc}", file=sys.stderr)
             if raw_subagents is not None and not isinstance(raw_subagents, list):
                 print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
@@ -269,7 +268,7 @@ def main():
                 try:
                     hook_out = json.loads(result.stdout)
                     decision = str(hook_out.get("decision", "")).strip().lower()
-                    if decision in ("block", "deny", "continue"):
+                    if decision in ("block", "deny"):
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
@@ -285,8 +284,16 @@ def main():
 
     elif event_type == "PreInvocation":
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
+        prompt_val = payload.get("prompt") or payload.get("userPrompt") or payload.get("message") or ""
+        if not prompt_val and isinstance(payload.get("messages"), list) and payload["messages"]:
+            last_msg = payload["messages"][-1]
+            if isinstance(last_msg, dict):
+                prompt_val = last_msg.get("content") or last_msg.get("text") or ""
+            elif isinstance(last_msg, str):
+                prompt_val = last_msg
+                
         ups_payload = {
-            "prompt": payload.get("prompt", ""),
+            "prompt": prompt_val,
             "invocation_num": payload.get("invocationNum"),
             "initial_num_steps": payload.get("initialNumSteps")
         }

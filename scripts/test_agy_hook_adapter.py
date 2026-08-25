@@ -323,6 +323,32 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(out["injectSteps"][1]["ephemeralMessage"], "Message 2")
 
     @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_messages_array_extraction(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Injected context"}), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "invocationNum": 1,
+            "messages": [
+                {"role": "user", "content": "Hello world from messages"}
+            ]
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(len(out.get("injectSteps", [])), 2)
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["prompt"], "Hello world from messages")
+
+    @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_FLAT_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -560,7 +586,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_stop_event_continue_decision(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "continue", "reason": "Native continue"}), stderr="")
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "continue", "reason": "Proceed with exit"}), stderr="")
         mock_run.return_value = mock_result
         
         payload = {"terminationReason": "model_stop"}
@@ -570,8 +596,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.adapter.main()
         
         out = json.loads(mock_stdout.getvalue())
-        self.assertEqual(out.get("decision"), "continue")
-        self.assertEqual(out.get("reason"), "Native continue")
+        self.assertEqual(out, {})
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

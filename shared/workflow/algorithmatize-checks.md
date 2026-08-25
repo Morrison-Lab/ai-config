@@ -750,7 +750,7 @@ Recording the pair rather than a new outcome, per [`ums`](../../skills/ums/SKILL
 
 The first is this entry's thesis.
 It fell under the outcome headed "The harness that performs those mutations needs the same scrutiny", whose `Do` is to verify each mutation changed the artifact.
-The anchor matched nothing, so it did not, and doubting the coverage would have been the wrong move exactly as this entry says.
+The anchor matched nothing, so the mutation never applied, and doubting the coverage would have been the wrong move exactly as this entry says.
 
 The second is the exception, and it is worth separating rather than folding in.
 `ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE` and could not observe the mutation aimed at it.
@@ -766,7 +766,7 @@ What that section does not say is that a mutation harness is where the check has
 There the tell is a match that inexplicably fails, and you react to it; here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
 
 - **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you.
-- **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- that is the second of the two questions above, and asking it first is what produced both misreadings here.
+- **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- that is the second of the two questions above, and asking it first is what misread the row that belonged to the first.
 
 **A component that stops failing under mutation is a question, not a cleanup.**
 

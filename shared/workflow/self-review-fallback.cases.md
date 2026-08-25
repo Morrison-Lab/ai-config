@@ -238,7 +238,7 @@ The first is that theory: two readings that share a vendor share their blind spo
 The second is **contamination**, recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the eleven prior rounds in its own justification, so the two same-vendor readings were not independent samples and part of their agreement is explained by the second having read about the first.
 That confound bears hardest on the evidence this record would otherwise lean on most, since the eleven pre-push rounds are both the largest part of the same-vendor total and the thing the later verdict cited.
 The third is a **different threshold**: that same verdict scopes its findings line to a "high-signal bar (compile/parse errors, definite wrong-result logic, or clear unambiguous CLAUDE.md violations)", so the two reviewers may have been applying different tests for what counts as a finding rather than holding different blind spots.
-It is the one of the three with a cheap remedy, since a bar can be stated in the request.
+Its remedy is the cheapest to state, since a bar can be named in the request; the contamination reading has cheap remedies of its own, in the section linked below.
 Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.
 
 The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).

@@ -143,26 +143,27 @@ leaving the next.
 
 **Third occurrence, 2026-08-24, after #1947 and #1973 above --- and the shape the `Don't` above does not literally name.**
 That `Don't` fires on a second *widening*.
-Here one widening forced two successive **narrowings**, which is the same rule from the other side: a pattern that cannot locate a token is equally unable to decide either direction.
+Here a widening forced a run of **narrowings**, which is the same rule from the other side: a pattern that cannot locate a token is equally unable to decide either direction.
 
 `COMMENT_FLAG_RE` in `hooks/require-agent-disclosure.py` decides whether a `gh issue|pr close|reopen` segment posts a comment, which it does only when `--comment` or its shorthand `-c` is present.
 On [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) its short-flag alternative began as `-c\s`, matching only the spaced spelling.
-Widening it to the attached and `=` forms `gh` also accepts gave `-c(?:[\s=]|["']|[A-Za-z0-9])`, which puts `-c` within reach of the middle of a word --- so a **compliant** `gh issue close 5 -R Morrison-Lab/ai-config` warned, on the `-co` inside `ai-config`.
-A boundary condition was then written to stop that, and rewritten twice: `(?<![\w-])`, then `(?<![\w\-"'])` once a preceding quote was found to slip past, then `(?<![^\s])`.
-Only the last of those three excludes the compliant command; paste the intermediate form beside it if you want to reproduce the warning, since the final regex correctly does not match.
+Widening it to `-c(?:\s|=|\S)`, for the attached and `=` forms `gh` also accepts, put `-c` within reach of the middle of a word --- so a **compliant** `gh issue close 5 -R Morrison-Lab/ai-config` warned, on the `-co` inside `ai-config`.
+A boundary condition then went in to stop that, and reached the branch head in a third form: `(?<![\w-])`, `(?<![\w\-"'])` once a preceding quote was found to slip past, and finally `(?<![^\s])`.
 
-**Establish the order from git rather than from the diff's shape**, which is what three earlier drafts of this entry got wrong.
-Two of the commits are concurrent siblings rather than successors, merged back together (see [`claim-pr`](../workflow/claim-pr.md)'s second-occurrence entry), and nothing in reading the patches in listed order shows that.
-`git log -1 --format=%P <sha>` settles it in one command per commit, and `git show <sha>:<path>` gives each revision's actual form.
-
-Whatever the order, **every one of those edits asks where a token begins**, so they are one finding about tokenization wearing four costumes.
+Every one of those four edits asks where a token begins, so they are one finding about tokenization wearing four costumes.
 The last of them answered it by hand-rolling a boundary test rather than by asking what already computes one.
-`shlex` is in the standard library and nine hooks in this repo already import it, so the layer that answers the question was reachable from the first widening.
+`shlex` is in the standard library and nine hooks in this repo already import it, so the layer that answers the question was reachable from the widening.
 The layer change is **filed rather than shipped**, as [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189), so this records a diagnosis rather than a demonstrated repair.
+
+**Six review rounds on this entry are its own second lesson**, and the more transferable one.
+Five of them found a factual error in a *different* narration of the order in which those edits landed --- which commit responded to which --- because two of the commits are concurrent siblings that were merged back together (see [`claim-pr`](../workflow/claim-pr.md)'s second-occurrence entry).
+The count and the forms survived every round untouched; only the causal chain kept breaking.
+So the entry now states what each revision **was** and drops what each revision was a **response to**, which the rule never needed.
 
 - **Do:** write down the one question a run of fixes shares, before writing the next pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.
 - **Do:** name the construct you are hand-rolling when a fix adds a boundary test, an escape check, or a quote check to a regex, and search the standard library for it before writing it.
-- **Do:** run `git log -1 --format=%P` over the commits before narrating a fix history as a sequence --- a concurrent pair reads as consecutive in every listing that orders by time.
+- **Do:** execute each revision of a matcher you are writing up, and quote what it matched --- reading the diff is what produced five wrong drafts of the paragraph above.
+- **Do:** run `git merge-base --is-ancestor A B` before writing that one commit responded to another, and drop the causal claim rather than reconstructing it when the answer is no.
 - **Don't:** read a widening and a narrowing as different classes --- both are the same pattern failing to locate a token, and a widening that forces a narrowing is already the second edit the rule above warns about.
 - **Don't:** count a boundary test that *generalizes* an earlier one as having changed layers; it is still the same construct answering a question it cannot decide.
 

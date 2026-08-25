@@ -3,6 +3,7 @@ import json
 import subprocess
 import os
 import re
+import traceback
 
 def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     try:
@@ -65,6 +66,7 @@ def main():
         payload = json.load(sys.stdin)
     except Exception as exc:
         print(f"claude-hook-adapter: failed to read payload: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         print(json.dumps({"decision": "allow"}))
         return
 
@@ -99,6 +101,7 @@ def main():
             hooks_def = json.load(f)
     except Exception as exc:
         print(f"claude-hook-adapter: failed to load {claude_hooks_json_path}: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         if event_type == "PreInvocation":
             print(json.dumps({"injectSteps": []}))
         elif event_type == "Stop":
@@ -134,7 +137,6 @@ def main():
             raw_subagents = args.get("Subagents")
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
             if not subagents:
-                # If subagents list is empty or omitted, construct an empty agent payload for audit hooks
                 empty_agent_payload = {
                     "tool_name": "Agent",
                     "tool_input": {}
@@ -251,7 +253,7 @@ def main():
                 try:
                     hook_out = json.loads(result.stdout)
                     decision = str(hook_out.get("decision", "")).strip().lower()
-                    if decision == "block":
+                    if decision in ("block", "deny"):
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
@@ -267,6 +269,7 @@ def main():
     elif event_type == "PreInvocation":
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
         ups_payload = {
+            "prompt": payload.get("prompt", ""),
             "invocation_num": payload.get("invocationNum"),
             "initial_num_steps": payload.get("initialNumSteps")
         }
@@ -289,7 +292,7 @@ def main():
                     try:
                         parsed = json.loads(text_out)
                         if isinstance(parsed, dict):
-                            text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or text_out
+                            text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or ""
                     except Exception:
                         pass
                     if text_out:

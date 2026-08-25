@@ -1,6 +1,6 @@
 ---
 name: delegate-to-opencode
-description: "Delegate sidecar work to opencode free or local models."
+description: "Delegate sidecar work to OpenCode (Go subscription, Zen free, local Ollama) or OpenRouter models."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -9,11 +9,11 @@ allowed-tools:
   - Edit
 ---
 
-# delegate-to-opencode --- run sidecar work on a free or local model
+# delegate-to-opencode --- run sidecar work on OpenCode or OpenRouter models
 
-The `opencode` CLI reaches two model tiers this corpus has no other route to --- a hosted free tier (opencode Zen) and a fully local one (ollama) --- plus OpenRouter as a third destination once its provider is activated.
-The two tiers cost no quota at all, so work small enough for them should not spend Claude's budget, codex's window, or agy's.
-The local tier also does something none of the other destinations can: it keeps the payload on the machine.
+The `opencode` CLI reaches an active OpenCode Go ($10/mo subscription), hosted free (`opencode Zen`), and local (`ollama`) tiers, plus OpenRouter as an activated provider for frontier and stealth models.
+The free and local tiers cost no quota at all, so work small enough for them should not spend Claude's budget, Codex's window, or OpenRouter credits.
+The local tier also keeps payloads strictly on the machine when loopback checks pass.
 
 Claude stays the orchestrator.
 It writes the prompt, runs the delegate, validates what comes back, and does the synthesis.
@@ -314,5 +314,5 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 - ❌ Passing `--auto` to widen a delegate's permissions instead of scoping the config (repo root `opencode.json` uses a blanket-allow config intentionally as the scoped equivalent --- see above --- prefer that over `--auto` per-run).
 - ❌ Pointing a codex-style `MAXPAR` fan-out at one ollama daemon and expecting hosted-style throughput.
 - ❌ Quoting a count, a line number, or a citation a free model returned without re-deriving it.
-- ❌ Skipping opencode for small mechanical work because codex is stronger --- codex has a window to conserve and opencode does not.
+- ❌ Skipping OpenCode free/local tiers for small mechanical work because Codex is stronger --- Codex has a window to conserve while OpenCode Zen and Ollama consume no quota.
 - ❌ Handing a free or local model the authoring or judgment task that needed Claude's own context.

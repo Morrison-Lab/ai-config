@@ -964,9 +964,9 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of service** (user directive, 2026-08-20; ai-config#1776).
+> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of service** (user directive, 2026-08-20, ai-config#1776).
 > Route no dispatched subagent work to it; interactive subscription/extension is unaffected.
-> Read the ladder as `opencode` / `openrouter`, then `codex`, then Claude.
+> Read the ladder as OpenCode free/local tiers, then Codex / OpenCode Go subscription windows, then OpenRouter prepaid models, then Claude.
 
 For heavy, parallelizable **read / draft / verify** work (deep reading, backlog scoping, file audits, drafting artifacts, adversarial verification), route to another agent CLI before spending Claude/Workflow tokens.
 CLIs drawing on subscriptions and keys (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, OpenRouter) provide high capacity.

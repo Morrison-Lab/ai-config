@@ -228,24 +228,22 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         is_clean = True
 
     findings_matches = list(re.finditer(r"(?is)#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report))
-    if findings_matches:
-        for f_match in findings_matches:
-            findings_body = f_match.group(1).strip()
-            is_clean_findings = bool(
-                re.match(
-                    r"^\s*(?:none(?:\.|\b)|n/a|zero(?:\s+critical)?|no(?:\s+(?:critical|blocking|issues|findings))(?:\s+found)?\.?)\s*$",
-                    findings_body,
-                    flags=re.IGNORECASE,
-                )
+    if not findings_matches:
+        return False, False, "Missing required section: Critical Findings"
+
+    for f_match in findings_matches:
+        findings_body = f_match.group(1).strip()
+        if not findings_body:
+            return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
+        is_clean_findings = bool(
+            re.match(
+                r"^\s*(?:none(?:\.|\b)|n/a|zero(?:\s+critical)?|no(?:\s+(?:critical|blocking|issues|findings))(?:\s+found)?\.?)\s*$",
+                findings_body,
+                flags=re.IGNORECASE,
             )
-            if not is_clean_findings:
-                has_list_item = bool(re.search(r"(?im)^\s*(?:1\.|-|\*)\s+", findings_body))
-                has_blocker_phrase = any(
-                    term in findings_body.lower()
-                    for term in ["blocking", "critical", "regression", "must fix", "severe", "bug", "fails", "fail", "broken", "issue"]
-                )
-                if is_clean and (has_list_item or has_blocker_phrase or len(findings_body) > 0):
-                    return False, False, "Contradictory output: clean verdict but critical findings body contains issues/blockers."
+        )
+        if is_clean and not is_clean_findings:
+            return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     refusal_patterns = [
         "hit your weekly limit",
@@ -359,10 +357,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
     if model:
         cmd.extend(["-m", model])
-    cmd.append("-")
+    cmd.append(prompt)
 
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None

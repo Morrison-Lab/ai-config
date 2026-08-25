@@ -214,6 +214,19 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(fenced_report, expected_commit_sha=commit)
         self.assertFalse(is_valid)
 
+        # Empty Critical Findings section is rejected as invalid
+        empty_findings_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(empty_findings_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("cannot be empty", reason)
+
         # Report entirely inside a tilde code fence is also rejected
         tilde_fenced_report = (
             "~~~markdown\n"
@@ -438,13 +451,13 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
-        # Test OpenCode runner uses stdin (-) and pure mode
+        # Test OpenCode runner uses positional prompt and pure mode
         mock_which.return_value = "/opt/homebrew/bin/opencode"
         out_oc = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertIn("-", oc_cmd)
+        self.assertIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 

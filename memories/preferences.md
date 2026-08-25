@@ -855,7 +855,7 @@
   This is a distinct axis from `shared/writing/timestamp-volatile-claims.md`'s time-based staleness: two observations can both be current and still disagree, because they were taken in different invocation contexts rather than at different times. (Generalized from the `TaskCreate`/`TodoWrite` incident recapped in the bullet above, ai-config#1732, 2026-08-20 --- caught in round-1 review, not by self-check.)
 - **All recorded facts about software, APIs, harnesses, and technologies must carry temporal qualifications and provenance.**
   Software inevitably changes over time: features evolve, defaults flip, endpoints deprecate, and internal limits move.
-  Do: attach explicit observation date, version number, commit snapshot, or runtime environment, and include a re-verification reminder (per `shared/writing/timestamp-volatile-claims.md`).
+  Do: attach explicit observation date, version number, execution environment, or snapshot reference, and include a re-verification reminder (per `shared/writing/timestamp-volatile-claims.md`).
   Don't: record third-party software behaviors, flag names, or vendor taxonomies as timeless present-tense truths without temporal bounds.
 
 ## Output-highlighting taxonomy

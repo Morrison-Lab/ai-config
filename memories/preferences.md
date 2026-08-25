@@ -965,7 +965,8 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 > [!IMPORTANT]
 > **`agy` (Google Antigravity)'s API-dispatch route is permanently out of service** (user directive, 2026-08-20, ai-config#1776).
-> Route no dispatched subagent work to it; interactive subscription/extension is unaffected.
+> Route no dispatched subagent work to it.
+> Interactive subscription/extension is unaffected.
 > Read the ladder as OpenCode free/local tiers, then Codex / OpenCode Go subscription windows, then OpenRouter prepaid models, then Claude.
 
 For heavy, parallelizable **read / draft / verify** work (deep reading, backlog scoping, file audits, drafting artifacts, adversarial verification), route to another agent CLI before spending Claude/Workflow tokens.

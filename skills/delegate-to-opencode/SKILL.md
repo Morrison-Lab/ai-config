@@ -185,7 +185,8 @@ opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PO
 opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 ```
 
-Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
+Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted.
+Go subscription verified 2026-08-25.
 
 Run `check-ollama-locality.py` (available in repository `scripts/` and packaged under `skills/delegate-to-opencode/scripts/`):
 

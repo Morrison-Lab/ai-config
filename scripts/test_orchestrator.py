@@ -1132,26 +1132,38 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
 
-        # 1. Clean PR
+        # 1. Clean PR with approved external Claude review comment
         clean_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
                 {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
+            "comments": [{"author": {"login": "github-actions"}, "body": "**Claude finished** -- review\n\n### Verdict\n**Clean**\n\nReady for merge"}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 2. Failing CI check
+        # 2. Clean PR with formal GitHub review approval
+        clean_gh_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [{"state": "APPROVED"}],
+            "comments": [],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, clean_gh_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
+        # 3. Failing CI check
         dirty_ci_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
             ],
-            "reviews": [],
+            "reviews": [{"state": "APPROVED"}],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
@@ -1159,78 +1171,95 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("failed", reason)
 
-        # 3. Blocking AI review verdict ("Needs more work")
+        # 4. Self-posted comment from collaborator / orchestrator account is REJECTED as an approval gate
+        self_comment_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [
+                {"author": {"login": "dem-extra1"}, "body": "**Claude finished** -- review\n\n### Verdict\n**Clean**"},
+            ],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, self_comment_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
+
+        # 5. Null author dictionary does not crash and is rejected
+        null_author_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [
+                {"author": None, "body": "**Claude finished** -- review\n\n### Verdict\n**Clean**"},
+            ],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, null_author_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("no independent approved external review", reason.lower())
+
+        # 6. Blocking AI review verdict ("Needs more work")
         dirty_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
+            "comments": [{"author": {"login": "github-actions"}, "body": "**Claude finished** -- review\n\nVerdict: Needs more work."}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("needs more work", reason.lower())
 
-        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
+        # 7. Alternative blocking verdict phrasing ("Blocked on human review")
         blocked_human_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
+            "comments": [{"author": {"login": "github-actions"}, "body": "**Claude finished** -- review\n\nVerdict: Blocked on human review"}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("blocked", reason.lower())
 
-        # 5. Production Claude review header format ("**Claude finished** -- ...")
+        # 8. Production Claude review header format ("**Claude finished** -- ...") from claude[bot]
         prod_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "**Claude finished** -- adversarial review\n\n### Verdict\nClean / Approved"}],
+            "comments": [{"author": {"login": "claude[bot]"}, "body": "**Claude finished** -- adversarial review\n\n### Verdict\nClean / Approved"}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, prod_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 6. Missing Claude review (fallback self-review only, or no comments)
-        missing_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "### Fallback Self-Review\nVerdict: Clean"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, missing_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("missing automated claude review", reason.lower())
-
-        # 7. Closed PR notice with em-dash ("No action \u2014 PR is closed/merged")
+        # 9. Closed PR notice with em-dash ("No action \u2014 PR is closed/merged")
         closed_pr_emdash_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action \u2014 PR is closed/merged"}],
+            "comments": [{"author": {"login": "github-actions"}, "body": "**Claude finished** -- review\n\nVerdict: No action \u2014 PR is closed/merged"}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, closed_pr_emdash_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("blocking verdict", reason.lower())
 
-        # 8. Stub review (Claude completed but no positive clean/approved verdict)
+        # 10. Stub review (Claude completed but no positive clean/approved verdict)
         stub_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "**Claude finished** -- review\n\nI examined the files but got cut short."}],
+            "comments": [{"author": {"login": "github-actions"}, "body": "**Claude finished** -- review\n\nI examined the files but got cut short."}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, stub_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)

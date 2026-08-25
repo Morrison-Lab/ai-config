@@ -232,78 +232,83 @@ class PRClaimManager:
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
+        # 4. Check for formal GitHub review approvals (from humans or approved external bots)
+        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
+
         comments = data.get("comments", [])
         claude_reviews = [
             c for c in comments
-            if "claude finished review" in c.get("body", "").lower()
-            or "**claude finished" in c.get("body", "").lower()
+            if (c.get("author") or {}).get("login") in ["github-actions", "claude[bot]"]
+            and ("claude finished review" in c.get("body", "").lower()
+                 or "**claude finished" in c.get("body", "").lower())
         ]
-        if not claude_reviews:
-            return False, "Missing automated Claude review evaluating PR (required for merge under mwc)"
+        if not (has_approved_review or claude_reviews):
+            return False, "No independent approved external review or GitHub approval found on PR"
 
-        latest_review = (
-            claude_reviews[-1].get("body", "")
-            .lower()
-            .replace("\u2014", "--")
-            .replace("\u2013", "--")
-        )
+        if claude_reviews:
+            latest_review = (
+                claude_reviews[-1].get("body", "")
+                .lower()
+                .replace("\u2014", "--")
+                .replace("\u2013", "--")
+            )
 
-        blocking_phrases = [
-            "needs more work",
-            "needs work",
-            "blocked",
-            "blocked on human review",
-            "changes requested",
-            "not clean",
-            "not ready",
-            "impasse",
-            "deadlock",
-            "finding 1 (blocking)",
-            "finding (blocking)",
-            "verdict\n\n**needs more work",
-            "verdict\n\n**needs work",
-            "no action -- pr is closed",
-            "no action -- pr is merged",
-        ]
-        for phrase in blocking_phrases:
-            if phrase in latest_review:
-                return False, f"Latest AI review has blocking verdict ('{phrase}')"
+            blocking_phrases = [
+                "needs more work",
+                "needs work",
+                "blocked",
+                "blocked on human review",
+                "changes requested",
+                "not clean",
+                "not ready",
+                "impasse",
+                "deadlock",
+                "finding 1 (blocking)",
+                "finding (blocking)",
+                "verdict\n\n**needs more work",
+                "verdict\n\n**needs work",
+                "no action -- pr is closed",
+                "no action -- pr is merged",
+            ]
+            for phrase in blocking_phrases:
+                if phrase in latest_review:
+                    return False, f"Latest AI review has blocking verdict ('{phrase}')"
 
-        # Require an explicit positive clean / approved verdict signal
-        positive_verdict_phrases = [
-            "verdict:\n\n**ready",
-            "verdict:\n\n**clean",
-            "verdict:\n\n**approved",
-            "verdict:\nready",
-            "verdict:\nclean",
-            "verdict:\napproved",
-            "verdict\n\nclean",
-            "verdict\n\napproved",
-            "verdict\n\nready",
-            "clean / approved",
-            "clean/approved",
-            "ready for merge",
-            "approved for merge",
-            "### verdict\n\nclean",
-            "### verdict\n\napproved",
-            "### verdict\n\nready",
-            "### verdict\nclean",
-            "### verdict\napproved",
-            "### verdict\nready",
-            "### verdict\n\n**clean",
-            "### verdict\n\n**approved",
-            "### verdict\n\n**ready",
-            "### verdict\n**clean",
-            "### verdict\n**approved",
-            "### verdict\n**ready",
-            "verdict:\n\nclean",
-            "verdict:\n\nready",
-            "verdict:\n**clean",
-            "verdict:\n**approved",
-            "verdict:\n**ready",
-        ]
-        if not any(phrase in latest_review for phrase in positive_verdict_phrases):
-            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
+            # Require an explicit positive clean / approved verdict signal
+            positive_verdict_phrases = [
+                "verdict:\n\n**ready",
+                "verdict:\n\n**clean",
+                "verdict:\n\n**approved",
+                "verdict:\nready",
+                "verdict:\nclean",
+                "verdict:\napproved",
+                "verdict\n\nclean",
+                "verdict\n\napproved",
+                "verdict\n\nready",
+                "clean / approved",
+                "clean/approved",
+                "ready for merge",
+                "approved for merge",
+                "### verdict\n\nclean",
+                "### verdict\n\napproved",
+                "### verdict\n\nready",
+                "### verdict\nclean",
+                "### verdict\napproved",
+                "### verdict\nready",
+                "### verdict\n\n**clean",
+                "### verdict\n\n**approved",
+                "### verdict\n\n**ready",
+                "### verdict\n**clean",
+                "### verdict\n**approved",
+                "### verdict\n**ready",
+                "verdict:\n\nclean",
+                "verdict:\n\nready",
+                "verdict:\n**clean",
+                "verdict:\n**approved",
+                "verdict:\n**ready",
+            ]
+            if not any(phrase in latest_review for phrase in positive_verdict_phrases):
+                return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
         return True, "PR is fully clean across CI and review"
 

@@ -1459,6 +1459,32 @@ This has since been resolved after addressing the finding.
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
 
+        # 20. LGTM on first verdict line is accepted
+        lgtm_body = "**Claude finished** review\n\n### Verdict\n\nLGTM"
+        lgtm_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": lgtm_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, lgtm_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+
+        # 21. Multi-paragraph review where first line is Needs more work but paragraph 2 mentions Ready for merge
+        multiparagraph_body = "**Claude finished** review\n\n### Verdict\n\n**Needs more work**\n\nOnce fixed, this will be ready for merge."
+        multiparagraph_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"author": {"login": "github-actions"}, "body": multiparagraph_body}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, multiparagraph_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

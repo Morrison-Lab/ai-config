@@ -9,7 +9,8 @@ When a Pull Request is prematurely or incorrectly merged
    Open a revert branch from `origin/main`,
    run `git revert <merge-commit>`,
    push,
-   and merge the revert PR to `main` right away.
+   and merge the revert PR to `main` right away once fast validation passes.
+   This is an emergency recovery action to restore the default branch to a known-clean state.
    Never leave a defective or unapproved merge on the default branch while troubleshooting.
 
 2. **Return to the original PR branch**:

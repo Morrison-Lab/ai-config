@@ -272,7 +272,14 @@ class PRClaimManager:
             else:
                 verdict_section = lower_body
 
-            # 1. Check for not-clean / blocking patterns in the verdict section
+            # Extract non-empty lines from the verdict section
+            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
+            if not verdict_lines:
+                return False, "Latest AI review verdict section is empty"
+
+            first_verdict_line = verdict_lines[0]
+
+            # 1. Check for not-clean / blocking patterns throughout the entire verdict section
             not_clean_patterns = [
                 r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
                 r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
@@ -292,24 +299,9 @@ class PRClaimManager:
                         continue
                     return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
 
-            # 2. Check for positive clean / approved verdict patterns in the verdict section
-            clean_patterns = [
-                r"\bready\s+for\s+merge\b",
-                r"\bapproved\s+for\s+merge\b",
-                r"\bclean\s*/\s*approved\b",
-                r"\bclean(?!-)\b",
-                r"\bapproved\b",
-                r"verdict:\s*(?:clean(?!-)|approved|ready)\b",
-            ]
-            bare_clean_patterns = {
-                r"\bready\s+for\s+merge\b",
-                r"\bapproved\s+for\s+merge\b",
-                r"\bclean\s*/\s*approved\b",
-                r"\bclean(?!-)\b",
-                r"\bapproved\b",
-            }
-            bare_clean_marked = re.compile(
-                r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+            # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
+            clean_first_line_pat = re.compile(
+                r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved(?:\s+for\s+merge)?|ready(?:\s+for\s+merge)?|lgtm|clean\s*/\s*approved)\b",
                 re.IGNORECASE,
             )
             clean_negation_prefix = re.compile(
@@ -324,28 +316,18 @@ class PRClaimManager:
                 re.IGNORECASE,
             )
 
-            has_clean_verdict = False
-            for pat in clean_patterns:
-                for match in re.finditer(pat, verdict_section, re.IGNORECASE | re.MULTILINE):
-                    if pat in bare_clean_patterns:
-                        line_start = verdict_section.rfind("\n", 0, match.start()) + 1
-                        line_prefix = verdict_section[line_start:match.start()]
-                        if not bare_clean_marked.search(line_prefix):
-                            continue
-                        prefix = verdict_section[max(0, match.start() - 40):match.start()]
-                        if clean_negation_prefix.search(prefix):
-                            continue
-                    remainder = verdict_section[match.end():min(len(verdict_section), match.end() + 60)]
-                    remainder_sentence = re.split(r"[.!?]|\n[ \t]*\n", remainder)[0]
-                    if clean_qualifier.search(remainder_sentence):
-                        continue
-                    has_clean_verdict = True
-                    break
-                if has_clean_verdict:
-                    break
-
-            if not has_clean_verdict:
+            match = clean_first_line_pat.search(first_verdict_line)
+            if not match:
                 return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
+
+            prefix = first_verdict_line[:match.start()]
+            if clean_negation_prefix.search(prefix):
+                return False, "Latest AI review verdict is negated"
+
+            remainder = first_verdict_line[match.end():min(len(first_verdict_line), match.end() + 60)]
+            remainder_sentence = re.split(r"[.!?]", remainder)[0]
+            if clean_qualifier.search(remainder_sentence):
+                return False, "Latest AI review clean verdict carries unresolved qualifiers or conditions"
 
         return True, "PR is fully clean across CI and review"
 

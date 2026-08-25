@@ -323,6 +323,21 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-status-read-after-pipe.py\"",
+            "timeout": 10,
+            "script": "warn-status-read-after-pipe.py",
+            "why": "shared/coding/errexit-is-not-uniform.md, which owns the mechanism, plus the exit-status section of shared/workflow/algorithmatize-checks.md. Without `pipefail` a pipeline's status is its RIGHTMOST command's, so `checker | head -20; echo \"exit=$?\"` reports whether `head` succeeded. Measured 2026-08-24 on UCD-SERG/ucd-serg.github.io#111: that exact line reported `exit=0` while the checker exited 1, and the PR's cleanliness was reasoned from it. NOTE the honest justification -- errexit-is-not-uniform already named this exact shape, with `head` named, and was simply not consulted, so this is a guard because the condition is decidable at composition time rather than because the corpus lacked a rule. WARNS, never blocks: reading the last stage's status is correct under `pipefail` and correct when that stage is the one meant. Fires only when an expandable `$?` sits in the segment IMMEDIATELY after a pipeline, with `set ... pipefail` opening no strictly-earlier segment and appearing at the own command level of no enclosing paren group (a nested group's option does not protect its parent, measured). Excludes single-quoted spans, heredoc bodies and `#` comments (so the corpus's own documentation cannot trip it), process substitution, argument-position command substitution, any `$?` that FOLLOWS a substitution in its segment, `[[ ]]` alternation, `$(( ))` and `(( ))` arithmetic, extglob `@(a|b)`, `>|`, fd-duplication redirects like `2>&1`, and backgrounded pipelines. An assignment's substitution and a bare subshell are NOT excluded: bash reads the pipeline's status there, measured. Negative control 2026-08-24 at branch HEAD, method stated in the hook docstring so it reproduces: 657 fenced blocks over 358 tracked files, 8 of them discriminating (containing both `$?` and `|`), 2 fired, both genuine. Report the 8, not the 657; the rest could not fire under any implementation. An earlier run scored 3, and the third was a false positive caught in review -- see the docstring. Fails open. Tracked as #2149.",
+            "_note_deliberate_under_approximation": [
+              "A `$?` inside SINGLE quotes is literal to the shell, so it is",
+              "never recorded -- which also means `bash -c '... | head; echo",
+              "$?'` gets no warning. That is accepted rather than overlooked:",
+              "this corpus writes such demonstration lines constantly, and a",
+              "warn-only guard should miss a real case before it fires on",
+              "every fragment that describes the rule it enforces."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",

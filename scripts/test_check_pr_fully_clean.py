@@ -444,6 +444,28 @@ def main() -> int:
         checker.classify_verdict(non_head_prose_round1["body"]) == "not-clean",
     )
 
+    # Regression (PR #2180 round 12): 'Needs more work: none identified' evaluates to clean
+    needs_work_none_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "**Needs more work: none identified -- code-level verdict is Ready for merge.**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nwn = json.dumps({"comments": [needs_work_none_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nwn):
+        nwn_ok, nwn_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: 'Needs more work: none identified' evaluates to clean",
+            nwn_ok and nwn_issues == [],
+        )
+    check(
+        "classify_verdict: 'Needs more work: none identified' classifies as clean",
+        checker.classify_verdict(needs_work_none_comment["body"]) == "clean",
+    )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

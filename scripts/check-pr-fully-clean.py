@@ -567,6 +567,9 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
+NOT_CLEAN_NEGATION_SUFFIX = re.compile(
+    r"^[ \t]*[:.\-]*[ \t]*(?:none\b|no\b|nothing\b|0\b|n/a\b)", re.IGNORECASE
+)
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
 # it would let an incidental "looks ready" in a later chatty comment discharge a
@@ -729,6 +732,9 @@ def classify_verdict(body: str, state: str = "") -> str:
                     continue
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
+            suffix = scan[match.end():match.end() + 25]
+            if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                 continue
             return "not-clean"
 
@@ -978,6 +984,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                         continue
                 prefix = scan_body[max(0, match.start() - 25):match.start()]
                 if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                    continue
+                suffix = scan_body[match.end():match.end() + 25]
+                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
                 if pat == r"changes\s+requested\b":
                     start = match.start()

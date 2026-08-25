@@ -301,12 +301,12 @@ This grants no merge authority: the strict merge policy below still applies.
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+1. **AI review triggers automatically on push**: Where `.github/workflows/claude-review.yml` (or equivalent) includes `pull_request: [opened, synchronize, ready_for_review]`, pushing code or opening the PR triggers the AI review automatically. Do **not** post redundant manual `@claude review` comments on push, as doing so cancels in-flight review runs. In repos without automated PR review workflows, dispatch `claude-review.yml` or request review explicitly after all code pushes are complete.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
-- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
+- **Do:** rely on automatic CI review triggers on push, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** post redundant manual `@claude review` comments when the review workflow is already automated on push, don't request human review when the PR is first opened empty, and don't request human review before code pushes are complete or before the AI review has passed.
 
 ## Cursor Cloud specific instructions
 

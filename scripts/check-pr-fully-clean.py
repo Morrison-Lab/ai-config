@@ -687,10 +687,15 @@ def _sentence_remainder(text: str, start: int) -> str:
     return text[start:stop]
 
 
+def _is_marked_pattern(scan: str, match_start: int) -> bool:
+    """Return True if match is marked on its line (e.g. heading, bullet, bold, or label)."""
+    line_start = scan.rfind("\n", 0, match_start) + 1
+    return bool(BARE_CLEAN_MARKED.search(scan[line_start:match_start]))
+
+
 def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
     """Return True if match is marked on its line or located in the Verdict section paragraph."""
-    line_start = scan.rfind("\n", 0, match_start) + 1
-    if BARE_CLEAN_MARKED.search(scan[line_start:match_start]):
+    if _is_marked_pattern(scan, match_start):
         return True
     last_verdict = -1
     for m in re.finditer(r"(?:^|\n)[ \t]*#{1,4}[ \t]*verdict\b", scan, re.IGNORECASE):
@@ -747,7 +752,7 @@ def classify_verdict(body: str, state: str = "") -> str:
             # the marking, and it already excludes a preceding negation by
             # adjacency.
             if pat in BARE_CLEAN_PATTERNS:
-                if not _is_marked_or_in_verdict_section(scan, match.start()):
+                if not _is_marked_pattern(scan, match.start()):
                     continue
                 prefix = scan[max(0, match.start() - 40):match.start()]
                 if CLEAN_NEGATION_PREFIX.search(prefix):

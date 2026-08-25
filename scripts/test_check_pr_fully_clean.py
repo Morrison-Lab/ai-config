@@ -450,7 +450,8 @@ def main() -> int:
         "author": {"login": "github-actions"},
         "body": (
             "**Claude finished** review\n\n### Verdict\n\n"
-            "**Needs more work: none identified -- code-level verdict is Ready for merge.**\n\n"
+            "Needs more work: none identified\n\n"
+            "**Ready for merge**\n\n"
             "(reviewed at `sha123`)"
         ),
     }
@@ -527,6 +528,24 @@ def main() -> int:
     check(
         "classify_verdict: 'not ready: none of...' classifies as not-clean",
         checker.classify_verdict(not_ready_none_of_comment["body"]) == "not-clean",
+    )
+
+    # Regression: an unmarked, mid-sentence 'ready for merge' mention inside a
+    # ### Verdict paragraph that merely recaps or quotes an earlier comment while
+    # findings remain open must NOT be classified as clean.
+    unmarked_verdict_section_recap = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "A teammate's earlier comment said this was ready for merge. "
+            "I re-checked and both findings from round 1 are still open here.\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    check(
+        "classify_verdict: unmarked mid-sentence 'ready for merge' in verdict paragraph does NOT classify as clean",
+        checker.classify_verdict(unmarked_verdict_section_recap["body"]) != "clean",
     )
 
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary

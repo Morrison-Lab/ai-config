@@ -1211,18 +1211,31 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("missing automated claude review", reason.lower())
 
-        # 7. Closed PR notice ("No action -- PR is closed/merged")
-        closed_pr_json = json.dumps({
+        # 7. Closed PR notice with em-dash ("No action \u2014 PR is closed/merged")
+        closed_pr_emdash_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action -- PR is closed/merged"}],
+            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action \u2014 PR is closed/merged"}],
         })
-        mgr._run_cmd = MagicMock(return_value=(0, closed_pr_json, ""))
+        mgr._run_cmd = MagicMock(return_value=(0, closed_pr_emdash_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("blocking verdict", reason.lower())
+
+        # 8. Stub review (Claude completed but no positive clean/approved verdict)
+        stub_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "**Claude finished** -- review\n\nI examined the files but got cut short."}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, stub_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("does not contain a recognized positive clean/approved verdict", reason)
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser

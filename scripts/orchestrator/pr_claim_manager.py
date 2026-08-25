@@ -241,9 +241,16 @@ class PRClaimManager:
         if not claude_reviews:
             return False, "Missing automated Claude review evaluating PR (required for merge under mwc)"
 
-        latest_review = claude_reviews[-1].get("body", "").lower()
+        latest_review = (
+            claude_reviews[-1].get("body", "")
+            .lower()
+            .replace("\u2014", "--")
+            .replace("\u2013", "--")
+        )
+
         blocking_phrases = [
             "needs more work",
+            "needs work",
             "blocked",
             "blocked on human review",
             "changes requested",
@@ -254,11 +261,43 @@ class PRClaimManager:
             "finding 1 (blocking)",
             "finding (blocking)",
             "verdict\n\n**needs more work",
+            "verdict\n\n**needs work",
             "no action -- pr is closed",
+            "no action -- pr is merged",
         ]
         for phrase in blocking_phrases:
             if phrase in latest_review:
                 return False, f"Latest AI review has blocking verdict ('{phrase}')"
+
+        # Require an explicit positive clean / approved verdict signal
+        positive_verdict_phrases = [
+            "verdict:\n\n**ready",
+            "verdict:\n\n**clean",
+            "verdict:\n\n**approved",
+            "verdict:\nready",
+            "verdict:\nclean",
+            "verdict:\napproved",
+            "verdict\n\nclean",
+            "verdict\n\napproved",
+            "verdict\n\nready",
+            "clean / approved",
+            "clean/approved",
+            "ready for merge",
+            "approved for merge",
+            "### verdict\n\nclean",
+            "### verdict\n\napproved",
+            "### verdict\n\nready",
+            "### verdict\nclean",
+            "### verdict\napproved",
+            "### verdict\nready",
+            "### verdict\n\n**clean",
+            "### verdict\n\n**approved",
+            "### verdict\n\n**ready",
+            "verdict:\n\nclean",
+            "verdict:\n\nready",
+        ]
+        if not any(phrase in latest_review for phrase in positive_verdict_phrases):
+            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
         return True, "PR is fully clean across CI and review"
 

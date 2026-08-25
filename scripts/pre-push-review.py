@@ -150,8 +150,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
-    # Strip markdown code blocks before parsing top-level structure to prevent fenced injection
-    unfenced_report = re.sub(r"```[\s\S]*?```", "", report)
+    # Strip markdown code blocks (backtick and tilde fences) before parsing top-level structure to prevent fenced injection
+    unfenced_report = re.sub(r"(?s)(?:```|~~~).*?(?:```|~~~)", "", report)
 
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
@@ -196,7 +196,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         "disapproved", "blocked", "ready after addressing findings", "unable to review",
         "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve"
     }
-    negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
+    core_negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
 
     parsed_verdicts = []
     for v_str in verdict_matches:
@@ -204,10 +204,10 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         v_split = re.split(r"\s*[-:—(]\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
 
-        has_negation = bool(re.search(negation_pattern, v_clean.lower()))
+        has_core_negation = bool(re.search(core_negation_pattern, v_core))
 
         if v_core in clean_allowlist:
-            if has_negation:
+            if has_core_negation:
                 parsed_verdicts.append((True, False, "Negated approval"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
@@ -359,10 +359,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
     if model:
         cmd.extend(["-m", model])
-    cmd.append(prompt)
+    cmd.append("-")
 
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None

@@ -18,7 +18,7 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
 4. **Skill Packaging & Synchronization**:
    - Maintain canonical `skills/pre-push-review/SKILL.md`.
    - Generate wrapper for OpenAI Codex in `codex-skills/pre-push-review/SKILL.md` via `scripts/sync-codex-skill-wrappers.py`.
-   - Update `.agents/skills.json` and validate with `scripts/validate-skills.py`.
+   - Discover via `.agents/skills.json` directory registration and validate with `scripts/validate-skills.py`.
 
 ## Non-Functional & Quality Requirements
 - Zero reliance on cloud API keys; purely local CLI execution.

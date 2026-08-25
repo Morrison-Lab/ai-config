@@ -185,7 +185,21 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(multiple_findings_report, expected_commit_sha=commit)
         self.assertFalse(is_clean)
 
-        # Report entirely inside a code fence is rejected as missing top-level structure
+        # Clean verdict with rationale containing 'no' (e.g. 'no blocking issues found') is accepted as clean
+        clean_with_no_rationale = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge — no blocking issues found and CI passed cleanly.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_with_no_rationale, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
+        # Report entirely inside a backtick code fence is rejected as missing top-level structure
         fenced_report = (
             "```markdown\n"
             "### Summary Verdict\n"
@@ -198,6 +212,21 @@ class TestPrePushReview(unittest.TestCase):
             "```"
         )
         is_valid, is_clean, _ = reviewer.parse_review_verdict(fenced_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+
+        # Report entirely inside a tilde code fence is also rejected
+        tilde_fenced_report = (
+            "~~~markdown\n"
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}\n"
+            "~~~"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(tilde_fenced_report, expected_commit_sha=commit)
         self.assertFalse(is_valid)
 
         # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
@@ -377,6 +406,47 @@ class TestPrePushReview(unittest.TestCase):
         cmd_args = mock_subproc.call_args[0][0]
         self.assertIn("-m", cmd_args)
         self.assertIn("gpt-5.6-sol", cmd_args)
+
+    @patch("subprocess.run")
+    @patch("shutil.which")
+    def test_all_runners_cli_contracts(self, mock_which, mock_subproc):
+        valid_report = (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            "Reviewed-Commit: abc12345"
+        )
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_res.stdout = valid_report
+        mock_subproc.return_value = mock_res
+
+        # Test Claude runner
+        mock_which.return_value = "/opt/homebrew/bin/claude"
+        out_claude = reviewer.run_claude_review("prompt", model="claude-3-5-sonnet", expected_commit_sha="abc12345")
+        self.assertEqual(out_claude, valid_report)
+        claude_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("--model", claude_cmd)
+        self.assertIn("claude-3-5-sonnet", claude_cmd)
+
+        # Test Antigravity runner
+        mock_which.return_value = "/opt/homebrew/bin/agy"
+        out_agy = reviewer.run_antigravity_review("prompt", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
+        self.assertEqual(out_agy, valid_report)
+        agy_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("--model", agy_cmd)
+        self.assertIn("claude-3-7-sonnet", agy_cmd)
+
+        # Test OpenCode runner uses stdin (-) and pure mode
+        mock_which.return_value = "/opt/homebrew/bin/opencode"
+        out_oc = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
+        self.assertEqual(out_oc, valid_report)
+        oc_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("--pure", oc_cmd)
+        self.assertIn("-", oc_cmd)
+        self.assertIn("-m", oc_cmd)
+        self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

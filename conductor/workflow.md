@@ -171,8 +171,8 @@ that also concludes a phase in `plan.md`.
 
 8.  **Get and Record Phase Checkpoint SHA:**
 
-    -   **Step 8.1: Get Commit Hash:** Obtain the hash of the *just-created
-        checkpoint commit* (`git log -1 --format="%H"`).
+    -   **Step 8.1: Get Commit Hash:** Obtain the hash of the *target commit*
+        identified in step 6 (`git log -1 --format="%H"` or target commit hash).
     -   **Step 8.2: Update Plan:** Read `plan.md`, find the heading for the
         completed phase, and append the first 7 characters of the commit hash in
         the format `[checkpoint: <sha>]`.

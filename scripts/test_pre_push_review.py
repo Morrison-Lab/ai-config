@@ -90,6 +90,7 @@ class TestPrePushReview(unittest.TestCase):
                 "### Verification Steps\nNone."
             )
             is_valid, is_clean, _ = reviewer.parse_review_verdict(neg_report)
+            self.assertTrue(is_valid)
             self.assertFalse(is_clean)
 
         # Extended heading with blockers: ### Critical Findings (blocking) is caught
@@ -270,6 +271,23 @@ class TestPrePushReview(unittest.TestCase):
             "~~~"
         )
         is_valid, is_clean, _ = reviewer.parse_review_verdict(tilde_fenced_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+
+        # Mixed fences (outer backtick containing inner tildes) are rejected
+        mixed_fence_report = (
+            "```markdown\n"
+            "~~~markdown\n"
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}\n"
+            "~~~\n"
+            "```"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(mixed_fence_report, expected_commit_sha=commit)
         self.assertFalse(is_valid)
 
         # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
@@ -518,6 +536,12 @@ class TestPrePushReview(unittest.TestCase):
             subset_engines = ["claude", "antigravity"]
             e5 = reviewer.get_next_alternate_engine(subset_engines)
             self.assertEqual(e5, "antigravity")
+
+    @patch("tempfile.NamedTemporaryFile", side_effect=OSError("No usable temporary directory found"))
+    @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
+    def test_opencode_tempfile_failure_handling(self, mock_which, mock_tf):
+        res = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet")
+        self.assertIsNone(res)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

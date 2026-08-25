@@ -155,8 +155,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if bt_fences % 2 != 0 or tilde_fences % 2 != 0:
         return False, False, "Unbalanced or unterminated markdown code fence detected."
 
-    # Strip markdown code blocks (backtick and tilde fences) before parsing top-level structure to prevent fenced injection
-    unfenced_report = re.sub(r"(?s)(?:```|~~~).*?(?:```|~~~)", "", report)
+    # Strip markdown code blocks separately (backtick blocks and tilde blocks) so backtick blocks cannot close with tildes and vice versa
+    unfenced_report = re.sub(r"(?s)```.*?```", "", report)
+    unfenced_report = re.sub(r"(?s)~~~.*?~~~", "", unfenced_report)
 
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
@@ -187,7 +188,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", unfenced_report)
     if not verdict_matches:
         bold_matches = re.findall(
-            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
+            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
             unfenced_report,
         )
         if bold_matches:
@@ -200,7 +201,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     needs_work_allowlist = {
         "needs work", "needs more work", "changes requested", "unapproved", "not approved",
         "disapproved", "blocked", "ready after addressing findings", "unable to review",
-        "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve"
+        "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve",
+        "not ready for merge", "do not approve", "never approve"
     }
     core_negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
 
@@ -217,8 +219,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 parsed_verdicts.append((True, False, "Negated approval"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
-        elif v_core in needs_work_allowlist or any(v_core.startswith(nw) for nw in needs_work_allowlist):
-            parsed_verdicts.append((True, False, "Needs work"))
+        elif v_core in needs_work_allowlist or any(v_core.startswith(nw) for nw in needs_work_allowlist) or has_core_negation:
+            parsed_verdicts.append((True, False, f"Needs work ({v_core})"))
         else:
             parsed_verdicts.append((False, False, f"Unrecognized verdict text: '{v_str}'"))
 
@@ -365,11 +367,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     if model:
         cmd.extend(["-m", model])
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tf:
-        tf.write(prompt)
-        prompt_file = tf.name
-
+    prompt_file = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tf:
+            tf.write(prompt)
+            prompt_file = tf.name
+
         with open(prompt_file, "r", encoding="utf-8") as pf:
             res = subprocess.run(cmd, stdin=pf, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
@@ -379,10 +382,11 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
     finally:
-        try:
-            os.remove(prompt_file)
-        except OSError:
-            pass
+        if prompt_file:
+            try:
+                os.remove(prompt_file)
+            except OSError:
+                pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()

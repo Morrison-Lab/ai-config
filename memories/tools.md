@@ -1,6 +1,6 @@
 # Local tools & CLIs
 
-### Available subscriptions & model providers
+## Available subscriptions & model providers
 
 Workstation configurations and delegation capabilities draw on multiple active subscriptions and API balances:
 - **OpenCode**: Reaches an active OpenCode Go subscription, the free/hosted gateway (`opencode Zen`), and local (`ollama`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).

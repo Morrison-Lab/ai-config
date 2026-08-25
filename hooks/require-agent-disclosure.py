@@ -128,6 +128,15 @@ POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")", re.MULTILIN
 # So test the parts independently over the whole segment, which the quote-aware
 # splitter has already bounded to one command. Order-independent by
 # construction, which also fixes `gh api -f body=... <url>`.
+# Every flag that can supply an API field body, in ONE place.
+#
+# Four patterns listed these independently and drifted three separate times --
+# `-F body=`, `--raw-field`, and `--form` were each added to some sites and not
+# others, and the last was reported missing from `UNREADABLE_RE` in two
+# consecutive review rounds. A shared constant makes the drift impossible rather
+# than reviewable.
+_FIELD_FLAGS = r"(?:-f|-F|--field|--raw-field|--form)"
+
 API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # A body-supplying field is what separates a POST from the review-READ that
 # `CLAUDE.md` prescribes and every ARDI round runs.
@@ -137,7 +146,7 @@ API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # (`request-pr-review`'s `-f "reviewers[]=<r>"`). Without it the registry line
 # this change annotates was completely invisible to the guard.
 API_BODY_FIELD_RE = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body="
+    _FIELD_FLAGS + r"[\s=]*[\"']?body="
     # `--form` is glab's flag, not gh's -- both appear because the detector
     # matches `(?:gh|glab) api`.
     # `--input <file>` supplies the whole payload, body included. The body is
@@ -267,18 +276,18 @@ CLOSE_REOPEN_RE = re.compile(
 # no separator (`-cvalue`) or with an equals (`-c=value`). Requiring whitespace
 # missed both, on the exact posting surface this file was extended to cover.
 #
-# `(?<![\w\-\"'])` is the half a concurrent session's fix on this same branch did
+# `(?<![^\s])` is the half a concurrent session's fix on this same branch did
 # not carry, and it is load-bearing: without it `-c` matches INSIDE
 # `--request-changes`, so `inline_body` returns "hanges" and a COMPLIANT
 # disclosed comment warns. A false positive on a compliant comment is the worst
 # outcome available to a warn-only guard, and the whole corpus is about to start
 # appending this marker.
 COMMENT_FLAG_RE = re.compile(
-    r"--comment\b|--comment=|(?<![\w\-\"'])-c(?:[\s=]|[\"\']|[A-Za-z0-9])")
+    r"--comment\b|--comment=|(?<![^\s])-c(?:[\s=]|[\"\']|[A-Za-z0-9])")
 ANY_BODY_FLAG_RE = re.compile(
     r"--body\b|--body=|--body-file\b|--message\b|--message="
-    r"|(?<![\w\-\"'])-(?:b|m|F)(?:[\s=]|[\"\']|[A-Za-z0-9])"
-    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=")
+    r"|(?<![^\s])-(?:b|m|F)(?:[\s=]|[\"\']|[A-Za-z0-9])"
+    r"|" + _FIELD_FLAGS + r"[\s=]*[\"']?body=")
 
 
 # `gh pr comment --delete-last` deletes a comment rather than posting one.
@@ -369,13 +378,13 @@ UNREADABLE_RE = re.compile(
     # so `-b "Addressed in $SHA."` fell through and was reported as a body whose
     # marker is missing: an assertion about text the check never read, and the
     # opposite verdict from `--body` on the identical body.
-    r"|(?<![\w\-\"'])-(?:b|m)[\s=]*(?:\"[^\"]*\$|'[^']*\$|\$)"
+    r"|(?<![^\s])-(?:b|m)[\s=]*(?:\"[^\"]*\$|'[^']*\$|\$)"
     # `@file` is gh api's read-from-file sigil, and it is routinely QUOTED
     # (`-F body="@/tmp/reply.md"`), so the optional quote is load-bearing.
-    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=[\"']?(?:@|\$)"
+    r"|" + _FIELD_FLAGS + r"[\s=]*[\"']?body=[\"']?(?:@|\$)"
     # Must cross quotes and spaces: a `$` anywhere in the value makes the body
     # unreadable, not just one directly after `body=`.
-    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=(?:[^\"']*\$|\"[^\"]*\$|'[^']*\$)"
+    r"|" + _FIELD_FLAGS + r"[\s=]*[\"']?body=(?:[^\"']*\$|\"[^\"]*\$|'[^']*\$)"
 )
 # A body flag with an inline literal value. Its absence on an interactive
 # invocation means there is no body to read here at all.
@@ -385,8 +394,8 @@ UNREADABLE_RE = re.compile(
 # as posting routes and omitted here, so they drew exactly that.
 HAS_INLINE_BODY_RE = re.compile(
     r"--(?:body|message|comment)[\s=]+[\"']?[^\s\"'$]"
-    r"|(?<![\w\-\"'])-(?:b|m|c)[\s=]*[\"']?[^\s\"'$=]"
-    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=")
+    r"|(?<![^\s])-(?:b|m|c)[\s=]*[\"']?[^\s\"'$=]"
+    r"|" + _FIELD_FLAGS + r"[\s=]*[\"']?body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
 # `[^"']*` after the handle would swallow unbounded prose, exempting a comment
@@ -427,7 +436,7 @@ _BOT_BODY = r"@(?:" + _BOT_HANDLES + r")\s+(?:" + _BOT_VERBS + r")\s*"
 # `--comment` flag this change just added as a surface were all missing.
 BOT_COMMAND_RE = re.compile(
     r"--(?:body|message|comment)[\s=]+([\"'])\s*" + _BOT_BODY + r"\1"
-    r"|(?<![\w\-\"'])-(?:b|m|c)[\s=]*([\"'])\s*" + _BOT_BODY + r"\2",
+    r"|(?<![^\s])-(?:b|m|c)[\s=]*([\"'])\s*" + _BOT_BODY + r"\2",
     re.IGNORECASE)
 
 # The same exemption tested against a RAW body, with no shell syntax around it.
@@ -574,11 +583,11 @@ def bodies_for(segment, bodies):
 # `$'Done,`, and it read `-f "body=X"` -- where the quote precedes `body=` --
 # as the bare token `X` truncated at the first space.
 _FLAG_BEFORE_VALUE = re.compile(
-    r"(?:--(?:body|message|comment)[\s=]+|(?<![\w\-\"'])-(?:b|m|c)[\s=]*)")
+    r"(?:--(?:body|message|comment)[\s=]+|(?<![^\s])-(?:b|m|c)[\s=]*)")
 _FIELD_QUOTED = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*([\"'])body=")
+    _FIELD_FLAGS + r"[\s=]*([\"'])body=")
 _FIELD_BARE = re.compile(
-    r"(?:-f|-F|--field|--raw-field|--form)[\s=]*body=")
+    _FIELD_FLAGS + r"[\s=]*body=")
 
 
 def _looks_like_flag(value):

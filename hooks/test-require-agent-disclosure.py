@@ -545,6 +545,36 @@ CASES = [
     ("a real -c disclosed stays silent",
      'gh issue close 5 -R o/r -c "Closing.\n\n' + MARKER + '"', False),
 
+    # --- #2185 round 3: --form's @file and $VAR forms -----------------------
+    #
+    # `--form` was added to three field patterns and not to UNREADABLE_RE, so a
+    # `--form body=@file` comment -- whose content the check cannot see -- was
+    # reported as CONFIDENTLY missing its marker. Flagged in two consecutive
+    # rounds. Fixed structurally: one `_FIELD_FLAGS` constant, used everywhere,
+    # since the four independent lists had now drifted three separate times.
+    ("--form body=@file is unreadable, not missing",
+     'glab api projects/:id/merge_requests/1/notes --form body=@/tmp/reply.md',
+     None),
+    ("--form body=$VAR is unreadable, not missing",
+     'glab api projects/:id/merge_requests/1/notes --form body=$BODY', None),
+    ("--form with a literal body is readable",
+     'glab api projects/:id/merge_requests/1/notes --form body="bare"',
+     "missing"),
+
+    # --- #2185 round 3: ANY punctuation before a hyphenated value ------------
+    #
+    # Enumerating excluded characters was always going to leak. Round B excluded
+    # word characters, round C added quotes, and comma/paren/slash still matched.
+    # The boundary is now POSITIVE -- a flag token starts after whitespace or at
+    # the start of the segment -- which closes the class rather than the last
+    # reported instance of it.
+    ("a comma before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo,-cool comment"', False),
+    ("a paren before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo (-cool)"', False),
+    ("a slash before a hyphenated value",
+     'gh issue close 5 -R o/r --duplicate-of "foo/-config"', False),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

@@ -127,3 +127,16 @@ Give the timeout its own observable outcome, per
   own children and parent, not existence in general.
 - **Don't:** treat a succeeding probe as proof of a live process anywhere
   --- zombies and open-handle corpses both pass it.
+
+## `time.tzset()` and timezone resolution on Windows
+
+The `time.tzset()` function is POSIX-only and unavailable on Windows. If a script needs to manipulate or query the local time zone dynamically, it cannot use `time.tzset()`.
+
+Furthermore, Python's `zoneinfo` module (introduced in 3.9) relies on the OS's time zone data. On Windows, the OS does not provide IANA time zone data natively in the format `zoneinfo` expects. Attempting to load a timezone like `zoneinfo.ZoneInfo("America/Los_Angeles")` on a standard Windows installation will fail with `ModuleNotFoundError: No module named 'tzdata'` (and `ZoneInfoNotFoundError`), unless the first-party `tzdata` PyPI package is installed in the environment.
+
+When writing platform-agnostic or Windows-compatible scripts that require local time formatting without external dependencies:
+- Do not rely on `zoneinfo` or `time.tzset()`.
+- If only the current local time relative to UTC is needed, calculate it using `datetime.datetime.now(datetime.UTC)` and an explicit `datetime.timedelta` for the known offset, or just use the system's local time if the system timezone is acceptable without overrides.
+
+- **Do:** Use `tzdata` package on Windows if full IANA timezone support via `zoneinfo` is needed.
+- **Don't:** Assume `time.tzset()` exists or that `zoneinfo.ZoneInfo("America/Los_Angeles")` will succeed out-of-the-box on a Windows Python installation.

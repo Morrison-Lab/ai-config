@@ -4,7 +4,7 @@
 Tests the adapter in hermetic isolation by mocking `hooks/hooks.json` and subprocess calls.
 Verifies event mapping (Bash, Agent, SendMessage, Task, generic/MCP tools), multi-subagent fanout,
 regex & wildcard matchers, flat and grouped schema tolerance, Stop block-to-continue translation,
-PreInvocation context injection, and unknown event handling.
+PreInvocation context injection, denial paths, and missing config fallback.
 """
 import importlib.util
 import io
@@ -123,6 +123,20 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertTrue(os.path.isfile(ADAPTER_SCRIPT), f"Adapter script missing at {ADAPTER_SCRIPT}")
         self.adapter = load_adapter()
 
+    @patch('os.path.exists', return_value=False)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_missing_hooks_json_fallback(self, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+        payload = {"toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}}}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
@@ -144,7 +158,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_run_command_to_bash(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+    def test_run_command_allow(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result
         
@@ -165,6 +179,36 @@ class TestAgyHookAdapter(unittest.TestCase):
         call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
         self.assertEqual(call_input["tool_name"], "Bash")
         self.assertEqual(call_input["tool_input"]["command"], "git status")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_run_command_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Unauthorized command"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_result
+        
+        payload = {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "rm -rf /"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("reason"), "Unauthorized command")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

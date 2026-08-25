@@ -292,6 +292,7 @@ below).
   - *Model Decision*: Injected dynamically based on task context.
   - *Manual*: Triggered via `@mention` or explicit command.
 - **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
+- **Hooks integration**: Configured via `plugins/ai-config/hooks.json` mapping Antigravity lifecycle events (`PreToolUse`, `Stop`, `PreInvocation`) to shared enforcement hooks via `plugins/ai-config/claude-hook-adapter.py`. See [`memories/antigravity.md`](memories/antigravity.md).
 
 ## Default to action without asking
 

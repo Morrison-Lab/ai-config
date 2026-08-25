@@ -186,7 +186,7 @@ def main():
                 if not cmd:
                     continue
                 cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-                timeout_val = parse_timeout(hook.get("timeout"))
+                timeout_val = parse_timeout(hook.get("timeout")) or 30.0
                 
                 result = run_hook_command(cmd, c_payload, cwd, timeout_val)
                 if result and result.returncode == 0 and result.stdout:

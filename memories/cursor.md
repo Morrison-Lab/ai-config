@@ -92,9 +92,10 @@ carries identity fields (including `cloudAgentBcId`) and no review body,
 even when the child ran in the foreground.
 That JSON is not the report to post as a fallback comment.
 The harness may still paste a child assistant message into the parent
-transcript. Quote that paste only when it already carries Summary /
-Findings / Verdict; otherwise fetch the child transcript. Do not treat a
-thinking paraphrase or an empty paste as the report.
+transcript.
+Quote that paste only when it already carries Summary / Findings / Verdict.
+Otherwise fetch the child transcript.
+Do not treat a thinking paraphrase or an empty paste as the report.
 
 The Cursor adapter skips `no-push-without-self-review.py` because JSONL
 omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in

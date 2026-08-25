@@ -3,7 +3,7 @@
 ## Available subscriptions & model providers
 
 Workstation configurations and delegation capabilities draw on multiple active subscriptions and API balances (measured 2026-08-25):
-- **OpenCode**: Reaches an active OpenCode Go ($10/mo windowed subscription), free models hosted via Zen (`zen/free`), and local (`ollama`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
+- **OpenCode**: Reaches an active OpenCode Go subscription (`opencode-go/*`, $10/mo windowed), free hosted models via Zen (`opencode/*-free`), and local (`ollama/*`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
 - **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or direct API access (configured in `~/.config/opencode/opencode.json`, activated 2026-08-23).
 - **OpenAI ChatGPT**: Backed by ChatGPT Plus/Team/Enterprise via OpenAI Codex (`codex` CLI, see [`skills/delegate-to-codex`](../skills/delegate-to-codex/SKILL.md)).
 - **Anthropic Claude**: Backed by Claude Pro/Team via Claude Code (`claude` CLI).

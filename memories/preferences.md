@@ -978,7 +978,7 @@ Standing default across all sessions.
 | CLI / Provider | Plan / Billing Tier | Entrypoint |
 |---|---|---|
 | `codex` | ChatGPT (Plus / Team / Enterprise) | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `opencode` | OpenCode Go ($10/mo) + free models via Zen + local (`ollama`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
+| `opencode` | OpenCode Go (`opencode-go/*`, $10/mo) + Zen free (`opencode/*-free`) + local (`ollama/*`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | `~/.config/opencode/opencode.json` / API |
 | `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
@@ -989,7 +989,7 @@ They are drawn per token for workloads benefiting from frontier/stealth models, 
 "Delegate first" spends available subscription windows and free tiers before drawing on Claude tokens or prepaid API credits.
 
 **`opencode` and `openrouter` expand non-metered, prepaid, and alternative routes:**
-- **OpenCode**: Reaches OpenCode Go ($10/mo windowed subscription), free models hosted via Zen gateway (e.g. `zen/free`), and a local tier (`ollama`).
+- **OpenCode**: Reaches OpenCode Go (`opencode-go/*`, $10/mo windowed subscription), free models hosted via Zen gateway (e.g. `opencode/*-free`), and a local tier (`ollama/*`).
   Free and local tiers cost no metered budget, executing without spending Claude or Codex quota (other Zen models incur per-request charges).
 - **OpenRouter**: Prepaid credit balance / key (`OPENROUTER_API_KEY`), reaching frontier/stealth previews (`openrouter/*`) via OpenCode (configured in user `~/.config/opencode/opencode.json`, measured 2026-08-23 on OpenCode 1.18.21).
 - **Local tier**: The local (`ollama/*`) tier keeps payloads on-device **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).

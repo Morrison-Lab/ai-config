@@ -56,9 +56,9 @@ That trigger does not transfer to opencode.
 It **splits**, because opencode is more than one destination, and the destinations differ in the only property the trigger cares about.
 
 **The split.**
-`opencode/*` is opencode Zen, a hosted gateway: the payload leaves the machine exactly as it does for any other hosted model.
-Free is a **billing** fact and says nothing about where bytes go.
-`ollama/*` is the only id on the whole ladder that *can* keep the payload on the machine --- not Claude, not codex, not agy, not opencode Zen.
+`opencode/*` (hosted Zen gateway) and `opencode-go/*` (OpenCode Go subscription) are hosted destinations: the payload leaves the machine exactly as it does for any other hosted model.
+Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go.
+`ollama/*` is the only id on the whole ladder that *can* keep the payload on the machine --- not Claude, not Codex, not `agy`, and not `opencode/*` or `opencode-go/*`.
 
 **But locality is a property of the configured endpoint, not of the prefix.**
 `ollama` is a user-authored provider entry in the opencode config, and its `options.baseURL` is an ordinary field in it.
@@ -125,8 +125,8 @@ curl -s https://openrouter.ai/api/v1/models \
 
 Two routing consequences:
 
-- **The data-sensitivity rule extends to OpenRouter on the split's own terms.**
-  A hosted destination's payload leaves the machine, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
+- **The data-sensitivity rule extends to OpenRouter and Go on the split's own terms.**
+  A hosted destination's payload leaves the machine, so a data trigger forbids `openrouter/*`, `opencode-go/*`, and `opencode/*` alike --- and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
 - **A stealth model inverts the capability caveat rather than sharing it** --- the consequence the split cannot supply.
   The hosted-free ids are unbenchmarked *small* models, so the "no judgment work" exception binds them.
   A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot --- but "plausibly" is the operative word: validate its output like any other delegate's, and timestamp any claim about a specific id.
@@ -135,7 +135,7 @@ Two routing consequences:
 - **Do:** activate the provider with a config entry, and route to a stealth model as `openrouter/<model-id>`.
 - **Do:** re-derive the stealth roster from the API on each use --- the ids expire without notice.
 - **Don't:** read an empty `openrouter/*` listing as OpenRouter being unreachable --- an unreferenced provider is inactive, and one config entry activates the whole roster.
-- **Don't:** send data-triggered work to `openrouter/*` --- free stealth pricing is a billing fact, and the bytes still leave the machine, to a lab the id does not even name.
+- **Don't:** send data-triggered work to `openrouter/*`, `opencode-go/*`, or `opencode/*` --- free or subscription pricing is a billing fact, and bytes still leave the machine.
 
 ## Where opencode sits in the budget ladder
 
@@ -143,10 +143,10 @@ Two routing consequences:
 Read it there rather than re-deriving it here.
 
 OpenCode spans multiple cost structures:
-- **Free models via Zen (`zen/free`) & local Ollama tiers**: Consume no metered window or API tokens.
+- **Free hosted models via Zen (`opencode/*-free`) & local Ollama tiers**: Consume no metered window or API tokens.
   For mechanical work a small model can perform, free/local tiers go ahead of Codex and Claude on cost.
-- **OpenCode Go subscription ($10/mo)**: Active monthly windowed tier providing access to additional hosted models without per-token charges.
-- **OpenRouter prepaid balance**: Billed per token.
+- **OpenCode Go subscription (`opencode-go/*`, $10/mo)**: Active monthly windowed tier providing access to hosted frontier models without per-token charges.
+- **OpenRouter prepaid balance (`openrouter/*`)**: Billed per token.
   Used when a task specifically benefits from frontier or stealth models not carried by desktop subscription quotas.
 
 The practical shape is a filter rather than a queue: send mechanical bounded work to OpenCode's free/local tiers first, utilize active Go subscription and Codex windows next, draw on OpenRouter for specialized frontier/stealth models or fallback, and keep Claude for high-level orchestration and synthesis.
@@ -309,7 +309,7 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 
 ## Anti-patterns
 
-- ❌ Sending data-triggered work to an `opencode/*` or `openrouter/*` model because it is free --- free is a billing property, and the payload still leaves the machine.
+- ❌ Sending data-triggered work to an `opencode/*`, `opencode-go/*`, or `openrouter/*` model because it is free or subscription-covered --- billing facts say nothing about data leaving the machine.
 - ❌ Retrying a failed or slow `ollama/*` run on the hosted tier.
 - ❌ Passing `--auto` to widen a delegate's permissions instead of scoping the config (repo root `opencode.json` uses a blanket-allow config intentionally as the scoped equivalent --- see above --- prefer that over `--auto` per-run).
 - ❌ Pointing a codex-style `MAXPAR` fan-out at one ollama daemon and expecting hosted-style throughput.

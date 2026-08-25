@@ -235,17 +235,14 @@ class PRClaimManager:
         # 4. Check for formal GitHub review approvals (from humans or approved external bots)
         has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
 
-        # 5. Check external review comments (e.g. Claude review workflow comments posted by github-actions / claude[bot])
-        # IMPORTANT: Self-posted comments authored by the author / orchestrator account do NOT satisfy the external gate!
+        # 5. Check external review comments (posted by github-actions / claude[bot] review workflow)
+        # IMPORTANT: Self-posted comments authored by user/collaborator accounts (e.g. dem-extra1) do NOT satisfy the gate!
         comments = data.get("comments", [])
         external_review_comments = [
             c for c in comments
-            if (c.get("author", {}).get("login") in ["github-actions", "claude[bot]", "d-morrison"]
-                or c.get("authorAssociation") in ["COLLABORATOR", "CONTRIBUTOR"])
+            if c.get("author", {}).get("login") in ["github-actions", "claude[bot]"]
             and ("claude finished review" in c.get("body", "").lower()
-                 or "adversarial" in c.get("body", "").lower()
-                 or "verdict" in c.get("body", "").lower()
-                 or "review report" in c.get("body", "").lower())
+                 or "### verdict" in c.get("body", "").lower())
         ]
 
         has_approved_external_comment = False

@@ -324,6 +324,22 @@ This grants no merge authority: the strict merge policy below still applies.
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
 
+## Always arm a persistent PR loop
+
+When you open, push to, or are handed a PR, immediately start a persistent monitoring loop.
+Keep it running until the PR merges, closes, or the user says stop.
+A one-shot status poll is not babysitting.
+A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
+Start the loop if it is not already running, then answer.
+
+Use whatever wake this session actually has: a PR-activity subscription, a `/loop` or schedule timer, or a monitored shell loop with output notification.
+Do not bake auto-merge into the loop prompt unless the user has granted merge permission for that PR.
+
+- **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR.
+- **Don't:** treat a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
+
+(Corrected 2026-08-25, `Lacaedemon/sparta#1397`: a session answered that it was not monitoring and declined to arm a loop because the user had only asked whether monitoring was happening.)
+
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:

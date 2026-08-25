@@ -63,6 +63,35 @@ Scope is not rationale: which branch, which base, where the tests live, and what
 - **Don't:** hand over the case for the change.
   If it is not persuasive from the diff alone, that is the finding.
 
+### The PR's own review history is rationale you cannot withhold
+
+The rule above governs the brief you write.
+A reviewer reading the **PR** gets a second channel you never chose to open: the claim comment saying how many rounds ran, the round-by-round commit messages, and the `# round-2 review finding 8` markers a fix left behind in the test file.
+Each of those is a true record, and none of them was written as an argument, which is why the effect is invisible from both ends --- nothing in the artifact reads as persuasion, and nothing in the verdict reads as deference.
+
+Measured 2026-08-24 Pacific on [ai-config#2131](https://github.com/Morrison-Lab/ai-config/pull/2131).
+The repo's own reviewer returned **Ready for merge** and named the history in its own justification: the PR's history and the round markers baked into the test file "show the near-misses I would normally look for [...] were already found and fixed in earlier rounds, and my independent probing did not surface anything beyond that."
+A cross-vendor pass on that same head then returned 11 findings, 8 of them blocking (see [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A clean same-vendor verdict over eight blocking cross-vendor findings").
+
+**State what is observable, which is narrower than it first looks.**
+That verdict also lists ten verification steps it ran, so "it probed less" is a claim about effort that its own evidence denies, and at least one other explanation fits --- the reviewer probed normally and the diff was, in its words, mostly prose plus one warn-only hook.
+What is observable is that **the history entered the justification**: a reason for finding nothing was supplied by the artifact rather than derived from the diff.
+That is enough, because a verdict resting partly on prior rounds is partly a re-reading of those rounds, so it is worth less as corroboration than its independence suggests --- however hard it worked.
+
+**A `# round-N` marker is a changelog of past MISSES, not a certificate of coverage.**
+It records that one defect was found there once.
+It says nothing about the family that defect belonged to, and reading it as evidence of scrutiny inverts its meaning: a line that needed three rounds to get right is the line most likely to still be wrong.
+
+**The loop is self-reinforcing, which is what makes it a rule rather than a matter of care.**
+More rounds produce a more reassuring history, which is available as a reason to stop, and a diff that accumulates many rounds is by construction one complex enough to need more.
+So the effect is strongest exactly where it is most costly.
+That is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence rule reaching a reviewer who never ran the earlier rounds: there a series narrows its own search space by inheriting findings, and here a *fresh* reviewer inherits the narrowing from the artifact instead.
+
+- **Do:** read a verdict for any appeal to the PR's history, and discount it as corroboration by however much of its reasoning came from the artifact rather than the diff.
+- **Do:** label a regression case with the property it pins rather than the round that found it, so the comment is a specification a reviewer can check instead of a report that scrutiny already happened.
+- **Don't:** read a long visible review history as coverage --- it is a record of what was found, and every entry marks a place a defect once lived.
+- **Don't:** count a verdict that deferred to prior rounds as an independent round; it is closer to a re-reading of the rounds it cites.
+
 ## Its findings are findings
 
 [`self-review-fallback`](self-review-fallback.md) already rules out surfacing a defect in your own review and closing it on your own estimate of its blast radius.

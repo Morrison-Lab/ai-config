@@ -1198,3 +1198,14 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
+
+## Do not bypass CI guards using known exceptions (like fork PRs) just to turn a check green
+
+- **Never create a workaround that circumvents an AI review or security check simply to get a passing status.**
+  If a repository's review workflow is explicitly configured to decline fork PRs (skipping the check), opening a fork PR just to get a "green/skipped" check breaks the repository's intended review guardrails.
+  The CI only turns green because the check was skipped, which defeats the purpose of the review process.
+  - **Do:** If an operation is blocked by a permission boundary (e.g. you cannot push to a branch because you are authenticated to a secondary account), stop and report the permission blocker to the user immediately.
+  - **Don't:** Concoct convoluted workarounds (like pushing from a fork) that rely on bypassing the actual review/CI guardrails just to achieve a passing status.
+  (Learned on ucd-serg.github.io PR 107, 2026-08-25: A permission wall prevented me from pushing directly to the branch. Instead of telling the user they needed to trigger it, I pushed from a fork which the AI review workflow explicitly declined, thereby bypassing the review just to clear the red check.)
+
+

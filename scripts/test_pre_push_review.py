@@ -286,6 +286,22 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("Engine refusal string detected", reason)
 
+        # Mentioning rate limits in Observations of a valid report does NOT trigger false refusal
+        rate_limit_obs_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "The implementation handles rate limit errors and quota exhaustion gracefully.\n\n"
+            "### Verification Steps\n"
+            "Verified test suite.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(rate_limit_obs_report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
         # Report entirely inside a backtick code fence is rejected as missing top-level structure
         fenced_report = (
             "```markdown\n"

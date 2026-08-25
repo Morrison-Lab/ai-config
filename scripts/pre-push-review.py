@@ -153,24 +153,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not report or len(report.strip()) < 50:
         return False, False, "Report is empty or too short."
 
-    refusal_patterns = [
+    cli_error_patterns = [
         "hit your weekly limit",
         "prepayment credits depleted",
         "unrecognized argument",
         "api key is missing",
-        "unable to review",
-        "cannot review",
-        "refuse to review",
-        "review cannot be performed",
-        "cannot perform",
-        "not able to review",
-        "rate limit",
-        "quota exhausted",
-        "usage limit",
-        "overloaded",
-        "too many requests",
     ]
-    for pat in refusal_patterns:
+    for pat in cli_error_patterns:
         if pat in report.lower():
             return False, False, f"Engine refusal string detected: '{pat}'"
 
@@ -242,6 +231,25 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     if not verdict_matches:
         return False, False, "No valid anchored verdict line found in Summary Verdict section."
+
+    verdict_refusal_patterns = [
+        "unable to review",
+        "cannot review",
+        "refuse to review",
+        "review cannot be performed",
+        "cannot perform",
+        "not able to review",
+        "rate limit",
+        "quota exhausted",
+        "hit your limit",
+        "usage limit",
+        "overloaded",
+        "too many requests",
+    ]
+    for v_str in verdict_matches:
+        for pat in verdict_refusal_patterns:
+            if pat in v_str.lower():
+                return False, False, f"Engine refusal string detected in verdict: '{pat}'"
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {

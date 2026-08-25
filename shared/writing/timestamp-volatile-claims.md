@@ -98,64 +98,6 @@ even though snapr had since been published to CRAN (0.1.0, 2026-05-22). A
 timestamp on the original --- "not on CRAN as of <date>" --- would have marked
 it as a fact with a vintage, worth re-verifying before repeating.
 
-## A claim inside a PR is read at merge time, and a shipped one outlives that
-
-The failure above decays slowly, over however long an undated claim sits
-unchallenged.
-The interval that matters inside a PR is far shorter, and the claim can be
-true, freshly verified, and correctly written and still be false by the time
-anyone reads it.
-
-A PR body, a review comment, a commit message, and a **source-file comment**
-added by the change are each composed once and read later --- at review, at
-merge, and afterwards in the log or the file.
-That fourth class is the one to watch, and the easiest to leave out of the
-list, because the other three are review artifacts that scroll away while a
-YAML or code comment ships and stays.
-So a claim about mutable state inside any of them carries an implicit "as of
-when I wrote this" that a reader has no reason to look for, and a PR's own
-lifetime is long enough for the state to move.
-Anything a human can change while the PR is open qualifies: a repository
-secret, a branch protection rule, an org setting, a dependency's version, a
-sibling PR's status.
-
-The increment over the re-derivation rules is the **trigger**, and it is worth
-stating precisely.
-[`ardi`](../workflow/ardi.md)'s verification-table rules already require
-re-deriving a PR body's figures, and every one of them keys on a **push** ---
-a round that changes the diff expires the figures that round was about.
-A PR sitting open while *external* state moves trips none of them.
-Nobody pushed, the diff did not change, and the claim went stale anyway,
-because a repository secret is not an artifact your commits control.
-So this widens both the trigger, from a push to the merge itself, and the
-claim class, from figures you derived to state somebody else owns.
-
-So a timestamp is necessary and not sufficient.
-Marking the vintage tells a later reader to re-verify, which is the right
-remedy for docs nobody is about to act on.
-A PR **is** acted on, so a mutable-state claim inside one owes a re-check
-before merge as well --- re-run the query, and correct the text when the answer
-has moved.
-
-- **Do:** re-derive any mutable-state claim in a PR body or comment before the
-  PR merges, not only before writing it.
-- **Do:** timestamp it as well, so it stays checkable in the log afterwards.
-- **Don't:** treat "I verified this when I wrote it" as covering a claim a
-  reader will meet days later.
-
-(The incident is measured; the re-check-before-merge remedy is inferred from
-it, on a single occurrence.
-Measured 2026-08-24 on the `UCD-SERG/ucd-serg.github.io` gha migration.
-`WORKFLOW_TOKEN` was measured absent from the repo, and "Not set in this repo"
-went into a comment in `.github/workflows/claude.yml` --- a shipped source
-file, not a review artifact, which is what makes it the fourth class above.
-The user added the secret org-wide while the work was still in flight, so the
-comment was false before it merged and would have stayed in the tree.
-Commit `a4589dec`, whose subject begins "Correct the WORKFLOW_TOKEN comment",
-touches only that file.
-Reported by the agent that made it.
-Tracked as ai-config#2149.)
-
 ## Relationship to other rules
 
 - [`fact-check-prose.md`](fact-check-prose.md) checks that a claim is *true*
@@ -169,11 +111,6 @@ Tracked as ai-config#2149.)
   convert-relative-dates-to-absolute memory rule timestamp *when you acted or
   spoke*; this rule timestamps *when a volatile fact was true* --- a different
   quantity that happens to share the "prefer absolute dates" mechanics.
-- [`ardi.md`](../workflow/ardi.md)'s verification-table rules re-derive a PR
-  body's figures, keyed on a **push**.
-  "A claim inside a PR is read at merge time" above is the complement:
-  it keys on the **merge**, and covers state somebody else owns, which no
-  push of yours disturbs.
 
 ## In review
 
@@ -181,7 +118,3 @@ An undated volatile claim is a review finding, the same weight as an uncited
 one: ask for a timestamp, or a rephrase to something timeless. Apply it to
 your **own** PR descriptions, comments, and commit messages too, not just
 when reviewing someone else's prose.
-
-Where the claim is about mutable state, ask for the re-check as well as the
-timestamp, per "A claim inside a PR is read at merge time" above --- a vintage
-tells a later reader to re-verify, and does not stop the claim shipping false.

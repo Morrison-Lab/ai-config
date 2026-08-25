@@ -16,9 +16,12 @@ When a Pull Request is prematurely or incorrectly merged
    Switch directly to the original feature branch (`git checkout <original-branch>`).
    Never abandon the original branch to spin off untracked ad-hoc fix branches.
 
-3. **Sync `main` on the original branch**:
-   Merge `origin/main` into the original branch (`git merge origin/main`) to incorporate upstream history;
-   the branch's feature commits remain intact for iteration.
+3. **Incorporate upstream and restore feature commits**:
+   Because `main` now carries the revert commit that undone the feature diff,
+   a plain merge of `main` into the original branch would erase the feature changes (the classic Git revert-of-a-merge trap).
+   To preserve the feature diff and incorporate upstream history:
+   merge `origin/main` and immediately revert the revert commit on the branch (`git revert <revert-commit-sha>`),
+   or rebase the feature commits onto `origin/main` (`git rebase origin/main`).
 
 4. **Address all review findings**:
    Fix every review finding and CI issue that was missed in the initial merge round.
@@ -31,5 +34,5 @@ When a Pull Request is prematurely or incorrectly merged
    request external AI review (`@claude review`),
    and drive the PR to a clean approved verdict before taking any merge action.
 
-- **Do:** revert the merge on `main` immediately, return to the original branch, sync `main`, address all findings, and drive the continuation PR to clean.
+- **Do:** revert the merge on `main` immediately, return to the original branch, restore the feature diff by reverting the revert or rebasing onto `main`, address all findings, and drive the continuation PR to clean.
 - **Don't:** leave an incorrect merge sitting on `main` while working on fixes, and don't create arbitrary new branches when the original PR branch is the canonical place of work.

@@ -2,6 +2,7 @@
 """Comprehensive unit and integration test suite for the Persistent Orchestrator."""
 
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -237,20 +238,58 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertIn("Find AST parsers", res.data["query"])
 
     def test_reviewer_adversarial_check(self):
+        import importlib.util
+        from orchestrator.model_adapters import ModelResponse
+        checker_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "check-pr-fully-clean.py")
+        spec = importlib.util.spec_from_file_location("checker", checker_path)
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+
         agent = self.registry.get_for_role("reviewer")
 
         # Clean code
-        task_clean = Task(title="Review clean diff", role="reviewer", payload={"diff": "+ def foo(): return 42", "dry_run": True})
-        ctx = SubagentContext(task=task_clean, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
-        res_clean = agent.execute(task_clean, ctx)
-        self.assertTrue(res_clean.success)
-        self.assertEqual(res_clean.data["verdict"], "CLEAN")
+        posted_comments = []
+        def mock_run(cmd, *args, **kwargs):
+            if "gh" in cmd and "comment" in cmd:
+                body_idx = cmd.index("--body") + 1
+                posted_comments.append(cmd[body_idx])
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-        # Unsafe code
-        task_unsafe = Task(title="Review unsafe diff", role="reviewer", payload={"diff": "+ eval(user_input)", "dry_run": True})
-        res_unsafe = agent.execute(task_unsafe, ctx)
-        self.assertFalse(res_unsafe.success)
-        self.assertEqual(res_unsafe.data["verdict"], "BLOCKED")
+        mock_adapter = unittest.mock.MagicMock()
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="CLEAN: No issues found.",
+            model_used="mock-model",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+
+        with unittest.mock.patch("shutil.which", return_value="/usr/bin/gh"), \
+             unittest.mock.patch("subprocess.run", side_effect=mock_run), \
+             unittest.mock.patch.object(agent.model_router, "route_task", return_value=(mock_adapter, "mock-model")):
+            task_clean = Task(
+                title="Review clean diff",
+                role="reviewer",
+                payload={"diff": "+ def foo(): return 42", "dry_run": False, "pr_number": 9999, "repo_slug": "Morrison-Lab/ai-config"}
+            )
+            ctx = SubagentContext(task=task_clean, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+            res_clean = agent.execute(task_clean, ctx)
+            self.assertTrue(res_clean.success)
+            self.assertEqual(res_clean.data["verdict"], "CLEAN")
+            self.assertEqual(len(posted_comments), 1)
+            self.assertEqual(checker.classify_verdict(posted_comments[0]), "clean")
+
+            # Unsafe code
+            task_unsafe = Task(
+                title="Review unsafe diff",
+                role="reviewer",
+                payload={"diff": "+ eval(user_input)", "dry_run": False, "pr_number": 9999, "repo_slug": "Morrison-Lab/ai-config"}
+            )
+            res_unsafe = agent.execute(task_unsafe, ctx)
+            self.assertFalse(res_unsafe.success)
+            self.assertEqual(res_unsafe.data["verdict"], "BLOCKED")
+            self.assertEqual(len(posted_comments), 2)
+            self.assertEqual(checker.classify_verdict(posted_comments[1]), "not-clean")
 
     def test_coordinator_dynamic_decomposition(self):
         agent = self.registry.get_for_role("coordinator")

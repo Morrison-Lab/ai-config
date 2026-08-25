@@ -700,20 +700,22 @@ class ReviewerSubagent(BaseSubagent):
                 if is_clean:
                     review_body = (
                         f"## Orchestrator Subagent Self-Review Report\n\n"
-                        f"**Status:** APPROVED\n\n"
+                        f"### Verdict\n\n"
+                        f"**Ready for merge**\n\n"
                         f"Independent subagent adversarial review (`{model_used}`) verified:\n"
                         f"- Implementation diff audited against repository standards and security guidelines.\n"
                         f"- Clean verdict issued with 0 blocking findings.\n\n"
-                        f"_Posted by Claude Code (AI agent) --- not written by a human._"
+                        f"_Posted by Claude Code (AI agent) --- not written by a human._\n"
                     )
                 else:
                     findings_summary = "\n".join(f"- {f.get('level', 'WARN')}: {f.get('message', '')}" for f in findings)
                     review_body = (
                         f"## Orchestrator Subagent Self-Review Report\n\n"
-                        f"**Status:** BLOCKED / NEEDS_WORK\n\n"
+                        f"### Verdict\n\n"
+                        f"**Needs more work**\n\n"
                         f"Independent subagent adversarial review (`{model_used}`) identified findings:\n"
                         f"{findings_summary}\n\n"
-                        f"_Posted by Claude Code (AI agent) --- not written by a human._"
+                        f"_Posted by Claude Code (AI agent) --- not written by a human._\n"
                     )
                 cmd_pr.extend(["--body", review_body])
                 proc = subprocess.run(cmd_pr, capture_output=True, text=True, check=False, timeout=30)

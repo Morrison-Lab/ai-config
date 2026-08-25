@@ -389,6 +389,32 @@ CASES = [
     ("gh pr merge --body is a merge-commit body, not a comment",
      'gh pr merge 5 -R o/r --body "merge commit body"', False),
 
+    # --- #2185 review: the close/reopen gate must be QUOTE-AWARE -------------
+    #
+    # The first version used a lookahead over a raw `[^\n;&|]` tail, so a `;`
+    # inside an EARLIER flag's quoted value ended the tail before `--comment`
+    # and the command went undetected. `gh issue close` really does take a
+    # free-text `--duplicate-of`, so this is a shape the corpus can produce.
+    # Every other matcher in the guard routes through `split_segments` for this
+    # reason; these now do too.
+    ("a semicolon in an earlier flag does not hide --comment",
+     'gh issue close 5 -R o/r --duplicate-of "see issue #3; also #4" '
+     '--comment "Closing without disclosure."', "missing"),
+    ("an ampersand in an earlier flag does not hide --comment",
+     'gh issue close 5 -R o/r --duplicate-of "A & B" --comment "bare"',
+     "missing"),
+    ("a pipe in an earlier flag does not hide --comment",
+     'gh pr close 5 -R o/r --title "a|b" --comment "bare"', "missing"),
+    ("the same command WITH the marker stays silent",
+     'gh issue close 5 -R o/r --duplicate-of "see #3; also #4" '
+     '--comment "Closing.\n\n' + MARKER + '"', False),
+    ("close with no --comment posts nothing",
+     'gh issue close 5 -R o/r --duplicate-of "see #3"', False),
+    ("reopen with no --comment posts nothing",
+     'gh issue reopen 5 -R o/r', False),
+    ("the -c short flag is a comment flag",
+     'gh issue close 5 -R o/r -c "bare"', "missing"),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

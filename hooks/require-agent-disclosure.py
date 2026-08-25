@@ -75,7 +75,13 @@ _ANCHOR = (
 )
 
 # Tail of one command, for a lookahead that must cross a line continuation.
-_SEG_TAIL = r"(?:[^\n;&|]|\\\n)*"
+# NOTE: the close/reopen verbs above are gated over the WHOLE SEGMENT by
+# `CLOSE_REOPEN_RE` + `COMMENT_FLAG_RE` below, not by a lookahead. A raw
+# `[^\\n;&|]` tail is not quote-aware, so
+# `gh issue close 5 --duplicate-of "see #3; also #4" --comment "..."` went
+# undetected -- the `;` inside a quoted value ended the tail early. Every
+# other matcher here routes through `split_segments` for that reason, and
+# `gh pr review` was already gated the right way.
 
 # The named CLI verbs, where the command word alone settles it.
 _POST_CMDS = (
@@ -99,11 +105,11 @@ _POST_CMDS = (
     # review rounds because the command word is `close`/`reopen`, so nothing
     # about it reads as commenting -- and `skills/rescue-closed/SKILL.md`
     # carries a live undisclosed one.
-    r"gh\s+issue\s+(?:close|reopen)\b(?=" + _SEG_TAIL + r"(?:--comment\b|-c\s))",
+    r"gh\s+issue\s+(?:close|reopen)\b",
     # NOT `gh pr merge`: its `-b/--body` is the MERGE-COMMIT body and it has no
     # `--comment` at all (`gh pr merge --help`), so that alternative could never
     # fire. Verified against gh 2.98.0.
-    r"gh\s+pr\s+(?:close|reopen)\b(?=" + _SEG_TAIL + r"(?:--comment\b|-c\s))",
+    r"gh\s+pr\s+(?:close|reopen)\b",
 )
 POST_RE = re.compile(_ANCHOR + r"(?:" + "|".join(_POST_CMDS) + r")", re.MULTILINE)
 
@@ -182,6 +188,13 @@ def is_api_post(segment):
 # there is nothing to disclose. Tested over the whole segment rather than in a
 # lookahead, so a continuation line cannot hide the flag.
 REVIEW_ONLY_RE = re.compile(_ANCHOR + r"gh\s+pr\s+review\b", re.MULTILINE)
+
+# `gh issue|pr close|reopen` post a comment only when `--comment`/`-c` is given.
+# Tested over the whole segment, which `split_segments` has already bounded with
+# quote awareness, so a `;` inside an earlier flag's value cannot truncate it.
+CLOSE_REOPEN_RE = re.compile(
+    _ANCHOR + r"gh\s+(?:issue|pr)\s+(?:close|reopen)\b", re.MULTILINE)
+COMMENT_FLAG_RE = re.compile(r"--comment\b|--comment=|-c\s")
 ANY_BODY_FLAG_RE = re.compile(
     r"--body\b|--body=|--body-file|--message\b|--message=|-b\s|-m\s|-F\s"
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
@@ -193,6 +206,10 @@ def is_post_segment(segment):
         # `gh pr review` is the one named verb that may carry no body at all.
         if (REVIEW_ONLY_RE.search("\n" + segment)
                 and not ANY_BODY_FLAG_RE.search(segment)):
+            return False
+        # A close/reopen posts nothing unless `--comment` is present.
+        if (CLOSE_REOPEN_RE.search("\n" + segment)
+                and not COMMENT_FLAG_RE.search(segment)):
             return False
         return True
     return is_api_post(segment)

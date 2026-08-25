@@ -16,8 +16,10 @@ underlying condition.
 A claim is volatile if updating the world could falsify the sentence without
 touching the sentence itself:
 
-- Release / availability status --- "package X is on CRAN", "feature Y is
-  supported", "the API doesn't expose Z".
+- Software, tools, APIs, harnesses, and platforms --- "package X is on CRAN",
+  "feature Y is supported", "the API doesn't expose Z", "the flag default is N".
+  All facts about third-party software behavior, configuration options,
+  runtime thresholds, and architecture are empirical observations, not timeless definitions.
 - "Current", "latest", "now", "recently", "still" claims --- a version number,
   a default, a "the newest model is ...".
 - Counts, prices, dates, and roster facts --- "there are N consumers", "it
@@ -36,27 +38,6 @@ Timeless facts whose truth value can't flip --- a mathematical identity, a
 definition, a language's fixed semantics ("R uses 1-based indexing"), a
 historical event's date. Don't clutter these with an "as of"; the target is
 specifically claims that a future change could falsify.
-
-## All facts about software, APIs, harnesses, and technologies are volatile
-
-Facts about software, platforms, libraries, compilers, runtimes, APIs, harnesses, tools,
-and technical specifications are empirical observations of a specific release, snapshot,
-or commit, not timeless definitions.
-Software inevitably changes over time:
-features are added or deprecated, flags are renamed, internal thresholds move,
-hook events evolve, defaults flip, endpoints deprecate, and architectures are refactored.
-
-When recording facts about any software or similar technologies in memory files,
-documentation, PR descriptions, comments, or codebase rules:
-
-1. **Explicit temporal bounds & provenance**:
-   Always attach the observation date, version number, or snapshot reference
-   (e.g. `Measured 2026-08 against CLI v2.1.236 / execution trace`).
-2. **Re-verification reminder**:
-   State explicitly that third-party behavior evolves across releases and to re-verify
-   against current runtime behavior rather than assuming permanence.
-3. **No timeless authority**:
-   Never write down software behavior as a standing, unhedged present-tense axiom.
 
 ## A product's distinction between two mechanisms is not one of those definitions
 
@@ -94,12 +75,8 @@ presence of both is what keeps the retired distinction feeling current.
   between two of its mechanisms, and date what you find.
 - **Do:** treat a corpus holding both forms as a prompt to re-check, since that
   is the state a merge leaves behind.
-- **Do:** qualify any recorded fact about software, APIs, harnesses, or tools
-  with an explicit observation date, version/commit snapshot, and re-verification note.
 - **Don't:** file a vendor's taxonomy under the definitions exemption above ---
   a definition cannot flip, and a product decision can.
-- **Don't:** record software implementation details, flag names, or runtime limits
-  as timeless present-tense truths without temporal provenance.
 - **Don't:** read "everything still works" as evidence the distinction holds;
   backward compatibility is what hides the collapse.
 

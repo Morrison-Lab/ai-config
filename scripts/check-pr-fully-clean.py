@@ -544,7 +544,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
 ]
 
@@ -926,13 +926,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         r"#+\s*Issues",
         r"#+\s*Remaining",
         r"\*\*Location:\*\*",
-        r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
-        r"\bNeeds\s+more\s+work\b",
-        r"\bNeeds\s+work\b",
+        r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+        r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
         r"changes\s+requested\b",
         r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
-        r"\b(?:unapproved|rejected|deadlock|impasse)\b",
-        r"\bblocked\s+on\b",
     ]
 
     has_findings = False
@@ -949,13 +946,17 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+                prefix = scan_body[max(0, match.start() - 25):match.start()]
+                if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                    continue
                 if pat == r"changes\s+requested\b":
                     start = match.start()
-                    prefix = scan_body[max(0, start - 25):start].lower()
-                    if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                    pfx = scan_body[max(0, start - 25):start].lower()
+                    if re.search(r"\bno\s+(\w+\s+)?$", pfx):
                         continue
                 has_findings = True
                 issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
+                break
 
     if not has_findings and not issues:
         print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")

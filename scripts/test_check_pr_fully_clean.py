@@ -313,6 +313,43 @@ def main() -> int:
             (not neg_ok) and len(neg_issues) > 0,
         )
 
+    # Regression (PR #2180 round 6): clean review mentioning resolved blocker in prose passes
+    resolved_blocker_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "All prior findings addressed. The earlier round was blocked on a missing test fixture, "
+            "which is now resolved.\n\n"
+            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+        ),
+    }
+    mock_res_blk = json.dumps({"comments": [resolved_blocker_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_res_blk):
+        rblk_ok, rblk_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "clean review mentioning resolved blocker in prose passes check_review_comments",
+            rblk_ok and rblk_issues == [],
+        )
+
+    # Regression (PR #2180 round 6): clean review mentioning resolved impasse in prose passes
+    resolved_impasse_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "No deadlock or impasse here -- the prior rebuttal convinced the reviewer.\n\n"
+            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+        ),
+    }
+    mock_res_imp = json.dumps({"comments": [resolved_impasse_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_res_imp):
+        rimp_ok, rimp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "clean review mentioning resolved impasse in prose passes check_review_comments",
+            rimp_ok and rimp_issues == [],
+        )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

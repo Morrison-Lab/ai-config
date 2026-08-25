@@ -9,8 +9,7 @@ When a Pull Request is prematurely or incorrectly merged
    Open a revert branch from `origin/main`,
    run `git revert <merge-commit>`,
    push,
-   open a revert PR to restore `main` to a known-clean state,
-   and merge under active session permissions (`/mwc` or `/maw`) once CI passes or request user merge authorization.
+   and drive the revert PR to a clean approved verdict and green CI before merging under `/mwc` / `/maw`, or request explicit user merge authorization.
    Never leave a defective or unapproved merge on the default branch while troubleshooting.
 
 2. **Return to the original PR branch**:

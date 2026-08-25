@@ -35,10 +35,11 @@ def main():
             pr_arg = ""
         
         view_cmd = ["gh", "pr", "view", pr_arg, "--json", "reviews,comments,statusCheckRollup"] if pr_arg else ["gh", "pr", "view", "--json", "reviews,comments,statusCheckRollup"]
-        result = subprocess.run(view_cmd, cwd=cwd, capture_output=True, text=True)
+        result = subprocess.run(view_cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8")
         
         if result.returncode == 0:
             data = json.loads(result.stdout)
+            
             reviews = data.get("reviews", [])
             comments = data.get("comments", [])
             
@@ -46,15 +47,15 @@ def main():
             
             # Check for bot approvals in comments (e.g. Claude Code, OpenCode)
             has_ai_approval = False
-            bot_comments = [c for c in comments if ("bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") in ["github-actions", "claude"]) and not c.get("body", "").startswith("💰 **Cost:**")]
+            bot_comments = [c for c in comments if ("bot" in c.get("author", {}).get("login", "").lower() or c.get("author", {}).get("login") in ["github-actions", "claude"]) and not c.get("body", "").startswith("\U0001f4b0 **Cost:**")]
             if bot_comments:
                 last_bot_body = bot_comments[-1].get("body", "").upper()
                 if re.search(r"\b(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)\b", last_bot_body) and not re.search(r"\b(NOT\s+(VERDICT: GREEN|READY FOR MERGE|APPROVE(D|S)?)|DISAPPROVE(D|S)?|UNAPPROVED?|NEEDS MORE WORK|REQUEST_CHANGES|NOT YET READY FOR MERGE|DON'T APPROVE|CAN'T APPROVE)\b", last_bot_body):
                     has_ai_approval = True            
 
-            # Check CI status (Never ignore red CI)
+            # Check CI status (Never ignore red CI or incomplete CI)
             status_rollup = data.get("statusCheckRollup") or []
-            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"]]
+            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"] or check.get("status") in ["IN_PROGRESS", "QUEUED", "PENDING", "WAITING"]]
             if failures:
                 print(json.dumps({
                     "decision": "deny",

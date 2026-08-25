@@ -16,8 +16,9 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
             cwd=cwd,
             timeout=timeout_val
         )
-        if result.returncode != 0 and result.stderr:
-            print(f"claude-hook-adapter: hook exited with code {result.returncode}: {result.stderr}", file=sys.stderr)
+        if result.returncode != 0:
+            err_msg = result.stderr.strip() if result.stderr else f"process exited with code {result.returncode}"
+            print(f"claude-hook-adapter: hook failed: {err_msg}", file=sys.stderr)
         return result
     except subprocess.TimeoutExpired:
         print(f"claude-hook-adapter: hook timed out after {timeout_val}s", file=sys.stderr)
@@ -132,22 +133,34 @@ def main():
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
-            for sub in subagents:
-                if not isinstance(sub, dict):
-                    continue
-                agent_payload = {
+            if not subagents:
+                # If subagents list is empty or omitted, construct an empty agent payload for audit hooks
+                empty_agent_payload = {
                     "tool_name": "Agent",
-                    "tool_input": {
-                        "subagent_type": sub.get("TypeName"),
-                        "isolation": sub.get("Workspace"),
-                        "prompt": sub.get("Prompt")
-                    }
+                    "tool_input": {}
                 }
                 if transcript_path:
-                    agent_payload["transcript_path"] = transcript_path
+                    empty_agent_payload["transcript_path"] = transcript_path
                 for group in pre_tool_groups:
                     if matches_tool(group.get("matcher", ""), "Agent"):
-                        tasks_to_run.append((extract_hook_list([group]), agent_payload))
+                        tasks_to_run.append((extract_hook_list([group]), empty_agent_payload))
+            else:
+                for sub in subagents:
+                    if not isinstance(sub, dict):
+                        continue
+                    agent_payload = {
+                        "tool_name": "Agent",
+                        "tool_input": {
+                            "subagent_type": sub.get("TypeName"),
+                            "isolation": sub.get("Workspace"),
+                            "prompt": sub.get("Prompt")
+                        }
+                    }
+                    if transcript_path:
+                        agent_payload["transcript_path"] = transcript_path
+                    for group in pre_tool_groups:
+                        if matches_tool(group.get("matcher", ""), "Agent"):
+                            tasks_to_run.append((extract_hook_list([group]), agent_payload))
 
         elif tool_name == "send_message":
             send_payload = {

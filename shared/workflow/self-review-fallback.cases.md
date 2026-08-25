@@ -233,11 +233,14 @@ Two readings are ruled out by the record itself.
 It is not that the primary was flaky, since it completed and produced a real, reasoned verdict at cost.
 It is not that the cross-vendor reviewer was noisier, since the findings were checked individually rather than taken on its word.
 
-Two remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
+Three remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
 The first is that theory: two readings that share a vendor share their blind spots, so their agreement measures the blind spot.
 The second is **contamination**, recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the eleven prior rounds in its own justification, so the two same-vendor readings were not independent samples and part of their agreement is explained by the second having read about the first.
 That confound bears hardest on the evidence this record would otherwise lean on most, since the eleven pre-push rounds are both the largest part of the same-vendor total and the thing the later verdict cited.
-Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which either mechanism delivers, rather than as measuring how much of the gap each one accounts for.
+The third is a **different threshold**: that same verdict scopes its findings line to a "high-signal bar (compile/parse errors, definite wrong-result logic, or clear unambiguous CLAUDE.md violations)", so the two reviewers may have been applying different tests for what counts as a finding rather than holding different blind spots.
+It is the one of the three with a cheap remedy, since a bar can be stated in the request.
+Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.
 
-The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177), which also carries the mechanism recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` round said in its own verdict that the PR's visible history was why it probed no further.
-That makes the two halves of this case one story: the same-vendor rounds did not merely fail to add breadth, they were available as a reason not to look for any.
+The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177), which also carries the mechanism recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the PR's visible history in its own justification for finding nothing.
+That makes the two halves of this case one story: the same-vendor rounds did not merely fail to add breadth, they entered the later verdict's reasoning as evidence that none was needed.
+Note that this is a claim about the verdict's *justification* and not about its effort, which its nine verification steps contradict --- see that section for the distinction.

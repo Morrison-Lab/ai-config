@@ -141,20 +141,24 @@ leaving the next.
 - **Don't:** read "it tokenizes" as "it is correct" --- that is one rung, and
   the wrapper class lives above it.
 
-**Third occurrence, 2026-08-24, after #1947 and #1973 above --- and the first where the rule was already written when the widening happened.**
-The `Don't` above names the *second* widening as the signal to stop.
+**Third occurrence, 2026-08-24, after #1947 and #1973 above --- and the shape the `Don't` above does not literally name.**
+That `Don't` fires on a second *widening*.
+Here one widening forced three successive **narrowings**, which is the same rule from the other side: a pattern that cannot decide the question is equally unable to decide it in either direction.
+
 `COMMENT_FLAG_RE` in `hooks/require-agent-disclosure.py` decides whether a `gh issue|pr close|reopen` segment posts a comment, which it does only when `--comment` or its shorthand `-c` is present.
-Three consecutive rounds on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) each adjusted where that `-c` is allowed to sit, and each closed exactly one shape: `cf195e46` anchored it, because it had matched mid-word, so `ai-config` and `--request-changes` both scored as the comment flag and a **compliant** comment warned; `93363481` excluded a preceding quote, because it had matched at the start of a quoted *value*, so `"-config"` scored too; and `15b63d91` replaced that forbidden-character lookbehind with a positive whitespace boundary, `(?<![^\s])-c(?:[\s=]|["']|[A-Za-z0-9])`.
+On [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) it began as `-c\s`, matching only the whitespace-separated spelling.
+Widening it to cover the attached and `=` forms that `gh` also accepts (`-cvalue`, `-c=value`) is what made `-c` match **mid-word**, so `--request-changes` and `ai-config` both scored as the comment flag and a **compliant** comment warned.
+Three rounds then patched the boundary: `cf195e46` added a `(?<![\w-])` lookbehind; `93363481` extended it to `(?<![\w\-"'])`, because a preceding quote still slipped past, so `"-config"` scored; and `15b63d91` replaced the forbidden-character list outright with a positive whitespace boundary, `(?<![^\s])-c(?:[\s=]|["']|[A-Za-z0-9])`.
 
 The increment over the rule above is the **diagnosis** rather than the count.
-All three shapes reduce to one question --- where does a token begin and end --- so they are one finding about tokenization wearing three costumes, and the third round answered it by hand-rolling a boundary test rather than by asking what already computes one.
-`shlex` is in the standard library and nine hooks in this repo already import it, so the layer that answers the question was reachable from round one.
+Every one of those four edits asks one question --- where does a token begin and end --- so they are one finding about tokenization wearing four costumes, and the last round answered it by hand-rolling a boundary test rather than by asking what already computes one.
+`shlex` is in the standard library and nine hooks in this repo already import it, so the layer that answers the question was reachable from the first widening.
 Note that the layer change is **filed rather than shipped**, as [ai-config#2189](https://github.com/Morrison-Lab/ai-config/issues/2189), so this records a diagnosis rather than a demonstrated repair.
 
-- **Do:** write down the one question three findings share, before writing a fourth pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.
+- **Do:** write down the one question a run of fixes shares, before writing the next pattern --- if the answer names a lexical property (token boundaries, quoting, nesting), reach for the lexer.
 - **Do:** name the construct you are hand-rolling when a fix adds a boundary test, an escape check, or a quote check to a regex, and search the standard library for it before writing it.
-- **Don't:** read three findings with three different surface shapes as three classes --- check first whether they share one question.
-- **Don't:** count a widening that *generalizes* two earlier ones as having changed layers; it is still the same construct answering a question it cannot decide.
+- **Don't:** read a widening and a narrowing as different classes --- both are the same pattern failing to locate a token, and a widening that forces a narrowing is already the second edit the rule above warns about.
+- **Don't:** count a boundary test that *generalizes* two earlier ones as having changed layers; it is still the same construct answering a question it cannot decide.
 
 (Dates Pacific; the commits above are timestamped 2026-08-25 UTC.)
 

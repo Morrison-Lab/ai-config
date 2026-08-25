@@ -247,7 +247,7 @@ There the fixture agrees with a defect in *code*, so reading the code cannot fin
 Here the fixture agrees with a laxness in the *matcher*, and the thing that would have found it is one paste from a document nobody thought to open, because the fixture's author was reconstructing the rule from a memory of what it means rather than from what it says.
 That reconstruction preserves whatever the author reads as the rule's *point* and loses the rest, so the divergence lands wherever the literal text was doing work the paraphrase does not notice --- which is exactly where a matcher then has to be loose.
 
-- **Do:** copy a required string into the fixture from the rule that defines it, and cite the rule's file and line beside it, rather than composing a case that looks like it complies.
+- **Do:** copy a required string into the fixture from the rule that defines it, and name that rule's file beside it, rather than composing a case that looks like it complies.
 - **Do:** diff a fixture's expected value against the rule's text character for character when the rule specifies a literal, since a shortened dash or a dropped word reads as identical.
 - **Don't:** read a fixture passing as evidence its expected value is conformant --- a loose matcher and a non-conformant fixture agree.
 - **Don't:** restate a rule's literal text from memory inside a fixture; the divergence is the defect the matcher then has to tolerate, in whichever direction the paraphrase drifted.

@@ -747,7 +747,7 @@ Each time the mutation, not the test, turned out to be at fault.)
 
 **Recurred twice more on 2026-08-24, on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), both under outcomes already listed above and both read as coverage gaps first.**
 Recording the count rather than a new outcome, per [`ums`](../../skills/ums/SKILL.md)'s recurrence step: the outcomes were right, and the reading of `MISSED` is what failed.
-One instance was outcome four's weakest form, where the anchor matched nothing so the artifact did not change at all; the other was the pass-condition entry above, a fixture routed down a sibling code path (`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE`) and so unable to observe the mutation aimed at it.
+One instance belonged to the outcome headed "The harness that performs those mutations needs the same scrutiny", whose `Do` is to verify each mutation changed the artifact --- here the anchor matched nothing, so it did not; the other was the pass-condition entry above, a fixture routed down a sibling code path (`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE`) and so unable to observe the mutation aimed at it.
 
 The one thing worth adding is **when** to check the anchor.
 It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.
@@ -755,6 +755,7 @@ What that section does not say is that a mutation harness is where the check has
 There the tell is a match that inexplicably fails, and you react to it; here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
 
 - **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you.
+- **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- ask first whether the file changed, which is the question a matrix cannot pose to itself.
 
 **A component that stops failing under mutation is a question, not a cleanup.**
 

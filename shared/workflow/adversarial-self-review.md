@@ -74,7 +74,7 @@ The repo's own reviewer returned **Ready for merge** and named the history in it
 A cross-vendor pass on that same head then returned 11 findings, 8 of them blocking (see [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A clean same-vendor verdict over eight blocking cross-vendor findings").
 
 **State what is observable, which is narrower than it first looks.**
-That verdict also lists ten verification steps it ran, so "it probed less" is a claim about effort that its own evidence denies, and at least one other explanation fits --- the reviewer probed normally and the diff was, in its words, mostly prose plus one warn-only hook.
+That verdict also lists nine verification steps it ran, so "it probed less" is a claim about effort that its own evidence denies, and at least one other explanation fits --- the reviewer probed normally and the diff was, in its own words, "almost entirely prose/documentation plus one well-isolated, warn-only hook with unusually thorough self-testing".
 What is observable is that **the history entered the justification**: a reason for finding nothing was supplied by the artifact rather than derived from the diff.
 That is enough, because a verdict resting partly on prior rounds is partly a re-reading of those rounds, so it is worth less as corroboration than its independence suggests --- however hard it worked.
 
@@ -87,10 +87,10 @@ More rounds produce a more reassuring history, which is available as a reason to
 So the effect is strongest exactly where it is most costly.
 That is [`learn-from-review-findings`](learn-from-review-findings.md)'s convergence rule reaching a reviewer who never ran the earlier rounds: there a series narrows its own search space by inheriting findings, and here a *fresh* reviewer inherits the narrowing from the artifact instead.
 
-- **Do:** read a verdict for any appeal to the PR's history, and discount it as corroboration by however much of its reasoning came from the artifact rather than the diff.
+- **Do:** quote back the sentences in a verdict that cite the PR's history rather than the diff, and say what independent evidence is left once they are set aside.
 - **Do:** label a regression case with the property it pins rather than the round that found it, so the comment is a specification a reviewer can check instead of a report that scrutiny already happened.
 - **Don't:** read a long visible review history as coverage --- it is a record of what was found, and every entry marks a place a defect once lived.
-- **Don't:** count a verdict that deferred to prior rounds as an independent round; it is closer to a re-reading of the rounds it cites.
+- **Don't:** count a verdict that cites prior rounds in its justification as a fully independent round; that much of it is a re-reading of the rounds it names, however hard the rest of it worked.
 
 ## Its findings are findings
 

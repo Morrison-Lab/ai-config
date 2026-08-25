@@ -14,6 +14,8 @@ index in that directory.
 |------|-------|--------|
 | [`preferences.md`](preferences.md) | User preferences (cross-workspace) | Standing working rules: never-assume/always-verify, record learnings as you go, cite sources for tool-behavior claims, issue-first, and the ARDI / fully-clean definitions. |
 | [`github.md`](github.md) | GitHub & GitLab CLIs and APIs | The `gh` CLI, `glab` and the GitLab Discussions API, GitHub access from bash in remote sessions, and PR / issue queue management (the GII startup sweep, stacked-PR pitfalls). |
+| [`gh-cli.md`](gh-cli.md) | GitHub CLI (`gh`) | The `gh` CLI behavior, rate limits, pagination, handling `GH_PAGER`, GraphQL vs REST pools, and fallback strategies. Split out of `github.md`. |
+
 | [`github-mcp-tools.md`](github-mcp-tools.md) | GitHub MCP tools (Claude Code remote/web sessions) | The GitHub MCP tool surface used when `gh` is unavailable: tool selection, scope and owner-string quirks, review/comment/thread mechanics, and per-tool failure modes. Split out of `github.md` (ai-config#694 pattern) pre-emptively at 1199 lines, just under the 1200-line gate. |
 | [`github-repo-transfers.md`](github-repo-transfers.md) | Repository transfers between owners | What a transfer does not carry (Actions secrets, so every secret-dependent workflow silently stops), which paths GitHub redirects (`pull` but not `issues`), and why `gh pr create` fails while `origin` still names the old owner. Split out of `github.md` (ai-config#694 pattern) at the 1200-line gate. |
 | [`github-actions.md`](github-actions.md) | GitHub Actions authoring | Workflow authoring gotchas, YAML quoting for Actions, gha's changelog conventions, and what a repo/org rename does to `uses:` refs. |

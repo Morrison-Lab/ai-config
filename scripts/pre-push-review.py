@@ -139,12 +139,17 @@ def get_pr_head_sha(pr_number: int) -> Optional[str]:
     return None
 
 
-def validate_review_output(report: Optional[str]) -> bool:
-    """Validate that review output conforms to structured adversarial review standards."""
-    if not report or len(report.strip()) < 50:
-        return False
+def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
+    """Parse structured review output and return (is_valid, is_clean, reason).
 
-    # Check for required section headings
+    Returns:
+        is_valid: True if report contains all 4 required sections and recognized verdict.
+        is_clean: True if verdict is Ready for merge / APPROVE and has zero blocking findings.
+        reason: Explanation of validation or review verdict.
+    """
+    if not report or len(report.strip()) < 50:
+        return False, False, "Report is empty or too short."
+
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
         ("Critical Findings", ["### Critical Findings", "## Critical Findings"]),
@@ -153,36 +158,56 @@ def validate_review_output(report: Optional[str]) -> bool:
     ]
     for section_name, patterns in required_sections:
         if not any(pat in report for pat in patterns):
-            return False
+            return False, False, f"Missing required section: {section_name}"
 
-    # Check for anchored verdict
     verdict_match = re.search(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", report)
-    if not verdict_match:
-        verdict_match = re.search(r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Changes requested)\.?\*\*", report)
-        if not verdict_match:
-            return False
+    verdict_str = ""
+    if verdict_match:
+        verdict_str = verdict_match.group(1).strip()
+    else:
+        bold_match = re.search(
+            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
+            report,
+        )
+        if bold_match:
+            verdict_str = bold_match.group(1).strip()
 
-    verdict_text = verdict_match.group(0).upper()
-    is_approval = "APPROVE" in verdict_text or "READY FOR MERGE" in verdict_text
-    is_needs_work = "NEEDS WORK" in verdict_text or "CHANGES REQUESTED" in verdict_text or "UNAPPROVED" in verdict_text
+    if not verdict_str:
+        return False, False, "No valid anchored verdict line found."
 
-    if is_approval and is_needs_work:
-        return False
+    v_upper = verdict_str.upper()
+    is_clean = any(
+        term in v_upper
+        for term in ["READY FOR MERGE", "READY AFTER ADDRESSING FINDINGS", "APPROVE"]
+    ) and not any(
+        term in v_upper
+        for term in ["NEEDS WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
+    )
+    is_needs_work = any(
+        term in v_upper
+        for term in ["NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
+    )
 
-    # Check for contradictions in Critical Findings
+    if not (is_clean or is_needs_work):
+        return False, False, f"Unrecognized verdict text: '{verdict_str}'"
+
+    if is_clean and is_needs_work:
+        return False, False, "Contradictory verdict statement."
+
     findings_match = re.search(r"(?is)### Critical Findings\s*\n(.*?)(?=\n###|\Z)", report)
     if findings_match:
         findings_body = findings_match.group(1).strip()
-        has_blockers = any(
-            pat in findings_body.lower()
-            for pat in ["blocking bug", "critical finding", "regression", "1.", "severe", "must fix"]
+        clean_indicators = ["none", "no blocking", "clean", "zero critical", "n/a", "no issues found"]
+        has_explicit_none = any(
+            findings_body.lower().startswith(ind) or ind in findings_body.lower()
+            for ind in clean_indicators
         )
-        has_none = any(
-            pat in findings_body.lower()
-            for pat in ["none", "no blocking", "clean", "zero critical", "n/a"]
+        has_numbered_blocker = bool(re.search(r"(?im)^\s*1\.\s+", findings_body)) or any(
+            term in findings_body.lower()
+            for term in ["blocking bug", "critical finding", "severe regression", "must fix before merge"]
         )
-        if is_approval and has_blockers and not has_none:
-            return False
+        if is_clean and has_numbered_blocker and not has_explicit_none:
+            return False, False, "Contradictory output: clean verdict but numbered/critical findings listed."
 
     refusal_patterns = [
         "hit your weekly limit",
@@ -192,9 +217,14 @@ def validate_review_output(report: Optional[str]) -> bool:
     ]
     for pat in refusal_patterns:
         if pat in report.lower():
-            return False
+            return False, False, f"Engine refusal string detected: '{pat}'"
 
-    return True
+    return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
+
+
+def validate_review_output(report: Optional[str]) -> bool:
+    is_valid, _, _ = parse_review_verdict(report)
+    return is_valid
 
 
 def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
@@ -206,7 +236,8 @@ def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
     if model:
         cmd.extend(["--model", model])
 
-    print("Running local adversarial review via Google Antigravity (plan mode)...")
+    label_suffix = f" (model: {model})" if model else ""
+    print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
         res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
@@ -233,7 +264,8 @@ def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
     if model:
         cmd.extend(["--model", model])
 
-    print("Running local adversarial review via Claude CLI (plan mode)...")
+    label_suffix = f" (model: {model})" if model else ""
+    print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
         res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
@@ -256,7 +288,8 @@ def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
         return None
 
-    print("Running local adversarial review via OpenAI Codex (read-only sandbox)...")
+    label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
+    print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
     cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check"]
     if model:
         cmd.extend(["-m", model])
@@ -284,7 +317,8 @@ def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
         return None
 
-    print("Running local adversarial review via OpenCode (plan agent)...")
+    label_suffix = f" (model: {model})" if model else ""
+    print(f"Running local adversarial review via OpenCode (plan agent){label_suffix}...")
     cmd = [opencode_path, "run", "--agent", "plan"]
     if model:
         cmd.extend(["-m", model])
@@ -329,7 +363,24 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         "opencode": (run_opencode_review, "OpenCode"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
+        "agy-claude": (lambda p, model="": run_antigravity_review(p, model=model or "claude-3-7-sonnet"), "Claude via Antigravity"),
     }
+
+    if engine in ["alternate", "round-robin"]:
+        available = detect_available_engines()
+        if not available:
+            log_error("No supported AI CLI found.")
+            return None, "None"
+        import time
+        idx = int(time.time() // 60) % len(available)
+        cand = available[idx]
+        runner, label = engine_dispatch[cand]
+        print(f"Alternating review engine: Selected '{label}' ({cand}).")
+        report = runner(prompt, model=model)
+        if report:
+            return report, label
+        # fallback to remaining engines
+        engine = "auto"
 
     if engine != "auto":
         runner, label = engine_dispatch.get(engine, (None, engine))
@@ -464,9 +515,9 @@ def main():
     )
     parser.add_argument(
         "--engine",
-        choices=["auto", "antigravity", "agy", "claude", "codex", "opencode"],
+        choices=["auto", "alternate", "round-robin", "claude", "codex", "opencode", "antigravity", "agy", "agy-claude"],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",
@@ -477,6 +528,11 @@ def main():
         "--post",
         action="store_true",
         help="Post the review comment/verdict directly to the GitHub PR",
+    )
+    parser.add_argument(
+        "--allow-findings",
+        action="store_true",
+        help="Exit 0 even when review returns 'Needs work' (defaults to exiting 1 on blocking findings)",
     )
     parser.add_argument(
         "--output",
@@ -500,14 +556,17 @@ def main():
     report, engine_label = execute_review(args.engine, full_prompt, model=args.model)
 
     if not report:
-        log_error("Adversarial review failed to produce a report across all attempted engines.")
+        log_error("Adversarial review failed to produce a valid report across all attempted engines.")
         sys.exit(1)
+
+    is_valid, is_clean, verdict_reason = parse_review_verdict(report)
 
     print("\n" + "=" * 60)
     print(f"LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")
     print("=" * 60 + "\n")
     print(report)
     print("\n" + "=" * 60)
+    print(f"Status: {verdict_reason}\n")
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
@@ -526,6 +585,10 @@ def main():
         posted = post_review_to_github(pr_num, report, engine_label, commit_sha=head_sha)
         if not posted:
             sys.exit(1)
+
+    if not is_clean and not args.allow_findings:
+        print("Review verdict is NOT clean (Needs work / blocking findings present). Exiting with code 1.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

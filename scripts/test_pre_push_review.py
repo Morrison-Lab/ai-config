@@ -52,9 +52,11 @@ class TestPrePushReview(unittest.TestCase):
             "- All unit tests passed.\n"
             "Reviewed-Commit: 12345678"
         )
-        self.assertTrue(reviewer.validate_review_output(valid))
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(valid)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
 
-        # Rejects unapproved / contradictory
+        # UNAPPROVED is a valid structural review format, but is NOT clean
         unapproved = (
             "### Summary Verdict\n"
             "Verdict: UNAPPROVED\n\n"
@@ -63,7 +65,9 @@ class TestPrePushReview(unittest.TestCase):
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone."
         )
-        self.assertFalse(reviewer.validate_review_output(unapproved))
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(unapproved)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
 
         # Rejects contradictory APPROVE with critical blocker
         contradictory = (
@@ -74,7 +78,8 @@ class TestPrePushReview(unittest.TestCase):
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone."
         )
-        self.assertFalse(reviewer.validate_review_output(contradictory))
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(contradictory)
+        self.assertFalse(is_valid)
 
         # Rejects missing required section (missing Verification Steps)
         missing_section = (
@@ -85,7 +90,8 @@ class TestPrePushReview(unittest.TestCase):
             "### Observations\n"
             "None."
         )
-        self.assertFalse(reviewer.validate_review_output(missing_section))
+        is_valid, _, _ = reviewer.parse_review_verdict(missing_section)
+        self.assertFalse(is_valid)
 
         # Rejects refusal / quota error
         refusal = (
@@ -97,10 +103,12 @@ class TestPrePushReview(unittest.TestCase):
             "### Verification Steps\nNone.\n"
             "You've hit your weekly limit."
         )
-        self.assertFalse(reviewer.validate_review_output(refusal))
+        is_valid, _, _ = reviewer.parse_review_verdict(refusal)
+        self.assertFalse(is_valid)
 
         # Rejects empty
-        self.assertFalse(reviewer.validate_review_output(""))
+        is_valid, _, _ = reviewer.parse_review_verdict("")
+        self.assertFalse(is_valid)
 
     def test_build_review_prompt_structure(self):
         prompt = reviewer.build_review_prompt(
@@ -164,6 +172,26 @@ class TestPrePushReview(unittest.TestCase):
         diff, label = reviewer.resolve_diff(explicit_base="origin/main")
         self.assertIn("+line", diff)
         self.assertEqual(label, "origin/main")
+
+    @patch("subprocess.run")
+    @patch.object(reviewer, "get_pr_head_sha")
+    def test_post_review_differing_head_sha_posts_comment(self, mock_get_sha, mock_subproc):
+        mock_get_sha.return_value = "remote_sha_9999"
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_subproc.return_value = mock_res
+
+        res = reviewer.post_review_to_github(
+            pr_number=123,
+            report="### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nPassed.",
+            engine_name="OpenAI Codex",
+            commit_sha="local_sha_1111",
+        )
+        self.assertTrue(res)
+        # Verify gh pr comment was called, NOT gh pr review
+        cmd_called = mock_subproc.call_args[0][0]
+        self.assertIn("comment", cmd_called)
+        self.assertNotIn("review", cmd_called)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

@@ -9,21 +9,22 @@ allowed-tools:
 
 # pre-push-review
 
-Runs an automated, single-pass adversarial AI code review on your outgoing branch commits before pushing,
-drawing directly on your desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google AI Ultra** subscription quota.
+Runs an automated, single-pass adversarial AI code review on outgoing branch commits,
+drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google AI Ultra** subscription quota.
 
 ## When this fires
 
 - "review this before I push", "pre-push review", "check my diff locally", "run local review", `/pre-push-review`
+- "alternate between models", "run adversarial review with codex/claude/cursor"
 - Before running `/push` or `git push` on complex feature branches when you want a second opinion without consuming cloud CI API credits or Claude Code token quotas.
 
 ## How it works
 
 1. Computes the local outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
-2. Injects repository standards and guidelines (`AGENTS.md`, `GEMINI.md`).
-3. Auto-detects and invokes the local AI CLI in plan/read-only mode (`claude` -> `codex` -> `opencode` -> `agy`), with automatic fallback on quota exhaustion.
-4. Validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps).
-5. Optionally posts review verdicts directly to the GitHub PR bound to the reviewed commit SHA.
+2. Injects universal repository standards (`AGENTS.md`).
+3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
+4. Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
+5. Exits nonzero on blocking `Needs work` findings (unless `--allow-findings` is specified) and optionally posts verified review notes directly to the GitHub PR.
 
 ## Usage
 
@@ -31,8 +32,11 @@ drawing directly on your desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**,
 # Auto-detect local AI CLI (priority: claude -> codex -> opencode -> agy)
 python3 scripts/pre-push-review.py
 
-# Review against a specific base branch
-python3 scripts/pre-push-review.py --base origin/develop
+# Alternate among available models/engines across successive runs
+python3 scripts/pre-push-review.py --engine alternate
+
+# Review via Claude model through Antigravity CLI
+python3 scripts/pre-push-review.py --engine agy-claude
 
 # Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity')
 python3 scripts/pre-push-review.py --engine codex
@@ -47,14 +51,9 @@ python3 scripts/pre-push-review.py --post
 python3 scripts/pre-push-review.py -o review.md
 ```
 
-## Integration with `push` skill
+## Relationship to other skills & guards
 
-Before executing `git push`, run `pre-push-review` to verify that no logical bugs, edge cases, or guideline regressions exist.
-Once clean, proceed with standard push guards.
-
-## Relationship to other skills
-
-- **`push`** --- The pre-push collision guard.
-  Run `pre-push-review` to inspect code quality, then `push` to safely push commits.
-- **`delegate-to-codex`** --- General offloading of heavy analysis tasks to Codex CLI.
-- **`ardi`** --- PR-level review iteration in GitHub Actions.
+- **`push` / pre-push guard**: Standalone multi-vendor adversarial review tool that can be run on-demand across all harnesses.
+  Within Claude Code sessions, pre-push enforcement hooks require clean foreground `adversarial-reviewer` subagent audits.
+- **`delegate-to-codex`**: General offloading of heavy analysis tasks to Codex CLI.
+- **`ardi`**: PR-level review iteration in GitHub Actions.

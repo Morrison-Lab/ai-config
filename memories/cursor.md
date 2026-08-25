@@ -58,3 +58,14 @@ bootstrap.
 Do not point the Cursor plugin `hooks` field at Claude `hooks/hooks.json`;
 that is Morrison-Lab/ai-config#1934, out of #1927 by design.
 
+Cursor Cloud loads project hooks from [`.cursor/hooks.json`](../.cursor/hooks.json)
+(native `version: 1` schema), not the Claude catalog.
+[`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)
+translates Cursor events into the payload the existing `hooks/` scripts
+already consume.
+The event mapping is [docs/cursor-hook-mapping.md](../docs/cursor-hook-mapping.md).
+
+User-level `~/.cursor/hooks.json` is not available to cloud agents.
+`sessionStart` injection is desktop-only; cloud agents get
+`UserPromptSubmit` context on the first `postToolUse` of a generation.
+

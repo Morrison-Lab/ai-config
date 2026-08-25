@@ -1,0 +1,57 @@
+# Cursor hook mapping
+
+Claude Code loads enforcement guards from [`hooks/hooks.json`](../hooks/hooks.json).
+Cursor Cloud does not.
+It loads [`.cursor/hooks.json`](../.cursor/hooks.json), which must use Cursor's native schema (`version: 1`).
+
+Pointing the Cursor plugin `hooks` field at the Claude file would feed a foreign schema.
+That is [ai-config#1934](https://github.com/Morrison-Lab/ai-config/issues/1934), out of #1927 by design.
+
+[`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py) is the Cursor-schema command.
+It translates Cursor stdin into the payload the existing `hooks/` scripts already consume, then translates their stdout back.
+
+It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude plugin path.
+
+## Event mapping
+
+| Claude Code event | Cursor event | Cloud agent | Notes |
+|---|---|---|---|
+| `PreToolUse` | `preToolUse` | yes | Covers Shell (Claude `Bash`), Task/Agent, and MCP tools. Matcher translation lives in the adapter. |
+| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `null` so a block can retry like Claude. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. |
+| `UserPromptSubmit` | `sessionStart` | no | Cursor `sessionStart` can inject `additional_context`. Cloud agents do not load `sessionStart`. |
+| `UserPromptSubmit` | `postToolUse` | yes | First `postToolUse` of a generation injects the same stdout / `additionalContext` the Claude UPS path would have added before the turn. Late by one tool call. `inject-local-time.sh` therefore lands after the first tool, not before the first token. |
+| `UserPromptSubmit` | `beforeSubmitPrompt` | yes, but unused | Cursor `beforeSubmitPrompt` can only `continue` / block. It cannot inject context. No UPS hook here currently blocks, so this event is unbound. |
+| `PreToolUse` matcher `SendMessage` | (none) | n/a | `remind-brief-premises.py` also binds `Agent` and `Task`, which Cursor maps. The SendMessage-only slice has no analog. |
+| `PreToolUse` MCP | `preToolUse` (`MCP:` prefix) | yes | Cursor Cloud does not load `beforeMCPExecution` / `afterMCPExecution`. `preToolUse` is the cloud path. |
+| `SessionStart` / `SessionEnd` / `PreCompact` | unused | mixed | This catalog does not register those Claude events. |
+
+The adapter's `EVENT_MAPPING` table is the machine-readable copy of the first three rows.
+`scripts/test_cursor_hook_adapter.py` asserts every Claude event in `hooks/hooks.json` appears there.
+
+## Tool-name mapping
+
+| Cursor `tool_name` | Claude `tool_name` values the adapter tries |
+|---|---|
+| `Shell` | `Bash` |
+| `Task` | `Task`, `Agent` |
+| `MCP:github-<id>` | `mcp__github__<id>` plus the raw suffix |
+| other `MCP:<id>` | `mcp__<id>` with hyphens folded to underscores |
+
+Warn-only `PreToolUse` output (`additionalContext` / `systemMessage` without a deny) is stashed and replayed as `postToolUse.additional_context` for that `tool_use_id`.
+Cursor `preToolUse` has no injection field on an allow.
+
+## What this file is not
+
+It is not a second catalog.
+New guards still land in `hooks/` with a `hooks/hooks.json` row, a README row, and a `test-<name>.py`.
+The adapter reads that catalog.
+Do not add a parallel list of script names here.
+
+## Activation
+
+Project hooks in [`.cursor/hooks.json`](../.cursor/hooks.json) load for this repo, including Cursor Cloud agents once the file is on the branch they boot from.
+User-level `~/.cursor/hooks.json` is not available in cloud agents.
+
+Do not also run `install-hooks.py --fix` to "activate" these for Cursor.
+That path writes `~/.claude/settings.json` for Claude Code.
+Cursor Cloud has no `~/.claude`.

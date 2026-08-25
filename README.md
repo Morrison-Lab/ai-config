@@ -94,6 +94,7 @@ Opening the clone in Cursor loads:
 - `AGENTS.md` (and `CLAUDE.md`, for compatibility)
 - project rules in [`.cursor/rules/`](.cursor/rules/)
 - skills from `skills/` once a Cursor plugin or `~/.claude/skills` install is live (Cursor also discovers `~/.claude/skills` and `.claude/skills/`)
+- project hooks in [`.cursor/hooks.json`](.cursor/hooks.json), which run the `hooks/` catalog through [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py) (see [Cursor hook mapping](docs/cursor-hook-mapping.md))
 
 **User-global rules.**
 `bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
@@ -118,6 +119,10 @@ prefer the GitHub marketplace install there.
 (skills, user-global rules from `cursor-rules/`, commands).
 Project-only rules stay in [`.cursor/rules/`](.cursor/rules/)
 and are not shipped through the plugin.
+The Cursor plugin `hooks` field is deliberately not pointed at
+Claude Code's [`hooks/hooks.json`](hooks/hooks.json); that file is a
+foreign schema ([#1934](https://github.com/Morrison-Lab/ai-config/issues/1934)).
+Project Cursor hooks live in [`.cursor/hooks.json`](.cursor/hooks.json) instead.
 Claude Code keeps using `.claude-plugin/`.
 
 ### Tool mappings
@@ -363,7 +368,10 @@ them.
 A few rules in this corpus cannot be enforced by writing them down, because
 the rule is consulted when it is *read* and broken when a message is
 *composed*.
-`hooks/` ships the harness hooks that close those gaps:
+`hooks/` ships the harness hooks that close those gaps.
+Claude Code loads them from [`hooks/hooks.json`](hooks/hooks.json).
+Cursor loads the same scripts through [`.cursor/hooks.json`](.cursor/hooks.json);
+the event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 
 | hook | event | enforces |
 |---|---|---|
@@ -622,6 +630,8 @@ activated.")
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
 - `cursor-rules/` --- user-global Cursor rules (`~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
+- `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
+- `.cursor/hooks/` --- adapter that runs the Claude `hooks/` catalog under that schema
 - `.cursor-plugin/` --- Cursor Plugin manifest (skills, rules, commands)
 - `.cursorignore` / `.geminiignore` --- keep local worktree and Aider residue
   out of Cursor and Gemini search (same paths `.gitignore` already excludes)

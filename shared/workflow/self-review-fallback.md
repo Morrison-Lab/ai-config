@@ -176,15 +176,15 @@ Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, whic
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "Where the cross-vendor directive came from".
 
 **A CLEAN same-vendor verdict is the state this rule most applies to, and the one where nothing prompts it.**
-Every sentence above reaches for the cross-vendor reviewer when the primary *fails* --- quota-skipped, stubbed, unreachable, or contradicting itself.
-None of them fires on the case that produces no artifact at all: the primary answers, finds nothing, and reports the PR ready.
+Every sentence above that names a *trigger* reaches for the cross-vendor reviewer when the primary fails --- quota-skipped, stubbed, unreachable, or contradicting itself.
+None of them fires on the case that leaves nothing outstanding: the primary answers, finds nothing, and reports the PR ready.
 A clean verdict closes the loop and reads as permission to stop, which is [`learn-from-review-findings`](learn-from-review-findings.md)'s "a clean verdict discharges the round, and it does not discharge your own probing" arriving one reviewer further out.
 There the unsearched space belongs to one reviewer's attention; here it belongs to a whole vendor's blind spot, so no amount of attention inside that vendor reaches it.
 
 The asymmetry is what decides it.
 A same-vendor clean verdict is evidence that the diff survives the checks that vendor's models are good at, and it is not evidence of absence, because the defects a shared blind spot hides are exactly the ones no same-vendor round can report.
 So same-vendor rounds do not accumulate into coverage.
-Eleven of them and one of them make the same claim about whatever the vendor's models are poor at, which is why the count reads as thoroughness while measuring only how much of the vendor's reachable region was covered.
+Eleven rounds and one round make the same claim about whatever the vendor's models are poor at, which is why a round count reads as thoroughness while measuring only how much of the vendor's reachable region was covered.
 
 - **Do:** run the cross-vendor pass on a clean same-vendor verdict, not only on a failed one.
 - **Do:** report a same-vendor round count as coverage inside one vendor's reachable region, and say which reviewers supplied it, rather than as a bare measure of how thoroughly the diff was reviewed.

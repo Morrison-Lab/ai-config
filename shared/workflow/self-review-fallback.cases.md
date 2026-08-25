@@ -213,18 +213,19 @@ the source, not the diff's description of it.
 The case above is the first measured instance of the cross-vendor preference, and it names its own limit: the primary produced zero verdicts across three attempts, so it is evidence about the value of a second reading rather than about when to reach for one.
 This is the case that supplies the missing half.
 Here the primary did not fail.
-Two same-vendor readings answered, and both answered clean.
+It read the reviewed head, and it answered clean.
 
 Measured 2026-08-24 Pacific on [ai-config#2131](https://github.com/Morrison-Lab/ai-config/pull/2131), at head `b744d6a2`.
 
-Two same-vendor readings cleared that head:
+Read the two same-vendor readings carefully, because only one of them is a reading of *that head*:
 
-| reader | rounds | outcome |
+| reader | rounds | what it read |
 | --- | --- | --- |
-| dispatched `adversarial-reviewer` subagent | 11, pre-push | no blocking findings left standing |
-| the repo's own `claude-review` | 1, at `b744d6a2` | **Ready for merge** |
+| the repo's own `claude-review` | 1 | `b744d6a2` itself; **Ready for merge** |
+| dispatched `adversarial-reviewer` subagent | 11, pre-push | a state four substantive commits earlier |
 
-That verdict's own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.
+The eleven rounds are same-vendor depth on the same work rather than a second verdict on the reviewed commit, and saying otherwise would inflate exactly the total this record's argument turns on.
+`claude-review`'s own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.
 Quote it that way rather than as "no findings": [`fully-clean`](fully-clean.md) is explicit that "non-blocking", "nit", and "minor" are prioritization labels rather than a pass, and softening the qualifier here would strengthen this record's own argument, which is the direction to be most careful about.
 
 A `codex` pass on the same head then returned 11 findings, 8 of them blocking, and every one was verified real before being accepted.
@@ -236,7 +237,7 @@ It is not that the cross-vendor reviewer was noisier, since the findings were ch
 Three remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
 The first is that theory: two readings that share a vendor share their blind spots, so their agreement measures the blind spot.
 The second is **contamination**, recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the eleven prior rounds in its own justification, so the two same-vendor readings were not independent samples and part of their agreement is explained by the second having read about the first.
-That confound bears hardest on the evidence this record would otherwise lean on most, since the eleven pre-push rounds are both the largest part of the same-vendor total and the thing the later verdict cited.
+That confound bears on the one verdict this record rests on, since the eleven pre-push rounds are what it cited.
 The third is a **different threshold**: that same verdict scopes its findings line to a "high-signal bar (compile/parse errors, definite wrong-result logic, or clear unambiguous CLAUDE.md violations)", so the two reviewers may have been applying different tests for what counts as a finding rather than holding different blind spots.
 Its remedy is the cheapest to state, since a bar can be named in the request; the contamination reading has cheap remedies of its own, in the section linked below.
 Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.

@@ -546,6 +546,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
+    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
 ]
 
 # Applies to EVERY not-clean pattern, not to one named member.
@@ -593,6 +594,9 @@ BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
     r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+}
+BARE_NOT_CLEAN_PATTERNS = {
+    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -700,6 +704,10 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if pat in BARE_NOT_CLEAN_PATTERNS:
+                line_start = scan.rfind("\n", 0, match.start()) + 1
+                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                    continue
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
@@ -929,6 +937,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
         r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
         r"changes\s+requested\b",
+        r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
         r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
     ]
 
@@ -946,6 +955,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+                if pat in BARE_NOT_CLEAN_PATTERNS:
+                    line_start = scan_body.rfind("\n", 0, match.start()) + 1
+                    if not BARE_CLEAN_MARKED.search(scan_body[line_start:match.start()]):
+                        continue
                 prefix = scan_body[max(0, match.start() - 25):match.start()]
                 if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                     continue

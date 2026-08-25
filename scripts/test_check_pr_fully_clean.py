@@ -350,6 +350,28 @@ def main() -> int:
             rimp_ok and rimp_issues == [],
         )
 
+    # Regression (PR #2180 round 8): standard bolded rejection verdicts must fail check_review_comments
+    for rejected_word in ["Rejected", "Blocked", "Unapproved", "Impasse", "Deadlock", "Changes requested"]:
+        rej_body = (
+            f"**Claude finished** review\n\n### Verdict\n\n**{rejected_word}** -- several blocking findings remain.\n\n(reviewed at `sha123`)"
+        )
+        check(
+            f"classify_verdict: '### Verdict\\n\\n**{rejected_word}**' classifies as not-clean",
+            checker.classify_verdict(rej_body) == "not-clean",
+        )
+        rej_comment = {
+            "createdAt": "2026-08-06T00:00:00Z",
+            "author": {"login": "github-actions"},
+            "body": rej_body,
+        }
+        mock_rej_data = json.dumps({"comments": [rej_comment], "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_rej_data):
+            rej_ok, rej_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+            check(
+                f"check_review_comments: '### Verdict\\n\\n**{rejected_word}**' fails as not clean",
+                (not rej_ok) and len(rej_issues) > 0,
+            )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

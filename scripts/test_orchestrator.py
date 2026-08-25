@@ -1223,6 +1223,37 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("changes_requested", reason.lower())
 
+        # 8. Multi-round review: Round 1 'Needs more work' followed by Round 2 'Verdict: CLEAN'
+        multi_round_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [
+                {"body": "Claude finished review\n\n### Verdict\n**Needs more work** - found an issue in round 1."},
+                {"body": "### Adversarial Self-Review Verdict: APPROVED\n\nFixed in round 2 with 0 blocking findings."},
+            ],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, multi_round_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
+        # 9. Custom Claude review with blocking verdict header and novel prose
+        custom_claude_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [
+                {"body": "Claude finished review\n\n### Finding 1 (blocking, high confidence)\nNovel defect.\n\n### Verdict\n**Needs more work**"},
+            ],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, custom_claude_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocking verdict", reason.lower())
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

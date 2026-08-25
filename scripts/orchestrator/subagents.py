@@ -708,7 +708,9 @@ class ReviewerSubagent(BaseSubagent):
                         f"{findings_summary}"
                     )
                 cmd_pr.extend(["--body", review_body])
-                subprocess.run(cmd_pr, capture_output=True, text=True, check=False)
+                proc = subprocess.run(cmd_pr, capture_output=True, text=True, check=False)
+                if proc.returncode != 0:
+                    logger.warning("Failed to post adversarial review comment to PR #%s (exit %d): %s", pr_number, proc.returncode, proc.stderr.strip())
             except Exception as exc:
                 logger.warning("Failed to post adversarial review comment to PR #%s: %s", pr_number, exc)
 

@@ -1185,6 +1185,45 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("blocked", reason.lower())
 
+        # 5. Production Claude review header format ("**Claude finished** -- ...")
+        prod_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "**Claude finished** -- adversarial review\n\n### Verdict\nClean / Approved"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, prod_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertTrue(is_clean)
+        self.assertIn("fully clean", reason)
+
+        # 6. Missing Claude review (fallback self-review only, or no comments)
+        missing_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "### Fallback Self-Review\nVerdict: Clean"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, missing_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("missing automated claude review", reason.lower())
+
+        # 7. Closed PR notice ("No action -- PR is closed/merged")
+        closed_pr_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action -- PR is closed/merged"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, closed_pr_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocking verdict", reason.lower())
+
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser
 

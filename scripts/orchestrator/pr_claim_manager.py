@@ -254,7 +254,6 @@ class PRClaimManager:
             "finding 1 (blocking)",
             "finding (blocking)",
             "verdict\n\n**needs more work",
-            "no action — pr is closed",
             "no action -- pr is closed",
         ]
         for phrase in blocking_phrases:

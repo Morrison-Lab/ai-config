@@ -278,7 +278,7 @@ COMMENT_FLAG_RE = re.compile(
 ANY_BODY_FLAG_RE = re.compile(
     r"--body\b|--body=|--body-file\b|--message\b|--message="
     r"|(?<![\w\-\"'])-(?:b|m|F)(?:[\s=]|[\"\']|[A-Za-z0-9])"
-    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
+    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=")
 
 
 # `gh pr comment --delete-last` deletes a comment rather than posting one.
@@ -372,10 +372,10 @@ UNREADABLE_RE = re.compile(
     r"|(?<![\w\-\"'])-(?:b|m)[\s=]*(?:\"[^\"]*\$|'[^']*\$|\$)"
     # `@file` is gh api's read-from-file sigil, and it is routinely QUOTED
     # (`-F body="@/tmp/reply.md"`), so the optional quote is load-bearing.
-    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=[\"']?(?:@|\$)"
+    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=[\"']?(?:@|\$)"
     # Must cross quotes and spaces: a `$` anywhere in the value makes the body
     # unreadable, not just one directly after `body=`.
-    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=(?:[^\"']*\$|\"[^\"]*\$|'[^']*\$)"
+    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=(?:[^\"']*\$|\"[^\"]*\$|'[^']*\$)"
 )
 # A body flag with an inline literal value. Its absence on an interactive
 # invocation means there is no body to read here at all.
@@ -386,7 +386,7 @@ UNREADABLE_RE = re.compile(
 HAS_INLINE_BODY_RE = re.compile(
     r"--(?:body|message|comment)[\s=]+[\"']?[^\s\"'$]"
     r"|(?<![\w\-\"'])-(?:b|m|c)[\s=]*[\"']?[^\s\"'$=]"
-    r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
+    r"|(?:-f|-F|--field|--raw-field|--form)[\s=]*[\"']?body=")
 
 # Whole-body commands addressed to another bot. Anchored to the WHOLE body:
 # `[^"']*` after the handle would swallow unbounded prose, exempting a comment

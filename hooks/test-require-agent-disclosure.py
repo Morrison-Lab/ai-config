@@ -550,6 +550,12 @@ CASES = [
      'gh pr comment 12 -F /tmp/body.md', None),
     ("--editor is unreadable",
      'gh pr comment 12 --editor', None),
+    ("glab api --form body= with marker discloses",
+     'glab api projects/1/merge_requests/2/notes --form body="Done.\n\n' + MARKER + '"',
+     False),
+    ("glab api --form body= bare misses marker",
+     'glab api projects/1/merge_requests/2/notes --form body="Done."',
+     "missing"),
 ]
 
 # --- the emoji branch --------------------------------------------------------
@@ -560,7 +566,11 @@ ROBOT_CASE = (
 INDIRECT_CASES = [
     ("body-file", 'gh pr comment 12 --body-file /tmp/b.md'),
     ("api body file", 'gh pr comment 12 -F body=@/tmp/b.md'),
+    ("glab api body file", 'glab api projects/1/merge_requests/2/notes --form body=@/tmp/b.md'),
+    ("glab api quoted body file", 'glab api projects/1/merge_requests/2/notes --form body="@/tmp/b.md"'),
     ("variable body", 'gh pr comment 12 --body "$BODY"'),
+    ("glab api variable body", 'glab api projects/1/merge_requests/2/notes --form body=$BODY'),
+    ("glab api quoted variable body", 'glab api projects/1/merge_requests/2/notes --form body="$BODY"'),
 ]
 
 

@@ -31,6 +31,8 @@ emit JSON before Cursor SIGKILLs the command. An overlapping first
 process that crashes still yields empty JSON, and Cursor fail-opens
 `preToolUse` in that latent case (no second Cursor-schema source is
 bound today).
+
+The adapter parses leading `KEY=VALUE` tokens from each catalog `command`
 (the Stop registration of `no-mistake-without-a-hook.py` needs
 `AI_CONFIG_STOP=1`) and runs each script with a remaining-time budget so
 Cursor does not SIGKILL the wrapper mid-catalog.

@@ -255,7 +255,7 @@ def coerce_tool_input(value: Any) -> dict[str, Any]:
 
 
 def claude_payload_for_pretool(cursor: dict[str, Any], claude_tool: str) -> dict[str, Any]:
-    tool_input = coerce_tool_input(cursor.get("tool_input"))
+    tool_input = alias_cursor_tool_input(coerce_tool_input(cursor.get("tool_input")))
     command = cursor.get("command")
     if command and "command" not in tool_input:
         tool_input["command"] = command
@@ -308,12 +308,29 @@ def claude_tool_name_for_cursor(name: str) -> str:
     return name
 
 
+def alias_cursor_tool_input(inp: Any) -> Any:
+    """Copy Cursor write keys to the Claude names catalog scripts read."""
+    if not isinstance(inp, dict):
+        return inp
+    out = dict(inp)
+    if "file_path" not in out and "path" in out:
+        out["file_path"] = out["path"]
+    if "content" not in out and "contents" in out:
+        out["content"] = out["contents"]
+    if "notebook_path" not in out and "target_notebook" in out:
+        out["notebook_path"] = out["target_notebook"]
+    return out
+
+
 def translate_content_block(block: Any) -> Any:
     if not isinstance(block, dict):
         return block
     out = dict(block)
-    if out.get("type") == "tool_use" and isinstance(out.get("name"), str):
-        out["name"] = claude_tool_name_for_cursor(out["name"])
+    if out.get("type") == "tool_use":
+        if isinstance(out.get("name"), str):
+            out["name"] = claude_tool_name_for_cursor(out["name"])
+        if "input" in out:
+            out["input"] = alias_cursor_tool_input(out["input"])
     return out
 
 
@@ -348,6 +365,13 @@ def record_needs_translation(record: dict[str, Any]) -> bool:
         ):
             src = block["name"]
             if CURSOR_TO_CLAUDE_TOOLS.get(src, src) != src:
+                return True
+            inp = block.get("input")
+            if isinstance(inp, dict) and (
+                ("path" in inp and "file_path" not in inp)
+                or ("contents" in inp and "content" not in inp)
+                or ("target_notebook" in inp and "notebook_path" not in inp)
+            ):
                 return True
     return False
 

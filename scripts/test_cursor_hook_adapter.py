@@ -255,6 +255,27 @@ check(
     "Cursor StrReplace becomes Edit",
     mod.claude_tool_name_for_cursor("StrReplace") == "Edit",
 )
+aliased = mod.alias_cursor_tool_input(
+    {"path": "memories/x.md", "contents": "hi"},
+)
+check("Cursor path aliases to file_path", aliased.get("file_path") == "memories/x.md")
+check("Cursor contents aliases to content", aliased.get("content") == "hi")
+typed_write = {
+    "type": "assistant",
+    "role": "assistant",
+    "message": {"content": [
+        {"type": "tool_use", "name": "Write", "input": {"path": "hooks/x.py"}},
+    ]},
+}
+check(
+    "typed Write with path still needs translation",
+    mod.record_needs_translation(typed_write),
+)
+write_translated = mod.translate_content_block(typed_write["message"]["content"][0])
+check(
+    "translated Write input has file_path",
+    write_translated["input"].get("file_path") == "hooks/x.py",
+)
 check(
     "Cursor EditNotebook becomes NotebookEdit",
     mod.claude_tool_name_for_cursor("EditNotebook") == "NotebookEdit",

@@ -713,29 +713,26 @@ if mutant is not None:
 PRODUCER = "grep -q zzz /dev/null"
 
 
+def _find_bash():
+    if sys.platform == "win32":
+        for cand in [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+        ]:
+            if os.path.exists(cand):
+                return cand
+    return shutil.which("bash") or "bash"
+
+
+BASH_BIN = _find_bash()
+
+
 def bash_says_misread(command):
-    """(moved, informative) for one shape under bash.
-
-    `moved` is True when `set -o pipefail` changes what the command prints.
-
-    `informative` is False when BOTH runs print nothing, which means the shape
-    told us nothing --- a syntax error, or a command that produces no output.
-    Such a case scores as an agreement whichever way the guard votes, so
-    counting it would inflate the tally with a case bash never evaluated.
-    That is this file's own subject one level up: a matcher that fires on
-    nothing and a matcher that never ran leave the same evidence.
-
-    `-O extglob` is passed because extglob is OFF in non-interactive bash, so
-    `ls @(a|b)` is a SYNTAX ERROR rather than a pattern --- which is exactly
-    how one case sat in the "agreed" column for a round without bash ever
-    evaluating it. An inline `shopt -s extglob;` does not help, since bash
-    parses the whole line before running it. Enabling the option adds pattern
-    syntax and changes no other case's behaviour.
-    """
-    plain = subprocess.run(["bash", "-O", "extglob", "-c", command],
+    plain = subprocess.run([BASH_BIN, "-O", "extglob", "-c", command],
                            capture_output=True, text=True, timeout=10)
     guarded = subprocess.run(
-        ["bash", "-O", "extglob", "-c", "set -o pipefail\n" + command],
+        [BASH_BIN, "-O", "extglob", "-c", "set -o pipefail\n" + command],
         capture_output=True, text=True, timeout=10)
     informative = bool(plain.stdout.strip() or guarded.stdout.strip())
     return plain.stdout != guarded.stdout, informative

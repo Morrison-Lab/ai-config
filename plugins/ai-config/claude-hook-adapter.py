@@ -110,9 +110,9 @@ def main():
     transcript_path = payload.get("transcriptPath")
 
     if event_type == "PreToolUse":
-        tool_call = payload.get("toolCall", {})
+        tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
-        args = tool_call.get("args", {})
+        args = tool_call.get("args") or {}
         cwd = args.get("Cwd") or repo_root
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
@@ -130,7 +130,7 @@ def main():
                     tasks_to_run.append((extract_hook_list([group]), bash_payload))
 
         elif tool_name == "invoke_subagent":
-            subagents = args.get("Subagents", [])
+            subagents = args.get("Subagents") or []
             for sub in subagents:
                 agent_payload = {
                     "tool_name": "Agent",

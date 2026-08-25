@@ -360,6 +360,21 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
+    def test_null_args_in_tool_call(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        payload = {"toolCall": {"name": "run_command", "args": None}}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
     def test_stop_event_allow_returns_empty_dict(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "allow"}), stderr="")

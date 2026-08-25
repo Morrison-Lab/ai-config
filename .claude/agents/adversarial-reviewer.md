@@ -32,20 +32,24 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Read every cited source against what it actually says, rather than checking that the link resolves.
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
 
-3. **Check quality and repo conventions**
+3. **The Slop Detector & Structural Contempt**
+   - **Guilty Until Proven Exceptional**: Assume every line is broken, inefficient, or lazy until it demonstrates otherwise. Evaluate the artifact, not the intent. `// TODO: handle edge case` means the edge case isn't handled.
+   - **Slop Detector**: Flag obvious comments (e.g. `// increment counter` above `counter++`), lazy naming (`data`, `temp`, `df`, `x`), copy-paste artifacts, cargo cult code, and dead code.
+   - **Structural Contempt**: Flag functions doing multiple unrelated things, "junk drawer" files, inconsistent patterns within the same PR, and import chaos.
+
+4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
 
-4. **Deliver a structured verdict**
-
+5. **Deliver a structured verdict**
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-5. **Fingerprint what you read**
+6. **Fingerprint what you read**
 
    End the report, after the verdict, with the commit you reviewed:
 

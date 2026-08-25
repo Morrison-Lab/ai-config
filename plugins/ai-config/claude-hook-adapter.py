@@ -141,6 +141,10 @@ def main():
 
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
+            if raw_subagents is None:
+                reason = "invoke_subagent missing required 'Subagents' argument"
+                print(json.dumps({"decision": "deny", "reason": reason}))
+                return
             if isinstance(raw_subagents, dict):
                 raw_subagents = [raw_subagents]
             elif isinstance(raw_subagents, str):

@@ -187,22 +187,22 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     if not verdict_str:
         return False, False, "No valid anchored verdict line found."
 
-    v_lower = verdict_str.lower()
-    negative_terms = [
-        "not approved", "disapproved", "unapproved", "needs work", "needs more work",
-        "changes requested", "blocked", "ready after addressing findings", "unable to review",
-        "refuse", "rejected", "conditional", "do not merge", "fail", "failed"
-    ]
-    has_negative_verdict = any(re.search(r"\b" + re.escape(term) + r"\b", v_lower) for term in negative_terms)
+    v_clean = re.sub(r"[\*`_]", "", verdict_str).strip()
+    v_core = re.split(r"\s*[-:—]\s*", v_clean)[0].strip().lower()
 
-    positive_match = bool(re.search(r"\b(?:ready for merge|approve|approved|clean)\b", v_lower))
-    is_clean = positive_match and not has_negative_verdict
-    is_needs_work = has_negative_verdict or not positive_match
+    # Any negation or rejection term completely invalidates clean verdict
+    negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
+    has_negation = bool(re.search(negation_pattern, v_clean.lower()))
+
+    clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
+    is_clean_verdict = (v_core in clean_allowlist or any(v_clean.lower().startswith(cv) for cv in clean_allowlist))
+    is_clean = is_clean_verdict and not has_negation
+    is_needs_work = has_negation or not is_clean_verdict
 
     if is_clean and is_needs_work:
         return False, False, "Contradictory verdict statement."
 
-    findings_match = re.search(r"(?is)#{2,3}\s+Critical Findings\s*\n(.*?)(?=\n#{2,3}\s+|\Z)", report)
+    findings_match = re.search(r"(?is)#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", report)
     if findings_match:
         findings_body = findings_match.group(1).strip()
         is_clean_findings = bool(
@@ -212,13 +212,14 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 flags=re.IGNORECASE,
             )
         )
-        has_list_item = bool(re.search(r"(?im)^\s*(?:1\.|-|\*)\s+", findings_body))
-        has_blocker_phrase = any(
-            term in findings_body.lower()
-            for term in ["blocking", "critical", "regression", "must fix", "severe", "bug", "fails", "fail", "broken", "issue"]
-        )
-        if is_clean and (not is_clean_findings or has_list_item or has_blocker_phrase):
-            return False, False, "Contradictory output: clean verdict but critical findings body contains issues/blockers."
+        if not is_clean_findings:
+            has_list_item = bool(re.search(r"(?im)^\s*(?:1\.|-|\*)\s+", findings_body))
+            has_blocker_phrase = any(
+                term in findings_body.lower()
+                for term in ["blocking", "critical", "regression", "must fix", "severe", "bug", "fails", "fail", "broken", "issue"]
+            )
+            if is_clean and (has_list_item or has_blocker_phrase or len(findings_body) > 0):
+                return False, False, "Contradictory output: clean verdict but critical findings body contains issues/blockers."
 
     refusal_patterns = [
         "hit your weekly limit",

@@ -76,8 +76,11 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("short", reason)
 
-        # NOT APPROVED and DISAPPROVED are NOT clean
-        for neg in ["NOT APPROVED", "DISAPPROVED", "UNAPPROVED", "BLOCKED", "NEEDS WORK", "CHANGES REQUESTED"]:
+        # NOT APPROVED, DISAPPROVED, Never approve, Do not approve are NOT clean
+        for neg in [
+            "NOT APPROVED", "DISAPPROVED", "UNAPPROVED", "BLOCKED", "NEEDS WORK",
+            "CHANGES REQUESTED", "Not ready for merge", "Do not approve", "Never approve", "Cannot approve"
+        ]:
             neg_report = (
                 f"### Summary Verdict\n"
                 f"Verdict: {neg}\n\n"
@@ -87,8 +90,33 @@ class TestPrePushReview(unittest.TestCase):
                 "### Verification Steps\nNone."
             )
             is_valid, is_clean, _ = reviewer.parse_review_verdict(neg_report)
-            self.assertTrue(is_valid)
             self.assertFalse(is_clean)
+
+        # Extended heading with blockers: ### Critical Findings (blocking) is caught
+        extended_heading_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings (blocking)\n"
+            "1. Major data loss on unverified commit.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone."
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(extended_heading_report)
+        self.assertFalse(is_clean)
+
+        # Legitimate clean wording like 'No issues.' is accepted as clean
+        clean_wording_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "No issues.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_wording_report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
 
         # None. followed by numbered blocker is NOT clean
         sneaky_findings = (
@@ -271,6 +299,28 @@ class TestPrePushReview(unittest.TestCase):
         cmd_called = mock_subproc.call_args[0][0]
         self.assertIn("comment", cmd_called)
         self.assertNotIn("review", cmd_called)
+
+    @patch("subprocess.run")
+    @patch("shutil.which")
+    def test_runner_model_forwarding(self, mock_which, mock_subproc):
+        mock_which.return_value = "/opt/homebrew/bin/codex"
+        valid_report = (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            "Reviewed-Commit: abc12345"
+        )
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_res.stdout = valid_report
+        mock_subproc.return_value = mock_res
+
+        out = reviewer.run_codex_review("prompt", model="gpt-5.6-sol", expected_commit_sha="abc12345")
+        self.assertEqual(out, valid_report)
+        cmd_args = mock_subproc.call_args[0][0]
+        self.assertIn("-m", cmd_args)
+        self.assertIn("gpt-5.6-sol", cmd_args)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

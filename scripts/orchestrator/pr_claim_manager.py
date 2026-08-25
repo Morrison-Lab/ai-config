@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 from typing import Any, Dict, List, Optional
 
 from .worktree_manager import WorktreeManager
@@ -200,153 +201,28 @@ class PRClaimManager:
         return True
 
     def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
-        """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
+        """Check if PR has 100% clean CI checks and an approved / clean review verdict.
+
+        Delegates to scripts/check-pr-fully-clean.py, this repository's authoritative verification tool.
+        """
         effective_repo = self.get_effective_repo_slug(repo_slug)
-        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,headRefOid"]
+        script_path = Path(__file__).resolve().parent.parent / "check-pr-fully-clean.py"
+        cmd = [sys.executable, str(script_path), str(pr_number)]
         if effective_repo:
             cmd.extend(["-R", effective_repo])
 
         rc, out, err = self._run_cmd(cmd)
-        if rc != 0:
-            return False, f"Failed to query PR #{pr_number} metadata: {err}"
+        if rc == 0:
+            return True, "PR is fully clean across CI and review"
 
-        try:
-            data = json.loads(out)
-        except Exception as exc:
-            return False, f"Failed to parse PR #{pr_number} JSON: {exc}"
-
-        # 1. Check CI statusCheckRollup
-        checks = data.get("statusCheckRollup", [])
-        for chk in checks:
-            name = chk.get("name") or chk.get("context", "unknown")
-            status = chk.get("status")
-            conclusion = (chk.get("conclusion") or chk.get("state") or "").upper()
-            if status != "COMPLETED":
-                return False, f"Check '{name}' is still in progress (status={status})"
-            if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
-                return False, f"Check '{name}' failed with conclusion={conclusion}"
-
-        # 2. Check for changes requested across all GitHub reviews
-        reviews = data.get("reviews", [])
-        has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
-        if has_changes_requested:
-            return False, "PR has CHANGES_REQUESTED review"
-
-        comments = data.get("comments", [])
-        claude_reviews = []
-        for c in comments:
-            author_login = (c.get("author") or {}).get("login", "")
-            if author_login not in ["github-actions", "github-actions[bot]", "claude", "claude[bot]"]:
-                continue
-            raw_c_body = (c.get("body") or "").replace("\u2014", "--").replace("\u2013", "--")
-            # Strip HTML comments and code blocks before checking trigger phrase to prevent comment spoofing
-            clean_c_body = re.sub(r"<!--[\s\S]*?-->", " ", raw_c_body)
-            clean_c_body = re.sub(r"```[\s\S]*?```", " ", clean_c_body)
-            if "claude finished review" in clean_c_body.lower() or "**claude finished" in clean_c_body.lower():
-                claude_reviews.append(c)
-
-        if not claude_reviews:
-            return False, "No independent external Claude Code Review found on PR"
-
-        body = claude_reviews[-1].get("body", "")
-        head_oid = (data.get("headRefOid") or "").strip()
-
-        # Strip HTML comments and fenced code blocks from review body
-        lower_body = (
-            body.lower()
-            .replace("\u2014", "--")
-            .replace("\u2013", "--")
-        )
-        stripped_body = re.sub(r"<!--[\s\S]*?-->", " ", lower_body)
-        stripped_body = re.sub(r"```[\s\S]*?```", " ", stripped_body)
-
-        # Check for commit-staleness: if headRefOid is present, require that the review comment
-        # cites a reviewed commit SHA matching the current PR headRefOid.
-        # Use the LAST match from stripped_body to avoid earlier decoy commit mentions in review prose.
-        reviewed_commit_matches = list(re.finditer(
-            r"(?:reviewed\s+(?:commit(?::)?|at\b(?::)?)|commit:)\s*(?:\*\*|__)?\s*`?([0-9a-f]{7,40})`?",
-            stripped_body,
-            re.IGNORECASE,
-        ))
-        if head_oid:
-            if not reviewed_commit_matches:
-                return False, "Latest AI review does not cite the reviewed commit SHA (cannot verify freshness against PR head)"
-            reviewed_sha = reviewed_commit_matches[-1].group(1).lower()
-            if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
-                return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
-
-        # 1. Check for not-clean / blocking patterns throughout review body (with code and quoted spans blanked)
-        scan_body = re.sub(r"`[^`\n]*`", " ", stripped_body)
-        scan_body = re.sub(r'"[^"\n]*"', " ", scan_body)
-        scan_body = re.sub(r"\u201c[^\u201d\n]*\u201d", " ", scan_body)
-
-        not_clean_patterns = [
-            r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-            r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
-            r"\bchanges\s+requested\b",
-            r"\bblocked\s+on\s+human\s+review\b",
-            r"\b(?:not|isn't|cannot\s+be|can't\s+be|nowhere\s+near|far\s+from)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
-            r"\b(?:unapproved|rejected|deadlock|impasse)\b",
-            r"\bfinding\s+(?:\d+\s+)?\(blocking\)",
-            r"\bno\s+action\s+--\s+pr\s+is\s+(?:closed|merged)\b",
-        ]
-        not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
-
-        for pat in not_clean_patterns:
-            for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-                prefix = scan_body[max(0, match.start() - 25):match.start()]
-                if not_clean_negation_prefix.search(prefix):
-                    continue
-                return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
-
-        # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
-        heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
-        if heading_matches:
-            verdict_section = stripped_body[heading_matches[-1].end():]
-        else:
-            verdict_section = stripped_body
-
-        # Extract non-empty lines from the verdict section
-        verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
-        if not verdict_lines:
-            return False, "Latest AI review verdict section is empty"
-
-        first_verdict_line = verdict_lines[0]
-
-        # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
-        clean_first_line_pat = re.compile(
-            r"^(?:[:\-\s#>*_+-])*(?:\*\*|__)?\s*(?:clean(?!-)|approved|ready|lgtm|clean\s*/\s*approved)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*\s*(?:(?:---|--|[\u2014\u2013—–-]|:)\s*.*)?$",
-            re.IGNORECASE,
-        )
-        if not clean_first_line_pat.search(first_verdict_line):
-            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
-
-        clean_qualifier = re.compile(
-            r"\b(?:once|after|when|if|unless|pending|provided|assuming"
-            r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
-            r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
-            re.IGNORECASE,
-        )
-        if clean_qualifier.search(first_verdict_line):
-            return False, f"Latest AI review verdict contains qualifier ('{first_verdict_line[:60]}')"
-
-        # 3. Allowlist of recognized benign trailing metadata lines
-        # Any other un-allowlisted prose in the verdict section fails closed
-        benign_trailer_pattern = re.compile(
-            r"^(?:"
-            r"(?:\*\*|__)?\s*(?:reviewed\s+(?:commit(?::)?|at\b(?::)?)|commit:)\s*(?:\*\*|__)?\s*`?[0-9a-f]{7,40}`?"
-            r"|_(?:posted\s+by|automated\s+review)\b.*?_"
-            r"|💰\s*\*\*cost:\*\*.*"
-            r"|<!--.*-->"
-            r"|(?:\*\*|__)?\s*(?:ready(?:\s+for\s+merge)?|approved(?:\s+for\s+merge)?|clean|lgtm)\b(?:\*\*|__)?(?:\s+for\s+merge)?(?:\*\*|__)?(?:\s*\(\s*(?:0\s+(?:blocking\s+)?findings?|no\s+(?:blocking\s+)?findings?|clean)\s*\))?(?:\*\*|__)?\s*[.!]*"
-            r")\s*$",
-            re.IGNORECASE,
-        )
-        for line in verdict_lines[1:]:
-            if not benign_trailer_pattern.match(line):
-                return False, f"Latest AI review verdict section contains trailing unrecognized prose ('{line[:60]}')"
-
-        return True, "PR is fully clean across CI and review"
+        output = (out or err or "").strip()
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        blocking_reasons = []
+        for line in lines:
+            if line.startswith("- "):
+                blocking_reasons.append(line[2:])
+        reason = "; ".join(blocking_reasons) if blocking_reasons else (lines[-1] if lines else "PR is not clean")
+        return False, reason
 
     def merge_pr_under_mwc(
         self,

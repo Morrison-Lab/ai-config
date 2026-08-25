@@ -304,7 +304,7 @@ This grants no merge authority: the strict merge policy below still applies.
   before merge.
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
-  revert it immediately on `main` and continue on the original PR branch per
+  open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
 
 ## Request review and drive every started PR to clean

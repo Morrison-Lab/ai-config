@@ -5,11 +5,12 @@ When a Pull Request is prematurely or incorrectly merged
 
 ## Immediate Revert Protocol
 
-1. **Revert on `main` immediately**:
+1. **Open a revert PR on `main` immediately**:
    Open a revert branch from `origin/main`,
    run `git revert <merge-commit>`,
    push,
-   and merge the revert PR to `main` right away once automated CI validation (`validate.yml`) passes (an emergency-recovery exception to restore `main` to a known-clean state before other work proceeds).
+   open a revert PR to restore `main` to a known-clean state,
+   and merge under active session permissions (`/mwc` or `/maw`) once CI passes or request user merge authorization.
    Never leave a defective or unapproved merge on the default branch while troubleshooting.
 
 2. **Return to the original PR branch**:

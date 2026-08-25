@@ -632,18 +632,18 @@ class ReviewerSubagent(BaseSubagent):
             except Exception:
                 pass
 
-            # Fail-fast if no diff found for a real branch review
-            if not diff.strip():
-                return SubagentResult(
-                    success=False,
-                    data={
-                        "verdict": "BLOCKED",
-                        "findings": [{"level": "ERROR", "message": f"No implementation diff found on branch '{branch_name}' against origin/main."}],
-                        "model_used": "empty-diff-check",
-                    },
-                    error=f"Empty implementation diff on branch '{branch_name}'.",
-                    execution_time_seconds=time.time() - start_time,
-                )
+        # Fail-fast if no diff found to review
+        if not diff.strip() and not dry_run:
+            return SubagentResult(
+                success=False,
+                data={
+                    "verdict": "BLOCKED",
+                    "findings": [{"level": "ERROR", "message": f"No implementation diff found to review (branch: '{branch_name or 'none'}')."}],
+                    "model_used": "empty-diff-check",
+                },
+                error=f"Empty implementation diff to review (branch: '{branch_name or 'none'}').",
+                execution_time_seconds=time.time() - start_time,
+            )
 
         findings: List[Dict[str, Any]] = []
         is_clean = True

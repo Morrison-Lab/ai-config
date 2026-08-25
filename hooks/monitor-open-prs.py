@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Continuously poll every open PR authored by the authenticated GitHub user."""
+import glob
 import json
 import os
 import shutil
@@ -10,15 +11,75 @@ import time
 
 POLL_SECONDS = 120
 STATE_PATH = os.path.join(tempfile.gettempdir(), "claude-pr-monitors", "all-open-prs.json")
+TEMP_SUFFIX = ".tmp"
 IS_WINDOWS = os.name == "nt"
+
+
+def temp_path_for(pid):
+    return f"{STATE_PATH}.{pid}{TEMP_SUFFIX}"
 
 
 def write_state(value):
     os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
-    temporary = f"{STATE_PATH}.{os.getpid()}.tmp"
+    temporary = temp_path_for(os.getpid())
     with open(temporary, "w", encoding="utf-8") as stream:
         json.dump(value, stream, sort_keys=True)
     os.replace(temporary, STATE_PATH)
+
+
+def _temp_pid(path):
+    # Only `<state>.<int>.tmp` is claimed as ours. Anything else sharing the
+    # directory belongs to another writer and is left untouched, so a sweep
+    # can never widen into a general "delete stray files here".
+    name = os.path.basename(path)
+    prefix = f"{os.path.basename(STATE_PATH)}."
+    if not name.startswith(prefix) or not name.endswith(TEMP_SUFFIX):
+        return None
+    middle = name[len(prefix):-len(TEMP_SUFFIX)]
+    try:
+        return int(middle)
+    except ValueError:
+        return None
+
+
+def sweep_orphan_temp_files(max_age_seconds=POLL_SECONDS):
+    """Unlink `<state>.<pid>.tmp` leftovers older than one poll interval.
+
+    write_state() is a create-then-replace pair, so a daemon killed between
+    the two steps -- by stop_stale_daemon(), an installer re-run, or logoff --
+    strands its temporary file with nothing to collect it. The age gate is
+    what makes removal safe without any locking: a live writer holds its
+    temporary file for the duration of one json.dump(), so anything whose
+    mtime predates a full poll interval is provably abandoned.
+    """
+    removed = 0
+    for path in glob.glob(f"{glob.escape(STATE_PATH)}.*{TEMP_SUFFIX}"):
+        pid = _temp_pid(path)
+        if pid is None or pid == os.getpid():
+            # A temporary file bearing our own pid can only be a write this
+            # process is executing right now; the sweep never owns it.
+            continue
+        try:
+            age = time.time() - os.stat(path).st_mtime
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            print(f"WARN: monitor-open-prs: cannot stat {path}: {error}", file=sys.stderr)
+            continue
+        if age <= max_age_seconds:
+            continue
+        try:
+            os.unlink(path)
+            removed += 1
+        except FileNotFoundError:
+            # Another sweeper won the race; the file is gone either way.
+            continue
+        except OSError as error:
+            # Reported, not swallowed: a locked or unwritable leftover must
+            # not take down the poll loop that this sweep is a side errand of.
+            print(f"WARN: monitor-open-prs: cannot unlink orphaned state file "
+                  f"{path}: {error}", file=sys.stderr)
+    return removed
 
 
 def _alive_windows(pid):
@@ -112,6 +173,10 @@ def poll_once(state):
         state.pop("data", None)
         state["error"] = message
     write_state(state)
+    # Swept after the replace, so this process holds no temporary file of its
+    # own. A gh failure still reaches here on purpose: leftovers should drain
+    # even while polls are erroring, since that is when restarts cluster.
+    sweep_orphan_temp_files()
     return state
 
 
@@ -123,6 +188,8 @@ def monitor():
 
 def ensure():
     if alive(read_state().get("pid")):
+        # A live daemon sweeps on its own schedule; do not duplicate the work
+        # on every hook invocation.
         return True
     try:
         process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--monitor"],
@@ -133,6 +200,9 @@ def ensure():
     state = read_state()
     state.update({"kind": "all_open_prs", "pid": process.pid, "started_at": time.time()})
     write_state(state)
+    # Respawn is exactly the event that strands temporary files, and the
+    # daemon that just died could not clean up after itself.
+    sweep_orphan_temp_files()
     return True
 
 

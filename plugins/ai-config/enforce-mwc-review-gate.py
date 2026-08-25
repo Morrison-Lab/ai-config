@@ -55,11 +55,11 @@ def main():
 
             # Check CI status (Never ignore red CI or incomplete CI)
             status_rollup = data.get("statusCheckRollup") or []
-            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"] or check.get("status") in ["IN_PROGRESS", "QUEUED", "PENDING", "WAITING"]]
+            failures = [check.get("name") for check in status_rollup if check.get("conclusion") in ["FAILURE", "ACTION_REQUIRED", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"] or check.get("status") in ["IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"]]
             if failures:
                 print(json.dumps({
                     "decision": "deny",
-                    "reason": f"Strict Merge Control Policy: Cannot merge with failing CI checks: {', '.join(failures)}. Make sure you NEVER ignore red CI."
+                    "reason": f"Strict Merge Control Policy: Cannot merge with failing or incomplete CI checks: {', '.join(failures)}. Make sure you NEVER ignore red CI and wait for all checks to complete."
                 }))
                 return
 

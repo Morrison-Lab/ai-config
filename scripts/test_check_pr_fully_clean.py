@@ -415,6 +415,35 @@ def main() -> int:
         (not nhp_ok) and any("NOT clean" in i for i in nhp_issues),
     )
 
+    # Regression (PR #2180 round 11): incidental prose negation outside verdict section does not fail
+    incidental_negation_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "The working tree wasn't clean until I reran git status.\n\n"
+            "### Verdict\n\n"
+            "**Ready for merge** -- all findings addressed.\n\n"
+            "(reviewed at `sha123`)\n\n"
+            "Note: this isn't ready for python 2, but python 2 is deprecated."
+        ),
+    }
+    mock_inc = json.dumps({"comments": [incidental_negation_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_inc):
+        inc_ok, inc_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: incidental prose negation outside verdict section does not raise finding",
+            inc_ok and inc_issues == [],
+        )
+    check(
+        "classify_verdict: incidental prose negation outside verdict section returns clean",
+        checker.classify_verdict(incidental_negation_comment["body"]) == "clean",
+    )
+    check(
+        "classify_verdict: unmarked prose rejection in verdict paragraph returns not-clean",
+        checker.classify_verdict(non_head_prose_round1["body"]) == "not-clean",
+    )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

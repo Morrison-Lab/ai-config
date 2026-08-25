@@ -684,7 +684,7 @@ def _sentence_remainder(text: str, start: int) -> str:
 
 
 def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
-    """Return True if match is marked on its line or located under a Verdict heading."""
+    """Return True if match is marked on its line or located in the Verdict section paragraph."""
     line_start = scan.rfind("\n", 0, match_start) + 1
     if BARE_CLEAN_MARKED.search(scan[line_start:match_start]):
         return True
@@ -694,7 +694,9 @@ def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
             last_verdict = m.start()
     if last_verdict != -1:
         between = scan[last_verdict:match_start]
-        if not list(re.finditer(r"\n[ \t]*#{1,4}[ \t]+(?!verdict\b)", between, re.IGNORECASE)):
+        after_header = re.sub(r"^\s*#{1,4}\s*verdict\b\s*", "", between, flags=re.IGNORECASE)
+        # Bounded by the immediate verdict paragraph (no blank line or header between verdict and match)
+        if not re.search(r"\n\s*\n", after_header) and not re.search(r"\n[ \t]*#{1,4}[ \t]+", after_header):
             return True
     return False
 
@@ -971,9 +973,8 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-                if pat in BARE_NOT_CLEAN_PATTERNS and "clean|approved|ready" not in pat:
-                    line_start = scan_body.rfind("\n", 0, match.start()) + 1
-                    if not BARE_CLEAN_MARKED.search(scan_body[line_start:match.start()]):
+                if pat in BARE_NOT_CLEAN_PATTERNS:
+                    if not _is_marked_or_in_verdict_section(scan_body, match.start()):
                         continue
                 prefix = scan_body[max(0, match.start() - 25):match.start()]
                 if NOT_CLEAN_NEGATION_PREFIX.search(prefix):

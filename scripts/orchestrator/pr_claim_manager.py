@@ -219,7 +219,7 @@ class PRClaimManager:
         lines = [line.strip() for line in output.splitlines() if line.strip()]
         blocking_reasons = []
         for line in lines:
-            if line.startswith("- "):
+            if line.startswith("- ") and not line.startswith("- NOTE:"):
                 blocking_reasons.append(line[2:])
         reason = "; ".join(blocking_reasons) if blocking_reasons else (lines[-1] if lines else "PR is not clean")
         return False, reason

@@ -1154,10 +1154,12 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertEqual(call_args[2], "2112")
         self.assertEqual(call_args[3:], ["-R", "Morrison-Lab/ai-config"])
 
-        # 2. Not clean PR with blocking bullet points parses reasons
+        # 2. Not clean PR with blocking bullet points parses reasons (excluding informational NOTEs)
         not_clean_output = (
             "Checking ARDI / fully-clean status for Morrison-Lab/ai-config#2112...\n"
             "PR #2112: state=OPEN, HEAD=c1427642\n"
+            "Notes:\n"
+            "  - NOTE: Review from Claude has a format the verdict classifier cannot read\n"
             "PR is NOT fully clean:\n"
             "  - Latest verdict-bearing review statement is NOT clean\n"
             "  - Check 'validate' failed with conclusion=FAILURE\n"
@@ -1167,6 +1169,7 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("Latest verdict-bearing review statement is NOT clean", reason)
         self.assertIn("Check 'validate' failed with conclusion=FAILURE", reason)
+        self.assertNotIn("NOTE:", reason)
 
         # 3. Usage or repo resolution error (exit 2) fails closed
         mgr._run_cmd = MagicMock(return_value=(2, "", "Repository could not be resolved"))

@@ -684,6 +684,10 @@ class ReviewerSubagent(BaseSubagent):
                     verdict = "NEEDS_WORK"
                     is_clean = False
                     findings.append({"level": "WARN", "message": resp.content[:300]})
+            else:
+                verdict = "BLOCKED"
+                is_clean = False
+                findings.append({"level": "ERROR", "message": f"Adversarial reviewer model invocation failed: {resp.error or 'Empty response'}"})
 
         # Post adversarial review comment to GitHub PR if pr_number is in payload
         pr_number = task.payload.get("pr_number")
@@ -710,7 +714,7 @@ class ReviewerSubagent(BaseSubagent):
                         f"_Posted by Claude Code (AI agent) --- not written by a human._"
                     )
                 cmd_pr.extend(["--body", review_body])
-                proc = subprocess.run(cmd_pr, capture_output=True, text=True, check=False)
+                proc = subprocess.run(cmd_pr, capture_output=True, text=True, check=False, timeout=30)
                 if proc.returncode != 0:
                     logger.warning("Failed to post adversarial review comment to PR #%s (exit %d): %s", pr_number, proc.returncode, proc.stderr.strip())
             except Exception as exc:

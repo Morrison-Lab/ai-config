@@ -202,7 +202,7 @@ class PRClaimManager:
     def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
         """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
         effective_repo = self.get_effective_repo_slug(repo_slug)
-        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,author,headRefOid"]
+        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments,headRefOid"]
         if effective_repo:
             cmd.extend(["-R", effective_repo])
 
@@ -226,40 +226,53 @@ class PRClaimManager:
             if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
                 return False, f"Check '{name}' failed with conclusion={conclusion}"
 
-        # 3. Check for changes requested across all GitHub reviews
+        # 2. Check for changes requested across all GitHub reviews
         reviews = data.get("reviews", [])
         has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
         comments = data.get("comments", [])
-        claude_reviews = [
-            c for c in comments
-            if (c.get("author") or {}).get("login") in ["github-actions", "claude", "claude[bot]"]
-            and ("claude finished review" in c.get("body", "").lower()
-                 or "**claude finished" in c.get("body", "").lower())
-        ]
+        claude_reviews = []
+        for c in comments:
+            author_login = (c.get("author") or {}).get("login", "")
+            if author_login not in ["github-actions", "github-actions[bot]", "claude", "claude[bot]"]:
+                continue
+            raw_c_body = (c.get("body") or "").replace("\u2014", "--").replace("\u2013", "--")
+            # Strip HTML comments and code blocks before checking trigger phrase to prevent comment spoofing
+            clean_c_body = re.sub(r"<!--[\s\S]*?-->", " ", raw_c_body)
+            clean_c_body = re.sub(r"```[\s\S]*?```", " ", clean_c_body)
+            if "claude finished review" in clean_c_body.lower() or "**claude finished" in clean_c_body.lower():
+                claude_reviews.append(c)
+
         if not claude_reviews:
             return False, "No independent external Claude Code Review found on PR"
 
         body = claude_reviews[-1].get("body", "")
         head_oid = (data.get("headRefOid") or "").strip()
 
-        # Check for commit-staleness: if the review comment cites a specific reviewed SHA,
-        # verify that it matches the current PR headRefOid.
-        reviewed_commit_match = re.search(r"reviewed\s+commit:\s*([0-9a-f]{7,40})", body, re.IGNORECASE)
-        if reviewed_commit_match and head_oid:
-            reviewed_sha = reviewed_commit_match.group(1).lower()
-            if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
-                return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
-
+        # Strip HTML comments and fenced code blocks from review body
         lower_body = (
             body.lower()
             .replace("\u2014", "--")
             .replace("\u2013", "--")
         )
-        # Strip fenced code blocks to prevent code examples or quoted text from spoofing headings
-        stripped_body = re.sub(r"```[\s\S]*?```", " ", lower_body)
+        stripped_body = re.sub(r"<!--[\s\S]*?-->", " ", lower_body)
+        stripped_body = re.sub(r"```[\s\S]*?```", " ", stripped_body)
+
+        # Check for commit-staleness: if headRefOid is present, require that the review comment
+        # cites a reviewed commit SHA matching the current PR headRefOid.
+        reviewed_commit_match = re.search(
+            r"(?:reviewed\s+(?:commit(?::)?|at\b(?::)?)|commit:)\s*(?:\*\*|__)?\s*`?([0-9a-f]{7,40})`?",
+            body,
+            re.IGNORECASE,
+        )
+        if head_oid:
+            if not reviewed_commit_match:
+                return False, "Latest AI review does not cite the reviewed commit SHA (cannot verify freshness against PR head)"
+            reviewed_sha = reviewed_commit_match.group(1).lower()
+            if not head_oid.lower().startswith(reviewed_sha) and not reviewed_sha.startswith(head_oid.lower()):
+                return False, f"Latest AI review is stale (reviewed commit {reviewed_sha}, but current head is {head_oid[:len(reviewed_sha)]})"
 
         # 1. Check for not-clean / blocking patterns throughout the ENTIRE stripped review body
         not_clean_patterns = [
@@ -307,8 +320,7 @@ class PRClaimManager:
         # Any other un-allowlisted prose in the verdict section fails closed
         benign_trailer_pattern = re.compile(
             r"^(?:"
-            r"reviewed\s+commit:\s*[0-9a-f]{7,40}"
-            r"|commit:\s*[0-9a-f]{7,40}"
+            r"(?:\*\*|__)?\s*(?:reviewed\s+(?:commit(?::)?|at\b(?::)?)|commit:)\s*(?:\*\*|__)?\s*`?[0-9a-f]{7,40}`?"
             r"|_(?:posted\s+by|automated\s+review)\b.*?_"
             r"|💰\s*\*\*cost:\*\*.*"
             r"|<!--.*-->"

@@ -992,7 +992,8 @@ Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for c
 "Delegate first" means the current window, not abandoning Claude permanently.
 
 **`opencode` and `openrouter` expand the non-metered and alternative frontier routes:**
-- **OpenCode**: Reaches an active OpenCode subscription, a free hosted gateway (`opencode Zen`), and a fully local tier (`ollama`). Its free/local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
+- **OpenCode**: Reaches an active OpenCode subscription, a free hosted gateway (`opencode Zen`), and a fully local tier (`ollama`).
+  Its free/local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
 - **OpenRouter**: Backed by an active OpenRouter subscription / API key, reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom script runners.
 - **Local tier**: The local (`ollama/*`) tier is the only destination that keeps the payload on the machine for sensitive data.
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.

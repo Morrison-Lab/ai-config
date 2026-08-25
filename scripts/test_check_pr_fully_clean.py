@@ -466,6 +466,26 @@ def main() -> int:
         checker.classify_verdict(needs_work_none_comment["body"]) == "clean",
     )
 
+    # Regression (PR #2180 round 13): '### Findings\n\nNo new high-confidence bugs...' evaluates to clean
+    findings_none_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "### Findings\n\n"
+            "No new high-confidence bugs or CLAUDE.md violations found in this round's diff.\n\n"
+            "### Verdict\n\n"
+            "**Ready for merge** -- all findings addressed.\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_fn = json.dumps({"comments": [findings_none_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_fn):
+        fn_ok, fn_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: '### Findings\\n\\nNo new...' evaluates to clean",
+            fn_ok and fn_issues == [],
+        )
+
     # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
     # inside a code span or double-quotes must NOT be read as raising a finding.
     # Both were live false positives on PRs about the review tooling itself.

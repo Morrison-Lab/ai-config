@@ -568,7 +568,7 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
-    r"^[ \t]*[:.\-]*[ \t]*(?:none\b|no\b|nothing\b|0\b|n/a\b)", re.IGNORECASE
+    r"^\s*[:.\-]*\s*(?:none\b|no\b|nothing\b|0\b|n/a\b)", re.IGNORECASE
 )
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:

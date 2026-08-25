@@ -5,13 +5,13 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
 
 ## Functional Requirements
 1. **Engine Selection & Auto-Detection**:
-   - Support explicit `--engine` selection (`antigravity` / `agy`, `claude`, `codex`).
-   - If `--engine auto` (or omitted), detect available installed CLIs in priority order (`agy` -> `claude` -> `codex`).
+   - Support explicit `--engine` selection (`claude`, `codex`, `opencode`, `antigravity`).
+   - If `--engine auto` (or omitted), detect available installed CLIs in priority order (`claude` -> `codex` -> `opencode` -> `agy`).
    - Allow optional `--model` flag to pass specific model strings to the target engine.
 2. **Context & Guideline Extraction**:
    - Extract git diff against detected PR base or merge-base with `origin/main` / `main`.
-   - Incorporate repository guidelines (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) into the prompt.
-   - Enforce structured adversarial review output (Summary Verdict, Critical Findings, Observations, Verification Steps).
+   - Incorporate universal repository guidelines (`AGENTS.md`) into the prompt.
+   - Enforce structured adversarial review output (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
 3. **Forge PR Posting & Attribution Compliance**:
    - When `--post` is specified, post review verdict/comments directly to GitHub PR via `gh pr review` / `gh pr comment`.
    - Enforce lab-wide disclosure policy (`_Posted by <Engine> (AI agent) --- not written by a human._`) without robot emojis.

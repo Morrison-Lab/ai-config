@@ -41,15 +41,62 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("### Local Adversarial AI Review (OpenAI Codex)", formatted)
 
     def test_validate_review_output(self):
-        valid = "### Summary Verdict\nAPPROVE\n\n### Critical Findings\nNone.\n\n### Verification Steps\nPassed."
+        valid = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations & Non-Blocking Suggestions\n"
+            "Looks clean and well-structured.\n\n"
+            "### Verification Steps\n"
+            "- All unit tests passed.\n"
+            "Reviewed-Commit: 12345678"
+        )
         self.assertTrue(reviewer.validate_review_output(valid))
 
-        # Rejects missing verdict
-        no_verdict = "### Overview\nLooks good.\n\n### Critical Findings\nNone."
-        self.assertFalse(reviewer.validate_review_output(no_verdict))
+        # Rejects unapproved / contradictory
+        unapproved = (
+            "### Summary Verdict\n"
+            "Verdict: UNAPPROVED\n\n"
+            "### Critical Findings\n"
+            "1. Major breaking regression in parser.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone."
+        )
+        self.assertFalse(reviewer.validate_review_output(unapproved))
+
+        # Rejects contradictory APPROVE with critical blocker
+        contradictory = (
+            "### Summary Verdict\n"
+            "Verdict: APPROVE\n\n"
+            "### Critical Findings\n"
+            "1. Severe blocking bug in execution pipeline.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone."
+        )
+        self.assertFalse(reviewer.validate_review_output(contradictory))
+
+        # Rejects missing required section (missing Verification Steps)
+        missing_section = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "None."
+        )
+        self.assertFalse(reviewer.validate_review_output(missing_section))
 
         # Rejects refusal / quota error
-        refusal = "### Summary Verdict\nAPPROVE\n\n### Critical Findings\nNone.\nYou've hit your weekly limit."
+        refusal = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            "You've hit your weekly limit."
+        )
         self.assertFalse(reviewer.validate_review_output(refusal))
 
         # Rejects empty
@@ -87,10 +134,15 @@ class TestPrePushReview(unittest.TestCase):
         # Claude fails or quota exhausted
         mock_claude.return_value = None
         # Codex succeeds
-        mock_codex.return_value = "### Summary Verdict\nAPPROVE\n\n### Critical Findings\nNone."
+        mock_codex.return_value = (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nPassed."
+        )
 
         report, label = reviewer.execute_review("auto", "prompt text")
-        self.assertEqual(report, "### Summary Verdict\nAPPROVE\n\n### Critical Findings\nNone.")
+        self.assertEqual(report, mock_codex.return_value)
         self.assertEqual(label, "OpenAI Codex")
         mock_claude.assert_called_once()
         mock_codex.assert_called_once()

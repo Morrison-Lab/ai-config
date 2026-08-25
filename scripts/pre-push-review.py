@@ -104,30 +104,86 @@ def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tu
     return diff_res.stdout, label
 
 
+import re
+
+
 def get_repo_guidelines(root: str) -> str:
-    candidate_files = ["AGENTS.md", "GEMINI.md"]
-    guidelines = []
-    for fname in candidate_files:
-        p = os.path.join(root, fname)
-        if os.path.isfile(p):
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                    if content:
-                        guidelines.append(f"--- Repository Guidelines ({fname}) ---\n{content}")
-            except Exception as e:
-                print(f"Warning: could not read {p}: {e}", file=sys.stderr)
-    return "\n\n".join(guidelines)
+    """Load universal repository guidelines from AGENTS.md per instruction-layering rules."""
+    p = os.path.join(root, "AGENTS.md")
+    if os.path.isfile(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    return f"--- Repository Universal Guidelines (AGENTS.md) ---\n{content}"
+        except Exception as e:
+            print(f"Warning: could not read {p}: {e}", file=sys.stderr)
+    return ""
+
+
+def get_pr_head_sha(pr_number: int) -> Optional[str]:
+    """Get the remote head commit SHA for a GitHub PR."""
+    if not shutil.which("gh"):
+        return None
+    res = subprocess.run(
+        ["gh", "pr", "view", str(pr_number), "--json", "headRefOid"],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode == 0:
+        try:
+            data = json.loads(res.stdout)
+            return data.get("headRefOid")
+        except Exception:
+            return None
+    return None
 
 
 def validate_review_output(report: Optional[str]) -> bool:
     """Validate that review output conforms to structured adversarial review standards."""
     if not report or len(report.strip()) < 50:
         return False
-    has_verdict = "### Summary Verdict" in report and ("APPROVE" in report or "NEEDS WORK" in report)
-    has_findings = "### Critical Findings" in report
-    if not (has_verdict and has_findings):
+
+    # Check for required section headings
+    required_sections = [
+        ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
+        ("Critical Findings", ["### Critical Findings", "## Critical Findings"]),
+        ("Observations", ["### Observations", "## Observations"]),
+        ("Verification Steps", ["### Verification Steps", "## Verification Steps", "### Verification", "## Verification"]),
+    ]
+    for section_name, patterns in required_sections:
+        if not any(pat in report for pat in patterns):
+            return False
+
+    # Check for anchored verdict
+    verdict_match = re.search(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", report)
+    if not verdict_match:
+        verdict_match = re.search(r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Changes requested)\.?\*\*", report)
+        if not verdict_match:
+            return False
+
+    verdict_text = verdict_match.group(0).upper()
+    is_approval = "APPROVE" in verdict_text or "READY FOR MERGE" in verdict_text
+    is_needs_work = "NEEDS WORK" in verdict_text or "CHANGES REQUESTED" in verdict_text or "UNAPPROVED" in verdict_text
+
+    if is_approval and is_needs_work:
         return False
+
+    # Check for contradictions in Critical Findings
+    findings_match = re.search(r"(?is)### Critical Findings\s*\n(.*?)(?=\n###|\Z)", report)
+    if findings_match:
+        findings_body = findings_match.group(1).strip()
+        has_blockers = any(
+            pat in findings_body.lower()
+            for pat in ["blocking bug", "critical finding", "regression", "1.", "severe", "must fix"]
+        )
+        has_none = any(
+            pat in findings_body.lower()
+            for pat in ["none", "no blocking", "clean", "zero critical", "n/a"]
+        )
+        if is_approval and has_blockers and not has_none:
+            return False
+
     refusal_patterns = [
         "hit your weekly limit",
         "prepayment credits depleted",
@@ -137,6 +193,7 @@ def validate_review_output(report: Optional[str]) -> bool:
     for pat in refusal_patterns:
         if pat in report.lower():
             return False
+
     return True
 
 
@@ -313,6 +370,24 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     """Post review report directly to GitHub PR via gh CLI."""
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
+    remote_sha = get_pr_head_sha(pr_number)
+    if commit_sha and remote_sha and commit_sha != remote_sha:
+        print(
+            f"Notice: Local commit ({commit_sha[:8]}) differs from remote PR head ({remote_sha[:8]}). "
+            "Posting as local PR comment note.",
+            file=sys.stderr,
+        )
+        res_comment = subprocess.run(
+            ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
+            capture_output=True,
+            text=True,
+        )
+        if res_comment.returncode == 0:
+            print(f"Successfully posted review note to PR #{pr_number} via `gh pr comment`.")
+            return True
+        log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
+        return False
+
     res = subprocess.run(
         ["gh", "pr", "review", str(pr_number), "--comment", "--body", formatted_body],
         capture_output=True,
@@ -355,11 +430,14 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str) -> str:
         "1. Be adversarial: actively search for regressions, edge-case failures, schema mismatches, syntax errors, omitted instances, and breaking contract changes.",
         "2. Do NOT rubber-stamp. Scrutinize whether any other files or callers suffer from identical bugs.",
         "3. Review the code strictly on what the diff and codebase state, not on assumptions.",
-        "4. Structure your response with:",
-        "   - ### Summary Verdict (APPROVE vs NEEDS WORK with reason)",
-        "   - ### Critical Findings (blocking bugs / regressions)",
+        "4. Structure your response strictly with:",
+        "   - ### Summary Verdict",
+        "     Verdict: Ready for merge (or Verdict: Needs work with concise reason)",
+        "   - ### Critical Findings",
+        "     None. (or numbered list of blocking bugs / contract regressions)",
         "   - ### Observations & Non-Blocking Suggestions",
         "   - ### Verification Steps",
+        f"   Reviewed-Commit: {head_sha}",
     ]
 
     if guidelines:
@@ -388,7 +466,7 @@ def main():
         "--engine",
         choices=["auto", "antigravity", "agy", "claude", "codex", "opencode"],
         default="auto",
-        help="AI engine: 'auto' (default: agy -> claude -> codex -> opencode), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), or specific engine name",
     )
     parser.add_argument(
         "--model",

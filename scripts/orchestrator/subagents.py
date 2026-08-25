@@ -819,7 +819,7 @@ class TesterSubagent(BaseSubagent):
         if passed and pr_number and (has_real_diff or dry_run):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
                 pr_number=pr_number,
-                reviewers=["d-morrison"],
+                reviewers=["the repository owner"],
                 repo_slug=repo_slug,
                 dry_run=dry_run,
             )

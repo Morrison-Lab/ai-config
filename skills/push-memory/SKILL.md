@@ -86,7 +86,7 @@ These are exactly
    place and match the file's voice — and decide your delivery path now, since
    reading and writing both follow it. In a **web/remote session, or with no
    usable local `ai-config` checkout**, use the GitHub file API (**Path A**,
-   step 4): read with `mcp__github__get_file_contents` (`owner: d-morrison`,
+   step 4): read with `mcp__github__get_file_contents` (`owner: the repository owner`,
    `repo: ai-config`). With a **clean local checkout you can branch in**, use a
    local worktree (**Path B**, step 4): read the file there.
 
@@ -103,7 +103,7 @@ These are exactly
    touches no working tree.
 
    1. Branch off `main`: `mcp__github__create_branch`
-      (`owner: d-morrison`, `repo: ai-config`, `from_branch: main`,
+      (`owner: the repository owner`, `repo: ai-config`, `from_branch: main`,
       `branch: memory/<slug>`). In a web session pinned to its assigned branch,
       use that assigned branch name instead.
    2. Read each target with `mcp__github__get_file_contents` (keep the returned

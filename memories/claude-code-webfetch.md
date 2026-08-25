@@ -10,7 +10,8 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
 
 
 ## WebFetch answers with a SUMMARY, so read the source when the answer is an exact literal
-- `WebFetch` runs a prompt against the fetched page using a small fast model.
+- `WebFetch` parses HTML into Markdown via `TurndownService` (capped at 100,000 characters)
+  and runs `applyPromptToMarkdown` using `queryHaiku` (which resolves dynamically to the harness's default Haiku model) to synthesize an answer.
   For "what does this do" that is the point.
   For "what exactly does it write" it is a paraphrase of the thing you asked
   for, and a paraphrase can silently change a character.
@@ -32,6 +33,14 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   The rendered page was the right artifact; the **summarizer** was the
   adjacent one, and asking it to "quote exactly" does not make it a
   transcription tool.
+- **Preflight domain safety and egress checks (`api.anthropic.com/api/web/domain_info`)**:
+  Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
+  Before fetching, `WebFetch` checks domain safety against Anthropic's preflight endpoint
+  (cached for 5 minutes, 128 domain LRU).
+  Domains in `PREAPPROVED_HOSTS` (`docs.python.org`, `go.dev`, `react.dev`, `en.cppreference.com`, `agentskills.io`, etc.)
+  or sessions with `skipWebFetchPreflight` bypass this step.
+  Redirects are capped at 10 hops and restricted to same-origin (or www-prefix changes).
+  Endpoints and allowed host lists are server-configured and subject to provider change.
 - **Do:** raw-fetch the source (per the section below) when the answer is a
   pattern list, a default value, a flag name, a version string, or anything
   else you are about to copy character-for-character.

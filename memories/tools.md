@@ -24,7 +24,7 @@ codex plugin add <plugin>@<new-name> --json
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
 This sequence preserves the source repository while replacing only its stale local registration.
 
-(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `d-morrison` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
+(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
 
 ## Julia in Claude Code cloud / web sessions
 - To install Julia, prefer downloading the official binary tarball from

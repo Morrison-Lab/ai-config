@@ -2,7 +2,7 @@
 """Verify data-locality guarantees for local Ollama delegation via OpenCode.
 
 Verifies:
-1. Direct loopback endpoint (literal loopback host, proxies disabled, redirects disabled).
+1. Direct loopback endpoint (literal loopback host, http/https scheme, proxies disabled, redirects disabled).
 2. Live daemon local-only state (checked directly against running Ollama daemon /api/status, requiring cloud.disabled == true).
 3. Target model local residency on-device (checked against Ollama /api/tags, refusing remote/cloud models).
 """
@@ -57,10 +57,14 @@ def verify_locality(
     # 1. Read opencode configuration
     try:
         if config_json is None:
-            raw = subprocess.run(
+            proc = subprocess.run(
                 ["opencode", "debug", "config"],
-                capture_output=True, text=True, check=True,
-            ).stdout
+                capture_output=True, text=True, timeout=15,
+            )
+            if proc.returncode != 0:
+                err = proc.stderr.strip() or proc.stdout.strip()
+                return False, f"opencode debug config failed (exit {proc.returncode}): {err}"
+            raw = proc.stdout
         else:
             raw = config_json
         data = json.loads(raw)
@@ -73,6 +77,9 @@ def verify_locality(
 
     # 2. Verify literal loopback endpoint
     parsed_url = urlparse(url)
+    if parsed_url.scheme not in ("http", "https"):
+        return False, f"Unsupported scheme {parsed_url.scheme!r} in baseURL {url!r}; only 'http' and 'https' are supported."
+
     host = parsed_url.hostname
     if not host:
         return False, f"No host in ollama baseURL {url!r}"
@@ -140,8 +147,10 @@ def verify_locality(
             continue
         if m.get("remote_model") or m.get("remote_host"):
             remote_models.add(name)
-        elif m.get("digest") and isinstance(m.get("size"), (int, float)) and m.get("size", 0) > 0:
-            local_models.append(name)
+        else:
+            sz = m.get("size")
+            if m.get("digest") and type(sz) in (int, float) and sz > 0:
+                local_models.append(name)
 
     matched = any(m == clean_target or m == target_tag for m in local_models)
     if not matched:

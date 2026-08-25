@@ -60,6 +60,20 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Cannot read", msg)
 
+    def test_unsupported_url_scheme_refuses(self):
+        cfg = json.dumps({
+            "provider": {
+                "ollama": {
+                    "options": {
+                        "baseURL": "ftp://localhost:11434/v1"
+                    }
+                }
+            }
+        })
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", cfg)
+        self.assertFalse(ok)
+        self.assertIn("Unsupported scheme 'ftp'", msg)
+
     def test_non_literal_loopback_host_refuses(self):
         cfg = json.dumps({
             "provider": {
@@ -138,7 +152,7 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
     @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_malformed_tags_elements_handled_defensively(self, mock_getaddrinfo, mock_open):
+    def test_malformed_tags_elements_and_boolean_size_handled_defensively(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
         status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
@@ -149,7 +163,7 @@ class TestCheckOllamaLocality(unittest.TestCase):
             "models": [
                 "string_entry_not_dict",
                 {"name": "missing_size", "digest": "sha256:123"},
-                {"name": "invalid_size", "digest": "sha256:456", "size": "not_int"},
+                {"name": "boolean_size", "digest": "sha256:456", "size": True},
             ]
         }).encode("utf-8")
         tags_resp = MagicMock()

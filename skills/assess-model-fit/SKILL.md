@@ -23,9 +23,9 @@ or **executable mode** (analyze a task and auto-recommend).
 1. **Identify the current model.**
    Check your session or settings.
    Common tiers:
-   - Tier 1: Fable 5, Opus 4.8, Gemini Pro
-   - Tier 2: Sonnet 5 / 4.6, Gemini Flash, Codex
-   - Tier 3: Haiku 4.5, Gemini Flash-Lite
+   - Tier 1: Fable 5 (`claude-fable-5`), Opus 4.8 (`claude-opus-4-8`)
+   - Tier 2: Sonnet 4.6 / 5 (`claude-sonnet-4-6`)
+   - Tier 3: Haiku 4.5 (`claude-haiku-4-5-20251001`)
 
 2. **Score your task against these criteria.**
    A task needs escalation or orchestrator-worker delegation if it hits any of these:

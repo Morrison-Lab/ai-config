@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Citadel-inspired unified preflight and health check diagnostic for ai-config.
+"""Unified preflight and health check diagnostic for ai-config.
 
 Inspects repository health, git worktree status, consumer symlinks, generated
 wrapper freshness, hook catalogs, context budgets, and submodule integrity in
@@ -72,13 +72,13 @@ def check_git_status() -> Dict[str, Any]:
 
 def check_submodules() -> Dict[str, Any]:
     """Check if git submodules (e.g. shared/sembr-skills) are initialized."""
-    code, out, _ = run_cmd(["git", "submodule", "status"])
+    code, out, err = run_cmd(["git", "submodule", "status"])
     if code != 0:
         return {
             "name": "submodules",
-            "ok": True,
-            "status": "OK",
-            "details": "No submodules configured or git submodule query bypassed.",
+            "ok": False,
+            "status": "FAIL",
+            "details": f"git submodule status failed: {err or out}",
         }
 
     uninitialized = []
@@ -139,6 +139,24 @@ def check_hook_catalog() -> Dict[str, Any]:
     }
 
 
+def check_context_closure() -> Dict[str, Any]:
+    """Check if CLAUDE.md context closure budget passes."""
+    code, out, err = run_cmd([sys.executable, str(REPO_ROOT / "scripts" / "check-context-closure.py")])
+    if code == 0:
+        return {
+            "name": "context_budget",
+            "ok": True,
+            "status": "OK",
+            "details": "Context closure character and fragment budgets are satisfied.",
+        }
+    return {
+        "name": "context_budget",
+        "ok": False,
+        "status": "FAIL",
+        "details": f"Context budget exceeded: {err or out}",
+    }
+
+
 def check_consumer_installs(fix: bool = False) -> Dict[str, Any]:
     """Check installed consumer symlinks in ~/.claude or $CLAUDE_HOME."""
     cmd = [sys.executable, str(REPO_ROOT / "scripts" / "check-install.py"), "--strict"]
@@ -170,6 +188,7 @@ def run_doctor(fix: bool = False) -> Dict[str, Any]:
         check_submodules(),
         check_codex_wrappers(),
         check_hook_catalog(),
+        check_context_closure(),
         check_consumer_installs(fix=fix),
     ]
 

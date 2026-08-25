@@ -58,6 +58,8 @@ jobs:
           python3 scripts/test_check_install.py
           python3 scripts/test_check_harness_installs.py
           python3 scripts/test_check_harness_ignores.py
+      - name: Run Ollama locality verification tests
+        run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run plugin-overlap detector tests

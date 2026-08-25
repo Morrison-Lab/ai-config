@@ -187,17 +187,19 @@ opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 
 Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
 
-**Before any data-triggered work, verify endpoint, daemon local mode, and model residency.**
-The routing rule above turns on where `ollama/*` actually points, whether cloud offloading is disabled, and whether the targeted model is present on-device.
-Run [`scripts/check-ollama-locality.py`](../../scripts/check-ollama-locality.py) with the target model:
+Run `check-ollama-locality.py` (available in repository `scripts/` and packaged under `skills/delegate-to-opencode/scripts/`):
 
 ```bash
+# In ai-config workspace:
 python3 scripts/check-ollama-locality.py "qwen2.5-coder:3b"
+
+# In consumer repository sessions (using installed skill bundle):
+python3 ~/.claude/skills/delegate-to-opencode/scripts/check-ollama-locality.py "qwen2.5-coder:3b"
 ```
 
 It exits 0 and prints the confirmation only when:
 1. Every address `options.baseURL` resolves to is loopback (`127.0.0.1` or `::1`).
-2. Local-only mode is verified (`OLLAMA_NO_CLOUD=1` in environment or `disable_ollama_cloud: true` in config).
+2. Local-only mode is verified (`OLLAMA_NO_CLOUD=1` in daemon environment or `disable_ollama_cloud: true` in `~/.ollama/server.json`).
 3. The specified target model is strictly locally resident in `/api/tags` (refusing any remote-backed, cloud, or absent models).
 
 Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unverified local-only mode, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.

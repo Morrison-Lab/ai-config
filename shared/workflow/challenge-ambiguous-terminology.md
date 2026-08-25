@@ -19,7 +19,7 @@ resolve it and note the correction; when it genuinely depends on the author's
 intent, ask rather than assume.
 
 **Cross-repo citations have a merge-order trap.**
-Citing a specific file path or construct in another repo is itself unverifiable if the PR that adds it hasn't merged yet --- and a link checker will not save you, as the measured cases below show: a backticked path is not a link, so nothing crawls it.
+Citing a specific file path or construct in another repo is itself unverifiable if the PR that adds it hasn't merged yet --- and a link checker will not save you, on any case measured here: a backticked path is not a link, so nothing crawls it.
 
 Don't fix this by promising a future edit ("cite it generically for now, then
 tighten the citation once it merges") --- that's still a citation that needs
@@ -70,7 +70,8 @@ So this is the one trap in this section where verification effort runs the wrong
 (Measured on [ai-config#2207](https://github.com/Morrison-Lab/ai-config/pull/2207), whose prose described a constant in `hooks/require-agent-disclosure.py` in the present tense.
 That constant exists only on [#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), open at the time, and its introducing commit was an ancestor of neither `main` nor the citing branch.
 Twelve pre-push adversarial rounds ran on that PR without raising it, and the round that did raise it had itself executed the regex, the commit ancestry, and the timestamps against `#2185` --- all correct, and all about the wrong branch.
-Two separately-dispatched same-vendor passes then raised it nine minutes apart, once the diff was read as something about to become `main`.)
+Two separately-dispatched same-vendor passes then raised it nine minutes apart, once the diff was read as something about to become `main`: a session verification pass at `05:27:25Z` (comment `5405924657`) and the repo's own `claude-review` at `05:36:44Z`.
+Naming both matters, because the *later* `claude-review` round at `05:46:39Z` reports zero findings and **Ready for merge** --- it confirmed the fix rather than raising anything, so a reader comparing only the two `claude-review` comments finds one raise, not two.)
 
 **A cross-repo citation can also name the wrong repository, with nothing
 pending and nothing to wait for.**

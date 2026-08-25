@@ -295,6 +295,8 @@ This grants no merge authority: the strict merge policy below still applies.
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
   Under `mwc`, a PR must be fully clean across CI and review (see
   [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  A clean automated Claude review evaluating the current HEAD commit is strictly required for merging with `mwc`.
+  A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
 

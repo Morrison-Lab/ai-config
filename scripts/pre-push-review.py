@@ -151,9 +151,9 @@ def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
 
     print("Running local adversarial review via Google Antigravity (plan mode)...")
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
-        print("Notice: Antigravity review timed out after 180s.", file=sys.stderr)
+        print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: Antigravity execution failed: {e}", file=sys.stderr)
@@ -178,9 +178,9 @@ def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
 
     print("Running local adversarial review via Claude CLI (plan mode)...")
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
-        print("Notice: Claude review timed out after 180s.", file=sys.stderr)
+        print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: Claude execution failed: {e}", file=sys.stderr)
@@ -206,9 +206,9 @@ def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
     cmd.append(prompt)
 
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
-        print("Notice: Codex review timed out after 180s.", file=sys.stderr)
+        print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: Codex execution failed: {e}", file=sys.stderr)
@@ -234,9 +234,9 @@ def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
     cmd.append(prompt)
 
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
-        print("Notice: OpenCode review timed out after 180s.", file=sys.stderr)
+        print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)

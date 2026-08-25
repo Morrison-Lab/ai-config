@@ -102,11 +102,13 @@ so this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
 - **Do:** quote the harness paste of the child's final message when it is
-  present; otherwise fetch the child transcript via cursor-cloud
-  `batch-fetch-details` (`includeTranscripts: true`) using `cloudAgentBcId`
-  and quote the last assistant `text` that carries
-  Summary / Findings / Verdict --- not the last assistant message (which may
-  be thinking or `tool_calls` with empty `text`), and not the whole file.
+  present; otherwise call cursor-cloud `batch-fetch-details` with
+  `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`, then quote
+  the last assistant `text` that carries Summary / Findings / Verdict ---
+  not the last assistant message (which may be thinking or `tool_calls`
+  with empty `text`), and not the whole file.
+  `cloudAgentBcId` is a field on the Task JSON `tool_result`; `bcIds` is
+  the tool parameter.
 - **Don't:** treat the parent thinking "the reviewer approved" as the report,
   post the identity-only JSON `tool_result` as the review, quote the whole
   `transcript.json`, or paraphrase a missing body as Ready for merge.

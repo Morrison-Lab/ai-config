@@ -121,10 +121,9 @@ The posted comment was author-assembled, labeled
 them in a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
 The parent JSON `tool_result` carried identity fields and no review body.
-On Cursor Cloud that identity-only return is expected; quote the harness
-paste of the child's final message, or the last assistant message in the
-fetched child transcript, before posting
-(see [`memories/cursor.md`](../../memories/cursor.md)).
+On Cursor Cloud that identity-only return is expected; how to obtain the
+child's structured report is in
+[`memories/cursor.md`](../../memories/cursor.md).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,

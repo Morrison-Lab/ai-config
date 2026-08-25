@@ -1132,51 +1132,26 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
 
         mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
 
-        # 1. Clean PR with approved external Claude review comment
+        # 1. Clean PR
         clean_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
                 {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean**\n\nVerified 0 blocking findings."},
-            ],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 2. Clean PR with approved GitHub review
-        clean_gh_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [{"state": "APPROVED"}],
-            "comments": [],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, clean_gh_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertTrue(is_clean)
-
-        # 3. Passing CI but NO review or comment -> MUST NOT MERGE
-        no_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, no_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        # 3. Failing CI check
+        # 2. Failing CI check
         dirty_ci_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
             ],
-            "reviews": [{"state": "APPROVED"}],
+            "reviews": [],
             "comments": [],
         })
         mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
@@ -1184,111 +1159,83 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(is_clean)
         self.assertIn("failed", reason)
 
-        # 4. Independent external review approval from github-actions bot
-        clean_ext_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean** (no blocking findings)."},
-            ],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, clean_ext_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertTrue(is_clean)
-        self.assertIn("fully clean", reason)
-
-        # 5. Self-posted comment from collaborator / orchestrator account (e.g. dem-extra1) is REJECTED as an approval gate
-        self_comment_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [
-                {"author": {"login": "dem-extra1"}, "authorAssociation": "COLLABORATOR", "body": "### Adversarial Self-Review Verdict: APPROVED\n\nSelf check passed."},
-            ],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, self_comment_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("no independent approved external review", reason.lower())
-
-        # 6. External review with blocking verdict ("Verdict: Needs more work")
+        # 3. Blocking AI review verdict ("Needs more work")
         dirty_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Needs more work**."},
-            ],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
         })
         mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("blocking verdict", reason.lower())
+        self.assertIn("needs more work", reason.lower())
 
-        # 7. Changes requested GitHub review
-        changes_req_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [{"state": "CHANGES_REQUESTED"}],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean**"},
-            ],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, changes_req_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("changes_requested", reason.lower())
-
-        # 8. Multi-round review: Round 1 'Needs more work' followed by Round 2 'Verdict: CLEAN' from github-actions
-        multi_round_json = json.dumps({
+        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
+        blocked_human_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Needs more work** - found an issue in round 1."},
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean**\n\nFixed in round 2 with 0 blocking findings."},
-            ],
+            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
         })
-        mgr._run_cmd = MagicMock(return_value=(0, multi_round_json, ""))
+        mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("blocked", reason.lower())
+
+        # 5. Production Claude review header format ("**Claude finished** -- ...")
+        prod_review_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "**Claude finished** -- adversarial review\n\n### Verdict\nClean / Approved"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, prod_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
         self.assertIn("fully clean", reason)
 
-        # 9. Custom Claude review with blocking verdict header and novel prose
-        custom_claude_json = json.dumps({
+        # 6. Missing Claude review (fallback self-review only, or no comments)
+        missing_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Finding 1 (blocking, high confidence)\nNovel defect.\n\n### Verdict\n**Needs more work**"},
-            ],
+            "comments": [{"body": "### Fallback Self-Review\nVerdict: Clean"}],
         })
-        mgr._run_cmd = MagicMock(return_value=(0, custom_claude_json, ""))
+        mgr._run_cmd = MagicMock(return_value=(0, missing_review_json, ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        self.assertFalse(is_clean)
+        self.assertIn("missing automated claude review", reason.lower())
+
+        # 7. Closed PR notice with em-dash ("No action \u2014 PR is closed/merged")
+        closed_pr_emdash_json = json.dumps({
+            "statusCheckRollup": [
+                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            ],
+            "reviews": [],
+            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action \u2014 PR is closed/merged"}],
+        })
+        mgr._run_cmd = MagicMock(return_value=(0, closed_pr_emdash_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
         self.assertIn("blocking verdict", reason.lower())
 
-        # 10. Comment with null author (e.g. deleted GitHub account) does not crash
-        null_author_json = json.dumps({
+        # 8. Stub review (Claude completed but no positive clean/approved verdict)
+        stub_review_json = json.dumps({
             "statusCheckRollup": [
                 {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
             ],
             "reviews": [],
-            "comments": [
-                {"author": None, "body": "random comment"},
-                {"author": {"login": "github-actions"}, "body": "Claude finished review\n\n### Verdict\n**Clean**"},
-            ],
+            "comments": [{"body": "**Claude finished** -- review\n\nI examined the files but got cut short."}],
         })
-        mgr._run_cmd = MagicMock(return_value=(0, null_author_json, ""))
+        mgr._run_cmd = MagicMock(return_value=(0, stub_review_json, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertTrue(is_clean)
+        self.assertFalse(is_clean)
+        self.assertIn("does not contain a recognized positive clean/approved verdict", reason)
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser

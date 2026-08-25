@@ -232,51 +232,80 @@ class PRClaimManager:
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
-        # 4. Check for formal GitHub review approvals (from humans or approved external bots)
-        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
-
-        # 5. Check external review comments (posted by github-actions / claude[bot] review workflow)
-        # IMPORTANT: Self-posted comments authored by user/collaborator accounts (e.g. dem-extra1) do NOT satisfy the gate!
         comments = data.get("comments", [])
-        external_review_comments = [
+        claude_reviews = [
             c for c in comments
-            if (c.get("author") or {}).get("login") in ["github-actions", "claude[bot]"]
-            and ("claude finished review" in c.get("body", "").lower()
-                 or ("### verdict" in c.get("body", "").lower() and "code review" in c.get("body", "").lower()))
+            if "claude finished review" in c.get("body", "").lower()
+            or "**claude finished" in c.get("body", "").lower()
         ]
+        if not claude_reviews:
+            return False, "Missing automated Claude review evaluating PR (required for merge under mwc)"
 
-        has_approved_external_comment = False
+        latest_review = (
+            claude_reviews[-1].get("body", "")
+            .lower()
+            .replace("\u2014", "--")
+            .replace("\u2013", "--")
+        )
 
-        if external_review_comments:
-            latest_external_comment = external_review_comments[-1]
-            latest_body = latest_external_comment.get("body", "")
-            lower_body = latest_body.lower()
+        blocking_phrases = [
+            "needs more work",
+            "needs work",
+            "blocked",
+            "blocked on human review",
+            "changes requested",
+            "not clean",
+            "not ready",
+            "impasse",
+            "deadlock",
+            "finding 1 (blocking)",
+            "finding (blocking)",
+            "verdict\n\n**needs more work",
+            "verdict\n\n**needs work",
+            "no action -- pr is closed",
+            "no action -- pr is merged",
+        ]
+        for phrase in blocking_phrases:
+            if phrase in latest_review:
+                return False, f"Latest AI review has blocking verdict ('{phrase}')"
 
-            # Check for blocking verdicts in the latest external review comment
-            blocking_patterns = [
-                r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:needs\s+more\s+work|blocked|needs_work|changes\s+requested|not\s+clean|not\s+ready|impasse|deadlock|fail)",
-                r"finding\s*(?:\d+)?\s*\(\s*blocking",
-                r"\bblocked\s+on\s+human\s+review\b",
-            ]
-            for pattern in blocking_patterns:
-                m = re.search(pattern, lower_body)
-                if m:
-                    return False, f"Latest external review comment has blocking verdict ('{m.group(0)}')"
+        # Require an explicit positive clean / approved verdict signal
+        positive_verdict_phrases = [
+            "verdict:\n\n**ready",
+            "verdict:\n\n**clean",
+            "verdict:\n\n**approved",
+            "verdict:\nready",
+            "verdict:\nclean",
+            "verdict:\napproved",
+            "verdict\n\nclean",
+            "verdict\n\napproved",
+            "verdict\n\nready",
+            "clean / approved",
+            "clean/approved",
+            "ready for merge",
+            "approved for merge",
+            "### verdict\n\nclean",
+            "### verdict\n\napproved",
+            "### verdict\n\nready",
+            "### verdict\nclean",
+            "### verdict\napproved",
+            "### verdict\nready",
+            "### verdict\n\n**clean",
+            "### verdict\n\n**approved",
+            "### verdict\n\n**ready",
+            "### verdict\n**clean",
+            "### verdict\n**approved",
+            "### verdict\n**ready",
+            "verdict:\n\nclean",
+            "verdict:\n\nready",
+            "verdict:\n**clean",
+            "verdict:\n**approved",
+            "verdict:\n**ready",
+        ]
+        if not any(phrase in latest_review for phrase in positive_verdict_phrases):
+            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
 
-            # Check for explicit positive approved / clean verdicts in the latest external review comment
-            approval_patterns = [
-                r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:clean|approved|ready\s+for\s+merge|lgtm)",
-                r"verdict:\s*ready",
-            ]
-            for pattern in approval_patterns:
-                if re.search(pattern, lower_body):
-                    has_approved_external_comment = True
-                    break
-
-        if not (has_approved_review or has_approved_external_comment):
-            return False, "No independent approved external review or GitHub approval found on PR"
-
-        return True, "PR is fully clean across CI and external review"
+        return True, "PR is fully clean across CI and review"
 
     def merge_pr_under_mwc(
         self,

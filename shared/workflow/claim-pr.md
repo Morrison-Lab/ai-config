@@ -221,7 +221,9 @@ The commoner collision has no merge in it at all: two sessions independently fix
 
 What carries over is the part that is not about parents.
 "They addressed the same findings" is exactly the belief that makes a reset feel safe, and it is the same interchangeability assumption the `Don't` above rejects.
-Measured on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), 2026-08-24 Pacific (`3b8d04e6` at 18:23 and `cf195e46` at 18:28, merged as `5c577a54` at 18:35): each side had a fix the other lacked --- theirs a `--comment=` spelling and an attached `-F` body, mine a flag-boundary lookbehind without which a **compliant** comment warned --- so either reset would have shipped a regression that no check could see, since both sides were green.
+Measured on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), 2026-08-24 Pacific (`3b8d04e6` at 18:23 and `cf195e46` at 18:28, merged as `5c577a54` at 18:35): each side had a fix the other lacked --- theirs an attached `-F` body (`-Fbody.md`), mine a flag-boundary lookbehind without which a **compliant** comment warned --- so either reset would have shipped a regression that no check could see, since both sides were green.
+A third apparent difference was inert: their `--comment=` alternative is already matched by `--comment\b`, since the boundary sits between `t` and `=`.
+That one is the reason to **execute** both patterns rather than read both diffs --- a diff shows what each side changed, and only running it shows which of those changes did anything.
 
 - **Do:** merge two independent fixes for one review round, whatever their parents, and read each side's diff for what only it carries.
 - **Don't:** reset onto the other session's commit because the two rounds answered the same findings --- addressing the same list is not producing the same fix.

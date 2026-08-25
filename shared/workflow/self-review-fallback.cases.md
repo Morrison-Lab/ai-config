@@ -213,7 +213,7 @@ the source, not the diff's description of it.
 The case above is the first measured instance of the cross-vendor preference, and it names its own limit: the primary produced zero verdicts across three attempts, so it is evidence about the value of a second reading rather than about when to reach for one.
 This is the case that supplies the missing half.
 Here the primary did not fail.
-It answered, twice over, and it answered clean.
+Two same-vendor readings answered, and both answered clean.
 
 Measured 2026-08-24 Pacific on [ai-config#2131](https://github.com/Morrison-Lab/ai-config/pull/2131), at head `b744d6a2`.
 
@@ -242,3 +242,4 @@ It is the one of the three with a cheap remedy, since a bar can be stated in the
 Read the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three mechanisms deliver, rather than as measuring how much of the gap each one accounts for.
 
 The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).
+Note throughout that the contamination reading is a claim about the later verdict's *justification* rather than about its effort, which its nine enumerated verification steps weigh against.

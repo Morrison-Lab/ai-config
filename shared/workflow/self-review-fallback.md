@@ -184,10 +184,10 @@ There the unsearched space belongs to one reviewer's attention; here it belongs 
 The asymmetry is what decides it.
 A same-vendor clean verdict is evidence that the diff survives the checks that vendor's models are good at, and it is not evidence of absence, because the defects a shared blind spot hides are exactly the ones no same-vendor round can report.
 So same-vendor rounds do not accumulate into coverage.
-Eleven of them and one of them make the same claim about the families neither searched, which is why the count reads as thoroughness and measures depth in one family instead.
+Eleven of them and one of them make the same claim about whatever the vendor's models are poor at, which is why the count reads as thoroughness while measuring only how much of the vendor's reachable region was covered.
 
 - **Do:** run the cross-vendor pass on a clean same-vendor verdict, not only on a failed one.
-- **Do:** report same-vendor round counts as depth in one family rather than as breadth across families.
+- **Do:** report a same-vendor round count as coverage inside one vendor's reachable region, and say which reviewers supplied it, rather than as a bare measure of how thoroughly the diff was reviewed.
 - **Don't:** read "the reviewer found nothing" as a reason the cross-vendor pass is unnecessary --- that is the reading the linked case record falsifies.
 - **Don't:** treat many same-vendor rounds as substituting for one cross-vendor round; they are not the same measurement.
 

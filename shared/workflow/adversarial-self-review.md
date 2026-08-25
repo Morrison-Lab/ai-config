@@ -80,7 +80,7 @@ That is enough, because a verdict resting partly on prior rounds is partly a re-
 
 **A `# round-N` marker is a changelog of past MISSES, not a certificate of coverage.**
 It records that one defect was found there once.
-It says nothing about the family that defect belonged to, and reading it as evidence of scrutiny inverts its meaning: a line that needed three rounds to get right is the line most likely to still be wrong.
+It says nothing about the family that defect belonged to, and reading it as evidence of scrutiny inverts its meaning: the marker points at a line that was wrong, and a reader who takes it as a coverage claim reads it as a line that has been checked.
 
 **The loop is self-reinforcing, which is what makes it a rule rather than a matter of care.**
 More rounds produce a more reassuring history, which is available as a reason to stop, and a diff that accumulates many rounds is often one complex enough to need more.

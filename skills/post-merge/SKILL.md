@@ -313,18 +313,25 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this --- paws off" (or equivalent) and the claim is
-   still live --- a push or comment within the last 2 hours ---
-   skip it --- another session owns it.
-   An expired claim (over 2 idle hours) no longer blocks; take over with a
-   fresh claim comment of your own, per
-   [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+   Match the two-word invariant, `hold off` or either retired wording `paws off` / `back off`, case-insensitively --- never a whole sentence.
+   The PR and issue claims differ after those two words, and the dash between them is an em-dash in this file's own claim emitter (step 4), so a quoted prefix misses claims this very skill posts.
+   See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
+
+   **Then check the same comment for a release term, because one release marker contains a claim invariant.**
+   The retired release wording is `... done --- paws off released.`, which matches `paws off` --- so the invariant that fixes one bug introduces another, and this one fails the safe way round: a released PR reads as claimed, the sweep skips it, and the conflict is never resolved with nothing reporting why.
+   The sentence matcher this replaced did not collide, so the collision arrived with the fix.
+   Treat the comment as a release, not a claim, if it also matches `unclaim|released|PR is free|now mergeable`.
+   If a live claim stands --- a push or comment within the last 2 hours --- skip the PR.
+   Another session owns it.
+   An expired claim (over 2 idle hours) no longer blocks.
+   Take over with a fresh claim comment of your own, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash
-   gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR
+   gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.
+
+   _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
-5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge
-   commit that caused the conflict), and merge:
+5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge commit that caused the conflict), and merge:
    ```bash
    git fetch origin main <branch>   # FETCH — fetch both: we need the new main tip
    git worktree add .claude/worktrees/pr-<N> origin/<branch>
@@ -354,14 +361,14 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    ```
 8. **Unclaim** with a brief resolution summary:
    ```bash
-   gh pr comment <N> --body "Conflict resolved — branch is now mergeable. <one-line summary of what conflicted and how it was resolved>"   # COMMENT_PR
+   gh pr comment <N> --body "Conflict resolved — branch is now mergeable. <one-line summary of what conflicted and how it was resolved>
+
+   _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
 
-Resolve PRs one at a time — not because worktrees race each other (each
-worktree is an independent checkout), but because the same human or bot may be
-actively working a PR between your claim and your push. One-at-a-time keeps
-the blast radius small. Skip any PR whose conflict is in a file you can't
-understand without more context — comment asking for clarification instead.
+Resolve PRs one at a time — not because worktrees race each other (each worktree is an independent checkout), but because the same human or bot may be actively working a PR between your claim and your push.
+One-at-a-time keeps the blast radius small.
+Skip any PR whose conflict is in a file you can't understand without more context — comment asking for clarification instead.
 
 **Match the response to standing, not only to cause.**
 Step 2 says whether a conflict is yours; it does not say the branch is.

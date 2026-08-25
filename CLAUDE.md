@@ -567,10 +567,13 @@ A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-re
 When the user gives feedback, corrections, or guidance in the CLI or chat while working a PR, paraphrase it and post it as a PR comment:
 
 ```
-gh pr comment <N> --body "..."
+gh pr comment <N> --body "<paraphrase>
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
 One to three sentences is enough.
+The trailing marker is required, per the section above: this comment paraphrases the user in the user's own voice under the user's own login, which is the shape most easily read as their own writing.
 Don't quote verbatim — paraphrase so it reads naturally in the PR thread.
 Skip trivial acknowledgments or conversational exchanges with nothing to act on.
 
@@ -607,15 +610,28 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
+## Every comment you post to a forge says an agent posted it
+
+[shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
+
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/github.md` records auditors mistaking exactly that.
+The forge cannot say it, so the body must: end every agent-posted comment with
+
+```
+_Posted by Claude Code (AI agent) --- not written by a human._
+```
+
+The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**.
+The fragment carries the rest: the two exemptions, the comment-bodies-only scope, and the queries that verify a marker or a bot identity.
+
+- **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
+- **Don't:** use the robot emoji in it, or put it in a commit message, a title, an issue body, or a PR body.
+
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 
 [shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)
 
-When a short `CLAUDE.md` names a fuller document as the actual authority
---- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style
-guide --- read that document before the first edit, and front-load its
-pre-PR requirements into the first commit rather than discovering them via
-a red CI check.
+When a short `CLAUDE.md` names a fuller document as the actual authority --- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style guide --- read that document before the first edit, and front-load its pre-PR requirements into the first commit rather than discovering them via a red CI check.
 
 ## Open a PR immediately after claiming an issue
 

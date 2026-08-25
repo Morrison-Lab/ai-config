@@ -27,7 +27,9 @@ Before fetching a branch, editing files, or triggering a review loop, post a
 brief comment so other people and bots know not to start a conflicting session:
 
 ```sh
-gh pr comment <N> --body "Working on this --- paws off until I'm done."
+gh pr comment <N> --body "Working on this --- please hold off on pushing to this branch until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
 After the session ends (PR merged, paused, or closed), follow up with a

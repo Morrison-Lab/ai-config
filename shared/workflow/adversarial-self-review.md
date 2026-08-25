@@ -210,6 +210,9 @@ The honest answer to the question was "nothing".)
 
 ## Query all available providers sequentially
 
-When obtaining adversarial reviews, we need a clean verdict from **every** available provider (e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
-Do not stop after one provider returns clean. Query them sequentially, one at a time.
-Once one provider gives a clean review, move on to the next one, until all available providers have signed off with a clean verdict on the same commit.
+When obtaining adversarial reviews, we need a clean verdict from **every** available provider.
+(e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
+Do not stop after one provider returns clean.
+Query them sequentially, one at a time.
+Once one provider gives a clean review, move on to the next one.
+Repeat this until all available providers have signed off with a clean verdict on the exact same commit.

@@ -59,6 +59,8 @@ def extract_hook_list(groups_or_hooks):
                 out.extend(item["hooks"])
             elif "command" in item:
                 out.append(item)
+            else:
+                print(f"claude-hook-adapter: ignoring unrecognized hook item: {item}", file=sys.stderr)
     return out
 
 def main():
@@ -117,7 +119,7 @@ def main():
         tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args") or {}
-        cwd = args.get("Cwd") or repo_root
+        tool_cwd = args.get("Cwd") or repo_root
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         tasks_to_run = []
@@ -131,7 +133,7 @@ def main():
                 bash_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Bash"):
-                    tasks_to_run.append((extract_hook_list([group]), bash_payload))
+                    tasks_to_run.append((extract_hook_list([group]), bash_payload, tool_cwd))
 
         elif tool_name == "invoke_subagent":
             raw_subagents = args.get("Subagents")
@@ -151,7 +153,7 @@ def main():
                     agent_payload["transcript_path"] = transcript_path
                 for group in pre_tool_groups:
                     if matches_tool(group.get("matcher", ""), "Agent"):
-                        tasks_to_run.append((extract_hook_list([group]), agent_payload))
+                        tasks_to_run.append((extract_hook_list([group]), agent_payload, repo_root))
 
         elif tool_name == "send_message":
             send_payload = {
@@ -165,7 +167,7 @@ def main():
                 send_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "SendMessage"):
-                    tasks_to_run.append((extract_hook_list([group]), send_payload))
+                    tasks_to_run.append((extract_hook_list([group]), send_payload, repo_root))
 
         elif tool_name == "define_subagent":
             task_payload = {
@@ -180,7 +182,7 @@ def main():
                 task_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Task"):
-                    tasks_to_run.append((extract_hook_list([group]), task_payload))
+                    tasks_to_run.append((extract_hook_list([group]), task_payload, repo_root))
 
         else:
             generic_payload = {
@@ -191,10 +193,10 @@ def main():
                 generic_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), tool_name):
-                    tasks_to_run.append((extract_hook_list([group]), generic_payload))
+                    tasks_to_run.append((extract_hook_list([group]), generic_payload, tool_cwd))
 
         # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
-        for hooks_list, c_payload in tasks_to_run:
+        for hooks_list, c_payload, cwd in tasks_to_run:
             for hook in hooks_list:
                 cmd = hook.get("command")
                 if not cmd:
@@ -250,8 +252,9 @@ def main():
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
-                    if hook_out.get("additionalContext"):
-                        print(f"Warning from Stop hook: {hook_out.get('additionalContext')}", file=sys.stderr)
+                    if hook_out.get("systemMessage") or hook_out.get("additionalContext"):
+                        msg = hook_out.get("systemMessage") or hook_out.get("additionalContext")
+                        print(f"Warning from Stop hook: {msg}", file=sys.stderr)
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 

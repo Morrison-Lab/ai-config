@@ -226,60 +226,50 @@ class PRClaimManager:
             if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
                 return False, f"Check '{name}' failed with conclusion={conclusion}"
 
-        # 2. Check reviews and comments for clean approval
+        # 2. Check reviews for changes requested
         reviews = data.get("reviews", [])
         has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
+        # 3. Check review comments for clean approval on the LATEST review round
         comments = data.get("comments", [])
-        blocking_phrases = [
-            "needs more work",
-            "needs_work",
-            "blocked",
-            "blocked on human review",
-            "changes requested",
-            "not clean",
-            "not ready",
-            "impasse",
-            "deadlock",
-            "finding 1 (blocking)",
-            "finding (blocking)",
-            "verdict\n\n**needs more work",
-            "verdict: blocked",
-            "verdict: needs_work",
+        review_comments = [
+            c for c in comments
+            if "claude finished review" in c.get("body", "").lower()
+            or "adversarial" in c.get("body", "").lower()
+            or "review report" in c.get("body", "").lower()
         ]
 
-        # Scan all review comments for blocking findings
-        for c in comments:
-            body = c.get("body", "").lower()
-            if "claude finished review" in body or "adversarial" in body or "review report" in body:
-                for phrase in blocking_phrases:
-                    if phrase in body:
-                        return False, f"Review comment has blocking verdict ('{phrase}')"
-
-        # 3. Require at least one explicit clean / approved review
         has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
         has_approved_comment = False
 
-        approval_phrases = [
-            "adversarial self-review verdict: approved",
-            "adversarial code review verdict: approved",
-            "adversarial code review report: pr",
-            "verdict: clean",
-            "verdict: approved",
-            "verdict**: clean",
-            "verdict**: approved",
-            "clean / approved",
-            "verdict: **clean",
-            "verdict: **approved",
-            "claude finished review",
-        ]
+        if review_comments:
+            latest_body = review_comments[-1].get("body", "")
+            lower_body = latest_body.lower()
 
-        for c in comments:
-            body = c.get("body", "").lower()
-            if any(phrase in body for phrase in approval_phrases):
-                if not any(bp in body for bp in blocking_phrases):
+            # Check for blocking verdicts in the latest review comment
+            blocking_patterns = [
+                r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:needs\s+more\s+work|blocked|needs_work|changes\s+requested|not\s+clean|not\s+ready|impasse|deadlock|fail)",
+                r"finding\s*(?:\d+)?\s*\(\s*blocking",
+                r"\bblocked\s+on\s+human\s+review\b",
+                r"adversarial\s+(?:self-)?review\s+verdict:\s*(?:blocked|needs_work)",
+            ]
+            for pattern in blocking_patterns:
+                m = re.search(pattern, lower_body)
+                if m:
+                    return False, f"Latest review comment has blocking verdict ('{m.group(0)}')"
+
+            # Check for explicit positive approved / clean verdicts in the latest review comment
+            approval_patterns = [
+                r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:clean|approved|ready\s+for\s+merge|lgtm)",
+                r"adversarial\s+(?:self-)?review\s+verdict:\s*approved",
+                r"adversarial\s+code\s+review\s+verdict:\s*approved",
+                r"clean\s*/\s*approved",
+                r"verdict:\s*ready",
+            ]
+            for pattern in approval_patterns:
+                if re.search(pattern, lower_body):
                     has_approved_comment = True
                     break
 

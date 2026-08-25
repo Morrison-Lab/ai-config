@@ -588,6 +588,15 @@ CASES = [
     ("a short flag inside a prior field's value false-positives (tracked in #2189)",
      'gh api repos/o/r/issues/5/comments -f title="Fix -m flag parsing" -f body="' + MARKER + '"', "missing"),
 
+    # Tracked by #2189: a comment body legitimately opening with a literal `--` or `---`
+    # (e.g. an em-dash) is misclassified by `_looks_like_flag` as a boolean flag, which
+    # causes `inline_body` to drop it and fall back to the segment-wide check. If another
+    # flag follows it, the segment-wide check fails because the marker is no longer at
+    # the exact end of the command string.
+    ("a body starting with a double hyphen false-positives if a flag follows (tracked in #2189)",
+     'gh pr comment 1 --body "--- see the linked issue for context.\\n\\n' + MARKER + '\" --repo o/r', "missing"),
+
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

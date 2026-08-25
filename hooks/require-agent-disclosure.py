@@ -595,8 +595,11 @@ def _looks_like_flag(value):
 
     `--comment` takes a value on `gh issue|pr close|reopen` and is a BOOLEAN
     action flag on `gh pr review`, so a flag-name list cannot settle it. What
-    settles it is the value: no comment body begins with `--`, so an extraction
-    that yields one has consumed a boolean flag and read the next token.
+    settles it is the value: while a comment body might legitimately start with
+    a literal `--` or `---` (an em-dash substitute), this is a known gap
+    (tracked in #2189) we accept to avoid worse false positives. An extraction
+    that yields a double-hyphen prefix is assumed to have consumed a boolean
+    flag and read the next token.
     Without this, `gh pr review 12 --comment --body "...<marker>"` extracted
     `--body` as the body and warned on a compliant comment, while the same
     flags in the other order passed.

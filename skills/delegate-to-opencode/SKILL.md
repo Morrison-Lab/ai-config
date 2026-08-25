@@ -41,7 +41,8 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
 - **The result must conform to a schema and you have no cheap validator.**
   `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
 - **The destination tier is unavailable or exhausted.**
-  OpenCode Go operates on windowed request limits (similar to 5-hour subscription windows); when exhausted, fall back to Codex or OpenRouter per the ladder.
+  OpenCode Go operates on windowed request limits (similar to 5-hour subscription windows).
+  When exhausted, fall back to Codex or OpenRouter per the ladder.
   Zen free tier rate-limiting and Ollama daemon reachability are availability states rather than window exhaustion.
 
 The first two transfer from `delegate-to-codex`, but for a reason that skill does not have.

@@ -221,13 +221,12 @@ The tell is a **permission or identity** answer rather than a capacity one:
 a `403 Resource not accessible by integration` on a dispatch (the token lacks `actions: write`),
 or a comment-triggered run reporting **skipped** rather than failed, which means its job `if:` rejected you ---
 usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR` or `NONE`.
-2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
-Cursor Cloud comments post as `cursor[bot]` / `NONE`, so `jules-review.yml`'s
-OWNER/MEMBER/COLLABORATOR gate skips the request.
+The reviewer completing on somebody else's branch the same day settles that it is up.
 Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
 a human OWNER/MEMBER/COLLABORATOR comment is the unblock
-(see [`memories/cursor.md`](../../memories/cursor.md)).
-The reviewer completing on somebody else's branch the same day settles that it is up.
+(see [`memories/cursor.md`](../../memories/cursor.md)
+and [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"A session that could reach none of four working reviewers").
 
 Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).
 One read settles the identity half:

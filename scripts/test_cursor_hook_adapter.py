@@ -178,8 +178,12 @@ check(
 )
 check(
     "result-gated scripts are skipped on Cursor",
-    {"no-push-without-self-review.py", "no-empty-promise.py", "no-unreviewed-pr.py"}
+    {"no-push-without-self-review.py", "no-unreviewed-pr.py", "no-unmonitored-pr.py"}
     <= mod.SKIP_WITHOUT_TOOL_RESULT,
+)
+check(
+    "no-empty-promise still runs on Cursor",
+    "no-empty-promise.py" not in mod.SKIP_WITHOUT_TOOL_RESULT,
 )
 check("empty matcher hits", mod.matcher_hits(None, "Bash"))
 check("Bash matcher hits Bash", mod.matcher_hits("Bash", "Bash"))
@@ -515,6 +519,38 @@ with tempfile.TemporaryDirectory() as raw:
         miss_env,
     )
     check("missing catalog script fail-closed denies", missing.get("permission") == "deny")
+    old_hooks_dir = os.environ.get("AI_CONFIG_HOOKS_DIR")
+    os.environ["AI_CONFIG_HOOKS_DIR"] = str(hooks)
+    try:
+        skipped_stop = mod.handle_stop(
+            {"conversation_id": "skip-stop"},
+            [{"event": "Stop", "script": "no-unreviewed-pr.py", "timeout": 1}],
+        )
+        check(
+            "handle_stop skips no-unreviewed-pr rather than fail-closed missing",
+            skipped_stop == {},
+        )
+        skipped_monitor = mod.handle_stop(
+            {"conversation_id": "skip-mon"},
+            [{"event": "Stop", "script": "no-unmonitored-pr.py", "timeout": 1}],
+        )
+        check(
+            "handle_stop skips no-unmonitored-pr rather than fail-closed missing",
+            skipped_monitor == {},
+        )
+        missing_stop = mod.handle_stop(
+            {"conversation_id": "miss-stop"},
+            [{"event": "Stop", "script": "no-such-unskipped.py", "timeout": 1}],
+        )
+        check(
+            "unskipped missing Stop script still fail-closes",
+            bool(missing_stop.get("followup_message")),
+        )
+    finally:
+        if old_hooks_dir is None:
+            os.environ.pop("AI_CONFIG_HOOKS_DIR", None)
+        else:
+            os.environ["AI_CONFIG_HOOKS_DIR"] = old_hooks_dir
 
 # --- live catalog, not the fixture ---
 with tempfile.TemporaryDirectory() as live_raw:

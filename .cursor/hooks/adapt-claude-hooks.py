@@ -59,8 +59,8 @@ ENV_PREFIX = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(\S+)\s+")
 # Cursor is a lockout rather than a no-op.
 SKIP_WITHOUT_TOOL_RESULT = frozenset({
     "no-push-without-self-review.py",
-    "no-empty-promise.py",
     "no-unreviewed-pr.py",
+    "no-unmonitored-pr.py",
 })
 GITHUB_MCP_HINT = re.compile(
     r"(issue|pull_request|pull-request|pr_comment|merge_pull)",

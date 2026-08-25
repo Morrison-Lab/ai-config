@@ -150,7 +150,7 @@ Don't assume it's fabricated or injected, and don't reflexively redo the same fi
 If a commit with that SHA genuinely exists, authored close to when the event arrived, treat it as confirmation a live parallel session owns this PR right now --- stop pushing further speculative fixes yourself, and, if genuinely in doubt, ask whether to keep driving or step back, rather than racing the other session's pushes.
 This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing.
 
-(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `d-morrison`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
+(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `the repository owner`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
 It was verified real via `get_commits` before proceeding --- a second live session, not injection.)
 
 **The git-level variant of that check: a rejected push whose remote commit is byte-for-byte what you were about to push.**
@@ -214,6 +214,19 @@ still failing `version-check` --- and had never seen the `WORDLIST`
 conflict at all, since its sync predated that conflict existing.
 Merging the two commits, rather than resetting onto either, kept both
 fixes.)
+
+**Second occurrence, 2026-08-24, with DIFFERENT parents --- the same lesson in the case the section above does not describe.**
+Both branches of the rule above turn on the parents matching, which happens when two sessions resolve the same `main`-merge.
+The commoner collision has matching parents nowhere in sight: two sessions independently fix the **same review round's findings** on one branch, five minutes apart, so the two commits share only their base and the divergence is ordinary.
+
+What carries over is the part that is not about parents.
+"They addressed the same findings" is exactly the belief that makes a reset feel safe, and it is the same interchangeability assumption the `Don't` above rejects.
+Measured on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), 2026-08-24 Pacific (`3b8d04e6` at 18:23 and `cf195e46` at 18:28, merged as `5c577a54` at 18:35): each side had a fix the other lacked --- `3b8d04e6` an attached `-F` body (`-Fbody.md`), `cf195e46` a flag-boundary lookbehind without which a **compliant** comment warned --- so either reset would have shipped a regression that no check could see, since both sides were green.
+A third apparent difference was inert: `cf195e46` dropped the `--comment=` alternative the base already carried, and `--comment\b` matches `--comment=x` anyway, since the boundary sits between `t` and `=`.
+That one is the reason to **execute** both patterns rather than read both diffs.
+
+- **Do:** merge two independent fixes for one review round, whatever their parents, and **run** each side's version against the inputs at issue --- a diff shows what each side changed, and only executing it shows which of those changes did anything.
+- **Don't:** reset onto the other session's commit because the two rounds answered the same findings --- addressing the same list is not producing the same fix.
 
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just

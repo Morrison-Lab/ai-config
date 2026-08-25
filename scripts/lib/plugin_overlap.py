@@ -65,7 +65,7 @@ from pathlib import Path
 
 # The plugin name both marketplaces publish. Matching is on the part before
 # `@` so any marketplace suffix is caught -- `ai-config@Morrison-Lab`,
-# `ai-config@d-morrison`, and a locally added marketplace alike.
+# `ai-config@the repository owner`, and a locally added marketplace alike.
 PLUGIN_NAME = "ai-config"
 
 

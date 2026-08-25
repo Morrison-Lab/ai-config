@@ -267,16 +267,16 @@
 - `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `d-morrison/ai-config` before the move, and that path still redirects).
   When working in that fork, open PRs against the canonical repo (base `main`) as a cross-fork PR with head `dem-extra1:<branch>`, NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened from a session where the canonical repo is in scope.)
   **The repo has MOVED: it was transferred from `d-morrison/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
-  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
+  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `the repository owner` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "the repository owner"` opens a PR that comes back with a `Morrison-Lab` URL and number.
   **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
-  The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
+  The same call with `owner: "the repository owner"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
   So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
-  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `the repository owner`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
   `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
   **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
   It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
   When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)
-  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `d-morrison` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
+  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `the repository owner` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
 - Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
 - On GitLab, assign MRs to `demorrison`.
 - Before committing code changes, run the repo checks that CI enforces
@@ -351,7 +351,7 @@
 - Before acting on a request, review the relevant ai-config memories first so existing standing rules and prior lessons shape the response.
 - When the user points out a mistake I made, fix that mistake immediately and then record the learning for future runs, without waiting for extra prompting.
 - When a CI/review gate on your OWN PR keeps failing because of the repo owner's tooling (a flaky review workflow, a misfiring guard) and NOT your content, don't rabbit-hole opening fix-PR after fix-PR against their CI infra --- FIRST check whether the owner is already reworking that same infra in parallel (scan recent `main` commits and open PRs), since a fix landed under them collides with their work and is likely superseded; then verify the deliverable independently (render/lint/tests) and hand off/escalate to the owner sooner.
-  Corollary --- bootstrap deadlock: you can't cleanly fix a review workflow via PRs that are themselves reviewed by that broken workflow, so such a fix lands by admin-merge, not self-certification. (Learned on rme#954: content was done+verified early, but I iterated several `gha` review-workflow PRs chasing a no-verdict gate that d-morrison was concurrently fixing via his own #201/#204.)
+  Corollary --- bootstrap deadlock: you can't cleanly fix a review workflow via PRs that are themselves reviewed by that broken workflow, so such a fix lands by admin-merge, not self-certification. (Learned on rme#954: content was done+verified early, but I iterated several `gha` review-workflow PRs chasing a no-verdict gate that the repository owner was concurrently fixing via his own #201/#204.)
 - Always check r-lib, tidyverse, and similar R ecosystem organizations for off-the-shelf solutions before building custom implementations.
   Prefer well-maintained upstream packages over hand-rolled code when they meet the requirements.
 - When borrowing code or ideas from another repo, verify its license from the source FIRST (fetch its LICENSE file / `gh api repos/<o>/<r>/license`).
@@ -720,7 +720,7 @@
   This is the scan-after counterpart to the plain-prose style above. (see the `find-ai-tells` skill, alias `ai-tells`.)
 - It's always OK to register a repo as a consumer in one of our upstream repos' reverse-dependency list, without asking --- e.g. add it to `d-morrison/gha`'s `REVDEPS.md` when a repo starts calling its reusable workflows.
   Open a small doc-only PR off the upstream's `main`.
-  Applies across our orgs: d-morrison, UCD-SERG, ucdavis, UCLA-PHP, UCD-IDDRC.
+  Applies across our orgs: the repository owner, UCD-SERG, ucdavis, UCLA-PHP, UCD-IDDRC.
   The REVDEPS list lets us warn consumers before a breaking tag move, so adding is pure upside.
 - When adding a new bare keyword directive that routes to a skill (e.g. "merge it"), update THREE places to keep routing consistent: (1) `CLAUDE.md` routing documentation, (2) the skill's `description:` frontmatter (what the LLM sees when scanning the skill list), and (3) the skill's "When this fires" trigger list.
   If the skill has N synonym trigger phrases, list all N in all three places.
@@ -805,7 +805,7 @@
   **Same rule for a write-capable `codex exec -C <path>` (or any `-s workspace-write`/`danger-full-access` subagent): never point it at the checkout you're actively editing.** Commit or stash first, then `git worktree add --detach <scratch> <commit>` and pass THAT to `-C`, and say so in the prompt ("this worktree is yours alone; do not cd outside it; do not commit or push").
   Use `--detach` so a read/verify agent never contends for a named branch another worktree already holds; afterwards verify with `git worktree list` that it actually made its own. (Learned on ucdavis/bcs, 2026-07-09: launched a codex verification with `-s workspace-write` pointed at my own worktree holding uncommitted #324 work, whose prompt told it to `git stash` --- which would have stashed my in-flight fix out from under a concurrent edit; caught before it ran.)
 - **General principle behind the worktree case above: when writing instructions for a subagent (or any delegated brief), state both what to do and what NOT to do --- don't rely on the reader to infer a forbidden path from what the instruction simply never mentioned.** A brief that only describes the desired positive action leaves every unmentioned path unconstrained; an agent under time/task pressure will happily take a technically-unmentioned-but-obviously-wrong action rather than stall on ambiguity (the worktree case: the brief named the *expected* path but never said the conductor's own path was off-limits, so a loose search matched it anyway).
-  Apply this especially for anything scope- or safety-sensitive --- target paths (worktrees, branches, files), destructive operations, credentials, merge/self-approval authority --- pair the positive instruction with an explicit negative constraint ("do X on branch Y; never touch branch Z or the conductor's own worktree") rather than a single-sided one. (d-morrison, ai-config#462 review, 2026-07-03.)
+  Apply this especially for anything scope- or safety-sensitive --- target paths (worktrees, branches, files), destructive operations, credentials, merge/self-approval authority --- pair the positive instruction with an explicit negative constraint ("do X on branch Y; never touch branch Z or the conductor's own worktree") rather than a single-sided one. (the repository owner, ai-config#462 review, 2026-07-03.)
 - A conductor cannot post its own "Ready for merge" / positive-verdict comment on a PR authored by its own dispatched subagent, even when the automated review bot is broken and the conductor has independently verified the diff is correct.
   This is self-approval --- the conductor and the PR's author are the same principal --- and the harness's auto-mode classifier blocks it outright, regardless of how solid the verification behind it is.
   When the intended independent reviewer isn't functioning (bot outage, quota exhaustion, a stub/no-verdict failure), the right moves are: get an independent review to actually run (retry the bot, or wait for a fix), or escalate the specific PR to the user for their own call --- never self-declare readiness to route around a missing reviewer. (Learned on sparta, 2026-07-02: attempting to post a "Ready for merge" summary on a PR whose review job had failed twice was blocked with an explicit self-approval reason.)
@@ -855,6 +855,10 @@
   Do: state which kind of session produced the observation (interactive CLI vs. a dispatched review/agent session, e.g. `claude-code-action`) alongside the model and date, and hedge or re-check across contexts before generalizing from one.
   Don't: write "confirmed absent on Sonnet 5" (or similar) from a single session's tool list and let it stand as an unqualified default --- the same model, same day, running as a dispatched review job can show the opposite.
   This is a distinct axis from `shared/writing/timestamp-volatile-claims.md`'s time-based staleness: two observations can both be current and still disagree, because they were taken in different invocation contexts rather than at different times. (Generalized from the `TaskCreate`/`TodoWrite` incident recapped in the bullet above, ai-config#1732, 2026-08-20 --- caught in round-1 review, not by self-check.)
+- **All recorded facts about software, APIs, harnesses, and technologies must carry temporal qualifications and provenance.**
+  Software inevitably changes over time: features evolve, defaults flip, endpoints deprecate, and internal limits move.
+  Do: attach explicit observation date, version number, execution environment, or snapshot reference, and include a re-verification reminder (per `shared/writing/timestamp-volatile-claims.md`).
+  Don't: record third-party software behaviors, flag names, or vendor taxonomies as timeless present-tense truths without temporal bounds.
 
 ## Output-highlighting taxonomy
 
@@ -1052,8 +1056,8 @@ Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-0
   Don't let this become an excuse to skip verification when there's no actual time-pressure --- only use it when a stop-hook or session-end signal is the forcing function. (Learned on d-morrison/rme#772: render was blocked on a ~1hr renv package install; committed the reorg + merge-conflict resolution before the render finished to satisfy the stop hook, then continued verifying.)
 
 ## Git author mapping
-- Commits by `dem-extra1` to repos owned by `d-morrison`, `ucd-serg`, or `ucdavis` → the true author is `d-morrison` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
-- Commits to `sparta` by `d-morrison` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `d-morrison`.
+- Commits by `dem-extra1` to repos owned by `the repository owner`, `ucd-serg`, or `ucdavis` → the true author is `the repository owner` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
+- Commits to `sparta` by `the repository owner` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `the repository owner`.
 
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
@@ -1183,3 +1187,9 @@ safer/preferred choice merely because the repo has external consumers.
   reviewer the row existed.
   The next review round found the gap and the top-level reply needed a public
   correction.)
+
+- **Never hardcode usernames in instructions/prose:**
+  When writing instructions, skills, or agent memories, use generic role-based descriptors (e.g. "the repository owner", "a human reviewer") rather than hardcoding a specific username (e.g. `octocat`).
+  Hardcoded usernames in shared config cause cross-user/fork breakages.
+  - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. `Morrison-Lab/ai-config`), submodules, flag names, and values that must resolve to a real remote/account.
+    Only purge them from prose and generic placeholder flags.

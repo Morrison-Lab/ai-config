@@ -207,3 +207,55 @@ parser bypasses, because checking a claim about `git push`'s option grammar
 requires re-deriving the grammar rather than re-reading the sentence.
 Where a diff encodes a *tool's* behaviour, read that tool's own documentation as
 the source, not the diff's description of it.
+
+## A clean same-vendor verdict over eight blocking cross-vendor findings
+
+The case above is the first measured instance of the cross-vendor preference, and it names its own limit: the primary produced zero verdicts across three attempts, so it is evidence about the value of a second reading rather than about when to reach for one.
+This is the case that supplies the missing half.
+Here the primary did not fail.
+It read the reviewed head, and it answered clean.
+
+Measured 2026-08-24 Pacific on [ai-config#2131](https://github.com/Morrison-Lab/ai-config/pull/2131), at head `b744d6a2`.
+
+Only one of the two same-vendor passes examined *that head*:
+
+| reader | rounds | what it read |
+| --- | --- | --- |
+| the repo's own `claude-review` | 1 | `b744d6a2` itself; **Ready for merge** |
+| dispatched `adversarial-reviewer` subagent | 11, pre-push | a sequence of states ending at `5aa36bbe` |
+
+Each of those eleven rounds read a different state, and the branch's own commit messages name them (`594fdce9`: "One blocking finding on `5aa36bbe`").
+So the last one is one small branch commit --- `594fdce9`, nine insertions and four deletions --- plus the `origin/main` merge away from the reviewed head.
+That gap cuts *for* this record rather than against it, and it is derivable rather than a judgment.
+Take [#2185](https://github.com/Morrison-Lab/ai-config/pull/2185)'s whole diff as a superset of the finding sites --- deliberately wider, since it also carries an unrelated learning, and width is the conservative direction when the result you want is an empty intersection --- and intersect it with the files that moved after the last state the rounds read:
+
+```bash
+comm -12 <(gh pr diff 2185 --name-only | sort) \
+         <(git diff --name-only 5aa36bbe 594fdce9 | sort)
+```
+
+That returns nothing.
+Only the `origin/main` merge in `b744d6a2` touches any of them, and only `hooks/hooks.json`, where it is a pure addition registering another PR's hook --- `git diff 5aa36bbe b744d6a2 -- hooks/hooks.json` removes no line, so nothing the rounds read changed.
+So the eleven rounds read the code the eight blocking findings were about, and they still are not a verdict on `b744d6a2`.
+
+Say it that way rather than counting them alongside the one verdict that did examine that head, which would inflate the same-vendor total this record's argument turns on.
+
+`claude-review`'s own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.
+Quote it that way rather than as "no findings": [`fully-clean`](fully-clean.md) is explicit that "non-blocking", "nit", and "minor" are prioritization labels rather than a pass, and softening the qualifier here would strengthen this record's own argument, which is the direction to be most careful about.
+
+A `codex` pass on the same head then returned 11 findings, 8 of them blocking, and every one was verified real before being accepted.
+
+Two explanations are ruled out by the record itself.
+It is not that the primary was flaky, since it completed and produced a real, reasoned verdict at cost.
+It is not that the cross-vendor reviewer was noisier, since the findings were checked individually rather than taken on its word.
+
+Three explanations remain, and they are not exclusive, so the case supports the fragment's theory without isolating it.
+The first explanation is that theory: two readings that share a vendor share their blind spots, so their agreement measures the blind spot.
+The second explanation is **contamination**, recorded in [`adversarial-self-review`](adversarial-self-review.md)'s "The PR's own review history is rationale you cannot withhold" --- the `claude-review` verdict named the eleven prior rounds in its own justification, so the two same-vendor readings were not independent samples and part of their agreement is explained by the second having read about the first.
+That confound bears on the one verdict this record rests on, since the eleven pre-push rounds are what it cited.
+The third explanation is a **different threshold**: that same verdict scopes its findings line to a "high-signal bar (compile/parse errors, definite wrong-result logic, or clear unambiguous CLAUDE.md violations)", so the two reviewers may have been applying different tests for what counts as a finding rather than holding different blind spots.
+The threshold explanation's remedy is the cheapest to state, since a bar can be named in the request;
+the contamination explanation has cheap remedies of its own, in the [`adversarial-self-review`](adversarial-self-review.md) section named two paragraphs above.
+Take the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three explanations deliver, rather than as measuring how much of the gap each one accounts for.
+
+The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).

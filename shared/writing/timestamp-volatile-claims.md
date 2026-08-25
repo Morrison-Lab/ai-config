@@ -16,8 +16,12 @@ underlying condition.
 A claim is volatile if updating the world could falsify the sentence without
 touching the sentence itself:
 
-- Release / availability status --- "package X is on CRAN", "feature Y is
-  supported", "the API doesn't expose Z".
+- Software, tools, APIs, harnesses, and platforms --- "package X is on CRAN",
+  "feature Y is supported", "the API doesn't expose Z", "the flag default is N".
+  All facts about third-party software behavior,
+  configuration options, runtime thresholds,
+  and architecture are empirical observations,
+  not timeless definitions.
 - "Current", "latest", "now", "recently", "still" claims --- a version number,
   a default, a "the newest model is ...".
 - Counts, prices, dates, and roster facts --- "there are N consumers", "it

@@ -384,7 +384,7 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 `04:07:37Z -> 04:08:12Z`, and the same reviewer returned a full
 `Ready for merge` verdict on Morrison-Lab/ai-config#858 over
 `04:08:50Z -> 04:11:41Z`.
-So the service was fine and the `d-morrison` credential was not, which no
+So the service was fine and the `the repository owner` credential was not, which no
 number of re-runs would have shown.
 Tracked in d-morrison/altdoc#99.)
 
@@ -977,12 +977,12 @@ $ echo $?
 ```
 
 No reviewer had produced a verdict on that PR at any head.
-The PR carried seven comments: five identical 363-character `claude-review` skip notices from `github-actions`, and two from `d-morrison` at 4226 and 4804 characters.
+The PR carried seven comments: five identical 363-character `claude-review` skip notices from `github-actions`, and two from `the repository owner` at 4226 and 4804 characters.
 The notice reads "**Claude review skipped --- API credential or quota unavailable.**" followed by a `View run` link, and it is that link the checker resolves --- the run's `head_sha` equals HEAD, so a comment stating explicitly that no review happened is admitted as a review evaluating HEAD.
 It carries none of `finding_patterns`, so the HEAD-matching half prints its tick, and `check_latest_verdict()` returns `True` because an empty verdict is not `not-clean`.
 
 Six items rather than seven is the second finding, and it names which loop admits what.
-Matching the comment loop's marker tuple against each body shows five admitted on author and exactly one on body text: the 4804-character `d-morrison` comment, whose first line is
+Matching the comment loop's marker tuple against each body shows five admitted on author and exactly one on body text: the 4804-character `the repository owner` comment, whose first line is
 
 ```
 ## ARD --- cross-vendor review (Codex / GPT-5.1, `### Verdict: Needs more work`)

@@ -51,7 +51,7 @@ def run_bootstrap(tmp: Path, config: str) -> tuple[Path, str]:
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)
     codex, output = run_bootstrap(
-        tmp / "plugin-enabled", '[plugins."ai-config@d-morrison"]\nenabled = true\n'
+        tmp / "plugin-enabled", '[plugins."ai-config@the repository owner"]\nenabled = true\n'
     )
     check("enabled plugin skips bare Codex wrappers", not (codex / "skills" / "ardi").exists())
     check("enabled plugin reports the skipped wrapper route", "ai-config plugin is enabled" in output)
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as raw:
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)
     codex, _ = run_bootstrap(
-        tmp / "plugin-disabled", '[plugins."ai-config@d-morrison"]\nenabled = false\n'
+        tmp / "plugin-disabled", '[plugins."ai-config@the repository owner"]\nenabled = false\n'
     )
     ardi = codex / "skills" / "ardi"
     check("disabled plugin installs bare Codex wrappers", ardi.is_symlink())
@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory() as raw:
     codex = root / "codex"
     (codex / "skills").mkdir(parents=True)
     (codex / "config.toml").write_text(
-        '[plugins."ai-config@d-morrison"]\nenabled = true\n', encoding="utf-8"
+        '[plugins."ai-config@the repository owner"]\nenabled = true\n', encoding="utf-8"
     )
     stale = codex / "skills" / "ardi"
     stale.symlink_to(ROOT / "codex-skills" / "ardi")

@@ -384,7 +384,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   that did nothing; removing the flag immediately reproduced the
   `unused_function` failure it was supposed to prevent.)
 
-## R-package PR CI gates (d-morrison / UCD-SERG R packages, e.g. `bcs`)
+## R-package PR CI gates (the repository owner / UCD-SERG R packages, e.g. `bcs`)
 - These repos gate PRs on a **changelog check** (`news.yaml` / "Check Changelog
   Action") and a **version-check**. Historically a user-visible PR needed
   **both** a `NEWS.md` entry under `# <pkg> (development version)` **and** a

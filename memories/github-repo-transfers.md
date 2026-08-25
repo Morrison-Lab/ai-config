@@ -137,7 +137,7 @@ Miss that notice and the failure arrives only at PR creation:
 ```
 GraphQL: Head sha can't be blank, Base sha can't be blank, Head repository
 can't be blank, No commits between Morrison-Lab:main and
-d-morrison:docs/customization-surface, Head ref must be a branch, not all refs
+the repository owner:docs/customization-surface, Head ref must be a branch, not all refs
 are readable (createPullRequest)
 ```
 
@@ -147,7 +147,7 @@ relationship, which sends you to check whether the push landed any commits ---
 the one thing that is definitely fine here.
 The actual finding is that the two sides carry **different owners**:
 `Morrison-Lab` for the base, which followed the transfer redirect, and
-`d-morrison` for the head, which tracked the stale `origin` URL.
+`the repository owner` for the head, which tracked the stale `origin` URL.
 Five of that message's six clauses are downstream noise from the head repo not
 resolving.
 

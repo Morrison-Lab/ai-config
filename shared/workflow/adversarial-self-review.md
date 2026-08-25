@@ -109,8 +109,9 @@ composed the text that readers treat as the review.
 
 Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
-A foreground `task_v2` named `adversarial-reviewer` (`bc-61fbadd0`) ran on
-`f71c02ea`.
+A foreground `Task` dispatch
+(`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`, catalog name
+"Final review HEAD f71c02ea") ran on `f71c02ea`.
 The posted comment was author-assembled via ManagePullRequest, labeled
 "Fallback self-review", and mixed a paraphrased
 `### Verdict: Ready for merge` with a 16-item

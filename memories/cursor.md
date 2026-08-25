@@ -87,15 +87,19 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud Task `tool_result` is identity-only
 
-A Cursor Cloud `task_v2` JSON `tool_result` carries identity fields
-(`agentId`, `cloudAgentBcId`) and no review body, even when the child
-ran in the foreground.
-The parent JSON therefore cannot satisfy
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s
-rule that a verdict is admitted from the reviewer's `tool_result`.
+A Cursor Cloud `Task` JSON `tool_result` (harness logs may show `task_v2`)
+carries identity fields (`agentId`, `cloudAgentBcId`) and no review body,
+even when the child ran in the foreground.
+That JSON is not the report to post as a fallback comment.
 The harness may still paste the child's final message into the parent
 transcript; quote that paste or fetch the child transcript, and do not
 treat a thinking paraphrase as the report.
+
+The Cursor adapter skips `no-push-without-self-review.py` because JSONL
+omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in
+[`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
+so this lesson is about the posted PR comment, not about satisfying the
+pre-push guard.
 
 Fetch the child transcript via cursor-cloud `batch-fetch-details`
 (`includeTranscripts: true`) using that `cloudAgentBcId` before posting a

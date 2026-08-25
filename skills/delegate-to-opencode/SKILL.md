@@ -13,7 +13,7 @@ allowed-tools:
 
 The `opencode` CLI reaches an active OpenCode Go ($10/mo subscription), hosted free (`opencode Zen`), and local (`ollama`) tiers, plus OpenRouter as an activated provider for frontier and stealth models.
 The free and local tiers cost no quota at all, so work small enough for them should not spend Claude's budget, Codex's window, or OpenRouter credits.
-The local tier also keeps payloads strictly on the machine when loopback checks pass.
+The local tier also keeps payloads strictly on the machine when loopback routing, local-only mode, and on-device model residency are verified.
 
 Claude stays the orchestrator.
 It writes the prompt, runs the delegate, validates what comes back, and does the synthesis.
@@ -189,79 +189,18 @@ Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s lo
 
 **Before any data-triggered work, verify endpoint, daemon local mode, and model residency.**
 The routing rule above turns on where `ollama/*` actually points, whether cloud offloading is disabled, and whether the targeted model is present on-device.
-`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), and the check queries the daemon tags API:
+Run [`scripts/check-ollama-locality.py`](../../scripts/check-ollama-locality.py) with the target model:
 
 ```bash
-python3 - "qwen2.5-coder:3b" <<'PY'
-import ipaddress, json, os, re, socket, subprocess, sys, urllib.request
-from urllib.parse import urlparse
-
-if len(sys.argv) < 2 or not sys.argv[1].strip():
-    sys.exit("REFUSE: target model identifier is required as an argument (e.g. 'qwen2.5-coder:3b')")
-
-target_model = sys.argv[1].strip()
-clean_target = re.sub(r"^ollama/", "", target_model)
-target_tag = clean_target if ":" in clean_target else f"{clean_target}:latest"
-
-try:
-    raw = subprocess.run(
-        ["opencode", "debug", "config"],
-        capture_output=True, text=True, check=True,
-    ).stdout
-    url = json.loads(raw)["provider"]["ollama"]["options"]["baseURL"]
-except Exception as exc:
-    sys.exit(f"REFUSE: cannot read the ollama baseURL from opencode's config: {exc}")
-
-host = urlparse(url).hostname
-if not host:
-    sys.exit(f"REFUSE: no host in ollama baseURL {url!r}")
-
-try:
-    addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
-except OSError as exc:
-    sys.exit(f"REFUSE: cannot resolve {host!r}: {exc}")
-
-remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
-if remote:
-    sys.exit(f"REFUSE: ollama baseURL {url} resolves off-machine: {', '.join(remote)}")
-
-# Verify Ollama daemon local residency and tags API
-try:
-    base_api = url[:-3] if url.endswith('/v1') else url.rstrip('/')
-    tags_url = base_api.rstrip('/') + '/api/tags'
-    req = urllib.request.Request(tags_url, headers={'User-Agent': 'opencode-locality-check'})
-    with urllib.request.urlopen(req, timeout=5) as resp:
-        data = json.loads(resp.read().decode('utf-8'))
-        model_entries = data.get('models', [])
-except Exception as exc:
-    sys.exit(f"REFUSE: cannot verify local model residency from Ollama tags API ({exc})")
-
-if not model_entries:
-    sys.exit("REFUSE: local Ollama daemon reports 0 resident models in /api/tags")
-
-# Reject any remote-backed entries (remote_model or remote_host)
-remote_models = {
-    m.get('name', '') for m in model_entries
-    if m.get('remote_model') or m.get('remote_host')
-}
-local_models = [
-    m.get('name', '') for m in model_entries
-    if m.get('name') and m.get('name') not in remote_models
-]
-
-matched = any(m == clean_target or m == target_tag for m in local_models)
-if not matched:
-    if any(m == clean_target or m == target_tag for m in remote_models):
-        sys.exit(f"REFUSE: target model {target_model!r} is backed by remote/cloud infrastructure")
-    sys.exit(f"REFUSE: target model {target_model!r} (normalized {target_tag!r}) is not locally resident (local models: {', '.join(local_models)})")
-
-print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
-print(f"OK: verified local on-device residency for {target_tag} ({len(local_models)} local models)")
-PY
+python3 scripts/check-ollama-locality.py "qwen2.5-coder:3b"
 ```
 
-It exits 0 and prints the confirmation only when every address the host resolves to is loopback and the specified target model is strictly locally resident (refusing any remote-backed or cloud models).
-Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.
+It exits 0 and prints the confirmation only when:
+1. Every address `options.baseURL` resolves to is loopback (`127.0.0.1` or `::1`).
+2. Local-only mode is verified (`OLLAMA_NO_CLOUD=1` in environment or `disable_ollama_cloud: true` in config).
+3. The specified target model is strictly locally resident in `/api/tags` (refusing any remote-backed, cloud, or absent models).
+
+Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unverified local-only mode, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model.
 Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md).
 This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
 

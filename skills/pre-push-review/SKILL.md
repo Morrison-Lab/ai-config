@@ -29,26 +29,29 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 ## Usage
 
 ```bash
+# Resolve the review script relative to the installed skill
+REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review'] if os.path.exists(os.path.expanduser(f))), 'skills/pre-push-review'); print(os.path.abspath(os.path.join(os.path.dirname(p), '..', 'scripts', 'pre-push-review.py')))")
+
 # Auto-detect local AI CLI (priority: claude -> codex -> opencode -> agy)
-python3 scripts/pre-push-review.py
+python3 "$REVIEW_SCRIPT"
 
 # Alternate among available models/engines across successive runs
-python3 scripts/pre-push-review.py --engine alternate
+python3 "$REVIEW_SCRIPT" --engine alternate
 
 # Review via Claude model through Antigravity CLI
-python3 scripts/pre-push-review.py --engine agy-claude
+python3 "$REVIEW_SCRIPT" --engine agy-claude
 
 # Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity')
-python3 scripts/pre-push-review.py --engine codex
+python3 "$REVIEW_SCRIPT" --engine codex
 
 # Pass custom model override
-python3 scripts/pre-push-review.py --engine codex --model gpt-5.6-sol
+python3 "$REVIEW_SCRIPT" --engine codex --model gpt-5.6-sol
 
 # Post the review report directly to the current GitHub PR
-python3 scripts/pre-push-review.py --post
+python3 "$REVIEW_SCRIPT" --post
 
 # Save output to a markdown file
-python3 scripts/pre-push-review.py -o review.md
+python3 "$REVIEW_SCRIPT" -o review.md
 ```
 
 ## Relationship to other skills & guards

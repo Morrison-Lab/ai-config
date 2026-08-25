@@ -75,10 +75,10 @@ def get_pr_base_branch(pr_number: int) -> Optional[str]:
     return None
 
 
-def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str]:
+def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str]:
     """Compute local git diff against the PR base branch or default main.
 
-    Always diffs local HEAD to include unpushed commits.
+    Always diffs the provided head_sha to include unpushed commits.
     """
     base_ref = explicit_base
     if not base_ref and pr_number:
@@ -99,9 +99,9 @@ def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tu
         if not base_ref:
             base_ref = "HEAD~1"
 
-    mb_res = subprocess.run(["git", "merge-base", "HEAD", base_ref], capture_output=True, text=True)
+    mb_res = subprocess.run(["git", "merge-base", head_sha, base_ref], capture_output=True, text=True)
     base_sha = mb_res.stdout.strip() if mb_res.returncode == 0 else base_ref
-    diff_res = subprocess.run(["git", "diff", base_sha, "HEAD"], capture_output=True, text=True)
+    diff_res = subprocess.run(["git", "diff", base_sha, head_sha], capture_output=True, text=True)
     if diff_res.returncode != 0:
         log_error(f"Could not compute diff against {base_ref}: {diff_res.stderr}")
         sys.exit(1)
@@ -335,6 +335,35 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
+def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
+    cursor_path = shutil.which("agent") or os.path.expanduser("~/.local/bin/agent")
+    if not os.path.isfile(cursor_path) and not shutil.which("agent"):
+        return None
+
+    cmd = [cursor_path, "--print", "--mode", "plan", "--trust", prompt]
+    if model:
+        cmd.extend(["--model", model])
+
+    label_suffix = f" (model: {model})" if model else ""
+    print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
+    try:
+        # Prompt is passed as an argument because `agent` doesn't natively support stdin
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+    except subprocess.TimeoutExpired:
+        print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Notice: Cursor execution failed: {e}", file=sys.stderr)
+        return None
+
+    if res.returncode != 0:
+        print(f"Notice: Cursor review returned nonzero ({res.stderr.strip()})", file=sys.stderr)
+        return None
+
+    out = res.stdout.strip()
+    return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
+
+
 def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = "") -> Optional[str]:
     codex_path = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
@@ -405,10 +434,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 
 def detect_available_engines() -> List[str]:
-    """Return available local engines in preferred fallback priority: claude -> codex -> opencode -> agy."""
+    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
     engines = []
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
         engines.append("claude")
+    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
+        engines.append("cursor")
     if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
         engines.append("codex")
     if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
@@ -418,7 +449,7 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
-ENGINE_ROTATION_ORDER = ["claude", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:
@@ -465,6 +496,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
         "claude": (run_claude_review, "Claude Code (Local)"),
+        "cursor": (run_cursor_review, "Cursor Agent"),
         "codex": (run_codex_review, "OpenAI Codex"),
         "dtc": (run_codex_review, "OpenAI Codex"),
         "opencode": (run_opencode_review, "OpenCode"),
@@ -540,32 +572,13 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
     remote_sha = get_pr_head_sha(pr_number)
-    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, post as comment note
+    # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, note it
     if not remote_sha or (commit_sha and commit_sha != remote_sha):
         print(
             f"Notice: Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
-            f"({remote_sha[:8] if remote_sha else 'unresolved'}). Posting as local PR comment note.",
+            f"({remote_sha[:8] if remote_sha else 'unresolved'}).",
             file=sys.stderr,
         )
-        res_comment = subprocess.run(
-            ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
-            capture_output=True,
-            text=True,
-        )
-        if res_comment.returncode == 0:
-            print(f"Successfully posted review note to PR #{pr_number} via `gh pr comment`.")
-            return True
-        log_error(f"Failed to post to GitHub PR #{pr_number}: {res_comment.stderr}")
-        return False
-
-    res = subprocess.run(
-        ["gh", "pr", "review", str(pr_number), "--comment", "--body", formatted_body],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        print(f"Successfully posted review to PR #{pr_number} via `gh pr review`.")
-        return True
 
     res_comment = subprocess.run(
         ["gh", "pr", "comment", str(pr_number), "--body", formatted_body],
@@ -580,14 +593,9 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     return False
 
 
-def build_review_prompt(diff: str, ref_name: str, guidelines: str) -> str:
+def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str) -> str:
     branch_name = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    head_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
     ).stdout.strip()
@@ -670,28 +678,39 @@ def main():
 
     git_root = get_git_root()
     pr_num = args.pr or get_current_pr()
-    diff, ref_name = resolve_diff(pr_number=pr_num, explicit_base=args.base)
+    
+    initial_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    
+    diff, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
     if not diff.strip():
         print(f"Clean: No outgoing changes compared to {ref_name}.")
         sys.exit(0)
 
-    head_sha = subprocess.run(
+    guidelines = get_repo_guidelines(git_root)
+    full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
+
+    report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head)
+    
+    current_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
     ).stdout.strip()
-
-    guidelines = get_repo_guidelines(git_root)
-    full_prompt = build_review_prompt(diff, ref_name, guidelines)
-
-    report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=head_sha)
+    
+    if current_head != initial_head:
+        log_error(f"HEAD moved during review (from {initial_head[:8]} to {current_head[:8]}). Verdict is bound to the old commit and cannot be posted/accepted.")
+        sys.exit(1)
 
     if not report:
         log_error("Adversarial review failed to produce a valid report across all attempted engines.")
         sys.exit(1)
 
-    is_valid, is_clean, verdict_reason = parse_review_verdict(report, expected_commit_sha=head_sha)
+    is_valid, is_clean, verdict_reason = parse_review_verdict(report, expected_commit_sha=initial_head)
 
     print("\n" + "=" * 60)
     print(f"LOCAL ADVERSARIAL REVIEW REPORT ({engine_label})")
@@ -709,7 +728,7 @@ def main():
         if not pr_num:
             log_error("Could not determine PR number to post to. Use --pr <number>.")
             sys.exit(1)
-        posted = post_review_to_github(pr_num, report, engine_label, commit_sha=head_sha)
+        posted = post_review_to_github(pr_num, report, engine_label, commit_sha=initial_head)
         if not posted:
             sys.exit(1)
 

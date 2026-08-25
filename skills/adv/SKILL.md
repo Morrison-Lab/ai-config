@@ -21,11 +21,13 @@ Runs a local adversarial AI code review on outgoing branch commits using an alte
 Run the `pre-push-review.py` script with the `--engine alternate` flag to rotate through available models, or specify a specific engine.
 
 ```bash
-# Alternate among available models/engines
-python3 scripts/pre-push-review.py --engine alternate
+# Resolve the review script relative to the installed skill
+REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills/adv', '~/.gemini/skills/adv', '~/.cursor/skills/adv', '~/.codex/skills/adv'] if os.path.exists(os.path.expanduser(f))), 'skills/adv'); print(os.path.abspath(os.path.join(os.path.dirname(p), '..', 'scripts', 'pre-push-review.py')))")
+
+python3 "$REVIEW_SCRIPT" --engine alternate
 
 # Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode)
-python3 scripts/pre-push-review.py --engine codex
+python3 "$REVIEW_SCRIPT" --engine codex
 ```
 
 ## How it works

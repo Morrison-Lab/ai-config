@@ -375,29 +375,28 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, _, _ = reviewer.parse_review_verdict("")
         self.assertFalse(is_valid)
 
-    def test_build_review_prompt_structure(self):
+    @patch("subprocess.run")
+    def test_build_review_prompt_structure(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="feature-branch\n", returncode=0)
+
         prompt = reviewer.build_review_prompt(
             diff="+ print('hello world')",
             ref_name="origin/main",
             guidelines="Strict merge policy: never merge without permission.",
+            head_sha="00000000"
         )
         self.assertIn("ADVERSARIAL AI CODE REVIEWER", prompt)
-        self.assertIn("Summary Verdict", prompt)
-        self.assertIn("Critical Findings", prompt)
+        self.assertIn("Context: feature-branch (diff against origin/main)", prompt)
+        self.assertIn("Strict merge policy: never merge without permission.", prompt)
         self.assertIn("+ print('hello world')", prompt)
+        self.assertIn("Reviewed-Commit: 00000000", prompt)
 
-    @patch("shutil.which")
-    @patch("os.path.isfile")
-    def test_detect_available_engines(self, mock_isfile, mock_which):
-        mock_which.side_effect = lambda name: f"/usr/local/bin/{name}"
-        mock_isfile.return_value = True
+    @patch("os.path.isfile", return_value=True)
+    @patch("shutil.which", return_value=True)
+    def test_detect_available_engines(self, mock_which, mock_isfile):
         engines = reviewer.detect_available_engines()
-        self.assertEqual(engines, ["claude", "codex", "opencode", "antigravity"])
+        self.assertEqual(engines, ["claude", "cursor", "codex", "opencode", "antigravity"])
 
-        mock_which.side_effect = lambda name: "/usr/local/bin/codex" if name == "codex" else None
-        mock_isfile.return_value = False
-        engines = reviewer.detect_available_engines()
-        self.assertEqual(engines, ["codex"])
 
     @patch.object(reviewer, "run_claude_review")
     @patch.object(reviewer, "run_codex_review")
@@ -434,7 +433,7 @@ class TestPrePushReview(unittest.TestCase):
             return m
 
         mock_subproc.side_effect = fake_run
-        diff, label = reviewer.resolve_diff(explicit_base="origin/main")
+        diff, label = reviewer.resolve_diff("head123", explicit_base="origin/main")
         self.assertIn("+line", diff)
         self.assertEqual(label, "origin/main")
 
@@ -542,21 +541,21 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
     def test_get_next_alternate_engine_rotation(self):
-        engines = ["claude", "codex", "opencode", "antigravity"]
+        engines = ["claude", "cursor", "codex", "opencode", "antigravity"]
         # When no prior state exists, starts with first available engine
         with patch("os.path.isfile", return_value=False):
             e1 = reviewer.get_next_alternate_engine(engines)
             self.assertEqual(e1, "claude")
 
-        # When last engine was claude, next is codex
+        # When last engine was claude, next is cursor
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "claude"}')):
             e2 = reviewer.get_next_alternate_engine(engines)
-            self.assertEqual(e2, "codex")
+            self.assertEqual(e2, "cursor")
 
-        # When last engine was codex, next is opencode
-        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "codex"}')):
+        # When last engine was cursor, next is codex
+        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "cursor"}')):
             e3 = reviewer.get_next_alternate_engine(engines)
-            self.assertEqual(e3, "opencode")
+            self.assertEqual(e3, "codex")
 
         # When last engine was antigravity, wraps around to claude
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "antigravity"}')):

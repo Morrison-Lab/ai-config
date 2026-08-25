@@ -302,6 +302,11 @@ def main():
             elif isinstance(last_msg, str):
                 prompt_val = last_msg
                 
+        if isinstance(prompt_val, list):
+            prompt_val = " ".join(str(p.get("text", p) if isinstance(p, dict) else p) for p in prompt_val)
+        elif not isinstance(prompt_val, str):
+            prompt_val = str(prompt_val)
+
         ups_payload = {
             "prompt": prompt_val,
             "invocation_num": payload.get("invocationNum"),
@@ -332,7 +337,8 @@ def main():
                     except Exception:
                         pass
                     if text_out:
-                        injected_messages.append(text_out)
+                        # Cap injected message length at 10KB to prevent unbounded context growth
+                        injected_messages.append(text_out[:10000])
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages]

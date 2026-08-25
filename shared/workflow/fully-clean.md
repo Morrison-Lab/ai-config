@@ -676,8 +676,13 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+GitHub's `mergeable` / `mergeStateStatus: CLEAN` is not a license to call the PR mergeable.
+A PR without a clean review verdict on the latest commit is not mergeable.
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+- **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
+- **Don't:** describe that PR as mergeable, ready to merge, or "green and mergeable."
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

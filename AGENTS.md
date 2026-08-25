@@ -319,6 +319,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+- **Never describe a PR as mergeable without a clean review verdict on the latest commit.**
+  GitHub's `mergeable` / `mergeStateStatus: CLEAN` means only that git can merge without conflicts.
+  A PR whose latest commit has no authentic clean review is not mergeable.
+  Report it as blocked on review, not as mergeable.
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per

@@ -99,7 +99,7 @@ def main() -> int:
         "submittedAt": "2026-08-05T18:14:14Z",
         "body": "LGTM, thanks!",
         "state": "APPROVED",
-        "author": {"login": "the repository owner"},
+        "author": {"login": "d-morrison"},
         "commit": {"oid": "sha123"}
     }
 
@@ -204,7 +204,7 @@ def main() -> int:
     human_no_sha = {
         "createdAt": "2026-08-05T18:30:00Z",
         "body": "Looks good to me!",
-        "author": {"login": "the repository owner"},
+        "author": {"login": "d-morrison"},
     }
     mock_pr_data4 = json.dumps({"comments": [human_no_sha], "reviews": []})
     with patch.object(checker, "run_cmd", side_effect=[mock_pr_data4]):
@@ -222,7 +222,7 @@ def main() -> int:
         "submittedAt": "2026-08-05T18:14:14Z",
         "body": "My verdict: this looks great, ship it!",
         "state": "COMMENTED",
-        "author": {"login": "the repository owner"},
+        "author": {"login": "d-morrison"},
         "commit": {"oid": "sha123"},
     }
     mock_hmv = json.dumps({"comments": [], "reviews": [human_marker_verdict]})
@@ -237,7 +237,7 @@ def main() -> int:
         "submittedAt": "2026-08-05T18:14:14Z",
         "body": "Thanks for the code review process improvements here, LGTM overall.",
         "state": "APPROVED",
-        "author": {"login": "the repository owner"},
+        "author": {"login": "d-morrison"},
         "commit": {"oid": "sha123"},
     }
     mock_hmc = json.dumps({"comments": [], "reviews": [human_marker_codereview]})

@@ -329,7 +329,7 @@ behind both.
 
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
-none is `APPROVED` --- `the repository owner`'s own included, so this is not a bot
+none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot
 limitation:
 
 ```sh

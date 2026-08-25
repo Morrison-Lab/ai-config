@@ -48,7 +48,7 @@ def main():
             if not has_human_review and len(reviews) == 0:
                 print(json.dumps({
                     "decision": "deny",
-                    "reason": "Strict Merge Control Policy: AI reviewer skipped or deadlocked, and no human review is present. You cannot use mwc to bypass the review boundary. Request human review from the repository owner."
+                    "reason": "Strict Merge Control Policy: AI reviewer skipped or deadlocked, and no human review is present. You cannot use mwc to bypass the review boundary. Request human review from d-morrison."
                 }))
                 return
     except Exception as e:

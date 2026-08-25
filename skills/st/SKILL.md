@@ -119,7 +119,7 @@ git checkout -b <type>/<slug> origin/main   # CREATE_BRANCH — fix/ feat/ docs/
   implementation onto the PR, committing with a message referencing the issue
   (`fix: … (closes #N)`).
 - **Mark the PR ready for review** (`gh pr ready <N>` — `MARK_PR_READY`) and
-  request `the repository owner` as reviewer (`request-pr-review`).
+  request `d-morrison` as reviewer (`request-pr-review`).
 - **ARDI** the PR to a clean verdict (`ardi`). Don't merge unless asked.
 
 ### 6. Report

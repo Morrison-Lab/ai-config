@@ -175,7 +175,7 @@ That is [`fail-fast`](../shared/principles/fail-fast.md)'s "partial is worse tha
   It prints that note only when run *without* `--fix`.
 - **Don't:** read a `PreToolUse` breakage minutes after a `--fix` as drift from an earlier state --- check whether the entry is one you just wrote.
 
-(2026-08-05 ~23:24 PDT / 2026-08-06 06:24Z, `the repository owner`'s machine, the same `settings.json` as the incident above.
+(2026-08-05 ~23:24 PDT / 2026-08-06 06:24Z, `d-morrison`'s machine, the same `settings.json` as the incident above.
 `install-hooks.py --fix` registered three hooks --- `remind-deserialize-before-binary-claim.py`, `remind-both-sides-from-git.py`, and `no-unauthorized-merge.py` --- none of which were in `~/.claude/hooks/`.
 The third is `PreToolUse` on `Bash`, so every subsequent Bash call died.
 All three were legitimately on `main` by then: `no-unauthorized-merge.py` from #1157 (merged 00:45:42Z), `remind-both-sides-from-git.py` from #1186 (03:37:06Z), and `remind-deserialize-before-binary-claim.py` from #1181 (06:18:11Z, six minutes before the incident) --- so only two were the newly-merged pair the operator had in mind, and the third rode along.

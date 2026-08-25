@@ -326,7 +326,7 @@ Render a **Review Summary Table** for the PR:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
+| [#<N>](https://github.com/<owner>/<repo>/pull/<N>) | `<author>` | [✅ Clean (Round N)](url) | 🟢 All Green | `d-morrison` | Ready for human review |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`.
 - **Author** --- author login.
@@ -338,7 +338,7 @@ Render a **Review Summary Table** for the PR:
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
-  When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
+  When AI review is clean and CI is green, list requested reviewers (e.g. `d-morrison`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
 - **Next Step** --- computed deterministically using the full state matrix:
@@ -352,8 +352,8 @@ Render a **Review Summary Table** for the PR:
   - If CI is pending: `Wait for CI (<pending-check>)`.
   - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
   - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
-    - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
-    - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
+    - If `Author` is `d-morrison` (self-authored): `Ready for self-merge`.
+    - If `Author` is external and human review is requested (`d-morrison`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.
 
 State, plainly: the latest review's verdict, who/what posted it, and the list of any open findings (or "none").

@@ -326,7 +326,7 @@ at all, reported:
 
 ```
 pwd                       -> /Users/ezramorrison/Documents/GitHub/psw/.claude/worktrees/agent-a1beebe72c1787629
-git remote get-url origin -> https://github.com/the repository owner/psw.git
+git remote get-url origin -> https://github.com/d-morrison/psw.git
 ```
 
 **Checking afterwards proves nothing, which is why this stayed a hypothesis for

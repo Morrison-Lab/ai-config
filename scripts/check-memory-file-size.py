@@ -43,7 +43,7 @@ file crossing a line count is a prompt to consider splitting, not a defect
 that should block an unrelated PR -- the same stance the repo's other
 advisory check takes (the diff-scoped semantic-line-break check, which
 started here as `scripts/check-new-line-breaks.py` and now runs from
-`the repository owner/gha`'s reusable workflow per gha#300 / ai-config#703), and the
+`d-morrison/gha`'s reusable workflow per gha#300 / ai-config#703), and the
 one `shared/writing/semantic-line-breaks.md` prescribes for style findings.
 """
 from __future__ import annotations

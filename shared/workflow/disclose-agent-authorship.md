@@ -110,4 +110,4 @@ git grep -noi '@claude' -- '*.md' ':!shared/workflow/disclose-agent-authorship.m
   The reader is whoever finds the thread later.
 - **Don't:** put the marker in a commit message, a title, an issue body, or a PR body.
 
-(Directive from the user, 2026-08-24: "all comments online posted by bots should say so", citing <https://github.com/UCD-SERG/ucd-serg.github.io/pull/108#issuecomment-5397889734> --- an agent-authored claim comment posted under `the repository owner`, `type: User`, `author_association: MEMBER`, reading exactly like a human's.)
+(Directive from the user, 2026-08-24: "all comments online posted by bots should say so", citing <https://github.com/UCD-SERG/ucd-serg.github.io/pull/108#issuecomment-5397889734> --- an agent-authored claim comment posted under `d-morrison`, `type: User`, `author_association: MEMBER`, reading exactly like a human's.)

@@ -283,5 +283,5 @@ This section is the file-side complement: same remedy, different mechanism, and 
 - **Don't:** leave a bare `#N` in a memory or fragment merely because it resolves correctly where it currently lives;
   these files get quoted, migrated, and read from other repos.
 
-(Morrison-Lab/ai-config#1677, 2026-08-20: caught in review, with exactly the misdiagnosis described above --- the reviewer verified `#1677` exists in neither `the repository owner/wai` nor `Morrison-Lab/wai` and concluded the repo label was wrong.
+(Morrison-Lab/ai-config#1677, 2026-08-20: caught in review, with exactly the misdiagnosis described above --- the reviewer verified `#1677` exists in neither `d-morrison/wai` nor `Morrison-Lab/wai` and concluded the repo label was wrong.
 Three Example lines carried the same construction.)

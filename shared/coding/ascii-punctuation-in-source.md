@@ -65,7 +65,7 @@ common ones reject different things:
   until the function moves into `R/`, at which point the same em-dash in
   code starts failing CI.
 - Some repos run a dedicated non-standard-character workflow -- e.g. the
-  UCD-SERG lab manual's own check, or `the repository owner/gha`'s reusable
+  UCD-SERG lab manual's own check, or `d-morrison/gha`'s reusable
   `check-non-standard-chars` -- which rejects only a specific glyph set
   (em-dashes, curly quotes, en-dashes), not every non-ASCII code point, over
   the file types it scans.

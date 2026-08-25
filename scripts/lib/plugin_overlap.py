@@ -19,7 +19,7 @@ entries were disabled, with every skill still served by the bare-name copy.
 
 A second, independent overlap sits inside `enabledPlugins` alone. Both
 `Morrison-Lab/.claude-plugin/marketplace.json` and
-`the repository owner/.claude-plugin/marketplace.json` declare a plugin named
+`d-morrison/.claude-plugin/marketplace.json` declare a plugin named
 `ai-config` sourced from `./`, so enabling both cannot load two corpora --
 only one can own the `ai-config:` namespace. The extra entry is a no-op
 collision, and nothing warns about it.
@@ -65,7 +65,7 @@ from pathlib import Path
 
 # The plugin name both marketplaces publish. Matching is on the part before
 # `@` so any marketplace suffix is caught -- `ai-config@Morrison-Lab`,
-# `ai-config@the repository owner`, and a locally added marketplace alike.
+# `ai-config@d-morrison`, and a locally added marketplace alike.
 PLUGIN_NAME = "ai-config"
 
 

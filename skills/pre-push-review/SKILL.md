@@ -1,6 +1,6 @@
 ---
 name: pre-push-review
-description: "Run local adversarial AI code review using desktop subscription quota (Google AI Ultra, Claude, or Codex)."
+description: "Run local adversarial AI code review using desktop subscription quota (Claude, Codex, OpenCode, Antigravity)."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -10,7 +10,7 @@ allowed-tools:
 # pre-push-review
 
 Runs an automated, single-pass adversarial AI code review on your outgoing branch commits before pushing,
-drawing directly on your desktop **Google AI Ultra**, **Claude Pro/Team**, or **ChatGPT** subscription quota.
+drawing directly on your desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google AI Ultra** subscription quota.
 
 ## When this fires
 
@@ -19,26 +19,26 @@ drawing directly on your desktop **Google AI Ultra**, **Claude Pro/Team**, or **
 
 ## How it works
 
-1. Computes the outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
-2. Injects repository standards and guidelines (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`).
-3. Auto-detects and invokes the local AI CLI (`agy` -> `claude` -> `codex`), leveraging your workstation's active subscription tier.
-4. Outputs structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps).
-5. Optionally posts review verdicts directly to the GitHub PR adhering to lab disclosure policy.
+1. Computes the local outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
+2. Injects repository standards and guidelines (`AGENTS.md`, `GEMINI.md`).
+3. Auto-detects and invokes the local AI CLI in plan/read-only mode (`claude` -> `codex` -> `opencode` -> `agy`), with automatic fallback on quota exhaustion.
+4. Validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps).
+5. Optionally posts review verdicts directly to the GitHub PR bound to the reviewed commit SHA.
 
 ## Usage
 
 ```bash
-# Auto-detect local AI CLI (priority: agy -> claude -> codex)
+# Auto-detect local AI CLI (priority: claude -> codex -> opencode -> agy)
 python3 scripts/pre-push-review.py
 
 # Review against a specific base branch
 python3 scripts/pre-push-review.py --base origin/develop
 
-# Explicitly choose AI engine ('antigravity', 'claude', or 'codex')
-python3 scripts/pre-push-review.py --engine claude
+# Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity')
+python3 scripts/pre-push-review.py --engine codex
 
 # Pass custom model override
-python3 scripts/pre-push-review.py --engine antigravity --model gemini-2.5-pro
+python3 scripts/pre-push-review.py --engine codex --model gpt-5.6-sol
 
 # Post the review report directly to the current GitHub PR
 python3 scripts/pre-push-review.py --post

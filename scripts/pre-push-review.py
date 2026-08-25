@@ -105,7 +105,7 @@ def resolve_diff(pr_number: Optional[int] = None, explicit_base: str = "") -> Tu
 
 
 def get_repo_guidelines(root: str) -> str:
-    candidate_files = ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]
+    candidate_files = ["AGENTS.md", "GEMINI.md"]
     guidelines = []
     for fname in candidate_files:
         p = os.path.join(root, fname)
@@ -114,11 +114,30 @@ def get_repo_guidelines(root: str) -> str:
                 with open(p, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
-                        # Include up to 16,000 characters to capture full merge, attribution, and delivery rules
-                        guidelines.append(f"--- Repository Guidelines ({fname}) ---\n{content[:16000]}")
+                        guidelines.append(f"--- Repository Guidelines ({fname}) ---\n{content}")
             except Exception as e:
                 print(f"Warning: could not read {p}: {e}", file=sys.stderr)
     return "\n\n".join(guidelines)
+
+
+def validate_review_output(report: Optional[str]) -> bool:
+    """Validate that review output conforms to structured adversarial review standards."""
+    if not report or len(report.strip()) < 50:
+        return False
+    has_verdict = "### Summary Verdict" in report and ("APPROVE" in report or "NEEDS WORK" in report)
+    has_findings = "### Critical Findings" in report
+    if not (has_verdict and has_findings):
+        return False
+    refusal_patterns = [
+        "hit your weekly limit",
+        "prepayment credits depleted",
+        "unrecognized argument",
+        "api key is missing",
+    ]
+    for pat in refusal_patterns:
+        if pat in report.lower():
+            return False
+    return True
 
 
 def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
@@ -126,17 +145,26 @@ def run_antigravity_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--dangerously-skip-permissions", "-p", prompt]
+    cmd = [agy_path, "--mode", "plan", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
-    print("Running local adversarial review via Google Antigravity...")
-    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    print("Running local adversarial review via Google Antigravity (plan mode)...")
+    try:
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        print("Notice: Antigravity review timed out after 180s.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Notice: Antigravity execution failed: {e}", file=sys.stderr)
+        return None
+
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
         print(f"Notice: Antigravity review returned nonzero ({err})", file=sys.stderr)
         return None
-    return res.stdout.strip()
+    out = res.stdout.strip()
+    return out if validate_review_output(out) else None
 
 
 def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
@@ -144,17 +172,26 @@ def run_claude_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "--dangerously-skip-permissions", "-p", prompt]
+    cmd = [claude_path, "--permission-mode", "plan", "-p", prompt]
     if model:
         cmd.extend(["--model", model])
 
-    print("Running local adversarial review via Claude CLI...")
-    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    print("Running local adversarial review via Claude CLI (plan mode)...")
+    try:
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        print("Notice: Claude review timed out after 180s.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Notice: Claude execution failed: {e}", file=sys.stderr)
+        return None
+
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
         print(f"Notice: Claude review returned nonzero ({err})", file=sys.stderr)
         return None
-    return res.stdout.strip()
+    out = res.stdout.strip()
+    return out if validate_review_output(out) else None
 
 
 def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
@@ -162,18 +199,27 @@ def run_codex_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(codex_path) and not shutil.which("codex"):
         return None
 
-    print("Running local adversarial review via OpenAI Codex (ChatGPT quota)...")
+    print("Running local adversarial review via OpenAI Codex (read-only sandbox)...")
     cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check"]
     if model:
         cmd.extend(["-m", model])
     cmd.append(prompt)
 
-    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    try:
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        print("Notice: Codex review timed out after 180s.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Notice: Codex execution failed: {e}", file=sys.stderr)
+        return None
+
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
         print(f"Notice: Codex review returned nonzero ({err})", file=sys.stderr)
         return None
-    return res.stdout.strip()
+    out = res.stdout.strip()
+    return out if validate_review_output(out) else None
 
 
 def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
@@ -181,42 +227,51 @@ def run_opencode_review(prompt: str, model: str = "") -> Optional[str]:
     if not os.path.isfile(opencode_path) and not shutil.which("opencode"):
         return None
 
-    print("Running local adversarial review via OpenCode...")
+    print("Running local adversarial review via OpenCode (plan agent)...")
     cmd = [opencode_path, "run", "--agent", "plan"]
     if model:
         cmd.extend(["-m", model])
     cmd.append(prompt)
 
-    res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    try:
+        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        print("Notice: OpenCode review timed out after 180s.", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
+        return None
+
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
         print(f"Notice: OpenCode review returned nonzero ({err})", file=sys.stderr)
         return None
-    return res.stdout.strip()
+    out = res.stdout.strip()
+    return out if validate_review_output(out) else None
 
 
 def detect_available_engines() -> List[str]:
-    """Return all available local engines in priority order."""
+    """Return available local engines in preferred fallback priority: claude -> codex -> opencode -> agy."""
     engines = []
-    if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
-        engines.append("antigravity")
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
         engines.append("claude")
     if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
         engines.append("codex")
     if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
         engines.append("opencode")
+    if shutil.which("agy") or os.path.isfile(os.path.expanduser("~/.local/bin/agy")):
+        engines.append("antigravity")
     return engines
 
 
 def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
-        "antigravity": (run_antigravity_review, "Google Antigravity"),
-        "agy": (run_antigravity_review, "Google Antigravity"),
         "claude": (run_claude_review, "Claude Code (Local)"),
         "codex": (run_codex_review, "OpenAI Codex"),
         "opencode": (run_opencode_review, "OpenCode"),
+        "antigravity": (run_antigravity_review, "Google Antigravity"),
+        "agy": (run_antigravity_review, "Google Antigravity"),
     }
 
     if engine != "auto":
@@ -229,7 +284,7 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
 
     available = detect_available_engines()
     if not available:
-        log_error("No supported AI CLI found (`agy`, `claude`, `codex`, `opencode`).")
+        log_error("No supported AI CLI found (`claude`, `codex`, `opencode`, `agy`).")
         return None, "None"
 
     for cand in available:
@@ -237,24 +292,26 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         report = runner(prompt, model=model)
         if report:
             return report, label
-        print(f"Engine '{label}' was unavailable or exhausted; falling back to next engine...")
+        print(f"Engine '{label}' was unavailable, exhausted, or produced invalid output; falling back...")
 
     return None, "Fallback Chain"
 
 
-def format_review_body(report: str, engine_name: str) -> str:
+def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> str:
     """Format review report for GitHub PR posting adhering to lab disclosure policy."""
+    sha_line = f"\n**Reviewed Commit**: `{commit_sha}`\n" if commit_sha else ""
     return (
-        f"### Local Adversarial AI Review ({engine_name})\n\n"
+        f"### Local Adversarial AI Review ({engine_name})\n"
+        f"{sha_line}\n"
         f"{report}\n\n"
         "---\n"
         f"_Posted by {engine_name} (AI agent) --- not written by a human._"
     )
 
 
-def post_review_to_github(pr_number: int, report: str, engine_name: str) -> bool:
+def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_sha: str = "") -> bool:
     """Post review report directly to GitHub PR via gh CLI."""
-    formatted_body = format_review_body(report, engine_name)
+    formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 
     res = subprocess.run(
         ["gh", "pr", "review", str(pr_number), "--comment", "--body", formatted_body],
@@ -383,7 +440,12 @@ def main():
         if not pr_num:
             log_error("Could not determine PR number to post to. Use --pr <number>.")
             sys.exit(1)
-        posted = post_review_to_github(pr_num, report, engine_label)
+        head_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        posted = post_review_to_github(pr_num, report, engine_label, commit_sha=head_sha)
         if not posted:
             sys.exit(1)
 

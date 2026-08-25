@@ -1,6 +1,6 @@
 ---
 name: "pre-push-review"
-description: "Run local adversarial AI code review using desktop subscription quota (Google AI Ultra, Claude, or Codex)."
+description: "Run local adversarial AI code review using desktop subscription quota (Claude, Codex, OpenCode, Antigravity)."
 ---
 
 # pre-push-review (Codex wrapper)

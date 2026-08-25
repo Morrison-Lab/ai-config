@@ -141,49 +141,21 @@ that also concludes a phase in `plan.md`.
 
 3.  **Execute Automated Tests with Proactive Debugging:**
 
-    -   Before execution, you **must** announce the exact shell command you will
-        use to run the tests.
-    -   **Example Announcement:** "I will now run the automated test suite to
-        verify the phase. **Command:** `CI=true npm test`"
+    -   Before execution, announce the exact shell command used to run tests.
+    -   **Example Announcement:** "Running automated test suite: `CI=true npm test`"
     -   Execute the announced command.
-    -   If tests fail, you **must** inform the user and begin debugging. You may
-        attempt to propose a fix a **maximum of two times**. If the tests still
-        fail after your second proposed fix, you **must stop**, report the
-        persistent failure, and ask the user for guidance.
+    -   If tests fail, proactively inspect logs, root-cause the failure, and iterate to repair failures until clean per `AGENTS.md`. If genuinely blocked on an external requirement, file an issue and escalate.
 
-4.  **Propose a Detailed, Actionable Manual Verification Plan:**
+4.  **Propose a Detailed, Actionable Verification Summary:**
 
-    -   **CRITICAL:** To generate the plan, first analyze `product.md`,
-        `product-guidelines.md`, and `plan.md` to determine the user-facing
-        goals of the completed phase.
-    -   You **must** generate a step-by-step plan that walks the user through
-        the verification process, including any necessary commands and specific,
-        expected outcomes.
-    -   The plan you present to the user **must** follow this format:
+    -   Analyze `product.md`, `product-guidelines.md`, and `plan.md` to confirm the goals of the completed phase are met.
+    -   Generate a verification summary documenting automated test results and verification steps.
 
-        **For a Frontend Change:** ``` The automated tests have passed. For
-        manual verification, please follow these steps:
+5.  **Autonomous Progress & User Feedback:**
 
-        **Manual Verification Steps:** 1. **Start the development server with
-        the command:** `npm run dev` 2. **Open your browser to:**
-        `http://localhost:3000` 3. **Confirm that you see:** The new user
-        profile page, with the user's name and email displayed correctly. ```
-
-        **For a Backend Change:** ``` The automated tests have passed. For
-        manual verification, please follow these steps:
-
-        **Manual Verification Steps:** 1. **Ensure the server is running.** 2.
-        **Execute the following command in your terminal:** `curl -X POST
-        http://localhost:8080/api/v1/users -d '{"name": "test"}'` 3. **Confirm
-        that you receive:** A JSON response with a status of `201 Created`. ```
-
-5.  **Await Explicit User Feedback:**
-
-    -   After presenting the detailed plan, ask the user for confirmation:
-        "**Does this meet your expectations? Please confirm with yes or provide
-        feedback on what needs to be changed.**"
-    -   **PAUSE** and await the user's response. Do not proceed without an
-        explicit yes or confirmation.
+    -   Per `AGENTS.md`, default to action without asking for non-destructive, verified steps.
+    -   Report completed verification in the past tense.
+    -   Ask the user only for destructive, ambiguous, high-impact, or genuinely blocking decisions.
 
 6.  **Identify Target Commit for Report:**
 

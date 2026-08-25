@@ -112,14 +112,15 @@ Measured 2026-08-25 on
 A foreground `Task` dispatch
 (`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`, catalog name
 "Final review HEAD f71c02ea") ran on `f71c02ea`.
-The posted comment was author-assembled via ManagePullRequest, labeled
+The posted comment was author-assembled, labeled
 "Fallback self-review", copied the child's
 `### Verdict: Ready for merge` and `Reviewed-Commit` lines, and wrapped
 them in a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
 The parent JSON `tool_result` carried identity fields and no review body.
-On Cursor Cloud that identity-only return is expected; fetch the child
-transcript before posting (see [`memories/cursor.md`](../../memories/cursor.md)).
+On Cursor Cloud that identity-only return is expected; quote the harness
+paste of the child's final message, or fetch the child transcript, before
+posting (see [`memories/cursor.md`](../../memories/cursor.md)).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,

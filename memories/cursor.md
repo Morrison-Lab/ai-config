@@ -88,7 +88,7 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 ## Cursor Cloud Task `tool_result` is identity-only
 
 A Cursor Cloud `Task` JSON `tool_result` (harness logs may show `task_v2`)
-carries identity fields (`agentId`, `cloudAgentBcId`) and no review body,
+carries identity fields (including `cloudAgentBcId`) and no review body,
 even when the child ran in the foreground.
 That JSON is not the report to post as a fallback comment.
 The harness may still paste the child's final message into the parent

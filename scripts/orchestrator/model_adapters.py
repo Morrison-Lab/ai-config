@@ -384,7 +384,13 @@ class ClaudeAdapter(BaseModelAdapter):
         target_model = model or self.default_model
 
         if shutil.which("claude"):
-            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+            pure_llm_preamble = (
+                "You are a pure code synthesis engine running in non-interactive batch mode.\n"
+                "You have NO interactive tools and MUST NOT emit <invoke> tags, function calls, or interactive prompts.\n"
+                "You MUST directly output the complete updated file or search/replace blocks in markdown code blocks."
+            )
+            base_system = f"{pure_llm_preamble}\n\n{system_prompt}" if system_prompt else pure_llm_preamble
+            full_prompt = f"{base_system}\n\n{prompt}"
             cmd = ["claude", "-p", "--tools", "", "--safe-mode", "--no-session-persistence"]
             try:
                 with self._lock:

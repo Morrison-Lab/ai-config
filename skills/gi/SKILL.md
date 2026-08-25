@@ -87,12 +87,10 @@ check both explicitly here).
 gh issue view <N> --json comments --jq '.comments | last | .body' | cat   # READ_ISSUE_COMMENTS
 ```
 
-If it contains "Working on this" / "paws off" (or an equivalent claim), skip
-the issue --- unless the claim has expired: no push or comment on the issue in
-over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration
-rule.
-An expired claim is taken over by posting your own claim comment, never
-silently.
+Match the two-word invariant `hold off`, or either retired wording `paws off` / `back off`, case-insensitively --- then **exclude the comment if it also carries a release term** (`unclaim|released|PR is free|now mergeable`), because the retired release wording `... done --- paws off released.` contains `paws off` and would otherwise read as a live claim.
+See [`claim-pr`](../../shared/workflow/claim-pr.md)'s "Match the two-word invariant".
+If a live claim stands, skip the issue --- unless the claim has expired: no push or comment on the issue in over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
+An expired claim is taken over by posting your own claim comment, never silently.
 
 **(2) No open PR already references the issue:**
 
@@ -124,10 +122,14 @@ MRs/PRs that touched the same area. Don't undo past progress.
 
 ```bash
 # GitHub
-gh issue comment <N> --body "Claude Code CLI (local session) is working on this — paws off until I'm done."   # COMMENT_ISSUE
+gh issue comment <N> --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 
 # GitLab
-glab issue note <N> --message "Claude Code CLI (local session) is working on this — paws off until I'm done."
+glab issue note <N> --message "Claude Code CLI (local session) is working on this — please hold off until I'm done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"
 ```
 
 ### 7. Create a branch

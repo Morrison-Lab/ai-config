@@ -11,138 +11,95 @@ allowed-tools:
 
 # claude-review-workflow
 
-Sets up or edits the Claude PR **review** workflow (`claude-code-review.yml`),
-which runs the upstream `code-review@claude-code-plugins` plugin on a PR. For
-the **agent** workflow that edits files in response to `@claude` mentions, use
-[[claude-agent-workflow]].
+Sets up or edits the Claude PR **review** workflow (`.github/workflows/claude-code-review.yml` or `.github/workflows/claude-review.yml`),
+which delegates to the reusable [`claude-code-review.yml`](https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/claude-code-review.yml) workflow from `Morrison-Lab/gha`.
+For the **agent** workflow that edits files in response to `@claude` mentions,
+use [`claude-agent-workflow`](../claude-agent-workflow/SKILL.md).
 
-Path: `.github/workflows/claude-code-review.yml`
+Path: `.github/workflows/claude-code-review.yml` (or `.github/workflows/claude-review.yml`)
 
-## Load-bearing pieces (don't "simplify" away)
-
-### 1. Fresh comment per run — do NOT delete prior reviews
-
-Each run posts a **new** review comment and leaves earlier ones in place, so
-the PR keeps a visible review history rather than a rolling sticky.
-
-**Do not add a "delete previous Claude sticky comment" pre-step.** An older
-version of this skill recommended exactly that; it was wrong and is rejected —
-deleting prior reviews erases history and the delete-then-repost churns
-notifications. (If you find such a step in a repo, remove it.) The canonical
-workflows (qwt, rme) explicitly leave priors in place.
-
-### 2. Encourage inline comments
-
-The action already makes inline review comments possible — `permissions:
-pull-requests: write`, and the inline tool available either by allowlisting
-`mcp__github_inline_comment__create_inline_comment` (qwt) or via the default
-toolset when you only use `--disallowedTools` (rme). But the
-`code-review:code-review` plugin **defaults to a single top-level summary**
-with prose line-references, so you have to *push* it toward real inline
-comments in the prompt:
-
-```
-**Post line-specific findings as inline review comments** anchored to the
-relevant line(s) — use the inline-comment tool, not a prose list in the
-summary. Reserve the top-level summary comment for a brief overall verdict
-plus any finding not tied to a specific line; don't restate each inline
-comment there.
-```
-
-Caveat: the plugin drives much of the behavior, so prompt-strengthening only
-*partly* moves it — verify on a live PR and iterate the wording. (Added in
-qwt#93 / rme#833.)
-
-**Pitfall — duplicate `with:` block.** When a workflow file has a commented-out
-`# with:` template block *below* the active `with:` block, do **not** uncomment
-it as a second `with:` key. YAML duplicate keys cause the second to silently
-override the first, dropping `pr-number` on `workflow_dispatch` runs. Instead,
-add `prompt-addendum` as a new key *inside* the existing `with:` block:
+## Standard caller stub
 
 ```yaml
-    with:
-      pr-number: ${{ inputs.pr_number }}
-      prompt-addendum: |
-        ...
-```
+name: Claude Code Review
 
-### 3. Event-gated `track_progress`
-
-```yaml
-track_progress: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-```
-
-`track_progress: true` forces tag mode, which guarantees a tracking comment
-even when the plugin scores the PR below its post threshold (≥80). **But the
-action rejects `track_progress` for `workflow_dispatch`** and fails the whole
-step — and `claude.yml` dispatches this workflow via `workflow_dispatch`. So
-gate it on `event_name`: tag mode for `pull_request`, agent mode for dispatched
-runs (which may then be silent on small/mechanical PRs — acceptable vs. the
-dispatch path failing outright). See d-morrison/rme#818, #801.
-
-### 4. `workflow_dispatch` path with `pr_number` input
-
-```yaml
 on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
   workflow_dispatch:
     inputs:
-      pr_number: { description: 'Pull request number to review', required: true, type: number }
+      pr_number:
+        description: 'Pull request number to review'
+        required: true
+        type: string
+
+jobs:
+  gather-context:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+    outputs:
+      prior-reviews: ${{ steps.fetch.outputs.prior-reviews }}
+    steps:
+      - id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          REVIEWS=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '[.[] | select(.user.login == "claude[bot]")] | .[-3:] |
+                  .[] | "=== Review posted \(.created_at) ===\n\(.body)\n"' \
+            2>/dev/null | head -c 12000 || true)
+          {
+            echo 'prior-reviews<<__REVIEWS_EOF__'
+            echo "$REVIEWS"
+            echo '__REVIEWS_EOF__'
+          } >> "$GITHUB_OUTPUT"
+
+  review:
+    needs: gather-context
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
+    secrets: inherit
+    with:
+      pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}
 ```
 
-`claude.yml` dispatches a fresh review after an `@claude` run pushes commits
-or on an `@claude review` comment. `GITHUB_TOKEN`-driven pushes don't fire
-`synchronize`, so this explicit dispatch path is required, and the job must
-resolve `PR_NUMBER` from `github.event.pull_request.number || inputs.pr_number`.
+## Load-bearing pieces (managed by `Morrison-Lab/gha`)
 
-### 5. Skip drafts / Dependabot / forks — except dispatched runs
+By delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`,
+the consumer repo automatically inherits:
 
-The `if:` runs `workflow_dispatch` unconditionally (so a review fires on the
-draft PR claude.yml opens for an issue trigger), otherwise skips drafts,
-`dependabot[bot]`, and fork PRs (forks can't read `CLAUDE_CODE_OAUTH_TOKEN`,
-so the run would fail with a noisy red check).
+1. **History preservation**: Fresh review comment posted per run without deleting prior review history.
+2. **Inline comment prompt**: Pushes review findings toward line-anchored comments via `mcp__github_inline_comment__create_inline_comment`.
+3. **Dispatch and event-gating**: Handles both `pull_request` and `workflow_dispatch` triggers, with branch-anchored dispatch resolution.
+4. **Draft and fork guards**: Skips unready drafts, Dependabot PRs, and tokenless fork PRs while executing dispatched runs.
+5. **Concurrency & self-cancellation safety**: Concurrency group keyed per PR with `cancel-in-progress: true`.
+6. **Package customization**: Supports `apt-packages` and `pip-packages` (e.g. `maxima`, `sympy`) for CAS-driven mathematical verification when needed.
+7. **Prompt extensions**: Custom repo-level instructions passed via `prompt-addendum`.
 
-### 6. Concurrency
+## Inputs and customization
 
-```yaml
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
-```
-
-`cancel-in-progress: true` is safe here **only because this workflow is
-read-only** (its tools grant no git push/commit, so it never pushes a fix and
-can't self-cancel). A review workflow that can push fixes must guard against
-cancelling its own triggered run — see d-morrison/rme#817.
-
-### 7. Optional: install a computer algebra system when math verification would help
-
-`apt-packages` / `pip-packages` inputs on `claude-code-review.yml` mirror the
-inputs `claude.yml` already had (both empty by default) and let a repo's
-review job install system/pip packages before the review runs — most usefully a CAS (`apt-packages: maxima`, `pip-packages:
-sympy`) so the reviewer's Bash tool can symbolically check a derivation
-instead of eyeballing the algebra. Set these only for repos with substantial
-math-heavy prose (e.g. rme's textbook chapters); most repos need neither.
-Pair with a `prompt-addendum` telling the reviewer to actually use the
-installed CAS for derivations/proofs, and — when the repo has a PR-preview
-deploy — to check any computed value or figure the prose describes against
-the rendered output rather than trusting the prose's own description (see
-`Morrison-Lab/ai-config`'s `shared/writing/fact-check-prose.md` and the
-`fact-check-prose` skill for the full policy this operationalizes).
+- `pr-number`: Required PR number passed from caller.
+- `prompt-addendum`: Repo-specific review instructions (e.g. Quarto/R checks, domain invariants).
+- `apt-packages` / `pip-packages`: Optional system/Python packages for verification (e.g. CAS engines).
+- `setup-r`: Set `true` if R packages or renv environment need initialization during review.
 
 ## Setting up in a new repo
 
-1. Confirm `CLAUDE_CODE_OAUTH_TOKEN` secret exists (`gh secret list`).
-2. Write the workflow with the pieces above. Keep the read-only tool posture
-   (`--disallowedTools` for git writes, or an allowlist without them).
-3. Add a repo-specific addendum to the prompt (Quarto/R checks, etc.) if the
-   project warrants it — see qwt's review workflow for an example.
+1. Confirm `CLAUDE_CODE_OAUTH_TOKEN` secret exists in repo/org secrets (`gh secret list`).
+2. Add the caller stub at `.github/workflows/claude-code-review.yml`.
+3. Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: read`) are declared on the caller job.
+4. Pass any project-specific guidance via `prompt-addendum`.
 
 ## Relationship to other skills
 
-- **`claude-agent-workflow`** — the companion skill for the agent workflow
-  that edits files in response to `@claude` mentions; see the top of this
-  file.
-- **`config-ai`** — the broader router: when a request is "change how the
-  `@claude` bot behaves when invoked," not "add something consumers' CI can
-  call," `config-ai` hands off to this skill (or `claude-agent-workflow`)
-  rather than `skill-builder`/`agent-builder`.
+- [`claude-agent-workflow`](../claude-agent-workflow/SKILL.md) — Companion skill for the interactive editing agent workflow.
+- [`upgrade-to-gha`](../../shared/workflow/upgrade-to-gha.md) — Migration guidelines for upgrading standalone workflows to `Morrison-Lab/gha`.
+- [`config-ai`](../config-ai/SKILL.md) — Router for AI workflow capability requests.

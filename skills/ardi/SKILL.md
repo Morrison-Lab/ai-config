@@ -19,7 +19,14 @@ finding → push → post summary → re-request review → repeat until clean.
 
 1. **Identify and claim the PR/MR.**
 Use the current branch's open MR, or the one the user specified.
-Post a brief claim comment (`COMMENT_PR`) so a parallel `@claude` CI run or another person doesn't start a colliding session: `gh pr comment <N> --body "Driving this PR to clean --- back off until done."`
+Post a brief claim comment (`COMMENT_PR`) so a parallel `@claude` CI run or another person doesn't start a colliding session.
+The body carries a real blank line before the disclosure marker --- `\n` inside a bash double-quoted string is the two characters, not a newline:
+
+```bash
+gh pr comment <N> --body "Driving this PR to clean --- please hold off until done.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
+```
 Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).
 (`COMMENT_PR` and the other bracketed tokens below are abstract operation tokens --- resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
@@ -383,8 +390,13 @@ The loop stopped to ask twice under the old guard; both times the answer was to 
 
 ## On clean
 
-Post an unclaim comment (`COMMENT_PR` --- `gh pr comment <N> --body "Done --- PR is free."`) to
-unblock any parallel sessions that backed off in step 1.
+Post an unclaim comment (`COMMENT_PR`) to unblock any parallel sessions that backed off in step 1:
+
+```bash
+gh pr comment <N> --body "Done --- PR is free.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
+```
 
 **Then run `ums`, before reporting ready.**
 The clean verdict is the proactive-UMS checkpoint for this PR, not the merge;

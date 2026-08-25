@@ -112,6 +112,17 @@ gh pr comment <N> --body-file ard-summary.md         # COMMENT_PR — GitHub
 glab mr note <N> -F ard-summary.md                   # GitLab
 ```
 
+**End `ard-summary.md` with the agent-disclosure marker**, on its own line after a blank line:
+
+```
+_Posted by Claude Code (AI agent) --- not written by a human._
+```
+
+This comment is posted under the account holder's own login on every round of every PR, so it is among the likeliest in the corpus to be mistaken for their own writing --- see [`disclose-agent-authorship`](../../shared/workflow/disclose-agent-authorship.md).
+The body arrives via `--body-file`, which the disclosure guard cannot read.
+It still warns --- but only that the body is unreadable, never that the marker is absent, and that weaker note reads as a formality rather than a finding.
+So this step states the requirement itself.
+
 **Keep the bot's trigger phrase out of the summary body.** The `issue_comment`
 trigger fires on the bare bot `@`-mention **anywhere** in a comment — even in a
 sentence saying you're *not* re-requesting a review. Refer to it obliquely
@@ -162,6 +173,8 @@ resolve via GraphQL (`RESOLVE_REVIEW_THREAD`):
 # /tmp/reply-<comment_id>.md silently writes to the wrong file)
 cat > "/tmp/reply-<comment_id>.md" <<'EOF'
 ✅ Addressed in `<sha>`.
+
+_Posted by Claude Code (AI agent) --- not written by a human._
 EOF
 gh api "repos/{owner}/{repo}/pulls/<N>/comments" \
   -F in_reply_to="<comment_id>" -F body="@/tmp/reply-<comment_id>.md"   # REPLY_REVIEW_COMMENT
@@ -182,6 +195,8 @@ In a remote/web session without `gh`, resolve `RESOLVE_REVIEW_THREAD` via
 ```bash
 cat > "/tmp/reply-<discussion_id>.md" <<'EOF'
 Addressed in `<sha>`.
+
+_Posted by Claude Code (AI agent) --- not written by a human._
 EOF
 glab api -X POST "projects/:id/merge_requests/<N>/discussions/<discussion_id>/notes" \
   -F body="@/tmp/reply-<discussion_id>.md"

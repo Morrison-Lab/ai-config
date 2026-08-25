@@ -179,6 +179,35 @@ When recording facts about any software or technology across memories, documenta
 - State the vintage explicitly so future readers and sessions know when the fact was verified and to re-verify against current state rather than treating it as permanent.
 - See [`shared/writing/timestamp-volatile-claims.md`](shared/writing/timestamp-volatile-claims.md).
 
+## Every comment you post to a forge says an agent posted it
+
+See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
+
+An agent driving `gh`/`glab` under the account holder's credentials posts as **that person**: their login, their avatar, a `MEMBER` association, and `type: User`.
+Nothing in the API distinguishes such a comment from one they typed, so a reader deciding how much weight to give a claim, a status note, or a review has no way to tell which they are reading.
+The forge cannot say it; the body must.
+
+End every comment an agent posts with this line, on its own, after a blank line:
+
+```
+_Posted by Claude Code (AI agent) --- not written by a human._
+```
+
+Substitute your own agent's name where you are not Claude Code, and keep the rest of the line verbatim so one query finds every disclosed comment.
+Check the substituted **name** against `REVIEW_BODY_MARKERS` as well as a replacement marker: `code review` is one of its entries, so an agent named for code review would reintroduce through its own name the false-clean the emoji ban exists to prevent.
+
+The marker deliberately contains **no robot emoji**: [`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) matches that emoji as a review-body marker, so a disclosed claim comment would be admitted into the fully-clean verdict scan as a finding-free review.
+Check any replacement marker against that script's `REVIEW_BODY_MARKERS` and `REVIEW_AGENT_MARKERS` before adopting it.
+
+Scope: comment bodies, on every surface --- claims, releases, status notes, review replies, self-reviews, issue comments filed on the user's behalf.
+Not commit messages, not titles, not issue bodies, not PR bodies, each of which has its own attribution convention.
+Two exemptions.
+A comment another machine parses as a command (`@dependabot rebase`), where the test is the audience rather than the length.
+And a comment posted under a genuine bot token, where the forge already reports `type: Bot` and the marker adds nothing.
+
+- **Do:** append the marker to every agent-posted comment, including ones whose prose already identifies the session.
+- **Don't:** use the robot emoji in the marker, and don't read "the account holder knows an agent is running" as making the disclosure unnecessary --- the reader is whoever finds the thread later.
+
 ## File formatting & links
 
 - Use GitHub-style markdown for all responses and documentation.
@@ -187,15 +216,10 @@ When recording facts about any software or technology across memories, documenta
 
 ## Deliver completed implementation work
 
-When asked to implement, edit, or write up a change on a feature branch, do
-not stop at an uncommitted worktree.
-Complete the delivery cycle: create the applicable tracking issue when
-issue-first workflow applies, commit the scoped changes, run local
-adversarial self-review to a clean verdict, push the branch, open or update
-its Pull Request, request AI review after the final push, and drive CI and
-review findings to a clean result.
-This does not grant merge authority; the strict merge policy below still
-applies.
+When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree.
+Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result.
+This does not grant merge authority.
+The strict merge policy below still applies.
 
 ## Every self-review is an adversarial review by a separate subagent
 
@@ -279,17 +303,21 @@ This grants no merge authority: the strict merge policy below still applies.
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
   Under `mwc`, a PR must be fully clean across CI and review (see
   [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  A clean automated Claude review evaluating the current HEAD commit is strictly required for merging with `mwc`.
+  A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+   In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 ## Cursor Cloud specific instructions

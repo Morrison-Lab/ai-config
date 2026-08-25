@@ -181,7 +181,9 @@ Top-level comment on the discussion (uses the discussion `id` from step 3,
 `COMMENT_DISCUSSION`):
 
 ```bash
-gh api graphql -f discussionId='<discussion-id>' -f body='<reply text>' -f query='
+gh api graphql -f discussionId='<discussion-id>' -f body='<reply text>
+
+_Posted by Claude Code (AI agent) --- not written by a human._' -f query='
   mutation($discussionId: ID!, $body: String!) {
     addDiscussionComment(input: {discussionId: $discussionId, body: $body}) {
       comment { id url }
@@ -193,7 +195,9 @@ Threaded reply to a specific comment — add `replyToId` (the comment `id`,
 also `COMMENT_DISCUSSION`):
 
 ```bash
-gh api graphql -f discussionId='<discussion-id>' -f replyToId='<comment-id>' -f body='<reply text>' -f query='
+gh api graphql -f discussionId='<discussion-id>' -f replyToId='<comment-id>' -f body='<reply text>
+
+_Posted by Claude Code (AI agent) --- not written by a human._' -f query='
   mutation($discussionId: ID!, $replyToId: ID!, $body: String!) {
     addDiscussionComment(input: {discussionId: $discussionId, replyToId: $replyToId, body: $body}) {
       comment { id url }

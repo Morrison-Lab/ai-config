@@ -210,8 +210,7 @@ The honest answer to the question was "nothing".)
 
 ## Query all available providers sequentially
 
-When obtaining adversarial reviews, we need a clean verdict from **every** pinned provider.
-(e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
+When obtaining adversarial reviews, we need a clean verdict from **every** pinned provider (e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.
@@ -219,6 +218,6 @@ If any provider rejects the diff with findings, you must address the feedback, p
 Repeat this until all pinned providers have signed off with a clean verdict on the exact same commit.
 
 The set of required providers must be pinned at the start of the review cycle.
-If a pinned provider drops offline, you must wait for it to return or explicitly request user permission to drop it from the quorum.
+If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry, or explicitly request user permission to drop it from the quorum.
 If zero providers are available at the start of the cycle, you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
 If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving --- halt the review process and escalate to the user for a tie-breaking decision.

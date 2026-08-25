@@ -992,7 +992,7 @@ They are drawn per token for workloads benefiting from frontier/stealth models, 
 - **OpenCode**: Reaches OpenCode Go (`opencode-go/*`, $10/mo windowed subscription), free models hosted via Zen gateway (e.g. `opencode/*-free`), and a local tier (`ollama/*`).
   Free and local tiers cost no metered budget, executing without spending Claude or Codex quota (other Zen models incur per-request charges).
 - **OpenRouter**: Prepaid credit balance / key (`OPENROUTER_API_KEY`), reaching frontier/stealth previews (`openrouter/*`) via OpenCode (configured in user `~/.config/opencode/opencode.json`, measured 2026-08-23 on OpenCode 1.18.21).
-- **Local tier**: The local (`ollama/*`) tier keeps payloads on-device **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).
+- **Local tier**: The local (`ollama/*`) tier keeps payloads on-device **only when** the endpoint resolves strictly to loopback (`127.0.0.1` / `::1`), local-only mode is verified (`OLLAMA_NO_CLOUD=1`), and the model is locally resident.
 Initial OpenCode tiers measured 2026-08-19 on OpenCode 1.18.15.
 Active Go subscription and OpenRouter credit balance verified 2026-08-25.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.

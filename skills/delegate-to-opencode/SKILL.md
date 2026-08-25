@@ -60,36 +60,39 @@ It **splits**, because opencode is more than one destination, and the destinatio
 Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go.
 `ollama/*` is the only id on the whole ladder that *can* keep the payload on the machine --- not Claude, not Codex, not `agy`, and not `opencode/*` or `opencode-go/*`.
 
-**But locality is a property of the configured endpoint, not of the prefix.**
+**Locality requires three conditions: loopback resolution, local-only mode, and local model residency.**
 `ollama` is a user-authored provider entry in the opencode config, and its `options.baseURL` is an ordinary field in it.
 Pointing that field at a LAN GPU box or a remote `OLLAMA_HOST` is ordinary usage rather than an edge case, and the id still reads `ollama/*` when it happens.
-So the prefix narrows the candidates to one and licenses nothing by itself, and a model id recorded in a report names the provider label rather than the endpoint it resolved to.
-What licenses the locality claim is the endpoint check in step 1, which resolves that `baseURL` and refuses anything that is not loopback.
-Run it before sending data-triggered work, and record the endpoint it printed rather than the model id alone.
+Furthermore, resolving `baseURL` to loopback only verifies the initial connection hop: if Ollama Cloud offloading is enabled or cloud models are targeted, payloads can be forwarded off-machine through the local daemon.
+Locality is therefore licensed only when three conditions hold:
+1. The endpoint check in step 1 resolves `baseURL` strictly to loopback (`127.0.0.1` or `::1`).
+2. The Ollama daemon is configured in local-only mode (`OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud: true`).
+3. The targeted model is verified as locally resident on-device (`ollama list` confirms the model exists locally).
+Run these checks before sending data-triggered work, and record the verified endpoint and residency.
 Measured 2026-08-19 on this machine: `http://localhost:11434/v1`, resolving to `127.0.0.1` and `::1`.
 
-So a data trigger routes to `ollama/*` and forbids `opencode/*`, where under codex the same trigger simply said "delegate".
+So a data trigger routes to `ollama/*` and forbids `opencode/*` and `opencode-go/*`, where under codex the same trigger simply said "delegate".
 Read a repo's approval as naming a **destination**, not as naming delegation in general: a `CLAUDE.md` rule permitting codex for restricted data says nothing about a hosted free tier nobody has cleared.
 
 **The discriminator is the provider prefix, not the `-free` suffix.**
 `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider.
 The suffix answers a pricing question.
 The prefix answers which tier a job goes to, which is the routing question.
-It does not answer where that tier's endpoint points, which is what step 1's endpoint check settles.
+It does not answer where that tier's endpoint points, which is what step 1's endpoint and residency checks settle.
 
 **The fallback inverts differently than it does for codex.**
 There, the inversion was "wait for the window instead of falling back to Claude".
-Local has no window, so there is nothing to wait for, and the move that must be blocked is a **tier** fallback rather than a vendor one: re-running a slow or failed `ollama/*` job on `opencode/*` because the hosted tier is faster.
+Local has no window, so there is nothing to wait for, and the move that must be blocked is a **tier** fallback rather than a vendor one: re-running a slow or failed `ollama/*` job on `opencode/*` or `opencode-go/*` because the hosted tier is faster.
 That retry is one flag value away and reads as ordinary troubleshooting, which is why it needs naming rather than leaving to judgment.
 When the local tier cannot do a data-triggered job, fall back only to whatever the repo's own rule already permits --- which may be doing the work by hand.
 
 As in the codex skill, do not infer a data trigger from a repo merely holding sensitive data.
 It applies where the consuming repo has written the rule down, and that repo owns the path list.
 
-- **Do:** run step 1's endpoint check before data-triggered work, and record the endpoint it printed beside the model id so the destination is auditable afterwards.
+- **Do:** run step 1's endpoint and local-residency check before data-triggered work, and record the endpoint it printed beside the model id so the destination is auditable afterwards.
 - **Do:** send data-triggered work to an `ollama/*` id, and stop rather than re-route when the daemon is unavailable or the check refuses.
 - **Don't:** retry a failed or slow local run on a hosted model.
-- **Don't:** treat the `ollama/` prefix as the locality guarantee --- it names a provider entry whose endpoint is user-configurable.
+- **Don't:** treat the `ollama/` prefix as the locality guarantee --- it names a provider entry whose endpoint is user-configurable and whose daemon can offload to cloud.
 - **Don't:** read a `-free` suffix, or its absence, as evidence about where the payload goes.
 
 ## A third destination: OpenRouter, for models neither tier carries
@@ -179,13 +182,14 @@ An `ollama/*` id appearing in that list only says the config declares it, not th
 ```bash
 opencode run -m ollama/qwen2.5-coder:3b "Reply with exactly the word: PONG"
 opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PONG"
+opencode run -m opencode-go/claude-3-5-sonnet "Reply with exactly the word: PONG"
 ```
 
-Measured 2026-08-19 on opencode 1.18.15: both returned `PONG`, in 13.3s local and 7.9s hosted.
+Measured 2026-08-19 on opencode 1.18.15: both returned `PONG`, in 13.3s local and 7.9s hosted; Go subscription verified 2026-08-25.
 
-**Before any data-triggered work, verify the endpoint.**
-The routing rule above turns on where `ollama/*` actually points, and that is a config value rather than a fixed property, so it gets checked rather than assumed.
-`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value rather than one file that something else may override:
+**Before any data-triggered work, verify endpoint, daemon local mode, and model residency.**
+The routing rule above turns on where `ollama/*` actually points and whether cloud offloading is disabled, so it gets checked rather than assumed.
+`opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value:
 
 ```bash
 python3 - <<'PY'

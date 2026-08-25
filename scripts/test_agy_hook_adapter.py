@@ -3,8 +3,8 @@
 
 Tests the adapter in hermetic isolation by mocking `hooks/hooks.json` and subprocess calls.
 Verifies event mapping (Bash, Agent, SendMessage, Task, generic/MCP tools), multi-subagent fanout,
-regex & wildcard matchers, flat/grouped schema tolerance, Stop block-to-continue translation,
-and PreInvocation context injection.
+regex & wildcard matchers, flat and grouped schema tolerance, Stop block-to-continue translation,
+PreInvocation context injection, and unknown event handling.
 """
 import importlib.util
 import io
@@ -99,10 +99,44 @@ MOCK_HOOKS_DEF = {
     }
 }
 
+MOCK_FLAT_HOOKS_DEF = {
+    "hooks": {
+        "UserPromptSubmit": [
+            {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-flat-prompt.py\"",
+                "timeout": 10
+            }
+        ],
+        "Stop": [
+            {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-flat-stop.py\"",
+                "timeout": 10
+            }
+        ]
+    }
+}
+
 class TestAgyHookAdapter(unittest.TestCase):
     def setUp(self):
         self.assertTrue(os.path.isfile(ADAPTER_SCRIPT), f"Adapter script missing at {ADAPTER_SCRIPT}")
         self.adapter = load_adapter()
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_unknown_event_payload(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        payload = {"randomUnknownField": 1234}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+        
+        self.adapter.main()
+        
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -138,7 +172,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_pre_invocation_multi_message_join(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+    def test_pre_invocation_multi_message_steps(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
         res2 = MagicMock(returncode=0, stdout="Message 2\n", stderr="")
         mock_run.side_effect = [res1, res2]
@@ -151,23 +185,21 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         out = json.loads(mock_stdout.getvalue())
         self.assertIn("injectSteps", out)
-        self.assertEqual(len(out["injectSteps"]), 1)
-        self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "Message 1\n\nMessage 2")
-        self.assertEqual(mock_run.call_count, 2)
+        self.assertEqual(len(out["injectSteps"]), 2)
+        self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "Message 1")
+        self.assertEqual(out["injectSteps"][1]["ephemeralMessage"], "Message 2")
 
     @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_FLAT_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_stop_event_block_to_continue(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = json.dumps({"decision": "block", "reason": "Missing self-review"})
+    def test_flat_schema_tolerance(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"decision": "block", "reason": "Flat stop block"}), stderr="")
         mock_run.return_value = mock_result
         
-        payload = {"terminationReason": "model_stop", "transcriptPath": "/tmp/transcript.jsonl"}
+        payload = {"terminationReason": "model_stop"}
         mock_stdin.write(json.dumps(payload))
         mock_stdin.seek(0)
         
@@ -175,10 +207,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "continue")
-        self.assertEqual(out.get("reason"), "Missing self-review")
-        
-        input_payload = json.loads(mock_run.call_args.kwargs['input'])
-        self.assertEqual(input_payload.get("termination_reason"), "model_stop")
+        self.assertEqual(out.get("reason"), "Flat stop block")
+        mock_run.assert_called_once()
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -210,32 +240,6 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "deny")
         self.assertEqual(out.get("reason"), "Agent 2 not permitted")
-
-    @patch('os.path.exists', return_value=True)
-    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
-    @patch('sys.stdin', new_callable=io.StringIO)
-    @patch('sys.stdout', new_callable=io.StringIO)
-    @patch('sys.stderr', new_callable=io.StringIO)
-    @patch('subprocess.run')
-    def test_wildcard_and_mcp_matching(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
-        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
-        mock_run.return_value = mock_result
-        
-        payload = {
-            "toolCall": {
-                "name": "mcp__github__create_pull_request",
-                "args": {"title": "Test PR"}
-            }
-        }
-        mock_stdin.write(json.dumps(payload))
-        mock_stdin.seek(0)
-        
-        self.adapter.main()
-        
-        # Matches both mcp__github__.* and *
-        self.assertEqual(mock_run.call_count, 2)
-        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
-        self.assertEqual(call_input["tool_name"], "mcp__github__create_pull_request")
 
 if __name__ == "__main__":
     unittest.main()

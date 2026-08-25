@@ -17,17 +17,19 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
             timeout=timeout_val
         )
         if result.returncode != 0 and result.stderr:
-            print(f"claude-hook-adapter: hook {cmd} exited with code {result.returncode}: {result.stderr}", file=sys.stderr)
+            print(f"claude-hook-adapter: hook exited with code {result.returncode}: {result.stderr}", file=sys.stderr)
         return result
     except subprocess.TimeoutExpired:
-        print(f"claude-hook-adapter: hook {cmd} timed out after {timeout_val}s", file=sys.stderr)
+        print(f"claude-hook-adapter: hook timed out after {timeout_val}s", file=sys.stderr)
         return None
     except Exception as exc:
-        print(f"claude-hook-adapter: execution of {cmd} failed: {exc}", file=sys.stderr)
+        print(f"claude-hook-adapter: execution of hook failed: {exc}", file=sys.stderr)
         return None
 
 def matches_tool(matcher_pattern, tool_name):
-    if matcher_pattern == "*" or matcher_pattern == "" or matcher_pattern is None:
+    if not matcher_pattern:
+        return False
+    if matcher_pattern == "*":
         return True
     if matcher_pattern == tool_name:
         return True
@@ -78,9 +80,6 @@ def main():
         print(json.dumps({"decision": "allow"}))
         return
 
-    # NOTE: This loads the Claude Code hooks manifest (`hooks/hooks.json`), NOT the
-    # Antigravity plugin manifest (`plugins/ai-config/hooks.json`). The adapter's job
-    # is to translate Antigravity lifecycle events into invocations of the shared Claude hooks.
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     claude_hooks_json_path = os.path.join(repo_root, "hooks", "hooks.json")
     
@@ -105,13 +104,13 @@ def main():
 
     # Common fields for Claude payload
     transcript_path = payload.get("transcriptPath")
-    cwd = os.getcwd()
+    cwd = repo_root
 
     if event_type == "PreToolUse":
         tool_call = payload.get("toolCall", {})
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args", {})
-        cwd = args.get("Cwd") or os.getcwd()
+        cwd = args.get("Cwd") or repo_root
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         tasks_to_run = []
@@ -199,7 +198,7 @@ def main():
                         if hso.get("additionalContext"):
                             print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
                     except Exception as exc:
-                        print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
+                        print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
         print(json.dumps({"decision": "allow"}))
         return
@@ -231,7 +230,7 @@ def main():
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
                 except Exception as exc:
-                    print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
+                    print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
         print(json.dumps({"decision": "allow"}))
         return
@@ -261,7 +260,7 @@ def main():
                     injected_messages.append(text_out)
 
         if injected_messages:
-            steps = [{"ephemeralMessage": "\n\n".join(injected_messages)}]
+            steps = [{"ephemeralMessage": msg} for msg in injected_messages]
             print(json.dumps({"injectSteps": steps}))
         else:
             print(json.dumps({"injectSteps": []}))

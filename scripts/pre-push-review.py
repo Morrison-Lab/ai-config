@@ -360,7 +360,12 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
     engine_dispatch = {
         "claude": (run_claude_review, "Claude Code (Local)"),
         "codex": (run_codex_review, "OpenAI Codex"),
+        "dtc": (run_codex_review, "OpenAI Codex"),
         "opencode": (run_opencode_review, "OpenCode"),
+        "dto": (run_opencode_review, "OpenCode"),
+        "opencode-claude": (lambda p, model="": run_opencode_review(p, model=model or "anthropic/claude-3.7-sonnet"), "Claude via OpenCode"),
+        "opencode-zen": (lambda p, model="": run_opencode_review(p, model=model or "zen/free"), "OpenCode Zen"),
+        "ollama": (lambda p, model="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest"), "Local Ollama"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
         "agy-claude": (lambda p, model="": run_antigravity_review(p, model=model or "claude-3-7-sonnet"), "Claude via Antigravity"),
@@ -515,7 +520,11 @@ def main():
     )
     parser.add_argument(
         "--engine",
-        choices=["auto", "alternate", "round-robin", "claude", "codex", "opencode", "antigravity", "agy", "agy-claude"],
+        choices=[
+            "auto", "alternate", "round-robin", "claude", "codex", "dtc",
+            "opencode", "dto", "opencode-claude", "opencode-zen", "ollama",
+            "antigravity", "agy", "agy-claude",
+        ],
         default="auto",
         help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
     )

@@ -254,9 +254,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if is_clean and not is_clean_findings:
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
-    # If verdict claims clean, verify that no explicit blocker or must-fix phrase appears anywhere in the report
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|\b(?:blocker|blocking)\s*:)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -518,12 +517,16 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             invoker = "antigravity"
         elif "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
             invoker = "cursor"
+        elif os.environ.get("CODEX_THREAD_ID") or "codex" in os.environ.get("AGENT_NAME", "").lower():
+            invoker = "codex"
+        elif os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
+            invoker = "opencode"
 
-        if invoker in available and len(available) > 1:
+        if invoker in available:
             available.remove(invoker)
 
         if not available:
-            log_error("No supported AI CLI found.")
+            log_error(f"No alternate AI CLI found (invoking agent '{invoker}' was excluded).")
             return None, "None"
         cand = get_next_alternate_engine(available)
         runner, label = engine_dispatch[cand]

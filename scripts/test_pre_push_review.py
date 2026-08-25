@@ -334,6 +334,21 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("Contradictory output", reason)
 
+        # Contradictory report with 'must be fixed before merge'
+        obs_must_fix_report = (
+            "### Summary Verdict\n"
+            "Verdict: CLEAN\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "This must be fixed before merge.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(obs_must_fix_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("Contradictory output", reason)
+
         # Rejects contradictory APPROVE with critical blocker
         contradictory = (
             "### Summary Verdict\n"
@@ -418,6 +433,25 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "OpenAI Codex")
         mock_claude.assert_called_once()
         mock_codex.assert_called_once()
+    @patch.object(reviewer, "run_codex_review")
+    @patch.object(reviewer, "detect_available_engines")
+    def test_execute_review_alternate_invoker_exclusion(self, mock_detect, mock_codex):
+        mock_detect.return_value = ["claude", "codex"]
+        mock_codex.return_value = "### Summary Verdict\nVerdict: Ready for merge"
+        
+        # When CLAUDE_SESSION_ID is set, Claude is excluded from 'alternate'
+        with patch.dict(os.environ, {"CLAUDE_SESSION_ID": "12345"}):
+            with patch.object(reviewer, "get_next_alternate_engine", return_value="codex") as mock_get_next:
+                reviewer.execute_review("alternate", "prompt text")
+                mock_get_next.assert_called_with(["codex"])
+                
+        # When CODEX_THREAD_ID is set and only codex is available, it fails and returns None
+        mock_detect.return_value = ["codex"]
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": "67890"}):
+            with patch.object(reviewer, "log_error") as mock_log_error:
+                report, label = reviewer.execute_review("alternate", "prompt text")
+                self.assertIsNone(report)
+                mock_log_error.assert_called_with("No alternate AI CLI found (invoking agent 'codex' was excluded).")
 
     @patch("subprocess.run")
     def test_resolve_diff_local(self, mock_subproc):
@@ -521,6 +555,14 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--model", claude_cmd)
         self.assertIn("claude-3-5-sonnet", claude_cmd)
 
+        # Test Cursor runner
+        mock_which.return_value = "/opt/homebrew/bin/agent"
+        out_cursor = reviewer.run_cursor_review("prompt", model="claude-3.7-sonnet", expected_commit_sha="abc12345")
+        self.assertEqual(out_cursor, valid_report)
+        cursor_cmd = mock_subproc.call_args[0][0]
+        self.assertIn("--trust", cursor_cmd)
+        self.assertIn("--print", cursor_cmd)
+        
         # Test Antigravity runner
         mock_which.return_value = "/opt/homebrew/bin/agy"
         out_agy = reviewer.run_antigravity_review("prompt", model="claude-3-7-sonnet", expected_commit_sha="abc12345")

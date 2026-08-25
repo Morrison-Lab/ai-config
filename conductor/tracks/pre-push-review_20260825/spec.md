@@ -5,8 +5,8 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
 
 ## Functional Requirements
 1. **Engine Selection & Auto-Detection**:
-   - Support explicit `--engine` selection (`claude`, `codex`, `opencode`, `antigravity`).
-   - If `--engine auto` (or omitted), detect available installed CLIs in priority order (`claude` -> `codex` -> `opencode` -> `agy`).
+   - Support explicit `--engine` selection (`claude`, `cursor`, `codex`, `opencode`, `antigravity`).
+   - If `--engine auto` (or omitted), detect available installed CLIs in priority order (`claude` -> `cursor` -> `codex` -> `opencode` -> `agy`).
    - Allow optional `--model` flag to pass specific model strings to the target engine.
 2. **Context & Guideline Extraction**:
    - Extract git diff against detected PR base or merge-base with `origin/main` / `main`.

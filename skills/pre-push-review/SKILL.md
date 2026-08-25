@@ -32,7 +32,7 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 # Resolve the review script relative to the installed skill
 REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review'] if os.path.exists(os.path.expanduser(f))), 'skills/pre-push-review'); print(os.path.abspath(os.path.join(os.path.dirname(p), '..', 'scripts', 'pre-push-review.py')))")
 
-# Auto-detect local AI CLI (priority: claude -> codex -> opencode -> agy)
+# Auto-detect local AI CLI (priority: claude -> cursor -> codex -> opencode -> agy)
 python3 "$REVIEW_SCRIPT"
 
 # Alternate among available models/engines across successive runs

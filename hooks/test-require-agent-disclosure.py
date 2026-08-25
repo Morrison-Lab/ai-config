@@ -514,6 +514,37 @@ CASES = [
      "gh pr comment 1 --body-file - <<'eof'\nHi.\n\n" + MARKER + "\n\neof",
      False),
 
+    # --- a short flag's letters at the START of another flag's VALUE ---------
+    #
+    # A dedicated category, at the reviewer's suggestion, because this exact
+    # false-positive class has now surfaced in three consecutive rounds on this
+    # file: `-c`/`-b`/`-m` matching text that is not the flag.
+    #
+    # Round A: unanchored, so `-R Morrison-Lab/ai-config` matched mid-word.
+    # Round B: `(?<![\w-])` fixed mid-word -- and a value BEGINNING with `-c`
+    #          still matched, because the character before it is a quote, which
+    #          the class did not exclude. Necessary, not sufficient.
+    # A real flag token is never immediately preceded by a quote: `"-config"` is
+    # an argument whose text happens to start with a hyphen.
+    #
+    # Each of these posts NO comment at all, so a warning is purely spurious --
+    # and a warn-only guard that cries wolf is one nobody reads.
+    ("a value beginning with -c is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "-cool, closing"', False),
+    ("a value beginning with -config is not the comment flag",
+     'gh issue close 5 -R o/r --duplicate-of "-config issue, see #3"', False),
+    ("a value beginning with -b is not a body flag",
+     'gh issue close 5 -R o/r --reason "-basically done"', False),
+    ("a value beginning with -m is not a message flag",
+     'gh issue close 5 -R o/r --duplicate-of "-merge later"', False),
+    ("a repo name containing -c is not the comment flag",
+     'gh issue close 5 -R Morrison-Lab/ai-config --reason "not planned"', False),
+    # ...and the real flags must survive all of that.
+    ("a real -c still posts", 'gh issue close 5 -R o/r -c "bare"', "missing"),
+    ("a real -c= still posts", 'gh issue close 5 -R o/r -c="bare"', "missing"),
+    ("a real -c disclosed stays silent",
+     'gh issue close 5 -R o/r -c "Closing.\n\n' + MARKER + '"', False),
+
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",
      'gh pr comment 12 -F /tmp/body.md', None),

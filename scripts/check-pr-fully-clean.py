@@ -842,18 +842,20 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             continue
 
         is_bot_author = _is_bot_author(author_login)
+        is_human_author = bool(author_login and not is_bot_author)
         # "**claude finished" and "### verdict" are the canonical review markers
         # CLAUDE.md prescribes ("Completed runs start the body with
-        # `**Claude finished`"). The older "claude finished review" marker was a
-        # near-miss: the real body reads "**Claude finished** -- adversarial
-        # review", so "review" never follows "finished" directly and the marker
-        # matched nothing. Measured on Morrison-Lab/ai-config#1267, where all four
-        # review comments were posted under a human login and both verdict-bearing
-        # ones carried "### Verdict" -- so admission failed, all_items was empty,
-        # and every body-content criterion below was evaluated over nothing.
+        # `**Claude finished`").
         is_review_header = has_review_body_marker(body)
+        verdict = classify_verdict(body)
 
-        if is_bot_author or is_review_header:
+        # Automated reviews must be authored by a recognized bot author (or untagged in test fixtures).
+        # Human/passerby comments are admitted only if they state a blocking (not-clean) verdict,
+        # ensuring that non-bot accounts cannot spoof an approved review.
+        if is_human_author:
+            if verdict == "not-clean":
+                all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+        else:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
 
     for r in reviews:
@@ -931,6 +933,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         r"\bNeeds\s+more\s+work\b",
         r"\bNeeds\s+work\b",
         r"changes\s+requested\b",
+        r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+        r"\b(?:unapproved|rejected|deadlock|impasse)\b",
+        r"\bblocked\s+on\b",
     ]
 
     has_findings = False

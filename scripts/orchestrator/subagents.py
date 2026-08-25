@@ -699,7 +699,8 @@ class ReviewerSubagent(BaseSubagent):
                     cmd_pr.extend(["-R", repo_slug])
                 if is_clean:
                     review_body = (
-                        f"### Adversarial Self-Review Verdict: APPROVED\n\n"
+                        f"## Orchestrator Subagent Self-Review Report\n\n"
+                        f"**Status:** APPROVED\n\n"
                         f"Independent subagent adversarial review (`{model_used}`) verified:\n"
                         f"- Implementation diff audited against repository standards and security guidelines.\n"
                         f"- Clean verdict issued with 0 blocking findings.\n\n"
@@ -708,7 +709,8 @@ class ReviewerSubagent(BaseSubagent):
                 else:
                     findings_summary = "\n".join(f"- {f.get('level', 'WARN')}: {f.get('message', '')}" for f in findings)
                     review_body = (
-                        f"### Adversarial Self-Review Verdict: BLOCKED / NEEDS_WORK\n\n"
+                        f"## Orchestrator Subagent Self-Review Report\n\n"
+                        f"**Status:** BLOCKED / NEEDS_WORK\n\n"
                         f"Independent subagent adversarial review (`{model_used}`) identified findings:\n"
                         f"{findings_summary}\n\n"
                         f"_Posted by Claude Code (AI agent) --- not written by a human._"

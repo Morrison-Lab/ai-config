@@ -745,6 +745,31 @@ misdiagnosis recurred three times in one review session, on one PR
 "A predicate a fix adds needs mutation in both directions" section.
 Each time the mutation, not the test, turned out to be at fault.)
 
+**Two `MISSED` rows on 2026-08-24, on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), both read as coverage gaps on sight --- one correctly and one not.**
+Recording the pair rather than a new outcome, per [`ums`](../../skills/ums/SKILL.md)'s recurrence step, because what separates them is the more useful half.
+
+The first is this entry's thesis.
+It fell under the outcome headed "The harness that performs those mutations needs the same scrutiny", whose `Do` is to verify each mutation changed the artifact.
+The anchor matched nothing, so the mutation never applied, and doubting the coverage would have been the wrong move exactly as this entry says.
+
+The second is the exception, and it is worth separating rather than folding in.
+`ANY_BODY_FLAG_RE` is consulted only for `gh pr review`, so the `-b` and `-m` fixtures went through `POST_RE` and could not observe the mutation aimed at `ANY_BODY_FLAG_RE`.
+The mutation was fine and the **suite** was the defect, so the remedy was a new discriminating fixture.
+That is the pass-condition entry above, which is explicit that such a case reads as "an unmeasured clause rather than a robust one".
+
+So read this entry's ordering as a **default** rather than a rule, and settle which of the two you have by asking the two questions in order: did the artifact change, and if it did, did the designated case reach the mutated code.
+The first separates an inapplicable mutation from everything else;
+the second is the pass-condition entry's own identity check, and it is what separates a faulty mutation from a suite that cannot see a good one.
+
+The one thing worth adding is **when** to check the anchor.
+It carried escape sequences and did not match the file's own escaping, which is the failure `CLAUDE.md`'s "Tool transport collapses doubled backslashes" section already covers --- read it for the mechanism, the remedy, and the platform caveat.
+What that section does not say is that a mutation harness is where the check has to move earlier.
+There the tell is a match that inexplicably fails, and you react to it;
+here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
+
+- **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you --- the fourth outcome's `Do` above already says to build the mutation from a raw literal or a written file, and this is the check for an anchor that reached you through a transport you did not choose.
+- **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- that is the second of the two questions above, and asking it first is what misread the row that belonged to the first.
+
 **A component that stops failing under mutation is a question, not a cleanup.**
 
 - **Do:** treat a zero mutation score on an existing component as a missing test

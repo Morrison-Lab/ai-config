@@ -1185,3 +1185,14 @@ safer/preferred choice merely because the repo has external consumers.
   reviewer the row existed.
   The next review round found the gap and the top-level reply needed a public
   correction.)
+
+- **Never hardcode usernames in instructions/prose:**
+  When writing instructions, skills, or agent memories, use generic role-based descriptors (e.g. "the repository owner", "a human reviewer") rather than hardcoding a specific username (e.g. `octocat`).
+  Hardcoded usernames in shared config cause cross-user/fork breakages.
+  - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. `Morrison-Lab/ai-config`), submodules, flag names, and values that must resolve to a real remote/account.
+    Only purge them from prose and generic placeholder flags.
+
+- **When reverting a merge, immediately reopen the corresponding issue(s).**
+  If you revert a PR or merge commit that previously closed one or more tracked issues, the bug or feature request is no longer solved on `main`. You must immediately locate the issues that were closed by the reverted merge and reopen them so the work is tracked again.
+  - **Do:** reopen the issues that were closed by the reverted merge.
+  - **Don't:** leave issues closed when the fix that closed them has been reverted from `main`.

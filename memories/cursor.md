@@ -101,18 +101,17 @@ omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in
 so this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
-Fetch the child transcript via cursor-cloud `batch-fetch-details`
-(`includeTranscripts: true`) using that `cloudAgentBcId` before posting a
-fallback review when the pasted report is absent.
-
-- **Do:** fetch the child transcript from `cloudAgentBcId` before posting
-  the fallback comment, and quote that report.
+- **Do:** quote the harness paste of the child's final message when it is
+  present; otherwise fetch the child transcript via cursor-cloud
+  `batch-fetch-details` (`includeTranscripts: true`) using `cloudAgentBcId`
+  before posting.
 - **Don't:** treat the parent thinking "the reviewer approved" as the report,
-  or paraphrase a missing `tool_result` as Ready for merge.
+  post the identity-only JSON `tool_result` as the review, or paraphrase a
+  missing body as Ready for merge.
 
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535);
-child `bc-61fbadd0`.)
+child `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.)
 
 ## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
 

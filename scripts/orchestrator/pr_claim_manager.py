@@ -226,57 +226,60 @@ class PRClaimManager:
             if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
                 return False, f"Check '{name}' failed with conclusion={conclusion}"
 
-        # 2. Check reviews for changes requested
+        # 3. Check for changes requested across all GitHub reviews
         reviews = data.get("reviews", [])
         has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
         if has_changes_requested:
             return False, "PR has CHANGES_REQUESTED review"
 
-        # 3. Check review comments for clean approval on the LATEST review round
+        # 4. Check for formal GitHub review approvals (from humans or approved external bots)
+        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
+
+        # 5. Check external review comments (e.g. Claude review workflow comments posted by github-actions / claude[bot])
+        # IMPORTANT: Self-posted comments authored by the author / orchestrator account do NOT satisfy the external gate!
         comments = data.get("comments", [])
-        review_comments = [
+        external_review_comments = [
             c for c in comments
-            if "claude finished review" in c.get("body", "").lower()
-            or "adversarial" in c.get("body", "").lower()
-            or "review report" in c.get("body", "").lower()
+            if (c.get("author", {}).get("login") in ["github-actions", "claude[bot]", "d-morrison"]
+                or c.get("authorAssociation") in ["COLLABORATOR", "CONTRIBUTOR"])
+            and ("claude finished review" in c.get("body", "").lower()
+                 or "adversarial" in c.get("body", "").lower()
+                 or "verdict" in c.get("body", "").lower()
+                 or "review report" in c.get("body", "").lower())
         ]
 
-        has_approved_review = any(r.get("state") == "APPROVED" for r in reviews)
-        has_approved_comment = False
+        has_approved_external_comment = False
 
-        if review_comments:
-            latest_body = review_comments[-1].get("body", "")
+        if external_review_comments:
+            latest_external_comment = external_review_comments[-1]
+            latest_body = latest_external_comment.get("body", "")
             lower_body = latest_body.lower()
 
-            # Check for blocking verdicts in the latest review comment
+            # Check for blocking verdicts in the latest external review comment
             blocking_patterns = [
                 r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:needs\s+more\s+work|blocked|needs_work|changes\s+requested|not\s+clean|not\s+ready|impasse|deadlock|fail)",
                 r"finding\s*(?:\d+)?\s*\(\s*blocking",
                 r"\bblocked\s+on\s+human\s+review\b",
-                r"adversarial\s+(?:self-)?review\s+verdict:\s*(?:blocked|needs_work)",
             ]
             for pattern in blocking_patterns:
                 m = re.search(pattern, lower_body)
                 if m:
-                    return False, f"Latest review comment has blocking verdict ('{m.group(0)}')"
+                    return False, f"Latest external review comment has blocking verdict ('{m.group(0)}')"
 
-            # Check for explicit positive approved / clean verdicts in the latest review comment
+            # Check for explicit positive approved / clean verdicts in the latest external review comment
             approval_patterns = [
                 r"(?:###\s*verdict|\bverdict\b)[:\s*]+(?:\*\*)?(?:clean|approved|ready\s+for\s+merge|lgtm)",
-                r"adversarial\s+(?:self-)?review\s+verdict:\s*approved",
-                r"adversarial\s+code\s+review\s+verdict:\s*approved",
-                r"clean\s*/\s*approved",
                 r"verdict:\s*ready",
             ]
             for pattern in approval_patterns:
                 if re.search(pattern, lower_body):
-                    has_approved_comment = True
+                    has_approved_external_comment = True
                     break
 
-        if not (has_approved_review or has_approved_comment):
-            return False, "No approved adversarial or external review found on PR"
+        if not (has_approved_review or has_approved_external_comment):
+            return False, "No independent approved external review or GitHub approval found on PR"
 
-        return True, "PR is fully clean across CI and review"
+        return True, "PR is fully clean across CI and external review"
 
     def merge_pr_under_mwc(
         self,

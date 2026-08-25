@@ -90,7 +90,7 @@ for the full definition this page summarizes.
 
 **Deadlock:** if you and the reviewer can't reach consensus after a rebuttal
 exchange, escalate to a human reviewer (`gh pr edit <N> --add-reviewer
-d-morrison`) rather than looping.
+the repository owner`) rather than looping.
 
 ## Keep branches synced with main
 

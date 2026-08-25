@@ -88,3 +88,33 @@ The `.md` source of a docs page, e.g.
 `https://code.claude.com/docs/en/settings.md`, fetches in full where `WebFetch`
 on the rendered page truncates the settings table before reaching
 `enabledPlugins`.)
+
+## Custom subagents vs third-party plugin agents security downgrade
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
+Third-party plugin security models evolve across releases;
+re-verify before assuming these specific fields are ignored:
+
+- **Local subagents (`.claude/agents/*.md`)**:
+  Support full frontmatter fields (`tools`, `disallowedTools`, `skills`, `model`, `effort`,
+  `permissionMode`, `hooks`, `mcpServers`, `isolation`, `memory`, `maxTurns`).
+- **Plugin agents loaded from third-party marketplaces**:
+  Silently ignore `permissionMode`, `hooks`, and `mcpServers` frontmatter fields
+  to prevent malicious plugins from auto-elevating permissions or executing arbitrary hook scripts.
+  Only local `.claude/agents/` definitions or enterprise managed policies can elevate permissions
+  or register agent-scoped hooks.
+
+## Dynamic and conditional skill activation
+
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
+
+- **Dynamic directory discovery**:
+  As files are read, written, or edited during a session,
+  parent directories between the file path and `cwd` are dynamically scanned
+  for `.claude/skills/` (skipping gitignored paths) and loaded into the active skill pool.
+- **Conditional skills (`paths:` frontmatter)**:
+  Skills specifying a `paths:` glob pattern in YAML frontmatter remain inert
+  until a matching file path is accessed in the session.
+- **Subagent forks (`context: fork`)**:
+  Skills specifying `context: fork` automatically spawn a subagent
+  rather than expanding inline into the current conversation turn.

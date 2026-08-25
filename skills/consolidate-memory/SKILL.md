@@ -134,7 +134,7 @@ python3 scripts/check-links.py          # no broken relative links
 ```
 
 Memories live in the ai-config repo — never leave changes local-only. Branch +
-PR (not direct to main), request `d-morrison` as reviewer (`request-pr-review`),
+PR (not direct to main), request `the repository owner` as reviewer (`request-pr-review`),
 then **ARDI to clean** (`ardi`).
 
 ```bash

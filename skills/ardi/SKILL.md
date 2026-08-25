@@ -348,7 +348,7 @@ Not a round count, not a sense that findings are getting smaller, not a judgment
 
 **Deadlock is per-item, and it does not stop the loop.**
 If you and the reviewer can't reach consensus on one finding (your rebuttal didn't convince them, and their re-raise didn't convince you), **escalate that item to a human reviewer** rather than looping on it or unilaterally overriding.
-Request `d-morrison` via the `request-pr-review` skill, `@`-mention them in a comment summarizing the impasse, and surface the open item to the user.
+Request `the repository owner` via the `request-pr-review` skill, `@`-mention them in a comment summarizing the impasse, and surface the open item to the user.
 The raw `gh pr edit <N> --add-reviewer d-morrison` form bypasses that skill and so does **not** inherit its `Lacaedemon/sparta` exception.
 In sparta, escalate to the user in chat rather than requesting a reviewer at all.
 Then **keep driving the PR**: address every other finding, push, and request the next review.

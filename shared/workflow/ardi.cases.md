@@ -164,7 +164,7 @@ working form.)
 
 ## Name the specific gate, not a category word
 
-(2026-08-01, `Morrison-Lab/ai-config` worked from a `d-morrison`-scoped
+(2026-08-01, `Morrison-Lab/ai-config` worked from a `the repository owner`-scoped
 session: an unresolvable review thread was reported as blocked "for scope
 reasons" across roughly six status updates, while the failure actually
 observed under that spelling was the node-versus-declared-string comparison.

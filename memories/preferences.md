@@ -290,7 +290,7 @@
   `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
-- Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md â†’ the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
+- Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
   For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
   The concise, auto-loaded version of this rule now lives in
   [`shared/workflow/read-canonical-doc-before-starting.md`](../shared/workflow/read-canonical-doc-before-starting.md),
@@ -353,8 +353,8 @@
 - Always check r-lib, tidyverse, and similar R ecosystem organizations for off-the-shelf solutions before building custom implementations.
   Prefer well-maintained upstream packages over hand-rolled code when they meet the requirements.
 - When borrowing code or ideas from another repo, verify its license from the source FIRST (fetch its LICENSE file / `gh api repos/<o>/<r>/license`).
-  MIT/BSD/Apache/ISC â†’ may adapt WITH attribution recorded in a root `CREDITS.md` (keep copyright notices); no-license / "all rights reserved" â†’ reimplement the *idea* clean-room, never copy text/code verbatim; copyleft (GPL/AGPL/MPL) â†’ flag the compatibility consequence before copying.
-  The `/scout-peers` skill encodes the full survey â†’ license-gate â†’ borrow-with-attribution loop.
+  MIT/BSD/Apache/ISC → may adapt WITH attribution recorded in a root `CREDITS.md` (keep copyright notices); no-license / "all rights reserved" → reimplement the *idea* clean-room, never copy text/code verbatim; copyleft (GPL/AGPL/MPL) → flag the compatibility consequence before copying.
+  The `/scout-peers` skill encodes the full survey → license-gate → borrow-with-attribution loop.
 - Before starting work on an issue/MR, always review the MR history (merged and closed) to ensure the proposed changes don't undo past progress or re-introduce previously fixed problems.
 - Before building setup/infra/toolchain config in a repo, fetch origin/main and scan the repo's own reference material (e.g. `references/`, `docs/`) and recent main commits for an existing or just-merged solution --- build on / align with it rather than a parallel, possibly contradictory approach. (Learned after drafting a juliaup-based Julia install that conflicted with the repo's reviewed curl+tarball cloud-setup reference.)
 - Always simplify code where feasible (without feature loss) --- prune dead code paths, remove unreachable branches, simplify variable assignments that can never take their fallback values given the current invocation context.
@@ -362,7 +362,7 @@
   Otherwise a reviewer flags the missed copies as a separate finding, costing an extra round. (Learned on d-morrison/ai-config#45: the `git -C ~/.claude/skills` path fix was applied to `ums/SKILL.md` but the identical line in `skill-builder/SKILL.md` was missed until review caught it.)
 - When renaming a variable or concept, grep for the old term in **both code and comments** (including section headers, file-level comments, and inline `# ---` banners).
   A variable rename that also appears in a section header (`# --- 2. Baseline covariates + Nelson-Aalen ---`) costs an extra ARDI round every time the header is missed.
-  After changing the identifier, run `grep -r "old_name" .` before committing. (Learned on ucdavis/bcs#246: `nelson_aalen` â†’ `cumhaz_baseline` fixed the variable and the file header but missed the section header --- caught two ARDI rounds later.)
+  After changing the identifier, run `grep -r "old_name" .` before committing. (Learned on ucdavis/bcs#246: `nelson_aalen` → `cumhaz_baseline` fixed the variable and the file header but missed the section header --- caught two ARDI rounds later.)
 - When removing decorative comment banners (e.g. `# ---...---` / `# Name #` blocks), scan for **every** occurrence in the file --- both file-scope banners and inner function-body banners.
   Removing only the outer ones leaves the inner ones, and a reviewer catches the inconsistency as a separate finding.
   Run `grep -n "^[[:space:]]*#[[:space:]]*[-=*_#]" file` to surface padded/decorated banner lines before committing. (Learned on d-morrison/ai-config#274: outer banners stripped in round 1, inner ones missed until round 2.)
@@ -670,8 +670,8 @@
     Verify locally instead: `npm i mathjax` (npmjs is allowed through the proxy), then init MathJax **with the `[tex]/noundefined` extension loaded** (`init({tex:{packages:{'[+]':['noundefined']}}}).then(MJ => MJ.tex2mml(defs + expr))`) and check the output.
     With `noundefined` an undefined macro shows as `<mtext mathcolor="red">\cmd</mtext>` (NOT an `<merror>` or a thrown exception), so grep for `mathcolor="red"`.
   - **MathJax ignores `\providecommand`** --- only `\newcommand` / `\def` / `\renewcommand` define a macro.
-    So `\providecommand{\X}{...}` is a *silent no-op* whenever `\X` shadows a LaTeX built-in (`\v` caron, `\b` bar, `\u`, `\c`, â€¦): the built-in meaning survives and renders broken (rme's `\hat{\v{\mu}}` showed a red `\v`).
-    Use `\vec` / `\vecf` (rme defines these with `\renewcommand{\vec}{...}`, which properly overrides the built-in), and fix upstream by switching `\providecommand` â†’ `\def`/`\renewcommand` for built-in names.
+    So `\providecommand{\X}{...}` is a *silent no-op* whenever `\X` shadows a LaTeX built-in (`\v` caron, `\b` bar, `\u`, `\c`, …): the built-in meaning survives and renders broken (rme's `\hat{\v{\mu}}` showed a red `\v`).
+    Use `\vec` / `\vecf` (rme defines these with `\renewcommand{\vec}{...}`, which properly overrides the built-in), and fix upstream by switching `\providecommand` → `\def`/`\renewcommand` for built-in names.
 - In Quarto, a cross-referenceable figure/table **div** (`::: {#fig-...}` / `::: {#tbl-...}`) uses its **last paragraph** as the caption --- the caption text must come AFTER the image / code chunk / table, not before it.
   A caption placed first renders as ordinary body prose and the float is left uncaptioned.
   Same rule for both `#fig-` and `#tbl-` divs; for a bare pipe/markdown table, put the caption below it with the `: Caption {#tbl-...}` syntax.
@@ -708,11 +708,11 @@
 - "dew it" means "do it".
 - After implementing a feature or fix, ALWAYS commit and push immediately --- don't wait for the user to ask "why haven't you pushed?"
   The implementation isn't done until the code is committed, pushed, and (if applicable) an MR is opened.
-- Write user-facing prose in my preferred style, per my Principles of Scientific Writing guide (https://morrison-lab.github.io/psw/ --- the authority): limit dependent (subordinate) clauses; cut low-content filler and jargon ("in order to" â†’ "to", "due to the fact that" â†’ "because", drop "it's worth noting"); prefer plain Anglish words over Latin-derived ones ("before" not "prior to", "needed" not "necessary", "use" not "utilize"); prefer short simple declarative sentences and active voice; and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions.
+- Write user-facing prose in my preferred style, per my Principles of Scientific Writing guide (https://morrison-lab.github.io/psw/ --- the authority): limit dependent (subordinate) clauses; cut low-content filler and jargon ("in order to" → "to", "due to the fact that" → "because", drop "it's worth noting"); prefer plain Anglish words over Latin-derived ones ("before" not "prior to", "needed" not "necessary", "use" not "utilize"); prefer short simple declarative sentences and active voice; and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions.
   Apply this by default to my OWN drafts, not just on request.
   Keep meaning, scope, and load-bearing hedges exact.
   When PSW and the skill disagree, PSW wins. (see the `use-preferred-style` skill, alias `style`; the `find-ai-tells` detector, alias `ai-tells`, is the scan-after counterpart.)
-- Before presenting non-trivial prose I authored (PR/issue descriptions, commit bodies, README/doc/vignette text, long answers meant as deliverable prose), self-check the draft for AI tells and cut them --- overused vocabulary (delve, tapestry, testament, robust, seamlessâ€¦), the "it's not just X, it's Y" antithesis, mechanical rule-of-three lists, hedging stacks, signposting filler ("it's worth noting"), em-dash overuse, bold-leading bullets, emoji headers, promotional register.
+- Before presenting non-trivial prose I authored (PR/issue descriptions, commit bodies, README/doc/vignette text, long answers meant as deliverable prose), self-check the draft for AI tells and cut them --- overused vocabulary (delve, tapestry, testament, robust, seamless…), the "it's not just X, it's Y" antithesis, mechanical rule-of-three lists, hedging stacks, signposting filler ("it's worth noting"), em-dash overuse, bold-leading bullets, emoji headers, promotional register.
   De-slop, don't ban words or flatten voice; any single tell is innocent --- clustering is the signal.
   Code, terse status lines, and short conversational replies are exempt.
   This is the scan-after counterpart to the plain-prose style above. (see the `find-ai-tells` skill, alias `ai-tells`.)
@@ -810,7 +810,7 @@
 - A dispatched subagent that ends its own turn with "waiting for the background task/monitor to notify me" has NOT set up anything that will actually resume it --- a subagent's own background wait (a `Monitor` call, a `ScheduleWakeup`, a described intent to "check back later") does not survive past that turn ending, and no one will follow up on its behalf automatically.
   The conductor must poll the real external state itself (CI checks, PR comments) and use `SendMessage` with the agent's id to resume it once something is actually ready --- treat "I'll wait for X" in a subagent's final message as a signal that *you* need to come back to it, not that it's still working.
   This happened repeatedly across four separate subagents in one session (each ended a multi-hour dispatch on an unresumable "waiting" message).
-  Brief agents doing multi-stage work (implement â†’ wait for CI â†’ react) to expect this: either they must actively poll within their own turn before finishing, or the brief should explicitly say the conductor will resume them later.
+  Brief agents doing multi-stage work (implement → wait for CI → react) to expect this: either they must actively poll within their own turn before finishing, or the brief should explicitly say the conductor will resume them later.
   **Recurred again in a later session (`Lacaedemon/sparta`, 2026-07-15) --- 3 separate stalls across 2 subagents in one `gii` batch, even though each agent's original brief already listed the remaining steps explicitly** (push, run the test suite, mark the PR ready, reply to the issue).
   Listing the steps isn't enough; the agent still ran a long local command (a full GUT suite, a Godot benchmark) and then ended its turn describing itself as waiting on that command's own completion, rather than blocking on it synchronously within the same tool call.
   The reliable fix is to state the constraint explicitly and up front in the **original** delegation prompt, not just discover it when resuming after the fact: add a line like "Run every verification step to actual completion within this turn --- a long-running local command (tests, coverage, a benchmark) must be waited on synchronously (the Bash tool call itself blocks until it returns); there is no background monitor that will wake you when it finishes, so do not end your turn describing yourself as waiting for one."
@@ -869,41 +869,41 @@ Stated without a count on purpose --- the previous wording said "the five boxed 
 If everything is boxed, the box stops meaning "look here," so keep it reserved.
 
 - **Boxed** --- a `===` line directly above and below the labeled block:
-  - â“ **QUESTION** --- need the user's input.
+  - ❓ **QUESTION** --- need the user's input.
     For a genuine either/or, prefer the AskUserQuestion picker over a boxed question.
-  - ðŸ’¡ **OFFER** --- optional work I can do if they want it.
-  - ðŸ›‘ **BLOCKER** --- stopped; need their call.
-  - âœ… **ANSWER** --- the headline answer to a question they asked; put nuance below the box.
-  - ðŸ§­ **RECOMMENDATION** --- the course of action I think they should take,
+  - 💡 **OFFER** --- optional work I can do if they want it.
+  - 🛑 **BLOCKER** --- stopped; need their call.
+  - ✅ **ANSWER** --- the headline answer to a question they asked; put nuance below the box.
+  - 🧭 **RECOMMENDATION** --- the course of action I think they should take,
     when the decision is theirs.
     The boundary against the two categories it most resembles
     is what makes it a separate category rather than a flavour of either:
-    an âœ… **ANSWER** reports what is true,
-    a ðŸ’¡ **OFFER** proposes work I would do,
+    an ✅ **ANSWER** reports what is true,
+    a 💡 **OFFER** proposes work I would do,
     and a recommendation is a judgment about what *they* should do ---
     including about things I will not be doing,
     such as which PR to merge first, which option to decline, or whether to stop.
     Lead with the action and keep the reasoning below the box.
     A recommendation earns the box
     because it feeds a decision the user is waiting to make;
-    an opinion nobody was waiting on is a ðŸ“Š **UPDATE** with a view in it,
+    an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
     and stays unboxed.
-  - ðŸ”€ **MERGE ORDER** --- several PRs are ready,
+  - 🔀 **MERGE ORDER** --- several PRs are ready,
     and merging them in the wrong order would produce a wrong result.
     Labeled with a markdown heading rather than bold text;
-    see the "Why ðŸ”€ MERGE ORDER works the way it does" section.
+    see the "Why 🔀 MERGE ORDER works the way it does" section.
 - **Prefixed, no box** --- informational and frequent, so a bold label with the emoji is enough:
-  - ðŸ“Š **UPDATE** --- status or progress.
-  - âš ï¸ **FLAG** --- a non-blocking heads-up or risk.
-  - âœ”ï¸ **DONE** --- a completed action.
-  - ðŸŸ¢ **ALL CLEAR** --- nothing needs the user right now; work continues in the background.
+  - 📊 **UPDATE** --- status or progress.
+  - ⚠️ **FLAG** --- a non-blocking heads-up or risk.
+  - ✔️ **DONE** --- a completed action.
+  - 🟢 **ALL CLEAR** --- nothing needs the user right now; work continues in the background.
     The recap's standing sign-off --- the frequent "nothing needs you" message.
 
 Keep the markers stable so they become muscle memory.
 The user may tune the emoji set over time; the categories and the box-versus-prefix split are the durable part.
 This is the fuller companion to the CLAUDE.md section on tagging chat output by category --- keep the two in sync if either changes.
 
-### Why ðŸ”€ MERGE ORDER works the way it does
+### Why 🔀 MERGE ORDER works the way it does
 
 CLAUDE.md's "Surface merge-order constraints" section carries the procedure ---
 the three surfaces, the draft-gating caveats, and when the convention fires.
@@ -1054,8 +1054,8 @@ Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-0
   Don't let this become an excuse to skip verification when there's no actual time-pressure --- only use it when a stop-hook or session-end signal is the forcing function. (Learned on d-morrison/rme#772: render was blocked on a ~1hr renv package install; committed the reorg + merge-conflict resolution before the render finished to satisfy the stop hook, then continued verifying.)
 
 ## Git author mapping
-- Commits by `dem-extra1` to repos owned by `the repository owner`, `ucd-serg`, or `ucdavis` â†’ the true author is `the repository owner` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
-- Commits to `sparta` by `the repository owner` â†’ the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `the repository owner`.
+- Commits by `dem-extra1` to repos owned by `the repository owner`, `ucd-serg`, or `ucdavis` → the true author is `the repository owner` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
+- Commits to `sparta` by `the repository owner` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `the repository owner`.
 
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
@@ -1185,5 +1185,6 @@ safer/preferred choice merely because the repo has external consumers.
   reviewer the row existed.
   The next review round found the gap and the top-level reply needed a public
   correction.)
-- **Never hardcode usernames in instructions/prose:** When writing instructions, skills, or agent memories, use generic role-based descriptors (e.g. "the repository owner", "a human reviewer") rather than hardcoding a specific username like d-morrison. Hardcoded usernames in shared config cause cross-user/fork breakages.
-  - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. Morrison-Lab/ai-config), submodules, and command-line flags (e.g. gh pr create --reviewer d-morrison). Only purge them from prose.
+
+- **Never hardcode usernames in instructions/prose:** When writing instructions, skills, or agent memories, use generic role-based descriptors (e.g. "the repository owner", "a human reviewer") rather than hardcoding a specific username (e.g. octocat). Hardcoded usernames in shared config cause cross-user/fork breakages.
+  - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. Morrison-Lab/ai-config), submodules, and command-line flags (e.g. gh pr create --reviewer octocat). Only purge them from prose.

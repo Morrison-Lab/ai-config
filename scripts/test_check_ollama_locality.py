@@ -4,13 +4,13 @@
 import importlib.util
 import json
 import os
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location(
-    "check_ollama_locality", Path(__file__).parent / "check-ollama-locality.py"
+    "check_ollama_locality", REPO_ROOT / "scripts" / "check-ollama-locality.py"
 )
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
@@ -44,6 +44,13 @@ class TestCheckOllamaLocality(unittest.TestCase):
             ]
         }).encode("utf-8")
 
+    def test_scripts_synchronization(self):
+        p1 = REPO_ROOT / "scripts" / "check-ollama-locality.py"
+        p2 = REPO_ROOT / "skills" / "delegate-to-opencode" / "scripts" / "check-ollama-locality.py"
+        self.assertTrue(p1.is_file(), "scripts/check-ollama-locality.py must exist")
+        self.assertTrue(p2.is_file(), "skills/delegate-to-opencode/scripts/check-ollama-locality.py must exist")
+        self.assertEqual(p1.read_text(encoding="utf-8"), p2.read_text(encoding="utf-8"), "Script copies must be identical")
+
     def test_missing_model_arg_refuses(self):
         ok, msg = checker.verify_locality("", self.valid_config)
         self.assertFalse(ok)
@@ -70,18 +77,28 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("resolves off-machine", msg)
 
+    @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
-    def test_cloud_enabled_daemon_refuses(self, mock_getaddrinfo):
+    def test_daemon_with_cloud_enabled_in_status_refuses(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        with patch.dict(os.environ, {}, clear=True):
-            ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config, server_json_path="/nonexistent/server.json")
-            self.assertFalse(ok)
-            self.assertIn("local-only mode not verified", msg)
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": True}).encode("utf-8")
+        status_resp.__enter__.return_value = status_resp
+
+        mock_urlopen.return_value = status_resp
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("reports active cloud offloading", msg)
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
     def test_remote_backed_model_in_tags_refuses(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
+        status_resp.__enter__.return_value = status_resp
+
         remote_tags = json.dumps({
             "models": [
                 {
@@ -91,74 +108,53 @@ class TestCheckOllamaLocality(unittest.TestCase):
                 }
             ]
         }).encode("utf-8")
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = remote_tags
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+        tags_resp = MagicMock()
+        tags_resp.read.return_value = remote_tags
+        tags_resp.__enter__.return_value = tags_resp
 
-        with patch.dict(os.environ, {"OLLAMA_NO_CLOUD": "1"}):
-            ok, msg = checker.verify_locality("remote-cloud-model", self.valid_config)
-            self.assertFalse(ok)
-            self.assertIn("remote/cloud infrastructure", msg)
+        mock_urlopen.side_effect = [status_resp, tags_resp]
+
+        ok, msg = checker.verify_locality("remote-cloud-model", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("remote/cloud infrastructure", msg)
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
     def test_absent_target_model_refuses(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = self.valid_tags_response
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
+        status_resp.__enter__.return_value = status_resp
 
-        with patch.dict(os.environ, {"OLLAMA_NO_CLOUD": "1"}):
-            ok, msg = checker.verify_locality("deepseek-r1:latest", self.valid_config)
-            self.assertFalse(ok)
-            self.assertIn("not locally resident", msg)
+        tags_resp = MagicMock()
+        tags_resp.read.return_value = self.valid_tags_response
+        tags_resp.__enter__.return_value = tags_resp
 
-    @patch("urllib.request.urlopen")
-    @patch("socket.getaddrinfo")
-    def test_valid_local_model_with_server_json_succeeds(self, mock_getaddrinfo, mock_urlopen):
-        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = self.valid_tags_response
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+        mock_urlopen.side_effect = [status_resp, tags_resp]
 
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
-            json.dump({"disable_ollama_cloud": True}, tf)
-            tf_path = tf.name
-
-        try:
-            with patch.dict(os.environ, {}, clear=True):
-                ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config, server_json_path=tf_path)
-                self.assertTrue(ok)
-                self.assertIn("OK: Verified loopback", msg)
-                self.assertIn("qwen2.5-coder:3b", msg)
-        finally:
-            os.remove(tf_path)
+        ok, msg = checker.verify_locality("deepseek-r1:latest", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("not locally resident", msg)
 
     @patch("urllib.request.urlopen")
     @patch("socket.getaddrinfo")
-    def test_url_with_trailing_slash_v1_succeeds(self, mock_getaddrinfo, mock_urlopen):
+    def test_valid_local_model_with_status_succeeds(self, mock_getaddrinfo, mock_urlopen):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = self.valid_tags_response
-        mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"status": "ok", "cloud": False}).encode("utf-8")
+        status_resp.__enter__.return_value = status_resp
 
-        cfg_trailing = json.dumps({
-            "provider": {
-                "ollama": {
-                    "options": {
-                        "baseURL": "http://127.0.0.1:11434/v1/"
-                    }
-                }
-            }
-        })
-        with patch.dict(os.environ, {"OLLAMA_NO_CLOUD": "1"}):
-            ok, msg = checker.verify_locality("qwen2.5-coder:3b", cfg_trailing)
-            self.assertTrue(ok)
-            self.assertIn("OK: Verified loopback", msg)
+        tags_resp = MagicMock()
+        tags_resp.read.return_value = self.valid_tags_response
+        tags_resp.__enter__.return_value = tags_resp
+
+        mock_urlopen.side_effect = [status_resp, tags_resp]
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertTrue(ok)
+        self.assertIn("OK: Verified loopback", msg)
+        self.assertIn("http://localhost:11434/v1", msg)
+        self.assertIn("qwen2.5-coder:3b", msg)
 
 
 if __name__ == "__main__":

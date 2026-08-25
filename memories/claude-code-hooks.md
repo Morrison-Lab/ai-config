@@ -244,11 +244,11 @@ Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\-
 
 ## Complete hook lifecycle catalog (27 events)
 
-Measured 2026-08 against Claude Code v2.1 harness source snapshot (`src/entrypoints/sdk/coreTypes.ts`, commit `eb0840e`).
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
 Harness behavior and event definitions evolve across releases;
 re-verify against current runtime behavior rather than treating this snapshot as permanent.
 
-The snapshot defines 27 hook events:
+The v2.1 hook schema supports 27 distinct lifecycle events:
 - **Tool lifecycle:**
   `PreToolUse` (match query: `tool_name`),
   `PostToolUse` (`tool_name`),
@@ -285,7 +285,7 @@ The snapshot defines 27 hook events:
 
 ## Advanced hook capabilities in the native schema
 
-Measured 2026-08 against Claude Code v2.1 harness source:
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
 - **In-process pre-filtering (`if: "..."`)**:
   Hooks can declare `"if": "Bash(git *)"` or `"if": "Read(*.ts)"` to evaluate permission expressions in-process,

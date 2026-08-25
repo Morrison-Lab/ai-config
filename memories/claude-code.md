@@ -1098,7 +1098,7 @@ the unquoted-delimiter case was written down nowhere.
 
 ## Tool result persistence & disk spillover threshold
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/toolResultStorage.ts` and `src/constants/toolLimits.ts`, commit `eb0840e`):
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
 - **Default size threshold**:
   Tool outputs exceeding `DEFAULT_MAX_RESULT_SIZE_CHARS = 50_000` characters (or 100,000 tokens)
@@ -1112,7 +1112,7 @@ Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/toolResultS
 
 ## Token budgeting directives
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/tokenBudget.ts`, commit `eb0840e`):
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
 - Shorthand forms (`+500k`, `+2m`, `+1b`) and verbose phrases (`spend 2M tokens`, `use 100k tokens`)
   are parsed into session token budgets.

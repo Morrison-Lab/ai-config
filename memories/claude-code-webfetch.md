@@ -34,7 +34,7 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   adjacent one, and asking it to "quote exactly" does not make it a
   transcription tool.
 - **Preflight domain safety and egress checks (`api.anthropic.com/api/web/domain_info`)**:
-  Measured 2026-08 against Claude Code v2.1 harness source (`src/tools/WebFetchTool/utils.ts`, commit `eb0840e`).
+  Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
   Before fetching, `WebFetch` checks domain safety against Anthropic's preflight endpoint
   (cached for 5 minutes, 128 domain LRU).
   Domains in `PREAPPROVED_HOSTS` (`docs.python.org`, `go.dev`, `react.dev`, `en.cppreference.com`, `agentskills.io`, etc.)

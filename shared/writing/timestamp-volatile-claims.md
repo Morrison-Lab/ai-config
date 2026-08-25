@@ -50,11 +50,11 @@ When recording facts about any software or similar technologies in memory files,
 documentation, PR descriptions, comments, or codebase rules:
 
 1. **Explicit temporal bounds & provenance**:
-   Always attach the observation date, version number, commit SHA, or snapshot reference
-   (e.g. `Measured 2026-08 against v2.1.236 / commit eb0840e`).
+   Always attach the observation date, version number, or snapshot reference
+   (e.g. `Measured 2026-08 against CLI v2.1.236 / execution trace`).
 2. **Re-verification reminder**:
    State explicitly that third-party behavior evolves across releases and to re-verify
-   against current runtime behavior or source rather than assuming permanence.
+   against current runtime behavior rather than assuming permanence.
 3. **No timeless authority**:
    Never write down software behavior as a standing, unhedged present-tense axiom.
 

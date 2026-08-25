@@ -161,7 +161,7 @@ it forecloses the correct next step for every later reader who takes it at face 
 
 ## Auto-mode YOLO classifier pipeline & denial circuit breakers
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/permissions/permissions.ts`, commit `eb0840e`).
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
 Classifier models, prompt evaluations, and safety thresholds are actively updated by upstream providers;
 re-verify before relying on these internal pipeline stages:
 
@@ -174,12 +174,12 @@ re-verify before relying on these internal pipeline stages:
   - Stage 2: Thinking classifier (invoked only if stage 1 is uncertain).
   - Fail-closed gate: If the classifier API fails, execution fails closed with retry guidance.
 - **Denial limits**:
-  Tracks consecutive and total denials via `denialTracking.ts` (`DENIAL_LIMITS.maxConsecutive` / `maxTotal`).
+  Tracks consecutive and total denials (default thresholds: 3 consecutive, 20 total).
   Exceeding thresholds falls back to user prompts or aborts headless runs.
 
 ## OS sandbox filesystem invariants & customization lockdown paths
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/utils/sandbox/sandbox-adapter.ts` and managed policy handlers, commit `eb0840e`):
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236) and managed policy behavior:
 
 - `sandbox.autoAllowBashIfSandboxed: true` auto-approves safe commands inside Seatbelt/Bubblewrap/WSL2.
 - **Protected paths**:

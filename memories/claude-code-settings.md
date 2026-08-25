@@ -91,7 +91,7 @@ on the rendered page truncates the settings table before reaching
 
 ## Custom subagents vs third-party plugin agents security downgrade
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/tools/AgentTool/loadAgentsDir.ts` and `src/utils/plugins/loadPluginAgents.ts`, commit `eb0840e`).
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236).
 Third-party plugin security models evolve across releases;
 re-verify before assuming these specific fields are ignored:
 
@@ -106,9 +106,9 @@ re-verify before assuming these specific fields are ignored:
 
 ## Dynamic and conditional skill activation
 
-Measured 2026-08 against Claude Code v2.1 harness source (`src/skills/loadSkillsDir.ts`, commit `eb0840e`):
+Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
-- **Dynamic directory discovery (`discoverSkillDirsForPaths`)**:
+- **Dynamic directory discovery**:
   As files are read, written, or edited during a session,
   parent directories between the file path and `cwd` are dynamically scanned
   for `.claude/skills/` (skipping gitignored paths) and loaded into the active skill pool.

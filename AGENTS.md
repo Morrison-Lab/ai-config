@@ -298,33 +298,22 @@ This grants no merge authority: the strict merge policy below still applies.
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
   Under `mwc`, a PR must be fully clean across CI and review (see
   [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  A clean automated Claude review evaluating the current HEAD commit is strictly required for merging with `mwc`.
+  A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **AI review triggers automatically on push**:
-   Where `.github/workflows/claude-review.yml` (or equivalent) includes `pull_request: [opened, synchronize, ready_for_review]`,
-   pushing code or opening the PR triggers the AI review automatically.
-   Do **not** post redundant manual `@claude review` comments on push,
-   as doing so cancels in-flight review runs.
-   In repos without automated PR review workflows,
-   dispatch `claude-review.yml` or request review explicitly after all code pushes are complete.
-2. **Drive to clean**:
-   Run `ardi` / the review-and-iterate loop to ensure CI passes
-   and all review findings are addressed until the PR reaches a clean verdict.
-3. **Request human review only after AI approval or deadlock**:
-   Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md),
-   request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`)
-   **only after** the AI review produces a clean/approved verdict,
-   or if an impasse/deadlock occurs.
+1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+   In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.
+2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
+3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** rely on automatic CI review triggers on push,
-  and request human review only after the AI review is clean/approved (or upon an impasse).
-- **Don't:** post redundant manual `@claude review` comments when the review workflow is already automated on push,
-  don't request human review when the PR is first opened empty,
-  and don't request human review before code pushes are complete or before the AI review has passed.
+- **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
+- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 ## Cursor Cloud specific instructions
 

@@ -194,9 +194,10 @@ REVIEW_ONLY_RE = re.compile(_ANCHOR + r"gh\s+pr\s+review\b", re.MULTILINE)
 # quote awareness, so a `;` inside an earlier flag's value cannot truncate it.
 CLOSE_REOPEN_RE = re.compile(
     _ANCHOR + r"gh\s+(?:issue|pr)\s+(?:close|reopen)\b", re.MULTILINE)
-COMMENT_FLAG_RE = re.compile(r"--comment\b|--comment=|-c\s")
+COMMENT_FLAG_RE = re.compile(r"--comment\b|--comment=|-c(?:\s|=|\S)")
 ANY_BODY_FLAG_RE = re.compile(
-    r"--body\b|--body=|--body-file|--message\b|--message=|-b\s|-m\s|-F\s"
+    r"--body\b|--body=|--body-file\b|--message\b|--message="
+    r"|-b(?:\s|=|\S)|-m(?:\s|=|\S)|-F(?:\s|=|\S)"
     r"|(?:-f|-F|--field|--raw-field)\s+[\"']?body=")
 
 
@@ -473,18 +474,13 @@ def bodies_for(segment, bodies):
 # trailing shell comment, in a `--repo` value, or followed by more human prose
 # after the marker. Each of those is a body that does not disclose, passed by a
 # check that says it does.
-# The inline body value, when the segment carries one. Needed because searching
-# the whole segment for the marker accepts it ANYWHERE -- including in a
-# trailing shell comment, in a `--repo` value, or followed by more human prose
-# after the marker. Each of those is a body that does not disclose, passed by a
-# check that says it does.
 #
 # Written as explicit cases rather than one regex. A single pattern got all
 # three quoting shapes wrong at once: it read `$'...'` as the bare token
 # `$'Done,`, and it read `-f "body=X"` -- where the quote precedes `body=` --
 # as the bare token `X` truncated at the first space.
 _FLAG_BEFORE_VALUE = re.compile(
-    r"(?:--(?:body|message|comment)[\s=]+|-(?:b|m|c)\s+)")
+    r"(?:--(?:body|message|comment)[\s=]+|-(?:b|m|c)[\s=]*)")
 _FIELD_QUOTED = re.compile(
     r"(?:-f|-F|--field|--raw-field|--form)\s+([\"'])body=")
 _FIELD_BARE = re.compile(

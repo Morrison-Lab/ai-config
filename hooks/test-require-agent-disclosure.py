@@ -414,6 +414,18 @@ CASES = [
      'gh issue reopen 5 -R o/r', False),
     ("the -c short flag is a comment flag",
      'gh issue close 5 -R o/r -c "bare"', "missing"),
+    ("the -c short flag with equals syntax is a comment flag",
+     'gh issue close 5 -R o/r -c="Closing without disclosure."', "missing"),
+    ("the -c short flag with attached quote is a comment flag",
+     'gh issue close 5 -R o/r -c"Closing without disclosure."', "missing"),
+    ("the -c short flag with equals syntax and marker discloses",
+     'gh issue close 5 -R o/r -c="Closing.\n\n' + MARKER + '"', False),
+    ("the -c short flag with attached quote and marker discloses",
+     'gh issue close 5 -R o/r -c"Closing.\n\n' + MARKER + '"', False),
+    ("the -b short flag with equals syntax is a body flag",
+     'gh pr comment 12 -b="bare"', "missing"),
+    ("the -b short flag with attached quote is a body flag",
+     'gh pr comment 12 -b"bare"', "missing"),
 
     # --- unreadable vs missing must not be confused (review finding 9) -------
     ("gh pr comment -F <file> is a body-file, reported unreadable",

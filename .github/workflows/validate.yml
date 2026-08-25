@@ -262,7 +262,7 @@ jobs:
     # that wraps it (ai-config#2165). A SHA pin on a reusable workflow freezes
     # the caller and nothing about what the caller runs: the pinned
     # `Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76`
-    # delegated in turn to `d-morrison/gha/check-new-line-breaks@v2` -- a
+    # delegated in turn to `the repository owner/gha/check-new-line-breaks@v2` -- a
     # floating tag, in what was then a different org -- so the pinned copy was
     # 340 lines with four knobs while the ref that actually executed was 637
     # lines with a clause-break rule on by default. Measured 2026-08-24 on one

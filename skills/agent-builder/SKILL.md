@@ -231,7 +231,7 @@ git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 
 Then, as explicit steps:
 
-1. **Request the reviewer:** `gh pr edit --add-reviewer d-morrison` (`EDIT_PR`; see
+1. **Request the reviewer:** `gh pr edit --add-reviewer the repository owner` (`EDIT_PR`; see
    `request-pr-review`).
 2. **Drive to clean:** run `ardi` on the new PR until the verdict has zero
    findings.

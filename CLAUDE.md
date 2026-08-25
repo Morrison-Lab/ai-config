@@ -746,7 +746,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer the repository owner`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -1487,7 +1487,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 
 ## Useful prompt formats for coding agents
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from the repository owner/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/prompt-formats.md](shared/vendored/prompt-formats.md)
 
 ## Review with Copilot before requesting human review
@@ -1495,7 +1495,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 This is shared lab guidance on getting an automated review before asking a human reviewer.
 When *I* iterate a PR, the ARDI loop above is the mechanism — it already addresses whatever the `@claude` or Copilot reviewer flags — so read this as the lab-member-facing statement of the same principle, not a second loop to run.
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from the repository owner/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/copilot-review-before-human.md](shared/vendored/copilot-review-before-human.md)
 
 ## Growth mindset: seek resources rather than accept limitations

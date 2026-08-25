@@ -308,7 +308,7 @@ persist and fire across all contexts even when the skill isn't invoked.
 
 Skills and memories all live in the ai-config repo — never leave changes
 local-only. Commit via a **branch + PR** (not direct to main), request
-`d-morrison` as reviewer, then **ARDI to clean**.
+`the repository owner` as reviewer, then **ARDI to clean**.
 
 > **In a worktree session, the repo toplevel below is the MAIN checkout, not
 > your worktree.** `~/.claude/skills` symlinks into the main `ai-config`
@@ -378,7 +378,7 @@ Re-run `sync-codex-skill-wrappers.py` after any frontmatter edit, since the Code
 
 Then, as their own explicit steps (don't leave them buried in a comment):
 
-1. **Request the reviewer:** `gh pr edit --add-reviewer d-morrison` (`EDIT_PR`; see
+1. **Request the reviewer:** `gh pr edit --add-reviewer the repository owner` (`EDIT_PR`; see
    `request-pr-review`).
 2. **Drive to clean:** run the `ardi` skill on the new PR until the verdict has
    zero findings.

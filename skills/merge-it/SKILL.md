@@ -47,10 +47,10 @@ standing yes (see `preferences.md`).
 - Check `mergeStateStatus` in addition to `mergeable`. A PR can be
   `"MERGEABLE"` but `"BLOCKED"` when branch protection requires at least one
   approving review and only bot/comment reviews exist. Fix: request
-  `d-morrison` as reviewer (`gh pr edit <N> --add-reviewer d-morrison` —
+  `the repository owner` as reviewer (`gh pr edit <N> --add-reviewer the repository owner` —
   `EDIT_PR`) and leave a note that the PR is clean and ready. Don't attempt to
   force-merge.
-  **Except in `Lacaedemon/sparta`, which never requests `d-morrison`** --- see
+  **Except in `Lacaedemon/sparta`, which never requests `the repository owner`** --- see
   [`request-pr-review`](../request-pr-review/SKILL.md)'s Scope section.
   There, leave the ready-for-merge note and surface the block to the user instead.
   This step names the raw `gh pr edit` command rather than deferring to that
@@ -116,7 +116,7 @@ In remote/web sessions, load the merge tool's schema with `ToolSearch`
 (`select:mcp__github__merge_pull_request`) before the first call to confirm the
 exact name and parameters -- [`tool-mappings.md`](../../tool-mappings.md) is
 the canonical `gh`→MCP reference (per `CLAUDE.md`'s "Skills that call
-gh/glab" rule); `d-morrison/gha`'s own CLAUDE.md carries an equivalent table
+gh/glab" rule); `the repository owner/gha`'s own CLAUDE.md carries an equivalent table
 for that repo.
 
 ### 3. Verify the merge landed — never assume

@@ -227,7 +227,7 @@
   A blank subagent re-reading what's already known is waste, not thoroughness.
 - Delegating implementation does NOT mean trusting an agent's "CLEAN, ready to merge" report blind.
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
-  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `d-morrison/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is the ONLY review.
+  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `the repository owner/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is the ONLY review.
   The merge gate is MY independent check, not the agent's word.
 - A verification artifact (state transcript, frame/state dump) is worthless unless something actually READS it.
   Put it where the reviewer looks: the `@claude` review bot reviews only the checked-out PR tree plus the diff, so a JSON linked by raw URL on a side/media branch is invisible to it --- inline a compact state summary in the PR conversation/diff (and add a line telling the reviewer to use it); a bare link is decoration.
@@ -264,19 +264,19 @@
 - When implementing a user instruction that edits a tracked file in the repo (e.g. CLAUDE.md, README, a config file), the task is not done at "made the local edit."
   Go all the way: file an issue, commit on a branch, and open a PR --- without waiting to be asked.
   Stopping at a local edit leaves the change uncommitted and invisible to reviewers.
-- `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `d-morrison/ai-config` before the move, and that path still redirects).
+- `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `the repository owner/ai-config` before the move, and that path still redirects).
   When working in that fork, open PRs against the canonical repo (base `main`) as a cross-fork PR with head `dem-extra1:<branch>`, NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened from a session where the canonical repo is in scope.)
-  **The repo has MOVED: it was transferred from `d-morrison/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
-  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
-  **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
-  The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
+  **The repo has MOVED: it was transferred from `the repository owner/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
+  GitHub keeps the pre-transfer path working, so `the repository owner/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `the repository owner` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "the repository owner"` opens a PR that comes back with a `Morrison-Lab` URL and number.
+  **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `the repository owner/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
+  The same call with `owner: "the repository owner"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
   So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
-  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `the repository owner`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
   `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
   **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
   It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
   When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)
-  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `d-morrison` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
+  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `the repository owner` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
 - Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
 - On GitLab, assign MRs to `demorrison`.
 - Before committing code changes, run the repo checks that CI enforces
@@ -349,7 +349,7 @@
 - Before acting on a request, review the relevant ai-config memories first so existing standing rules and prior lessons shape the response.
 - When the user points out a mistake I made, fix that mistake immediately and then record the learning for future runs, without waiting for extra prompting.
 - When a CI/review gate on your OWN PR keeps failing because of the repo owner's tooling (a flaky review workflow, a misfiring guard) and NOT your content, don't rabbit-hole opening fix-PR after fix-PR against their CI infra --- FIRST check whether the owner is already reworking that same infra in parallel (scan recent `main` commits and open PRs), since a fix landed under them collides with their work and is likely superseded; then verify the deliverable independently (render/lint/tests) and hand off/escalate to the owner sooner.
-  Corollary --- bootstrap deadlock: you can't cleanly fix a review workflow via PRs that are themselves reviewed by that broken workflow, so such a fix lands by admin-merge, not self-certification. (Learned on rme#954: content was done+verified early, but I iterated several `gha` review-workflow PRs chasing a no-verdict gate that d-morrison was concurrently fixing via his own #201/#204.)
+  Corollary --- bootstrap deadlock: you can't cleanly fix a review workflow via PRs that are themselves reviewed by that broken workflow, so such a fix lands by admin-merge, not self-certification. (Learned on rme#954: content was done+verified early, but I iterated several `gha` review-workflow PRs chasing a no-verdict gate that the repository owner was concurrently fixing via his own #201/#204.)
 - Always check r-lib, tidyverse, and similar R ecosystem organizations for off-the-shelf solutions before building custom implementations.
   Prefer well-maintained upstream packages over hand-rolled code when they meet the requirements.
 - When borrowing code or ideas from another repo, verify its license from the source FIRST (fetch its LICENSE file / `gh api repos/<o>/<r>/license`).
@@ -359,16 +359,16 @@
 - Before building setup/infra/toolchain config in a repo, fetch origin/main and scan the repo's own reference material (e.g. `references/`, `docs/`) and recent main commits for an existing or just-merged solution --- build on / align with it rather than a parallel, possibly contradictory approach. (Learned after drafting a juliaup-based Julia install that conflicted with the repo's reviewed curl+tarball cloud-setup reference.)
 - Always simplify code where feasible (without feature loss) --- prune dead code paths, remove unreachable branches, simplify variable assignments that can never take their fallback values given the current invocation context.
 - When fixing a bug or a fragile/duplicated pattern, grep the WHOLE repo for sibling instances and fix them all in one pass --- don't patch only the occurrence you happened to notice.
-  Otherwise a reviewer flags the missed copies as a separate finding, costing an extra round. (Learned on d-morrison/ai-config#45: the `git -C ~/.claude/skills` path fix was applied to `ums/SKILL.md` but the identical line in `skill-builder/SKILL.md` was missed until review caught it.)
+  Otherwise a reviewer flags the missed copies as a separate finding, costing an extra round. (Learned on the repository owner/ai-config#45: the `git -C ~/.claude/skills` path fix was applied to `ums/SKILL.md` but the identical line in `skill-builder/SKILL.md` was missed until review caught it.)
 - When renaming a variable or concept, grep for the old term in **both code and comments** (including section headers, file-level comments, and inline `# ---` banners).
   A variable rename that also appears in a section header (`# --- 2. Baseline covariates + Nelson-Aalen ---`) costs an extra ARDI round every time the header is missed.
   After changing the identifier, run `grep -r "old_name" .` before committing. (Learned on ucdavis/bcs#246: `nelson_aalen` → `cumhaz_baseline` fixed the variable and the file header but missed the section header --- caught two ARDI rounds later.)
 - When removing decorative comment banners (e.g. `# ---...---` / `# Name #` blocks), scan for **every** occurrence in the file --- both file-scope banners and inner function-body banners.
   Removing only the outer ones leaves the inner ones, and a reviewer catches the inconsistency as a separate finding.
-  Run `grep -n "^[[:space:]]*#[[:space:]]*[-=*_#]" file` to surface padded/decorated banner lines before committing. (Learned on d-morrison/ai-config#274: outer banners stripped in round 1, inner ones missed until round 2.)
+  Run `grep -n "^[[:space:]]*#[[:space:]]*[-=*_#]" file` to surface padded/decorated banner lines before committing. (Learned on the repository owner/ai-config#274: outer banners stripped in round 1, inner ones missed until round 2.)
 - Do not commit scratch test files that are not wired into CI.
   A file like `test_fix.py` with a dead `sys.path.insert` at the top and no pytest/CI integration adds noise without value and costs an extra ARDI round.
-  Delete it before the initial push, or as soon as a reviewer flags it. (Learned on d-morrison/ai-config#274.)
+  Delete it before the initial push, or as soon as a reviewer flags it. (Learned on the repository owner/ai-config#274.)
 - In test code, express date intervals with lubridate rather than hardcoded day counts.
   Use `lubridate::years(N)` + date arithmetic for calendar-year intervals from a known start date, or `lubridate::dyears(N)` when an exact numeric duration (`N x 365.25 x 86400` seconds) is what the function under test expects --- `years()` returns a Period, `dyears()` returns a Duration; pick the one that matches the semantics.
   Only fall back to a raw day count when the function requires one; verify it via `365.25 x N`, not by counting leap years manually (e.g., "3 leap years in 2000-2003" is wrong --- only 2000 qualifies), and confirm with `lubridate::time_length(lubridate::ddays(days_exact), "years") == N` (`time_length()` requires a timespan object, not a bare numeric). (Learned on ucdavis/bcs#249: using lubridate directly avoids the error class entirely.)
@@ -610,7 +610,7 @@
 - Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
-  On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
+  On workflows with `concurrency: cancel-in-progress` (the repository owner/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
   If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>`.
   Attribute in-flight runs to a PR from each run's own `gather-context` log.
   `gh run list` reports `main` as the branch for every dispatched review.
@@ -643,7 +643,7 @@
 - Keep the bot's `@`-mention trigger phrase OUT of PR/issue comment prose unless you actually intend to dispatch.
   The `issue_comment` trigger fires on the bare mention ANYWHERE in a comment --- even in a sentence saying you're NOT triggering a review (e.g. an ARD summary noting "not posting [the mention]").
   A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
-  On the d-morrison/gha mention bot it also starts a session whose residual-commit sweep can churn the branch.
+  On the the repository owner/gha mention bot it also starts a session whose residual-commit sweep can churn the branch.
   Refer to it obliquely ("re-request review", "the review-trigger mention") or split the tokens (e.g. `@ claude`, with a space). (Learned the hard way on ai-config#41; ardi/iterate/ard carry the warning.)
 - Don't ping EXTERNAL people or repos from our OWN repo's PR/issue/commit/comment text.
   An `@username` for a non-team person (e.g. an upstream maintainer) sends them a GitHub notification, and the `owner/repo#number` shorthand for an external issue posts a cross-reference backlink onto THEIR issue.
@@ -665,8 +665,8 @@
   Example: [ucdavis/bcs#191 review comment r3437005734](https://github.com/ucdavis/bcs/pull/191/changes#r3437005734).
 - When adding or changing math (LaTeX/Quarto equations --- `$...$`, `$$...$$`, `\begin{equation}`, `\(...\)`), always verify it actually RENDERS --- open the rendered HTML page and confirm the equation displays, not just that the build succeeded.
   A typo in a macro can silently break MathJax while the build still passes.
-  For rme, open your PR's preview page --- e.g. `https://d-morrison.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html` (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number). (An instance of never assume; always verify, applied to math.)
-  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `d-morrison.github.io` the proxy answers `403` to CONNECT (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`), so you can't load the preview to eyeball the math.
+  For rme, open your PR's preview page --- e.g. `https://the repository owner.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html` (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number). (An instance of never assume; always verify, applied to math.)
+  - **In a remote/web sandbox the github.io preview may be unreachable** --- if the environment's network policy blocks `the repository owner.github.io` the proxy answers `403` to CONNECT (curl: `CONNECT tunnel failed, response 403`; Chromium: `ERR_TUNNEL_CONNECTION_FAILED`), so you can't load the preview to eyeball the math.
     Verify locally instead: `npm i mathjax` (npmjs is allowed through the proxy), then init MathJax **with the `[tex]/noundefined` extension loaded** (`init({tex:{packages:{'[+]':['noundefined']}}}).then(MJ => MJ.tex2mml(defs + expr))`) and check the output.
     With `noundefined` an undefined macro shows as `<mtext mathcolor="red">\cmd</mtext>` (NOT an `<merror>` or a thrown exception), so grep for `mathcolor="red"`.
   - **MathJax ignores `\providecommand`** --- only `\newcommand` / `\def` / `\renewcommand` define a macro.
@@ -716,9 +716,9 @@
   De-slop, don't ban words or flatten voice; any single tell is innocent --- clustering is the signal.
   Code, terse status lines, and short conversational replies are exempt.
   This is the scan-after counterpart to the plain-prose style above. (see the `find-ai-tells` skill, alias `ai-tells`.)
-- It's always OK to register a repo as a consumer in one of our upstream repos' reverse-dependency list, without asking --- e.g. add it to `d-morrison/gha`'s `REVDEPS.md` when a repo starts calling its reusable workflows.
+- It's always OK to register a repo as a consumer in one of our upstream repos' reverse-dependency list, without asking --- e.g. add it to `the repository owner/gha`'s `REVDEPS.md` when a repo starts calling its reusable workflows.
   Open a small doc-only PR off the upstream's `main`.
-  Applies across our orgs: d-morrison, UCD-SERG, ucdavis, UCLA-PHP, UCD-IDDRC.
+  Applies across our orgs: the repository owner, UCD-SERG, ucdavis, UCLA-PHP, UCD-IDDRC.
   The REVDEPS list lets us warn consumers before a breaking tag move, so adding is pure upside.
 - When adding a new bare keyword directive that routes to a skill (e.g. "merge it"), update THREE places to keep routing consistent: (1) `CLAUDE.md` routing documentation, (2) the skill's `description:` frontmatter (what the LLM sees when scanning the skill list), and (3) the skill's "When this fires" trigger list.
   If the skill has N synonym trigger phrases, list all N in all three places.
@@ -803,7 +803,7 @@
   **Same rule for a write-capable `codex exec -C <path>` (or any `-s workspace-write`/`danger-full-access` subagent): never point it at the checkout you're actively editing.** Commit or stash first, then `git worktree add --detach <scratch> <commit>` and pass THAT to `-C`, and say so in the prompt ("this worktree is yours alone; do not cd outside it; do not commit or push").
   Use `--detach` so a read/verify agent never contends for a named branch another worktree already holds; afterwards verify with `git worktree list` that it actually made its own. (Learned on ucdavis/bcs, 2026-07-09: launched a codex verification with `-s workspace-write` pointed at my own worktree holding uncommitted #324 work, whose prompt told it to `git stash` --- which would have stashed my in-flight fix out from under a concurrent edit; caught before it ran.)
 - **General principle behind the worktree case above: when writing instructions for a subagent (or any delegated brief), state both what to do and what NOT to do --- don't rely on the reader to infer a forbidden path from what the instruction simply never mentioned.** A brief that only describes the desired positive action leaves every unmentioned path unconstrained; an agent under time/task pressure will happily take a technically-unmentioned-but-obviously-wrong action rather than stall on ambiguity (the worktree case: the brief named the *expected* path but never said the conductor's own path was off-limits, so a loose search matched it anyway).
-  Apply this especially for anything scope- or safety-sensitive --- target paths (worktrees, branches, files), destructive operations, credentials, merge/self-approval authority --- pair the positive instruction with an explicit negative constraint ("do X on branch Y; never touch branch Z or the conductor's own worktree") rather than a single-sided one. (d-morrison, ai-config#462 review, 2026-07-03.)
+  Apply this especially for anything scope- or safety-sensitive --- target paths (worktrees, branches, files), destructive operations, credentials, merge/self-approval authority --- pair the positive instruction with an explicit negative constraint ("do X on branch Y; never touch branch Z or the conductor's own worktree") rather than a single-sided one. (the repository owner, ai-config#462 review, 2026-07-03.)
 - A conductor cannot post its own "Ready for merge" / positive-verdict comment on a PR authored by its own dispatched subagent, even when the automated review bot is broken and the conductor has independently verified the diff is correct.
   This is self-approval --- the conductor and the PR's author are the same principal --- and the harness's auto-mode classifier blocks it outright, regardless of how solid the verification behind it is.
   When the intended independent reviewer isn't functioning (bot outage, quota exhaustion, a stub/no-verdict failure), the right moves are: get an independent review to actually run (retry the bot, or wait for a fix), or escalate the specific PR to the user for their own call --- never self-declare readiness to route around a missing reviewer. (Learned on sparta, 2026-07-02: attempting to post a "Ready for merge" summary on a PR whose review job had failed twice was blocked with an explicit self-approval reason.)
@@ -934,15 +934,15 @@ it suppresses a mistake at the cost of suppressing the PR's own review and auto-
 
 ## Use the shared math-macros submodule for manuscript math
 
-Write math in lab Quarto/LaTeX manuscripts with the shared [`d-morrison/macros`](https://github.com/d-morrison/macros) submodule (vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
-Keep the submodule up to date, and add new macros to it (via a PR to `d-morrison/macros`) whenever a needed concept has no macro, rather than defining one-off commands inline.
+Write math in lab Quarto/LaTeX manuscripts with the shared [`the repository owner/macros`](https://github.com/the repository owner/macros) submodule (vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
+Keep the submodule up to date, and add new macros to it (via a PR to `the repository owner/macros`) whenever a needed concept has no macro, rather than defining one-off commands inline.
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 
 Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which dirties `git diff HEAD` --- do it in a worktree, never a checkout running provenance-stamped SLURM jobs.
 And custom macro command-names leak into `spelling::spell_check_package()` for `.qmd` files under `vignettes/` (the spelling filter strips common LaTeX like `\text`/`\frac` but not custom macros), so add every macro name used, plus genuine terms, to `inst/WORDLIST`; files under `inst/analyses/` are not spell-checked.
 
 This is the author-side half; the review-side counterpart is
-`d-morrison/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input
+`the repository owner/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input
 (gha#204), which flags PR-diff LaTeX simplifiable via an existing macro and
 nontrivial expressions repeated 3+ times as new-macro candidates. It needs
 `checkout-submodules: true` alongside it (the reviewer has no network-fetch
@@ -1051,11 +1051,11 @@ Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-0
 - **In an ephemeral remote/web session, a repo's "commit only after render/lint/spell pass" rule can conflict with a session-end stop-hook that demands uncommitted work be committed+pushed immediately** (the container gets reclaimed, so leaving edits uncommitted risks losing them entirely --- a worse outcome than an unverified commit).
   When verification is genuinely still in flight (e.g. blocked on a slow package install) and the hook fires, commit+push now with a commit message that doesn't claim verification passed, then keep verifying and push a follow-up fixup commit if anything turns up.
   Git history is cheap; lost work in a reclaimed container is not.
-  Don't let this become an excuse to skip verification when there's no actual time-pressure --- only use it when a stop-hook or session-end signal is the forcing function. (Learned on d-morrison/rme#772: render was blocked on a ~1hr renv package install; committed the reorg + merge-conflict resolution before the render finished to satisfy the stop hook, then continued verifying.)
+  Don't let this become an excuse to skip verification when there's no actual time-pressure --- only use it when a stop-hook or session-end signal is the forcing function. (Learned on the repository owner/rme#772: render was blocked on a ~1hr renv package install; committed the reorg + merge-conflict resolution before the render finished to satisfy the stop hook, then continued verifying.)
 
 ## Git author mapping
-- Commits by `dem-extra1` to repos owned by `d-morrison`, `ucd-serg`, or `ucdavis` → the true author is `d-morrison` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
-- Commits to `sparta` by `d-morrison` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `d-morrison`.
+- Commits by `dem-extra1` to repos owned by `the repository owner`, `ucd-serg`, or `ucdavis` → the true author is `the repository owner` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
+- Commits to `sparta` by `the repository owner` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `the repository owner`.
 
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
@@ -1064,7 +1064,7 @@ Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-0
 
 When adding an optional capability to a repo the user personally owns and
 treats as shared infrastructure for their *own* other repos (e.g.
-`d-morrison/gha`'s reusable workflows, consumed by d-morrison/UCD-SERG/ucdavis
+`the repository owner/gha`'s reusable workflows, consumed by the repository owner/UCD-SERG/ucdavis
 repos alike), don't default to pure opt-in just because the repo has
 external, non-owner consumers.
 **Why:** built a `plugin-marketplaces`/`plugins` passthrough on `gha`'s
@@ -1080,7 +1080,7 @@ comment) to flip it to on-by-default before merging.
 float "on by default for the owner, opt-out for others" as a distinct option
 from "opt-in only" rather than assuming opt-in is automatically the
 safer/preferred choice merely because the repo has external consumers.
-(d-morrison/gha#321, closing #319, 2026-07-26/27.)
+(the repository owner/gha#321, closing #319, 2026-07-26/27.)
 
 ## Code organization
 - One function per file, across languages (not just R) --- the exception is a trivial two-line wrapper/helper, not a general "where practical" hedge or a "major function" loophole that lets other private helpers ride along (see `shared/coding/one-function-per-file.md`).

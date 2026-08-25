@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "ai-config",
-  "description": "d-morrison's personal Claude Code skills (PR/review workflow, grading, reprexes, R-package helpers) and slash commands.",
+  "description": "the repository owner's personal Claude Code skills (PR/review workflow, grading, reprexes, R-package helpers) and slash commands.",
   "author": {
-    "name": "d-morrison"
+    "name": "the repository owner"
   }
 }

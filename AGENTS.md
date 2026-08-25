@@ -118,7 +118,7 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 |---|---|---|
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
-| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| upstream the repository owner/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
 

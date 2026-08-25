@@ -12,7 +12,7 @@ review" below).
 ## Where to look
 
 - **Our own repos**: the lab packages (e.g. `{bcs}`, `{ettbc}`), the
-  shared reusable workflows and actions in `d-morrison/gha`, and this
+  shared reusable workflows and actions in `the repository owner/gha`, and this
   `ai-config` corpus's skills and fragments.
   Packages can depend on each other, so reuse across our repos is fine.
 - **Trustworthy external sources**: base R; the
@@ -48,7 +48,7 @@ to build on.
 
 DRW also runs forward, not just backward: when the tooling you're about
 to *build* is generic CI/lint/project infrastructure rather than
-agent-behavior/config, ask whether it belongs in `d-morrison/gha`'s
+agent-behavior/config, ask whether it belongs in `the repository owner/gha`'s
 reusable-actions layer instead of ai-config's own `scripts/` --- even
 when the immediate need surfaced from ai-config's own corpus.
 `scripts/` should stay scoped to checks specific to *this* repo's own
@@ -73,7 +73,7 @@ local duplicate, or the two copies drift independently (a fix to one
 never reaches the other). (gha#300 shipped `check-new-line-breaks` as a
 composite action + reusable workflow; ai-config#702/#703 then retired
 `scripts/check-new-line-breaks.py` in favor of calling
-`d-morrison/gha/.github/workflows/check-new-line-breaks.yml@v2` from
+`the repository owner/gha/.github/workflows/check-new-line-breaks.yml@v2` from
 `validate.yml`.)
 
 The [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md) skill is
@@ -191,7 +191,7 @@ action than the patch you were about to write.
 
 (`UCD-SERG/serocalculator#614`, 2026-07-27: a raw `gh pr comment` heredoc
 posted as a review body was diagnosed against the `@v2` snapshot, then
-reproduced and patched locally. `d-morrison/gha`'s `main` already carried
+reproduced and patched locally. `the repository owner/gha`'s `main` already carried
 the fix (`gha#318`), and it handled three cases the local patch did not:
 `<<-` heredocs, unquoted tags, and CRLF transcripts --- that last one a
 bug the local patch would have shipped, since normalizing `\r` only for

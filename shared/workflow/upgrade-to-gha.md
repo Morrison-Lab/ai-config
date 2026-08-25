@@ -19,7 +19,7 @@ Three rules already name a condition for reaching toward gha, and each waits for
 
 - [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s "A stale, un-migrated local copy is the least reliable place to fix a bug" fires when you are **about to patch a bug** in a workflow file.
 - The same fragment's "Close the loop once the port lands" fires when **gha has just gained** a capability a consumer already had locally.
-- [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) opens with "Check `d-morrison/gha` before writing bespoke CI", which fires when you are **about to write new CI**.
+- [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) opens with "Check `the repository owner/gha` before writing bespoke CI", which fires when you are **about to write new CI**.
 
 Those three are the migration-condition rules, not every mention of gha in the corpus.
 Many more files mention gha without naming one --- `git grep -l gha <ref> -- '*.md' | wc -l` counts them at whatever ref you hand it --- and some route work toward gha for reasons that are not migration at all: [`config-ai`](../../skills/config-ai/SKILL.md)'s routing table picks gha as the home for a new shared capability, and [`convert-repo-format`](../../skills/convert-repo-format/SKILL.md) assumes a target template already calls it.
@@ -64,7 +64,7 @@ The boundary matters as much as the trigger, because a migration that drops beha
   Do not migrate around it, per [`incidents-dont-repeal-decisions`](incidents-dont-repeal-decisions.md).
 - **A repo we do not administrate.**
   The operative test is whether we can merge a PR to that repo, not whether its owner appears on a list.
-  The gha README names `d-morrison`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
+  The gha README names `the repository owner`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
   Read the list as evidence of reach rather than as an allowlist, and treat a repo outside our administration as a question for its maintainer rather than a migration to perform.
 
 Both [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) author caller stubs delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` and `Morrison-Lab/gha/.github/workflows/claude.yml@v2` (reconciled under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133)).

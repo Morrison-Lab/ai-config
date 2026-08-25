@@ -20,13 +20,13 @@ The tell is that nothing about the session resembles a terminal recap: no human 
 - **Don't:** assume the harness concatenates your turn.
   The common implementation takes one message.
 
-(Measured 2026-08-19 on `d-morrison/rme`.
-Installing this corpus as a plugin in that repo's `@claude` workflow ([rme#1076](https://github.com/d-morrison/rme/pull/1076)) made every prose reply collapse to a one-line declaration.
+(Measured 2026-08-19 on `the repository owner/rme`.
+Installing this corpus as a plugin in that repo's `@claude` workflow ([rme#1076](https://github.com/the repository owner/rme/pull/1076)) made every prose reply collapse to a one-line declaration.
 The pre-plugin reply was 1182 characters and substantive.
 The three post-plugin replies were 233, 356, and 501 characters, and each began with the marker.
 One run diagnosed the bug itself and had its diagnosis swallowed by the bug.
-Tracked as [rme#1081](https://github.com/d-morrison/rme/issues/1081).
-[rme#1082](https://github.com/d-morrison/rme/pull/1082) is the consumer-side workaround, and this section is the upstream fix that stops it recurring in every other repo installing the plugin.)
+Tracked as [rme#1081](https://github.com/the repository owner/rme/issues/1081).
+[rme#1082](https://github.com/the repository owner/rme/pull/1082) is the consumer-side workaround, and this section is the upstream fix that stops it recurring in every other repo installing the plugin.)
 
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.

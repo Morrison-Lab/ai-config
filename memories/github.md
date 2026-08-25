@@ -9,7 +9,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 
 - **Preflight gate:** verify target branch/repo and whether the action should update an existing PR versus create a new one.
 - **Safe command form:** when content includes markdown/backticks, write to a temp file and pass `--body-file` or `-F "body=@<file>"`; avoid inline double-quoted body args.
-- **Postcondition gate:** after push/post/create, query GitHub state in the intended base repo (for PRs, include both repo and head owner) and confirm the intended object actually exists/updated. `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head even when a matching PR exists — verified directly against a real open PR (`gh pr list --head d-morrison:ums-pr635-lessons` returned `[]`; the bare `--head ums-pr635-lessons` found it). Use the REST API instead, with the branch passed as a `-f` GET field rather than interpolated into the raw URL — a branch name containing `#`, `&`, or `+` breaks a hand-built query string but is passed through correctly as a field: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'`.
+- **Postcondition gate:** after push/post/create, query GitHub state in the intended base repo (for PRs, include both repo and head owner) and confirm the intended object actually exists/updated. `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head even when a matching PR exists — verified directly against a real open PR (`gh pr list --head the repository owner:ums-pr635-lessons` returned `[]`; the bare `--head ums-pr635-lessons` found it). Use the REST API instead, with the branch passed as a `-f` GET field rather than interpolated into the raw URL — a branch name containing `#`, `&`, or `+` breaks a hand-built query string but is passed through correctly as a field: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'`.
 - **Failure signature:** stderr like `command not found` during a `gh`/`glab ... --body` call can mean two different things — check which first, probing whichever CLI actually failed (`which gh` or `which glab`, not always `gh`): if `gh` itself is unavailable (expected in remote/web sessions), fall back to the mapped MCP tool instead of retrying the CLI — `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead. If the CLI that failed is present, the likely cause is shell-expanded backticks mangling the body — re-run using a file-backed body.
 
 ## gh (GitHub CLI)
@@ -21,7 +21,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `gh api /users/<owner>/repos` is the personal-account counterpart, and `gh api /users/<owner> --jq .type` returns `User` or `Organization` when you need to branch.
   This matters when enumerating repos across a mixed owner list: substituting the `/orgs/` form to get pagination silently drops every user account in the list.
   (Morrison-Lab/ai-config#833, 2026-07-29: a review suggested exactly that substitution to fix a `--limit 1000` truncation.
-  `d-morrison` is a `User`, so it would have 404'd on the first owner in the list.
+  `the repository owner` is a `User`, so it would have 404'd on the first owner in the list.
   The truncation was real, and the fix was to detect the ceiling instead, in the census command under "`gh search code` is not a reliable way to enumerate consumers".)
 - **Rate limit is shared (5000/hr) and split GraphQL vs REST.**
   All tools/sessions/agents share the one user's 5000/hr, and `core` (REST)
@@ -147,7 +147,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 - **A third variant, and it is not one repo's quirk: the review comment can
   post as `github-actions[bot]` rather than `claude`/`claude[bot]`, and the
   same repo can do it on one round and not the next.**
-  First recorded on `d-morrison/gha`; observed again on
+  First recorded on `the repository owner/gha`; observed again on
   `Morrison-Lab/ai-config#1054` (2026-08-03), where round 2's verdict posted as
   `claude[bot]` at `02:12:52Z` and round 3's as `github-actions[bot]` at
   `03:04:19Z` --- so the login varied **between consecutive rounds of one PR**,
@@ -259,7 +259,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Raising the limit to 30 returned both #1019 and #969.)
 - **`gh pr edit` exits 1 on repos with Projects Classic — use `gh api` to update PR body.** `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`). Sometimes the edit lands anyway; **sometimes it does not apply at all** (seen on sparta 2026-06-30: three `gh pr edit --body-file` attempts left the body unchanged with the `SHA_PLACEHOLDER` still in place). Either way, don't trust it — verify with `gh api repos/<o>/<r>/pulls/<N> --jq .body`, and just use the REST PATCH directly, which always exits 0 and applies: `gh api -X PATCH repos/<o>/<r>/pulls/<N> -f body="..."`. For a multi-line body, read it from a file with `-F body=@<path>` (capital `-F` to pull the field value from the file) rather than cramming it into `-f body="..."`.
 - **PR description image embeds: use `raw.githubusercontent.com`, not `github.com/.../raw/...`.** Embedding a committed file in a PR body with `![](https://github.com/<owner>/<repo>/raw/<sha>/<path>)` may not render — the reviewer will flag it. The correct raw-content domain is `https://raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Reference the full commit SHA so the image keeps rendering after the branch is deleted on merge.
-- **`raw.githubusercontent.com` FOLLOWS repository-rename redirects, so a `200` under the OLD owner proves nothing — only a `200` under the NEW owner is decisive.** To test whether a repo has moved, probe the *new* name and treat `404` there as "did not move". Run a known-moved repo as a control first, or the probe silently answers backwards: `d-morrison/gha` still returned `200` on `raw.githubusercontent.com` well after it became `Morrison-Lab/gha`, so an old-name probe reports every repo as "not moved". The REST API is not a substitute — behind an agent proxy `api.github.com/repos/<o>/<r>` can return `403` for every repo regardless of existence, which answers nothing in either direction. This matters before any blanket owner rewrite: probing all nine `d-morrison/*` references in ucdavis/bcs under the new owner showed only `gha` and `ai-config` had moved, so a find-and-replace would have broken `macros`, `altdoc`, `snapr`, `stats-allowlist`, `diffviewer`, `equation-anchors`, and `rme`. Note the bare `d-morrison` *username* (a `reviewer:` input, author metadata) is unaffected by a repo/org rename and must not be swept along. The Actions-side consequences of the same rename are in `github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"). (2026-07-28.)
+- **`raw.githubusercontent.com` FOLLOWS repository-rename redirects, so a `200` under the OLD owner proves nothing — only a `200` under the NEW owner is decisive.** To test whether a repo has moved, probe the *new* name and treat `404` there as "did not move". Run a known-moved repo as a control first, or the probe silently answers backwards: `the repository owner/gha` still returned `200` on `raw.githubusercontent.com` well after it became `Morrison-Lab/gha`, so an old-name probe reports every repo as "not moved". The REST API is not a substitute — behind an agent proxy `api.github.com/repos/<o>/<r>` can return `403` for every repo regardless of existence, which answers nothing in either direction. This matters before any blanket owner rewrite: probing all nine `the repository owner/*` references in ucdavis/bcs under the new owner showed only `gha` and `ai-config` had moved, so a find-and-replace would have broken `macros`, `altdoc`, `snapr`, `stats-allowlist`, `diffviewer`, `equation-anchors`, and `rme`. Note the bare `the repository owner` *username* (a `reviewer:` input, author metadata) is unaffected by a repo/org rename and must not be swept along. The Actions-side consequences of the same rename are in `github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"). (2026-07-28.)
 - **Download a user-pasted PR screenshot with `curl -L`.** When a user pastes an image into a GitHub PR comment, the file lives at `https://github.com/user-attachments/assets/<uuid>` and is publicly downloadable: `curl -L -o <dest>.png "https://github.com/user-attachments/assets/<uuid>"`. Retrieve the URL from the comment body via `gh api repos/<o>/<r>/issues/comments/<comment_id> --jq .body`.
 - **Linking a GitHub sub-issue needs an integer DB id, not the number.** `POST /repos/<o>/<r>/issues/<parent>/sub_issues` takes `sub_issue_id` = the child's **database id** (`gh api repos/<o>/<r>/issues/<child> --jq .id`), *not* its issue number. Pass it with `-F` (typed, integer), never `-f` (string) — `-f sub_issue_id=…` fails with `422 Invalid property /sub_issue_id: "…" is not of type integer`. Full call: `gh api repos/<o>/<r>/issues/<parent>/sub_issues -F sub_issue_id=<child_db_id>`. Verify with `gh api .../issues/<parent>/sub_issues --jq '.[] | "#\(.number) \(.title)"'`.
 - **Backticks in a double-quoted `-m` / `--body` string get command-substituted by the shell.** In the Bash tool, `` git commit -m "... `origin` ..." `` or `` gh pr comment --body "use `foo`" `` makes the shell run `` `origin` ``/`` `foo` `` as a command and splice the (usually empty/erroring) output into the message — silently mangling it (seen on sparta 2026-06-30: a commit body's `` `origin` `` and `` `killer` `` vanished, with `origin: command not found` in stderr). For any message/body containing backticks, use a single-quoted **heredoc** (`` -m "$(cat <<'EOF' … EOF)" `` — the quoted `'EOF'` disables all expansion) or a `--body-file`, never a bare double-quoted string. (Same root cause as ARD inline reply bodies too; use `-F body=@<file>` for `gh api .../pulls/<N>/comments`/`glab api .../notes` so backticks in Markdown never get shell-expanded.)
@@ -440,8 +440,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 
 - **`gh pr edit --add-reviewer` silently no-ops when the requested reviewer is the PR's author, and the CLI reports success anyway.**
   GitHub forbids a review request aimed at a PR's author, and [`skills/request-pr-review/SKILL.md`](../skills/request-pr-review/SKILL.md)'s edge case records that the REST POST answers HTTP **422** --- but the `gh pr edit <N> --add-reviewer <login>` wrapper swallows it: exit 0, no error, no warning.
-  Observed on `Morrison-Lab/wai#93`, 2026-08-22 --- the session requested `d-morrison` and the PR author was `d-morrison`.
-  Two runs of `gh pr edit 93 --add-reviewer d-morrison` both exited clean, and `GET /repos/Morrison-Lab/wai/pulls/93/requested_reviewers` returned no users after each.
+  Observed on `Morrison-Lab/wai#93`, 2026-08-22 --- the session requested `the repository owner` and the PR author was `the repository owner`.
+  Two runs of `gh pr edit 93 --add-reviewer the repository owner` both exited clean, and `GET /repos/Morrison-Lab/wai/pulls/93/requested_reviewers` returned no users after each.
   Here the empty `requested_reviewers` list **is** decisive negative evidence: the request was refused at creation, not accepted-and-hidden.
   Consequence for the skill's own step: human review cannot be requested from a PR's author --- when the intended reviewer is the author, "request human review" degenerates to reporting the PR to that person in chat.
 
@@ -501,7 +501,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   The remedy this paragraph used to give --- unregister it from `~/.claude/settings.json`'s `Stop` hooks --- covered only ONE installation shape, and it is worth recording why rather than just deleting it.
   Where ai-config is installed as a **plugin**, the registration lives in ai-config's own `hooks/hooks.json` under `${CLAUDE_PLUGIN_ROOT}`, so there is nothing in the user's settings to remove: the edit succeeds, changes no behaviour, and the hook keeps firing.
   A remedy that silently does nothing is worse than none, because it reads as applied.
-  The plugin shape is now the common one --- `d-morrison/rme#1074` migrates off the `.ai-config` submodule, and `Morrison-Lab/gha`'s `run-claude-review-attempt` installs the plugin for every review run --- which is the general lesson: a fix aimed at a local registration has to name which installation shape it assumes.
+  The plugin shape is now the common one --- `the repository owner/rme#1074` migrates off the `.ai-config` submodule, and `Morrison-Lab/gha`'s `run-claude-review-attempt` installs the plugin for every review run --- which is the general lesson: a fix aimed at a local registration has to name which installation shape it assumes.
 
   - **Do:** treat the hook's `MORATORIUM_END` as the switch, and move it and this memory together.
   - **Don't:** unregister the hook from `~/.claude/settings.json` to quiet it --- that does nothing on a plugin install, and nothing is needed on any install now.
@@ -563,7 +563,7 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 
   **Two negative controls are needed before reading anything into a zero from a `reviewed-by:` search, and they test different things.**
   The first is the ordinary one this corpus already requires of any sweep: does the detector run at all?
-  `repo:Morrison-Lab/ai-config reviewed-by:d-morrison` returns `total_count: 273`, so the qualifier works.
+  `repo:Morrison-Lab/ai-config reviewed-by:the repository owner` returns `total_count: 273`, so the qualifier works.
   The second is specific to a search keyed on a **login**, and it is free: GitHub rejects a nonexistent one outright rather than returning zero.
   `reviewed-by:Copilot` fails with `422 Validation Failed ... The listed users cannot be searched either because the users do not exist or you do not have permission to view the users`, whereas `copilot-pull-request-reviewer` returned `0` with no `422`.
   A quiet zero therefore establishes that the login resolved, and a `422` establishes that it did not --- so the error channel is the negative control for the predicate, and running the search against a deliberately bogus value is the cheapest way to prove the value you care about was understood.
@@ -638,11 +638,11 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   rename, a move between orgs --- so the set you know about is rarely the set
   that exists.
   (2026-07-29: a sweep of 118 local checkouts found 5 stale, and only **one**
-  was the `d-morrison` -> `Morrison-Lab` transfer being fixed at the time
+  was the `the repository owner` -> `Morrison-Lab` transfer being fixed at the time
   (`gha`; the other repo in that transfer had already been corrected by hand
   before the sweep ran, so it was no longer stale).
   The rest came from three unrelated events: two repos moved out of
-  `UCD-SERG` to `d-morrison` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
+  `UCD-SERG` to `the repository owner` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
   `ucdavis` (`fxtas`), and one plain rename, `snapshot.data` -> `snapr`.
   So 1 + 2 + 1 + 1, which is the point --- four of the five had nothing to do
   with the move that prompted the sweep.)
@@ -727,7 +727,7 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     answered normally for a repo in that session's GitHub scope:
     ```
     $ curl -sS -o /dev/null -w '%{http_code}\n' \
-        https://api.github.com/repos/d-morrison/altdoc
+        https://api.github.com/repos/the repository owner/altdoc
     200
     ```
     For a repo outside the scope it returned `403`, with a body naming the
@@ -758,7 +758,7 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     lookup.
     See [`git-tags.md`](git-tags.md)'s "Resolving a tag to a COMMIT sha" for the exact
     refspec form to ask for.
-    (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
+    (the repository owner/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
     needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
     `JamesIves/`, none of them in session scope, and `add_repo` would have been
     five pointless scope grants for five ref lookups.)
@@ -780,9 +780,9 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
 
     | repo | `curl -I` | `git ls-remote <url> HEAD` |
     |---|---|---|
-    | `d-morrison/ai-config` | 403 | `7d843650...` |
+    | `the repository owner/ai-config` | 403 | `7d843650...` |
     | `Morrison-Lab/ai-config` | 200 | `7d843650...` |
-    | `d-morrison/macros` | 403 | `8ce5d0cf...` |
+    | `the repository owner/macros` | 403 | `8ce5d0cf...` |
     | `Morrison-Lab/macros` | 403 | `fatal: could not read Username` |
 
     Read the `curl` column as a table of the allowlist and nothing else:
@@ -800,13 +800,13 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     to asking for credentials rather than reporting a 404.
     Set `GIT_TERMINAL_PROMPT=0` so that case fails immediately instead of
     blocking on a prompt.
-    Note the pair `d-morrison/macros` resolving while `Morrison-Lab/macros`
+    Note the pair `the repository owner/macros` resolving while `Morrison-Lab/macros`
     does not --- the opposite direction from `ai-config`, which is why a
     blanket owner rewrite across both would break a working reference.
     (`Morrison-Lab/wai#54`, 2026-08-09: a `.gitmodules` still naming
-    `d-morrison/ai-config` resolved only through the rename redirect, so
+    `the repository owner/ai-config` resolved only through the rename redirect, so
     nothing was visibly broken; `macros` was correctly left pointed at
-    `d-morrison`.)
+    `the repository owner`.)
 - **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.
@@ -900,7 +900,7 @@ applying that label didn't work -- the wrapped `UCD-SERG/changelog-check-action`
 hardcodes checking for `no changelog` (space), a different string. The first
 fix redocumented the label as `no changelog` (space) everywhere -- technically
 unblocked the PR, but was wrong: it was really the shared
-`d-morrison/gha` `check-news.yml` reusable workflow, pinned to the repo's
+`the repository owner/gha` `check-news.yml` reusable workflow, pinned to the repo's
 frozen `@v1` tag, that was stale. A newer version (`@v2`) already had a
 configurable `no-changelog-label` input, added specifically for this
 convention by an earlier, already-closed upstream issue (gha#143). The
@@ -940,7 +940,7 @@ this only because it explicitly checked fragments outside the current PR's
 diff -- don't assume a `changelog.d/` file is out of scope just because this
 PR didn't author it.
 
-(`UCD-SERG/serocalculator#593` / `d-morrison/gha#304`/`#143`, 2026-07-25: the
+(`UCD-SERG/serocalculator#593` / `the repository owner/gha#304`/`#143`, 2026-07-25: the
 label-name fix round-tripped through a wrong "redocument the label" patch
 before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
 caught two more stale `@v1` references in sibling docs pages and the
@@ -954,9 +954,9 @@ Code search is the obvious instrument and it is **incomplete**: it silently
 omits repos whose content it has not indexed, and nothing in the response
 says so.
 
-Measured 2026-07-28, hunting callers of a renamed `d-morrison/gha` across ten
-owners: an owner-scoped `gh search code '"d-morrison/gha" user:...'` returned
-176 hits across 23 repos, and missed `d-morrison/altdoc`, a live consumer with
+Measured 2026-07-28, hunting callers of a renamed `the repository owner/gha` across ten
+owners: an owner-scoped `gh search code '"the repository owner/gha" user:...'` returned
+176 hits across 23 repos, and missed `the repository owner/altdoc`, a live consumer with
 four workflow files calling it.
 An exhaustive scan of all 947 non-archived repos found it immediately.
 
@@ -1010,7 +1010,7 @@ clean census:
   Widen the path filter, or use the git-trees API to list every blob under
   `.github/` in one call per repo.
 - **A local checkout is not evidence about the remote.**
-  `d-morrison/methods.paper` had four gha-calling workflows on disk, all on an
+  `the repository owner/methods.paper` had four gha-calling workflows on disk, all on an
   unmerged branch; the remote default branch had no `.github/workflows`
   directory at all.
 

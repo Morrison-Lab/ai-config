@@ -267,21 +267,7 @@ class PRClaimManager:
             # Strip fenced code blocks to prevent code examples or quoted text from spoofing headings
             stripped_body = re.sub(r"```[\s\S]*?```", " ", lower_body)
 
-            # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
-            heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
-            if heading_matches:
-                verdict_section = stripped_body[heading_matches[-1].end():]
-            else:
-                verdict_section = stripped_body
-
-            # Extract non-empty lines from the verdict section
-            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
-            if not verdict_lines:
-                return False, "Latest AI review verdict section is empty"
-
-            first_verdict_line = verdict_lines[0]
-
-            # 1. Check for not-clean / blocking patterns throughout the entire verdict section
+            # 1. Check for not-clean / blocking patterns throughout the ENTIRE stripped review body
             not_clean_patterns = [
                 r"\bneeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
                 r"verdict:\s*(?:ready after addressing findings|changes requested|actionable findings|block(?:ed|ing)?|needs\s+more\s+work)",
@@ -295,11 +281,25 @@ class PRClaimManager:
             not_clean_negation_prefix = re.compile(r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE)
 
             for pat in not_clean_patterns:
-                for match in re.finditer(pat, verdict_section, re.IGNORECASE | re.MULTILINE):
-                    prefix = verdict_section[max(0, match.start() - 25):match.start()]
+                for match in re.finditer(pat, stripped_body, re.IGNORECASE | re.MULTILINE):
+                    prefix = stripped_body[max(0, match.start() - 25):match.start()]
                     if not_clean_negation_prefix.search(prefix):
                         continue
                     return False, f"Latest AI review has blocking verdict ('{match.group(0)}')"
+
+            # Per fully-clean.md: anchor on the last genuine `^### Verdict` markdown heading in the comment
+            heading_matches = list(re.finditer(r"^(?:#{1,6}\s*verdict\b|verdict:)", stripped_body, re.IGNORECASE | re.MULTILINE))
+            if heading_matches:
+                verdict_section = stripped_body[heading_matches[-1].end():]
+            else:
+                verdict_section = stripped_body
+
+            # Extract non-empty lines from the verdict section
+            verdict_lines = [line.strip() for line in verdict_section.strip().splitlines() if line.strip()]
+            if not verdict_lines:
+                return False, "Latest AI review verdict section is empty"
+
+            first_verdict_line = verdict_lines[0]
 
             # 2. Check for positive clean / approved verdict strictly on the FIRST line of the verdict section
             clean_first_line_pat = re.compile(

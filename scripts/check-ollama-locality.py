@@ -2,7 +2,7 @@
 """Verify data-locality guarantees for local Ollama delegation via OpenCode.
 
 Verifies:
-1. Endpoint loopback resolution (baseURL host resolves strictly to 127.0.0.1 or ::1).
+1. Endpoint loopback resolution (baseURL host resolves strictly to 127.0.0.1 or ::1, redirects disabled).
 2. Live daemon local-only state (checked directly against running Ollama daemon /api/status, requiring cloud.disabled == true).
 3. Target model local residency on-device (checked against Ollama /api/tags, refusing remote/cloud models).
 """
@@ -10,14 +10,37 @@ Verifies:
 import argparse
 import ipaddress
 import json
-import os
 import re
 import socket
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 from typing import Optional, Tuple
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(
+            newurl, code, f"HTTP redirects disallowed for locality-verified endpoints ({newurl})", headers, fp
+        )
+
+
+def _safe_fetch_json(url: str, timeout: int = 5) -> Tuple[dict, str]:
+    opener = urllib.request.build_opener(NoRedirectHandler)
+    req = urllib.request.Request(url, headers={"User-Agent": "opencode-locality-check"})
+    with opener.open(req, timeout=timeout) as resp:
+        final_url = resp.geturl()
+        final_host = urlparse(final_url).hostname
+        if not final_host:
+            raise ValueError(f"No host in response URL {final_url!r}")
+        addrs = {info[4][0] for info in socket.getaddrinfo(final_host, None)}
+        remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
+        if remote:
+            raise ValueError(f"Final response URL {final_url} resolves off-machine: {', '.join(remote)}")
+        data = json.loads(resp.read().decode("utf-8"))
+        return data, final_url
 
 
 def verify_locality(
@@ -68,9 +91,7 @@ def verify_locality(
     # 3. Verify running daemon live local-only status via /api/status
     try:
         status_url = f"{base_endpoint}/api/status"
-        req_status = urllib.request.Request(status_url, headers={"User-Agent": "opencode-locality-check"})
-        with urllib.request.urlopen(req_status, timeout=5) as resp:
-            status_data = json.loads(resp.read().decode("utf-8"))
+        status_data, _ = _safe_fetch_json(status_url, timeout=5)
     except Exception as exc:
         return False, f"Cannot reach or verify live Ollama status at {base_endpoint}/api/status ({exc}). Refusing: running daemon must confirm cloud is disabled."
 
@@ -78,23 +99,14 @@ def verify_locality(
         return False, f"Unexpected response schema from {base_endpoint}/api/status: expected JSON object."
 
     cloud_obj = status_data.get("cloud")
-    if isinstance(cloud_obj, dict):
-        cloud_disabled = cloud_obj.get("disabled") is True
-    elif isinstance(cloud_obj, bool):
-        cloud_disabled = (cloud_obj is False)
-    else:
-        cloud_disabled = False
-
-    if not cloud_disabled:
-        return False, f"Running Ollama daemon at {url} reports cloud offloading is active (status: {json.dumps(status_data)}). Refusing."
+    if not isinstance(cloud_obj, dict) or cloud_obj.get("disabled") is not True:
+        return False, f"Running Ollama daemon at {url} reports cloud offloading is active or unverified (status: {json.dumps(status_data)}). Refusing."
 
     # 4. Verify local model residency via /api/tags
     try:
         tags_url = f"{base_endpoint}/api/tags"
-        req_tags = urllib.request.Request(tags_url, headers={"User-Agent": "opencode-locality-check"})
-        with urllib.request.urlopen(req_tags, timeout=5) as resp:
-            tags_data = json.loads(resp.read().decode("utf-8"))
-            model_entries = tags_data.get("models", [])
+        tags_data, _ = _safe_fetch_json(tags_url, timeout=5)
+        model_entries = tags_data.get("models", [])
     except Exception as exc:
         return False, f"Cannot verify local model residency from Ollama tags API ({exc})"
 

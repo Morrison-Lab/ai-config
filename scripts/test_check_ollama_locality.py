@@ -3,7 +3,6 @@
 
 import importlib.util
 import json
-import os
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -77,50 +76,68 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("resolves off-machine", msg)
 
-    @patch("urllib.request.urlopen")
+    @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_daemon_status_unreachable_refuses_fail_closed(self, mock_getaddrinfo, mock_urlopen):
+    def test_daemon_status_unreachable_refuses_fail_closed(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
-        mock_urlopen.side_effect = OSError("Connection refused")
+        mock_open.side_effect = OSError("Connection refused")
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
         self.assertIn("Cannot reach or verify live Ollama status", msg)
 
-    @patch("urllib.request.urlopen")
+    @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_daemon_with_cloud_disabled_false_refuses(self, mock_getaddrinfo, mock_urlopen):
+    def test_daemon_with_cloud_disabled_false_refuses(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
         status_resp.read.return_value = json.dumps({"cloud": {"disabled": False, "source": "config"}}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
         status_resp.__enter__.return_value = status_resp
 
-        mock_urlopen.return_value = status_resp
+        mock_open.return_value = status_resp
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
         self.assertIn("cloud offloading is active", msg)
 
-    @patch("urllib.request.urlopen")
+    @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_daemon_with_unknown_cloud_schema_refuses(self, mock_getaddrinfo, mock_urlopen):
+    def test_daemon_with_boolean_cloud_false_refuses_strict_schema(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
-        status_resp.read.return_value = json.dumps({"cloud": "unknown"}).encode("utf-8")
+        status_resp.read.return_value = json.dumps({"cloud": False}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
         status_resp.__enter__.return_value = status_resp
 
-        mock_urlopen.return_value = status_resp
+        mock_open.return_value = status_resp
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertFalse(ok)
-        self.assertIn("cloud offloading is active", msg)
+        self.assertIn("cloud offloading is active or unverified", msg)
 
-    @patch("urllib.request.urlopen")
+    @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_remote_backed_model_in_tags_refuses(self, mock_getaddrinfo, mock_urlopen):
+    def test_daemon_with_unknown_cloud_schema_refuses(self, mock_getaddrinfo, mock_open):
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"cloud": "disabled"}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
+        status_resp.__enter__.return_value = status_resp
+
+        mock_open.return_value = status_resp
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("cloud offloading is active or unverified", msg)
+
+    @patch("urllib.request.OpenerDirector.open")
+    @patch("socket.getaddrinfo")
+    def test_remote_backed_model_in_tags_refuses(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
         status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
         status_resp.__enter__.return_value = status_resp
 
         remote_tags = json.dumps({
@@ -134,27 +151,30 @@ class TestCheckOllamaLocality(unittest.TestCase):
         }).encode("utf-8")
         tags_resp = MagicMock()
         tags_resp.read.return_value = remote_tags
+        tags_resp.geturl.return_value = "http://localhost:11434/api/tags"
         tags_resp.__enter__.return_value = tags_resp
 
-        mock_urlopen.side_effect = [status_resp, tags_resp]
+        mock_open.side_effect = [status_resp, tags_resp]
 
         ok, msg = checker.verify_locality("remote-cloud-model", self.valid_config)
         self.assertFalse(ok)
         self.assertIn("remote/cloud infrastructure", msg)
 
-    @patch("urllib.request.urlopen")
+    @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
-    def test_valid_local_model_with_status_succeeds(self, mock_getaddrinfo, mock_urlopen):
+    def test_valid_local_model_with_status_succeeds(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
         status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
         status_resp.__enter__.return_value = status_resp
 
         tags_resp = MagicMock()
         tags_resp.read.return_value = self.valid_tags_response
+        tags_resp.geturl.return_value = "http://localhost:11434/api/tags"
         tags_resp.__enter__.return_value = tags_resp
 
-        mock_urlopen.side_effect = [status_resp, tags_resp]
+        mock_open.side_effect = [status_resp, tags_resp]
 
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
         self.assertTrue(ok)

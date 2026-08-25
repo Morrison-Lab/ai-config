@@ -142,6 +142,8 @@ def main():
                     raw_subagents = json.loads(raw_subagents)
                 except Exception:
                     pass
+            if raw_subagents is not None and not isinstance(raw_subagents, list):
+                print(f"claude-hook-adapter: invoke_subagent Subagents argument is not a list: {type(raw_subagents).__name__}", file=sys.stderr)
             subagents = raw_subagents if isinstance(raw_subagents, list) else []
             for sub in subagents:
                 if not isinstance(sub, dict):

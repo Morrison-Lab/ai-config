@@ -104,10 +104,12 @@ pre-push guard.
 - **Do:** quote the harness paste of the child's final message when it is
   present; otherwise fetch the child transcript via cursor-cloud
   `batch-fetch-details` (`includeTranscripts: true`) using `cloudAgentBcId`
-  and quote that transcript's last assistant message, not the whole file.
+  and quote the last assistant `text` that carries
+  Summary / Findings / Verdict --- not the last assistant message (which may
+  be thinking or `tool_calls` with empty `text`), and not the whole file.
 - **Don't:** treat the parent thinking "the reviewer approved" as the report,
-  post the identity-only JSON `tool_result` as the review, or paraphrase a
-  missing body as Ready for merge.
+  post the identity-only JSON `tool_result` as the review, quote the whole
+  `transcript.json`, or paraphrase a missing body as Ready for merge.
 
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535);

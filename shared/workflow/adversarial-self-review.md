@@ -128,15 +128,14 @@ fetched child transcript, before posting
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the harness paste of the child's final message, or the last
-  assistant message in the fetched child transcript --- not the identity-only
-  JSON `tool_result` and not the whole `transcript.json`.
-  Then append the required disclosure marker.
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
 - **Don't:** omit the disclosure marker, or treat that marker as license to
   add an ARD ledger.
-- **Don't:** paraphrase a missing `tool_result` as Ready for merge.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
 ## The mechanism
 

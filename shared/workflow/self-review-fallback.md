@@ -114,15 +114,14 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the harness paste of the child's final message, or the last
-  assistant message in the fetched child transcript --- not the identity-only
-  JSON `tool_result` and not the whole `transcript.json`.
-  Then append the required disclosure marker.
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
 - **Don't:** omit the disclosure marker, or treat that marker as license to
   add an ARD ledger.
-- **Don't:** paraphrase a missing `tool_result` as Ready for merge.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
 **Self-review is the immediate fallback so the PR never stalls --
 but declaring the PR clean still requires an external verdict whenever one is reachable.**
@@ -227,9 +226,6 @@ a `403 Resource not accessible by integration` on a dispatch (the token lacks `a
 or a comment-triggered run reporting **skipped** rather than failed, which means its job `if:` rejected you ---
 usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR` or `NONE`.
 The reviewer completing on somebody else's branch the same day settles that it is up.
-Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
-a human OWNER/MEMBER/COLLABORATOR comment is the unblock
-(see [`memories/cursor.md`](../../memories/cursor.md)).
 
 Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).
 One read settles the identity half:

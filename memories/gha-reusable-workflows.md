@@ -1,7 +1,12 @@
-# d-morrison/gha reusable workflows
+# Morrison-Lab/gha reusable workflows
 
-Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+Check `Morrison-Lab/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
 The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
+
+The repo is `Morrison-Lab/gha`.
+Notes predating the org move (and this file until 2026-08-24) name it `d-morrison/gha`;
+that owner is stale in every `uses:` line --- a caller written against it resolves to a repo the lab does not own.
+Sibling `d-morrison/*` repos (`altdoc`, `macros`) are unrelated to the move and keep their owner.
 
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
 Generic Actions-authoring material stays there.
@@ -49,7 +54,7 @@ Generic Actions-authoring material stays there.
 - **`lint-changed-lines.yml@v2`** (gha#276) --- runs `lintr` on changed R files but filters the reported lints down to only the lines a PR **adds or modifies**, so a repo can adopt or tighten a lint rule *incrementally*: new and edited code must comply while untouched legacy code is left alone.
   This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" --- don't disable the linter or reformat everything at once;
   adopt via this workflow and let the rule migrate file-by-file as code is touched.
-  Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
+  Caller stub is ~8 lines (`uses: Morrison-Lab/gha/.github/workflows/lint-changed-lines.yml@v2`).
   Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
   serocalculator#564 is the first consumer.
 - **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
@@ -57,6 +62,7 @@ Generic Actions-authoring material stays there.
   **Which** major tag is per-capability, not a repo-wide default --- read the README's Versioning section.
   Corrected 2026-08-24 (ai-config#2126): this bullet previously read `@v1` repo-wide, which the `@v1` freeze made stale.
   Measured the same day, ai-config's own callers are eight `@v2`, one `@v1` (`sync-shared-fragments`, one of the three capabilities still current there), and two deliberately SHA-pinned to a gha commit.
+  gha's own `examples/` on `main` are uniformly `@v2` as of 2026-08-24 --- but `examples/` tracks `main`, not any tag, so it is a hint about the current major and not a substitute for reading the tagged file (see the trailing-tag bullet below).
 - **gha's major tag slides ONLY on a manual `workflow_dispatch`, NOT on every merge to main**
   (`slide-major-tag.yml`; `on: workflow_dispatch:` only, gated `if: github.ref == 'refs/heads/main'`).
   It re-points the major derived from the latest `vX.Y.Z` tag to HEAD when dispatched.
@@ -69,10 +75,12 @@ Generic Actions-authoring material stays there.
   Once `v2.0.0` exists it's the latest semver, so the slide moves `v2` thereafter and `v1` stays frozen.
   There is NO MCP tool to create tags/releases --- use `git` (but see the 403 caveat below).
   Notify registered consumers in `REVDEPS.md` (e.g. `Lacaedemon/sparta`).
-- **`@v1` can trail `main` in practice --- verify against the TAGGED file, not `main` or `examples/`.**
-  Observed: `main`'s `claude.yml` / `claude-code-review.yml` both declare an `ANTHROPIC_API_KEY` secret in their `workflow_call: secrets:` block, and `examples/claude.yml` / `examples/claude-code-review.yml` (also on `main`) show passing it --- but the `@v1` tag's copy of both reusable workflows only declares `CLAUDE_CODE_OAUTH_TOKEN`, `SUBMODULES_TOKEN`, and (for `claude.yml`) `WORKFLOW_TOKEN`.
-  A caller that copies the example verbatim and pins `@v1` gets a `startup_failure`: `Invalid secret, ANTHROPIC_API_KEY is not defined in the referenced workflow.` Before trusting an `examples/` template (or `main`'s workflow file) for a `secrets:`/`with:` block passed to an `@v1` call, fetch the actual `@v1`-tagged file (`mcp__github__get_file_contents` with `ref: refs/tags/v1`, or `git show v1:.github/workflows/<file>`) and diff its `workflow_call:` section against what you're about to pass.
-  Filed as gha#179; worked around in `d-morrison/altdoc`#14 by omitting `ANTHROPIC_API_KEY` until `@v1` catches up.
+- **A major tag can trail `main` in practice --- verify against the TAGGED file, not `main` or `examples/`.**
+  This is the direct consequence of the manual-slide bullet above: `main` can carry inputs, secrets, and whole capabilities that no tag has picked up yet.
+  Observed on `@v1`: `main`'s `claude.yml` / `claude-code-review.yml` both declare an `ANTHROPIC_API_KEY` secret in their `workflow_call: secrets:` block, and `examples/claude.yml` / `examples/claude-code-review.yml` (also on `main`) show passing it --- but the `@v1` tag's copy of both reusable workflows only declared `CLAUDE_CODE_OAUTH_TOKEN`, `SUBMODULES_TOKEN`, and (for `claude.yml`) `WORKFLOW_TOKEN`.
+  A caller that copied the example verbatim and pinned `@v1` got a `startup_failure`: `Invalid secret, ANTHROPIC_API_KEY is not defined in the referenced workflow.`
+  The rule generalizes to whichever major you are pinning, `@v1` or `@v2`: before trusting an `examples/` template (or `main`'s workflow file) for a `secrets:`/`with:` block, fetch the actual tagged file (`mcp__github__get_file_contents` with `ref: refs/tags/<major>`, or `git show <major>:.github/workflows/<file>`) and diff its `workflow_call:` section against what you're about to pass.
+  Filed as gha#179; worked around in `d-morrison/altdoc`#14 by omitting `ANTHROPIC_API_KEY` until `@v1` caught up.
 - **A `workflow_call` reusable-workflow ref (`@v1`/`@v2`) resolves ONCE, at the run's original creation time, and stays pinned to that SHA across every re-run of that same run --- even after the tag has since moved to a fix.**
   So if a consumer PR's `claude-code-review.yml` run first ran while `@v2` still pointed at a broken gha commit, re-running that same run (whether via the Actions UI "Re-run failed jobs" or a bot re-dispatch that happens to target the existing run rather than creating a new one) reproduces the identical pre-fix failure forever, no matter how many times you retry or how long ago the tag was fixed.
   **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` --- compare against when the fix landed), then read `referenced_workflows[].sha` in the same response --- it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
@@ -115,7 +123,8 @@ Generic Actions-authoring material stays there.
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under `on: workflow_call: inputs:`.
-  2. Forward it in the reusable workflow's `uses: d-morrison/gha/<name>@v1` step's `with:` block.
+  2. Forward it in the reusable workflow's `uses: Morrison-Lab/gha/<name>@<major>` step's `with:` block.
+     Match the major the surrounding file already uses rather than typing one from memory --- each nested `uses:@ref` resolves at its own literal ref (see the nested-composite point above), so a stale major here silently forwards the input to an old copy of the composite.
   3. Update `examples/<name>.yml` (the caller stub) if the input is consumer-visible.
   4. Update the README table row for `<name>.yml` to list the new input under "Key inputs".
   Missing any of these leaves the input wired only partway --- consumers can't pass it through the reusable workflow even though it exists in the composite.
@@ -147,14 +156,15 @@ Generic Actions-authoring material stays there.
   The result's `original_length` field reports the full line count, so compute the offset: returned line `i` (0-based) is full-log line `original_length - 5000 + i + 1`.
   There's no way to fetch the head through this tool, and the REST fallback (`/actions/jobs/{id}/logs`) needs `api.github.com`, which the agent proxy blocks in these sessions.
   A GitHub UI deep link `#step:N:L` means line `L` counted *within step N* (step N's first log line is 1), so locating it in the tail needs the step's start line --- estimable from the earlier steps' typical output volume when the head is unfetchable, and worth cross-checking against whether a plausible warning/error actually sits at the computed spot. (rme#1047: located a docx TeX-math warning this way at `#step:10:8366` of a truncated publish log.)
-- **`claude-review` failing with "Skipping action due to workflow validation… must have identical content to the default branch" is NOT always the documented self-mod-skip or stale-`@v1`-tag drift.**
+- **`claude-review` failing with "Skipping action due to workflow validation… must have identical content to the default branch" is NOT always the documented self-mod-skip or stale-tag drift.**
   Before assuming either, verify: diff the PR branch's own workflow files against current `origin/main` (`git diff origin/<branch> origin/main -- .github/workflows/`) --- if that's empty, the branch has zero drift and neither known cause applies.
   The actual failure can be a one-off transient GitHub API error unrelated to workflow content at all, e.g. a `502` "Unicorn" error page from `GET /repos/.../collaborators/<actor>/permission` during the action's actor-permission check --- visible only by reading the full job log (see the `tail_lines` note above), not from the top-level check-run message.
   Re-running (push a commit, since `actions:write` is usually unavailable --- see above) clears a transient 502 with no code change needed. (ai-config#403.)
-- **`update-snapshots.yml@v1`** --- regenerates testthat snapshots, commits, and pushes.
+- **`update-snapshots.yml`** --- regenerates testthat snapshots, commits, and pushes.
   Supports `workflow_dispatch`, `/update-snapshots` PR comment (`pr-mode: true`), and auto-update before R-CMD-check (`ref: github.head_ref`).
   Pass system deps via `apt-packages`.
   Added in gha#103; bcs#226 is the reference caller.
+  This bullet deliberately pins no major --- read the current one from the README's Versioning section, per the Convention bullet.
 - **The gha family has THREE different R-dependency mechanisms, with opposite defaults, and picking the wrong one fails only at render time.**
   A consumer migrating a whole repo touches several of these workflows in one PR, which is exactly when the differences are invisible --- they read as one coherent family, and each caller stub is short enough to look obviously correct.
   - **`claude.yml`** --- `setup-r` defaults **true**, and with `use-renv` false it runs `setup-r-dependencies` with `extra-packages`, whose default spec includes `local::.`.

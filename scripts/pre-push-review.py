@@ -188,19 +188,33 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         return False, False, "No valid anchored verdict line found."
 
     v_clean = re.sub(r"[\*`_]", "", verdict_str).strip()
-    v_core = re.split(r"\s*[-:—]\s*", v_clean)[0].strip().lower()
+    # Split off any trailing delimiter-separated rationale (e.g. "Ready for merge — all tests pass", "Needs work: bug in parser")
+    v_split = re.split(r"\s*[-:—(]\s*", v_clean, maxsplit=1)
+    v_core = v_split[0].strip().lower().rstrip(".!")
 
     # Any negation or rejection term completely invalidates clean verdict
     negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
     has_negation = bool(re.search(negation_pattern, v_clean.lower()))
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
-    is_clean_verdict = (v_core in clean_allowlist or any(v_clean.lower().startswith(cv) for cv in clean_allowlist))
-    is_clean = is_clean_verdict and not has_negation
-    is_needs_work = has_negation or not is_clean_verdict
+    needs_work_allowlist = {
+        "needs work", "needs more work", "changes requested", "unapproved", "not approved",
+        "disapproved", "blocked", "ready after addressing findings", "unable to review",
+        "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve"
+    }
 
-    if is_clean and is_needs_work:
-        return False, False, "Contradictory verdict statement."
+    if v_core in clean_allowlist:
+        if has_negation:
+            is_clean = False
+            is_needs_work = True
+        else:
+            is_clean = True
+            is_needs_work = False
+    elif v_core in needs_work_allowlist or any(v_core.startswith(nw) for nw in needs_work_allowlist):
+        is_clean = False
+        is_needs_work = True
+    else:
+        return False, False, f"Unrecognized verdict text: '{verdict_str}'"
 
     findings_match = re.search(r"(?is)#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", report)
     if findings_match:
@@ -329,8 +343,8 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         return None
 
     label_suffix = f" (model: {model})" if model else ""
-    print(f"Running local adversarial review via OpenCode (plan agent){label_suffix}...")
-    cmd = [opencode_path, "run", "--agent", "plan"]
+    print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
+    cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
     if model:
         cmd.extend(["-m", model])
     cmd.append(prompt)

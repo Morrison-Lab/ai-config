@@ -104,17 +104,32 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(extended_heading_report)
         self.assertFalse(is_clean)
 
-        # Legitimate clean wording like 'No issues.' is accepted as clean
-        clean_wording_report = (
+        # Prefix collisions and unknown verdicts are rejected as invalid (is_valid=False)
+        for invalid_v in ["Ready for merger", "Ready for merge someday", "banana", "POTATO", "Almost ready"]:
+            inv_report = (
+                f"### Summary Verdict\n"
+                f"Verdict: {invalid_v}\n\n"
+                "### Critical Findings\n"
+                "None.\n\n"
+                "### Observations\nNone.\n\n"
+                "### Verification Steps\nNone.\n"
+                f"Reviewed-Commit: {commit}"
+            )
+            is_valid, is_clean, reason = reviewer.parse_review_verdict(inv_report, expected_commit_sha=commit)
+            self.assertFalse(is_valid)
+            self.assertIn("Unrecognized", reason)
+
+        # Qualified verdicts with valid rationale are parsed correctly
+        rationale_report = (
             "### Summary Verdict\n"
-            "Verdict: Ready for merge\n\n"
+            "Verdict: Ready for merge — all tests pass and documentation is verified.\n\n"
             "### Critical Findings\n"
-            "No issues.\n\n"
+            "None.\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_wording_report, expected_commit_sha=commit)
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(rationale_report, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 

@@ -146,7 +146,8 @@ OpenCode spans multiple cost structures:
 - **Free Zen & local Ollama tiers**: Consume no metered window or API tokens.
   For mechanical work a small model can perform, free/local tiers go ahead of Codex and Claude on cost.
 - **OpenCode Go subscription ($10/mo)**: Active monthly tier providing access to additional hosted models without per-token charges.
-- **OpenRouter prepaid balance**: Billed per token; used when a task specifically benefits from frontier or stealth models not carried by desktop subscription quotas.
+- **OpenRouter prepaid balance**: Billed per token.
+  Used when a task specifically benefits from frontier or stealth models not carried by desktop subscription quotas.
 
 The practical shape is a filter rather than a queue: send mechanical bounded work to OpenCode's free/local tiers first, utilize active Go subscription and Codex windows next, draw on OpenRouter for specialized frontier/stealth models or fallback, and keep Claude for high-level orchestration and synthesis.
 

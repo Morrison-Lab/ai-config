@@ -989,7 +989,8 @@ This is a standing default across all sessions, including ultracode/Workflow fan
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
 
 Exhaust the *current usage window* of each metered subscription CLI --- roughly 5 hours for Codex --- then fall back to Claude until it resets.
-Prepaid credit balances (OpenRouter) do not have a recurring time window; they are drawn on per token for workloads that specifically benefit from frontier/stealth models not carried by desktop subscription tiers, or as fallback when subscription windows are depleted.
+Prepaid credit balances (OpenRouter) do not have a recurring time window.
+They are drawn on per token for workloads that specifically benefit from frontier/stealth models not carried by desktop subscription tiers, or as fallback when subscription windows are depleted.
 "Delegate first" means spending available subscription windows and free tiers before drawing on Claude's orchestrator tokens or prepaid API credits.
 
 **`opencode` and `openrouter` expand non-metered, prepaid, and alternative frontier routes:**
@@ -998,7 +999,8 @@ Prepaid credit balances (OpenRouter) do not have a recurring time window; they a
 - **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners (activated in config; measured 2026-08-23 on OpenCode 1.18.21).
 - **Local tier**: The local (`ollama/*`) tier keeps the payload on the machine for sensitive data **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
-The initial OpenCode tiers and version above were measured 2026-08-19 on OpenCode 1.18.15; active Go subscription and OpenRouter credit balance verified 2026-08-25.
+The initial OpenCode tiers and version above were measured 2026-08-19 on OpenCode 1.18.15.
+Active Go subscription and OpenRouter credit balance verified 2026-08-25.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
 **`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**

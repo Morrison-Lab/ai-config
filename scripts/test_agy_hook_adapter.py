@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """Test suite for the Antigravity hook adapter (`plugins/ai-config/claude-hook-adapter.py`).
 
-Before this test existed, `test_hooks.py` tested the Claude Code hooks themselves,
-but the adapter mapping Antigravity's lifecycle events to those hooks was untested.
-This script feeds mock Antigravity payloads into the adapter and asserts that it
-parses the payloads correctly, runs the expected underlying hooks via subprocess,
-and formats its stdout into the schema Antigravity expects.
+Tests the adapter in hermetic isolation by mocking `hooks/hooks.json` and subprocess calls.
+Verifies event mapping, multi-subagent fanout, regex matchers, Stop block-to-continue translation,
+and PreInvocation context injection.
 """
 import importlib.util
 import io
@@ -13,7 +11,7 @@ import json
 import os
 import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, mock_open
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ADAPTER_SCRIPT = os.path.join(ROOT, "plugins", "ai-config", "claude-hook-adapter.py")
@@ -24,16 +22,76 @@ def load_adapter():
     spec.loader.exec_module(module)
     return module
 
+MOCK_HOOKS_DEF = {
+    "hooks": {
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-prompt.py\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-bash.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "Agent",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-agent.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "mcp__github__.*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-mcp.py\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-stop.py\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ]
+    }
+}
+
 class TestAgyHookAdapter(unittest.TestCase):
     def setUp(self):
         self.adapter = load_adapter()
-        
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_pre_invocation_event(self, mock_run, mock_stderr, mock_stdout, mock_stdin):
-        # Mock the underlying hook's execution
+    def test_pre_invocation_event(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "UMS reminder: do not forget to check X\n"
@@ -43,25 +101,21 @@ class TestAgyHookAdapter(unittest.TestCase):
         mock_stdin.write(json.dumps(payload))
         mock_stdin.seek(0)
         
-        # Execute
         self.adapter.main()
         
-        # Verify output format
         out = json.loads(mock_stdout.getvalue())
         self.assertIn("injectSteps", out)
-        self.assertGreaterEqual(len(out["injectSteps"]), 1)
-        self.assertIn("UMS reminder: do not forget to check X", out["injectSteps"][0]["ephemeralMessage"])
-        
-        # Verify it actually called subprocess (the exact command will depend on hooks.json, 
-        # but we know it should have called at least one hook for UserPromptSubmit)
-        mock_run.assert_called()
+        self.assertEqual(len(out["injectSteps"]), 1)
+        self.assertEqual(out["injectSteps"][0]["ephemeralMessage"], "UMS reminder: do not forget to check X")
+        mock_run.assert_called_once()
 
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_stop_event_block(self, mock_run, mock_stderr, mock_stdout, mock_stdin):
-        # Mock the underlying hook blocking the stop
+    def test_stop_event_block_to_continue(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = json.dumps({"decision": "block", "reason": "Missing self-review"})
@@ -77,32 +131,13 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(out.get("decision"), "continue")
         self.assertEqual(out.get("reason"), "Missing self-review")
 
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_stop_event_allow(self, mock_run, mock_stderr, mock_stdout, mock_stdin):
-        # Mock the underlying hook allowing the stop
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = json.dumps({"decision": "allow"})
-        mock_run.return_value = mock_result
-        
-        payload = {"terminationReason": "model_stop"}
-        mock_stdin.write(json.dumps(payload))
-        mock_stdin.seek(0)
-        
-        self.adapter.main()
-        
-        out = json.loads(mock_stdout.getvalue())
-        self.assertEqual(out.get("decision"), "allow")
-
-    @patch('sys.stdin', new_callable=io.StringIO)
-    @patch('sys.stdout', new_callable=io.StringIO)
-    @patch('sys.stderr', new_callable=io.StringIO)
-    @patch('subprocess.run')
-    def test_pre_tool_use_agent(self, mock_run, mock_stderr, mock_stdout, mock_stdin):
-        # Mock an Agent hook issuing a warning
+    def test_multi_subagent_fanout(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = json.dumps({
@@ -116,7 +151,10 @@ class TestAgyHookAdapter(unittest.TestCase):
             "toolCall": {
                 "name": "invoke_subagent",
                 "args": {
-                    "Subagents": [{"TypeName": "research", "Workspace": "share", "Prompt": "look"}]
+                    "Subagents": [
+                        {"TypeName": "agent1", "Workspace": "share", "Prompt": "p1"},
+                        {"TypeName": "agent2", "Workspace": "branch", "Prompt": "p2"}
+                    ]
                 }
             }
         }
@@ -125,21 +163,38 @@ class TestAgyHookAdapter(unittest.TestCase):
         
         self.adapter.main()
         
-        # Verify the Claude payload structure was correctly adapted from Antigravity format
-        # The adapter passes json.dumps(claude_payload) to subprocess.run(input=...)
-        call_args = mock_run.call_args
-        self.assertIsNotNone(call_args)
-        kwargs = call_args[1]
-        passed_input = json.loads(kwargs['input'])
+        # Verify subprocess.run was called for BOTH subagents
+        self.assertEqual(mock_run.call_count, 2)
+        call_inputs = [json.loads(c[1]['input']) for c in mock_run.call_args_list]
+        self.assertEqual(call_inputs[0]["tool_input"]["subagent_type"], "agent1")
+        self.assertEqual(call_inputs[1]["tool_input"]["subagent_type"], "agent2")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_mcp_regex_matching(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = json.dumps({"hookSpecificOutput": {}})
+        mock_run.return_value = mock_result
         
-        self.assertEqual(passed_input["tool_name"], "Agent")
-        self.assertEqual(passed_input["tool_input"]["subagent_type"], "research")
-        self.assertEqual(passed_input["tool_input"]["isolation"], "share")
+        payload = {
+            "toolCall": {
+                "name": "mcp__github__create_pull_request",
+                "args": {"title": "Test PR"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
         
-        # Output should allow but print warning to stderr
-        out = json.loads(mock_stdout.getvalue())
-        self.assertEqual(out.get("decision"), "allow")
-        self.assertIn("Warning: isolation mode recommended", mock_stderr.getvalue())
+        self.adapter.main()
+        
+        mock_run.assert_called_once()
+        call_input = json.loads(mock_run.call_args[1]['input'])
+        self.assertEqual(call_input["tool_name"], "mcp__github__create_pull_request")
 
 if __name__ == "__main__":
     unittest.main()

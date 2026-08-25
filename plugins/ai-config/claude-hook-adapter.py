@@ -2,6 +2,37 @@ import sys
 import json
 import subprocess
 import os
+import re
+
+def run_hook_command(cmd, claude_payload, cwd, timeout_val):
+    try:
+        result = subprocess.run(
+            cmd, 
+            shell=True, 
+            input=json.dumps(claude_payload), 
+            text=True, 
+            capture_output=True,
+            env=os.environ,
+            cwd=cwd,
+            timeout=timeout_val
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        print(f"claude-hook-adapter: hook {cmd} timed out after {timeout_val}s", file=sys.stderr)
+        return None
+    except Exception as exc:
+        print(f"claude-hook-adapter: execution of {cmd} failed: {exc}", file=sys.stderr)
+        return None
+
+def matches_tool(matcher_pattern, tool_name):
+    if not matcher_pattern:
+        return False
+    if matcher_pattern == tool_name:
+        return True
+    try:
+        return bool(re.fullmatch(matcher_pattern, tool_name))
+    except re.error:
+        return False
 
 def main():
     try:
@@ -36,7 +67,7 @@ def main():
         return
 
     try:
-        with open(hooks_json_path, "r") as f:
+        with open(hooks_json_path, "r", encoding="utf-8") as f:
             hooks_def = json.load(f)
     except Exception as exc:
         print(f"claude-hook-adapter: failed to load {hooks_json_path}: {exc}", file=sys.stderr)
@@ -46,11 +77,8 @@ def main():
             print(json.dumps({"decision": "allow"}))
         return
 
-    hooks_to_run = []
-    claude_payload = payload.copy()
-    
-    # Map common fields
-    claude_payload["transcript_path"] = payload.get("transcriptPath")
+    # Common fields for Claude payload
+    transcript_path = payload.get("transcriptPath")
     cwd = os.getcwd()
 
     if event_type == "PreToolUse":
@@ -61,136 +89,156 @@ def main():
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         
+        # Prepare list of (hooks_list, claude_payload) pairs to execute
+        tasks_to_run = []
+        
         if tool_name == "run_command":
-            claude_payload["tool_name"] = "Bash"
-            claude_payload["tool_input"] = {"command": args.get("CommandLine", "")}
-            for group in pre_tool_groups:
-                if group.get("matcher") == "Bash":
-                    hooks_to_run.extend(group.get("hooks", []))
-                    
-        elif tool_name == "invoke_subagent":
-            claude_payload["tool_name"] = "Agent"
-            subagents = args.get("Subagents", [])
-            first_sub = subagents[0] if subagents else {}
-            claude_payload["tool_input"] = {
-                "subagent_type": first_sub.get("TypeName"),
-                "isolation": first_sub.get("Workspace"),
-                "prompt": first_sub.get("Prompt")
+            bash_payload = {
+                "tool_name": "Bash",
+                "tool_input": {"command": args.get("CommandLine", "")}
             }
+            if transcript_path:
+                bash_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
-                if group.get("matcher") == "Agent":
-                    hooks_to_run.extend(group.get("hooks", []))
-                    
+                if matches_tool(group.get("matcher", ""), "Bash"):
+                    tasks_to_run.append((group.get("hooks", []), bash_payload))
+
+        elif tool_name == "invoke_subagent":
+            subagents = args.get("Subagents", [])
+            # Evaluate each invoked subagent against Agent hooks
+            for sub in subagents:
+                agent_payload = {
+                    "tool_name": "Agent",
+                    "tool_input": {
+                        "subagent_type": sub.get("TypeName"),
+                        "isolation": sub.get("Workspace"),
+                        "prompt": sub.get("Prompt")
+                    }
+                }
+                if transcript_path:
+                    agent_payload["transcript_path"] = transcript_path
+                for group in pre_tool_groups:
+                    if matches_tool(group.get("matcher", ""), "Agent"):
+                        tasks_to_run.append((group.get("hooks", []), agent_payload))
+
         elif tool_name == "send_message":
-            claude_payload["tool_name"] = "SendMessage"
-            claude_payload["tool_input"] = args
+            send_payload = {
+                "tool_name": "SendMessage",
+                "tool_input": args
+            }
+            if transcript_path:
+                send_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
-                if group.get("matcher") == "SendMessage":
-                    hooks_to_run.extend(group.get("hooks", []))
-                    
+                if matches_tool(group.get("matcher", ""), "SendMessage"):
+                    tasks_to_run.append((group.get("hooks", []), send_payload))
+
         elif tool_name == "define_subagent":
-            claude_payload["tool_name"] = "Task"
-            claude_payload["tool_input"] = args
+            task_payload = {
+                "tool_name": "Task",
+                "tool_input": args
+            }
+            if transcript_path:
+                task_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
-                if group.get("matcher") == "Task":
-                    hooks_to_run.extend(group.get("hooks", []))
-                    
+                if matches_tool(group.get("matcher", ""), "Task"):
+                    tasks_to_run.append((group.get("hooks", []), task_payload))
+
         elif tool_name.startswith("mcp__github__"):
-            claude_payload["tool_name"] = tool_name
-            claude_payload["tool_input"] = args
+            mcp_payload = {
+                "tool_name": tool_name,
+                "tool_input": args
+            }
+            if transcript_path:
+                mcp_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
-                if group.get("matcher") == "mcp__github__.*":
-                    hooks_to_run.extend(group.get("hooks", []))
-                    
+                if matches_tool(group.get("matcher", ""), tool_name):
+                    tasks_to_run.append((group.get("hooks", []), mcp_payload))
+
+        # Execute PreToolUse hooks
+        for hooks_list, c_payload in tasks_to_run:
+            for hook in hooks_list:
+                cmd = hook.get("command")
+                if not cmd:
+                    continue
+                cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+                timeout_val = float(hook["timeout"]) if hook.get("timeout") is not None else None
+                
+                result = run_hook_command(cmd, c_payload, cwd, timeout_val)
+                if result and result.returncode == 0 and result.stdout:
+                    try:
+                        hook_out = json.loads(result.stdout)
+                        hso = hook_out.get("hookSpecificOutput", {})
+                        if hso.get("permissionDecision") == "deny":
+                            reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
+                            print(json.dumps({"decision": "deny", "reason": reason}))
+                            return
+                        if hso.get("additionalContext"):
+                            print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
+                    except Exception as exc:
+                        print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
+                        if result.stderr:
+                            print(f"stderr was: {result.stderr}", file=sys.stderr)
+
+        print(json.dumps({"decision": "allow"}))
+        return
+
     elif event_type == "Stop":
         stop_groups = hooks_def.get("hooks", {}).get("Stop", [])
-        for group in stop_groups:
-            hooks_to_run.extend(group.get("hooks", []))
+        stop_payload = {}
+        if transcript_path:
+            stop_payload["transcript_path"] = transcript_path
             
+        for group in stop_groups:
+            for hook in group.get("hooks", []):
+                cmd = hook.get("command")
+                if not cmd:
+                    continue
+                cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+                timeout_val = float(hook["timeout"]) if hook.get("timeout") is not None else None
+                
+                result = run_hook_command(cmd, stop_payload, cwd, timeout_val)
+                if result and result.returncode == 0 and result.stdout:
+                    try:
+                        hook_out = json.loads(result.stdout)
+                        if hook_out.get("decision") == "block":
+                            reason = hook_out.get("reason", "Blocked by Stop hook")
+                            print(json.dumps({"decision": "continue", "reason": reason}))
+                            return
+                    except Exception as exc:
+                        print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
+                        if result.stderr:
+                            print(f"stderr was: {result.stderr}", file=sys.stderr)
+
+        print(json.dumps({"decision": "allow"}))
+        return
+
     elif event_type == "PreInvocation":
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
+        ups_payload = {}
+        if transcript_path:
+            ups_payload["transcript_path"] = transcript_path
+
+        injected_messages = []
         for group in ups_groups:
-            hooks_to_run.extend(group.get("hooks", []))
-
-    # Run the matched hooks
-    injected_messages = []
-    
-    for hook in hooks_to_run:
-        cmd = hook.get("command")
-        if not cmd:
-            continue
-            
-        cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-        
-        timeout_val = hook.get("timeout")
-        if timeout_val is not None:
-            try:
-                timeout_val = float(timeout_val)
-            except ValueError:
-                timeout_val = None
-
-        try:
-            result = subprocess.run(
-                cmd, 
-                shell=True, 
-                input=json.dumps(claude_payload), 
-                text=True, 
-                capture_output=True,
-                env=os.environ,
-                cwd=cwd,
-                timeout=timeout_val
-            )
-            
-            if result.returncode == 0 and result.stdout:
-                if event_type == "PreInvocation":
-                    # Claude UserPromptSubmit hooks usually just print text
+            for hook in group.get("hooks", []):
+                cmd = hook.get("command")
+                if not cmd:
+                    continue
+                cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+                timeout_val = float(hook["timeout"]) if hook.get("timeout") is not None else None
+                
+                result = run_hook_command(cmd, ups_payload, cwd, timeout_val)
+                if result and result.returncode == 0 and result.stdout:
                     text_out = result.stdout.strip()
                     if text_out:
                         injected_messages.append(text_out)
-                else:
-                    try:
-                        hook_out = json.loads(result.stdout)
-                        
-                        if event_type == "PreToolUse":
-                            hso = hook_out.get("hookSpecificOutput", {})
-                            if hso.get("permissionDecision") == "deny":
-                                reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
-                                print(json.dumps({"decision": "deny", "reason": reason}))
-                                return
-                            if hso.get("additionalContext"):
-                                print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
-                                
-                        elif event_type == "Stop":
-                            # Claude Stop hook block means we must continue
-                            if hook_out.get("decision") == "block":
-                                reason = hook_out.get("reason", "Blocked by Stop hook")
-                                print(json.dumps({"decision": "continue", "reason": reason}))
-                                return
-                    except Exception as exc:
-                        if event_type == "PreInvocation":
-                            injected_messages.append(result.stdout.strip())
-                        else:
-                            print(f"claude-hook-adapter: failed to parse output from {cmd}: {exc}", file=sys.stderr)
-                            if result.stderr:
-                                print(f"stderr was: {result.stderr}", file=sys.stderr)
-            elif result.returncode != 0:
-                print(f"claude-hook-adapter: hook {cmd} failed with exit code {result.returncode}", file=sys.stderr)
-                if result.stderr:
-                    print(result.stderr, file=sys.stderr)
 
-        except subprocess.TimeoutExpired:
-            print(f"claude-hook-adapter: hook {cmd} timed out after {timeout_val}s", file=sys.stderr)
-        except Exception as exc:
-            print(f"claude-hook-adapter: execution of {cmd} failed: {exc}", file=sys.stderr)
-
-    if event_type == "PreInvocation":
         if injected_messages:
             steps = [{"ephemeralMessage": "\n\n".join(injected_messages)}]
             print(json.dumps({"injectSteps": steps}))
         else:
             print(json.dumps({"injectSteps": []}))
-    else:
-        print(json.dumps({"decision": "allow"}))
+        return
 
 if __name__ == "__main__":
     main()

@@ -120,9 +120,8 @@ The posted comment was author-assembled, labeled
 `### Verdict: Ready for merge` and `Reviewed-Commit` lines, and wrapped
 them in a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
-The parent JSON `tool_result` carried identity fields and no review body.
-On Cursor Cloud that identity-only return is expected; how to obtain the
-child's structured report is in
+That comment is the wrap, not the parent `Task` JSON.
+How Cursor Cloud obtains the child's structured report is in
 [`memories/cursor.md`](../../memories/cursor.md).
 
 - **Do:** post the dispatched reviewer's structured report

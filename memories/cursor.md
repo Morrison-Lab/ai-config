@@ -117,9 +117,12 @@ pre-push guard.
   a harness paste of thinking or empty `text`, quote the whole
   `transcript.json`, or paraphrase a missing body as Ready for merge.
 
-(Measured 2026-08-25 on
-[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535);
-child `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.)
+(Measured 2026-08-25.
+The wrap is
+[ai-config#2234 comment 5415839535](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
+The identity-only JSON is the parent `Task` `tool_result` for child
+`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
+That comment does not contain the JSON.)
 
 ## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
 

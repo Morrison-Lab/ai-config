@@ -255,7 +255,7 @@ The second explanation is **contamination**, recorded in [`adversarial-self-revi
 That confound bears on the one verdict this record rests on, since the eleven pre-push rounds are what it cited.
 The third explanation is a **different threshold**: that same verdict scopes its findings line to a "high-signal bar (compile/parse errors, definite wrong-result logic, or clear unambiguous CLAUDE.md violations)", so the two reviewers may have been applying different tests for what counts as a finding rather than holding different blind spots.
 The threshold explanation's remedy is the cheapest to state, since a bar can be named in the request;
-the contamination explanation has cheap remedies of its own, in the section linked below.
+the contamination explanation has cheap remedies of its own, in the [`adversarial-self-review`](adversarial-self-review.md) section named two paragraphs above.
 Take the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three explanations deliver, rather than as measuring how much of the gap each one accounts for.
 
 The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).

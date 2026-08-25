@@ -12,9 +12,14 @@ _Posted by Claude Code (AI agent) --- not written by a human._
 ```
 
 **It deliberately does not use the robot emoji.**
-That looks like the obvious choice, and it is the one thing the marker must avoid: `scripts/check-pr-fully-clean.py` matches the bare emoji as a `REVIEW_BODY_MARKERS` entry, so any comment carrying it is admitted into the verdict scan as a review item.
-A disclosure footer on every agent comment would therefore turn every claim, every status note, and every deferral into something the fully-clean checker reads as a review --- and a claim comment carries no findings, so it would scan as a **clean** one.
-That is the false-clean failure [`fully-clean`](fully-clean.md) already describes for a human-authored self-review, arriving through the very mechanism added to make authorship legible.
+That looks like the obvious choice, and it is the one thing the marker must avoid: `scripts/check-pr-fully-clean.py` matches the bare emoji as a `REVIEW_BODY_MARKERS` entry, so a comment carrying it is *admitted* into the verdict scan as a review item.
+A disclosure footer on every agent comment would therefore turn every claim, every status note, and every deferral into something the fully-clean checker can read as a review --- and a claim comment carries no findings, so it would scan as a **clean** one.
+
+**Admission is necessary and not sufficient, which is worth stating precisely.**
+The comment must ALSO name the current HEAD SHA to count toward criterion 2.
+A synthetic `Working on this 🤖` with no SHA returns `No review comment has been posted evaluating HEAD SHA`, not a clean verdict.
+So the emoji does not single-handedly manufacture a false clean --- it removes the one filter standing between a claim comment and the verdict scan, and leaves a SHA mention as the only thing still separating them.
+A claim comment that quotes the head SHA is ordinary, which is why the gap is worth closing at the marker rather than relying on the second gate.
 
 The marker above collides with none of the checker's `REVIEW_BODY_MARKERS` (the robot emoji, `### ` plus that emoji, `code review`, `**claude finished`, `### verdict`, `verdict:`) nor with any `REVIEW_AGENT_MARKERS` entry, verified against `scripts/check-pr-fully-clean.py` on 2026-08-24.
 Check a replacement marker against both tuples before changing it.
@@ -86,7 +91,7 @@ The literal `--body "@...` grep finds the two Dependabot sites and misses the th
 
 An earlier draft of this passage gave a different and wrong reason --- that the handle is never spelled contiguously in a source file, because a diff view would summon the bot.
 That is false twice over.
-The handle appears 248 times across this corpus's markdown, counting every file but this one --- the command below is itself an occurrence, so a figure that included this file would move each time the file was edited, and both earlier drafts of this sentence were wrong for exactly that reason.
+The handle appears in the hundreds across this corpus's markdown --- run the command below for the figure at your commit, rather than trusting one written here, since it moves whenever any file mentioning the handle changes.
 And [`memories/mention-triggers.md`](../../memories/mention-triggers.md) states the gate as `contains(github.event.comment.body, '@claude')`, over comment, review and issue bodies --- file contents are not among them.
 The practice of not spelling it applies to text that becomes a comment, which is what that file scopes it to.
 

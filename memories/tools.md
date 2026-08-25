@@ -1120,7 +1120,7 @@ while `_selftest.yml` was green on `main`.)
 
 ## `subprocess.run(text=True)` on Windows with Python <3.15 defaults to locale encoding
 
-Prior to Python 3.15 (PEP 686; measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
+Prior to Python 3.15 (PEP 686 --- measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
 When a CLI tool (such as `gh pr view --json`) outputs UTF-8 text containing non-ASCII characters or emojis, reading stdout with `text=True` without specifying an encoding corrupts characters (mojibake) or raises `UnicodeDecodeError`.
 
 - **Do:** specify `encoding="utf-8"` explicitly when capturing text stdout on Windows: `subprocess.run(["gh", ...], capture_output=True, text=True, encoding="utf-8")`.

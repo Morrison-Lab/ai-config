@@ -65,6 +65,26 @@ MOCK_HOOKS_DEF = {
                 ]
             },
             {
+                "matcher": "SendMessage",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-send.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
+                "matcher": "Task",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/test-task.py\"",
+                        "timeout": 10
+                    }
+                ]
+            },
+            {
                 "matcher": "mcp__github__.*",
                 "hooks": [
                     {
@@ -216,6 +236,31 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_send_message_and_define_subagent(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+        
+        # Test SendMessage mapping
+        payload_send = {
+            "toolCall": {
+                "name": "send_message",
+                "args": {"Recipient": "agent-123", "Message": "hello"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload_send))
+        mock_stdin.seek(0)
+        self.adapter.main()
+        
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_name"], "SendMessage")
+        self.assertEqual(call_input["tool_input"]["recipient"], "agent-123")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_pre_invocation_multi_message_steps(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
         res2 = MagicMock(returncode=0, stdout="Message 2\n", stderr="")
@@ -263,7 +308,7 @@ class TestAgyHookAdapter(unittest.TestCase):
     def test_multi_subagent_fanout_and_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"additionalContext": "Warn 1"}}), stderr="")
         res2 = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "Agent 2 not permitted"}}), stderr="")
-        mock_run.side_effect = [res1, res2]
+        mock_run.side_effect = [res1, res2, MagicMock(), MagicMock()]
         
         payload = {
             "toolCall": {

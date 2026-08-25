@@ -29,7 +29,7 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
 def matches_tool(matcher_pattern, tool_name):
     if not matcher_pattern:
         return False
-    if matcher_pattern == "*":
+    if matcher_pattern == "*" or matcher_pattern == ".*":
         return True
     if matcher_pattern == tool_name:
         return True
@@ -149,7 +149,10 @@ def main():
         elif tool_name == "send_message":
             send_payload = {
                 "tool_name": "SendMessage",
-                "tool_input": args
+                "tool_input": {
+                    "recipient": args.get("Recipient"),
+                    "message": args.get("Message")
+                }
             }
             if transcript_path:
                 send_payload["transcript_path"] = transcript_path
@@ -160,7 +163,11 @@ def main():
         elif tool_name == "define_subagent":
             task_payload = {
                 "tool_name": "Task",
-                "tool_input": args
+                "tool_input": {
+                    "name": args.get("name"),
+                    "description": args.get("description"),
+                    "system_prompt": args.get("system_prompt")
+                }
             }
             if transcript_path:
                 task_payload["transcript_path"] = transcript_path
@@ -221,7 +228,7 @@ def main():
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout"))
+            timeout_val = parse_timeout(hook.get("timeout")) or 30.0
             
             result = run_hook_command(cmd, stop_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:
@@ -255,7 +262,7 @@ def main():
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout"))
+            timeout_val = parse_timeout(hook.get("timeout")) or 30.0
             
             result = run_hook_command(cmd, ups_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:

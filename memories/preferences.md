@@ -1201,5 +1201,3 @@ safer/preferred choice merely because the repo has external consumers.
 - **End-of-Session PR Dashboard**: When ending a session or reaching a clean stopping point, execute the `pr-status-all` skill.
   This is a user mandate (2026-08-25) to provide a whole-queue dashboard before yielding.
   Do not merely recommend the slash command.
-  To prevent quota exhaustion on large repositories, run `gh pr list --state open` first.
-  If there are more than 10 open PRs, skip the dashboard entirely.

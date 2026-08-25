@@ -54,7 +54,9 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `CheckRun` and a legacy `StatusContext` carry different fields
   (`name`/`status`/`conclusion` versus `context`/`state`).
   `CheckRun.status` (`CheckStatusState` enum: `QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED` --- measured 2026-08-25) includes non-terminal states like `REQUESTED` and `WAITING` before a run is queued.
-  Gating code must treat any status other than `COMPLETED` (and any `StatusContext.state` other than a terminal state) as still running rather than allow-listing expected pending values. (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
+  Gating code must treat any status other than `COMPLETED` (and any `StatusContext.state` other than a terminal state) as still running rather than allow-listing expected pending values.
+  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000;
+  the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
 - **A session's egress proxy can block GraphQL entirely, as a session-scoped
   policy rather than an account-level quota --- distinct from the rate-limit
   case above, and easy to conflate with it.**

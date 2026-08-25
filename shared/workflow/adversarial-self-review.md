@@ -113,8 +113,9 @@ A foreground `Task` dispatch
 (`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`, catalog name
 "Final review HEAD f71c02ea") ran on `f71c02ea`.
 The posted comment was author-assembled via ManagePullRequest, labeled
-"Fallback self-review", and mixed a paraphrased
-`### Verdict: Ready for merge` with a 16-item
+"Fallback self-review", copied the child's
+`### Verdict: Ready for merge` and `Reviewed-Commit` lines, and wrapped
+them in a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
 The parent JSON `tool_result` carried identity fields and no review body.
 On Cursor Cloud that identity-only return is expected; fetch the child
@@ -122,7 +123,8 @@ transcript before posting (see [`memories/cursor.md`](../../memories/cursor.md))
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the child return or the fetched child transcript.
+  quoting the harness paste of the child's final message, or the fetched
+  child transcript --- not the identity-only JSON `tool_result`.
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
 - **Don't:** paraphrase a missing `tool_result` as Ready for merge.

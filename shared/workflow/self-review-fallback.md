@@ -114,7 +114,8 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the child return or the fetched child transcript.
+  quoting the harness paste of the child's final message, or the fetched
+  child transcript --- not the identity-only JSON `tool_result`.
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
 - **Don't:** paraphrase a missing `tool_result` as Ready for merge.
@@ -224,9 +225,7 @@ usually an `author_association` allowlist, against a session whose comments post
 The reviewer completing on somebody else's branch the same day settles that it is up.
 Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
 a human OWNER/MEMBER/COLLABORATOR comment is the unblock
-(see [`memories/cursor.md`](../../memories/cursor.md)
-and [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
-"A session that could reach none of four working reviewers").
+(see [`memories/cursor.md`](../../memories/cursor.md)).
 
 Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).
 One read settles the identity half:

@@ -1191,3 +1191,5 @@ safer/preferred choice merely because the repo has external consumers.
   Hardcoded usernames in shared config cause cross-user/fork breakages.
   - **Exception:** You *must* preserve literal usernames when they are structural/functional elements that require an exact match: GitHub URLs, git repository paths/namespaces (e.g. `Morrison-Lab/ai-config`), submodules, flag names, and values that must resolve to a real remote/account.
     Only purge them from prose and generic placeholder flags.
+- **When reverting a merge, immediately reopen the corresponding issue(s).**
+  If you revert a PR or merge commit that previously closed one or more tracked issues, the bug or feature request is no longer solved on `main`. You must immediately locate the issues that were closed by the reverted merge and reopen them so the work is tracked again.

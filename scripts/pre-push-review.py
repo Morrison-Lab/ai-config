@@ -139,11 +139,11 @@ def get_pr_head_sha(pr_number: int) -> Optional[str]:
     return None
 
 
-def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
+def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
     """Parse structured review output and return (is_valid, is_clean, reason).
 
     Returns:
-        is_valid: True if report contains all 4 required sections and recognized verdict.
+        is_valid: True if report contains all 4 required sections, recognized verdict, and valid SHA fingerprint.
         is_clean: True if verdict is Ready for merge / APPROVE and has zero blocking findings.
         reason: Explanation of validation or review verdict.
     """
@@ -159,6 +159,16 @@ def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
     for section_name, patterns in required_sections:
         if not any(pat in report for pat in patterns):
             return False, False, f"Missing required section: {section_name}"
+
+    # Verify Reviewed-Commit fingerprint if expected SHA provided
+    if expected_commit_sha:
+        sha_match = re.search(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9]+)\s*$", report)
+        if not sha_match:
+            return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
+        found_sha = sha_match.group(1).lower()
+        exp_sha = expected_commit_sha.lower()
+        if not (found_sha.startswith(exp_sha[:8]) or exp_sha.startswith(found_sha[:8])):
+            return False, False, f"Mismatched Reviewed-Commit fingerprint: found {found_sha[:8]}, expected {exp_sha[:8]}."
 
     verdict_match = re.search(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", report)
     verdict_str = ""
@@ -178,14 +188,14 @@ def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
     v_upper = verdict_str.upper()
     is_clean = any(
         term in v_upper
-        for term in ["READY FOR MERGE", "READY AFTER ADDRESSING FINDINGS", "APPROVE"]
+        for term in ["READY FOR MERGE", "APPROVE"]
     ) and not any(
         term in v_upper
-        for term in ["NEEDS WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
+        for term in ["READY AFTER ADDRESSING FINDINGS", "NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
     )
     is_needs_work = any(
         term in v_upper
-        for term in ["NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
+        for term in ["READY AFTER ADDRESSING FINDINGS", "NEEDS WORK", "NEEDS MORE WORK", "CHANGES REQUESTED", "UNAPPROVED", "BLOCKED", "UNABLE TO REVIEW"]
     )
 
     if not (is_clean or is_needs_work):
@@ -194,19 +204,17 @@ def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
     if is_clean and is_needs_work:
         return False, False, "Contradictory verdict statement."
 
-    findings_match = re.search(r"(?is)### Critical Findings\s*\n(.*?)(?=\n###|\Z)", report)
+    findings_match = re.search(r"(?is)#{2,3}\s+Critical Findings\s*\n(.*?)(?=\n#{2,3}\s+|\Z)", report)
     if findings_match:
         findings_body = findings_match.group(1).strip()
-        clean_indicators = ["none", "no blocking", "clean", "zero critical", "n/a", "no issues found"]
-        has_explicit_none = any(
-            findings_body.lower().startswith(ind) or ind in findings_body.lower()
-            for ind in clean_indicators
-        )
-        has_numbered_blocker = bool(re.search(r"(?im)^\s*1\.\s+", findings_body)) or any(
+        first_line = findings_body.split("\n")[0].strip().lower() if findings_body else ""
+        is_clean_first_line = re.match(r"^(none(?:\.|\b)|n/a|zero(?:\b|\s+critical)|no(?:\s+(?:critical|blocking|issues)))\b", first_line)
+        has_list_item = bool(re.search(r"(?im)^\s*(?:1\.|-|\*)\s+", findings_body))
+        has_blocker_phrase = any(
             term in findings_body.lower()
-            for term in ["blocking bug", "critical finding", "severe regression", "must fix before merge"]
+            for term in ["blocking bug", "critical finding", "severe regression", "must fix before merge", "must fix"]
         )
-        if is_clean and has_numbered_blocker and not has_explicit_none:
+        if is_clean and (has_list_item or has_blocker_phrase) and not is_clean_first_line:
             return False, False, "Contradictory output: clean verdict but numbered/critical findings listed."
 
     refusal_patterns = [
@@ -222,8 +230,8 @@ def parse_review_verdict(report: Optional[str]) -> Tuple[bool, bool, str]:
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 
 
-def validate_review_output(report: Optional[str]) -> bool:
-    is_valid, _, _ = parse_review_verdict(report)
+def validate_review_output(report: Optional[str], expected_commit_sha: str = "") -> bool:
+    is_valid, _, _ = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
     return is_valid
 
 
@@ -384,8 +392,15 @@ def execute_review(engine: str, prompt: str, model: str = "") -> Tuple[Optional[
         report = runner(prompt, model=model)
         if report:
             return report, label
-        # fallback to remaining engines
-        engine = "auto"
+        # fallback to remaining engines without retrying cand
+        available = [c for c in available if c != cand]
+        for rem_cand in available:
+            rem_runner, rem_label = engine_dispatch[rem_cand]
+            rem_report = rem_runner(prompt, model=model)
+            if rem_report:
+                return rem_report, rem_label
+            print(f"Engine '{rem_label}' was unavailable, exhausted, or produced invalid output; falling back...")
+        return None, "Fallback Chain"
 
     if engine != "auto":
         runner, label = engine_dispatch.get(engine, (None, engine))

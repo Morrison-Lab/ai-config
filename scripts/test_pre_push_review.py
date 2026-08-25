@@ -41,6 +41,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("### Local Adversarial AI Review (OpenAI Codex)", formatted)
 
     def test_validate_review_output(self):
+        commit = "12345678abcdef00"
         valid = (
             "### Summary Verdict\n"
             "Verdict: Ready for merge\n\n"
@@ -50,13 +51,18 @@ class TestPrePushReview(unittest.TestCase):
             "Looks clean and well-structured.\n\n"
             "### Verification Steps\n"
             "- All unit tests passed.\n"
-            "Reviewed-Commit: 12345678"
+            f"Reviewed-Commit: {commit}"
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(valid)
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(valid, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
-        # UNAPPROVED is a valid structural review format, but is NOT clean
+        # Missing fingerprint when expected
+        is_valid, _, reason = reviewer.parse_review_verdict(valid, expected_commit_sha="99999999")
+        self.assertFalse(is_valid)
+        self.assertIn("Mismatched", reason)
+
+        # UNAPPROVED is structurally valid, but NOT clean
         unapproved = (
             "### Summary Verdict\n"
             "Verdict: UNAPPROVED\n\n"
@@ -67,6 +73,31 @@ class TestPrePushReview(unittest.TestCase):
         )
         is_valid, is_clean, _ = reviewer.parse_review_verdict(unapproved)
         self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
+
+        # Ready after addressing findings is NOT clean
+        conditional = (
+            "### Summary Verdict\n"
+            "Verdict: Ready after addressing findings\n\n"
+            "### Critical Findings\n"
+            "1. Must fix the edge case.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone."
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(conditional)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
+
+        # Adversarial wording inside findings (contains "None" in sentence but lists numbered blocker)
+        adv_findings = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "## Critical Findings\n"
+            "1. None of the posting paths verify the SHA; must fix before merge.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone."
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(adv_findings)
         self.assertFalse(is_clean)
 
         # Rejects contradictory APPROVE with critical blocker

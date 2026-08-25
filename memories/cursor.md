@@ -91,9 +91,10 @@ A Cursor Cloud `Task` JSON `tool_result` (harness logs may show `task_v2`)
 carries identity fields (including `cloudAgentBcId`) and no review body,
 even when the child ran in the foreground.
 That JSON is not the report to post as a fallback comment.
-The harness may still paste the child's final message into the parent
-transcript; quote that paste or fetch the child transcript, and do not
-treat a thinking paraphrase as the report.
+The harness may still paste a child assistant message into the parent
+transcript. Quote that paste only when it already carries Summary /
+Findings / Verdict; otherwise fetch the child transcript. Do not treat a
+thinking paraphrase or an empty paste as the report.
 
 The Cursor adapter skips `no-push-without-self-review.py` because JSONL
 omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in
@@ -101,16 +102,18 @@ omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in
 so this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
-- **Do:** quote the harness paste of the child's final message when it is
-  present; otherwise call cursor-cloud `batch-fetch-details` with
-  `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`, then quote
-  the last assistant `text` that carries Summary / Findings / Verdict ---
-  not the last assistant message (which may be thinking or `tool_calls`
-  with empty `text`), and not the whole file.
+- **Do:** quote a harness paste of the child's report when that paste
+  already carries Summary / Findings / Verdict; otherwise call
+  cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
+  `includeTranscripts: true`, then quote the last assistant `text` that
+  carries those same sections --- not the last assistant message (which
+  may be thinking or `tool_calls` with empty `text`), and not the whole
+  file.
   `cloudAgentBcId` is a field on the Task JSON `tool_result`; `bcIds` is
   the tool parameter.
-- **Don't:** treat the parent thinking "the reviewer approved" as the report,
-  post the identity-only JSON `tool_result` as the review, quote the whole
+- **Don't:** treat the parent thinking "the reviewer approved" as the
+  report, post the identity-only JSON `tool_result` as the review, quote
+  a harness paste of thinking or empty `text`, quote the whole
   `transcript.json`, or paraphrase a missing body as Ready for merge.
 
 (Measured 2026-08-25 on

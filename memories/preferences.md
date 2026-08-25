@@ -441,7 +441,6 @@
   (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
 
-
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.
   **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.
@@ -1196,5 +1195,6 @@ safer/preferred choice merely because the repo has external consumers.
 - **When reverting a merge, immediately reopen the corresponding issue(s).**
   If you revert a PR or merge commit that previously closed one or more tracked issues, the bug or feature request is no longer solved on `main`.
   You must immediately locate the issues that were closed by the reverted merge and reopen them so the work is tracked again.
-  - **Do:** reopen the issues that were closed by the reverted merge.
-  - **Don't:** leave issues closed when the fix that closed them has been reverted from `main`.
+  - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
+    you must immediately reopen the corresponding issue(s).
+  - **Don't:** Leave closed issues pointing at reverted work.

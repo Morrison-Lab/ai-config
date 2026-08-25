@@ -8,9 +8,11 @@ subscription engines with automatic fallback, and optionally posts review verdic
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import List, Optional, Tuple
 
 
@@ -165,18 +167,19 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        sha_match = re.search(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9A-F]+)\s*$", unfenced_report)
-        if not sha_match:
+        sha_matches = re.findall(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9A-F]+)\s*$", unfenced_report)
+        if not sha_matches:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
-        found_sha = sha_match.group(1).lower()
         exp_sha = expected_commit_sha.lower()
-        if len(found_sha) < 7 or len(exp_sha) < 7:
-            return False, False, f"Fingerprint SHA too short: found {found_sha!r}, expected {exp_sha!r}."
-        if len(found_sha) > 40:
-            return False, False, f"Fingerprint SHA too long: found {found_sha!r}."
-        min_len = min(len(found_sha), len(exp_sha))
-        if found_sha[:min_len] != exp_sha[:min_len]:
-            return False, False, f"Mismatched Reviewed-Commit fingerprint: found {found_sha!r}, expected {exp_sha!r}."
+        for found_sha_raw in sha_matches:
+            found_sha = found_sha_raw.lower()
+            if len(found_sha) < 7 or len(exp_sha) < 7:
+                return False, False, f"Fingerprint SHA too short: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
+            if len(found_sha) > 40:
+                return False, False, f"Fingerprint SHA too long: found {found_sha_raw!r}."
+            min_len = min(len(found_sha), len(exp_sha))
+            if found_sha[:min_len] != exp_sha[:min_len]:
+                return False, False, f"Mismatched or contradictory Reviewed-Commit fingerprint: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", unfenced_report)
     if not verdict_matches:
@@ -354,19 +357,29 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
+
     cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
     if model:
         cmd.extend(["-m", model])
-    cmd.append(prompt)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tf:
+        tf.write(prompt)
+        prompt_file = tf.name
 
     try:
-        res = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=360)
+        with open(prompt_file, "r", encoding="utf-8") as pf:
+            res = subprocess.run(cmd, stdin=pf, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
+    finally:
+        try:
+            os.remove(prompt_file)
+        except OSError:
+            pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
@@ -390,6 +403,34 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
+def get_next_alternate_engine(available_engines: List[str]) -> str:
+    """Select the next engine in persistent round-robin order across successive invocations."""
+    if not available_engines:
+        return "codex"
+    if len(available_engines) == 1:
+        return available_engines[0]
+
+    state_file = os.path.expanduser("~/.gemini/pre_push_review_state.json")
+    last_idx = -1
+    try:
+        if os.path.isfile(state_file):
+            with open(state_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                last_idx = int(data.get("last_engine_index", -1))
+    except Exception:
+        pass
+
+    next_idx = (last_idx + 1) % len(available_engines)
+    try:
+        os.makedirs(os.path.dirname(state_file), exist_ok=True)
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"last_engine_index": next_idx}, f)
+    except Exception:
+        pass
+
+    return available_engines[next_idx]
+
+
 def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "") -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
@@ -411,9 +452,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         if not available:
             log_error("No supported AI CLI found.")
             return None, "None"
-        import time
-        idx = int(time.time() // 60) % len(available)
-        cand = available[idx]
+        cand = get_next_alternate_engine(available)
         runner, label = engine_dispatch[cand]
         print(f"Alternating review engine: Selected '{label}' ({cand}).")
         report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)

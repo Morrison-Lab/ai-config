@@ -15,7 +15,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 spec = importlib.util.spec_from_file_location(
     "pre_push_review", Path(__file__).parent / "pre-push-review.py"
@@ -153,6 +153,21 @@ class TestPrePushReview(unittest.TestCase):
         )
         self.assertFalse(is_valid)
         self.assertIn("Mismatched", reason)
+
+        # Contradictory fingerprints in the same report (one matching, one differing) is rejected
+        contradictory_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}\n"
+            "Reviewed-Commit: deadbeef12345678"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(contradictory_report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("Mismatched or contradictory", reason)
 
         # Clean verdict followed by Needs work verdict yields is_clean=False
         multiple_verdicts_report = (
@@ -451,15 +466,21 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
-        # Test OpenCode runner uses positional prompt and pure mode
+        # Test OpenCode runner uses tempfile stdin pipe and pure mode
         mock_which.return_value = "/opt/homebrew/bin/opencode"
         out_oc = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertIn("prompt", oc_cmd)
+        self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
+
+    def test_get_next_alternate_engine_rotation(self):
+        engines = ["claude", "codex", "opencode", "antigravity"]
+        with patch("builtins.open", mock_open()) as mock_file, patch("os.path.isfile", return_value=False), patch("os.makedirs"):
+            e1 = reviewer.get_next_alternate_engine(engines)
+            self.assertEqual(e1, "claude")
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

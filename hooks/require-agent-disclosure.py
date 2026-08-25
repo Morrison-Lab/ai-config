@@ -130,6 +130,8 @@ API_CMD_RE = re.compile(_ANCHOR + r"(?:gh|glab)\s+api\b", re.MULTILINE)
 # this change annotates was completely invisible to the guard.
 API_BODY_FIELD_RE = re.compile(
     r"(?:-f|-F|--field|--raw-field|--form)\s+[\"']?body="
+    # `--form` is glab's flag, not gh's -- both appear because the detector
+    # matches `(?:gh|glab) api`.
     # `--input <file>` supplies the whole payload, body included. The body is
     # then unreadable rather than absent, which is what the caller reports.
     r"|--input\b")
@@ -544,9 +546,12 @@ def discloses(text):
         pass
     if m is None:
         return False
-    # Only the remainder of the marker line may follow. A blank line after it,
-    # or a long trailing run, means the body continues past the disclosure --
-    # which reads as quoting the convention rather than as disclosing.
+    # A blank line after the marker, or a long trailing run, means the body
+    # continues past the disclosure -- which reads as quoting the convention
+    # rather than as disclosing. A SINGLE newline plus a short run is tolerated
+    # deliberately: a trailing signature or a wrapped marker line is common, and
+    # refusing it would warn on compliant comments, which is the costlier error
+    # for a warn-only guard.
     after = tail[m.end():].rstrip()
     return "\n\n" not in after and len(after) <= 60
 

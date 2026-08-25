@@ -388,6 +388,23 @@ p.write_text(str(n + 1))
 print(json.dumps({}))
 """
 
+tx_guard_py = """\
+#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+payload = json.load(sys.stdin)
+raw = payload.get("transcript_path") or ""
+text = Path(raw).read_text() if raw and Path(raw).is_file() else ""
+if '"name": "Bash"' in text or '"name":"Bash"' in text:
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "saw translated Bash",
+        }
+    }))
+"""
+
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)
     hooks = tmp / "hooks"
@@ -399,12 +416,16 @@ with tempfile.TemporaryDirectory() as raw:
     write_hook(hooks, "warn-stop.py", stop_warn_py)
     write_hook(hooks, "inject-time.sh", ups_sh)
     write_hook(hooks, "count-task.py", count_py)
+    write_hook(hooks, "tx-guard.py", tx_guard_py)
     manifest = {
         "hooks": {
             "PreToolUse": [
                 {
                     "matcher": "Bash",
-                    "hooks": [{"script": "deny-merge.py", "timeout": 5}],
+                    "hooks": [
+                        {"script": "deny-merge.py", "timeout": 5},
+                        {"script": "tx-guard.py", "timeout": 5},
+                    ],
                 },
                 {
                     "matcher": "Agent",
@@ -486,6 +507,66 @@ with tempfile.TemporaryDirectory() as raw:
         env,
     )
     check("innocent Shell is allowed", allowed.get("permission") == "allow")
+    cursor_tx = tmp / "cursor-shell.jsonl"
+    cursor_tx.write_text(
+        json.dumps({
+            "role": "assistant",
+            "message": {"content": [
+                {
+                    "type": "tool_use",
+                    "name": "Shell",
+                    "input": {"command": "git status"},
+                },
+            ]},
+        }) + "\n",
+        encoding="utf-8",
+    )
+    translated_pre = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "git status"},
+            "tool_use_id": "tx-1",
+            "conversation_id": "c1",
+            "generation_id": "g-tx",
+            "transcript_path": str(cursor_tx),
+        },
+        env,
+    )
+    check(
+        "PreToolUse translates Cursor Shell to Bash in the transcript",
+        "saw translated Bash" in str(translated_pre.get("agent_message") or ""),
+    )
+    mod._TRANSLATED_TRANSCRIPTS.clear()
+    first_dest = mod.translate_transcript_path(str(cursor_tx))
+    Path(first_dest).write_text("CORRUPT\n", encoding="utf-8")
+    second_dest = mod.translate_transcript_path(str(cursor_tx))
+    check("transcript translation is reused within a process", second_dest == first_dest)
+    check(
+        "cached transcript dest is not rewritten",
+        Path(second_dest).read_text(encoding="utf-8") == "CORRUPT\n",
+    )
+    real_remaining = mod.remaining_timeout
+    mod.remaining_timeout = lambda *a, **k: None
+    try:
+        timed = mod.handle_pretool(
+            {
+                "tool_name": "Shell",
+                "tool_input": {"command": "git status"},
+                "tool_use_id": "timeout-1",
+            },
+            [{"event": "PreToolUse", "matcher": "Bash", "script": "deny-merge.py", "timeout": 5}],
+        )
+        check(
+            "catalog budget exhaustion fail-closed denies",
+            timed.get("permission") == "deny",
+        )
+        check(
+            "catalog timeout reason is named",
+            "timed out" in str(timed.get("agent_message") or ""),
+        )
+    finally:
+        mod.remaining_timeout = real_remaining
 
     warned = run_adapter(
         "preToolUse",

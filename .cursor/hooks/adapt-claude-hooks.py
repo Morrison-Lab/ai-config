@@ -402,15 +402,30 @@ def transcript_needs_translation(path: Path) -> bool:
     return False
 
 
+_TRANSLATED_TRANSCRIPTS: dict[str, str] = {}
+
+
 def translate_transcript_path(raw: str) -> str:
-    """Point Stop/UPS scripts at a Claude-shaped JSONL when Cursor wrote it."""
+    """Point Stop/UPS/PreToolUse scripts at a Claude-shaped JSONL when Cursor wrote it.
+
+    Cached per process and source path so one Shell preToolUse does not
+    rewrite the stash once per catalog row.
+    """
     if not raw:
         return raw
     path = Path(raw)
+    try:
+        key = str(path.resolve())
+    except OSError:
+        key = str(path)
+    cached = _TRANSLATED_TRANSCRIPTS.get(key)
+    if cached is not None:
+        return cached
     if not path.is_file() or not transcript_needs_translation(path):
+        _TRANSLATED_TRANSCRIPTS[key] = raw
         return raw
     dest = stash_dir() / (
-        f"tx-{hashlib.sha256(str(path.resolve()).encode()).hexdigest()[:20]}.jsonl"
+        f"tx-{hashlib.sha256(key.encode()).hexdigest()[:20]}.jsonl"
     )
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -432,6 +447,7 @@ def translate_transcript_path(raw: str) -> str:
         dest.write_text("".join(lines), encoding="utf-8")
     except OSError:
         return raw
+    _TRANSLATED_TRANSCRIPTS[key] = str(dest)
     return str(dest)
 
 
@@ -723,6 +739,7 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
             continue
         timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
         if timeout is None:
+            deny_reason = deny_reason or "hook catalog timed out"
             break
         ran_scripts.add(script)
         claude_tool = hits[0]
@@ -764,6 +781,7 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
             continue
         timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
         if timeout is None:
+            followups.append("hook catalog timed out")
             break
         code, stdout, stderr = run_script(
             entry["script"], payload, timeout, entry.get("env"),

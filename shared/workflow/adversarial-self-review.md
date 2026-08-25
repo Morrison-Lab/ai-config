@@ -99,6 +99,34 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 A dispatched reviewer makes that concrete, because the finding now has an author who is not you: give each one Address, Rebut, or Defer-to-a-tracked-issue per [`ard`](../../skills/ard/SKILL.md), in writing, exactly as for a finding from the PR's own reviewer.
 "I know why that is fine" is a Rebut, and a Rebut is something you would be willing to post.
 
+## The posted fallback comment is the reviewer's report, not an author composite
+
+When the self-review is posted as a PR comment, the comment body **is**
+the dispatched reviewer's structured report.
+Dispatching the reviewer and then writing a different comment is the same
+failure as reviewing inline, one step later: the authoring session still
+composed the text that readers treat as the review.
+
+Measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
+A foreground `task_v2` named `adversarial-reviewer` (`bc-61fbadd0`) ran on
+`f71c02ea`.
+The posted comment was author-assembled via ManagePullRequest, labeled
+"Fallback self-review", and mixed a paraphrased
+`### Verdict: Ready for merge` with a 15-item
+"Round history that was Addressed, Rebutted, or Deferred" ledger.
+The parent `tool_result` held only `{agentId, cloudAgentBcId}` --- no review
+text.
+On Cursor Cloud that identity-only return is expected; fetch the child
+transcript before posting (see [`memories/cursor.md`](../../memories/cursor.md)).
+
+- **Do:** post the dispatched reviewer's structured report
+  (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
+  quoting the child return or the fetched child transcript.
+- **Don't:** wrap the verdict in the authoring session's ARD round-history
+  recap in the same comment.
+- **Don't:** paraphrase a missing `tool_result` as Ready for merge.
+
 ## The mechanism
 
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).

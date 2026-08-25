@@ -85,3 +85,47 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 (both sources run; measured against Cursor's third-party hook docs on
 2026-08-25).
 
+## Cursor Cloud Task `tool_result` is identity-only
+
+A Cursor Cloud `task_v2` return is `{agentId, isBackground, cloudAgentBcId}`
+only --- no review text, even when the child ran in the foreground.
+The parent `tool_result` therefore cannot satisfy
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s
+rule that a verdict is admitted from the reviewer's `tool_result`.
+
+Fetch the child transcript via cursor-cloud `batch-fetch-details`
+(`includeTranscripts: true`) using that `cloudAgentBcId` before posting a
+fallback review.
+
+- **Do:** fetch the child transcript from `cloudAgentBcId` before posting
+  the fallback comment, and quote that report.
+- **Don't:** treat the parent thinking "the reviewer approved" as the report,
+  or paraphrase a missing `tool_result` as Ready for merge.
+
+(Measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535);
+child `bc-61fbadd0`.)
+
+## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
+
+[`.github/workflows/jules-review.yml`](../.github/workflows/jules-review.yml)
+requires `author_association` in OWNER/MEMBER/COLLABORATOR.
+This Cloud session's comments post as `cursor[bot]` / `NONE`, so
+an `@jules review` comment from this session is skipped.
+
+This is the same class as
+[`self-review-fallback.cases.md`](../shared/workflow/self-review-fallback.cases.md)
+"A session that could reach none of four working reviewers"
+([#1417](https://github.com/Morrison-Lab/ai-config/pull/1417) /
+[#1433](https://github.com/Morrison-Lab/ai-config/issues/1433), 2026-08-12:
+`claude[bot]` / `CONTRIBUTOR`).
+2nd occurrence, 2026-08-25, #2234; the association this time is `NONE`.
+
+- **Do:** have a human OWNER/MEMBER/COLLABORATOR post the request
+  (the workflow trigger is a trusted comment containing that bot mention).
+- **Don't:** re-post the same request from this Cloud session --- the gate
+  that skipped it skips the retry.
+
+(Measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)
+

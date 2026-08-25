@@ -171,6 +171,16 @@ check(
     "mcp__github__merge_pull_request"
     in mod.cursor_to_claude_tool_names("MCP:github-merge_pull_request"),
 )
+check(
+    "MCP:merge_pull_request also tries mcp__github__merge_pull_request",
+    "mcp__github__merge_pull_request"
+    in mod.cursor_to_claude_tool_names("MCP:merge_pull_request"),
+)
+check(
+    "result-gated scripts are skipped on Cursor",
+    {"no-push-without-self-review.py", "no-empty-promise.py", "no-unreviewed-pr.py"}
+    <= mod.SKIP_WITHOUT_TOOL_RESULT,
+)
 check("empty matcher hits", mod.matcher_hits(None, "Bash"))
 check("Bash matcher hits Bash", mod.matcher_hits("Bash", "Bash"))
 check("Bash matcher misses Agent", not mod.matcher_hits("Bash", "Agent"))
@@ -204,6 +214,17 @@ check("Cursor role becomes Claude type", translated.get("type") == "assistant")
 check(
     "Cursor Shell tool_use becomes Bash",
     translated["message"]["content"][1].get("name") == "Bash",
+)
+typed_shell = {
+    "type": "assistant",
+    "role": "assistant",
+    "message": {"content": [
+        {"type": "tool_use", "name": "Shell", "input": {"command": "git status"}},
+    ]},
+}
+check(
+    "typed Cursor record with Shell still needs translation",
+    mod.record_needs_translation(typed_shell),
 )
 
 # --- subprocess fixtures ---
@@ -526,6 +547,21 @@ with tempfile.TemporaryDirectory() as live_raw:
         live_env,
     )
     check("live catalog denies gh pr merge", live_deny.get("permission") == "deny")
+    live_push = run_adapter(
+        "preToolUse",
+        {
+            "tool_name": "Shell",
+            "tool_input": {"command": "git push origin HEAD"},
+            "tool_use_id": "live-push-1",
+            "conversation_id": "live-c",
+            "generation_id": "live-g-push",
+        },
+        live_env,
+    )
+    check(
+        "live catalog does not lock out git push without tool_result",
+        live_push.get("permission") == "allow",
+    )
     nonce = str(time.time_ns())
     cursor_tx = live_stash / "cursor-offer.jsonl"
     cursor_tx.write_text(

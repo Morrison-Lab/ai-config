@@ -13,7 +13,11 @@ This adapter is the Cursor-schema command those events invoke. It:
 4. Translates Claude stdout back into Cursor's response shape.
 
 It never registers anything in `~/.claude/settings.json`, so it cannot
-double-bind the Claude plugin / `install-hooks.py` path.
+itself double-bind the `install-hooks.py` path. Desktop Cursor with
+third-party Claude hooks enabled still loads `~/.claude/settings.json`
+natively and runs every source; the tick sentinel only collapses two
+adapter processes, not adapter-plus-native. Cloud agents have no home
+Claude settings.
 A per-payload sentinel still collapses a project-hook plus plugin-hook
 double fire of the *same* Cursor event by replaying the first JSON result.
 
@@ -50,6 +54,18 @@ WRAPPER_TIMEOUT_S = {
 }
 WRAPPER_SLACK_S = 10
 ENV_PREFIX = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(\S+)\s+")
+# Cursor JSONL omits tool_result (Cursor staff, 2026-04-13). These
+# scripts fail closed or loop until they see one, so running them on
+# Cursor is a lockout rather than a no-op.
+SKIP_WITHOUT_TOOL_RESULT = frozenset({
+    "no-push-without-self-review.py",
+    "no-empty-promise.py",
+    "no-unreviewed-pr.py",
+})
+GITHUB_MCP_HINT = re.compile(
+    r"(issue|pull_request|pull-request|pr_comment|merge_pull)",
+    re.I,
+)
 
 
 def hooks_dir() -> Path:
@@ -198,6 +214,9 @@ def cursor_to_claude_tool_names(cursor_name: str) -> list[str]:
         else:
             names.append("mcp__" + rest.replace("-", "_"))
             names.append("mcp__" + rest.replace("-", "__"))
+            if GITHUB_MCP_HINT.search(rest):
+                suffix = rest[len("github-"):] if rest.startswith("github-") else rest
+                names.append("mcp__github__" + suffix.replace("-", "_"))
     seen: set[str] = set()
     out: list[str] = []
     for name in names:
@@ -288,6 +307,26 @@ def cursor_record_to_claude(record: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def record_needs_translation(record: dict[str, Any]) -> bool:
+    if record.get("role") in ("user", "assistant") and record.get("type") not in (
+        "user",
+        "assistant",
+    ):
+        return True
+    message = record.get("message")
+    blocks = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(blocks, list):
+        return False
+    for block in blocks:
+        if (
+            isinstance(block, dict)
+            and block.get("type") == "tool_use"
+            and block.get("name") == "Shell"
+        ):
+            return True
+    return False
+
+
 def transcript_needs_translation(path: Path) -> bool:
     try:
         with path.open(encoding="utf-8", errors="replace") as handle:
@@ -302,9 +341,8 @@ def transcript_needs_translation(path: Path) -> bool:
                     continue
                 if record.get("type") == "turn_ended":
                     continue
-                if record.get("role") in ("user", "assistant") and "type" not in record:
+                if record_needs_translation(record):
                     return True
-                return False
     except OSError:
         return False
     return False
@@ -573,7 +611,7 @@ def handle_pretool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dic
         if entry["event"] != "PreToolUse":
             continue
         script = entry["script"]
-        if script in ran_scripts:
+        if script in ran_scripts or script in SKIP_WITHOUT_TOOL_RESULT:
             continue
         hits = [name for name in candidates if matcher_hits(entry.get("matcher"), name)]
         if not hits:
@@ -616,6 +654,8 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
     deadline = event_deadline("stop")
     for entry in entries:
         if entry["event"] != "Stop":
+            continue
+        if entry["script"] in SKIP_WITHOUT_TOOL_RESULT:
             continue
         timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
         if timeout is None:

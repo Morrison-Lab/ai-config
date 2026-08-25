@@ -70,4 +70,8 @@ User-level `~/.cursor/hooks.json` is not available to cloud agents.
 Cloud agents get `UserPromptSubmit` context on the first `postToolUse`
 of a generation; a tool-less cloud turn drops that context rather than
 delaying it, because `beforeSubmitPrompt` cannot inject.
+Desktop Cursor with third-party Claude hooks enabled also loads
+`~/.claude/settings.json`; do not pair that with this project adapter
+(both sources run; measured against Cursor's third-party hook docs on
+2026-08-25).
 

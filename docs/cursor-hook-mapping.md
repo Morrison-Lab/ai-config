@@ -17,7 +17,7 @@ It does not call `install-hooks.py --fix`, so it cannot double-bind the Claude p
 | Claude Code event | Cursor event | Cloud agent | Notes |
 |---|---|---|---|
 | `PreToolUse` | `preToolUse` | yes | Covers Shell (Claude `Bash`), Task/Agent, and MCP tools. Matcher translation lives in the adapter. |
-| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `5` (Cursor's default) so a block can retry a few times without an unbounded follow-up loop. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. The adapter rewrites a Cursor JSONL (`role` + `Shell`) into the Claude shape (`type` + `Bash`) before the catalog reads it. Cursor transcripts omit tool *results*, so a discharge that needs output cannot see it. |
+| `Stop` | `stop` | yes | Claude `decision: block` becomes Cursor `followup_message`. The message has already gone out; Cursor cannot suppress it the way Claude Stop can. `loop_limit` is `5` (Cursor's default) so a block can retry a few times without an unbounded follow-up loop. Warn-only Stop hooks (`systemMessage` without `decision`) go to stderr and do not auto-continue. The adapter rewrites a Cursor JSONL (`role` + `Shell`) into the Claude shape (`type` + `Bash`) before the catalog reads it. Cursor transcripts omit tool *results*, so scripts that fail closed without a `tool_result` (`no-push-without-self-review.py`, `no-empty-promise.py`, `no-unreviewed-pr.py`) are skipped rather than locking out every push or looping Stop. A discharge that needs output and fail-opens still cannot see it. |
 | `UserPromptSubmit` | `sessionStart` | no | Cursor `sessionStart` can inject `additional_context`. Cloud agents do not load `sessionStart`. |
 | `UserPromptSubmit` | `postToolUse` | yes | First `postToolUse` of a generation injects the same stdout / `additionalContext` the Claude UPS path would have added before the turn. A cloud turn that never calls a tool never fires `postToolUse`, so UPS context is dropped, not delayed. `inject-local-time.sh` therefore lands after the first tool when there is one, and not at all on a tool-less turn. |
 | `UserPromptSubmit` | `beforeSubmitPrompt` | yes, but unused | Cursor `beforeSubmitPrompt` can only `continue` / block. It cannot inject context. No UPS hook here currently blocks, so this event is unbound. |
@@ -59,3 +59,7 @@ User-level `~/.cursor/hooks.json` is not available in cloud agents.
 Do not also run `install-hooks.py --fix` to "activate" these for Cursor.
 That path writes `~/.claude/settings.json` for Claude Code.
 Cursor Cloud has no `~/.claude`.
+Desktop Cursor with third-party Claude hooks enabled loads that file natively
+and runs every source ([third-party hooks](https://cursor.com/docs/reference/third-party-hooks.md), fetched 2026-08-25);
+the adapter's tick sentinel does not collapse adapter-plus-native.
+Leave one path enabled: this project file, or Claude settings, not both.

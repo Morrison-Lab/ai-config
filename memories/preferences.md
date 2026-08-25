@@ -964,42 +964,36 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
-> service** (user directive, 2026-08-20; scope corrected 2026-08-23),
-> confirmed via a dispatched run's `429: prepayment credits depleted`.
-> Route no dispatched subagent work to it.
-> The interactive subscription/extension is unaffected and not at quota --
-> don't extrapolate this into "uninstall the extension".
-> The mechanics below are kept as measured history rather than as a live destination, so read the ladder as `opencode` / `openrouter`, then `codex`, then Claude.
-> Tracked as ai-config#1776.
+> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of service** (user directive, 2026-08-20; ai-config#1776).
+> Route no dispatched subagent work to it; interactive subscription/extension is unaffected.
+> Read the ladder as `opencode` / `openrouter`, then `codex`, then Claude.
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
-CLIs drawing on user subscriptions and API keys (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, and OpenRouter) provide high-throughput capacity.
-Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
-This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
+For heavy, parallelizable **read / draft / verify** work (deep reading, backlog scoping, file audits, drafting artifacts, adversarial verification), route to another agent CLI before spending Claude/Workflow tokens.
+CLIs drawing on subscriptions and keys (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, OpenRouter) provide high capacity.
+Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and fallback.
+Standing default across all sessions.
 
 **Available subscriptions, balances, and delegation destinations (measured 2026-08-25):**
 
-| CLI / Provider | Plan / Billing Tier | Skill / Entrypoint |
+| CLI / Provider | Plan / Billing Tier | Entrypoint |
 |---|---|---|
 | `codex` | ChatGPT (Plus / Team / Enterprise) | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `opencode` | OpenCode Go ($10/mo subscription) + Zen free tier + local (`ollama`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
-| OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | Configured in `opencode.jsonc` provider block or direct HTTP API |
+| `opencode` | OpenCode Go ($10/mo) + Zen free tier + local (`ollama`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
+| OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | `opencode.jsonc` provider block / API |
 | `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
 | `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
 
-Exhaust the *current usage window* of each metered subscription CLI --- roughly 5 hours for Codex --- then fall back to Claude until it resets.
+Exhaust the *current usage window* of each metered subscription CLI (roughly 5 hours for Codex) before falling back.
 Prepaid credit balances (OpenRouter) do not have a recurring time window.
-They are drawn on per token for workloads that specifically benefit from frontier/stealth models not carried by desktop subscription tiers, or as fallback when subscription windows are depleted.
-"Delegate first" means spending available subscription windows and free tiers before drawing on Claude's orchestrator tokens or prepaid API credits.
+They are drawn per token for workloads benefiting from frontier/stealth models, or when subscription windows deplete.
+"Delegate first" spends available subscription windows and free tiers before drawing on Claude tokens or prepaid API credits.
 
-**`opencode` and `openrouter` expand non-metered, prepaid, and alternative frontier routes:**
-- **OpenCode**: Reaches an active OpenCode Go subscription ($10/mo), the free/hosted gateway (`opencode Zen`), and a local tier (`ollama`).
-  Its free and local tiers cost no metered budget, so mechanical work can execute without spending Claude or Codex quota.
-- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or custom runners (activated in config; measured 2026-08-23 on OpenCode 1.18.21).
-- **Local tier**: The local (`ollama/*`) tier keeps the payload on the machine for sensitive data **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).
-[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
-The initial OpenCode tiers and version above were measured 2026-08-19 on OpenCode 1.18.15.
+**`opencode` and `openrouter` expand non-metered, prepaid, and alternative routes:**
+- **OpenCode**: Reaches OpenCode Go ($10/mo), the free gateway (`opencode Zen`), and a local tier (`ollama`).
+  Free and local tiers cost no metered budget, executing without spending Claude or Codex quota.
+- **OpenRouter**: Prepaid credit balance / key (`OPENROUTER_API_KEY`), reaching frontier/stealth previews (`openrouter/*`) via OpenCode (activated in config, measured 2026-08-23 on OpenCode 1.18.21).
+- **Local tier**: The local (`ollama/*`) tier keeps payloads on-device **only when** the mandatory loopback endpoint check in [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) passes (resolving strictly to `127.0.0.1` / `::1`).
+Initial OpenCode tiers measured 2026-08-19 on OpenCode 1.18.15.
 Active Go subscription and OpenRouter credit balance verified 2026-08-25.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 

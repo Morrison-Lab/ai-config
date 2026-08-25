@@ -178,7 +178,7 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Active delegation budgets include `codex` (ChatGPT plan, operationalized by `delegate-to-codex`), `opencode` (OpenCode Go subscription, Zen free tier, local Ollama, operationalized by `delegate-to-opencode`), and OpenRouter (prepaid credit balance for frontier/stealth previews).
-`agy` (Google Antigravity)'s API route was permanently retired for dispatched work (user directive, 2026-08-20; ai-config#1776), though interactive desktop extension and plan mode remain active.
+`agy` (Google Antigravity)'s API route was permanently retired for dispatched work (user directive, 2026-08-20, ai-config#1776), though interactive desktop extension and plan mode remain active.
 `memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule, the usage-window semantics, and prepaid balance details.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 

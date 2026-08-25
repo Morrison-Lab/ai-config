@@ -765,7 +765,7 @@ It carried escape sequences and did not match the file's own escaping, which is 
 What that section does not say is that a mutation harness is where the check has to move earlier.
 There the tell is a match that inexplicably fails, and you react to it; here the same failure produces a green suite and a `MISSED` row that reads as a finding, so nothing prompts a reaction at all.
 
-- **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you.
+- **Do:** print `repr()` of a mutation anchor carrying escape sequences, and confirm it appears in the file, **before** running the mutation rather than after a match surprises you --- the fourth outcome's `Do` above already says to build the mutation from a raw literal or a written file, and this is the check for an anchor that reached you through a transport you did not choose.
 - **Don't:** open a `MISSED` row by asking what the fixture failed to cover --- that is the second of the two questions above, and asking it first is what misread the row that belonged to the first.
 
 **A component that stops failing under mutation is a question, not a cleanup.**

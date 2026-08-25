@@ -222,7 +222,7 @@ Two same-vendor readings cleared that head:
 | reader | rounds | outcome |
 | --- | --- | --- |
 | dispatched `adversarial-reviewer` subagent | 11, pre-push | no blocking findings left standing |
-| the repo's own `claude-review` | 1, at `b744d6a2` | **Ready for merge**, $3.07 |
+| the repo's own `claude-review` | 1, at `b744d6a2` | **Ready for merge** |
 
 That verdict's own findings line reads "None that meet the high-signal bar", followed by two observations it calls very minor and non-blocking.
 Quote it that way rather than as "no findings": [`fully-clean`](fully-clean.md) is explicit that "non-blocking", "nit", and "minor" are prioritization labels rather than a pass, and softening the qualifier here would strengthen this record's own argument, which is the direction to be most careful about.

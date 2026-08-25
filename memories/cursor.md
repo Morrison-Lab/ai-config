@@ -104,7 +104,7 @@ pre-push guard.
 - **Do:** quote the harness paste of the child's final message when it is
   present; otherwise fetch the child transcript via cursor-cloud
   `batch-fetch-details` (`includeTranscripts: true`) using `cloudAgentBcId`
-  before posting.
+  and quote that transcript's last assistant message, not the whole file.
 - **Don't:** treat the parent thinking "the reviewer approved" as the report,
   post the identity-only JSON `tool_result` as the review, or paraphrase a
   missing body as Ready for merge.

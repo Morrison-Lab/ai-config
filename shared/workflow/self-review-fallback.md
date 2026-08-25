@@ -114,10 +114,14 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the harness paste of the child's final message, or the fetched
-  child transcript --- not the identity-only JSON `tool_result`.
+  quoting the harness paste of the child's final message, or the last
+  assistant message in the fetched child transcript --- not the identity-only
+  JSON `tool_result` and not the whole `transcript.json`.
+  Then append the required disclosure marker.
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
 - **Don't:** paraphrase a missing `tool_result` as Ready for merge.
 
 **Self-review is the immediate fallback so the PR never stalls --

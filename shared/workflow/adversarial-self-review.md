@@ -102,10 +102,13 @@ A dispatched reviewer makes that concrete, because the finding now has an author
 ## The posted fallback comment is the reviewer's report, not an author composite
 
 When the self-review is posted as a PR comment, the comment body **is**
-the dispatched reviewer's structured report.
-Dispatching the reviewer and then writing a different comment is the same
-failure as reviewing inline, one step later: the authoring session still
-composed the text that readers treat as the review.
+the dispatched reviewer's structured report, then the required
+disclosure marker from
+[`disclose-agent-authorship`](disclose-agent-authorship.md).
+The marker is forge attribution, not author recap.
+Dispatching the reviewer and then writing a different review body is the
+same failure as reviewing inline, one step later: the authoring session
+still composed the text that readers treat as the review.
 
 Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
@@ -119,15 +122,20 @@ them in a 16-item
 "Round history that was Addressed, Rebutted, or Deferred" ledger.
 The parent JSON `tool_result` carried identity fields and no review body.
 On Cursor Cloud that identity-only return is expected; quote the harness
-paste of the child's final message, or fetch the child transcript, before
-posting (see [`memories/cursor.md`](../../memories/cursor.md)).
+paste of the child's final message, or the last assistant message in the
+fetched child transcript, before posting
+(see [`memories/cursor.md`](../../memories/cursor.md)).
 
 - **Do:** post the dispatched reviewer's structured report
   (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
-  quoting the harness paste of the child's final message, or the fetched
-  child transcript --- not the identity-only JSON `tool_result`.
+  quoting the harness paste of the child's final message, or the last
+  assistant message in the fetched child transcript --- not the identity-only
+  JSON `tool_result` and not the whole `transcript.json`.
+  Then append the required disclosure marker.
 - **Don't:** wrap the verdict in the authoring session's ARD round-history
   recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
 - **Don't:** paraphrase a missing `tool_result` as Ready for merge.
 
 ## The mechanism

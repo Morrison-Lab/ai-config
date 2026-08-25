@@ -159,6 +159,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Strip fenced code blocks using CommonMark rules (handles nested same-character fences correctly)
     unfenced_report = strip_fences(report)
+    
+    # Strip HTML comments to prevent hiding clean skeletons or blockers
+    unfenced_report = re.sub(r"<!--.*?-->", "", unfenced_report, flags=re.DOTALL)
 
     required_sections = [
         ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
@@ -205,15 +208,16 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         "refuse", "rejected", "do not merge", "fail", "failed", "cannot approve",
         "not ready for merge", "do not approve", "never approve"
     }
-    core_negation_pattern = r"\b(not|no|never|don't|do not|cannot|dis|un|non|fail|failed|reject|rejected|blocked|conditional|needs work|changes requested)\b"
+    # Avoid matching 'no' or 'not' which often appear in positive rationales like 'no blocking issues'
+    core_negation_pattern = r"\b(do not merge|cannot merge|fail|failed|reject|rejected|blocked|needs work|changes requested|not ready|unapproved)\b"
 
     parsed_verdicts = []
     for v_str in verdict_matches:
         v_clean = re.sub(r"[\*`_]", "", v_str).strip()
-        v_split = re.split(r"\s*[-:—(]\s*", v_clean, maxsplit=1)
+        v_split = re.split(r"\s*[-:\u2014(]\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
 
-        has_core_negation = bool(re.search(core_negation_pattern, v_core))
+        has_core_negation = bool(re.search(core_negation_pattern, v_clean.lower()))
 
         if v_core in clean_allowlist:
             if has_core_negation:
@@ -339,9 +343,10 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(cursor_path) and not shutil.which("agent"):
         return None
 
-    cmd = [cursor_path, "--print", "--mode", "plan", "--trust", prompt]
+    cmd = [cursor_path, "--print", "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
+    cmd.append(prompt)
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
@@ -402,27 +407,16 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
     if model:
         cmd.extend(["-m", model])
+    cmd.append(prompt)
 
-    prompt_file = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as tf:
-            tf.write(prompt)
-            prompt_file = tf.name
-
-        with open(prompt_file, "r", encoding="utf-8") as pf:
-            res = subprocess.run(cmd, stdin=pf, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
-    finally:
-        if prompt_file:
-            try:
-                os.remove(prompt_file)
-            except OSError:
-                pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()

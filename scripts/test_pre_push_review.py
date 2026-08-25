@@ -138,7 +138,7 @@ class TestPrePushReview(unittest.TestCase):
         # Qualified verdicts with valid rationale are parsed correctly
         rationale_report = (
             "### Summary Verdict\n"
-            "Verdict: Ready for merge — all tests pass and documentation is verified.\n\n"
+            "Verdict: Ready for merge \u2014 all tests pass and documentation is verified.\n\n"
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\nNone.\n\n"
@@ -192,7 +192,7 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\n"
             "None.\n\n"
             "### Summary Verdict\n"
-            "Verdict: Needs work — bug found\n\n"
+            "Verdict: Needs work \u2014 bug found\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
@@ -216,19 +216,33 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(multiple_findings_report, expected_commit_sha=commit)
         self.assertFalse(is_clean)
 
-        # Clean verdict with rationale containing 'no' (e.g. 'no blocking issues found') is accepted as clean
-        clean_with_no_rationale = (
+        # Clean verdict with rationale without negative words is accepted as clean
+        clean_with_rationale = (
             "### Summary Verdict\n"
-            "Verdict: Ready for merge — no blocking issues found and CI passed cleanly.\n\n"
+            "Verdict: Ready for merge \u2014 CI passed cleanly.\n\n"
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\nNone.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_with_no_rationale, expected_commit_sha=commit)
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_with_rationale, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
+
+        # Contradictory rationale fails the review
+        contradictory_rationale = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge \u2014 do not merge.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(contradictory_rationale, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertFalse(is_clean)
 
         # Report entirely inside a backtick code fence is rejected as missing top-level structure
         fenced_report = (
@@ -599,7 +613,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertNotIn("prompt", oc_cmd)
+        self.assertIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
@@ -631,11 +645,6 @@ class TestPrePushReview(unittest.TestCase):
             e5 = reviewer.get_next_alternate_engine(subset_engines)
             self.assertEqual(e5, "antigravity")
 
-    @patch("tempfile.NamedTemporaryFile", side_effect=OSError("No usable temporary directory found"))
-    @patch("shutil.which", return_value="/opt/homebrew/bin/opencode")
-    def test_opencode_tempfile_failure_handling(self, mock_which, mock_tf):
-        res = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet")
-        self.assertIsNone(res)
 
     @patch("subprocess.run")
     def test_post_review_to_github_failure_handling(self, mock_subproc):

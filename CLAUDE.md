@@ -761,15 +761,16 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
-## Watch and ARDI every PR you touch — don't ask first
+## Watch and ARDI every PR you touch --- don't ask first
 
 The persistent-loop standing yes lives in `AGENTS.md` and applies to every agent.
 This section is only the Claude-specific half: how this harness wakes, and how it must not double-trigger review.
 
-When you open (or are handed) a PR/MR, subscribe with `subscribe_pr_activity` when that tool exists, and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-A subscription does not replace the persistent loop: webhooks do not deliver CI-success or merge-conflict transitions.
+When you open, push to, or are handed a PR/MR, subscribe with `subscribe_pr_activity` when that tool exists.
+A subscription does not replace the persistent loop.
+Webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
+This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 

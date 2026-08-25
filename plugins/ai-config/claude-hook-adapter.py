@@ -300,9 +300,11 @@ def main():
                 if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
                     prompt_val = msg.get("content") or msg.get("text") or ""
                     break
-                elif isinstance(msg, str):
-                    prompt_val = msg
-                    break
+            if not prompt_val:
+                for msg in reversed(payload["messages"]):
+                    if isinstance(msg, str):
+                        prompt_val = msg
+                        break
             if not prompt_val and payload["messages"]:
                 last_msg = payload["messages"][-1]
                 if isinstance(last_msg, dict):
@@ -348,13 +350,16 @@ def main():
                     if text_out:
                         # Cap single injected message at 10KB and total cumulative bytes at 30KB
                         chunk = text_out[:10000]
-                        if total_injected_bytes + len(chunk) <= 30000:
+                        chunk_bytes = len(chunk.encode("utf-8"))
+                        if total_injected_bytes + chunk_bytes <= 30000:
                             injected_messages.append(chunk)
-                            total_injected_bytes += len(chunk)
+                            total_injected_bytes += chunk_bytes
                         elif total_injected_bytes < 30000:
-                            remaining = 30000 - total_injected_bytes
-                            injected_messages.append(chunk[:remaining])
-                            total_injected_bytes += remaining
+                            remaining_bytes = 30000 - total_injected_bytes
+                            # Trim to fit remaining byte budget
+                            encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
+                            injected_messages.append(encoded_trimmed.decode("utf-8", errors="ignore"))
+                            total_injected_bytes = 30000
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages[:20]]

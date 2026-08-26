@@ -445,6 +445,24 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 REDIRECTED = object()
 
 
+# POSIX shlex treats an unquoted backslash as an escape, so
+# `git -C C:\Users\foo\AppData\Local\Temp\npwsr-abc push origin main` parses as
+# `-C C:UsersfooAppDataLocalTempnpwsr-abc`. The guard then rev-parses `main` in
+# a directory that does not exist and reports that `main` could not be resolved
+# to a commit --- every allow-case in this hook's suite on Windows 11 /
+# Python 3.13 / Git Bash, measured against main at 47e49fd1 (ai-config#2037).
+# Recovering the original backslashes after shlex has eaten them is not
+# possible. Git accepts forward slashes on Windows, so rewriting the drive
+# path before the parse is the recovery. A POSIX path has no drive-letter
+# backslash run and is unchanged.
+_WIN_DRIVE_PATH = re.compile(r"[A-Za-z]:(?:\\[^\\/;\n|&<>]+)+")
+
+
+def _posixize_windows_paths(command: str) -> str:
+    """Rewrite `C:\\Users\\...` to `C:/Users/...` so POSIX shlex keeps the path."""
+    return _WIN_DRIVE_PATH.sub(lambda m: m.group(0).replace("\\", "/"), command)
+
+
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
@@ -476,9 +494,13 @@ def iter_pushes(command: str):
 
     `-C` is also CHAINED by git -- each is applied relative to the last -- so
     the first one is not the answer when several appear (ai-config#1977).
+
+    Windows drive paths are rewritten to forward slashes before either parser
+    runs, so `_simple_commands` and `_hints_by_position` see the same command.
     """
     if _SIBLING is None:
         return
+    command = _posixize_windows_paths(command)
     cmds = _SIBLING._simple_commands(command)
     if not cmds:
         return

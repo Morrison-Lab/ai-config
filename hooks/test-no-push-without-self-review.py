@@ -15,8 +15,11 @@ permission to the diff rather than merely to the speaker.
 Every case runs against a real throwaway git repository, because the subject
 half of the check is a `git rev-parse HEAD` rather than a transcript fact.
 """
+import importlib.util
 import json
 import os
+import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -39,20 +42,26 @@ ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e"}
 
 
-def _git(d, *args):
+def _git(d, *args, env=None):
+    merged = ENV if env is None else {**ENV, **env}
     return subprocess.run(["git", "-C", d, *args], capture_output=True,
-                          text=True, env=ENV, check=True).stdout.strip()
+                          text=True, env=merged, check=True).stdout.strip()
 
 
-def make_repo(names=("one", "two")) -> str:
+def make_repo(names=("one", "two"), extra_env=None) -> str:
+    # `-b main` pins the branch name. `git init` then `checkout -b main` also
+    # lands on `main` on git 2.43 when `init.defaultBranch` is `master` (the
+    # unborn HEAD is renamed), so a missing `main` ref is not what failed the
+    # suite on Windows --- POSIX shlex eating backslashes in `-C C:\...` is.
+    # Pinning here still matches test-no-clobbering-push.py and does not
+    # depend on that pre-first-commit checkout behaviour.
     d = tempfile.mkdtemp(prefix="npwsr-")
-    _git(d, "init", "-q")
-    _git(d, "checkout", "-q", "-b", "main")
+    _git(d, "init", "-q", "-b", "main", env=extra_env)
     for n in names:
         with open(os.path.join(d, f"{n}.txt"), "w") as f:
             f.write(n)
-        _git(d, "add", "-A")
-        _git(d, "commit", "-qm", n)
+        _git(d, "add", "-A", env=extra_env)
+        _git(d, "commit", "-qm", n, env=extra_env)
     return d
 
 
@@ -899,6 +908,112 @@ def orphan_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def _isolated_git_env(default_branch: str) -> dict:
+    """A git env whose init.defaultBranch cannot leak in from the user config."""
+    return {
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "init.defaultBranch",
+        "GIT_CONFIG_VALUE_0": default_branch,
+    }
+
+
+def _load_subject():
+    spec = importlib.util.spec_from_file_location("npwsr_subject", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def fixture_branch_cases() -> tuple[int, int]:
+    """The fixture names `main` even when git's default branch is not `main`.
+
+    That was one of the two Windows hypotheses in ai-config#2037. Measured on
+    git 2.43.0, `git init` + `checkout -b main` already creates `main` when
+    `init.defaultBranch` is `master` (the unborn HEAD is renamed), so a
+    missing `main` ref is not what failed the 58 allow-cases --- but a fixture
+    that only ran `git init` would leave HEAD on `master` and reproduce the
+    reported reason exactly. Pin the name, under both defaults.
+    """
+    failures = 0
+    ran = 0
+    for default in ("master", "trunk", "main"):
+        ran += 1
+        label = (f"fixture HEAD is `main` and `rev-parse main` works when "
+                 f"init.defaultBranch is `{default}`")
+        env = _isolated_git_env(default)
+        d = None
+        try:
+            d = make_repo(("one",), extra_env=env)
+            branch = _git(d, "rev-parse", "--abbrev-ref", "HEAD", env=env)
+            sha = _git(d, "rev-parse", "main", env=env)
+            peeled = _git(d, "rev-parse", "main^{commit}", env=env)
+            if branch != "main" or not re.fullmatch(r"[0-9a-f]{40}", sha) \
+                    or peeled != sha:
+                print(f"FAIL (branch={branch!r}, sha={sha!r}, peeled={peeled!r}): {label}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+        except Exception as exc:
+            print(f"FAIL ({exc}): {label}")
+            failures += 1
+        finally:
+            if d:
+                shutil.rmtree(d, ignore_errors=True)
+    return failures, ran
+
+
+def windows_path_cases() -> tuple[int, int]:
+    """POSIX shlex eating `C:\\...` in `-C` is the Windows 58-case failure.
+
+    The diagnosis pin is that raw shlex mangles the path; the wiring pin is
+    that `iter_pushes` (not the helper called in isolation) recovers it, so a
+    mutant that writes `_posixize_windows_paths` and never calls it still
+    fails. Git is not asked to open these paths --- they do not exist here.
+    """
+    failures = 0
+    ran = 0
+    mod = _load_subject()
+    win = r"C:\Users\foo\AppData\Local\Temp\npwsr-abc123"
+    posix = "C:/Users/foo/AppData/Local/Temp/npwsr-abc123"
+    mangled = "C:UsersfooAppDataLocalTempnpwsr-abc123"
+
+    def check(label, ok):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}")
+            failures += 1
+
+    cmd = f"git -C {win} push origin main"
+    check("POSIX shlex mangles an unquoted Windows -C path "
+          "(the #2037 diagnosis pin)",
+          shlex.split(cmd)[2] == mangled)
+
+    pushes = list(mod.iter_pushes(cmd))
+    check("iter_pushes recovers an unquoted Windows -C path as forward slashes",
+          len(pushes) == 1 and pushes[0][2] == posix)
+
+    quoted = f"git -C {shlex.quote(win)} push origin main"
+    pushes = list(mod.iter_pushes(quoted))
+    check("iter_pushes recovers a quoted Windows -C path too",
+          len(pushes) == 1 and pushes[0][2] == posix)
+
+    cd_cmd = f"cd {win} && git push origin main"
+    pushes = list(mod.iter_pushes(cd_cmd))
+    check("iter_pushes recovers a Windows path on `cd`, not only on `-C`",
+          len(pushes) == 1 and pushes[0][2] == posix)
+
+    posix_cmd = f"git -C {REPO} push origin main"
+    pushes = list(mod.iter_pushes(posix_cmd))
+    check("a POSIX -C path is unchanged",
+          len(pushes) == 1 and os.path.abspath(pushes[0][2]) == os.path.abspath(REPO))
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -926,7 +1041,8 @@ def main():
             else:
                 print(f"PASS: {label}")
         for fn in (raw_cases, orphan_cases, config_cases,
-                   valueless_bool_cases, budget_cases):
+                   valueless_bool_cases, budget_cases,
+                   fixture_branch_cases, windows_path_cases):
             f, r = fn()
             failed += f
             extra += r

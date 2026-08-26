@@ -202,9 +202,11 @@ def scan(path):
         if rec_type == "user":
             raw = _text_of(blocks)
             prose = visible_prose(raw)
-            # Paste markers on RAW text: a user-pasted review is often a
-            # blockquote or fence, which visible_prose strips.
-            if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(raw):
+            # Paste markers on RAW text minus inline ticks: a pasted review
+            # is often a blockquote or fence (visible_prose strips those),
+            # and naming `### Verdict` in inline code is not a review-read.
+            paste_src = re.sub(r"`[^`]*`", " ", raw)
+            if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(paste_src):
                 last_review_at = i
             if _is_tool_result(blocks):
                 continue
@@ -225,7 +227,6 @@ def scan(path):
 
         if rec_type != "assistant":
             continue
-        last_assistant_at = i
 
         for b in blocks:
             if not isinstance(b, dict):
@@ -264,6 +265,10 @@ def scan(path):
                 if _is_correction(prose):
                     last_correction_at = i
                     last_correction_txt = prose.strip().splitlines()[0][:80]
+                elif prose.strip():
+                    # A non-correction reply, not a tool-only turn, is what
+                    # later lets a new human turn close the question window.
+                    last_assistant_at = i
 
     unpaid_qw = (
         last_question_at >= 0

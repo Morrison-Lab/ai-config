@@ -927,25 +927,43 @@ def _load_subject():
 
 
 def fixture_branch_cases() -> tuple[int, int]:
-    """The fixture names `main` even when git's default branch is not `main`.
+    """`init` + `checkout -b main` lands on `main` whatever the default is.
 
     That was one of the two Windows hypotheses in ai-config#2037. Measured on
     git 2.43.0, `git init` + `checkout -b main` already creates `main` when
     `init.defaultBranch` is `master` (the unborn HEAD is renamed), so a
     missing `main` ref is not what failed the 58 allow-cases --- but a fixture
     that only ran `git init` would leave HEAD on `master` and reproduce the
-    reported reason exactly. Pin the name, under both defaults.
+    reported reason exactly. Pin the name, under all three defaults tried.
+
+    This builds the repo directly rather than through `make_repo`, on
+    purpose: `make_repo` now calls `git init -q -b main`, and `-b` on `git
+    init` overrides `init.defaultBranch` unconditionally, so routing this
+    through `make_repo` would vary `_isolated_git_env(default)` across the
+    loop while every iteration still took the identical code path --- a
+    zero-matrix that cannot detect a regression in the property it claims to
+    pin (ai-config#2325 review). Calling `init` and `checkout -b main`
+    separately, as `make_repo` did before that change, is what makes the
+    `default` variation observable: confirmed above, `checkout -b main` on an
+    unborn HEAD renames the branch regardless of `init.defaultBranch`, but a
+    future change that reintroduces a bare `git init` with no override would
+    fail this for a non-`main` default.
     """
     failures = 0
     ran = 0
     for default in ("master", "trunk", "main"):
         ran += 1
-        label = (f"fixture HEAD is `main` and `rev-parse main` works when "
+        label = (f"`init` + `checkout -b main` lands on `main` when "
                  f"init.defaultBranch is `{default}`")
         env = _isolated_git_env(default)
-        d = None
+        d = tempfile.mkdtemp(prefix="npwsr-")
         try:
-            d = make_repo(("one",), extra_env=env)
+            _git(d, "init", "-q", env=env)
+            _git(d, "checkout", "-q", "-b", "main", env=env)
+            with open(os.path.join(d, "one.txt"), "w") as f:
+                f.write("one")
+            _git(d, "add", "-A", env=env)
+            _git(d, "commit", "-qm", "one", env=env)
             branch = _git(d, "rev-parse", "--abbrev-ref", "HEAD", env=env)
             sha = _git(d, "rev-parse", "main", env=env)
             peeled = _git(d, "rev-parse", "main^{commit}", env=env)
@@ -959,8 +977,7 @@ def fixture_branch_cases() -> tuple[int, int]:
             print(f"FAIL ({exc}): {label}")
             failures += 1
         finally:
-            if d:
-                shutil.rmtree(d, ignore_errors=True)
+            shutil.rmtree(d, ignore_errors=True)
     return failures, ran
 
 
@@ -999,8 +1016,11 @@ def windows_path_cases() -> tuple[int, int]:
 
     quoted = f"git -C {shlex.quote(win)} push origin main"
     pushes = list(mod.iter_pushes(quoted))
-    check("iter_pushes recovers a quoted Windows -C path too",
-          len(pushes) == 1 and pushes[0][2] == posix)
+    check("iter_pushes leaves a QUOTED Windows -C path's backslashes alone "
+          "(a quoted path never had the unquoted-shlex bug, and rewriting "
+          "it anyway verifies a directory bash never asked for -- "
+          "ai-config#2325 finding 4)",
+          len(pushes) == 1 and pushes[0][2] == win)
 
     cd_cmd = f"cd {win} && git push origin main"
     pushes = list(mod.iter_pushes(cd_cmd))
@@ -1023,6 +1043,40 @@ def windows_path_cases() -> tuple[int, int]:
     pushes = list(mod.iter_pushes(posix_cmd))
     check("a POSIX -C path is unchanged",
           len(pushes) == 1 and os.path.abspath(pushes[0][2]) == os.path.abspath(REPO))
+
+    # Four fail-open holes from ai-config#2325's review round, each verified
+    # against real bash first (see the PR discussion) before being encoded
+    # here: the old, overly-permissive character class let a match run
+    # through `#`, `(`/`)`, and a closing quote, undoing the very escaping
+    # that made those characters safe.
+    hash_cmd = r"printf C:\foo\#bar ; git push --all origin"
+    pushes = list(mod.iter_pushes(hash_cmd))
+    check("an escaped `#` inside a Windows path does not turn the rest of "
+          "the line into a shlex comment and hide a real `git push --all` "
+          "(finding 1)",
+          len(pushes) == 1 and pushes[0][1] == ["git", "push", "--all", "origin"])
+
+    paren_cmd = r"git -C C:\a\)b push origin main && git -C C:\ok push origin main"
+    pushes = list(mod.iter_pushes(paren_cmd))
+    check("an escaped `)` inside a Windows path does not un-escape into a "
+          "bare punctuation token and hide ITS OWN push, or the chained one "
+          "after it (finding 2)",
+          len(pushes) == 2)
+
+    all_cmd = r"git -C 'C:\repo' push --\all origin"
+    pushes = list(mod.iter_pushes(all_cmd))
+    check("an escaped `--all` after a QUOTED Windows path is not corrupted "
+          "into the unrecognized `--/all`, degrading a refused indeterminate "
+          "push into an approved bare one (finding 3)",
+          len(pushes) == 1 and "--all" in pushes[0][1]
+          and "--/all" not in pushes[0][1])
+
+    quoted_all = f"git -C {shlex.quote(win)} push --\\all origin"
+    pushes = list(mod.iter_pushes(quoted_all))
+    check("the same escaped `--all` bypass, after an UNQUOTED Windows path "
+          "(finding 3's mechanism does not require the path to be quoted)",
+          len(pushes) == 1 and "--all" in pushes[0][1]
+          and "--/all" not in pushes[0][1])
     return failures, ran
 
 

@@ -108,20 +108,19 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
         sys.exit(1)
 
     label = f"{base_ref} (PR #{pr_number})" if pr_number else base_ref
-    return diff_res.stdout, label
+    return diff_res.stdout, base_sha, label
 
 
-def get_repo_guidelines(root: str) -> str:
-    """Load universal repository guidelines from AGENTS.md per instruction-layering rules."""
-    p = os.path.join(root, "AGENTS.md")
-    if os.path.isfile(p):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content:
-                    return f"--- Repository Universal Guidelines (AGENTS.md) ---\n{content}"
-        except Exception as e:
-            print(f"Warning: could not read {p}: {e}", file=sys.stderr)
+def get_repo_guidelines(base_ref: str) -> str:
+    """Load universal repository guidelines from AGENTS.md at the base revision."""
+    try:
+        r = subprocess.run(["git", "show", f"{base_ref}:AGENTS.md"], capture_output=True, text=True)
+        if r.returncode == 0:
+            content = r.stdout.strip()
+            if content:
+                return f"--- Repository Universal Guidelines (AGENTS.md) ---\n{content}"
+    except Exception as e:
+        print(f"Warning: could not read AGENTS.md from {base_ref}: {e}", file=sys.stderr)
     return ""
 
 
@@ -164,19 +163,24 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     # Strip HTML comments to prevent hiding clean skeletons or blockers
     unfenced_report = re.sub(r"<!--.*?-->", "", unfenced_report, flags=re.DOTALL)
 
-    required_sections = [
-        ("Summary Verdict", [r"(?im)^#{2,3}\s+(?:Summary\s+)?Verdict"]),
-        ("Critical Findings", [r"(?im)^#{2,3}\s+Critical Findings"]),
-        ("Observations", [r"(?im)^#{2,3}\s+Observations"]),
-        ("Verification Steps", [r"(?im)^#{2,3}\s+Verification(?: Steps)?"]),
-    ]
-    for section_name, patterns in required_sections:
-        if not any(re.search(pat, unfenced_report) for pat in patterns):
-            return False, False, f"Missing required section: {section_name}"
+    def extract_section(text, header_pattern):
+        pattern = r"(?im)^#{2,3}\s+(?:" + header_pattern + r")\s*(.*?)(?=^#{2,3}\s+|\Z)"
+        matches = re.findall(pattern, text, re.DOTALL)
+        return "\n\n".join(m.strip() for m in matches) if matches else None
+
+    summary_text = extract_section(unfenced_report, r"(?:Summary\s+)?Verdict")
+    critical_text = extract_section(unfenced_report, r"Critical Findings")
+    observations_text = extract_section(unfenced_report, r"Observations")
+    verification_text = extract_section(unfenced_report, r"Verification(?: Steps)?")
+
+    if summary_text is None: return False, False, "Missing required section: Summary Verdict"
+    if critical_text is None: return False, False, "Missing required section: Critical Findings"
+    if observations_text is None: return False, False, "Missing required section: Observations"
+    if verification_text is None: return False, False, "Missing required section: Verification Steps"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        sha_matches = re.findall(r"(?im)^\s*Reviewed-Commit:\s*([a-f0-9A-F]+)\s*$", unfenced_report)
+        sha_matches = re.findall(r"(?i)Reviewed-Commit:\s*([a-f0-9A-F]+)\s*\Z", unfenced_report)
         if not sha_matches:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
@@ -185,11 +189,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             if found_sha != exp_sha:
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
-    verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", unfenced_report)
+    verdict_matches = re.findall(r"(?im)^(?:(?:###\s*)?(?:Summary\s+)?Verdict:\s*)?(.+)$", summary_text)
     if not verdict_matches:
         bold_matches = re.findall(
             r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
-            unfenced_report,
+            summary_text,
         )
         if bold_matches:
             verdict_matches = bold_matches
@@ -255,7 +259,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?:[:\s]|$)|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -729,16 +733,22 @@ def main():
         text=True,
     ).stdout.strip()
 
-    diff, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
+    diff, base_sha, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
     if not diff.strip():
         print(f"Clean: No outgoing changes compared to {ref_name}.")
         sys.exit(0)
 
-    guidelines = get_repo_guidelines(git_root)
+    guidelines = get_repo_guidelines(base_sha)
     full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
 
-    report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(temp_dir)
+            report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head)
+        finally:
+            os.chdir(original_cwd)
 
     current_head = subprocess.run(
         ["git", "rev-parse", "HEAD"],

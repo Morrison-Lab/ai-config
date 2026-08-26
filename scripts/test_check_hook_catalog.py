@@ -281,10 +281,13 @@ def _fetch_with_urlopen(side_effect, extra_env=None):
     saved = {
         key: os.environ.get(key)
         for key in ("HOOK_CATALOG_ISSUE_STATES", "HOOK_CATALOG_REPO",
-                    "GITHUB_REPOSITORY")
+                    "GITHUB_REPOSITORY", "GITHUB_TOKEN", "GH_TOKEN")
     }
     os.environ.pop("HOOK_CATALOG_ISSUE_STATES", None)
     os.environ.pop("HOOK_CATALOG_REPO", None)
+    os.environ.pop("GITHUB_REPOSITORY", None)
+    os.environ.pop("GITHUB_TOKEN", None)
+    os.environ.pop("GH_TOKEN", None)
     if extra_env:
         os.environ.update(extra_env)
     try:
@@ -313,19 +316,43 @@ check("urllib 200 closed is closed",
       == "closed")
 
 seen_urls = []
+seen_auth = []
+
+
+def _auth_header(request):
+    return request.headers.get("Authorization") or request.headers.get("authorization")
 
 
 def _capture_open(request, timeout=None):
     seen_urls.append(request.full_url)
+    seen_auth.append(_auth_header(request))
     return _OpenBody(b'{"state":"open"}')
 
 
 _fetch_with_urlopen(_capture_open,
-                    extra_env={"GITHUB_REPOSITORY": "some-fork/ai-config"})
+                    extra_env={"GITHUB_REPOSITORY": "some-fork/ai-config",
+                               "GITHUB_TOKEN": "fork-token"})
 check("fork GITHUB_REPOSITORY is not the issues host",
       seen_urls == [
           "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1"
       ])
+check("fork GITHUB_TOKEN is not sent to DEFAULT_REPO",
+      seen_auth == [None])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
+                               "GITHUB_TOKEN": "home-token"})
+check("same-repo GITHUB_TOKEN is sent",
+      seen_auth == ["Bearer home-token"])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_TOKEN": "local-token"})
+check("local token is sent when GITHUB_REPOSITORY is unset",
+      seen_auth == ["Bearer local-token"])
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",

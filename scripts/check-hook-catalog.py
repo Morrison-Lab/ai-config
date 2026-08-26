@@ -86,10 +86,12 @@ KNOWN_UNREGISTERED = {
     "remind-ums-on-scrutiny.py": 2265,
 }
 
-# Public repo (measured 2026-08-26); unauthenticated GET works. A token, when
-# present, stays under a higher rate limit. Do not read GITHUB_REPOSITORY:
-# KNOWN_UNREGISTERED numbers belong to this repo, and a fork CI run would
-# 404 them against the fork. Override via HOOK_CATALOG_REPO only in tests.
+# Public repo (measured 2026-08-26); unauthenticated GET works. A token is
+# used only when it is scoped to this repo: a fork `push` sets
+# GITHUB_REPOSITORY to the fork, and that GITHUB_TOKEN 404s an existing
+# issue on Morrison-Lab/ai-config (GitHub REST troubleshooting, "404 Not
+# Found for an existing resource", measured against the 2026-08-26 docs).
+# Override the issues host via HOOK_CATALOG_REPO only in tests.
 DEFAULT_REPO = "Morrison-Lab/ai-config"
 ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
 UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
@@ -201,6 +203,24 @@ def _injected_states():
     return out
 
 
+def _token_for_default_repo():
+    """Return a bearer token only when it is scoped to DEFAULT_REPO.
+
+    GITHUB_TOKEN is installation-scoped to github.repository. A fork `push`
+    sets GITHUB_REPOSITORY to the fork; attaching that token to a request
+    for Morrison-Lab/ai-config 404s an existing issue. Treating that 404 as
+    `missing` would fail the catalog on an open tracker. When
+    GITHUB_REPOSITORY is unset (local pre-commit), a present token is used.
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None
+    here = os.environ.get("GITHUB_REPOSITORY", "")
+    if here and here.lower() != DEFAULT_REPO.lower():
+        return None
+    return token
+
+
 def fetch_issue_state(number):
     """Return `open`, `closed`, or `missing`, or None when unfetchable.
 
@@ -218,7 +238,7 @@ def fetch_issue_state(number):
         "User-Agent": "ai-config-check-hook-catalog",
         "Accept": "application/vnd.github+json",
     }
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    token = _token_for_default_repo()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(url, headers=headers)

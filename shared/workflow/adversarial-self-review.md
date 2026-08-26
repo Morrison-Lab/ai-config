@@ -26,7 +26,8 @@ Those are different independences, and this rule buys the second one only.
 Where a cross-vendor reviewer is reachable ---
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
 or the repo's own configured reviewer ---
-it is still worth chasing.
+chasing it is advisory at the push gate
+and required by the merge gate below.
 The next section raises the bar for merges above what a push gate needs.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
@@ -53,9 +54,10 @@ any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
 Among qualifying entries, dispatch through whichever differs from you first;
 when one is temporarily out of quota, move to the next.
-Order by measured headless readiness ---
-`agy` CLI, `opencode`, then `codex`, with `cursor` last:
-it is named in the inventory but not yet probed headless here.
+Known-good headless entry points are the `agy` CLI and `opencode`,
+followed by `codex` and `claude` where installed,
+with `cursor` last --- named in the inventory but not yet probed headless here.
+A multi-backend harness counts only when configured to run a non-author model.
 If no qualifying entry remains, the merge waits;
 it never falls through to a same-model or same-harness reviewer.
 A quota outage reroutes the dispatch --- it does not license skipping it.
@@ -63,8 +65,8 @@ A quota outage reroutes the dispatch --- it does not license skipping it.
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
 [`memories/preferences.md`](../../memories/preferences.md)'s delegate ladder.
-A retired API never disqualifies the CLI harness operating on a separate
-path from it.
+A retired API never disqualifies a CLI harness
+that operates on a separate path from it.
 
 A second directive the same day sets the merge consequence: "you must not
 merge, even with mwc enabled, unless you have a 100% 'all clear' review
@@ -76,14 +78,31 @@ unchanged ---
 including the external automated PR reviewer's clean verdict at head,
 wherever a repo has one ---
 and an author-dispatched subagent verdict never satisfies that external gate.
-What is added: a merge additionally requires a 100% all-clear adversarial
-verdict at the shipping head from that cross-model, cross-harness reviewer.
+What is added: a merge additionally requires
+a 100% all-clear adversarial verdict at the shipping head,
+delivered by that cross-model, cross-harness reviewer.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
 If no qualifying reviewer is reachable, the merge waits --- "blocked on
 reviewer availability" is the honest status, and arming an auto-merge while
 waiting is [Pattern 12](../../memories/mistake-patterns.md).
+
+
+The merge-side rules live with the gate they serve:
+
+- **Do:** for any merge, use a reviewer on a **different model and harness**
+  from your own (agy CLI, opencode, codex, or claude;
+  `cursor` once its headless dispatch is measured),
+  and report which harness produced each verdict.
+- **Don't:** merge anything --- under any grant, `mwc` included ---
+  without a 100% all-clear adversarial verdict at the shipping head.
+  A skip notice, a stub, an older-head verdict,
+  or a same-harness convenience pass clears nothing.
+- **Don't:** reuse a passing same-harness pre-push verdict
+  to satisfy the merge gate.
+  A merge needs its own cross-model, cross-harness verdict
+  evaluating the shipping head.
 
 
 ## What "separate" requires
@@ -216,24 +235,11 @@ The other cases have no guard and are prose rules here.
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
   (foreground, read-only) for the pre-push self-review gate,
   and report which agent produced the verdict.
-- **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own (agy CLI, opencode, codex, or claude;
-  `cursor` once its headless dispatch is measured).
-- **Do:** move down that list when one is out of quota,
-  and report which harness produced each verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
-- **Don't:** merge anything --- under any grant, `mwc` included ---
-  without a 100% all-clear adversarial verdict at the shipping head.
-  A skip notice, a stub, an older-head verdict,
-  or a same-harness convenience pass clears nothing.
-- **Don't:** reuse a passing same-harness pre-push verdict
-  to satisfy the merge gate.
-  A merge needs its own cross-model, cross-harness verdict
-  evaluating the shipping head.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

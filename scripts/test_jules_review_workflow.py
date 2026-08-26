@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Regression tests for check_jules_review_workflow.py.
 
-The live workflow is one case. The cases that matter are the negatives: the
-pre-#2280 wrap (uses: plus YAML env) must fail, dropping the mention path
-must fail, and a check that has never been watched fail is a guess.
+The live workflow is one case. Each finding the checker claims to catch has
+its own fixture that is otherwise valid, so deleting that finder turns the
+matching test red. A check that has never been watched fail is a guess.
 """
 from __future__ import annotations
 
@@ -41,59 +41,7 @@ def run_check(workflow: Path) -> tuple[int, str]:
     return proc.returncode, proc.stdout + proc.stderr
 
 
-BROKEN_USES_WRAP = """\
-name: Jules PR Review
-on:
-  issue_comment:
-    types: [created]
-jobs:
-  review:
-    steps:
-      - name: Run Jules PR Reviewer
-        env:
-          GITHUB_EVENT_NAME: pull_request
-          GITHUB_EVENT_PATH: /tmp/pull_request_event.json
-        uses: sanjay3290/jules-pr-reviewer@fc66a7c78b499bfa2e16235b55574e458c6551d6
-        with:
-          extra_instructions: |
-            Files are written as imperative prose addressed to an AI reader.
-"""
-
-DROPPED_MENTION = """\
-name: Jules PR Review
-on:
-  pull_request:
-    types: [opened]
-jobs:
-  review:
-    steps:
-      - run: |
-          env \\
-            GITHUB_EVENT_NAME=pull_request \\
-            node /tmp/jules-pr-reviewer/dist/index.js
-        env:
-          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
-          INPUT_SKIP_DRAFTS: 'false'
-          INPUT_EXTRA_INSTRUCTIONS: |
-            Files are written as imperative prose addressed to an AI reader.
-"""
-
-MISSING_CHILD_OVERRIDE = """\
-name: Jules PR Review
-on:
-  issue_comment:
-    types: [created]
-jobs:
-  review:
-    steps:
-      - run: node /tmp/jules-pr-reviewer/dist/index.js
-        env:
-          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
-          INPUT_SKIP_DRAFTS: 'false'
-          INPUT_EXTRA_INSTRUCTIONS: |
-            Files are written as imperative prose addressed to an AI reader.
-"""
-
+# Otherwise-valid wrap. Each negative below changes one thing.
 MINIMAL_OK = """\
 name: Jules PR Review
 on:
@@ -108,12 +56,66 @@ jobs:
       - run: |
           env \\
             GITHUB_EVENT_NAME=pull_request \\
+            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\
             node "$JULES_ACTION_DIR/dist/index.js"
         env:
           INPUT_SKIP_DRAFTS: 'false'
           INPUT_EXTRA_INSTRUCTIONS: |
             Files are written as imperative prose addressed to an AI reader.
 """
+
+
+def tweak(old: str, new: str, body: str = MINIMAL_OK) -> str:
+    if old not in body:
+        raise AssertionError(f"fixture anchor missing: {old!r}")
+    return body.replace(old, new, 1)
+
+
+BROKEN_USES_WRAP = tweak(
+    "    steps:\n",
+    "    steps:\n      - uses: sanjay3290/jules-pr-reviewer@fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
+)
+
+DROPPED_MENTION = tweak(
+    "on:\n  issue_comment:\n    types: [created]\n",
+    "on:\n  workflow_dispatch:\n",
+)
+
+ADDED_PULL_REQUEST = tweak(
+    "on:\n  issue_comment:\n    types: [created]\n",
+    "on:\n  issue_comment:\n    types: [created]\n  pull_request:\n    types: [opened]\n",
+)
+
+YAML_ONLY_EVENT_NAME = tweak(
+    "            GITHUB_EVENT_NAME=pull_request \\\n",
+    "",
+)
+YAML_ONLY_EVENT_NAME = tweak(
+    "        env:\n          INPUT_SKIP_DRAFTS:",
+    "        env:\n          GITHUB_EVENT_NAME: pull_request\n          INPUT_SKIP_DRAFTS:",
+    YAML_ONLY_EVENT_NAME,
+)
+
+MISSING_CHILD_NAME = tweak(
+    "            GITHUB_EVENT_NAME=pull_request \\\n",
+    "",
+)
+
+MISSING_CHILD_PATH = tweak(
+    '            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\\n',
+    "",
+)
+
+MISSING_DIST = tweak("dist/index.js", "index.js")
+
+MISSING_SHA = tweak(
+    "          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
+    "",
+)
+
+MISSING_SKIP_DRAFTS = tweak("          INPUT_SKIP_DRAFTS: 'false'\n", "")
+
+MISSING_PROSE = tweak("imperative prose", "review rules")
 
 
 def write_fixture(tmpdir: str, body: str) -> Path:
@@ -136,29 +138,50 @@ check("live workflow exists", LIVE.is_file())
 live_code, live_out = run_check(LIVE)
 check("live workflow is clean", live_code == 0, live_out)
 
-# Negative controls: each defect the check claims to catch.
+case_exits("minimal valid wrap", MINIMAL_OK, 0)
+
+# Unique negatives: each needle is the finding that would vanish if that
+# branch of findings() were deleted.
 case_exits(
     "pre-#2280 uses:+env wrap",
     BROKEN_USES_WRAP,
     1,
-    "uses:",
+    "via uses:",
 )
 case_exits(
     "dropped mention path",
     DROPPED_MENTION,
     1,
-    "issue_comment",
+    "issue_comment trigger",
 )
 case_exits(
-    "missing env(1) child override",
-    MISSING_CHILD_OVERRIDE,
+    "automatic pull_request trigger beside mention",
+    ADDED_PULL_REQUEST,
+    1,
+    "pull_request trigger reintroduced",
+)
+case_exits(
+    "YAML env event name without env(1)",
+    YAML_ONLY_EVENT_NAME,
+    1,
+    "only as YAML env",
+)
+case_exits(
+    "missing env(1) GITHUB_EVENT_NAME",
+    MISSING_CHILD_NAME,
     1,
     "GITHUB_EVENT_NAME=pull_request",
 )
-
-# Positive control: a minimal fixture that is not the live file, so a checker
-# that only special-cases the real path cannot hide here.
-case_exits("minimal valid wrap", MINIMAL_OK, 0)
+case_exits(
+    "missing env(1) GITHUB_EVENT_PATH",
+    MISSING_CHILD_PATH,
+    1,
+    "GITHUB_EVENT_PATH=",
+)
+case_exits("missing dist/index.js", MISSING_DIST, 1, "dist/index.js")
+case_exits("missing SHA pin", MISSING_SHA, 1, "40-character pin")
+case_exits("missing INPUT_SKIP_DRAFTS", MISSING_SKIP_DRAFTS, 1, "INPUT_SKIP_DRAFTS")
+case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is content")
 
 # Mechanism: env(1) overrides an inherited GITHUB_EVENT_NAME. This is the
 # property the workflow relies on and that YAML env: on uses: does not have.

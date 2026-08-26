@@ -7,8 +7,9 @@ event except `pull_request`. A step `env:` block that sets `GITHUB_EVENT_NAME`
 on a `uses:` step looks like a wrap and is a no-op: GitHub ignores reserved
 `GITHUB_*` assignments, measured 2026-08-26 on run 32942088643.
 
-This check fails if the mention path is dropped, if the action is invoked
-via `uses:` again, or if the child-process `env(1)` override is missing.
+This check fails if the mention path is dropped, if automatic `pull_request`
+reviews are reintroduced, if the action is invoked via `uses:` again, or if
+the child-process `env(1)` override of event name *or* event path is missing.
 """
 from __future__ import annotations
 
@@ -20,59 +21,74 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "jules-review.yml"
 SHA_RE = re.compile(r"\b[0-9a-f]{40}\b")
-USES_ACTION_RE = re.compile(
-    r"^\s*uses:\s*sanjay3290/jules-pr-reviewer@",
-    re.MULTILINE,
-)
-CHILD_EVENT_RE = re.compile(
+USES_ACTION_RE = re.compile(r"uses:\s*sanjay3290/jules-pr-reviewer@")
+CHILD_EVENT_NAME_RE = re.compile(
     r"^[ \t]*GITHUB_EVENT_NAME=pull_request[ \t]*\\?\s*$",
     re.MULTILINE,
 )
-YAML_EVENT_OVERRIDE_RE = re.compile(
+CHILD_EVENT_PATH_RE = re.compile(
+    r"^[ \t]*GITHUB_EVENT_PATH=",
+    re.MULTILINE,
+)
+YAML_EVENT_NAME_RE = re.compile(
     r"^[ \t]*GITHUB_EVENT_NAME:\s*pull_request\s*$",
     re.MULTILINE,
 )
 
 
+def pre_jobs(text: str) -> str:
+    """Trigger and concurrency only --- comments here can mention pull_request."""
+    return text.split("\njobs:", 1)[0]
+
+
+def on_block(text: str) -> str:
+    """Indented body of the top-level `on:` mapping, or empty."""
+    match = re.search(r"^on:\n((?:[ \t].*\n)*)", pre_jobs(text), re.MULTILINE)
+    return match.group(1) if match else ""
+
+
 def findings(text: str) -> list[str]:
     out: list[str] = []
-    if "issue_comment:" not in text:
-        out.append("mention path dropped: workflow has no issue_comment trigger")
-    if "on:\n  pull_request:" in text or re.search(
-        r"^on:\n(?:  .+\n)*  pull_request:", text
+    block = on_block(text)
+    header = pre_jobs(text)
+    if "issue_comment:" not in block and not re.search(
+        r"^on:\s*issue_comment:", header, re.MULTILINE
     ):
-        # Automatic pull_request reviews were disabled on purpose (#856/#1172).
-        # A wrap that re-adds that trigger undoes the file header.
-        if re.search(r"^on:\s*$", text, re.MULTILINE) and re.search(
-            r"^  pull_request:\s*$", text, re.MULTILINE
-        ):
-            out.append(
-                "automatic pull_request trigger reintroduced; mention path is the point"
-            )
+        out.append("mention path dropped: workflow has no issue_comment trigger")
+    if re.search(r"^on:\s*pull_request:", header, re.MULTILINE) or re.search(
+        r"^  pull_request:", block, re.MULTILINE
+    ):
+        out.append(
+            "automatic pull_request trigger reintroduced; mention path is the point"
+        )
     if USES_ACTION_RE.search(text):
         out.append(
             "invokes sanjay3290/jules-pr-reviewer via uses:; "
             "GITHUB_* env on a uses: step is ignored"
         )
-    if YAML_EVENT_OVERRIDE_RE.search(text) and not CHILD_EVENT_RE.search(text):
+    if YAML_EVENT_NAME_RE.search(text) and not CHILD_EVENT_NAME_RE.search(text):
         out.append(
             "GITHUB_EVENT_NAME is set only as YAML env (ignored on uses: steps); "
             "need env(1) GITHUB_EVENT_NAME=pull_request on the node child"
         )
-    if not CHILD_EVENT_RE.search(text):
+    elif not CHILD_EVENT_NAME_RE.search(text):
         out.append(
             "missing child-process override: env GITHUB_EVENT_NAME=pull_request"
         )
-    if "dist/index.js" not in text or not re.search(
-        r"\bnode\b.*dist/index\.js|dist/index\.js", text
-    ):
+    if not CHILD_EVENT_PATH_RE.search(text):
+        out.append(
+            "missing child-process override: env GITHUB_EVENT_PATH= "
+            "(without it, eventName is pull_request but the payload is still "
+            "issue_comment)"
+        )
+    if "dist/index.js" not in text:
         out.append("does not run the pinned action's dist/index.js")
     if "JULES_PR_REVIEWER_SHA:" not in text or not SHA_RE.search(text):
         out.append("missing 40-character pin for sanjay3290/jules-pr-reviewer")
-    if "INPUT_SKIP_DRAFTS:" in text and not re.search(
-        r"INPUT_SKIP_DRAFTS:\s*'false'", text
-    ):
-        out.append("INPUT_SKIP_DRAFTS is not 'false'; a mention on a draft would skip")
+    if not re.search(r"INPUT_SKIP_DRAFTS:\s*'false'", text):
+        out.append(
+            "INPUT_SKIP_DRAFTS is not 'false'; a mention on a draft would skip"
+        )
     if "imperative prose" not in text:
         out.append("missing extra_instructions that this corpus's prose is content")
     return out

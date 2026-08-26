@@ -50,13 +50,9 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `resolveReviewThread` to resolve it, `addComment` for a top-level summary,
   and `pullRequest{ headRefOid mergeable reviewThreads statusCheckRollup }`
   for the fully-clean sweep.
-  Note `statusCheckRollup.contexts` needs inline fragments, since a
-  `CheckRun` and a legacy `StatusContext` carry different fields
-  (`name`/`status`/`conclusion` versus `context`/`state`).
-  `CheckRun.status` uses the `CheckStatusState` enum (`QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED` --- measured 2026-08-25),
-  where `REQUESTED` represents a requested check run before queueing, and `WAITING` represents a check run paused on environment protection or manual approvals.
-  `StatusContext.state` uses the `StatusState` enum (`EXPECTED`, `PENDING`, `SUCCESS`, `FAILURE`, `ERROR`),
-  where `EXPECTED` is non-terminal (treated as pending by GitHub and `gh`).
+  Note `statusCheckRollup.contexts` needs inline fragments, since `CheckRun` and `StatusContext` carry different fields (`name`/`status`/`conclusion` versus `context`/`state`).
+  `CheckRun.status` (`CheckStatusState`: `QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED` --- measured 2026-08-25) has non-terminal states like `REQUESTED` (pre-queue) and `WAITING` (protection/approvals).
+  `StatusContext.state` (`StatusState`: `EXPECTED`, `PENDING`, `SUCCESS`, `FAILURE`, `ERROR`) treats `EXPECTED` as non-terminal.
   Gating code must fail-closed: require `CheckRun.status === 'COMPLETED'` and `StatusContext.state` in terminal states (`SUCCESS`, `FAILURE`, `ERROR` --- or `StatusState === 'SUCCESS'` for all-green checks),
   treating any other status or state as still in progress rather than allow-listing expected pending values.
   (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000;

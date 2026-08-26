@@ -52,8 +52,12 @@ Where no second context is reachable at all, say so in the review itself rather 
 **Cursor Cloud has a subagent dispatch.**
 Cursor Cloud's `Task` tool is that dispatch when the session can
 resolve the persona (measured 2026-08-25 PDT).
-On that route the adapter skips the pre-push guard, so do not
-prefix `ALLOW_UNREVIEWED_PUSH=1` as if the subagent were missing.
+Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task` dispatch
+just ran: the subagent route was available.
+The prefix is inert on this route because the adapter skips the
+guard, which is not a reason to use it.
+If the persona does not resolve, that is the CLI-fallback case;
+the adapter still skips the guard, so say so in the review.
 The Cursor-specific recipe is in
 [`memories/cursor.md`](../../memories/cursor.md).
 

@@ -105,10 +105,7 @@ The author is the one party who cannot: the session that wrote the diff knows wh
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
 On Cursor Cloud, dispatch through `Task`.
-A GitHub `claude-review` skip does not mean no reviewer is reachable.
 The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
-A Claude child of a non-Claude conductor is independent of the author,
-not of a Claude primary.
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**
 Dispatching and then composing a different comment is the same failure as
@@ -180,8 +177,7 @@ reaches it.
 `delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
 **dispatches** as a cross-vendor second reviewer.
 `delegate-to-opencode` is a further CLI, not a member of that pairing;
-its skill excludes judgment-heavy review on the free and local tiers
-and treats an OpenRouter stealth preview as able to carry it.
+its skill excludes judgment-heavy review on the free and local tiers.
 A Cursor Cloud Claude `Task` child is a self-review dispatch
 (see [`memories/cursor.md`](../../memories/cursor.md)),
 not a member of this pairing.

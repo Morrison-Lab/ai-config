@@ -28,12 +28,19 @@ mkdir -p "$CLAUDE_DIR"
 
 # Symlink $src -> $dest unless something is already there. Shared with the
 # per-machine installers under dotfiles/, so both resolve collisions the same
-# way; the hint below is the part that differs, since check-install.py only
-# knows about ~/.claude.
-# shellcheck disable=SC2034  # consumed by the sourced link-one.sh
-LINK_ONE_FIX_HINT="run scripts/check-install.py --fix to replace it with a link, or merge manually"
+# way. The default hint from link-one.sh is a manual backup/link instruction.
+# check-install.py --fix is Claude-only: --consumer-dir retargets a whole
+# Claude-style manifest, so pointing it at a Copilot memory dir or a Gemini
+# skills dir creates unrelated top-level links there (ai-config#2286).
 # shellcheck source=scripts/lib/link-one.sh
 . "$SCRIPT_DIR/scripts/lib/link-one.sh"
+
+# Claude collisions may recommend check-install.py --fix; other consumers
+# must not inherit that hint.
+link_one_claude() {
+  link_one "$1" "$2" \
+    "run scripts/check-install.py --fix to replace it with a link, or merge manually"
+}
 
 # --- Top-level files (CLAUDE.md, etc.) ---
 shopt -s nullglob
@@ -41,7 +48,7 @@ for src in "$SCRIPT_DIR"/*.md; do
   [ -f "$src" ] || continue
   fname="$(basename "$src")"
   [[ "$fname" == "README.md" ]] && continue   # don't symlink repo README
-  link_one "$src" "$CLAUDE_DIR/$fname"
+  link_one_claude "$src" "$CLAUDE_DIR/$fname"
 done
 
 # --- Directories (skills, commands, memories, etc.) ---
@@ -70,11 +77,11 @@ for src in "$SCRIPT_DIR"/*/; do
   if [ -d "$dest" ] && [ ! -L "$dest" ]; then
     shopt -s dotglob
     for child in "$src"/*; do
-      link_one "$child" "$dest/$(basename "$child")"
+      link_one_claude "$child" "$dest/$(basename "$child")"
     done
     shopt -u dotglob
   else
-    link_one "$src" "$dest"
+    link_one_claude "$src" "$dest"
   fi
 done
 

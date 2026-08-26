@@ -144,10 +144,22 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 
 ## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
 - **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
-  Treating the arming as harmless because CI is red ignores that the robot fires later, the moment checks go green, with no re-check of review state.
-- **Example**: 2026-08-26 on `ai-config#2226`: armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-  Hours later a push turned `validate` green, auto-merge fired at 04:30Z, and it merged over an explicit Needs-more-work verdict --- requiring revert (#2268) plus reland-with-fixes (#2269).
-- **Canonical Rule**: [`fully-clean`](../shared/workflow/fully-clean.md).
-  See also [check-before-pushing](../shared/workflow/check-before-pushing.md): the remote can act between your commands, and an armed automation is exactly such an action you scheduled against yourself.
-- **Fix**: Arm `--auto` only when the PR is already fully clean (CI green AND review verdict clean at head), or use a gate that includes review state (branch protection requiring review) so the automation cannot fire on CI alone.
-  If findings arrive after arming, cancel it first: `gh pr merge <N> --repo <r> --disable-auto`, then verify with `gh pr view --json autoMergeRequest`.
+  Treating the arming as harmless because CI is red ignores that the robot fires later,
+  the moment checks go green,
+  with no re-check of review state.
+- **Example**: 2026-08-26 on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  the remote can act between your commands,
+  and an armed automation is exactly such an action you scheduled against yourself.
+- **Fix**: Never arm `--auto` while any review finding is open or before an all-clear verdict at HEAD is verified.
+  Arm it only when CI and the review verdict are already verified clean at head --- at which point deferred merging is redundant rather than harmful.
+  Branch protection does not substitute: it gates native approvals, not external review verdicts posted as comments.
+  If findings arrive after arming, disable immediately:
+  `gh pr merge <N> --repo <r> --disable-auto`,
+  then verify with `gh pr view <N> --repo <r> --json autoMergeRequest`.

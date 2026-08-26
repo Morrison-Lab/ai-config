@@ -771,28 +771,51 @@ class TestPrePushReview(unittest.TestCase):
 
     def test_benign_p0_p1_wording(self):
         commit = "12345678abcdef0012345678abcdef0012345678"
-    def test_benign_p0_p1_wording(self):
-        commit = "12345678abcdef0012345678abcdef0012345678"
         report = (
             "### Summary Verdict\n"
             "Verdict: Ready for merge.\n\n"
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\n"
-            "No P0 or P1 findings.\n"
-            "P2 test coverage verified.\n\n"
+            "No P0 issues.\n"
+            "Zero P1 bugs.\n"
+            "There are non-blocking findings.\n"
+            "No P2 flaws.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertTrue(is_clean, f"Should be clean but got: {reason}")
-
-    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.stdout.isatty", return_value=False)
+    @patch.dict(os.environ, {"AGENT_NAME": "human"}, clear=True)
     @patch.object(reviewer, "detect_available_engines", return_value=["codex", "claude"])
-    def test_alternate_fails_without_invoker(self, mock_detect):
+    def test_alternate_fails_without_invoker(self, mock_detect, mock_isatty):
         report, label = reviewer.execute_review("alternate", "prompt")
         self.assertIsNone(report)
         self.assertEqual(label, "None")
+
+
+
+    @patch.object(reviewer, "detect_available_engines")
+    def test_alternate_fallback_chain(self, mock_detect):
+        mock_detect.return_value = ["codex", "claude", "cursor"]
+        
+        call_count = 0
+        def fake_codex(*a, **k):
+            nonlocal call_count; call_count += 1; return None
+        def fake_claude(*a, **k):
+            nonlocal call_count; call_count += 1; return None
+        def fake_cursor(*a, **k):
+            nonlocal call_count; call_count += 1; return "success report"
+            
+        with patch.dict(os.environ, {"AGENT_NAME": "antigravity"}, clear=True):
+            with patch.object(reviewer, "get_next_alternate_engine", side_effect=["codex", "claude", "cursor"]):
+                with patch.object(reviewer, "run_codex_review", side_effect=fake_codex):
+                    with patch.object(reviewer, "run_claude_review", side_effect=fake_claude):
+                        with patch.object(reviewer, "run_cursor_review", side_effect=fake_cursor):
+                            report, label = reviewer.execute_review("alternate", "prompt")
+                            self.assertEqual(report, "success report")
+                            self.assertEqual(label, "Cursor Agent")
 
 if __name__ == "__main__":
     unittest.main()

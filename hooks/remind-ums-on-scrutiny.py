@@ -12,7 +12,7 @@ WHY THE EXISTING HOOKS DO NOT COVER THIS
 and deliberately excludes correcting someone else. `remind-learn-from-review.py`
 keys on ACCEPTING a finding. A clean-verdict UMS pass is later still.
 
-Three paths skip all of those:
+Two decidable paths skip all of those:
 
   * You READ a review (Rebut, Defer, or no findings) and start ARD. The
     review taught something; Address and the verdict have not happened.
@@ -110,18 +110,13 @@ QUESTIONING = re.compile(
 )
 
 # Assistant correction of a prior claim. The first-person admission sibling
-# already covers "I was wrong"; keep those, and add the phrasings that update
-# the answer WITHOUT admitting. "actually" is constrained to a claim-shaped
-# continuation so ordinary "actually, let's do X next" does not match.
-# "on re-checking" is deliberately absent: it also covers confirming the
-# claim, which the written rule says does not owe a pass.
+# already covers "I was wrong". Extra alternatives here must also name that
+# the claim was WRONG: "the correct figure is 12" and "actually, it is 12"
+# are how a confirmed claim is restated, and the written rule says
+# confirming does not owe a pass (ai-config#2261 review).
 CORRECTION_EXTRA = re.compile(
     r"""(
-      actually,?\s+(?:it(?:'s|\s+is)|the\s+
-        (?:count|figure|number|answer|value|total|claim))\b
-    | i\s+misspoke\b
-    | the\s+(?:correct|actual|real)\s+
-        (?:figure|count|number|answer|value|total)\b
+      i\s+misspoke\b
     | that\s+(?:count|figure|number|claim)\s+was\s+
         (?:wrong|incorrect|off)\b
     )""",

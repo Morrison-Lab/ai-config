@@ -88,6 +88,17 @@ so.
   `pr-preview/pr-<N>/`, with the direct URL posted in a sticky PR comment ---
   check that comment or the repo's own CLAUDE.md for the exact convention
   rather than assuming a layout.
+- **Displayed equations vs the implementation they cite.**
+  When the document says the Stan, R, or JAGS implements `@eq-...`,
+  read that code.
+  A derivation that is algebraically fine but is not what the runner does
+  is still a finding: the filter, the mixture, the never-infected branch,
+  and the defaults that produced the tables, not only the algebra on the
+  page.
+  (UCD-SERG/shigella#31, 2026-08-25: `@eq-lpfilter` used max `lp__`, every
+  R runner used the median; `@eq-brt` was a truncated exponential, the
+  likelihood mixed in a uniform; the simulator evaluated a decay-only
+  curve while the design said evaluate `@eq-curve`.)
 
 ## What to report
 

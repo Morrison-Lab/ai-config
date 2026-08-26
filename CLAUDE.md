@@ -764,7 +764,8 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 ## Watch and ARDI every PR you touch — don't ask first
 
 When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs and all repos.
+That answer is a standing yes across all PRs and all repos **you are driving**.
+A request to post a review and leave findings, with no request to edit, is review-only: do not start ARDI on that branch.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
 
 This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.

@@ -345,7 +345,7 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--print", "--mode", "plan"]
+    cmd = [agy_path, "--print", "-", "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 

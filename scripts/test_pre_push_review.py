@@ -703,7 +703,8 @@ class TestPrePushReview(unittest.TestCase):
         out_agy = reviewer.run_antigravity_review("prompt_diff", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_agy, valid_report)
         agy_cmd = mock_subproc.call_args[0][0]
-        self.assertNotIn("Please review the diff provided on standard input.", agy_cmd)
+        print_idx = agy_cmd.index("--print")
+        self.assertEqual(agy_cmd[print_idx + 1], "-")
         self.assertIn("Please review the following diff:\n\nprompt_diff", mock_subproc.call_args[1].get("input"))
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)

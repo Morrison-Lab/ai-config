@@ -33,8 +33,9 @@ The condition is decidable from the transcript:
     AND a partial reading (`gh pr checks` or `statusCheckRollup`) appears
     AND no complete enumeration appears after the last push
 
-where a complete enumeration is `check-pr-fully-clean.py` (which consumes the
-endpoint and reports a verdict) or a direct `commits/<sha>/check-runs` read.
+where a complete read is `check-pr-fully-clean.py` (exit status + finding
+bullets). A paginated `commits/<sha>/check-runs` read covers the check-run
+half only and does not authorize "fully clean" / "ready to merge".
 
 Deliberately narrow on the assertion side. A progress report -- "13 pass, 5
 pending" -- is honest and must not trip this; only a terminal claim does.
@@ -69,11 +70,10 @@ RX_PARTIAL = re.compile(
     re.I,
 )
 
-# Instruments that see every check run on the head.
+# Only the fully-clean script authorizes a terminal clean / ready-to-merge
+# claim. A paginated check-runs read is the check half only (ai-config#2277).
 RX_COMPLETE = re.compile(
-    r"(?<!test_)\bcheck-pr-fully-clean\.py|"
-    r"commits/[0-9a-f]{7,40}/check-runs|"
-    r"\bget_check_runs\b",
+    r"(?<!test_)\bcheck-pr-fully-clean\.py",
     re.I,
 )
 

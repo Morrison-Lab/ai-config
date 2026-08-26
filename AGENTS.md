@@ -137,6 +137,7 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
 | upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
 
@@ -369,6 +370,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+  A disagreement among reviews is not fully clean: any reviewer's standing
+  not-clean --- nits included --- vetoes merge even with `mwc` active.
+  ARD every item from every review, then request fresh reviews
+  (ai-config#2274).
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per

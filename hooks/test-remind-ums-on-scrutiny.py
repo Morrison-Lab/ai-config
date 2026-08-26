@@ -212,7 +212,7 @@ try:
         env = dict(os.environ, TMPDIR=shared)
         payload = json.dumps({"transcript_path": same_path})
         out = [
-            subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+            subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
                            text=True, env=env).stdout.strip()
             for _ in range(2)
         ]

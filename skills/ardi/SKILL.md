@@ -12,8 +12,11 @@ allowed-tools:
 
 # ARDI --- ARD + Iterate (single PR/MR)
 
-Drive one PR/MR to a clean review verdict by looping: read review → ARD every
-finding → push → post summary → re-request review → repeat until clean.
+Drive one PR/MR to a clean review verdict by looping: read every review → ARD every
+finding from every reviewer → push → post summary → re-request review from those
+reviewers → repeat until every reviewer's latest verdict is clean.
+A later all-clear from one reviewer does not clear another reviewer's standing
+not-clean, even with `mwc` active (ai-config#2274).
 
 ## Procedure
 
@@ -30,9 +33,13 @@ _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).
 (`COMMENT_PR` and the other bracketed tokens below are abstract operation tokens --- resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
-2. **Read the latest review.**
-Pull the most recent reviewer comment --- the `@claude` bot's, or a human's.
+2. **Read every review, not only the latest.**
+Pull the most recent reviewer comment --- the `@claude` bot's, or a human's ---
+and every other review that still has a standing verdict.
 Don't trust earlier cached verdicts --- actively poll until a review appears that references the commit you just pushed, then read **that** one.
+If one review is all-clear and another raises findings or nits, the findings
+win: ARD the union, then request fresh reviews.
+Do not merge on the all-clear, even with `mwc` (ai-config#2274).
 `gh pr checks` (`PR_CHECKS`) / `glab ci list` going green is about **CI state**, not the review verdict --- always parse the latest review *body* for findings.
 A user question about this PR that is not the word "status" still requires
 this fetch (see [`pr-status`](../pr-status/SKILL.md)).
@@ -51,13 +58,21 @@ sits unread.
    reach the filter, making a review with real findings look empty.
 
    - **GitHub:**
+     Filter on the body marker, not on an author login.
+     Do not take `| last` as the only review to ARD
+     (ai-config#2274).
+     Claude, Antigravity, and skip notices can all post as `github-actions[bot]`,
+     so a login filter silently drops a standing not-clean.
      ```bash
-     gh pr view <N> --json comments \
-       --jq '[.comments[] | select(.author.login | startswith("claude"))] | last | .body'   # READ_PR_COMMENTS
+     gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+       | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"; "i"))] | .[] | {created: .created_at, user: .user.login, body: .body}'   # READ_PR_COMMENTS
      ```
-     The reviewer's bot login varies by setup --- `gh pr view` reports it as `claude`, the REST API as `claude[bot]`, and some setups post as `github-actions[bot]`.
-     `startswith("claude")` matches across `gh pr view` and `gh api`; broaden it if your reviewer posts under another login, or you'll silently read `null` and false-pass.
-     **This command captures the *bot* review only** --- for a **human** reviewer (any login), gather comments with the `ard` skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API), which collects every reviewer's comments regardless of login.
+     Completed Claude runs start the body with `**Claude finished`.
+     Read every matching comment, not only the newest.
+     A later all-clear from a different reviewer does not clear another
+     reviewer's standing not-clean.
+     For a **human** reviewer (any login), also gather comments with the `ard`
+     skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API).
 
      **Copilot code review doesn't post as a PR comment at all -- it's a
      formal GitHub review**, invisible to the command above. Request it
@@ -310,11 +325,13 @@ The loop ends only at **fully clean**, which means **both**:
    in progress (see *Fix broken CI/workflows too* above, and
    `shared/workflow/fully-clean.md` for the check-run-vs-workflow-run and
    API-casing gotchas).
-2. **The latest review is totally clean** --- zero flagged items under any heading.
+2. **Every reviewer's latest verdict is totally clean** --- zero flagged items under any heading.
    "Looks good" / "no findings" / "approved" with no follow-on bullets.
    Every item that wasn't directly **Addressed** is either **Deferred** to a tracked issue or **Rebutted with a rebuttal that actually convinced the reviewer** (they didn't re-raise it on the next round).
    A rebuttal the reviewer still disputes does **not** count as clean.
    Don't stop at "ready with one minor nit."
+   A later all-clear from one reviewer does not clear another reviewer's standing
+   not-clean, even with `mwc` (ai-config#2274).
    **That review must be a genuine posted verdict at the current head, from an external reviewer if one is reachable** -- check availability again right before declaring clean, not just at the round where self-review first started; an inferred "probably clean" from green CI and resolved threads does not satisfy this.
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and
@@ -333,7 +350,7 @@ Do-Confirm; per
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.
-- [ ] Latest reviews have zero findings and no disputed rebuttals.
+- [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
 - [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 - [ ] Every inline review thread is resolved.

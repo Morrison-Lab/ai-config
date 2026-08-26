@@ -103,6 +103,13 @@
   This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section --- a corrected understanding, a false claim about state, and a questioned claim that was wrong all fire immediately, and that section holds the rationale and case records (User directive / CAI, 2026-08-05 and 2026-08-25, [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261)).
 - **Proactive Immediate Fixes for Self-Acknowledged / Realized Mistakes (In-Flight Work & Directives)**: Whenever realizing, discovering, or acknowledging a mistake, bug, gap, missed instruction, or oversight in your own in-flight work or directive-following (whether self-discovered or pointed out by the user), take immediate, proactive corrective action to fix it permanently (implement the fix/skill/memory update, commit on a dedicated branch, open a PR, request review, and drive to clean) in the exact same turn without waiting for a user prompt or follow-up instruction. (For out-of-scope codebase bugs discovered incidentally, file a tracking issue per `report-mistakes-proactively` instead). (User directive / correction, 2026-08-17.)
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
+  Reaffirmed 2026-08-26 as bare "always push and PR" on ai-config#2277 after a turn left four commits ahead of origin and ended with "say if you want those pushed".
+  - **Do:** push and open/update the PR in the same turn as the commits.
+    Report the PR URL in the past tense.
+  - **Don't:** leave `ahead N` commits local,
+    park on a client approval-card failure,
+    or close with an offer to push ---
+    standing grant already covers push and PR (not merge).
 - When opening a GitHub PR, trigger AI review (`@claude review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
 - **In repos whose review workflow does not auto-trigger on PR activity, ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
@@ -176,6 +183,10 @@
   (Learned on ucdavis/bcs#578, 2026-08-05.)
 - Always ARDI an open PR/MR to a clean review verdict --- don't ask "want me to ARDI it?" first, just drive it to clean. An ARDI loop is NOT finished when you push fixes for a finding-bearing review or post an ARD summary -- it is only finished when a fresh, clean review evaluating that latest pushed commit arrives and confirms zero findings. (Still don't merge unless asked; "always ardi" means always drive to clean, not always merge.)
 - "Fully clean" (the ARDI/iterate terminal state) means BOTH: (1) all CI workflows AND check runs have finished with a passing outcome (success or skipped) --- across every workflow and every individual check run, not just required checks, not just the review job; includes non-gating checks like Coverage/codecov; never merge while any workflow or check run is still queued or in progress, AND (2) the latest review is totally clean --- no nits, evaluating the current HEAD SHA on the branch, and every item not directly Addressed is either Deferred to a tracked issue or Rebutted with a rebuttal that actually CONVINCED the reviewer (they didn't re-raise it).
+  That second half is every reviewer's latest verdict, not the globally last
+  comment (ai-config#2274).
+  A later all-clear from one reviewer does not clear another reviewer's
+  standing not-clean, even with mwc.
   A rebuttal the reviewer still disputes does NOT count as clean.
   **`mergeable_state: clean` is NOT Fully Clean**: GitHub API's `mergeable_state: clean` / `mergeStateStatus: CLEAN` indicates ONLY that git merge will succeed without merge conflicts.
   It does NOT mean CI has passed or that an AI/human review has approved the PR.
@@ -751,6 +762,8 @@
   Wrong ordering misleads the reader about the correct flow.
 - When a user explicitly says to contribute to an existing PR (for example "this should go on #280"), keep the work on that PR's head branch and push there.
   Do not open a new sibling PR to `main` unless the user asks to supersede the original; if the documented push-scope exception applies (e.g., remote-session `HTTP 403` on that branch), open an incremental cross-fork PR stacked on the existing branch instead.
+  A fork PR opened this way still needs an actual review afterward.
+  See "A skipped fork-PR review check is not a completed review" below --- the target repo's review workflow may skip a fork-originated PR outright, and that skip is not equivalent to a passing review.
 - After pushing to any non-default branch for maintenance work (including ai-config memory/skill branches), explicitly verify whether that branch already has an open PR in the intended base repo before ending the task.
   Check with `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open"` --- not `gh pr list --repo ... --head <owner>:<branch>`, which silently returns empty for an owner-qualified head even when a matching PR exists (verified directly: it returned `[]` against a real open PR that the bare branch-only form found).
   If none exists and upstream is accessible, prepare explicit title and body, show the draft for approval (per the "always show the draft before posting" rule below), then create non-interactively with `--repo`/`--base`/`--head`/`--title`/`--body-file`/`--reviewer`; otherwise hand off that upstream PR creation is still required.
@@ -1131,3 +1144,16 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
+
+## A skipped fork-PR review check is not a completed review
+
+- **Never treat a review check that came back green or skipped, only because a PR is fork-originated, as equivalent to a completed review.**
+  Many repos' review workflows decline fork-originated PRs outright, so a green or skipped check there reflects the decline, not an approval.
+  - **Do:** When the push-scope exception above applies and you open an incremental cross-fork PR, still get an actual review afterward on the original in-repo PR --- try a review-trigger comment there, and escalate to a maintainer when trigger comments produce nothing (in the incident below, only a maintainer close/reopen cycle finally produced the review) --- rather than treating the fork's skip as sufficient.
+  - **Don't:** Stop pursuing review once a fork-originated PR shows a green or skipped check, and don't open a wholesale replacement PR to route around a stalled review when the underlying problem is the review stalling, not a push-permission wall.
+  (Learned on ucd-serg.github.io, 2026-08-25: PR #107 is an in-repo PR whose review stalled, with no fork involved.
+  Several review-trigger comments on it produced no review, and its substantive review only posted after the maintainer closed and reopened the PR.
+  The fork PRs were #116, opened stacked on #107's branch per the push-scope exception above, and #117, opened as a wholesale replacement of #107 --- the exact move the second Don't above rules out.
+  The repo's review workflow declines fork-originated PRs by construction (its dispatch job tests the PR head repo against the target repo), so #116's review checks never produced a verdict.
+  The exact check conclusions could not be re-verified from the public page when this record was corrected on 2026-08-26, so "declined, no verdict" is the claim, not a specific conclusion string.
+  Treating that fork-side non-review as sufficient --- rather than continuing to pursue #107's own review --- was the mistake.)

@@ -937,3 +937,43 @@ Two Copilot reviews on that PR restated the premise without objection.
 Fixed in #91.
 A single query for a `claude` comment on any earlier PR would have caught it at any
 point in the preceding month.)
+
+## `claude-code-action`'s `Task`/`Agent` tool is not gated behind `--allowedTools`
+
+Split out of [`github.md`](github.md) (ai-config#2267 / #694 pattern).
+
+`claude --allowedTools` is documented as "Comma or space-separated list
+of tool names to allow" -- read naturally, that implies anything not
+listed gets denied in unattended CI, where nobody can approve a
+permission prompt.
+**Verified false for `Task`**: `claude -p "..." --allowedTools
+"Bash(echo hi:*)"` (deliberately excluding `Task`) let a real `Task`
+subagent call through with `permission_denials: []`, identical to
+running with `Task` explicitly listed.
+Confirmed on the raw CLI directly, not inferred from
+`claude-code-action`'s own wrapping behavior.
+
+So a `claude-code-action` review job that stubs -- real turns and cost
+logged, `is_error: false`, but no verdict ever posted -- is **not**
+explained by "the plugin's `Task` calls were denied" just because `Task`
+is absent from the job's `claude_args --allowedTools`.
+Look for a different denied tool instead.
+`Morrison-Lab/gha`'s `run-claude-review-attempt` composite action
+documents the actual repeat offender at length: the
+`code-review@claude-code-plugins` command's own declared `allowed-tools`
+frontmatter names `Bash(gh pr list:*)`, `Bash(gh issue view:*)`,
+`Bash(gh issue list:*)`, and `Bash(gh search:*)` alongside
+`view`/`diff`/`comment` -- omit any of those and the plugin's 4 parallel
+sub-agents rack up denials across their fan-out.
+
+(Morrison-Lab/wai#49/#50, 2026-08-08: diagnosed a stub review as a
+missing `Task` grant, patched it, then verified empirically that the
+patch was a no-op.
+The real fix was migrating to gha's canonical reusable workflow, which
+grants the plugin's actual declared tool list and -- more robustly --
+denies `gh pr comment` to the agent entirely, having the workflow post
+the review from the agent's final message instead.
+See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
+"A stale, un-migrated local copy is the least reliable place to fix a
+bug" for the broader lesson.)
+

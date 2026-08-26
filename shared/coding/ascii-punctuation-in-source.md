@@ -123,7 +123,7 @@ The duration is the part worth carrying.
 That multiplication sign has been in the file since commit `0030720` (2026-01-27), and the check reported green over it for roughly seven months, until the instrument's glyph set changed.
 A repo can therefore carry a real violation indefinitely while its check stays green, so a clean history of that check is not evidence the rule was being followed.
 
-The converse --- a check that starts failing on a file no PR touched, which is a signal to look at the checker's version before hunting for a new violation --- is already recorded in [`memories/github.md`](../../memories/github.md)'s "A moving upstream tag can turn a consumer's default branch red with no local change" section, from this same incident family.
+The converse --- a check that starts failing on a file no PR touched, which is a signal to look at the checker's version before hunting for a new violation --- is already recorded in [`memories/github-consumer-ci.md`](../../memories/github-consumer-ci.md)'s "A moving upstream tag can turn a consumer's default branch red with no local change" section, from this same incident family.
 Read it there rather than re-deriving it here.
 
 - **Do:** read a green glyph check as covering its own glyph set, and say which set when reporting the result.

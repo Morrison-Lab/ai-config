@@ -524,8 +524,8 @@ See ai-config#694 for the precedent.
   `git clone --depth 1 --filter=blob:none --sparse` plus `git push` from
   that clone worked in this same session, for a branch that was neither
   harness-assigned nor the working directory's own repo --- consistent
-  with [`github.md`](github.md)'s "the proxy allows branch creation/push
-  but BLOCKS branch deletion."
+  with [`github-remote-sessions.md`](github-remote-sessions.md)'s
+  "the proxy allows branch creation/push but BLOCKS branch deletion."
   `git config -l` showed no local credential (only
   `http.proxyauthmethod=basic` and `credential.interactive=false`, no
   `~/.git-credentials` or `~/.netrc`), so authentication happens somewhere
@@ -873,7 +873,8 @@ See ai-config#694 for the precedent.
 - **The raw REST API and the `mcp__github__*` tools can be gated
   independently, per ORG --- so a REST `403` is not evidence the repo is
   unreachable.**
-  [`github.md`](github.md)'s "GitHub access from bash in remote/web sessions"
+  [`github-remote-sessions.md`](github-remote-sessions.md)'s
+  "GitHub access from bash in remote/web sessions"
   section is right that REST from bash can be scope-limited rather than
   absent, and it used to add that switching to the MCP tools "does not get
   around a `403`" because they share one repo list.

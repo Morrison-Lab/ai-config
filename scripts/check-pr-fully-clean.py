@@ -1013,10 +1013,11 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 break
 
     if not has_findings and not issues:
-        print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")
-        print("  NOTE: This script verifies that AT LEAST ONE clean review exists at HEAD.")
-        print("        If your workflow requires a multi-provider quorum, you must separately verify")
-        print("        that ALL required providers have returned a clean verdict.")
+        unique_authors = set(item[5] for item in matching_items if len(item) > 5)
+        if len(unique_authors) < quorum:
+            issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
+        else:
+            print(f"\u2713 Found {len(unique_authors)} clean review(s) evaluating HEAD SHA {sha[:8]}, meeting quorum of {quorum}.")
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.
@@ -1029,6 +1030,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         prog="check-pr-fully-clean.py",
         description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
     )
+    parser.add_argument("--quorum", type=int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
     parser.add_argument("pr_number", help="Pull request number to check")
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",
@@ -1053,7 +1055,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch, args.quorum)
 
     all_issues = ci_issues + review_issues
 

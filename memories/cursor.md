@@ -155,3 +155,14 @@ This is the same class as
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)
 
+## Cursor CLI requires `--trust` for non-interactive execution
+
+When running `cursor-agent` or the Cursor CLI non-interactively (without a TTY, such as in a subprocess or automated script),
+the `--trust` flag is strictly required even in `plan` mode.
+
+If `--trust` is omitted, the agent will prompt for workspace trust confirmation and hang indefinitely waiting for standard input,
+leading to silent timeouts in automated tools.
+Do not remove this flag in the name of tighter sandboxing for automated review scripts.
+
+(Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
+

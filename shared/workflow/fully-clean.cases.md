@@ -44,7 +44,7 @@ quota problem needing a fix.)
 
 ## "`status` itself can be stale" --- duration from log timestamps
 
-(`d-morrison/altdoc#96`, 2026-07-30: `claude-review` had failed six times
+(`Morrison-Lab/altdoc#96`, 2026-07-30: `claude-review` had failed six times
    in ~26 seconds each, the signature of the model call failing at auth.
    A re-run was polled twice, three minutes apart, and read `in_progress`
    both times --- reported as "the reviewer has recovered", and acted on by
@@ -263,7 +263,7 @@ after a clean `Ready for merge` verdict on an otherwise all-green head.)
 
 ## One finding can own two threads
 
-(`d-morrison/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
+(`Morrison-Lab/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
 parameter opened `PRRT_...TyfeQ` alongside the original `PRRT_...TyeRc`;
 resolving the original left the re-raise outstanding, caught only by a
 mechanical sweep of all seven threads.)
@@ -343,7 +343,7 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 
@@ -376,7 +376,7 @@ Jules returned `VERDICT: approve` on the new head about four minutes later.)
 
 ## The cross-repo test that localizes a durable credential failure
 
-(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+(Morrison-Lab/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
 times across those two PRs -- six on #96, one on #95 -- each run finishing in
 the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
 permission denials.
@@ -386,7 +386,7 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 `04:08:50Z -> 04:11:41Z`.
 So the service was fine and the `the repository owner` credential was not, which no
 number of re-runs would have shown.
-Tracked in d-morrison/altdoc#99.)
+Tracked in Morrison-Lab/altdoc#99.)
 
 ## The zero-cost signature is necessary, not sufficient, for "quota"
 
@@ -446,7 +446,7 @@ agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
 Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
 and then failed
 `Command failed: git fetch origin --depth=20 pull/77/head:main`.
-`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`Morrison-Lab/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
 
@@ -896,7 +896,7 @@ verdict.)
 
 (Morrison-Lab/gha#520 / #521, 2026-08-19.)
 
-`d-morrison/rme#1072`'s `review / claude-review` check was red.
+`Morrison-Lab/rme#1072`'s `review / claude-review` check was red.
 The cause was in the run's result object rather than in the PR.
 Abridged below --- it also carried `terminal_reason: "api_error"` and `permission_denials_count: 42`.
 

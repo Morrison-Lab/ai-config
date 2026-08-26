@@ -494,7 +494,7 @@ If the answer is "nothing", the fixture is asserting the bug's own behaviour.
 - **Don't:** treat a rising fixture count as rising coverage without reading
   what each one asserts.
 
-(Measured 2026-08-19 on [rme#1082](https://github.com/d-morrison/rme/pull/1082).
+(Measured 2026-08-19 on [rme#1082](https://github.com/Morrison-Lab/rme/pull/1082).
 A fixture named `"two consecutive declarations: reaches back past both"`
 asserted the buggy output rather than the fixed one: it supplied two trailing
 markers with **no message behind them**, so nothing existed for the lookback to

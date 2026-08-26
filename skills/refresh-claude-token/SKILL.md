@@ -182,7 +182,7 @@ Pick one **non-draft** PR, record what already exists, then dispatch:
 First find the reviewer's login **in this repo**, rather than assuming it.
 It differs by repo:
 `Morrison-Lab/ai-config` posts as `claude`,
-while `d-morrison/gha` posts as `github-actions[bot]`.
+while `Morrison-Lab/gha` posts as `github-actions[bot]`.
 A hardcoded login matches nothing, which reads as "posted nothing":
 
 ```bash
@@ -292,7 +292,7 @@ and the only positive evidence is a run that reached the model.
 This is the failure recorded in
 [`review-verdict-pitfalls`](../../shared/workflow/review-verdict-pitfalls.md)'s
 eighth case and its cross-repo variant:
-seven `claude-review` runs on `d-morrison/altdoc` #95 and #96
+seven `claude-review` runs on `Morrison-Lab/altdoc` #95 and #96
 failing in the 26-to-35-second band
 with `is_error: true`, `total_cost_usd: 0`, and no permission denials,
 while the same reviewer returned a full verdict on another owner's repo

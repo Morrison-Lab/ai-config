@@ -7,18 +7,18 @@ what a run does once it starts, split at the 1200-line gate.
 
 ## Re-triggering the @claude PR *review* (the repository owner Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
-  `Morrison-Lab/psw`, moved there from `d-morrison/psw`): the review workflow
+  `Morrison-Lab/psw`, moved there from `Morrison-Lab/psw`): the review workflow
   is `.github/workflows/claude-code-review.yml`
   and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
   (ai-config's *own* bot uses different names --- `claude-review.yml` /
   `claude-bot.yml` --- so don't infer these from *this* repo's `.github/workflows/`.)
-- **`d-morrison/gha` itself (the shared workflow repo) is different:** the
+- **`Morrison-Lab/gha` itself (the shared workflow repo) is different:** the
   reusable workflow is `claude-code-review.yml` (no `workflow_dispatch`), and the
   dogfooding caller stub with `workflow_dispatch` is `claude-review.yml`.
   So to
   dispatch a review in `gha`:
   `gh workflow run claude-review.yml -f pr_number=<N>` (not `claude-code-review.yml`).
-- The review workflow (which calls `d-morrison/gha`'s reusable review workflow)
+- The review workflow (which calls `Morrison-Lab/gha`'s reusable review workflow)
   is **not** comment-triggered.
   It runs on `pull_request` (`types: [opened,
   synchronize, ready_for_review, reopened]`) and on `workflow_dispatch` (input
@@ -252,7 +252,7 @@ That makes it easy to trigger a full agent run by accident while merely
 The agent's reply also arrives as a plain PR comment rather than a check run,
 so it satisfies the review criterion without turning any check green, and
 `claude-review` stays a skip either way.
-(d-morrison/altdoc#71, 2026-07-27: a self-review comment that named the
+(Morrison-Lab/altdoc#71, 2026-07-27: a self-review comment that named the
 reviewer woke the agent unintentionally, and it posted a substantive review of
 the diff, checking `"${REF_ARGS[@]}"` expansion under `set -u`, the per-event
 `author_association` fields, and `required: false` secret semantics, on a PR
@@ -365,7 +365,7 @@ The loss is silent and unrecoverable: the run log does not carry the
 conversation, and no execution-file artifact is published.
 It is also self-concealing --- a stopping-point line reads like a completed
 task, so nothing in the thread shows that an answer went missing.
-Measured 2026-08-19 on `d-morrison/rme` after the ai-config plugin was
+Measured 2026-08-19 on `Morrison-Lab/rme` after the ai-config plugin was
 installed there (rme#1076): the pre-plugin reply ran 1182 characters, the three
 post-plugin ones 233, 356 and 501, each beginning with the marker.
 One run diagnosed the bug itself and had its diagnosis swallowed by it.
@@ -374,7 +374,7 @@ Two fixes, and both were needed.
 Upstream, `flag-session-boundaries.md` now scopes the declaration to
 interactive sessions and tells an agent whose last message a harness posts to
 fold it into the substantive reply instead (ai-config#1711).
-Consumer-side, [rme#1082](https://github.com/d-morrison/rme/pull/1082) made
+Consumer-side, [rme#1082](https://github.com/Morrison-Lab/rme/pull/1082) made
 the selection a **slice-and-join** from the last substantive message onward
 rather than a pick.
 That shape is the load-bearing part: any test for "is this message only a
@@ -398,7 +398,7 @@ exclude the real answer behind it --- reintroducing the exact loss.
 - **Don't:** read a well-formed status line in a PR thread as evidence the
   reply arrived intact.
 
-(Tracked as [rme#1081](https://github.com/d-morrison/rme/issues/1081).
+(Tracked as [rme#1081](https://github.com/Morrison-Lab/rme/issues/1081).
 The two rules are individually reasonable and collide only when composed,
 which is the class of defect a memory catches and a code review of either side
 alone does not.)

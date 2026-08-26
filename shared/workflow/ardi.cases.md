@@ -54,7 +54,7 @@ Both verdicts were wrong; fixed in `0c19d3c`.)
 
 ## A fix is not pushed until it's on the PR's head commit
 
-(d-morrison/altdoc#54, 2026-07-25: two review fixes were edited locally and a
+(Morrison-Lab/altdoc#54, 2026-07-25: two review fixes were edited locally and a
 PR comment said they were "addressed in the latest push"; the head sat at the
 pre-fix commit for over an hour, with 14 green checks validating a branch
 carrying neither fix, until a scheduled check-in compared the SHAs.)
@@ -137,7 +137,7 @@ rule in this file was asking whether there was one.)
 
 ## Verify a blocker you assert before publishing it
 
-(d-morrison/altdoc#76, 2026-07-27: the PR body said roxygen2 8.0.0 --- the
+(Morrison-Lab/altdoc#76, 2026-07-27: the PR body said roxygen2 8.0.0 --- the
 version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `packageVersion()` call with no install attempted. The review built a
 "this may need a follow-up" recommendation on top of it. A single
@@ -223,7 +223,7 @@ which is the first shape handled correctly.)
 
 ## Read a third-party tool's own docs, don't infer its behavior
 
-(d-morrison/altdoc#78, 2026-07-27: a generator-to-extension map gave mkdocs
+(Morrison-Lab/altdoc#78, 2026-07-27: a generator-to-extension map gave mkdocs
 `.html`, reasoning that mkdocs compiles Markdown to HTML. Its
 `use_directory_urls` default is `TRUE`, so it serves `/man/foo/` and never
 `/man/foo.html` --- every reference link the feature emitted for that
@@ -231,7 +231,7 @@ generator would have 404'd. Caught in review, not by the 39 tests.)
 
 ## A regression test written alongside its fix can lock the bug in
 
-(d-morrison/altdoc#78, 2026-07-27: twice.
+(Morrison-Lab/altdoc#78, 2026-07-27: twice.
 A `.pdf` vignette test asserted
 the entry's extension but never its label, so an extension leaking into the
 label passed; and a nested-article test built no source tree, so top-level
@@ -241,7 +241,7 @@ Both were found by review reading the test, not the code.)
 
 ## A systematic audit done by skimming is worse than one-at-a-time
 
-(d-morrison/altdoc#78, 2026-07-27: a commit written to get ahead of a
+(Morrison-Lab/altdoc#78, 2026-07-27: a commit written to get ahead of a
 one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`.
 It matches `\.md$|\.pdf$`; the grep had returned a different function 120
 lines above the sidebar builder in the same file.
@@ -325,7 +325,7 @@ already said to run the test files, so the follow-up was to make the failure
 self-documenting and to write the repo-specific mechanism down, not to restate
 the rule a fourth time.)
 
-(d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
+(Morrison-Lab/altdoc#95 and #96, 2026-07-29: twice in one session.
 On #95 a test asserting "aborts when no venv is configured" read that
 precondition from the ambient environment; the local run missed it because
 `NOT_CRAN` was unset and `skip_on_cran()` skipped that very test, and
@@ -541,7 +541,7 @@ Had #1358 still been open, merging #1361 would have closed it.)
 
 ## A review round surfacing five findings your own conventions already covered
 
-([gha#219](https://github.com/d-morrison/gha/issues/219)/[#220](https://github.com/d-morrison/gha/pull/220): one review round surfaced five findings --- a DRY
+([gha#219](https://github.com/Morrison-Lab/gha/issues/219)/[#220](https://github.com/Morrison-Lab/gha/pull/220): one review round surfaced five findings --- a DRY
 duplication, an incomplete-coverage doc overclaim, a wrong changelog
 category, an uncited claim, and missing test coverage for new logic --- all
 catchable this way, since each was a direct match against gha's own
@@ -562,7 +562,7 @@ have.)
 
 ## Self-correcting a rationale before the reviewer re-raises it
 
-([d-morrison/rme#989](https://github.com/d-morrison/rme/pull/989) /
+([Morrison-Lab/rme#989](https://github.com/Morrison-Lab/rme/pull/989) /
 [ucdavis/epi204#363](https://github.com/ucdavis/epi204/pull/363): after telling both reviewers `references.bib` didn't
 share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
 simulation showed it does --- posted the correction with repro steps on
@@ -622,8 +622,8 @@ rather than by either review, and the merged body records that catch in a
 
 ## Validating against a real consumer repo covers what fixtures cannot
 
-(d-morrison/altdoc#34: running the new reference-index generator
-against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
+(Morrison-Lab/altdoc#34: running the new reference-index generator
+against `Morrison-Lab/rpt` covered a `\docType{package}` topic, the singular
 form of a missing-topic warning, and the documented "existing settings files
 do not pick this up automatically" caveat --- confirmed by the page
 generating while `grep -c reference.html docs/index.html` returned `0`.
@@ -631,7 +631,7 @@ None of the three were reachable from the repo's own fixture packages.)
 
 ## An instruction's own suggested code breaking a project convention
 
-(d-morrison/altdoc#73: the issue proposed ending a function with a bare
+(Morrison-Lab/altdoc#73: the issue proposed ending a function with a bare
 trailing `hashes`, which reads as a fix for the fragility it names but is
 still an implicit return, so a statement added after it silently becomes
 the return value.
@@ -641,7 +641,7 @@ earlier.)
 
 ## A staging step the unit fixtures could not reach
 
-(d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
+(Morrison-Lab/altdoc#76: a guard checked for the copied logo under `docs/`,
 but the `quarto_website` path stages into `_quarto/` first, so the logo
 line was dropped on every render of the one generator the feature wired up.
 Seventeen unit assertions passed throughout; one throwaway render found it

@@ -7,7 +7,7 @@ Each heading names the rule the record supports.
 
 ## Check tests the same way --- a vacuous ordering-constraint assertion
 
-(d-morrison/altdoc#43: an ordering-constraint test
+(Morrison-Lab/altdoc#43: an ordering-constraint test
 asserted `expect_false(any(grepl("_GITHUB", out)))` while also expecting
 `out` to be `character(0)`, so it could never fail; fixed by adding an
 input line that survives substitution, then verified by swapping the two

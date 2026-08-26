@@ -90,8 +90,8 @@ accepted review findings of this shape, in one afternoon:
   and missed the same command in a sibling `github_mcp:` field and embedded
   mid-value after `git log` (Morrison-Lab/ai-config#1476, round 1: 6 sites
   claimed, 8 real).
-- An owner-rename sweep derived from the literal `d-morrison/ai-config` and
-  missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
+- An owner-rename sweep derived from the literal `Morrison-Lab/ai-config` and
+  missed the dead `Morrison-Lab.github.io/ai-config` domain in `_quarto.yml`'s
   `site-url` --- a genuinely broken reference, not mere staleness, invisible
   to the slash form (Morrison-Lab/ai-config#1482, round 1).
   The broken plugin refs (`ai-config@the repository owner`) and marketplace key

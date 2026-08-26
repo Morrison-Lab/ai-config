@@ -91,7 +91,7 @@ truncation. **Before trusting any regenerated lockfile, diff old-vs-new
 package *counts*** (e.g. `jq -r '.Packages|keys[]' old.json | sort >
 /tmp/old.txt`, same for `new.json`, then `comm -23 /tmp/old.txt
 /tmp/new.txt` to list dropped packages) and treat a dramatic shrink as a red
-flag requiring revert, not a "cleanup." (`d-morrison/rme#1017`: reverted via `git revert`, then fixed the
+flag requiring revert, not a "cleanup." (`Morrison-Lab/rme#1017`: reverted via `git revert`, then fixed the
 actual root cause — see the repo-move 404 entry above — with a minimal
 hand-edit instead.)
 
@@ -265,7 +265,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   *single* level (one `indent-width`), NOT the styler/tidyverse-style-guide
   "double indent". lintr's default `indentation_linter` also expects a single
   2-space indent there. So air's default output and lintr agree at 2 --- but a
-  repo that sets `air.toml` `indent-width = 4` (as `d-morrison/altdoc` does)
+  repo that sets `air.toml` `indent-width = 4` (as `Morrison-Lab/altdoc` does)
   will have air-formatted signatures that a *different* repo's lintr (default
   2) rejects.
 - **Practical failure:** old styler-formatted code (4-space double-indent
@@ -332,8 +332,8 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   review-job cases in
   [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md).
   Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
-  running air without lintr (d-morrison/altdoc) has no gate at all.
-  (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
+  running air without lintr (Morrison-Lab/altdoc) has no gate at all.
+  (Morrison-Lab/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
   and 98 characters with `air format . --check` clean throughout.)
 
 ## jarl (Just Another R Linter) — `jarl.toml` fields lag the published docs
@@ -365,7 +365,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   than editing fixture file content to appease the linter (fixture bytes often
   feed snapshot/rendering tests, so editing them risks unrelated test
   breakage). File a follow-up issue to narrow `exclude` to `per-file-ignores`
-  once the installed jarl version supports it. (`d-morrison/altdoc#18`, #19.)
+  once the installed jarl version supports it. (`Morrison-Lab/altdoc#18`, #19.)
 - **There is no `.jarlignore` file — jarl has never supported one.** Don't
   assume jarl follows the `.gitignore`/`.eslintignore`-style convention of a
   dotfile-per-tool; its only exclusion mechanism is `jarl.toml`'s `[lint]`
@@ -380,7 +380,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   Verify a suppression file is real by checking the tool's own config-file
   reference (or just removing `continue-on-error` and running the check) —
   not by pattern-matching on other tools' ignore-file conventions.
-  (`d-morrison/altdoc#7`: `continue-on-error: true` masked a `.jarlignore`
+  (`Morrison-Lab/altdoc#7`: `continue-on-error: true` masked a `.jarlignore`
   that did nothing; removing the flag immediately reproduced the
   `unused_function` failure it was supposed to prevent.)
 
@@ -441,7 +441,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
     anyway. Cleaner than both rewording and a WORDLIST add. (ucdavis/ettbc#30.)
   - **Cross-repo issue refs and bare domain names are spellable-token sources
     too, not just code identifiers.** The checker splits on punctuation, so an
-    unbackticked `d-morrison/altdoc#26` flags `morrison`, and `rdrr.io` flags
+    unbackticked `Morrison-Lab/altdoc#26` flags `morrison`, and `rdrr.io` flags
     both `rdrr` and `io`. Backtick them (existing NEWS entries already backtick
     cross-repo refs, so this matches convention), and reword genuinely-prose
     words instead of listing them (`undiscoverable` → "cannot discover").
@@ -527,16 +527,16 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   changed sentence. (bcs#225; serocalculator#562 --- but prefer installing the
   toolchain over all of this.)
 - **Codoc mismatch with escaped-dot defaults: limit the lesson to the observed case.**
-  In d-morrison/altdoc#30, changing the default regex from an escaped dot (`\\.`) to
+  In Morrison-Lab/altdoc#30, changing the default regex from an escaped dot (`\\.`) to
   a bracket expression (`[.]`) resolved an `R CMD check` codoc mismatch for
   `setup_github_actions()`. Keep this note scoped to that concrete escaped-dot case;
   avoid generalizing to other escape sequences without direct evidence.
-  (d-morrison/altdoc#30, 2026-07-22.)
+  (Morrison-Lab/altdoc#30, 2026-07-22.)
 - **Internal helper functions as default argument values appear literally in `.Rd` usage
   blocks.** If you write `foo = .helper_default()` as a parameter default, the roxygen
   `\usage{}` section shows `.helper_default()` verbatim — which is confusing to users
   copy-pasting the signature. Inline the literal value directly in the function
-  signature instead. (d-morrison/altdoc#30.)
+  signature instead. (Morrison-Lab/altdoc#30.)
 
 ## R test/lint gotchas that only surface in CI
 Also from ettbc#13/#14:
@@ -643,7 +643,7 @@ entry + index link + index text), a sidebar-missing one only **2**.
 ported into `reference.qmd` only; caught before merge, fixed, and confirmed
 2 -> 3 occurrences each in the deployed preview.
 `UCD-SERG/serocalculator#610` proposes the cross-check as CI, possibly
-belonging in `d-morrison/gha` since every altdoc repo shares the structure.)
+belonging in `Morrison-Lab/gha` since every altdoc repo shares the structure.)
 
 ## renv — each git worktree gets its own (empty) project library
 
@@ -803,7 +803,7 @@ no settings file under a directory that does not exist, and aborted with
 That message is confident, actionable, and pointing at the wrong problem.
 Check both the missing and the invalid case when guarding a forwarded
 argument, not only the one the issue reports.
-(d-morrison/altdoc#64.)
+(Morrison-Lab/altdoc#64.)
 
 ## A container with no R at all is not a blocker: apt for R, P3M for the packages, a tarball for Quarto
 
@@ -844,7 +844,7 @@ The same session hit the mirror image: a plain CRAN source install of
 installed all four packages in one call with no compilation.
 So neither repo is the reliable one --- when the first fails on a build
 step, switch and retry before concluding a package is unavailable.
-(`d-morrison/altdoc` #82/#83/#84, 2026-07-28: this turned "assert the output
+(`Morrison-Lab/altdoc` #82/#83/#84, 2026-07-28: this turned "assert the output
 tree and hope" into rendering each generator, listing its published `docs/`
 tree, and deriving the assertions from what was actually there.)
 
@@ -854,7 +854,7 @@ Both bite a **bare `Rscript` call** --- which is what a sandbox run is --- and
 each fails in the direction that reads as success.
 
 `devtools::test()` sets `NOT_CRAN = "true"`, and so does a
-`rcmdcheck`-driven CI run: `d-morrison/altdoc`'s `R-CMD-check` reports
+`rcmdcheck`-driven CI run: `Morrison-Lab/altdoc`'s `R-CMD-check` reports
 `FAIL 0 | WARN 1 | SKIP 6 | PASS 406`, and none of those six skips is
 `On CRAN`, so its `skip_on_cran()`-guarded render tests genuinely run there.
 But do not read that as "`R CMD check` protects you": CRAN's own runs leave
@@ -947,7 +947,7 @@ braces vanish from the output, silently corrupting the message (a user reads
 A **non-empty** `{foo}` hard-errors on the missing object, taking down the
 whole call.
 Which one applies is easy to get backwards --- a review of
-`d-morrison/altdoc#87` predicted the crash for the empty form, and the
+`Morrison-Lab/altdoc#87` predicted the crash for the empty form, and the
 opposite is true.
 
 This matters wherever a message carries text the code did not author:

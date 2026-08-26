@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Morrison-Lab AI agent skills (PR/review workflow, grading, reprexes, R-package helpers), rules, and commands for Cursor.",
   "author": {
-    "name": "d-morrison"
+    "name": "Morrison-Lab"
   },
   "homepage": "https://github.com/Morrison-Lab/ai-config",
   "repository": "https://github.com/Morrison-Lab/ai-config",

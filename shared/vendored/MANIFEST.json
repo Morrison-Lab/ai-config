@@ -1,5 +1,5 @@
 {
-  "source_repo": "d-morrison/wai",
+  "source_repo": "Morrison-Lab/wai",
   "source_ref": "main",
   "files": [
     {
@@ -7,14 +7,14 @@
       "source_path": "shared/prompt-formats.md",
       "commit": "3774cc3b84135e58b67c963c5f70e97b4783962b",
       "sha256": "0de939768a35cb65bda6f5cdf99c1dad91f89b5a86d8d62ff82d91146a4ea3c3",
-      "source_url": "https://github.com/d-morrison/wai/blob/3774cc3b84135e58b67c963c5f70e97b4783962b/shared/prompt-formats.md"
+      "source_url": "https://github.com/Morrison-Lab/wai/blob/3774cc3b84135e58b67c963c5f70e97b4783962b/shared/prompt-formats.md"
     },
     {
       "path": "shared/vendored/copilot-review-before-human.md",
       "source_path": "shared/copilot-review-before-human.md",
       "commit": "3774cc3b84135e58b67c963c5f70e97b4783962b",
       "sha256": "335a52dc0d0c58029c16ae838dd3ce136376cdcc3358b08aedbf4f14e5494585",
-      "source_url": "https://github.com/d-morrison/wai/blob/3774cc3b84135e58b67c963c5f70e97b4783962b/shared/copilot-review-before-human.md"
+      "source_url": "https://github.com/Morrison-Lab/wai/blob/3774cc3b84135e58b67c963c5f70e97b4783962b/shared/copilot-review-before-human.md"
     }
   ]
 }

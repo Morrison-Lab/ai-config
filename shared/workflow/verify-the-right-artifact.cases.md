@@ -3,10 +3,10 @@ Case records for
 
 ## Five claims from one session, four sharing a root cause
 
-Recorded from a session on `d-morrison/rme`
+Recorded from a session on `Morrison-Lab/rme`
 covering rme#1068, #1073, #1074, #1076 and #1086,
 and filed for transfer as
-[rme#1089](https://github.com/d-morrison/rme/issues/1089).
+[rme#1089](https://github.com/Morrison-Lab/rme/issues/1089).
 Each claim was asserted confidently and each was wrong.
 In every case a real artifact was inspected,
 real evidence was found in it,
@@ -43,7 +43,7 @@ A single line, and it is the save.
 Nothing in that repository ever reads the cache,
 so the key's contents cannot matter and the premise is empty.
 
-Re-measured 2026-08-20 on `d-morrison/rme` at `main`:
+Re-measured 2026-08-20 on `Morrison-Lab/rme` at `main`:
 still exactly one match, still the save.
 The line number had moved from 86 to 83 in the interval,
 which is its own small argument for citing the derived command

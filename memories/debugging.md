@@ -31,7 +31,7 @@ Pattern: any loop that accumulates lines before processing should break (or trac
 - Fenced code block inside a blockquote (`> ``` … > ``` `)
 - Multi-line code block body (not just single-line) in each of the above
 
-Hit on d-morrison/ai-config#265: the semantic-line-breaks script lacked fence
+Hit on Morrison-Lab/ai-config#265: the semantic-line-breaks script lacked fence
 tracking in the bullet continuation loop and the blockquote collection loop.
 Both took two rounds of review to fully fix (single-line fence caught in round 1,
 multi-line body in blockquotes caught in round 2).
@@ -111,7 +111,7 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
   `path`/`head_branch`, sort by `run_number`) is far more reliable than
   grepping the raw JSON text, since a single workflow run's JSON blob is
   usually one unbroken line with no per-field markers to grep on the same
-  line. (`d-morrison/altdoc#16`: confirmed `jarl-check`'s failures via
+  line. (`Morrison-Lab/altdoc#16`: confirmed `jarl-check`'s failures via
   `lint.yml`'s run history on `main` going back 4+ commits before reporting it
   as pre-existing and out of scope.)
 
@@ -348,7 +348,7 @@ The remedy above was already written and not reached for, so what recurs is
 recall rather than knowledge, and this machine's BSD `grep` also rejects `-P`.
 
 ## Writing robust bash scripts (recurring review findings)
-Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —
+Lessons the reviewer flagged across the `session-lock` PR (Morrison-Lab/ai-config#38) —
 pre-empt these when authoring shell, especially under `set -euo pipefail`:
 - **`mktemp` + rename: add a cleanup trap.** A process killed between `mktemp`
   and the `mv` orphans temp files forever. Pattern: `tmp=$(mktemp -- "<dir>"/.tmp.XXXXXX);
@@ -591,7 +591,7 @@ Hit across ucdavis/bcs#264 (the snapr-based `expect_snapshot_data` suite):
 A workflow that triggers only on `push:` to `main` (deploy/publish/release jobs)
 never runs on pull requests, so a bug it would catch stays invisible until after
 merge — and then it fails on `main`, where no one is watching a specific PR.
-Hit on d-morrison/rme#966/#967: the Quarto **publish** workflow (push-to-main
+Hit on Morrison-Lab/rme#966/#967: the Quarto **publish** workflow (push-to-main
 only) went red the moment the concept-map appendix merged and stayed red for two
 days across several later merges, because no PR ever ran the full multi-format
 website render that collides.
@@ -599,7 +599,7 @@ website render that collides.
 When you fix such a post-merge-only failure, don't stop at the fix — add a
 **cheap static check that runs on `pull_request`** so the bug class can't regress
 unnoticed. It needn't reproduce the whole heavy job; a few seconds of parsing
-that asserts the invariant is enough. d-morrison/rme#970 added `check-render-headers`, a
+that asserts the invariant is enough. Morrison-Lab/rme#970 added `check-render-headers`, a
 ~120-line Python + PyYAML script that asserts "no two of a render-list page's
 formats resolve to the same output file," runs in ~8s, and would have caught the
 original bug at PR time. Prevention (fix the scaffolder/template that emits the
@@ -881,7 +881,7 @@ occurrence, not the flagged one.)
   a rendered docs-site preview runs ~40+ MB, so a couple dozen closed PRs'
   previews reach 1 GB on their own.
 - Fix: dispatch the repo's `cleanup-pr-previews` workflow (the
-  `d-morrison/gha` reusable: deletes previews for non-open PRs, then
+  `Morrison-Lab/gha` reusable: deletes previews for non-open PRs, then
   orphan-squashes `gh-pages` under `compact-history`) rather than waiting
   for its weekly Sunday cron — the limit can be crossed mid-week. Re-measure
   after, and expect the next successful Pages build to pick up everything
@@ -942,7 +942,7 @@ occurrence, not the flagged one.)
   `.../gh-pages/pr-preview/pr-598/vignettes/x.html`. Then grep the HTML for
   the thing you're verifying.
 - This is strictly better than the "403 on the docs page, so raw-fetch its
-  `.qmd` source instead" fallback in `d-morrison/gha`'s `CLAUDE.md`: the
+  `.qmd` source instead" fallback in `Morrison-Lab/gha`'s `CLAUDE.md`: the
   source only tells you what SHOULD render, while the `gh-pages` blob is the
   actual rendered artifact the reader sees, so it verifies the whole
   toolchain end to end.
@@ -964,7 +964,7 @@ occurrence, not the flagged one.)
   self-reference. Deliberate downlit behavior (r-lib/downlit#106, #195) —
   not worth forking downlit over, since even its local-package hooks emit
   pkgdown's `reference/` layout, not altdoc's `man/`.
-- Fixed generally in the `d-morrison/altdoc` fork (altdoc#25/#26): the
+- Fixed generally in the `Morrison-Lab/altdoc` fork (altdoc#25/#26): the
   post-render rewrite pass converts the documented package's rdrr-form
   self-links to page-relative `man/` links, alongside the recorded-site-URL
   form it already handled. A consumer repo just needs its renv altdoc pin at
@@ -1012,7 +1012,7 @@ interpret replacement escapes like `\\1`.
 If you do need regex matching (`fixed = FALSE`), replacement escapes can still
 apply, so validate any claim about replacement behavior against a runnable
 example before recording a generalized rule.
-(Correction logged from review on d-morrison/ai-config#641, 2026-07-22.)
+(Correction logged from review on Morrison-Lab/ai-config#641, 2026-07-22.)
 
 ## When a diagnosis asserts an ordering, measure the ordering
 

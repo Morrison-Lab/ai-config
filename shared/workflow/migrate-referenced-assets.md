@@ -58,16 +58,16 @@ the submodule was never copied --- so the include hard-fails
 a repo migrates a shared asset (LaTeX macros, a common header) from a local
 `_*.qmd` include to a submodule: (1) the staged renderer's checkout step needs
 `submodules: true` *and* the renderer itself must stage the submodule's
-content into the build dir (fixed upstream in d-morrison/altdoc's
+content into the build dir (fixed upstream in Morrison-Lab/altdoc's
 `quarto_website` flow, PR #27 --- `submodules: true` alone is necessary but not
 sufficient); (2) the docs CI workflow's `paths:` trigger filter should include
 the submodule path (e.g. `macros`, `.gitmodules`) so a submodule-pointer bump
 actually rebuilds the docs. (UCD-SERG/serocalculator#503, 2026-07: `main`
-migrated the macros to the `d-morrison/macros` submodule while the pkgdown-to-altdoc
+migrated the macros to the `Morrison-Lab/macros` submodule while the pkgdown-to-altdoc
 PR was open; pkgdown had rendered fine, altdoc's staged build could not find
 `../macros/macros.qmd`.)
 
-(d-morrison/wai#6, 2026-07-14: a chapter migration from one Quarto repo to
+(Morrison-Lab/wai#6, 2026-07-14: a chapter migration from one Quarto repo to
 another moved 25 `.qmd` fragments referencing five meme images, but never
 copied the `assets/images/` directory itself. HTML rendering silently
 degraded to missing-image placeholders and every other CI check passed, so

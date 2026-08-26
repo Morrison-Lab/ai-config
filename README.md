@@ -232,7 +232,7 @@ bare wrappers, and removes only stale wrapper symlinks that point to the same
 checkout. Re-run it after enabling or disabling the plugin.
 
 The same goes for enabling the plugin from **more than one marketplace**:
-both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
+both `Morrison-Lab/ai-config` and `Morrison-Lab/ai-config` publish a plugin
 named `ai-config` from the same repo, so only one entry can own the
 `ai-config:` namespace and the rest are no-op collisions.
 Enable at most one.
@@ -686,7 +686,7 @@ repo root.
 
 ### Vendored from wai (`shared/vendored/`)
 
-A few fragments are authored in **[d-morrison/wai](https://github.com/d-morrison/wai)**
+A few fragments are authored in **[Morrison-Lab/wai](https://github.com/Morrison-Lab/wai)**
 instead (prompt formats, the Copilot-review workflow) — that repo hosts the
 UCD-SERG lab's "Working with AI" notes, migrated out of the lab manual once
 they outgrew a single chapter. This repo can't add wai as a submodule — wai

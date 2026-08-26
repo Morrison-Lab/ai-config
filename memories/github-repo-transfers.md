@@ -70,7 +70,7 @@ reported by `gh api repos/<o>/<r>/pages` --- ucdavis/mic.sim#51.)
 
 ## A repository transfer redirects `pull` paths but NOT `issues` paths
 
-When a repo moves between owners (`d-morrison/gha` -> `Morrison-Lab/gha`),
+When a repo moves between owners (`Morrison-Lab/gha` -> `Morrison-Lab/gha`),
 GitHub's redirect does not cover every path shape, and the split is not
 documented anywhere obvious.
 Measured directly after one such move:
@@ -176,8 +176,8 @@ using.
   looking at.
 
 (`Morrison-Lab/wai`, 2026-08-04: `git remote get-url origin` returned
-`https://github.com/d-morrison/wai`, while `gh api repos/Morrison-Lab/wai`
-reported `Morrison-Lab/wai` and `gh api repos/d-morrison/wai` returned that
+`https://github.com/Morrison-Lab/wai`, while `gh api repos/Morrison-Lab/wai`
+reported `Morrison-Lab/wai` and `gh api repos/Morrison-Lab/wai` returned that
 same `full_name`, confirming the redirect.
 The push succeeded --- with a `remote: This repository moved` notice naming
 `https://github.com/Morrison-Lab/wai.git` as the new location --- `gh pr create`
@@ -191,7 +191,7 @@ Everything above is about transferring a **repository**.
 An issue is the other thing people say "transfer" about, and it obeys a
 constraint the repository case does not: GitHub transfers an issue only
 between repositories owned by the **same** user or organization.
-So `d-morrison/<repo>` to `Morrison-Lab/<repo>` is not a transfer at all, and
+So `Morrison-Lab/<repo>` to `Morrison-Lab/<repo>` is not a transfer at all, and
 the two interfaces refuse it differently.
 `gh issue transfer` takes the destination as a positional argument and errors
 on it.
@@ -226,7 +226,7 @@ The hand copy is the whole remedy, and it has three parts, none optional:
   permissions problem --- same-owner is a hard constraint of the feature.
 - **Don't:** leave the source issue open once the copy exists.
 
-(`d-morrison/rme#1083` to `Morrison-Lab/ai-config#1709`, 2026-08-19.
+(`Morrison-Lab/rme#1083` to `Morrison-Lab/ai-config#1709`, 2026-08-19.
 The original was filed in `rme` precisely because that session's write access
 was scoped there, with the body opening "Filed here for transfer to
 `Morrison-Lab/ai-config`" --- a transfer that was never available.)

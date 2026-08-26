@@ -125,7 +125,7 @@ See ai-config#694 for the precedent.
   run_workflow` (a fresh `workflow_dispatch`, not a rerun) 403s the same way** —
   the token lacks `actions: write` for dispatch too, not just for reruns, so
   don't expect a direct-dispatch workaround to succeed where rerun failed
-  (confirmed on UCD-SERG/serodynamics#193, and again on `d-morrison/rme#1017`
+  (confirmed on UCD-SERG/serodynamics#193, and again on `Morrison-Lab/rme#1017`
   trying to dispatch `publish.yml` — same `403 Resource not accessible by
   integration`).
   **`run_workflow` succeeded on `Morrison-Lab/ai-config`, 2026-08-15, so treat
@@ -379,7 +379,7 @@ See ai-config#694 for the precedent.
   `in_progress` R-CMD-check was genuinely still running, and the runs
   endpoint confirmed it.
   The endpoint is unreliable, not wrong.
-  (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
+  (`Morrison-Lab/altdoc#61`, 2026-07-25: three instances in one afternoon ---
   `test-coverage`, `docs-check` (completed `21:12:56`, still reported
   `in_progress` after), and one true negative.)
 - **`list_pull_requests` reports `merged: false` for every PR, merged ones
@@ -389,7 +389,7 @@ See ai-config#694 for the precedent.
   looking correct on any unmerged one you spot-check it against.
   A constant carries no information, the argument
   [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
-  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+  Measured on `Morrison-Lab/ai-config`, 2026-08-01, over 101 rows all `false`:
 
   | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
   |---|---|---|---|
@@ -572,7 +572,7 @@ See ai-config#694 for the precedent.
   current commit there, not by re-snapshotting blindly (see the
   `renv::snapshot()` destructive-mistake entry below for why not) or assuming
   a simple re-pin to the old repo's `main` will work.
-  (`d-morrison/rme#1017`: `insightsengineering/cards` had moved to
+  (`Morrison-Lab/rme#1017`: `insightsengineering/cards` had moved to
   `pharmaverse/cards`; the old repo was reduced to a redirect-only stub with
   history removed, orphaning the pinned SHA.)
 - **WebFetch summarizes rendered page text through a small model, which can
@@ -583,7 +583,7 @@ See ai-config#694 for the precedent.
   `/owner/repo/commit/<sha>`), which is far less prone to transcription
   errors than reading digits out of rendered commit-page text, and repeat the
   fetch 2-3× to confirm the same value comes back consistently before using
-  it in a commit/config change. (`d-morrison/rme#1017`: eyeballing a
+  it in a commit/config change. (`Morrison-Lab/rme#1017`: eyeballing a
   WebFetch-rendered SHA left doubt about its exact length at a glance; an
   href-based cross-check against the commit permalink URL, repeated across
   three independent fetches, confirmed the same 40-char value each time
@@ -641,7 +641,7 @@ See ai-config#694 for the precedent.
   global node ids, which the REST comments endpoint does not return.
   So one `pull_request_read` tool spans both pagination models depending
   on `method`; don't generalize either one across it.
-  (Guessed twice in one `d-morrison/altdoc#78` session, 2026-07-27,
+  (Guessed twice in one `Morrison-Lab/altdoc#78` session, 2026-07-27,
   costing two failed calls before fetching properly.)
 - **A repository transfer breaks `mcp__github__resolve_review_thread`
   specifically, and neither owner spelling works.**
@@ -673,11 +673,11 @@ See ai-config#694 for the precedent.
   2026-07-31, against PR #975 --- two different gates, one per spelling:
   - `owner: the repository owner` --- `Access denied: review thread
     PRRT_kwDOShagnM6VdO1_ does not belong to the declared repo
-    "d-morrison/ai-config".`
+    "Morrison-Lab/ai-config".`
   - `owner: Morrison-Lab` --- `Access denied: repository
     "morrison-lab/ai-config" is not configured for this session.
-    Allowed repositories: d-morrison/gha, d-morrison/workflows,
-    d-morrison/ai-config, d-morrison/rpt, d-morrison/qwt, d-morrison/qbt`
+    Allowed repositories: Morrison-Lab/gha, Morrison-Lab/workflows,
+    Morrison-Lab/ai-config, Morrison-Lab/rpt, Morrison-Lab/qwt, Morrison-Lab/qbt`
 
   The second is the session's own repo-scope list, which is fixed at session
   start, and `add_repo` refuses a cross-owner add --- so this is **not
@@ -779,7 +779,7 @@ See ai-config#694 for the precedent.
 - **`add_repo` refuses a cross-owner add once the session already has a repo from a
   different owner** ("cross-tier adds are not supported in v1: requested `<owner>/<repo>`
   but session already has repos from owner(s) `[...]`") — it does NOT fall back to a
-  read-only or degraded mode, so a session scoped to e.g. `d-morrison/*` repos cannot add
+  read-only or degraded mode, so a session scoped to e.g. `Morrison-Lab/*` repos cannot add
   a `UCD-SERG/*` repo (or vice versa) no matter how the request is phrased. When a task
   needs to read a PR/issue in such an out-of-scope repo, don't stop at the `add_repo`
   failure or a raw `api.github.com` 403 (a plain `WebFetch` GET to
@@ -793,7 +793,7 @@ See ai-config#694 for the precedent.
   title, state, and recent comment/review content (works even for reading a *specific*
   comment by its anchor), succeeding where both the MCP tool and the JSON API failed.
   (Used to read UCD-SERG/serodynamics#193's `@claude`-bot comment from a
-  `d-morrison/gha`-scoped session, which surfaced the root cause fixed in gha#191.)
+  `Morrison-Lab/gha`-scoped session, which surfaced the root cause fixed in gha#191.)
 - **`add_repo` (and likely other approval-gated MCP tools) can fail repeatedly
   and silently under auto-mode, with no useful error.** In auto mode, a call
   that needs an interactive permission-dialog approval has no human present to
@@ -857,7 +857,7 @@ See ai-config#694 for the precedent.
   disproved by this very bullet's own PR, `ai-config#724`, whose description
   lost an angle-bracket span from inside a code span in the heading that
   introduced this entry.)
-- `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
+- `Morrison-Lab/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
   (the "GitHub access in remote / web sessions" section), scoped to that repo.
   `Morrison-Lab/ai-config` has its own cross-model registry at
   [`tool-mappings.md`](../tool-mappings.md) (generated from `tool-mappings.yml`),

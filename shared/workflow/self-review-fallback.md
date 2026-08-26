@@ -104,6 +104,12 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch through `Task`.
+If `Task` is absent or does not list that persona, that is the
+CLI-fallback case in
+[`adversarial-self-review`](adversarial-self-review.md).
+The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**
 Dispatching and then composing a different comment is the same failure as
@@ -167,13 +173,15 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
-Those two are not interchangeable, which is why the preference still needs
+So the pairing above is now Copilot and `delegate-to-codex`.
+Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the only cross-vendor reviewer this corpus can
-**dispatch** itself.
+`delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
+**dispatches** for that pairing.
+The Cursor `Task` route above is the same-session self-review
+dispatch, not this second-reviewer pairing.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

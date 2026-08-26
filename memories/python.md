@@ -127,3 +127,24 @@ Give the timeout its own observable outcome, per
   own children and parent, not existence in general.
 - **Don't:** treat a succeeding probe as proof of a live process anywhere
   --- zombies and open-handle corpses both pass it.
+
+## `time.tzset()` and timezone resolution on Windows
+
+`time.tzset()` is unavailable on Windows --- CPython documents it as `Availability: Unix`.
+It resets the C library's time-conversion rules from the `TZ` environment variable;
+merely reading the local time needs no `tzset()` on any platform (`time.localtime()`, `datetime.datetime.now().astimezone()`).
+What Windows loses is the ability to re-apply a changed `TZ` inside a running process, which is why the bash `TZ=America/Los_Angeles date` recap recipe has no direct Python equivalent there.
+
+Python's `zoneinfo` module (3.9+) reads the system IANA time zone database where one exists, and falls back to the first-party `tzdata` PyPI package otherwise.
+Windows ships no IANA database in the format `zoneinfo` expects, so on a standard Windows Python installation without the `tzdata` package, `zoneinfo.ZoneInfo("America/Los_Angeles")` raises `zoneinfo.ZoneInfoNotFoundError` (a `KeyError` subclass).
+The internal `ModuleNotFoundError` for `tzdata` is caught inside `zoneinfo` and survives only as the traceback's chained `__context__`, so `except ModuleNotFoundError` around the `ZoneInfo` call catches nothing.
+Measured 2026-08-26 on CPython 3.11.15 (Linux), forcing the no-system-data path --- the one a Windows install without `tzdata` takes --- via `zoneinfo.reset_tzpath([])`;
+the mechanism is `Lib/zoneinfo/_common.py`'s `load_tzdata()`, which catches `ImportError`/`FileNotFoundError` and raises `ZoneInfoNotFoundError`.
+
+For dependency-free local-time output on Windows, do not substitute a fixed UTC offset: a DST-observing zone like `America/Los_Angeles` is UTC-7 or UTC-8 depending on the date, so a hard-coded `datetime.timedelta` is wrong for half the year.
+Use the system's own local clock (`datetime.datetime.now().astimezone()`) when the machine's zone is the wanted one, or the DST-aware PowerShell fallback in `CLAUDE.md`'s "Timestamp recaps in local time" section when it is not.
+
+- **Do:** install the `tzdata` PyPI package when full IANA `zoneinfo` support is needed on Windows.
+- **Do:** catch `zoneinfo.ZoneInfoNotFoundError` when handling a missing time zone database.
+- **Don't:** assume `time.tzset()` exists, or that `zoneinfo.ZoneInfo("America/Los_Angeles")` succeeds out-of-the-box, on a Windows Python installation.
+- **Don't:** wrap a `ZoneInfo` call in `except ModuleNotFoundError`, or hard-code a fixed UTC offset for a DST-observing zone.

@@ -252,12 +252,8 @@ See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-
 When the reviewing subagent returns,
 its structured report --- summary, findings, and verdict --- *is* the review.
 The report's entire value is its independence from the authoring session.
-Rewriting it before posting --- summarizing it, regrouping it,
-translating it into the session's own status prose,
-or softening the verdict ---
-discards exactly that value,
-and the rewrite is authored by the party
-the separate reviewer exists to check.
+To summarize it, regroup it, translate it into the session's own status prose, or soften its verdict is to discard that value.
+The rewritten version then comes from the party the separate reviewer exists to check.
 A reader cannot tell filtered-out findings from absent ones,
 so a softened publication reads as a cleaner review than occurred.
 

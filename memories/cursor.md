@@ -146,6 +146,7 @@ This is the same class as
 [#1433](https://github.com/Morrison-Lab/ai-config/issues/1433), 2026-08-12:
 `claude[bot]` / `CONTRIBUTOR`).
 2nd occurrence, 2026-08-25, #2234; the association this time is `NONE`.
+3rd occurrence, 2026-08-26, #2290; still `cursor[bot]` / `NONE`.
 
 - **Do:** have a human OWNER/MEMBER/COLLABORATOR post `@jules review`
   (the workflow trigger is a trusted comment containing that mention).
@@ -153,5 +154,30 @@ This is the same class as
   as `cursor[bot]` / `NONE` --- the gate that skipped it skips the retry.
 
 (Measured 2026-08-25 on
-[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234);
+3rd occurrence measured 2026-08-26 on
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)
+
+## Cursor Cloud `gh` writes can 403 while the PR-comment tool still posts
+
+Measured 2026-08-26 on a Cursor Cloud run driving
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290):
+`gh issue comment` and a Copilot review-request POST returned
+`403 Resource not accessible by integration`.
+`gh api user` returned the same 403.
+`gh issue create` and `gh pr view` succeeded in the same session.
+PR conversation comments posted through Cursor's `ManagePullRequest`
+`post_comment` action (example:
+[comment 5423368708](https://github.com/Morrison-Lab/ai-config/pull/2290#issuecomment-5423368708)).
+
+This is a session-token measurement, not a standing GitHub outage.
+Re-attempt `gh` writes before reporting them blocked, per
+[`github-mcp-tools.md`](github-mcp-tools.md)'s 403-as-measurement note.
+
+- **Do:** fall back to Cursor's `ManagePullRequest` `post_comment` when
+  `gh pr comment` 403s in a Cursor Cloud session, and disclose agent
+  authorship in the body.
+- **Don't:** treat a 403 on one write surface as covering every `gh`
+  write --- `gh issue create` worked in the same run that could not
+  comment.
 

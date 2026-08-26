@@ -399,8 +399,11 @@ _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 ```
 
 **Then run `ums`, before reporting ready.**
-The clean verdict is the proactive-UMS checkpoint for this PR, not the merge;
-see `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate".
+The clean verdict is still a proactive-UMS checkpoint for this PR, not the
+merge, but it is not the first one: run a pass when you read the review,
+including a Rebut/Defer round, rather than holding everything for the
+verdict.
+See `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate".
 The loop's whole point is that it ends here and hands the merge to a human,
 so a pass deferred to the merge is deferred to a moment this session may
 never see.

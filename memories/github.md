@@ -1,9 +1,9 @@
 # GitHub & GitLab CLIs and APIs
 
-The GitHub MCP tool surface used in remote/web sessions lives in
-[`github-mcp-tools.md`](github-mcp-tools.md).
-What a repository transfer between owners carries, and silently does not, lives
-in [`github-repo-transfers.md`](github-repo-transfers.md).
+Remote/web MCP tools: [`github-mcp-tools.md`](github-mcp-tools.md).
+Owner transfers: [`github-repo-transfers.md`](github-repo-transfers.md).
+Closing-keyword parser traps:
+[`github-closing-keywords.md`](github-closing-keywords.md).
 
 ## Operational checklist pattern for write actions
 
@@ -581,17 +581,5 @@ interpolation), same as `--body-file` on the porcelain command.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows
-session; the REST PATCH succeeded immediately on the same body file.)
-
-## `gh pr update-branch` creates a merge commit and triggers CI
-
-When a PR is out of date with the base branch,
-`gh pr update-branch <PR>` is a convenient way to merge the base branch into the PR.
-It avoids manually checking it out and running git merge or rebase.
-
-However, note that this action creates a new merge commit on the PR branch.
-This will trigger any CI pipelines or automated review workflows that run on push.
-You must wait for those new runs to pass before the PR is fully clean again.
-
-(Measured 2026-08-25 via `gh pr update-branch --help`)
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
+the REST PATCH succeeded immediately on the same body file.)

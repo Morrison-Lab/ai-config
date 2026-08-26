@@ -55,14 +55,27 @@ def cursor_skill_catalog_served(
     ) is not None
 
 
-def catalog_leftovers(entries):
-    """Keep on-disk Cursor skill entries when a plugin/catalog already serves.
+def cursor_plugin_installed(cursor_dir: Path) -> bool:
+    """True when an ai-config Cursor plugin is actually installed."""
+    spec = importlib.util.spec_from_file_location(
+        "cursor_plugin_enabled", ROOT / "scripts" / "cursor-plugin-enabled.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module.plugin_installed(cursor_dir)
 
-    ``missing`` is expected in that state (bootstrap did not link
-    ``~/.cursor/skills``). Leftover ``ok`` links are the stacked-catalog
-    hazard (ai-config#1409), so they become ``stacked`` rather than staying
-    healthy. ``stale`` / ``foreign`` leftovers stay as themselves.
+
+def catalog_leftovers(entries, detail=None):
+    """Keep on-disk Cursor entries when a plugin/catalog already serves.
+
+    ``missing`` is expected in that state (bootstrap did not link the
+    consumer dir). Leftover ``ok`` links are the stacked-catalog hazard
+    (ai-config#1409 / #2291), so they become ``stacked`` rather than
+    staying healthy. ``stale`` / ``foreign`` leftovers stay as themselves.
     """
+    if detail is None:
+        detail = "plugin or Claude catalog already serves this skill"
     leftovers = []
     for entry in entries:
         if entry.status == "missing":
@@ -71,7 +84,7 @@ def catalog_leftovers(entries):
             leftovers.append(ci.Entry(
                 entry.group, entry.name, "stacked",
                 entry.repo_path, entry.install_path,
-                detail="plugin or Claude catalog already serves this skill",
+                detail=detail,
             ))
         else:
             leftovers.append(entry)
@@ -142,6 +155,7 @@ def main() -> int:
     cursor_uses_catalog = cursor_skill_catalog_served(
         cursor_dir, claude_dir, repo_root, repo_roots
     )
+    cursor_uses_plugin = cursor_plugin_installed(cursor_dir)
     codex_entries = [] if codex_uses_plugin else collect_flat(
         repo_root, "codex-skills", codex_dir / "skills", "codex", repo_roots
     )
@@ -150,6 +164,17 @@ def main() -> int:
     )
     cursor_skill_entries = (
         catalog_leftovers(cursor_skill_raw) if cursor_uses_catalog else cursor_skill_raw
+    )
+    cursor_rule_raw = collect_flat(
+        repo_root, "cursor-rules", cursor_dir / "rules", "cursor", repo_roots
+    )
+    cursor_rule_entries = (
+        catalog_leftovers(
+            cursor_rule_raw,
+            detail="Cursor plugin already serves this rule",
+        )
+        if cursor_uses_plugin
+        else cursor_rule_raw
     )
     checks = (
         ("Claude", ci.collect(repo_root, claude_dir, repo_roots)),
@@ -162,10 +187,10 @@ def main() -> int:
             cursor_skill_entries,
         ),
         (
-            "Cursor rules",
-            collect_flat(
-                repo_root, "cursor-rules", cursor_dir / "rules", "cursor", repo_roots
-            ),
+            "Cursor rules (plugin leftovers)"
+            if cursor_uses_plugin
+            else "Cursor rules",
+            cursor_rule_entries,
         ),
     )
     defects = sum(report(name, entries) for name, entries in checks)

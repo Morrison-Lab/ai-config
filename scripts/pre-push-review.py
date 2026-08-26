@@ -180,14 +180,17 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        sha_matches = re.findall(r"(?i)Reviewed-Commit:\s*([a-f0-9A-F]+)\s*\Z", unfenced_report)
-        if not sha_matches:
+        all_shas = re.findall(r"(?i)Reviewed-Commit:\s*([a-f0-9A-F]+)", unfenced_report)
+        if not all_shas:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
-        for found_sha_raw in sha_matches:
-            found_sha = found_sha_raw.lower()
-            if found_sha != exp_sha:
+        for found_sha_raw in all_shas:
+            if found_sha_raw.lower() != exp_sha:
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
+        
+        # Also ensure the final fingerprint is anchored at the end of the report
+        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+\s*\Z", unfenced_report):
+            return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
     if not verdict_matches:
@@ -517,7 +520,7 @@ def record_successful_engine(engine_name: str):
         pass
 
 
-def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "") -> Tuple[Optional[str], str]:
+def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "", exclude_engine: str = "") -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
         "claude": (run_claude_review, "Claude Code (Local)"),
@@ -537,6 +540,8 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
     if engine in ["alternate", "round-robin"]:
         available = detect_available_engines()
         invokers = set()
+        if exclude_engine:
+            invokers.add(exclude_engine.lower())
         if os.environ.get("CLAUDE_SESSION_ID"):
             invokers.add("claude")
         if os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
@@ -547,6 +552,10 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             invokers.add("codex")
         if os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("opencode")
+
+        if not invokers:
+            log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
+            return None, "None"
 
         for inv in invokers:
             if inv in available:
@@ -711,6 +720,10 @@ def main():
         help="Post the review comment/verdict directly to the GitHub PR",
     )
     parser.add_argument(
+        "--exclude-engine",
+        help="Explicitly exclude an engine from being selected in alternate mode (e.g., to exclude the current agent)",
+    )
+    parser.add_argument(
         "--allow-findings",
         action="store_true",
         help="Exit 0 even when review returns 'Needs work' (defaults to exiting 1 on blocking findings)",
@@ -746,7 +759,7 @@ def main():
         original_cwd = os.getcwd()
         try:
             os.chdir(temp_dir)
-            report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head)
+            report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)
 

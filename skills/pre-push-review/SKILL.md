@@ -15,14 +15,14 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 ## When this fires
 
 - "review this before I push", "pre-push review", "check my diff locally", "run local review", `/pre-push-review`
-- "alternate between models", "run adversarial review with codex/claude/cursor"
+- "alternate between models", "run adversarial review with codex/claude/opencode"
 - Before running `/push` or `git push` on complex feature branches when you want a second opinion without consuming cloud CI API credits or Claude Code token quotas.
 
 ## How it works
 
 1. Computes the local outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
 2. Injects universal repository standards (`AGENTS.md`).
-3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `cursor` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
+3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
 4. Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
 5. Exits nonzero on blocking `Needs work` findings (unless `--allow-findings` is specified) and optionally posts verified review notes directly to the GitHub PR.
 
@@ -38,7 +38,7 @@ if [ -n "$PRE_PUSH_REVIEW_LOCAL_DEV" ] && [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/
   REVIEW_SCRIPT="$GIT_ROOT/scripts/pre-push-review.py"
 fi
 
-# Auto-detect local AI CLI (priority: claude -> cursor -> codex -> opencode -> agy)
+# Auto-detect local AI CLI (priority: claude -> codex -> opencode -> agy)
 python3 "$REVIEW_SCRIPT"
 
 # Alternate among available models/engines across successive runs

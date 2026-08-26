@@ -162,6 +162,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Strip HTML comments to prevent hiding clean skeletons or blockers
     unfenced_report = re.sub(r"<!--.*?-->", "", unfenced_report, flags=re.DOTALL)
+    if "<!--" in unfenced_report:
+        return False, False, "Unterminated HTML comment detected."
 
     def extract_section(text, header_pattern):
         pattern = r"(?im)^#{2,3}\s+(?:" + header_pattern + r")\s*(.*?)(?=^#{2,3}\s+|\Z)"
@@ -546,13 +548,10 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             invokers.add("claude")
         if os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("antigravity")
-        if "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
-            invokers.add("cursor")
         if os.environ.get("CODEX_THREAD_ID") or "codex" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("codex")
         if os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("opencode")
-
         if not invokers:
             log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
             return None, "None"
@@ -588,7 +587,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
                 recognized = True
 
         if exclude_engine and not recognized:
-            log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, cursor, antigravity). Unknown exclusions: {list(invokers)}")
+            log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, antigravity). Unknown exclusions: {list(invokers)}")
             return None, "None"
         elif not invokers and not sys.stdout.isatty():
             log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
@@ -744,7 +743,7 @@ def main():
     parser.add_argument(
         "--engine",
         choices=[
-            "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
+            "auto", "alternate", "round-robin", "claude", "codex", "dtc",
             "opencode", "dto", "opencode-claude", "opencode-zen", "ollama",
             "antigravity", "agy", "agy-claude",
         ],
@@ -806,7 +805,7 @@ def main():
             os.chdir(temp_dir)
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             # Remove branch-controlled agent configs to enforce sandbox isolation
-            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github", ".vscode", "cursor.json", ".aider.conf.yml"], check=False)
+            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".vscode", "cursor.json", ".aider.conf.yml"], check=False)
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)

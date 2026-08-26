@@ -456,6 +456,12 @@ check("command_has_issue_dupe_check: gh search issues",
 check("command_has_issue_dupe_check: gh search issues --state open",
       hook.command_has_issue_dupe_check(
           "gh search issues --state open 'x'"), False)
+check("command_has_issue_dupe_check: gh search issues --state \"open\"",
+      hook.command_has_issue_dupe_check(
+          'gh search issues --state "open" x'), False)
+check("command_has_issue_dupe_check: gh search issues --state=OPEN",
+      hook.command_has_issue_dupe_check(
+          "gh search issues --state=OPEN x"), False)
 check("command_has_issue_dupe_check: glab --all --search",
       hook.command_has_issue_dupe_check(
           'glab issue list --all --search "x"'), True)

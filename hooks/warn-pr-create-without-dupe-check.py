@@ -221,7 +221,8 @@ RX_GH_SEARCH_ISSUES = re.compile(
 )
 
 RX_GH_SEARCH_STATE_FILTER = re.compile(
-    r"--state(?:=|\s+)(?:open|closed)\b"
+    r"--state(?:=|\s+)['\"]?(?:open|closed)\b['\"]?",
+    re.IGNORECASE,
 )
 
 # gh issue list: `--state all` or `--state=all`, and short `-s all`
@@ -348,7 +349,10 @@ def command_has_issue_dupe_check(command):
     """
     text = strip_heredocs(command)
     for match in RX_GH_SEARCH_ISSUES.finditer(text):
-        rest = RX_QUOTED_SPAN.sub(" ", _command_rest(text, match.end()))
+        # Inspect UNSTRIPPED flags so `--state "open"` and `--state=OPEN`
+        # still count as an open-state filter (quote-stripping would drop
+        # the value and look like the all-state form).
+        rest = _command_rest(text, match.end())
         if not RX_GH_SEARCH_STATE_FILTER.search(rest):
             return True
     for match in RX_GH_ISSUE_LIST.finditer(text):

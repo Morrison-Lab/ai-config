@@ -64,6 +64,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   "Generalize instructions to every AI agent by default."
 - **Fix**: If `AGENTS.md` doesn't exist locally, read it from the `ai-config` repository.
   Always follow the standing Universal AI Agent Instructions (Adversarial Self-Review, Default to action, Agent disclosure) everywhere.
+
 ## Pattern 5f: Declaring a PR "Fully Clean" Without Verified Automated Review Approval on HEAD
 - **Mistake**: Reporting a PR as "fully clean" based solely on passing CI checks and an internal self-review fallback, while an external automated review had unaddressed findings or had not yet evaluated the exact current HEAD SHA.
 - **Example**: 2026-08-25 session (`gha#668`, `ai-config#2226`): declared PRs fully clean because CI was green and subagent self-reviews passed, despite outstanding "Needs more work" findings from Cursor Grok 4.6 on previous SHAs and unevaluated latest SHAs.
@@ -71,6 +72,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   A fallback self-review or reviewer skip notice does NOT grant approval or satisfy `mwc`.
 - **Fix**: Run `scripts/check-pr-fully-clean.py` (or verify all its criteria) before ever declaring a PR fully clean.
   Only report clean when all CI checks pass AND an automated AI review evaluating the exact HEAD SHA has posted an approved / ready verdict with zero open findings.
+
 ## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
 - **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
 - **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
@@ -131,6 +133,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
 - **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
   Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.
+
 ## Pattern 11: Pasting Repo-Specific Infrastructure into Universal Instructions for Another Repository
 - **Mistake**: When creating `AGENTS.md` in a sibling repository (such as `Morrison-Lab/gha`), copying instructions verbatim from `ai-config` that refer to `ai-config`-specific infrastructure (`scripts/validate-skills.py`, `validate.yml`, pre-push git hooks, relative documentation links) instead of tailoring instructions to the target repository.
 - **Example**: 2026-08-25 session on `Morrison-Lab/gha`: created `AGENTS.md` by pasting `ai-config`'s file, claiming pre-push hooks existed, inventing non-existent test filenames, and inverting instruction layering over `gha`'s `CLAUDE.md`.
@@ -138,3 +141,33 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   Universal instructions must be repository-agnostic or verified against the target repo.
 - **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
   Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
+
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+- **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
+  Treating the arming as harmless because CI is red ignores that the robot fires later,
+  the moment checks go green,
+  with no re-check of review state.
+- **Example**: 2026-08-26 on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  the remote can act between your commands,
+  and an armed automation is exactly such an action you scheduled against yourself.
+- **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  Auto-merge fires server-side the moment CI passes,
+  so a review landing seconds later cannot block it,
+  and no reactive disable can win that race.
+  Branch protection does not substitute either:
+  it gates native approvals, not verdicts posted as comments.
+  Merge synchronously instead,
+  only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
+  CI green and the all-clear verdict both verified at the shipping head.
+  If something is found already armed, disable it at once ---
+  `gh pr merge <N> --repo <r> --disable-auto`,
+  verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
+  and treat the PR as unverified until re-checked.
+  Disabling is cleanup, not protection.

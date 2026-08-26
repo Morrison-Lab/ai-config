@@ -7,7 +7,6 @@ push-but-not-delete rule, and GitHub Pages policy denials.
 Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
 1200-line gate.
 
-## GitHub access from bash in remote/web sessions
 - There is no `gh`/`glab` CLI in these sessions, so `mcp__github__*` is the
   normal path for anything the API would answer.
   - **The REST API itself is not necessarily unreachable from bash, though ---

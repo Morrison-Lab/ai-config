@@ -101,8 +101,9 @@ so.
   Every R runner used the median.
   `@eq-brt` wrote a truncated exponential.
   The R likelihood mixed a uniform into that density.
-  The never-infected branch in the R likelihood used `y_f = 0`
-  rather than the bank's `y_0`.
+  `@eq-joint` and `@eq-shared` wrote `p(y | y_0^{(k)})` for the
+  never-infected branch.
+  The R likelihood used `y_f = 0` instead.
   The R simulator evaluated a decay-only curve
   while the design said to evaluate `@eq-curve`.)
 

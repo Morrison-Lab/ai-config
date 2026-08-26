@@ -154,7 +154,8 @@ The other cases have no guard and are prose rules here.
 
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
-  Re-dispatch after each push that moves HEAD on a PR you are driving, not only after the last planned fix.
+  Do not report a HEAD as reviewed until a dispatched review of **that** SHA has returned.
+  If a fix already moved HEAD, re-dispatch on the current SHA before the next status report.
   (ai-config#2277, 2026-08-26: addressed two wording nits on `92c65d5c` and reported without a review of that SHA until asked.)
 - **Do:** chase a cross-vendor reviewer on top of it wherever one is reachable.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.

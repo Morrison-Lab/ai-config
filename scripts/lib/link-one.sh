@@ -16,9 +16,10 @@
 # The hint is a parameter because callers resolve a collision differently:
 # bootstrap.sh passes scripts/check-install.py --fix only for ~/.claude
 # links. That script's --consumer-dir retargets a whole Claude-style
-# manifest, so the same hint is wrong for Codex, Gemini, Copilot, Cursor,
-# and the dotfiles installers (ai-config#2286). Those keep a manual
-# backup/link instruction.
+# manifest, so the same hint is wrong for Codex, Gemini, Copilot, and
+# Cursor (ai-config#2286). Those callers inherit this file's default
+# (remove it or replace it with a link manually). Dotfiles installers
+# set their own LINK_ONE_FIX_HINT; shiva's is the --adopt path.
 
 # Advice printed when a real (non-symlink) path blocks the link. Overridable by
 # the caller or by a per-call third argument; the default says nothing

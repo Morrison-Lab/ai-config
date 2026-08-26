@@ -163,7 +163,7 @@ with tempfile.TemporaryDirectory() as raw:
             hint is not None and CLAUDE_HINT not in hint,
         )
         check(
-            f"{label} skip names a manual backup/link repair",
+            f"{label} skip names a manual replace/link repair",
             hint is not None and bool(re.search(r"link|symlink|replace|remove", hint, re.I)),
         )
 

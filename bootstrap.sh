@@ -28,7 +28,7 @@ mkdir -p "$CLAUDE_DIR"
 
 # Symlink $src -> $dest unless something is already there. Shared with the
 # per-machine installers under dotfiles/, so both resolve collisions the same
-# way. The default hint from link-one.sh is a manual backup/link instruction.
+# way. The default hint from link-one.sh is a manual replace/link instruction.
 # check-install.py --fix is Claude-only: --consumer-dir retargets a whole
 # Claude-style manifest, so pointing it at a Copilot memory dir or a Gemini
 # skills dir creates unrelated top-level links there (ai-config#2286).

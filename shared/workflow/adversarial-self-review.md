@@ -226,7 +226,10 @@ Only after the provider posts a new clean verdict may you continue to the next p
 Repeat this until all pinned providers have explicitly confirmed that zero findings remain open on the exact same codebase state (the same commit and working tree).
 
 The set of required providers must be pinned at the start of the review cycle.
-If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry, or explicitly request user permission to drop it from the quorum.
-If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle (for example, if all external providers AND the local fallback self-review subagent are offline or fail), you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
+If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry.
+Alternatively, explicitly request user permission to drop it from the quorum.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle, you must fail closed and wait until at least one becomes reachable.
+This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
+Alternatively, request explicit user permission to proceed.
 Do not bypass the review gate.
 If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving --- halt the review process and escalate to the user for a tie-breaking decision.

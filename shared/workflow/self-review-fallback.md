@@ -126,7 +126,8 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 **Execute the sequential multi-provider review loop when the primary reviewer fails.**
 Instead, fall back to the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 
-Pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent) and query them sequentially, one at a time.
+Pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent).
+Query them sequentially, one at a time.
 Do not request them in parallel.
 Re-check reachability at the start of every cycle:
 a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)

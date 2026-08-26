@@ -35,20 +35,26 @@ Prefer a reviewer that differs from the authoring session in **both** model
 and harness --- that is the only configuration that buys independence of blind
 spot as well as of intent, which the same-vendor case above explicitly does
 not.
-On this machine the reachable harnesses are: **cursor**, **agy**, **opencode**,
-and **claude**.
+The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
+**opencode**, and **claude**;
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)'s `codex`
+belongs in the same ladder wherever installed.
 Dispatch through whichever differs from you first; when one is temporarily out
-of quota, move to the next rather than falling back to a same-harness pass.
+of quota, move to the next.
+A quota outage reroutes the dispatch --- it does not license skipping it.
+
+Same-harness scope, stated precisely because two gates meet here.
+The **self-review duty** keeps its same-harness floor: the
+[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
+subagent dispatch remains valid and hook-checked for gating a push.
+The **merge gate** below is stricter: its all-clear verdict prefers a
+cross-model, cross-harness reviewer, and when none is reachable the merge
+waits rather than degrading to a same-harness pass.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
 [`memories/preferences.md`](../../memories/preferences.md)'s delegate ladder.
 A retired API never disqualifies the CLI harness built on top of it.
-
-A quota skip never downgrades the requirement --- it reroutes it.
-The only accepted outputs are an adversarial verdict from a separate context;
-everything else (inline passes, skip notices, same-harness convenience) is
-non-compliance wearing a fallback costume.
 
 ## No merge without a 100% all-clear adversarial verdict
 
@@ -56,16 +62,20 @@ non-compliance wearing a fallback costume.
 enabled, unless you have a 100% 'all clear' review verdict from an adversarial
 review".)
 
-This binds every repo and every grant, including the standing `mwc`
-exception: **mwc authorizes merging a PR that is fully clean, and fully clean
-now requires an all-clear adversarial verdict at the shipping head from a
-reviewer meeting this fragment's independence bar.**
-A Needs-more-work verdict blocks until re-dispatched clean at the new head.
-A skip notice, a stub, a same-harness subagent verdict, or silence clears
-nothing.
-If no compliant reviewer is reachable, the PR waits --- "blocked on reviewer
-availability" is the honest status, and arming an auto-merge while waiting is
-[Pattern 12](../../memories/mistake-patterns.md).
+This **adds** a gate and replaces none.
+Every requirement [`fully-clean`](fully-clean.md) already sets --- including
+the external automated PR reviewer's clean verdict at head, wherever a repo
+has one --- stands unchanged, and an author-dispatched subagent verdict never
+satisfies that external gate.
+What is added: a merge additionally requires a 100% all-clear verdict at the
+shipping head from an adversarial review meeting this fragment's independence
+bar, preferably a different model and harness than the authoring session.
+A Needs-more-work verdict blocks until a compliant re-dispatch returns
+all-clear at the new head.
+A skip notice, a stub, or a stale-head verdict clears nothing.
+If no qualifying reviewer is reachable, the merge waits --- "blocked on
+reviewer availability" is the honest status, and arming an auto-merge while
+waiting is [Pattern 12](../../memories/mistake-patterns.md).
 
 
 ## What "separate" requires
@@ -196,7 +206,10 @@ That is also why the review comes **after** committing, which is where [`ardi`](
 The other cases have no guard and are prose rules here.
 
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.
-- **Do:** prefer a reviewer on a **different model and harness** from your own --- cursor, agy (CLI), opencode, or claude --- and move down that list when one is out of quota; report which harness produced each verdict.
+- **Do:** prefer a reviewer on a **different model and harness** from your own
+  (cursor, codex, agy CLI, opencode, or claude).
+- **Do:** move down that list when one is out of quota,
+  and report which harness produced each verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.

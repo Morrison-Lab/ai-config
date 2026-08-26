@@ -178,9 +178,19 @@ check(
     None,
 )
 check(
-    "issue 2282 without hash still counts",
-    subject.find_issue_ref("please grab issue 2282")["number"],
+    "issue #2282 with hash counts",
+    subject.find_issue_ref("please grab issue #2282")["number"],
     "2282",
+)
+check(
+    "issue 2 weeks ago is not an issue ref",
+    subject.find_issue_ref("the issue 2 weeks ago is still open"),
+    None,
+)
+check(
+    "fix #12 counts",
+    subject.find_issue_ref("please fix #12 in this repo")["number"],
+    "12",
 )
 check(
     "pull URL is not an issue",
@@ -403,6 +413,26 @@ check(
     warned(out),
     False,
 )
+
+followup_issue_word = write_transcript([
+    NAMING,
+    VIEW,
+    VIEW_OPEN,
+    FETCH,
+    user("see issue #140 for context"),
+])
+out = run_hook(followup_issue_word)
+check(
+    "incidental issue #N follow-up does not retarget",
+    warned(out),
+    False,
+)
+
+weeks_ago = write_transcript([
+    user("the issue 2 weeks ago is why this broke"),
+])
+out = run_hook(weeks_ago)
+check("issue 2 weeks ago does not arm the write guard", warned(out), False)
 
 
 # ---------------------------------------------------------------------------

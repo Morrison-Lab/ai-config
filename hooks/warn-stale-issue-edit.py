@@ -42,9 +42,11 @@ Fires only when ALL of these hold:
   1. The about-to-run tool is a source/config write (`Write`, `Edit`,
      `NotebookEdit`, or the Cursor names the adapter maps onto those).
   2. Some earlier USER prose message in this transcript names a forge
-     issue (a GitHub/GitLab issue URL, `owner/repo#N`, or
-     implement/issue/fix + number). Pull URLs do not count. The latest
-     such message is the request this edit is treated as implementing.
+     issue (a GitHub/GitLab issue URL, `owner/repo#N`, `issue #N`, or
+     implement/fix/closes/resolves + `#N`). Pull URLs do not count.
+     The first such message arms the guard. A later message retargets
+     only with a URL or implement/fix/closes/resolves + `#N`; an
+     incidental `owner/repo#N` or `issue #N` citation does not.
   3. After that message, the transcript lacks fresh evidence of BOTH:
        (a) a VIEW_ISSUE of that number, and
        (b) a remote/default-branch read.
@@ -101,15 +103,15 @@ RX_GL_ISSUE_URL = re.compile(
 RX_SHORTHAND = re.compile(
     r"\b([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#(\d+)\b",
 )
-# implement/closes/fixes/resolves require '#': "implement 2-factor" is not
-# issue #2. Singular "issue N" may omit the hash; plural "issues" may not,
-# because "issues 3 times" is ordinary prose.
+# implement/closes/fix(es)/resolves require '#': "implement 2-factor" is
+# not issue #2. "issue N" also requires '#', because "the issue 2 weeks
+# ago" is ordinary prose.
 RX_TASK_HASH = re.compile(
-    r"\b(?:implement(?:ing)?|closes|fixes|resolves)\s+#(\d+)\b",
+    r"\b(?:implement(?:ing)?|closes|fix(?:es)?|resolves)\s+#(\d+)\b",
     re.I,
 )
 RX_ISSUE_WORD = re.compile(
-    r"\bissue\s+#?(\d+)\b|\bissues\s+#(\d+)\b",
+    r"\bissues?\s+#(\d+)\b",
     re.I,
 )
 # A pull URL is not an issue, even though GitHub shares the number space.
@@ -252,14 +254,14 @@ def load_mapping_stems(path=None):
 # A later user message retargets only with these forms. Incidental
 # `owner/repo#N` citations (how recurrences are named) must not steal
 # the issue the session is already implementing.
-RETARGET_FORGES = frozenset({"github", "gitlab", "task", "issue-word"})
+RETARGET_FORGES = frozenset({"github", "gitlab", "task"})
 
 
 def find_issue_ref(text):
     """Return the primary forge-issue ref in user prose, or None.
 
     Pull URLs are ignored. The first GitHub/GitLab issue URL wins, then
-    implement/closes/fixes/resolves + `#N`, then `issue N`, then
+    implement/closes/fix(es)/resolves + `#N`, then `issue #N`, then
     `owner/repo#N`.
     """
     if not text or not isinstance(text, str):
@@ -293,7 +295,7 @@ def find_issue_ref(text):
         }
     matched = RX_ISSUE_WORD.search(stripped)
     if matched:
-        number = matched.group(1) or matched.group(2)
+        number = matched.group(1)
         return {
             "owner": "",
             "repo": "",

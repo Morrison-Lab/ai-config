@@ -309,6 +309,46 @@ check(
     ),
     False,
 )
+check(
+    "issue_read method=get_comments is not VIEW_ISSUE",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {"issue_number": 2282, "method": "get_comments"},
+        issue,
+        stems["view_mcp"],
+    ),
+    False,
+)
+check(
+    "issue_read method=get_labels is not VIEW_ISSUE",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {"issue_number": 2282, "method": "get_labels"},
+        issue,
+        stems["view_mcp"],
+    ),
+    False,
+)
+check(
+    "issue_read with no method field still views (fallback tool shape)",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {"issue_number": 2282},
+        issue,
+        stems["view_mcp"],
+    ),
+    True,
+)
+check(
+    "glab issue show is an alias for glab issue view",
+    subject.command_views_issue("glab issue show 2282", issue, stems["view_cli"]),
+    True,
+)
+check(
+    "glab TTY-style 'closed • ...' summary line counts as closed",
+    subject.result_is_closed("closed • closed by @someone Aug 26, 2026"),
+    True,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -471,6 +511,32 @@ glab = write_transcript([
 ])
 out = run_hook(glab)
 check("glab view + git ls-remote is silent", warned(out), False)
+
+glab_show_closed = write_transcript([
+    user("Implement https://gitlab.com/acme/proj/-/issues/44"),
+    tool("Bash", {"command": "glab issue show 44"}, "g2"),
+    result("closed • closed by @someone Aug 26, 2026", "g2"),
+    tool("Bash", {"command": "git ls-remote --heads origin main"}, "l2"),
+])
+out = run_hook(glab_show_closed)
+check("glab issue show discharges the view half", kind_of(out), "closed")
+
+comments_only = write_transcript([
+    NAMING,
+    tool(
+        stems["view_mcp"],
+        {"issue_number": 2282, "method": "get_comments"},
+        "c1",
+    ),
+    result('[{"body": "a comment"}]', "c1"),
+    FETCH,
+])
+out = run_hook(comments_only)
+check(
+    "issue_read method=get_comments does not discharge VIEW_ISSUE",
+    warned(out),
+    True,
+)
 
 wrong_n = write_transcript([
     NAMING,

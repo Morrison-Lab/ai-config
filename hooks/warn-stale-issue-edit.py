@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """PreToolUse reminder: issue-driven edits without a fresh issue and remote check.
 
-[`check-history`](../skills/check-history/SKILL.md) already names the two
-checks --- confirm the issue still needs a new PR, and re-read it against
-current default-branch state --- but that rule is consulted at read time and
-broken at the first `Write`/`Edit`. The omission has no artifact, which is
-why a memory bullet does not catch it.
+[`check-history`](../skills/check-history/SKILL.md) already names an
+issue-state check (VIEW_ISSUE: is the issue already resolved on `main`?) and
+an open-PR check (LIST_PRS: does an existing PR already cover it?), but that
+rule is consulted at read time and broken at the first `Write`/`Edit`. The
+omission has no artifact, which is why a memory bullet does not catch it.
+Neither of `check-history`'s own checks confirms the *local checkout* is
+fresh against the remote default branch, which is the gap this hook adds a
+check for.
 
 WHAT HAPPENED
 -------------
@@ -52,10 +55,10 @@ Fires only when ALL of these hold:
        (b) a remote/default-branch read.
 
 VIEW_ISSUE and FETCH stems are read from `tool-mappings.yml` so a GitHub MCP
-spelling counts, not only `gh issue view`. GitLab `glab issue view` and
-`git ls-remote` / `git pull` are extra live-read forms the mapping file does
-not currently list; they discharge the matching half, they do not replace
-it.
+spelling counts, not only `gh issue view`. GitLab `glab issue view` (and its
+documented `glab issue show` alias) and `git ls-remote` / `git pull` are
+extra live-read forms the mapping file does not currently list; they
+discharge the matching half, they do not replace it.
 
 A check that appears ONLY BEFORE the naming message is stale for this
 request --- leftover from an earlier task in the same session.
@@ -137,6 +140,12 @@ RX_FETCH_EXTRA = re.compile(
 )
 
 RX_HEADER_CLOSED = re.compile(r"^state:\s*closed\b", re.I | re.M)
+# `glab issue view`'s TTY-rendered summary line leads with the state word
+# followed by a bullet rather than a `state:` key ("closed • closed by
+# ..."); a piped/non-TTY capture can still carry this shape depending on
+# glab's renderer. Matched separately from RX_HEADER_CLOSED so the `gh`
+# key-value format is not loosened.
+RX_TTY_STATE_CLOSED = re.compile(r"^\s*closed\b\s*[•·]", re.I | re.M)
 
 # Fallback stems if tool-mappings.yml cannot be read. Tests that care about
 # the mapping file load it directly; these keep the hook failing open rather
@@ -148,8 +157,8 @@ FALLBACK_FETCH_CLI = "git fetch"
 NOTE_MISSING = """\
 Issue-driven edit without a fresh state check for {label}.
 
-`check-history` requires both of these AFTER the request that named the
-issue, before the first source/config edit:
+Confirm both of these AFTER the request that named the issue, before the
+first source/config edit:
 
   1. issue state (VIEW_ISSUE): `gh issue view {number}` or the mapped
      GitHub MCP tool (`{view_mcp}`), or `glab issue view {number}`
@@ -376,7 +385,9 @@ def command_views_issue(command, issue, view_cli):
         return False
     text = strip_heredocs(command)
     number = re.escape(issue["number"])
-    stems = [view_cli, "glab issue view"]
+    # "show" is a documented alias for "view" in gitlab-org/cli, so a live
+    # `glab issue show N` must discharge exactly like `glab issue view N`.
+    stems = [view_cli, "glab issue view", "glab issue show"]
     for stem in stems:
         if not stem:
             continue
@@ -411,11 +422,24 @@ def command_fetches_remote(command, fetch_cli):
 
 
 def mcp_views_issue(name, tool_input, issue, view_mcp):
+    """True when `name`/`tool_input` is a VIEW_ISSUE call for `issue`.
+
+    A `method` field of `get_comments`, `get_labels`, `get_sub_issues`, or
+    `get_parent` reads the issue but is not VIEW_ISSUE (tool-mappings.yml
+    maps `get_comments` to the separate READ_ISSUE_COMMENTS op), and its
+    result carries no top-level `state`, so a closed issue would not be
+    classified as closed. Only `method: get` (or a tool with no `method`
+    field at all) counts.
+    """
     if not isinstance(name, str) or not name:
         return False
     mcp = view_mcp or FALLBACK_VIEW_MCP
     if name != mcp and not name.endswith("issue_read"):
         return False
+    if isinstance(tool_input, dict):
+        method = tool_input.get("method")
+        if isinstance(method, str) and method != "get":
+            return False
     blob = ""
     if isinstance(tool_input, dict):
         try:
@@ -504,7 +528,9 @@ def result_is_closed(text):
         if sep in stripped:
             header = stripped.split(sep, 1)[0]
             break
-    return bool(RX_HEADER_CLOSED.search(header))
+    return bool(
+        RX_HEADER_CLOSED.search(header) or RX_TTY_STATE_CLOSED.search(header)
+    )
 
 
 def evaluate(entries, stems=None):

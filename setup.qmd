@@ -13,39 +13,28 @@ git clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
-`bootstrap.sh` symlinks Claude assets into `~/.claude/`,
-generated Codex wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`,
-Cursor user rules into `${CURSOR_HOME:-$HOME/.cursor}/rules`,
-and --- when no Cursor plugin or Claude skill install is already
-serving the catalog --- Cursor skills into `~/.cursor/skills/`.
-Run it again any time you add a new top-level dir to the repo.
+Claude Code and Cursor install this repo's skills natively as a plugin (see the repo README's per-harness sections).
+`bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
+Codex and Cursor's user-global rules currently have no install path other than a manual symlink or copy of `codex-skills/` / `cursor-rules/` respectively ([ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)) --- except that the Cursor plugin already ships `cursor-rules/` as its user-global rules, so a Cursor plugin install covers that one.
 
 ### Verify the install
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.cursor/rules
+cat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 
-In a Claude Code session, type `/` and confirm skills appear (e.g. `/ardi`, `/scout-peers`).
+In a Claude Code, Codex, or Cursor session with the plugin installed, type `/` and confirm skills appear (e.g. `/ardi`, `/scout-peers`).
 
-In Codex, the wrappers appear as skills from `${CODEX_HOME:-$HOME/.codex}/skills`.
-Each wrapper reads the matching canonical workflow from `skills/<name>/SKILL.md`
-and adapts Claude-specific metadata/tools to Codex.
-
-In Cursor, open **Customize -> Rules** and confirm
-the `cursor-rules/` files appear as user rules.
-Skills appear under **Customize -> Skills** from the plugin,
-from `~/.claude/skills`, or from `~/.cursor/skills/`.
+In Cursor, open **Customize -> Rules** and confirm the `cursor-rules/` files appear as user rules (from the plugin).
+Skills appear under **Customize -> Skills** from the plugin.
 
 ## Web (cloud) sessions — this repo
 
-In cloud sessions (claude.ai or remote environments), `bootstrap.sh` can't run
-at startup because the repo isn't on disk yet. The committed `SessionStart` hook
-(`.claude/settings.json` → `.claude/hooks/session-start.sh`) runs `bootstrap.sh`
-once the repo is checked out, symlinking `skills/` and `commands/` into
-`~/.claude/`. The hook is a no-op outside remote sessions (`CLAUDE_CODE_REMOTE`)
-and is idempotent.
+In cloud sessions (claude.ai or remote environments), `bootstrap.sh` can't run at startup because the repo isn't on disk yet.
+Skills and commands need no such step, though: this repo is a native Claude Code plugin (`.claude-plugin/plugin.json`), so a web session working in ai-config itself discovers `skills/` and `commands/` directly.
+The committed `SessionStart` hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`) instead runs `bootstrap.sh` once the repo is checked out, for its remaining job: Gemini CLI / Antigravity config and per-machine dotfiles.
+The hook is a no-op outside remote sessions (`CLAUDE_CODE_REMOTE`) and is idempotent.
 
 The hook also installs **Julia** (via `juliaup`) on first start, if allowed by
 the environment's network policy. See
@@ -81,24 +70,13 @@ Or try it interactively in any Claude Code session:
 
 ::: {.callout-warning}
 
-## Pick one install route
+## Enable the plugin from at most one marketplace
 
-The plugin install and the `bootstrap.sh` symlink install are
-**alternatives, not complements**: both serve the same corpus, so running
-both lists every skill twice (bare `/ardi` plus prefixed `/ai-config:ardi`)
-and blows the skill-listing context budget
-([ai-config#1409](https://github.com/Morrison-Lab/ai-config/issues/1409)).
-On a machine that ran `bootstrap.sh`, leave the plugin disabled --- including
-a consumer repo's checked-in `enabledPlugins` block, which you opt out of
-with `"ai-config@Morrison-Lab": false` in **`.claude/settings.local.json`**.
-Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude
-Code's five, so a `false` there loses to the repo's checked-in `true`
-([settings docs](https://code.claude.com/docs/en/settings)).
-Likewise enable the plugin from at most **one** marketplace:
-`Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin,
-so a second entry is a no-op collision.
-`bootstrap.sh` warns about both cases via
-`scripts/check-plugin-overlap.py`.
+`Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin from the same repo, so only one entry can own the `ai-config:` namespace and the rest are no-op collisions.
+Enabling both lists every skill twice (bare `/ai-config:ardi` from each marketplace) and risks the skill-listing context budget ([ai-config#1409](https://github.com/Morrison-Lab/ai-config/issues/1409)).
+Enable at most one, and opt a specific repo's checked-in `enabledPlugins` block out of the other in **`.claude/settings.local.json`**, not `~/.claude/settings.json`.
+The user scope is the *lowest* of Claude Code's five, so a `false` there loses to the repo's checked-in `true` ([settings docs](https://code.claude.com/docs/en/settings)).
+
 :::
 
 ## `@claude` bot on PRs

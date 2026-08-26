@@ -11,11 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEMINI_DIR="${GEMINI_HOME:-$HOME/.gemini}"
 GEMINI_CONFIG_DIR="${GEMINI_CONFIG_HOME:-$GEMINI_DIR/config}"
 
-# Symlink helper for per-machine installers under dotfiles/
-# shellcheck disable=SC2034  # consumed by the sourced link-one.sh
-LINK_ONE_FIX_HINT="run scripts/check-install.py --fix to replace it with a link, or merge manually"
-# shellcheck source=scripts/lib/link-one.sh
-. "$SCRIPT_DIR/scripts/lib/link-one.sh"
+# Note: scripts/lib/link-one.sh (the symlink helper) is not sourced here.
+# Nothing below uses it -- each dotfiles/*/install.sh that needs it sources
+# its own copy with its own LINK_ONE_FIX_HINT, since a collision at
+# e.g. ~/bin needs different advice than one under ~/.gemini would.
 
 # --- Gemini CLI & Antigravity skills: register skills.json ---
 if [ -d "$SCRIPT_DIR/skills" ]; then
@@ -48,6 +47,8 @@ EOF
     printf 'write skills.json (%s) -> %s/skills\n' "$SKILLS_JSON" "$SCRIPT_DIR"
   elif grep -q "$SCRIPT_DIR/skills" "$SKILLS_JSON" 2>/dev/null; then
     printf 'ok    skills.json (%s/skills already registered)\n' "$SCRIPT_DIR"
+  elif grep -q "$GEMINI_DIR/skills" "$SKILLS_JSON" 2>/dev/null; then
+    printf 'skip  skills.json (%s still names the old %s/skills symlink destination -- delete it and rerun to migrate to the checkout path)\n' "$SKILLS_JSON" "$GEMINI_DIR"
   else
     printf 'skip  skills.json (%s exists but does not register %s/skills)\n' "$SKILLS_JSON" "$SCRIPT_DIR"
   fi
@@ -68,6 +69,8 @@ EOF
     printf 'write plugins.json (%s) -> %s/plugins/ai-config\n' "$PLUGINS_JSON" "$SCRIPT_DIR"
   elif grep -q "$SCRIPT_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
     printf 'ok    plugins.json (%s/plugins/ai-config already registered)\n' "$SCRIPT_DIR"
+  elif grep -q "$GEMINI_CONFIG_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
+    printf 'skip  plugins.json (%s still names the old %s/plugins/ai-config symlink destination -- delete it and rerun to migrate to the checkout path)\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
   else
     printf 'skip  plugins.json (%s exists but does not register %s/plugins/ai-config)\n' "$PLUGINS_JSON" "$SCRIPT_DIR"
   fi

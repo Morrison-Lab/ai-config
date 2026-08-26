@@ -4,8 +4,8 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-This repository relies on native plugin configuration architectures for installation.
-by `bootstrap.sh`.
+Claude Code, Codex, and Cursor install this repo's skills natively as a plugin (see each harness's section below).
+`bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
 
 ## Setup on a new machine
 
@@ -25,22 +25,20 @@ Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
 
 ### Verify the install
 
-After bootstrapping, confirm the symlinks resolved and the skills are visible:
+After bootstrapping, confirm the Gemini/Antigravity registration and the skill catalog are in order:
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config ~/.cursor/rules
+cat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
-python3 scripts/check-harness-installs.py    # audit every installed harness
 ```
 
-In a Claude Code session, type `/` and confirm the skills appear (e.g.
-`/scout-peers`, `/ardi`).
+In a Claude Code, Codex, or Cursor session with the plugin installed (see each harness's section below), type `/` and confirm the skills appear (e.g. `/scout-peers`, `/ardi`).
 
 ### Antigravity & Gemini CLI
 
 `ai-config` natively integrates with **Google Antigravity** (`agy` CLI, Antigravity IDE, and Antigravity 2.0) and **Gemini CLI**:
 
-- **Global Plugin**: `bootstrap.sh` symlinks `plugins/ai-config` to `~/.gemini/config/plugins/ai-config` and registers `~/.gemini/config/plugins.json` and `skills.json`.
+- **Global Plugin**: `bootstrap.sh` writes `~/.gemini/config/plugins.json` and `skills.json`, registering this checkout's `plugins/ai-config` and `skills/` paths directly (no symlink).
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
 ### opencode
@@ -77,7 +75,7 @@ strict `name`/`description` frontmatter. Each wrapper tells Codex to read the
 matching canonical skill from `skills/<name>/SKILL.md` and adapt Claude-only
 metadata or tools to the current Codex session.
 
-`bootstrap.sh` links those wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`.
+`bootstrap.sh` no longer places those wrappers on disk for Codex (see its header comment) --- Codex has no marketplace-plugin mechanism analogous to Claude Code's or Cursor's, so until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), reach `codex-skills/` by symlinking or copying it into `${CODEX_HOME:-$HOME/.codex}/skills` by hand.
 After adding or editing a canonical skill, regenerate the wrappers:
 
 ```sh
@@ -93,15 +91,14 @@ Opening the clone in Cursor loads:
 
 - `AGENTS.md` (and `CLAUDE.md`, for compatibility)
 - project rules in [`.cursor/rules/`](.cursor/rules/)
-- skills from `skills/` once a Cursor plugin or `~/.claude/skills` install is live (Cursor also discovers `~/.claude/skills` and `.claude/skills/`)
+- skills from `skills/` once a Cursor plugin install is live
 
 **User-global rules.**
-`bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
+`bootstrap.sh` no longer places [`cursor-rules/`](cursor-rules/) under `${CURSOR_HOME:-$HOME/.cursor}/rules` (see its header comment), but installing the Cursor plugin below already covers this: `.cursor-plugin/plugin.json`'s `rules` field ships `cursor-rules/` as the plugin's user-global rules, so they apply in every other Cursor workspace once the plugin is installed.
 Files that exist in both `cursor-rules/` and `.cursor/rules/` must stay identical (`scripts/test_cursor_rules_sync.py`).
 
 **Skills in other workspaces.**
-Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`), or let `bootstrap.sh` link each skill into `~/.cursor/skills/` when no plugin and no Claude skill install is already serving the catalog.
-The plugin route and the `~/.cursor/skills` links are alternatives: stacking them lists every skill twice.
+Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`).
 
 To load the plugin from a local checkout without GitHub:
 
@@ -142,13 +139,10 @@ resolving for other models.
 
 ## Claude Code on the web
 
-In cloud (web) sessions you can't run `bootstrap.sh` by hand, and the
-environment "Setup script" runs at build time *before* this repo is checked
-out — so it can't reference `bootstrap.sh` either. Instead, the committed
-`SessionStart` hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`)
-runs `bootstrap.sh` once the repo is on disk, symlinking `skills/` and
-`commands/` into `~/.claude/`. The hook is a no-op outside remote sessions
-(`CLAUDE_CODE_REMOTE`) and idempotent, so local machines are unaffected.
+In cloud (web) sessions you can't run `bootstrap.sh` by hand, and the environment "Setup script" runs at build time *before* this repo is checked out — so it can't reference `bootstrap.sh` either.
+Skills and commands need no such step, though: this repo is a native Claude Code plugin (`.claude-plugin/plugin.json`), so a web session working in ai-config itself discovers `skills/` and `commands/` directly.
+The committed `SessionStart` hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`) instead runs `bootstrap.sh` once the repo is on disk, for its remaining job: Gemini CLI / Antigravity config and per-machine dotfiles.
+The hook is a no-op outside remote sessions (`CLAUDE_CODE_REMOTE`) and idempotent, so local machines are unaffected.
 
 The same hook also installs **Julia** (via `juliaup`) on the first session
 start, since the base web image ships none. The install is guarded (a no-op
@@ -205,13 +199,10 @@ sessions with marketplace auto-update pick up the latest automatically.
 
 ## Use these skills with this repo's own `@claude` bot
 
-The two mechanisms above cover the **CLI** (`~/.claude/skills` via `bootstrap.sh`)
-and **other repos' cloud sessions** (the plugin marketplace). The third surface
-is the `@claude` **CI bot** running on *this* repo's PRs/issues
-(`.github/workflows/claude-bot.yml`).
+The two mechanisms above cover the **CLI** (the Claude Code plugin, or Gemini CLI / Antigravity via `bootstrap.sh`) and **other repos' cloud sessions** (the plugin marketplace).
+The third surface is the `@claude` **CI bot** running on *this* repo's PRs/issues (`.github/workflows/claude-bot.yml`).
 
-That bot runs `claude-code-action`, which does **not** auto-discover skills from
-`~/.claude` (the runner's home is fresh) or from a plugin unless it's installed.
+That bot runs `claude-code-action`, which does **not** auto-discover skills from `~/.claude` (the runner's home is fresh) or from a plugin unless it's installed.
 It *does* load **project** skills from `.claude/skills/` in the checked-out
 repo.
 
@@ -431,11 +422,9 @@ A hook that is deliberately documented-but-inert says **not registered** in its
 own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
 asserted rather than merely true.
 
-`bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
-directory, so the scripts arrive with no extra step.
-Registering them is separate and deliberately opt-in --- bootstrap is a pure
-symlinker and never edits `settings.json`, since silently rewriting harness
-config while installing skills is the wrong default:
+The Claude Code plugin (`.claude-plugin/plugin.json`, `source: "./"`) is the supported path for the full catalog: its loader auto-discovers [`hooks/hooks.json`](hooks/hooks.json) at the plugin root and registers every hook it names, no separate step needed.
+
+`bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so the non-plugin path below only helps on a machine that already has the scripts there from an install predating that change, or where they were placed some other way:
 
 ```sh
 python3 scripts/install-hooks.py         # report what is registered
@@ -457,8 +446,7 @@ The two registrations carry different command strings ---
 every hook fires twice: the `UserPromptSubmit` hooks inject their context twice
 per turn, and the `Stop` guards' fire-once `/tmp` sentinel becomes a
 check-then-create race between the two copies.
-So pick one path: the plugin for a plugin install, `install-hooks.py --fix` for
-a non-plugin (bootstrap-symlink) install.
+So pick one path: the plugin (the supported route on a fresh machine), or `install-hooks.py --fix` for a non-plugin install whose `~/.claude/hooks` already holds the scripts some other way.
 `install-hooks.py` warns when it detects the plugin already enabled in the
 `settings.json` it edits (best-effort --- it cannot see a project-level
 enablement).
@@ -467,10 +455,7 @@ Bindings live in [`hooks/hooks.json`](hooks/hooks.json), in the native Claude
 Code plugin-hooks schema (`hooks` keyed by event) --- a script cannot declare
 its own event, so the file names the event, matcher, and, as tolerated extra
 keys, the `script` and the rule each one enforces.
-The file is dual-purpose: the plugin loader reads it directly when the
-ai-config plugin is enabled, and `install-hooks.py` reads the same file to
-register the hooks into `~/.claude/settings.json` for a non-plugin
-(bootstrap-symlink) install.
+The file is dual-purpose: the plugin loader reads it directly when the ai-config plugin is enabled, and `install-hooks.py` reads the same file to register the hooks into `~/.claude/settings.json` for a non-plugin install.
 
 **A hook that misfires is worse than a missing one**, since it trains everyone
 to work around the guard.
@@ -493,12 +478,10 @@ Neither reaches anyone else before merge --- a branch's `hooks/hooks.json`
 never reaches a consumer, and `--fix` only edits the running machine --- so the
 *script* existing is harmless while merging its entry is activation.
 
-On the plugin path a hook now behaves like a skill --- both go live on merge ---
-so the distinction [`record-learnings`](skills/record-learnings/SKILL.md) draws
-for a new skill, where "the skill becomes available locally immediately (via
-symlink)" is listed as a feature, narrows to the non-plugin path.
-There a symlinked skill is live at once, whereas a hook stays inert until
-someone runs `install-hooks.py --fix`.
+On the plugin path a hook now behaves like a skill --- both go live on merge.
+[`record-learnings`](skills/record-learnings/SKILL.md) lists "the skill becomes available locally immediately" as a feature.
+That described a symlinked non-plugin skill install, which `bootstrap.sh` no longer performs (see *Use these skills* above), so it no longer applies to a fresh machine.
+A hook stays inert either way until its entry merges and, on the non-plugin hook path, someone runs `install-hooks.py --fix`.
 Either way the hazard the gate addresses is the same --- pre-merge
 self-activation --- and neither path allows it.
 
@@ -559,9 +542,9 @@ activated.")
 
 ## What's tracked
 
-- `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`, and Cursor via plugin or `~/.cursor/skills/`)
-- `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
-- `cursor-rules/` --- user-global Cursor rules (`~/.cursor/rules/`)
+- `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, `~/.gemini/skills/` via `bootstrap.sh`)
+- `codex-skills/` --- generated Codex wrappers (no install path yet --- [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352))
+- `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor-plugin/` --- Cursor Plugin manifest (skills, rules, commands)
 - `.cursorignore` / `.geminiignore` --- keep local worktree and Aider residue
@@ -569,7 +552,7 @@ activated.")
 - `AGENTS.md` --- universal vendor-neutral instruction file for all coding agents
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)
-- `commands/` — slash commands (`~/.claude/commands/`)
+- `commands/` — slash commands (Claude Code via plugin install)
 - `memories/` — persistent notes & preferences (symlinked into VS Code Copilot memory dir)
 - `references/` — reviewed reference material / worked examples (e.g. a cloud
   Setup script). Documentation only: `bootstrap.sh` skips it, so it is **not**
@@ -602,9 +585,9 @@ Conventions for fragments:
 - Keep them **ASCII** — write `---` for em-dashes and straight quotes — so the
   lab manual's non-standard-character check passes when it includes them.
 
-`bootstrap.sh` symlinks `shared/` into `~/.claude/`, so `@shared/...` imports
-resolve in local CLI sessions; the `@claude` CI bot reads `shared/` from the
-repo root.
+A session working in this repo's own checkout resolves `@shared/...` imports against the repo root directly (as `CLAUDE.md` does for this very session).
+A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink or copy `shared/` there by hand.
+The `@claude` CI bot reads `shared/` from the repo root.
 
 ### Vendored from wai (`shared/vendored/`)
 
@@ -624,8 +607,8 @@ workflow (`.github/workflows/sync-from-wai.yml`) refreshes them weekly —
 via `Morrison-Lab/gha`'s `sync-shared-fragments` — and opens a PR when the upstream
 files change.
 
-Add more by creating a top-level dir here (e.g., `agents/`,
-`output-styles/`) and rerunning `bootstrap.sh`.
+Add more fragments by creating a top-level dir here (e.g., `agents/`, `output-styles/`).
+`bootstrap.sh` no longer has a generic per-directory symlink step to rerun (see its header comment), so wire a new dir into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.
 
 ## What's deliberately NOT tracked
 
@@ -640,11 +623,10 @@ These are either machine-specific, sensitive, or pure session state:
   and per-CWD memory state, keyed by absolute home path.
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
-- `plugins/` (in `~/.claude`) — managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests and is linked into `~/.gemini/config/plugins/`.)
+- `plugins/` (in `~/.claude`) — managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
+  `bootstrap.sh` registers `~/.gemini/config/plugins.json` with this checkout's path, no symlink.)
 
-If a per-machine variation appears that's worth syncing (e.g., a global
-`CLAUDE.md`), add it as a top-level entry here and update `bootstrap.sh`
-only if it needs special handling beyond a directory symlink.
+If a per-machine variation appears that's worth syncing (e.g., a global `CLAUDE.md`), add it as a top-level entry here and wire it into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.
 
 ## Similar projects
 

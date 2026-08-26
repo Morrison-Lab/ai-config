@@ -50,8 +50,12 @@ jobs:
         # conceptually adjacent pairs score low) that the script's documented
         # scope rests on.
         run: python3 scripts/test_find_near_duplicates.py
-      - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
+      - name: Run harness-ignore-files check tests
+        run: python3 scripts/test_check_harness_ignores.py
+      - name: Check harness ignore files cover local residue
+        run: python3 scripts/check-harness-ignores.py
+      - name: Run Cursor rules-sync tests
+        # cursor-rules/ and .cursor/rules/ must stay identical where they overlap.
         run: |
           python3 scripts/test_cursor_rules_sync.py
       - name: Run PR-monitor installer tests

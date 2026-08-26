@@ -1,10 +1,8 @@
 # Claude Code hooks: manifest, registration, and install failures
 
-How this repo's hooks reach a machine and how that goes wrong --- the native
-`hooks/hooks.json` schema, the split between `install-hooks.py` (which binds)
-and `check-install.py` / `bootstrap.sh` (which place), and the two routes to a
-registered hook whose script is absent, one of which takes the whole `Bash`
-tool down.
+How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and the plugin loader or a manual copy (which places), and the two routes to a registered hook whose script is absent, one of which takes the whole `Bash` tool down.
+`check-install.py`, this file's original placement instrument, was removed along with the symlink install it verified.
+[ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) tracks a replacement, so read every reference to it below as historical.
 
 Split out of [`claude-code.md`](claude-code.md), which had reached the
 1200-line advisory threshold; the harness behaviour that is not about hooks
@@ -166,8 +164,7 @@ The transferable half is not about hooks.
 The operation the operator wanted was composite, it needs two tools, and half of it is worse than none.
 That is [`fail-fast`](../shared/principles/fail-fast.md)'s "partial is worse than absent" one layer out: there the guard is partially *written*, here the guard is complete, correct, and partially *installed*.
 
-- **Do:** run `check-install.py --fix` before `install-hooks.py --fix`, so every script is on disk before anything binds to it.
-  (Inferred from the incident, not given as a user directive.)
+- **Do:** confirm `~/.claude/hooks/<script>` exists before running `install-hooks.py --fix` for it --- there is no automated placement instrument for this any more (see the top of this file), so verify by hand or use the Claude Code plugin path instead, which places and binds together. (Inferred from the incident, not given as a user directive.)
 - **Do:** read a tool's success line as covering that tool's own scope, and name the other half of a composite operation yourself.
 - **Do:** reach for `/reload-plugins` when registered hooks point at absent scripts that do exist in the checkout.
 - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.

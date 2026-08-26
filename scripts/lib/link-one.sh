@@ -2,19 +2,20 @@
 # link_one -- symlink a repo path into a consumer location, never clobbering
 # whatever is already there.
 #
-# Sourced by bootstrap.sh (which installs into ~/.claude, ~/.codex, ~/.gemini)
-# and by the per-machine installers under dotfiles/ (which install into ~/bin,
-# ~/.local/bin, ~/.config/...). It lives here so those two callers share one
-# implementation rather than each carrying a copy that can drift.
+# Sourced by the per-machine installers under dotfiles/ (which install into
+# ~/bin, ~/.local/bin, ~/.config/...). bootstrap.sh itself no longer sources
+# this -- it stopped placing anything under ~/.claude, ~/.codex, or
+# ~/.cursor in favor of native plugin installs (see its header comment).
+# This helper lives in its own file so multiple dotfiles installers can share
+# one implementation rather than each carrying a copy that can drift.
 #
 # Usage:
 #   LINK_ONE_FIX_HINT="how to resolve a collision in this context"   # optional
 #   . "<repo>/scripts/lib/link-one.sh"
 #   link_one /abs/path/in/repo /abs/path/at/destination
 #
-# The hint is a parameter because the two callers resolve a collision
-# differently: bootstrap.sh points at scripts/check-install.py --fix, which
-# only knows about ~/.claude, so it would be wrong advice for a dotfile.
+# The hint is a parameter because each caller resolves a collision
+# differently for its own destination directory.
 
 # Advice printed when a real (non-symlink) path blocks the link. Overridable by
 # the caller; the default says nothing tool-specific.

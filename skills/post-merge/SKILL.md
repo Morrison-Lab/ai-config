@@ -783,10 +783,15 @@ the merged content in one commit; it decides nothing, so do not skip the
 instrument when it comes back empty.
 
 Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md)
-point 2, the `~/.claude` consumer copies, which already owns the mechanics: run
-`check-install.py --fix` first so the script is on disk before anything binds
-to it, check `enabledPlugins` before `--fix` since the plugin path already
-loads every hook and a second registration makes each one fire twice, compare
+point 2, the `~/.claude` consumer copies, which already owns the mechanics: if
+the Claude Code plugin is enabled, its loader already picked up the merged
+hook the moment `main` moved, so there is nothing to run.
+Otherwise (`install-hooks.py --fix`'s non-plugin path), check `enabledPlugins`
+first since the plugin path already loads every hook and a second
+registration makes each one fire twice, confirm `~/.claude/hooks` actually
+holds the merged script first --- `bootstrap.sh` no longer places it there
+(see its header comment; tracked as
+[#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)) --- compare
 the printed `examined N` against the current `hooks/hooks.json` before
 believing a clean report, and say that hooks connect at session start so a
 mid-session `--fix` arms nothing until a restart.

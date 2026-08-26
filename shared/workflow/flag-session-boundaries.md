@@ -24,7 +24,7 @@ It is also self-concealing, because a stopping-point line reads like a completed
 So: **when the final message is not being read by a person --- a non-interactive run whose output is posted somewhere by a harness --- put the declaration inside the substantive reply rather than after it, or omit the declaration.**
 The tell is that nothing about the session resembles a terminal recap: no human is reading turn-by-turn, and the "session" is a single automated invocation whose whole output is one artifact.
 
-- **Do:** end with the declaration in an interactive session, where a person reads the recap (though for non-clean stopping points, pending work may follow it).
+- **Do:** end with the declaration in an interactive session, where a person reads the recap (though for non-clean stopping points, pending work may follow the declaration).
 - **Do:** fold it into the substantive message, or leave it out, when a harness will post your last message verbatim.
 - **Don't:** emit a bare declaration as a separate final message in a CI run --- that is the whole failure, and it looks like compliance.
 - **Don't:** assume the harness concatenates your turn.

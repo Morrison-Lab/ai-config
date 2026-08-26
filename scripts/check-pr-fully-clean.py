@@ -883,7 +883,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
+        is_bot_author = _is_bot_author(author_login)
         verdict = classify_verdict(body)
 
         # Automated reviews must be authored by a recognized bot author.
@@ -900,16 +900,12 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
         author_login = (r.get("author") or {}).get("login", "")
-
-        if is_non_review_notice(body):
-            continue
-
         # A formal review carries a real commit.oid, so admitting one attributes
         # it to HEAD with no body-content check. Scope admission to automated bot
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
+        is_bot_author = _is_bot_author(author_login)
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 

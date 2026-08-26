@@ -1096,3 +1096,40 @@ because the filter ate the two `##[error]` lines naming the real ones.)
   or dump the failing step's segment raw (`sed -n '/step marker/,/end marker/p'`).
 - **Don't:** strip `##[`-prefixed lines while looking for what a checker flagged ---
   that filter removes annotations, and annotations are the findings.
+
+## A file split always trips `check-new-line-breaks`, and the content it flags was never new
+
+`check-new-line-breaks` is diff-scoped by design, specifically to avoid
+reflagging pre-existing formatting drift --- see the comment above the
+`new-line-breaks` job in `.github/workflows/validate.yml`.
+That guarantee assumes `git diff <base>...HEAD` can tell "added" from
+"moved", and it cannot, for the specific shape of an `ai-config#694`-pattern
+split: file A (e.g. `memories/github.md`) is trimmed (modified, not
+deleted), and a chunk of its content becomes a brand-new file B (e.g.
+`memories/gh-cli.md`).
+Git's rename detection only pairs a **deleted** blob against an added one, so
+a modified-not-deleted A never pairs with new file B --- every line of B
+reads as freshly added, and the checker re-lints content that was already
+reviewed and merged in its prior location.
+
+- **Do:** expect this on every future `ai-config#694`-pattern split, and
+  budget time to reformat the flagged (pre-existing) lines rather than
+  treating a red `new-line-breaks` check as evidence something new is wrong.
+- **Do:** fetch the pinned composite action's script directly
+  (`curl -sL "https://raw.githubusercontent.com/Morrison-Lab/gha/<pinned-sha>/check-new-line-breaks/check-new-line-breaks.py"`)
+  and run it locally with `NLB_BASE_REF=$(git rev-parse origin/main)` before
+  pushing, to iterate on the reformat without burning CI cycles or racing the
+  review bot's own runs.
+- **Don't:** read a red `new-line-breaks` check on a split PR as a defect in
+  the new content specifically --- diff the flagged lines against the base
+  tree first; if they exist there verbatim, it's this trap, not a real
+  violation.
+
+(Morrison-Lab/ai-config#2250, 2026-08-26: splitting `## gh (GitHub CLI)` out
+of `memories/github.md` into `memories/gh-cli.md` flagged 23 lines, every one
+verified present verbatim in `origin/main`'s `github.md` at the time.
+Filed the checker-side fix as
+[Morrison-Lab/gha#684](https://github.com/Morrison-Lab/gha/issues/684)
+--- rename/copy-detection in the diff, or a base-tree existence check before
+flagging a line as added --- but until that lands, the workaround above is
+the only path to a green check on a split.)

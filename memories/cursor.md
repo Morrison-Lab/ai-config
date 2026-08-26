@@ -178,8 +178,9 @@ A decoder that skips a later non-empty assistant text
 grades a draft when the child errored after quoting the shape.
 A last assistant message that restates the brief's required shape
 (a plan or an apology that reproduces those four headings)
-passes the heading check.
+is not a report; refuse it.
 The role filter does not exclude it.
+The heading check still passes.
 `parse_report`'s fingerprint regex refuses a placeholder
 (`REVIEWED_COMMIT` requires 7-40 hex characters,
 so a literal placeholder yields no fingerprint and gate 3 refuses).
@@ -473,10 +474,9 @@ Say in the reply that the carve-out was used.
    Skipping a later non-empty assistant text
    to reach an earlier matching one also fails this gate.
    A last assistant message that restates the brief's
-   required shape still passes this heading check;
-   `parse_report`'s fingerprint regex refuses a placeholder
-   and does not refuse a restatement that already
-   carries a real HEAD-matching sha
+   required shape is not a report; refuse it.
+   The heading check and `parse_report` do not refuse a
+   restatement that already carries a real HEAD-matching sha
    ([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
@@ -593,9 +593,10 @@ is the instruction to use this route.
   `no-push-without-self-review` deny of the unprefixed push.
   On a desktop session, do not pair the project adapter
   with native Claude hooks.
-  On Cursor Cloud, do not treat both-present as a
-  Cloud defect to clear by deleting settings
-  (see the pairing rule in the procedure above).
+  On Cursor Cloud, do not treat adapter plus
+  `~/.claude/settings.json` as a Cloud defect
+  to clear by deleting that settings file
+  until the native runner's firing is measured.
   If the dispatch errored, produced no report,
   or produced a report whose fingerprint cannot be recovered
   (including a stale-registered persona),

@@ -78,6 +78,15 @@ HEDGE_PLUS_QMD_ABSOLUTE = (
     HEDGED + "so it can never call those tools to change a file.\n"
 )
 
+# One synthetic per forbidden needle, each carrying the hedge and
+# the discipline sentence, so dropping any other needle still
+# leaves this one able to fail.
+HEDGE_PLUS_NEVER_ALTER = HEDGED + "so it can never alter code.\n"
+HEDGE_PLUS_YOU_HAVE_NO = HEDGED + "You have no Edit or Write access.\n"
+HEDGE_PLUS_WITH_NO = (
+    HEDGED + "with no Edit or Write access, so it can never do that.\n"
+)
+
 passes = failures = 0
 
 
@@ -123,6 +132,18 @@ check(
 check(
     "hedge plus leftover agents.qmd absolute still fails",
     persona_hedges_write_schemas(HEDGE_PLUS_QMD_ABSOLUTE) is False,
+)
+check(
+    "hedge plus 'can never alter code' still fails",
+    persona_hedges_write_schemas(HEDGE_PLUS_NEVER_ALTER) is False,
+)
+check(
+    "hedge plus 'You have no Edit or Write access' still fails",
+    persona_hedges_write_schemas(HEDGE_PLUS_YOU_HAVE_NO) is False,
+)
+check(
+    "hedge plus 'with no Edit or Write access, so it can never' still fails",
+    persona_hedges_write_schemas(HEDGE_PLUS_WITH_NO) is False,
 )
 check(
     "hedged wording passes the predicate",

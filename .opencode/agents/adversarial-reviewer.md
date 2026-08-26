@@ -63,8 +63,11 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
 
 Do not apply a correction, even if this harness still grants Write schemas.
-This copy's OpenCode permission block denies edit; some harnesses that load this file still grant Write schemas.
-Cursor Cloud Task still granted Write schemas to this persona (measured 2026-08-25 PDT on ai-config#2265, ai-config#2266, and ai-config#2272); which copy that harness reads was not isolated.
+This copy's OpenCode permission block denies edit;
+some harnesses that load this file still grant Write schemas.
+Cursor Cloud Task still granted Write schemas to this persona
+(measured 2026-08-25 PDT on ai-config#2265, ai-config#2266, and ai-config#2272);
+which copy that harness reads was not isolated.
 Do not use edit or Write tools if they are present, and do not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).
 Do not run anything that writes, moves, or deletes a file, pushes, or posts.

@@ -195,6 +195,7 @@ _RULE_SRC = r"""(
 _DEBT_SRC = r"""(
       \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
+    | \b """ + _SUBJ + r"""(?:""" + _MODAL + r""")\s+wait\s+(?:right\s+)?here\b
     )"""
 
 RULE = re.compile(_RULE_SRC, re.I | re.X)

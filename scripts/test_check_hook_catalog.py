@@ -12,6 +12,8 @@ the way this particular check could silently pass forever -- a README whose
 table shape changed would otherwise make every set comparison compare nothing.
 """
 import importlib.util
+import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -109,10 +111,21 @@ def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
     return root
 
 
-def run(root):
+def run(root, issue_states="unfetchable"):
+    """Run the copied check. Fixture tests default to unfetchable trackers
+    so they never hit the network and never depend on live issue state.
+    Pass issue_states=None to fetch live (the real-repo case).
+    """
+    env = os.environ.copy()
+    if issue_states is None:
+        env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    elif isinstance(issue_states, str):
+        env["HOOK_CATALOG_ISSUE_STATES"] = issue_states
+    else:
+        env["HOOK_CATALOG_ISSUE_STATES"] = json.dumps(issue_states)
     proc = subprocess.run(
         [sys.executable, str(Path(root) / "scripts" / "check-hook-catalog.py")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=env)
     return proc.returncode, proc.stdout + proc.stderr
 
 
@@ -122,10 +135,11 @@ ALLOW_ROWS = [(s, "PreToolUse", "Bash", f"**not registered ([#{issue}](u))** ---
               for s, issue in sorted(_catalog.KNOWN_UNREGISTERED.items())]
 
 
-def case(name, entries, rows, want_fail, needle=None, heading=None, allowlisted=None):
+def case(name, entries, rows, want_fail, needle=None, heading=None,
+         allowlisted=None, issue_states="unfetchable"):
     with tempfile.TemporaryDirectory() as td:
         root = make_repo(td, entries, rows, heading, allowlisted)
-        rc, out = run(root)
+        rc, out = run(root, issue_states=issue_states)
     ok = (rc != 0) if want_fail else (rc == 0)
     if ok and needle:
         ok = needle in out
@@ -192,6 +206,26 @@ case("allowlisted hook with no README row fails",
      [("a.py", "Stop", "", "blocks x"), test_allow_rows[1]],
      want_fail=True, needle="has no README row", allowlisted=test_allow)
 
+# --- closed-tracker gate (ai-config#2302) ---------------------------------
+# Synthetic allowlist, so these run even after production KNOWN_UNREGISTERED
+# empties. Injected states, so they never hit the network.
+case("open tracker passes",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=False, allowlisted=test_allow, issue_states={"9999": "open"})
+
+case("closed tracker fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="which is closed",
+     allowlisted=test_allow, issue_states={"9999": "closed"})
+
+case("unfetchable tracker skips rather than failing",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=False, needle="SKIP: could not fetch",
+     allowlisted=test_allow, issue_states="unfetchable")
+
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",
      [("a.py", "Stop", "")],
@@ -211,8 +245,14 @@ with tempfile.TemporaryDirectory() as td:
           rc != 0 and "parsed 0 hook rows" in out)
 
 # --- the live corpus: a holding-constant regression guard -----------------
+# Fetch live so a closed production tracker fails this suite, not only the
+# injected closed-tracker case. Drop a leaked HOOK_CATALOG_ISSUE_STATES so
+# the parent environment cannot skip the live fetch.
+live_env = os.environ.copy()
+live_env.pop("HOOK_CATALOG_ISSUE_STATES", None)
 proc = subprocess.run([sys.executable, str(SCRIPT)],
-                      capture_output=True, text=True, cwd=str(ROOT))
+                      capture_output=True, text=True, cwd=str(ROOT),
+                      env=live_env)
 check("the real repo's catalog is consistent", proc.returncode == 0)
 if proc.returncode != 0:
     print(proc.stdout + proc.stderr)

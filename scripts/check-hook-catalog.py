@@ -23,16 +23,26 @@ rather than in anyone's periodic reading. The drift grew by one entry in the ten
 days between #1206 being filed and being fixed, which is the argument for
 gating it rather than only reconciling it once.
 
-This checks three things:
+This checks four things:
 
   1. Every hook registered in `hooks.json` has a README row.
   2. Every hook with a README row is registered in `hooks.json`, unless it is in
      `KNOWN_UNREGISTERED` -- and an allowlisted hook's row must SAY it is not
      registered, so the table never reads as an active guard.
   3. For a hook in both, README's stated event and matcher match the binding.
+  4. Every `KNOWN_UNREGISTERED` tracker is still open. A closed mapped issue is
+     how a hook stays silently inert with a README row that still names a
+     follow-up that will never happen (ai-config#1717 stayed allowlisted after
+     it closed, until #2275 / #2294). Fail, do not warn.
 
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
+
+When a tracker cannot be fetched (offline, timeout, HTTP error), this check
+prints `SKIP` and does not fail. That skip is the documented offline path, not
+a silent pass: the line is visible, and tests assert it. Inject states via
+`HOOK_CATALOG_ISSUE_STATES` (a JSON object of `{issue: state}`, or the token
+`unfetchable`) so tests never hit the network.
 
 Hard-gating rather than advisory. Unlike a file-length threshold, nothing here
 is a judgment call -- the two sets either match or they do not.
@@ -45,6 +55,8 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS_JSON = os.path.join(ROOT, "hooks", "hooks.json")
@@ -66,9 +78,17 @@ README = os.path.join(ROOT, "README.md")
 KNOWN_UNREGISTERED = {
     # Inert BY THE GATE: README's activation rule makes the hooks.json entry
     # itself the plugin-path activation, so this is registered by the
-    # follow-up after its authoring PR merges.
-    "remind-ums-on-scrutiny.py": 2261,
+    # follow-up after its authoring PR merges. Tracker is that open
+    # registration PR, not the closed authoring issue (#2261).
+    "remind-ums-on-scrutiny.py": 2265,
 }
+
+# Public repo (measured 2026-08-26); unauthenticated GET works. A token, when
+# present, stays under a higher rate limit. Override via GITHUB_REPOSITORY.
+DEFAULT_REPO = "Morrison-Lab/ai-config"
+ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
+UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
+API_TIMEOUT_SEC = 10
 
 # The README row of an allowlisted hook must contain this, so the table states
 # the hook is inert rather than describing it as an active guard.
@@ -142,6 +162,90 @@ def documented():
     return out
 
 
+def _injected_states():
+    """Parse HOOK_CATALOG_ISSUE_STATES, or None to fetch live.
+
+    A JSON object maps issue number -> `open`/`closed`. The tokens
+    `unfetchable` / `skip` / empty string mean every tracker is unfetchable
+    (the documented offline path, and the fixture-test default). Invalid JSON
+    fails the check rather than skipping: a malformed injection is a test bug,
+    not an offline run.
+    """
+    raw = os.environ.get(ISSUE_STATES_ENV)
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    if stripped.lower() in UNFETCHABLE_TOKENS:
+        return {}
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        sys.exit(f"FAIL: {ISSUE_STATES_ENV} is not valid JSON: {exc}")
+    if not isinstance(data, dict):
+        sys.exit(f"FAIL: {ISSUE_STATES_ENV} must be a JSON object of "
+                 f"issue-number -> state")
+    out = {}
+    for key, value in data.items():
+        state = str(value).lower()
+        if state not in ("open", "closed"):
+            sys.exit(f"FAIL: {ISSUE_STATES_ENV} has invalid state {value!r} "
+                     f"for #{key}")
+        out[str(key)] = state
+    return out
+
+
+def fetch_issue_state(number):
+    """Return `open` or `closed`, or None when the issue cannot be fetched."""
+    injected = _injected_states()
+    if injected is not None:
+        return injected.get(str(number))
+
+    repo = os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
+    url = f"https://api.github.com/repos/{repo}/issues/{int(number)}"
+    headers = {
+        "User-Agent": "ai-config-check-hook-catalog",
+        "Accept": "application/vnd.github+json",
+    }
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SEC) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    state = str(payload.get("state", "")).lower()
+    if state in ("open", "closed"):
+        return state
+    return None
+
+
+def check_tracker_states():
+    """Fail when an allowlisted hook's mapped issue is closed.
+
+    Returns the extra failure count. A fetch failure prints SKIP and does
+    not count as a failure -- that skip is the documented offline path.
+    """
+    failures = 0
+    for script, number in sorted(KNOWN_UNREGISTERED.items()):
+        state = fetch_issue_state(number)
+        if state is None:
+            print(f"SKIP: could not fetch ai-config#{number} for {script}; "
+                  "not failing the closed-tracker check (offline path; set "
+                  f"{ISSUE_STATES_ENV} to inject a state)")
+            continue
+        if state == "closed":
+            print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+                  f"ai-config#{number}, which is closed, so a closed tracker "
+                  "is keeping the hook silently inert; register the hook, "
+                  "or retarget the allowlist at an open issue")
+            failures += 1
+    return failures
+
+
 def check(reg, doc):
     """Compare the two catalogs. Returns the failure count."""
     failures = 0
@@ -199,6 +303,7 @@ def main() -> int:
     reg = registered()
     doc = documented()
     failures = check(reg, doc)
+    failures += check_tracker_states()
 
     print(f"\n{len(reg)} hooks registered in hooks.json; {len(doc)} documented "
           f"in README ({len(KNOWN_UNREGISTERED)} known unregistered); "

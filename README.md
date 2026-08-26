@@ -400,7 +400,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
-| `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it (not registered -- see ai-config#2261) |
+| `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it (not registered -- see ai-config#2265) |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-09-01) while the standing directive forbids the Copilot request it would demand |
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply after a commit with no later push or PR creation |
@@ -512,6 +512,11 @@ fires.
 A hook that is deliberately documented-but-inert says **not registered** in its
 own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
 asserted rather than merely true.
+A mapped tracker that has closed fails the check, so a closed activation
+issue cannot keep a hook silently inert
+([#2302](https://github.com/Morrison-Lab/ai-config/issues/2302)).
+When the issue cannot be fetched, the check prints `SKIP` and does not
+fail --- that skip is the documented offline path, not a silent pass.
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

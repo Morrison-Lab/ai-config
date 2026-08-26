@@ -259,7 +259,6 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
 Cursor's project adapter skips `no-push-without-self-review.py`
-on Cursor Cloud
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](memories/cursor.md)).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
@@ -395,5 +394,3 @@ Non-obvious caveats worth knowing:
   default; run it as `~/.local/bin/pre-commit run --all-files`.
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
-- **Adversarial review:** the self-review section above;
-  the hand comparison is in [`memories/cursor.md`](memories/cursor.md).

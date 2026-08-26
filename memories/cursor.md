@@ -141,10 +141,15 @@ The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
 Compare that sha to the recorded sha and to `git rev-parse HEAD`.
 If they differ, do not push.
-Resolve what the push would ship with `git push --dry-run`
+Run `git push --dry-run` with the same arguments as the push
+that follows, including the refspec
 (the guard exempts dry-run from review).
-If that output lists refs other than the compared sha,
+If that command fails,
+or you cannot tell from its output which commits would ship,
+or those commits are not the compared sha,
 do not push.
+A new branch's dry-run line is `[new branch]` with no sha;
+compare the destination ref to the branch whose HEAD you recorded.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -155,8 +160,10 @@ This repo's Cursor adapter skips `no-push-without-self-review.py`
 so a failed or skipped dispatch is not caught before the push.
 The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
-that is the CLI-fallback case in
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md).
+obtain a review via the CLI fallback in
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
+and still compare `Reviewed-Commit` by hand;
+do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -207,18 +214,17 @@ is the instruction to use this route.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
-  or `git push --dry-run` lists refs other than that sha,
+  or the same-argv dry-run fails or does not show that sha,
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task`
-  dispatch that returned a usable verdict.
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud.
   If the dispatch errored or produced no report,
-  that is the CLI-fallback case.
+  obtain a CLI review and still compare by hand.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
-  that lists other refs.
+  that used different arguments, failed, or listed other refs.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 

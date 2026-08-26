@@ -169,7 +169,8 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and a CLI second reviewer.
+So the pairing above is now Copilot and a CLI second reviewer
+(`delegate-to-codex` or `delegate-to-opencode`).
 Those two are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing

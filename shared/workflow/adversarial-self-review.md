@@ -54,17 +54,16 @@ On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
 (measured 2026-08-25 PDT on a Grok conductor).
 This repo's Cursor adapter skips `no-push-without-self-review.py`
-on Cursor Cloud,
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT);
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a Cursor `Task`
-dispatch that returned a usable verdict on Cursor Cloud:
+Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud:
 the guard does not run, so the prefix is inert and misreports
-the session.
+the session, including after a Task dispatch that errored.
 If that dispatch errored or produced no report,
-that is the CLI-fallback case above.
+obtain a review via the CLI fallback above
+and still compare `Reviewed-Commit` by hand.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is also the CLI-fallback case above.
 

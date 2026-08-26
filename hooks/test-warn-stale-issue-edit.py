@@ -428,6 +428,20 @@ check(
     False,
 )
 
+same_issue_restatement = write_transcript([
+    NAMING,
+    VIEW,
+    VIEW_OPEN,
+    FETCH,
+    user("yes, implement #2282 as discussed"),
+])
+out = run_hook(same_issue_restatement)
+check(
+    "restating the same issue number does not stale the checks",
+    warned(out),
+    False,
+)
+
 weeks_ago = write_transcript([
     user("the issue 2 weeks ago is why this broke"),
 ])

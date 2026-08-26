@@ -45,8 +45,8 @@ Fires only when ALL of these hold:
      issue (a GitHub/GitLab issue URL, `owner/repo#N`, `issue #N`, or
      implement/fix/closes/resolves + `#N`). Pull URLs do not count.
      The first such message arms the guard. A later message retargets
-     only with a URL or implement/fix/closes/resolves + `#N`; an
-     incidental `owner/repo#N` or `issue #N` citation does not.
+     only with a URL or implement/fix/closes/resolves + `#N` that names
+     a *different* issue; repeating the same number does not.
   3. After that message, the transcript lacks fresh evidence of BOTH:
        (a) a VIEW_ISSUE of that number, and
        (b) a remote/default-branch read.
@@ -313,6 +313,18 @@ def find_issue_ref(text):
     return None
 
 
+def same_issue(left, right):
+    """True when two refs are the same issue number, and owners agree if both named."""
+    if left["number"] != right["number"]:
+        return False
+    if left.get("owner") and right.get("owner") and left.get("repo") and right.get("repo"):
+        return (
+            left["owner"].lower() == right["owner"].lower()
+            and left["repo"].lower() == right["repo"].lower()
+        )
+    return True
+
+
 def issue_label(issue):
     if issue.get("owner") and issue.get("repo"):
         return f"{issue['owner']}/{issue['repo']}#{issue['number']}"
@@ -512,7 +524,10 @@ def evaluate(entries, stems=None):
         found = find_issue_ref(user_text(entry))
         if not found:
             continue
-        if issue is None or found.get("forge") in RETARGET_FORGES:
+        if issue is None or (
+            found.get("forge") in RETARGET_FORGES
+            and not same_issue(found, issue)
+        ):
             naming_idx = idx
             issue = found
     if issue is None:

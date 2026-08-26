@@ -249,18 +249,28 @@ Re-derive which of the two you are in each round rather than carrying the classi
 See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
 
 **Publish a dispatched review verbatim --- the posting session transports it, it does not edit it.**
-When the reviewing subagent returns, its findings list and verdict *are* the review.
-Rewriting them before posting --- summarizing, regrouping, translating into the
-session's own status prose, or softening the verdict --- filters the one
-artifact whose entire value is independence from the authoring session,
-and the summary is written by exactly the party the separate reviewer exists
-to check.
+When the reviewing subagent returns,
+its structured report --- summary, findings, and verdict --- *is* the review.
+Rewriting that report before posting
+--- summarizing it, regrouping it,
+translating it into the session's own status prose,
+or softening the verdict ---
+filters the artifact whose entire value
+is independence from the authoring session.
+A rewrite is authored by exactly
+the party the separate reviewer exists to check.
 A reader cannot tell filtered-out findings from absent ones,
 so a softened publication reads as a cleaner review than occurred.
 
-Post the reviewer's output as received: findings in its order and wording,
-the verdict line intact, attributed to the reviewer, with the reviewed commit
-SHA and a one-line header naming what produced it.
+Post the reviewer's report as received:
+the findings in its order and wording,
+the summary and verdict lines intact,
+attributed to the reviewer,
+with the reviewed commit SHA
+and a one-line header naming what produced it.
+This is the same requirement as the Cursor Cloud route above;
+this section adds that it holds wherever a dispatched review is published,
+not only in that harness.
 The session's own dispositions of the findings (addressed / rebutted / deferred)
 go in separate follow-up comments or commit messages ---
 never interleaved into the published review body.

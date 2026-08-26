@@ -157,9 +157,16 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
   the remote can act between your commands,
   and an armed automation is exactly such an action you scheduled against yourself.
-- **Fix**: Never arm `--auto` while any review finding is open or before an all-clear verdict at HEAD is verified.
-  Arm it only when CI and the review verdict are already verified clean at head --- at which point deferred merging is redundant rather than harmful.
-  Branch protection does not substitute: it gates native approvals, not external review verdicts posted as comments.
-  If findings arrive after arming, disable immediately:
+- **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  Auto-merge fires server-side the moment CI passes,
+  so a review landing seconds later cannot block it,
+  and no reactive disable can win that race.
+  Branch protection does not substitute either:
+  it gates native approvals, not verdicts posted as comments.
+  Merge synchronously instead,
+  only after CI and the all-clear review verdict are both verified clean at the shipping head.
+  If something is found already armed, disable it at once ---
   `gh pr merge <N> --repo <r> --disable-auto`,
-  then verify with `gh pr view <N> --repo <r> --json autoMergeRequest`.
+  verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
+  and treat the PR as unverified until re-checked.
+  Disabling is cleanup, not protection.

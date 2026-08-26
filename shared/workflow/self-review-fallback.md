@@ -124,7 +124,8 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
 **Execute the sequential multi-provider review loop when the primary reviewer fails.**
-Don't stall the PR waiting on the primary bot. Instead, fall back to the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
+Don't stall the PR waiting on the primary bot.
+Instead, fall back to the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 
 Pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent) and query them sequentially, one at a time.
 Do not request them in parallel.

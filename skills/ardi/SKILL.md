@@ -115,10 +115,11 @@ sits unread.
    Re-applying fixes that are already in the tree wastes a round and muddies the diff.
    If *nothing* remains outstanding (every finding is already applied), don't push an empty commit --- skip to step 6 and re-request the review directly.
 
-    **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), do not stall the PR. Instead of parallel fallback requests, you must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
+    **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), do not stall the PR.
+    Instead of parallel fallback requests, you must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 
     This loop requires you to pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent) and query them sequentially, one at a time.
-Do not request them in parallel.
+    Do not request them in parallel.
     **When the loop reaches the local self-review step, don't perform it.**
     Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
     The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).

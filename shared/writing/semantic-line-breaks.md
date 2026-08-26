@@ -441,7 +441,8 @@ segments, while `... continues` stayed one.
 - **Don't:** assume an ellipsis is inert because it is not a sentence end in
   ordinary reading --- the gate matches characters, not intent.
 - **Don't:** skip `--write` on an ellipsis hit thinking the reformatter cannot
-  see it. It shares `_SENT_BREAK_RE`, so `--write` proposes the same split the
+  see it.
+  It shares `_SENT_BREAK_RE`, so `--write` proposes the same split the
   gate flags.
 
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**

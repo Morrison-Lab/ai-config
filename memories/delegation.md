@@ -153,13 +153,16 @@ ours returns prompt content promptly on 1.1.13 ---
 but both are worth knowing before trusting a headless run,
 since each fails silently in its own way.
 
-- **Do:** route heavy read/draft/verify work to `codex` before Claude,
-  and, where an old `agy` invocation still has to be read,
-  keep the prompt immediately after `--print` or bind it with `=`.
+- **Do:** route heavy read/draft/verify work to `opencode`
+  (for zero-cost and local-only tasks)
+  or to `codex` and the `agy` CLI before Claude.
+- **Do:** keep the prompt immediately after `--print`
+  or bind it with `=` when dispatching the `agy` CLI headlessly.
 - **Do:** re-verify any figure a delegate reports,
   since `agy` miscounted a 73-line file by one while reading it correctly.
 - **Don't:** put another flag between `--print` and the prompt ---
-  that flag becomes the prompt, and the exit status is still 0.
+  that flag becomes the prompt,
+  and the exit status is still 0.
 - **Don't:** read "we have agy quota" as "agy is usable".
   Quota and a working invocation are separate facts,
   and the second took five probes plus a review round to establish.

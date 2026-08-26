@@ -242,9 +242,9 @@ The other cases have no guard and are prose rules here.
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
   (foreground, read-only) for the pre-push self-review gate,
   and report which agent produced the verdict.
-- **Do:** chase a cross-model, cross-harness reviewer
-  on top of it wherever reachable ---
-  recommended at the push gate, required by the merge gate.
+- **Do:** at merge time, satisfy the separate cross-model, cross-harness
+  gate defined under "Cross-model and cross-harness reviews are required
+  for merging" above.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.

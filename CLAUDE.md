@@ -182,7 +182,7 @@ One such budget remains, and the standing preference is to try it first: `codex`
 Scope corrected 2026-08-23: the interactive subscription/extension is unaffected and not at quota.
 ai-config#1776 tracks the retirement.
 `opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
-`memories/delegation.md` carries the rule and the usage-window semantics, and keeps the `agy` mechanics as history rather than as a destination.
+`memories/delegation.md` carries the rule and the usage-window semantics across `opencode`, `codex`, and `agy` (CLI available since 2026-08-25; API retired).
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**

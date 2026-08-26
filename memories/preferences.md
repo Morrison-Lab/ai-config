@@ -975,6 +975,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 Moved to [delegation.md](delegation.md) --- the cost-first order,
 usage-window rules, and headless dispatch mechanics live there.
+
 ## Ephemeral-session commit tension
 
 - **In an ephemeral remote/web session, a repo's "commit only after render/lint/spell pass" rule can conflict with a session-end stop-hook that demands uncommitted work be committed+pushed immediately** (the container gets reclaimed, so leaving edits uncommitted risks losing them entirely --- a worse outcome than an unverified commit).

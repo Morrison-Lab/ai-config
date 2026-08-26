@@ -171,3 +171,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
   and treat the PR as unverified until re-checked.
   Disabling is cleanup, not protection.
+
+## Pattern 13: Forgetting to Undraft a Review-Ready PR
+- **Mistake**: Pushing a fully completed feature or bugfix but leaving the PR in draft mode. This silently stalls progress because reviewers and automations treat drafts as WIP.
+- **Example**: 2026-08-26 session (ai-config#2295): completed fixes, ran local verification, requested Claude review, but left the PR in draft mode. The user had to manually ask "why is 2295 still in draft mode".
+- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft... Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
+- **Fix**: Right after a final push to a PR that completes its implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`). Do this before dispatching review workflows or yielding to the user.

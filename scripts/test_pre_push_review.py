@@ -127,7 +127,7 @@ class TestPrePushReview(unittest.TestCase):
             "Verdict: Ready for merge.\n\n"
             "### Critical Findings\n"
             "None.\n\n"
-            "### Observations\nThe reviewed change is safe to merge.\n\n"
+            "### Observations\n[INFO] The reviewed change is safe to merge.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
@@ -734,8 +734,8 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\n"
-            "Non-blocking issue found in documentation.\n"
-            "This is a non-blocking bug.\n\n"
+            "[INFO] Non-blocking issue found in documentation.\n"
+            "[INFO] This is a non-blocking bug.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
@@ -752,10 +752,10 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations\n"
-            "No P0 issues.\n"
-            "Zero P1 bugs.\n"
-            "There are non-blocking findings.\n"
-            "No P2 flaws.\n\n"
+            "[INFO] No P0 issues.\n"
+            "[INFO] Zero P1 bugs.\n"
+            "[INFO] There are non-blocking findings.\n"
+            "[INFO] No P2 flaws.\n\n"
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
@@ -865,6 +865,22 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIsNone(reviewer.run_cursor_review(huge_prompt))
 
 
+    
+    def test_verdict_observations_header_variants(self):
+        commit = "12345678abcdef00"
+        
+        # Test "## Observations"
+        report1 = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n## Observations\nObservation: The command always crashes before producing output.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report1, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output: unclassified free-text observation", reason)
+
+        # Test "### Observations"
+        report2 = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations\nThe command always crashes before producing output.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report2, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output: unclassified free-text observation", reason)
+
     def test_verdict_contradiction_in_observations(self):
         commit = "12345678abcdef00"
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\nObservation: The command always crashes before producing output.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
@@ -884,17 +900,32 @@ class TestPrePushReview(unittest.TestCase):
     @patch.object(reviewer, "run_codex_review", return_value="report")
     @patch.object(reviewer, "run_claude_review", return_value="report")
     @patch.object(reviewer, "run_opencode_review", return_value="report")
-    def test_alternate_invocation_without_agent_name(self, mock_opencode, mock_claude, mock_codex, mock_cursor, mock_anti):
+    @patch.object(reviewer, "detect_available_engines", return_value=["claude", "codex", "cursor", "antigravity", "opencode"])
+    @patch("sys.stdout.isatty", return_value=True)
+    def test_alternate_invocation_without_agent_name(self, mock_isatty, mock_detect, mock_opencode, mock_claude, mock_codex, mock_cursor, mock_anti):
         import os
         orig_agent = os.environ.get("AGENT_NAME")
         if "AGENT_NAME" in os.environ:
             del os.environ["AGENT_NAME"]
+        
+        # Clear specific env vars that might leak harness status
+        env_vars = ["CLAUDE_SESSION_ID", "GEMINI_SESSION_ID", "ANTIGRAVITY_AGENT", "OPENCODE_SESSION_ID", "CODEX_THREAD_ID"]
+        orig_envs = {k: os.environ.get(k) for k in env_vars}
+        for k in env_vars:
+            if k in os.environ:
+                del os.environ[k]
+                
         try:
             report, label = reviewer.execute_review("alternate", "prompt", exclude_engine="")
             self.assertEqual(report, "report")
         finally:
             if orig_agent is not None:
                 os.environ["AGENT_NAME"] = orig_agent
+            for k, v in orig_envs.items():
+                if v is not None:
+                    os.environ[k] = v
+                elif k in os.environ:
+                    del os.environ[k]
 
 if __name__ == "__main__":
     unittest.main()

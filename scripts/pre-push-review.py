@@ -267,10 +267,10 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
 
-    observations_match = re.search(r"(?i)### Observations & Non-Blocking Suggestions(.*?)(?:###|$)", unfenced_report, re.DOTALL)
+    observations_match = re.search(r"(?i)#{2,3}\s*Observations(?: & Non-Blocking Suggestions)?(.*?)(?:###|$)", unfenced_report, re.DOTALL)
     if is_clean and observations_match:
         obs_body = observations_match.group(1).strip()
-        if obs_body and not re.match(r"^\s*(?:none(?:\.|)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
+        if obs_body and not re.match(r"^\s*(?:none(?:\.|\b)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
             # Check that ALL non-empty lines start with [P3], [P4], [INFO], or a list marker followed by them
             for line in obs_body.splitlines():
                 line = line.strip()

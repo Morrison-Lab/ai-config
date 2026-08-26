@@ -394,8 +394,9 @@ See [`fully-clean.cases.md`](fully-clean.cases.md),
 
 **A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
 
-When a review run skips (e.g. self-modification workflow guard or quota
-limits) and falls back to a self-review or human review per
+When a review run skips
+(e.g. self-modification workflow guard or quota limits)
+and falls back to a self-review or human review per
 [`self-review-fallback`](self-review-fallback.md),
 that fallback lets the ARDI iteration loop proceed
 in the absence of prior unresolved findings.

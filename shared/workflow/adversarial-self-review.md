@@ -23,13 +23,12 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Chasing an additional reviewer is advisory at the push gate.
-At the merge gate it becomes required --- with a distinction the two roles
-must not blur:
-the repo's configured PR reviewer (often `@claude`) satisfies criterion 2 of
-[`fully-clean`](fully-clean.md),
-while this gate needs an author-dispatched reviewer on a different model and
-harness than the authoring session.
+Chasing an additional reviewer remains recommended at the push gate.
+At the merge gate a second, stricter review applies, defined below.
+It is distinct from the repo's configured PR reviewer:
+that reviewer satisfies criterion 2 of [`fully-clean`](fully-clean.md),
+while this gate needs an author-dispatched reviewer
+on a different model and harness than the authoring session.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -54,7 +53,8 @@ From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
 Dispatch in priority order ---
-`agy` CLI or `opencode` first, then `codex` / `claude`, then `cursor` ---
+`agy` CLI or `opencode` first, then `codex`, then `claude`
+(qualifying only for sessions authored outside Claude), then `cursor` ---
 moving down when one is out of quota.
 Known-good headless entry points are the `agy` CLI and `opencode`,
 followed by `codex` and `claude` where installed,
@@ -72,9 +72,10 @@ separate path and remains available --- see
 A retired API never disqualifies a CLI harness
 that operates on a separate path from it.
 
-A second directive the same day sets the merge consequence: "you must not
-merge, even with mwc enabled, unless you have a 100% 'all clear' review
-verdict from an adversarial review".
+A second directive the same day sets the merge consequence:
+"you must not merge, even with mwc enabled,
+unless you have a 100% 'all clear' review verdict
+from an adversarial review".
 
 This **adds** a gate and replaces none.
 Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
@@ -82,8 +83,7 @@ Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
 wherever a repo has one ---
 and an author-dispatched subagent verdict never satisfies that external gate.
 What is added: a merge additionally requires
-a 100% all-clear adversarial verdict at the shipping head,
-delivered by that cross-model, cross-harness reviewer.
+that reviewer's 100% all-clear adversarial verdict at the shipping head.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
@@ -97,7 +97,8 @@ The merge-side rules live with the gate they serve:
 
 - **Do:** for any merge, use a reviewer on a **different model and harness**
   from your own
-  (agy CLI, opencode, codex, claude,
+  (agy CLI, opencode, codex,
+  claude only for sessions authored outside Claude,
   or cursor once its headless dispatch is measured),
   and report which harness produced each verdict.
 - **Don't:** merge anything --- under any grant, `mwc` included ---
@@ -240,6 +241,8 @@ The other cases have no guard and are prose rules here.
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
   (foreground, read-only) for the pre-push self-review gate,
   and report which agent produced the verdict.
+- **Do:** chase a cross-vendor reviewer on top of it wherever reachable ---
+  recommended at the push gate, required by the merge gate.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.

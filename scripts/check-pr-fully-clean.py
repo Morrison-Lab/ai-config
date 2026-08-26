@@ -223,6 +223,8 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "**claude finished": "Claude",
     "### \U0001f916 antigravity agent report": "Antigravity",
     "verdict: block": "Jules",
+    "_posted by codex (ai agent)": "Codex",
+    "_posted by opencode (ai agent)": "OpenCode",
 }
 
 
@@ -271,6 +273,8 @@ REVIEW_BODY_MARKERS = (
     "code review",
     "**claude finished",
     "### verdict",
+    "_posted by codex (ai agent)",
+    "_posted by opencode (ai agent)",
     "verdict:",
 )
 
@@ -917,8 +921,8 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
         verdict = classify_verdict(body)
 
-        # Automated reviews must be authored by a recognized bot author.
-        # A comment whose author is missing, null, or a non-bot account is admitted
+        # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
+        # A comment that is neither from a bot account nor carrying a review agent marker is admitted
         # ONLY if it states a blocking (not-clean) verdict -- fail closed.
         if is_bot_author:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))

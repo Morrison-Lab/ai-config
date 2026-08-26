@@ -74,12 +74,17 @@ jobs:
           python3 scripts/test_codex_plugin_enabled.py
           python3 scripts/test_bootstrap_codex_plugin.py
       - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
+        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills or
+        # ~/.cursor/rules links.
         run: |
           python3 scripts/test_cursor_plugin_enabled.py
           python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
           python3 scripts/test_cursor_hook_adapter.py
+      - name: Run bootstrap consumer-hint tests
+        # check-install.py --fix is Claude-only. A collision in Copilot, Gemini,
+        # Codex, or Cursor must not print that hint (ai-config#2286).
+        run: python3 scripts/test_bootstrap_link_hints.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must

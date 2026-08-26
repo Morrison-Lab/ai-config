@@ -306,6 +306,13 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     ``**Claude finished**`` on line 2 must not inherit Claude's identity.
     Cited finding vocabulary is blanked first so a code span still does not
     match.
+
+    Residual: a shared-login review whose first non-empty line has no known
+    agent marker falls back to the login, so two unmarked ``github-actions``
+    bodies share one identity.
+    Real Claude and Antigravity reviews carry the marker on that first line.
+    Scanning the whole body would re-open the quote-inheritance hole this
+    first-line rule exists to close.
     """
     login = str(author or "").strip()
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())

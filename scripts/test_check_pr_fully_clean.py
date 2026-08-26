@@ -578,6 +578,33 @@ def main() -> int:
         "line does not collapse the two reviewers (#2274)",
         (not fl_ok) and any("Claude" in i and "different reviewer" in i for i in fl_issues),
     )
+    unmarked_ga = (
+        "**Round-2 verification** --- adversarial re-check.\n\n"
+        "### Verdict\n\n**Ready for merge**"
+    )
+    check(
+        "_reviewer_identity: a shared-login body with no first-line agent "
+        "marker falls back to the login",
+        checker._reviewer_identity(unmarked_ga, "github-actions") == "github-actions",
+    )
+    items_unmarked_after_claude = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            unmarked_ga,
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    um_ok, um_issues = checker.check_latest_verdict(items_unmarked_after_claude)
+    check(
+        "check_latest_verdict: an unmarked later all-clear does not clear a "
+        "marked Claude not-clean (#2274 residual: unmarked bodies share the "
+        "login, which is a different identity from Claude)",
+        (not um_ok) and any("Claude" in i and "different reviewer" in i for i in um_issues),
+    )
     items_same_para = [
         items_cross_reviewer[0],
         (

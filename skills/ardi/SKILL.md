@@ -58,13 +58,21 @@ sits unread.
    reach the filter, making a review with real findings look empty.
 
    - **GitHub:**
+     Filter on the body marker, not on an author login.
+     Do not take `| last` as the only review to ARD
+     (ai-config#2274).
+     Claude, Antigravity, and skip notices can all post as `github-actions[bot]`,
+     so a login filter silently drops a standing not-clean.
      ```bash
-     gh pr view <N> --json comments \
-       --jq '[.comments[] | select(.author.login | startswith("claude"))] | last | .body'   # READ_PR_COMMENTS
+     gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+       | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"))] | .[] | {created: .created_at, user: .user.login, body: .body}'   # READ_PR_COMMENTS
      ```
-     The reviewer's bot login varies by setup --- `gh pr view` reports it as `claude`, the REST API as `claude[bot]`, and some setups post as `github-actions[bot]`.
-     `startswith("claude")` matches across `gh pr view` and `gh api`; broaden it if your reviewer posts under another login, or you'll silently read `null` and false-pass.
-     **This command captures the *bot* review only** --- for a **human** reviewer (any login), gather comments with the `ard` skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API), which collects every reviewer's comments regardless of login.
+     Completed Claude runs start the body with `**Claude finished`.
+     Read every matching comment, not only the newest.
+     A later all-clear from a different reviewer does not clear another
+     reviewer's standing not-clean.
+     For a **human** reviewer (any login), also gather comments with the `ard`
+     skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API).
 
      **Copilot code review doesn't post as a PR comment at all -- it's a
      formal GitHub review**, invisible to the command above. Request it

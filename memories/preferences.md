@@ -748,6 +748,8 @@
   Wrong ordering misleads the reader about the correct flow.
 - When a user explicitly says to contribute to an existing PR (for example "this should go on #280"), keep the work on that PR's head branch and push there.
   Do not open a new sibling PR to `main` unless the user asks to supersede the original; if the documented push-scope exception applies (e.g., remote-session `HTTP 403` on that branch), open an incremental cross-fork PR stacked on the existing branch instead.
+  A fork PR opened this way still needs an actual review afterward.
+  See "A skipped fork-PR review check is not a completed review" below --- the target repo's review workflow may skip a fork-originated PR outright, and that skip is not equivalent to a passing review.
 - After pushing to any non-default branch for maintenance work (including ai-config memory/skill branches), explicitly verify whether that branch already has an open PR in the intended base repo before ending the task.
   Check with `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open"` --- not `gh pr list --repo ... --head <owner>:<branch>`, which silently returns empty for an owner-qualified head even when a matching PR exists (verified directly: it returned `[]` against a real open PR that the bare branch-only form found).
   If none exists and upstream is accessible, prepare explicit title and body, show the draft for approval (per the "always show the draft before posting" rule below), then create non-interactively with `--repo`/`--base`/`--head`/`--title`/`--body-file`/`--reviewer`; otherwise hand off that upstream PR creation is still required.
@@ -1129,13 +1131,14 @@ safer/preferred choice merely because the repo has external consumers.
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
 
-## Do not bypass CI guards using known exceptions (like fork PRs) just to turn a check green
+## A skipped fork-PR review check is not a completed review
 
-- **Never create a workaround that circumvents an AI review or security check simply to get a passing status.**
-  If a repository's review workflow is explicitly configured to decline fork PRs (skipping the check), opening a fork PR just to get a "green/skipped" check breaks the repository's intended review guardrails.
-  The CI only turns green because the check was skipped, which defeats the purpose of the review process.
-  - **Do:** If an operation is blocked by a permission boundary (e.g. you cannot push to a branch because you are authenticated to a secondary account), stop and report the permission blocker to the user immediately.
-  - **Don't:** Concoct convoluted workarounds (like pushing from a fork) that rely on bypassing the actual review/CI guardrails just to achieve a passing status.
-  (Learned on ucd-serg.github.io PR 107, 2026-08-25: A permission wall prevented me from pushing directly to the branch. Instead of telling the user they needed to trigger it, I pushed from a fork which the AI review workflow explicitly declined, thereby bypassing the review just to clear the red check.)
+- **Never treat a review check that came back green or skipped, only because a PR is fork-originated, as equivalent to a completed review.**
+  Many repos' review workflows decline fork-originated PRs outright, so a green or skipped check there reflects the decline, not an approval.
+  - **Do:** When the push-scope exception above applies and you open an incremental cross-fork PR, still get an actual review afterward --- a manual review-trigger comment on the original branch, or asking a maintainer to push on your behalf --- rather than treating the fork's skip as sufficient.
+  - **Don't:** Stop pursuing review once a fork-originated PR shows a green or skipped check, and don't open a wholesale replacement PR to route around a stalled review when the underlying problem is the review stalling, not a push-permission wall.
+  (Learned on ucd-serg.github.io, 2026-08-25: PR #107 is an in-repo PR whose review stalled, and its own review later completed normally once triggered manually, with no fork involved.
+  The fork PR was #116, opened stacked on #107's branch per the push-scope exception above.
+  Its review and require-review checks both came back skipped, which this repo's review workflow does for any fork-originated PR, and treating that skip as sufficient --- rather than continuing to pursue #107's own review --- was the mistake.)
 
 

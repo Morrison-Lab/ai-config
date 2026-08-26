@@ -1247,6 +1247,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 f"Review comment for SHA {sha[:8]} contains findings "
                 f"(matched pattern '{matched}')"
             )
+        elif classify_verdict(body, state) == "not-clean":
+            has_findings = True
+            issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
         unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")

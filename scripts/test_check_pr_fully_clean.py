@@ -2123,8 +2123,9 @@ def main() -> int:
               for i in skip_issues))
 
     # Negative control, MINIMAL: the identical body with only the marker phrase
-    # deleted. It must NO LONGER read clean since quorum logic requires an
-    # explicit verdict, which proves the assertion above is about the marker.
+    # deleted. It will still not read clean (because it lacks an explicit
+    # verdict), but it proves the marker's effect because it is now treated as
+    # a review rather than being skipped, producing a different failure reason.
     #
     # The earlier version of this control substituted a whole different body (an
     # Antigravity report with an explicit `Verdict: Clean`), so it routed through
@@ -2139,9 +2140,12 @@ def main() -> int:
           and len(control["body"]) > 0.8 * len(skip_at_head["body"]))
     with patch.object(checker, "run_cmd",
                       return_value=json.dumps({"comments": [control], "reviews": []})):
-        ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
+        ctrl_ok, ctrl_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
     check("negative control: the same body without the marker NO LONGER reads clean (quorum requires explicit verdict)",
           not ctrl_ok)
+    check("negative control: is NOT skipped as a notice (different failure reason)",
+          not any("No automated review" in i or "No review comment" in i
+                  for i in ctrl_issues))
 
     # --- review findings on #1862 ------------------------------------------
     #

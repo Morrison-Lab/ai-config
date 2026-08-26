@@ -6,6 +6,13 @@ import re
 import traceback
 
 def run_hook_command(cmd, claude_payload, cwd, timeout_val):
+    # A timeout or a launch exception returns None, and every caller below
+    # treats that the same way native Claude Code treats a PreToolUse hook
+    # timeout: the hook is skipped and execution continues as if it had
+    # never run (fail-open), not as a denial. This mirrors Claude Code's own
+    # documented behavior rather than diverging from it, since command hooks
+    # there only block via an explicit exit-code-2 (or JSON deny) response,
+    # never via failing to answer at all.
     try:
         result = subprocess.run(
             cmd, 
@@ -225,32 +232,45 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), generic_payload, repo_root, tool_name))
 
         # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
+        system_messages = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
             for hook in hooks_list:
-                cmd = hook.get("command")
+                cmd = hook.get("command") or hook.get("script")
                 if not cmd:
                     continue
                 cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
                 timeout_val = parse_timeout(hook.get("timeout"))
                 if timeout_val is None:
                     timeout_val = 30.0
-                
+
                 result = run_hook_command(cmd, c_payload, cwd, timeout_val)
                 if result and result.returncode == 0 and result.stdout:
                     try:
                         hook_out = json.loads(result.stdout)
+                        # systemMessage is a top-level field Claude Code hooks
+                        # may return on every event, shown to the user rather
+                        # than fed back to the model; forward it regardless
+                        # of the deny/allow decision below.
+                        if hook_out.get("systemMessage"):
+                            system_messages.append(str(hook_out.get("systemMessage")))
                         hso = hook_out.get("hookSpecificOutput", {})
                         if hso.get("permissionDecision") == "deny":
                             base_reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
                             reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
-                            print(json.dumps({"decision": "deny", "reason": reason}))
+                            deny_response = {"decision": "deny", "reason": reason}
+                            if system_messages:
+                                deny_response["systemMessage"] = "\n\n".join(system_messages)
+                            print(json.dumps(deny_response))
                             return
                         if hso.get("additionalContext"):
                             print(f"Warning from {hook.get('script') or cmd}: {hso.get('additionalContext')}", file=sys.stderr)
                     except Exception as exc:
                         print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
-        print(json.dumps({"decision": "allow"}))
+        allow_response = {"decision": "allow"}
+        if system_messages:
+            allow_response["systemMessage"] = "\n\n".join(system_messages)
+        print(json.dumps(allow_response))
         return
 
     elif event_type == "Stop":
@@ -264,15 +284,16 @@ def main():
             stop_payload["transcript_path"] = transcript_path
             
         hooks_to_run = extract_hook_list(stop_groups)
+        warn_messages = []
         for hook in hooks_to_run:
-            cmd = hook.get("command")
+            cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
             timeout_val = parse_timeout(hook.get("timeout"))
             if timeout_val is None:
                 timeout_val = 30.0
-            
+
             result = run_hook_command(cmd, stop_payload, repo_root, timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 try:
@@ -282,36 +303,42 @@ def main():
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
-                    if hook_out.get("systemMessage") or hook_out.get("additionalContext"):
-                        msg = hook_out.get("systemMessage") or hook_out.get("additionalContext")
-                        print(f"Warning from Stop hook: {msg}", file=sys.stderr)
+                    msg = hook_out.get("systemMessage") or hook_out.get("additionalContext")
+                    if msg:
+                        warn_messages.append(str(msg))
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
-        # Standard Antigravity response to allow stopping is an empty JSON object
-        print(json.dumps({}))
+        # A warn-only Stop hook (no block/deny decision) still allows the
+        # agent to stop, but its message is forwarded via the top-level
+        # systemMessage field -- shown to the user in Antigravity's
+        # interface on every event, independent of `decision` -- rather
+        # than dropped after only reaching stderr. No warning still allows
+        # stopping via the standard empty JSON object.
+        if warn_messages:
+            print(json.dumps({"systemMessage": "\n\n".join(warn_messages)}))
+        else:
+            print(json.dumps({}))
         return
 
     elif event_type == "PreInvocation":
         ups_groups = hooks_def.get("hooks", {}).get("UserPromptSubmit", [])
+        # Antigravity's documented PreInvocation payload carries no prompt
+        # text at all (invocationNum, initialNumSteps, conversationId,
+        # workspacePaths, transcriptPath, artifactDirectoryPath, modelName),
+        # so "prompt" / "userPrompt" / "message" and this "messages" scan
+        # are defensive fallbacks for a payload shape this adapter has not
+        # observed in production, not a documented field. The scan only
+        # accepts an entry explicitly authored by the user; it never falls
+        # back to the last entry regardless of role, since that can silently
+        # substitute the model's own prior turn for the user's prompt.
         prompt_val = payload.get("prompt") or payload.get("userPrompt") or payload.get("message") or ""
-        if not prompt_val and isinstance(payload.get("messages"), list) and payload["messages"]:
+        if not prompt_val and isinstance(payload.get("messages"), list):
             for msg in reversed(payload["messages"]):
                 if isinstance(msg, dict) and msg.get("role") in ("user", "human"):
                     prompt_val = msg.get("content") or msg.get("text") or ""
                     break
-            if not prompt_val:
-                for msg in reversed(payload["messages"]):
-                    if isinstance(msg, str):
-                        prompt_val = msg
-                        break
-            if not prompt_val and payload["messages"]:
-                last_msg = payload["messages"][-1]
-                if isinstance(last_msg, dict):
-                    prompt_val = last_msg.get("content") or last_msg.get("text") or ""
-                elif isinstance(last_msg, str):
-                    prompt_val = last_msg
-                
+
         if isinstance(prompt_val, list):
             prompt_val = " ".join(str(p.get("text", p) if isinstance(p, dict) else p) for p in prompt_val)
         elif not isinstance(prompt_val, str):
@@ -331,7 +358,7 @@ def main():
         for hook in hooks_to_run:
             if len(injected_messages) >= 20:
                 break
-            cmd = hook.get("command")
+            cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
             cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)

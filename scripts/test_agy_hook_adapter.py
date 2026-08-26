@@ -895,5 +895,134 @@ class TestAgyHookAdapter(unittest.TestCase):
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out, {})
 
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_event_warn_only_system_message_surfaced(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # A warn-only Stop hook (no block/deny decision) must still surface
+        # its systemMessage in the top-level response rather than dropping
+        # it after only reaching stderr.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Unresolved obligations remain"}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"terminationReason": "model_stop"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("systemMessage"), "Unresolved obligations remain")
+        self.assertNotIn("decision", out)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pretooluse_top_level_system_message_surfaced_on_allow(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "systemMessage": "Remember: this directory is protected.",
+            "hookSpecificOutput": {}
+        }), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}}}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        # Both the "Bash" and the wildcard "*" matcher groups fire for a
+        # run_command call, so the mocked message is forwarded from each.
+        self.assertIn("Remember: this directory is protected.", out.get("systemMessage", ""))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pretooluse_top_level_system_message_surfaced_on_deny(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "systemMessage": "Writing to /etc is not allowed.",
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Unauthorized command"
+            }
+        }), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"toolCall": {"name": "run_command", "args": {"CommandLine": "rm -rf /etc"}}}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertEqual(out.get("systemMessage"), "Writing to /etc is not allowed.")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_assistant_only_messages_yield_empty_prompt(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # An assistant-only (or trailing-assistant) messages list must never
+        # be substituted for the user's prompt: with no user/human-role
+        # entry present, prompt_val stays empty rather than grabbing the
+        # last entry regardless of role.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "context"}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "invocationNum": 1,
+            "messages": [
+                {"role": "assistant", "content": "The assistant's own prior turn"}
+            ]
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["prompt"], "")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_script_key_executes_in_stop_and_pre_invocation(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+        # extract_hook_list's "script" key support (test_extract_hook_list_
+        # supports_script_key) must also be honored by the execution loops,
+        # not just by the list-flattening step.
+        script_hooks_def = {
+            "hooks": {
+                "Stop": [{"script": "python3 /path/to/stop-hook.py"}]
+            }
+        }
+        with patch('builtins.open', mock_open(read_data=json.dumps(script_hooks_def))):
+            mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+            mock_run.return_value = mock_result
+
+            payload = {"terminationReason": "model_stop"}
+            mock_stdin.write(json.dumps(payload))
+            mock_stdin.seek(0)
+
+            self.adapter.main()
+
+        self.assertEqual(mock_run.call_count, 1)
+        self.assertIn("stop-hook.py", mock_run.call_args_list[0].args[0])
+
 if __name__ == "__main__":
     unittest.main()

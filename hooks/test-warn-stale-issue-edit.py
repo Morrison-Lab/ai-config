@@ -308,6 +308,51 @@ check(
     False,
 )
 check(
+    "trailing comment naming the target number does not view",
+    subject.command_views_issue(
+        "gh issue view 99  # this may also relate to 2282",
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "piped grep naming the target number does not view",
+    subject.command_views_issue(
+        "gh issue view 99 --json body -q .body | grep 2282",
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "flag value ending in the target number does not view",
+    subject.command_views_issue(
+        "gh issue view 99 -R Morrison-Lab/ai-config-2282",
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "gh issue view of the target number with trailing flags still views",
+    subject.command_views_issue(
+        "gh issue view 2282 -R Morrison-Lab/ai-config",
+        issue,
+        stems["view_cli"],
+    ),
+    True,
+)
+check(
+    "glab issue show of the target number with trailing flags still views",
+    subject.command_views_issue(
+        "glab issue show 2282 --output json",
+        issue,
+        stems["view_cli"],
+    ),
+    True,
+)
+check(
     "git fetch at command position",
     subject.command_fetches_remote("git fetch origin main", stems["fetch_cli"]),
     True,
@@ -383,6 +428,21 @@ check(
         stems["view_mcp"],
     ),
     True,
+)
+check(
+    "issue_read of a different issue does not view merely because the "
+    "target number appears in an unrelated field",
+    subject.mcp_views_issue(
+        stems["view_mcp"],
+        {
+            "issue_number": 99,
+            "method": "get",
+            "body": "This may also relate to 2282.",
+        },
+        issue,
+        stems["view_mcp"],
+    ),
+    False,
 )
 check(
     "glab issue show is an alias for glab issue view",
@@ -591,6 +651,23 @@ wrong_n = write_transcript([
 ])
 out = run_hook(wrong_n)
 check("view of a different issue number still warns", warned(out), True)
+
+wrong_n_trailing_target = write_transcript([
+    NAMING,
+    tool(
+        "Bash",
+        {"command": "gh issue view 99  # this may also relate to 2282"},
+        "w2",
+    ),
+    result('{"state":"OPEN"}', "w2"),
+    FETCH,
+])
+out = run_hook(wrong_n_trailing_target)
+check(
+    "view of a wrong number with the target trailing on the line still warns",
+    warned(out),
+    True,
+)
 
 heredoc_tx = write_transcript([
     NAMING,

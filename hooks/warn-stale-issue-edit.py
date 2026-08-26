@@ -380,7 +380,19 @@ def _stem_regex(stem):
 
 
 def command_views_issue(command, issue, view_cli):
-    """True when `command` views `issue` at a command position."""
+    """True when `command` views `issue` at a command position.
+
+    The number checked is the CLI's own positional argument --- the first
+    token after the stem --- not any number occurring later on the line.
+    Both `gh issue view` and `glab issue view`/`show` take the issue number
+    (or a URL naming it) as their first positional argument with no flags
+    in between, so requiring the target number to appear in that first
+    token (rather than `[^\\n]*` anywhere on the line) still discharges
+    every documented invocation while refusing a line whose target number
+    only appears in a flag, a trailing comment, or a downstream pipe stage
+    (e.g. `gh issue view 99  # ... 2282`, `... | grep 2282`,
+    `gh issue view 99 -R owner/repo-2282`).
+    """
     if not isinstance(command, str) or not command.strip():
         return False
     text = strip_heredocs(command)
@@ -392,11 +404,13 @@ def command_views_issue(command, issue, view_cli):
         if not stem:
             continue
         pattern = re.compile(
-            CMD_PREFIX + _stem_regex(stem) + rf"\b[^\n]*\b{number}\b",
+            CMD_PREFIX + _stem_regex(stem) + r"\s+(\S+)",
             re.MULTILINE,
         )
-        if pattern.search(text):
-            return True
+        for match in pattern.finditer(text):
+            arg = match.group(1).strip("'\"")
+            if re.search(rf"\b{number}\b", arg):
+                return True
     rest_issue = re.compile(
         CMD_PREFIX
         + rf"gh\s+api\b[^\n]*/issues/{number}(?!\d)(?!/)",
@@ -451,12 +465,18 @@ def mcp_views_issue(name, tool_input, issue, view_mcp):
     number = re.escape(issue["number"])
     if re.search(rf"/issues/{number}\b", blob):
         return True
-    if re.search(
+    # No whole-blob fallback beyond these two shapes: an issue_read of a
+    # DIFFERENT issue whose tool_input happens to mention the target
+    # number in an unrelated field (a title, a body excerpt, a comment)
+    # must not discharge. An /issues/N URL path and an
+    # issue_number/issueNumber/number key are the only documented
+    # VIEW_ISSUE argument shapes; this warn-only hook's stated bias is
+    # toward warning, never toward silent discharge (see module
+    # docstring, WHY WARN RATHER THAN BLOCK).
+    return bool(re.search(
         rf'"(?:issue_number|issueNumber|number)"\s*:\s*{number}\b',
         blob,
-    ):
-        return True
-    return bool(re.search(rf"\b{number}\b", blob))
+    ))
 
 
 def _tool_result_text(entry):

@@ -969,9 +969,9 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > confirmed via a dispatched run's `429: prepayment credits depleted`.
 > Route no API-dispatched subagent work to it.
 > **The API and the CLI are two separate paths: the API is out of commission,
-> but the agy CLI is available** (user clarification, 2026-08-25) --- so
-> headless `agy --print` invocations, including adversarial review dispatch,
-> remain usable.
+> but the agy CLI is available** (user clarification, 2026-08-25),
+> so headless `agy --print` invocations --- including adversarial review
+> dispatch --- remain usable.
 > The interactive subscription/extension is unaffected and not at quota --
 > don't extrapolate this into "uninstall the extension".
 > Tracked as ai-config#1776.
@@ -993,7 +993,6 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 Headless dispatch: `agy --print="<prompt>" [--effort low]`.
 The prompt flag consumes the next token,
 so attach the prompt to the flag and keep other flags outside it.
-Further measured quirks appear in the delegate notes in this section.
 
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)

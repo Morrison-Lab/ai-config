@@ -52,9 +52,9 @@ From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
 Dispatch in independence-and-availability order ---
-`agy` CLI or `opencode` first, then `codex`, then `claude`
-(qualifying only for sessions authored outside Claude) ---
-moving down when one is out of quota.
+`agy` CLI or `opencode` first, then `codex`, then `claude` ---
+where each entry qualifies only if both its model and harness
+differ from the authoring session.
 This review order serves independence and measured availability,
 overriding [`preferences.md`](../../memories/preferences.md)'s cost-first
 delegation order for general work.

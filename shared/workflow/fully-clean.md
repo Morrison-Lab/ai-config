@@ -245,11 +245,10 @@ reviewer meeting [`adversarial-self-review`](adversarial-self-review.md)'s
 independence bar.**
 It composes with the external-reviewer requirement above ---
 neither satisfies the other.
-When that external reviewer self-skips by design ---
-workflow-modification guards are the known case ---
-this gate's cross-model, cross-harness verdict stands in as the independent
-check, and where even that is unreachable, only human approval merges the PR.
-Blocking, retry, and unavailability mechanics live in that fragment.
+When the external reviewer self-skips by design (workflow modification is
+the known case), autonomous merging stays blocked:
+human approval is the only path.
+Specification and mechanics live in that fragment.
 
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".

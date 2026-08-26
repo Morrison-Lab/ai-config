@@ -103,6 +103,7 @@ class TestPrePushReview(unittest.TestCase):
             "### Verification Steps\nNone."
         )
         is_valid, is_clean, _ = reviewer.parse_review_verdict(extended_heading_report)
+        self.assertFalse(is_valid)
         self.assertFalse(is_clean)
 
         # Prefix collisions and unknown verdicts are rejected as invalid (is_valid=False)
@@ -678,7 +679,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(out_agy, valid_report)
         agy_cmd = mock_subproc.call_args[0][0]
         print_idx = agy_cmd.index("--print")
-        self.assertEqual(agy_cmd[print_idx + 1], "prompt_diff")
+        self.assertEqual(agy_cmd[print_idx + 1], "Please review the diff provided on standard input.")
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
@@ -751,6 +752,18 @@ class TestPrePushReview(unittest.TestCase):
         res = reviewer.post_review_to_github(123, "report content", "OpenAI Codex")
         self.assertFalse(res)
 
+
+
+    @patch("shutil.which")
+    def test_post_review_mismatched_sha(self, mock_which):
+        mock_which.return_value = "/usr/bin/gh"
+        old_get_pr_head = reviewer.get_pr_head_sha
+        reviewer.get_pr_head_sha = lambda x: "remote123"
+        try:
+            result = reviewer.post_review_to_github(123, "report", "engine", commit_sha="local456")
+            self.assertFalse(result)
+        finally:
+            reviewer.get_pr_head_sha = old_get_pr_head
 
 if __name__ == "__main__":
     unittest.main()

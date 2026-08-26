@@ -256,7 +256,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     parsed_verdicts = []
     for v_str in verdict_matches:
         v_clean = re.sub(r"[\*`_]", "", v_str).strip()
-        v_split = re.split(r"\s*(?:---|[-:—(])\s*", v_clean, maxsplit=1)
+        v_split = re.split(r"\s*(?:---|[:(]|\s+[-—]\s+)\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
         v_qual = v_split[1].strip().rstrip(").!") if len(v_split) > 1 else ""
 
@@ -320,14 +320,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--print", prompt, "--mode", "plan"]
+    cmd = [agy_path, "--print", "Please review the diff provided on standard input.", "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -348,7 +348,7 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "-p", "--permission-mode", "plan"]
+    cmd = [claude_path, "-p", "Please review the diff provided on standard input.", "--permission-mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
@@ -513,7 +513,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         "ollama": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest", expected_commit_sha=expected_commit_sha), "Local Ollama"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
-        "agy-claude": (lambda p, model="", expected_commit_sha="": run_antigravity_review(p, model=model or "claude-3-7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via Antigravity"),
+        "agy-claude": (lambda p, model="", expected_commit_sha="": run_antigravity_review(p, model=model or "claude-3.7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via Antigravity"),
     }
 
     if engine in ["alternate", "round-robin"]:
@@ -581,6 +581,12 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     if not shutil.which("gh"):
         log_error("gh CLI is not installed or not in PATH; cannot post review to GitHub.")
         return False
+        
+    if commit_sha:
+        remote_sha = get_pr_head_sha(pr_number)
+        if remote_sha and remote_sha != commit_sha:
+            log_error(f"Cannot post review: local HEAD ({commit_sha[:8]}) does not match PR headRefOid ({remote_sha[:8]}). Push your changes first.")
+            return False
 
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 

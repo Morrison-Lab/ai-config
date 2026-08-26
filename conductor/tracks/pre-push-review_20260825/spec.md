@@ -13,7 +13,7 @@ Integrate and standardize the `pre-push-review` tool and skill across all suppor
    - Incorporate universal repository guidelines (`AGENTS.md`) into the prompt.
    - Enforce structured adversarial review output (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
 3. **Forge PR Posting & Attribution Compliance**:
-   - When `--post` is specified, post review verdict/comments directly to GitHub PR via `gh pr review` / `gh pr comment`.
+   - When `--post` is specified, post review verdict/comments directly to GitHub PR via `gh pr comment`.
    - Enforce lab-wide disclosure policy (`_Posted by <Engine> (AI agent) --- not written by a human._`) without robot emojis.
 4. **Skill Packaging & Synchronization**:
    - Maintain canonical `skills/pre-push-review/SKILL.md`.

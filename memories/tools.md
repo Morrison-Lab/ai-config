@@ -404,7 +404,7 @@ The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuati
 `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169);
 it still depends on the stream supporting `reconfigure`.
 ASCII cannot fail the encoding.
-#2080 tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
+Issue [#2080](https://github.com/Morrison-Lab/ai-config/issues/2080) tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
 
 Distinct from the `LC_ALL=C.UTF-8` material in [`fail-fast`](../shared/principles/fail-fast.md) and `memories/debugging.md`, which is an **input**-side problem --- `grep -P` failing to *match* a non-ASCII pattern under a non-UTF-8 locale.
 This one is **output**-side, in the interpreter, on a string the script already holds.

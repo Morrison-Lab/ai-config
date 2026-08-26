@@ -248,6 +248,28 @@ since it is correct about the gate and silent about the capability claim underne
 Re-derive which of the two you are in each round rather than carrying the classification forward.
 See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
 
+**Publish a dispatched review verbatim --- the posting session transports it, it does not edit it.**
+When the reviewing subagent returns, its findings list and verdict *are* the review.
+Rewriting them before posting --- summarizing, regrouping, translating into the
+session's own status prose, or softening the verdict --- filters the one
+artifact whose entire value is independence from the authoring session,
+and the summary is written by exactly the party the separate reviewer exists
+to check.
+A reader cannot tell filtered-out findings from absent ones,
+so a softened publication reads as a cleaner review than occurred.
+
+Post the reviewer's output as received: findings in its order and wording,
+the verdict line intact, attributed to the reviewer, with the reviewed commit
+SHA and a one-line header naming what produced it.
+The session's own dispositions of the findings (addressed / rebutted / deferred)
+go in separate follow-up comments or commit messages ---
+never interleaved into the published review body.
+
+- **Do:** publish the reviewer's findings and verdict verbatim, attributed, with the reviewed commit SHA.
+- **Do:** post your dispositions as separate follow-ups, after the review is on the record.
+- **Don't:** paraphrase, filter, reorder, summarize, or re-frame a review before publishing it.
+- **Don't:** fold your own status framing or "ready" assessment into the published review body.
+
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
 The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.

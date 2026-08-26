@@ -10,18 +10,19 @@ The learning is exactly as real; only the surface that carried it is a review th
 
 So when you Address a finding --- as opposed to Rebut or Defer it, per [`ardi`](ardi.md)'s ARD dispositions --- do two things beyond the fix:
 
-The UMS pass itself now fires earlier than Address: on *reading* the review,
-and on critical feedback or a questioned claim that was wrong, per
-[`run-ums-proactively`](run-ums-proactively.md).
-This section's two steps still attach to Address.
-The read-time pass is the bank; Address is the class-of-mistake write-up.
-
 1. **Record the class of mistake** --- what you overlooked or believed, and what the reviewer saw.
    This is `CLAUDE.md`'s "Run UMS proactively" rule reaching the review loop: record the lesson as the finding is accepted rather than deferring it, with [`ardi`](ardi.md)'s clean-verdict pass as the backstop that catches whatever slipped through, not the trigger to wait for.
    Delegate it to a subagent, per `CLAUDE.md`'s pre-authorized sidecar work, so it does not compete with the round.
 2. **Ask whether it is algorithmatizable**, per [`algorithmatize-checks`](algorithmatize-checks.md).
    A finding with a decidable condition --- a banned token, a stale cross-reference, a missing test for new logic, a doc a diff falsified --- is one a pre-push check or a hook can catch every time thereafter, so the next reviewer never has to.
    That is the mechanism half of `hooks/no-mistake-without-a-hook.py`, one class of mistake over: the reviewer's finding is the incident, and the guard built from it is what turns "the reviewer keeps catching this" into "the reviewer never sees it again".
+
+The UMS pass itself now fires earlier than Address: on *reading* the review,
+and on critical feedback or a questioned claim that was wrong, per
+[`run-ums-proactively`](run-ums-proactively.md).
+This section's two steps still attach to Address.
+The read-time pass is the bank.
+Address is the class-of-mistake write-up.
 
 The lever that actually delivers a clean first push is the pre-push self-review [`ardi`](ardi.md) already requires: the project's own review skills and checks applied to your own diff *before* pushing, so a finding you would have accepted is one you caught first.
 Dispatch that pass rather than performing it --- a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent, per [`adversarial-self-review`](adversarial-self-review.md) --- since the session that wrote the diff is the one party that reads it already knowing what it meant.

@@ -84,15 +84,20 @@ UMS_WORD = getattr(_ums, "UMS_WORD", None)
 # Fetching a PR review or review comments. Deliberately NOT the bare word
 # "review", which appears in almost every ARDI turn and would nag constantly.
 # `issues/N/comments` is the endpoint that carries `**Claude finished` review
-# bodies; include it because that is how this corpus actually reads a review.
-REVIEW_READ = re.compile(
-    r"get_review_comments|get_reviews|"
+# bodies; include it because that is how this corpus actually reads a review
+# (over-firing on a non-PR issue-comment fetch is the accepted cost).
+# Paste markers live in REVIEW_PASTE and are NOT applied to tool_use blobs:
+# a Grep of this file, or an adversarial-reviewer brief that names the
+# verdict heading, is not a review-read.
+REVIEW_FETCH = re.compile(
+    r"get_review_comments|get_reviews|get_comments|"
+    r"pull_request_read|"
     r"/pulls/\d+/(comments|reviews)\b|"
     r"/issues/\d+/comments|"
-    r"gh\s+pr\s+view\b[^\n]*(--comments|\breviews\b)|"
-    r"\*\*Claude finished|### Verdict",
+    r"gh\s+pr\s+view\b[^\n]*(--comments|\bcomments\b|\breviews\b)",
     re.I,
 )
+REVIEW_PASTE = re.compile(r"\*\*Claude finished|### Verdict", re.I)
 
 # User (or reviewer-as-user) questioning a claim. Narrow on purpose: operational
 # "did you push?" and "are you done?" must not match. The given example is
@@ -102,7 +107,6 @@ QUESTIONING = re.compile(
       are\s+you\s+sure\b
     | are\s+you\s+certain\b
     | is\s+that\s+(?:even\s+)?(?:true|correct|accurate|right)\b
-    | did\s+you\s+actually\b
     | (?:i\s+don'?t\s+think|i\s+do\s+not\s+think)\s+that\b
     | that\s+doesn'?t\s+(?:sound|seem)\s+(?:right|correct)\b
     )""",
@@ -113,16 +117,19 @@ QUESTIONING = re.compile(
 # already covers "I was wrong". Extra alternatives here must name that the
 # prior value was displaced, not merely restate the current one.
 #
-# Discriminator (ai-config#2261 review): a contrast against a number
+# Discriminator (ai-config#2261 review): a COMMA contrast against a number
 # ("Actually, it's 12, not 9." / "The figure is 12, not 9 as I said.")
-# is the closed-Q&A path the issue names. "The correct figure is 12" and
-# "Actually, it is 12" restate a confirmed claim and must stay silent.
+# is the closed-Q&A path the issue names. Bare "not N" is not a contrast:
+# "I'm not 100% sure" and "Not 5 minutes ago" must stay silent.
+# "The correct figure is 12" and "Actually, it is 12" restate a confirmed
+# claim and must stay silent too.
 CORRECTION_EXTRA = re.compile(
     r"""(
       i\s+misspoke\b
     | that\s+(?:count|figure|number|claim)\s+was\s+
         (?:wrong|incorrect|off)\b
-    | \bnot\s+\d+\b
+    | ,\s*not\s+\d+\b
+    | not\s+\d+\s+as\s+i\s+said\b
     )""",
     re.I | re.X,
 )
@@ -187,7 +194,7 @@ def scan(path):
 
         if rec_type == "user":
             prose = visible_prose(_text_of(blocks))
-            if REVIEW_READ.search(prose):
+            if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(prose):
                 last_review_at = i
             hit = QUESTIONING.search(prose)
             if hit:
@@ -207,11 +214,12 @@ def scan(path):
                 if not isinstance(inp, dict):
                     inp = {}
                 blob = name + " " + json.dumps(inp)
-                # Write/Edit bodies quote this matcher (the regex itself, a
-                # case record). Searching them treats authoring the rule as
-                # reading a review.
+                # Write/Edit bodies quote fetch patterns and paste markers.
+                # Searching them treats authoring the rule as reading a review.
+                # Paste markers are also omitted from this blob search so a
+                # Grep or reviewer brief that names `### Verdict` stays silent.
                 if name not in ("Write", "Edit", "NotebookEdit"):
-                    if REVIEW_READ.search(blob):
+                    if REVIEW_FETCH.search(blob):
                         last_review_at = i
                 if name in ("Task", "Agent"):
                     ums_blob = (

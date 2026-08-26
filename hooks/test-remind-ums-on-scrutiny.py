@@ -70,7 +70,16 @@ FIX_SHARED = tool("Edit", {
 })
 WRITE_HOOK = tool("Write", {
     "file_path": "hooks/remind-ums-on-scrutiny.py",
-    "content": "REVIEW_READ = re.compile(r'**Claude finished|### Verdict')",
+    "content": "REVIEW_PASTE = re.compile(r'**Claude finished|### Verdict')",
+})
+GREP_VERDICT = tool("Grep", {"pattern": "### Verdict"})
+TASK_VERDICT = tool("Task", {
+    "prompt": "Review origin/main...HEAD. End with ### Verdict: Ready for merge",
+    "description": "adversarial review",
+})
+MCP_COMMENTS = tool("CallDynamicTool", {
+    "toolName": "pull_request_read",
+    "arguments": {"method": "get_comments", "pullNumber": 2262},
 })
 
 
@@ -80,6 +89,7 @@ REMIND = [
     ([Q, CONTRAST], "closed Q&A contrast without admission: it's 12, not 9"),
     ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),
     ([REVIEW], "review comments fetched, no UMS"),
+    ([MCP_COMMENTS], "MCP pull_request_read get_comments is a review-read"),
     ([user("**Claude finished** reviewing HEAD. ### Verdict")],
      "user-pasted review body"),
     ([REVIEW, FIX_SHARED], "editing shared/ after a review-read is the fix"),
@@ -99,10 +109,15 @@ SILENT = [
     ([REVIEW, UMS], "explicit ums after the review-read"),
     ([Q, WRONG, tool("Skill", {"skill": "ums"})], "Skill ums discharges"),
     ([user("did you push the branch?")], "operational did-you is not questioning"),
+    ([user("did you actually push the branch?")], "did you actually push is still operational"),
+    ([Q, txt("I'm not 100% sure, let me check.")], "hedging not-100 is not a contrast correction"),
+    ([Q, txt("Not 5 minutes ago I pushed.")], "Not-N-minutes is not a contrast correction"),
     ([user("are you done with this PR?")], "are you done is not are you sure"),
     ([txt("The `are you sure about that?` example is in the fragment."),
       WRONG], "inline-code mention of the example is not a user question"),
     ([WRITE_HOOK], "writing the matcher into a hook file is not a review-read"),
+    ([GREP_VERDICT], "grepping the verdict heading is not a review-read"),
+    ([TASK_VERDICT], "an adversarial-reviewer brief naming ### Verdict is not a review-read"),
     ([txt("I was wrong about this.")],
      "bare admission without a question is the sibling's case"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),

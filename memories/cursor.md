@@ -126,7 +126,12 @@ How to retrieve that paste or transcript is
 [Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
 Blank fenced blocks before taking that verdict:
 this corpus quotes those strings constantly (ai-config#1297).
+If a fence never closes, treat the report as stating no verdict:
+do not push.
 Take the first `Reviewed-Commit` after that verdict line.
+The last `Verdict:` line must match `Ready for merge` or
+`Needs more work` the way `VERDICT_LINE` does;
+a heading such as `Approved` is not a verdict.
 The `Task` JSON `tool_result` has no review body.
 If you cannot obtain `Reviewed-Commit`, do not push.
 The verdict must be Ready for merge; do not push a Needs more work
@@ -135,9 +140,11 @@ Compare that sha to the recorded sha and to `git rev-parse HEAD`.
 If they differ, do not push.
 If the push refspec is not `HEAD`, compare against that named ref.
 This check covers one named ref.
-It does not cover `--all`, `--tags`, `--mirror`, `--follow-tags`,
-or `push.default=matching`;
-do not treat a matching HEAD sha as covering those pushes.
+If the push is not a single named ref
+(`--all`, `--tags`, `--mirror`, `push.default=matching`,
+a configured `remote.<name>.push`,
+`--recurse-submodules=on-demand|only`),
+do not treat a matching HEAD sha as covering it.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -197,7 +204,8 @@ is the instruction to use this route.
   (fences blanked) and the first `Reviewed-Commit` after it,
   from a harness paste of the child's report or from
   `batch-fetch-details` with `bcIds` and `includeTranscripts: true`.
-  If you cannot obtain it, or the verdict is not Ready for merge,
+  If you cannot obtain it, or a fence never closes,
+  or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
@@ -208,8 +216,8 @@ is the instruction to use this route.
   dispatch that returned a usable verdict.
   If the dispatch errored or produced no report,
   that is the CLI-fallback case.
-- **Don't:** treat a matching HEAD sha as covering `--all`,
-  `--tags`, `--mirror`, or `push.default=matching`.
+- **Don't:** treat a matching HEAD sha as covering a push
+  that is not a single named ref.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 

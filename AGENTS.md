@@ -263,8 +263,9 @@ when that adapter is the active hook path
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](memories/cursor.md)).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
-dispatch that persona through `Task` instead
-(same file).
+dispatch that persona through `Task`
+and compare `Reviewed-Commit` by hand
+([`memories/cursor.md`](memories/cursor.md)).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -394,11 +395,5 @@ Non-obvious caveats worth knowing:
   default; run it as `~/.local/bin/pre-commit run --all-files`.
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
-- **Adversarial review:** when `Task` lists `adversarial-reviewer`,
-  a Cursor Cloud conductor in this repo can dispatch that persona
-  through `Task`
-  (`subagent_type: adversarial-reviewer`,
-  measured 2026-08-25 PDT on this repo).
-  When the conductor is not Claude and a Claude model is listed
-  for `Task`, pass that Claude model on `model`.
-  Details are in [`memories/cursor.md`](memories/cursor.md).
+- **Adversarial review:** the self-review section above;
+  the hand comparison is in [`memories/cursor.md`](memories/cursor.md).

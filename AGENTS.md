@@ -258,9 +258,8 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
-Cursor Cloud's adapter skips that guard
-(see the Cursor Cloud caveat below, and
-[`memories/cursor.md`](memories/cursor.md)).
+Cursor's adapter skips that guard on Cloud and on Desktop
+([`memories/cursor.md`](memories/cursor.md)).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -393,7 +392,7 @@ Non-obvious caveats worth knowing:
 - **Adversarial review:** a Cursor Cloud session dispatches
   `adversarial-reviewer` through `Task`
   (`subagent_type: adversarial-reviewer`,
-  measured 2026-08-26 on this repo).
+  measured 2026-08-25 PDT on this repo).
   When the conductor is not Claude and a Claude model is listed
   for `Task`, pass that Claude model on `model`.
   Details are in [`memories/cursor.md`](memories/cursor.md).

@@ -179,8 +179,9 @@ Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
 `delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
 **dispatches** as a cross-vendor second reviewer.
-`delegate-to-opencode` is another CLI;
-its skill excludes judgment-heavy review on the free and local tiers.
+`delegate-to-opencode` is a further CLI, not a member of that pairing;
+its skill excludes judgment-heavy review on the free and local tiers
+and treats an OpenRouter stealth preview as able to carry it.
 A Cursor Cloud Claude `Task` child is a self-review dispatch
 (see [`memories/cursor.md`](../../memories/cursor.md)),
 not a member of this pairing.

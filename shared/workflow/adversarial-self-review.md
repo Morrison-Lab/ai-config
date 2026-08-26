@@ -51,7 +51,7 @@ Where no second context is reachable at all, say so in the review itself rather 
 
 **Cursor Cloud has a subagent dispatch.**
 Cursor Cloud's `Task` tool is that dispatch when the session can
-resolve the persona (measured 2026-08-26).
+resolve the persona (measured 2026-08-25 PDT).
 On that route the adapter skips the pre-push guard, so do not
 prefix `ALLOW_UNREVIEWED_PUSH=1` as if the subagent were missing.
 The Cursor-specific recipe is in

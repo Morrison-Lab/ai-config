@@ -87,7 +87,7 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud `Task` dispatches `adversarial-reviewer`
 
-Measured 2026-08-26: a Cursor Cloud session can dispatch the
+Measured 2026-08-25 PDT: a Cursor Cloud session can dispatch the
 `adversarial-reviewer` persona through `Task`
 (`subagent_type: adversarial-reviewer`).
 Morrison-Lab/ai-config ships that persona under both `.claude/agents/`
@@ -96,7 +96,7 @@ Which path Cursor Cloud reads was not isolated.
 
 The dispatch this corpus requires is foreground
 (`run_in_background` false).
-Measured 2026-08-26 on a Cursor Cloud Grok conductor in this repo:
+Measured 2026-08-25 PDT on a Cursor Cloud Grok conductor in this repo:
 that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
 `flag-unassigned-worktree.py` warns on every such dispatch
@@ -119,19 +119,24 @@ The push-enforcement check is the parent's reading of the `Task`
 result and the posted PR comment.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
-(that 2026-08-26 conductor listed `claude-opus-5-thinking-high`
+(that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
 on its `Task` model list).
 The `Task` schema documents that omitting `model` inherits the parent.
 That inherit path was not separately observed on a live omit.
-Don't omit `model` when the conductor is not Claude and Claude is listed:
-inherit keeps the author's vendor.
-Self-review is independence from the author.
+A separate context buys independence of intent even if `model` is omitted
+([`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)).
+Passing a listed Claude slug when the conductor is not Claude also buys
+independence of vendor from the author, which inherit does not.
+That is the [#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)
+instruction, not the floor.
 Independence from a Claude primary is the second-reviewer pairing,
 not this dispatch
 ([`self-review-fallback`](../shared/workflow/self-review-fallback.md)).
 
-Measured 2026-08-25: the persona's `tools:` frontmatter is
+Measured 2026-08-25 PDT: the persona's `tools:` frontmatter is
 instruction-level on Cursor Cloud, not a harness filter.
+The `.claude/agents/` copy carries a `tools:` field;
+the `.opencode/` copy uses `permission: edit: deny` instead.
 The Cursor Grok dispatch measured that day on
 [#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266)
@@ -201,7 +206,7 @@ The wrap is
 The identity-only JSON is the parent `Task` `tool_result` for child
 `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
 That comment does not contain the JSON.
-The same author wrap recurred 2026-08-25 on
+The same author wrap recurred 2026-08-25 PDT on
 [#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266).)
 

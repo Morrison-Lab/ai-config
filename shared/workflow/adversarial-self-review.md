@@ -244,7 +244,7 @@ The other cases have no guard and are prose rules here.
   and report which agent produced the verdict.
 - **Do:** at merge time, satisfy the separate cross-model, cross-harness
   gate defined under "Cross-model and cross-harness reviews are required
-  for merging" above.
+  for merging, and the harness list is concrete" above.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.

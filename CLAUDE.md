@@ -186,8 +186,8 @@ then `agy` CLI as availability allows.
 so route no API-dispatched subagent work to it;
 headless `agy` CLI dispatch remains available
 per the 2026-08-25 clarification.
-Scope corrected 2026-08-23: the interactive subscription/extension is unaffected and not at quota.
-ai-config#1776 tracks the retirement.
+Scope corrected 2026-08-23: the interactive subscription/extension is
+unaffected and not at quota.
 `opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
 `memories/delegation.md` carries the rule and the usage-window semantics
 across `opencode`, `codex`, and `agy`

@@ -3,12 +3,12 @@ Use the `⚠️ **FLAG** ---` tag from `CLAUDE.md`'s chat-output-tagging convent
 Place it on one line, at the natural end of that turn's recap (or immediately before a `wrap-up` report).
 Don't interrupt mid-task to say it.
 
-**Always state whether or not the session is at a clean stopping point.** The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
+**Always state whether or not the session is at a clean stopping point.** The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (though for non-clean stopping points, it need not be the absolute final line of the message) (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
 
 **The declaration is for a human reading a recap, so it does not apply where the last message is consumed by a machine instead.**
-The rule says the last message MUST be the declaration.
+The rule says the final element of the last message MUST be the declaration (for a clean stopping point).
 A CI harness that posts an agent's reply to a PR or issue thread typically takes the **last assistant message** and posts that.
-Two rules then claim the same slot, and the declaration wins every time, because it is by construction written last --- so the answer is replaced by a status marker and discarded.
+Two rules then claim the same slot, and the declaration wins every time, because it is by construction written last (or near last) --- so the answer is replaced by a status marker and discarded.
 
 The loss is silent and usually unrecoverable: a run log does not carry the conversation, and such workflows rarely publish the transcript as an artifact.
 It is also self-concealing, because a stopping-point line reads like a completed task, so nobody looking at the thread can tell an answer went missing.
@@ -16,7 +16,7 @@ It is also self-concealing, because a stopping-point line reads like a completed
 So: **when the final message is not being read by a person --- a non-interactive run whose output is posted somewhere by a harness --- put the declaration inside the substantive reply rather than after it, or omit the declaration.**
 The tell is that nothing about the session resembles a terminal recap: no human is reading turn-by-turn, and the "session" is a single automated invocation whose whole output is one artifact.
 
-- **Do:** end with the declaration in an interactive session, where a person reads the recap.
+- **Do:** end with the declaration (or with the pending tasks, if not clean) in an interactive session, where a person reads the recap.
 - **Do:** fold it into the substantive message, or leave it out, when a harness will post your last message verbatim.
 - **Don't:** emit a bare declaration as a separate final message in a CI run --- that is the whole failure, and it looks like compliance.
 - **Don't:** assume the harness concatenates your turn.

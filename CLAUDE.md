@@ -715,9 +715,9 @@ Its second half is the general principle: best practice outranks repo precedent 
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
-The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else).
-Even if it is out of scope for the current task, flag it in chat (`⚠️ **FLAG** ---`).
-File a tracking issue immediately, in a repo we administrate.
+The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else),
+even if it is out of scope for the current task, flag it in chat (`⚠️ **FLAG** ---`),
+and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 

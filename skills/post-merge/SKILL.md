@@ -708,8 +708,8 @@ for both and there is no case where dropping it helps.
 (`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for
 the same reason.)
 
-Then raise it as a `⚠️ **FLAG** ---` in step 5's report.
-Name the tag and what is unreachable until it moves.
+Then raise it as a `⚠️ **FLAG** ---` in step 5's report,
+naming the tag and what is unreachable until it moves.
 An offer is not a flag: say plainly that the slide is owed and that it needs
 the human, the same way
 [`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md)

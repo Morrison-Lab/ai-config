@@ -14,7 +14,7 @@ Runs a local adversarial AI code review on outgoing branch commits using an alte
 ## When this fires
 
 - "adv", "run adv", "get an adversarial review from another model"
-- When the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, OpenCode, Antigravity) without using their primary model's context or quota.
+- When the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model's context or quota.
 
 ## Usage
 

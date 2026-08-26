@@ -61,7 +61,7 @@ Review via Claude model through Antigravity CLI:
 python3 "$REVIEW_SCRIPT" --engine agy-claude
 ```
 
-Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity'):
+Explicitly choose AI engine ('claude', 'cursor', 'codex', 'opencode', or 'antigravity'):
 ```bash
 python3 "$REVIEW_SCRIPT" --engine codex
 ```

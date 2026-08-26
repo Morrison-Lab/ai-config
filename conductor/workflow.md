@@ -1,5 +1,9 @@
 # Project Workflow
 
+> [!NOTE]
+> These workflow rules are specific to Conductor-driven execution tracks and are advisory guidelines for structuring tasks. They do not override the universal lab policies in `AGENTS.md`.
+
+
 ## Guiding Principles
 
 1. **The Plan is the Source of Truth:** All work must be tracked in `plan.md`

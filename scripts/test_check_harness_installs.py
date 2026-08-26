@@ -93,6 +93,27 @@ with tempfile.TemporaryDirectory() as raw:
               leftover.get("cursor/alpha") == "stale")
     else:
         print("SKIP: leftover stacked symlink (platform cannot create it)")
+    check(
+        "Cursor plugin is detected as installed",
+        hc.cursor_plugin_installed(cursor),
+    )
+    write(repo / "cursor-rules" / "live.mdc")
+    try:
+        (cursor / "rules" / "live.mdc").symlink_to(repo / "cursor-rules" / "live.mdc")
+        rule_linked = True
+    except OSError:
+        rule_linked = False
+    if rule_linked:
+        leftover_rules = statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "cursor-rules", cursor / "rules", "cursor"),
+            detail="Cursor plugin already serves this rule",
+        ))
+        check("leftover current rule symlink is stacked, not ok",
+              leftover_rules.get("cursor/live.mdc") == "stacked")
+        check("unlinked leftover rule stays unlinked beside a stacked rule",
+              leftover_rules.get("cursor/base.mdc") == "unlinked")
+    else:
+        print("SKIP: leftover stacked rule symlink (platform cannot create it)")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

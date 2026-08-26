@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -29,11 +30,15 @@ with tempfile.TemporaryDirectory() as raw:
     (repo / "skills" / "ardi").mkdir(parents=True)
     check("empty dirs do not skip skill install",
           mod.skip_reason(cursor, claude, repo) is None)
+    check("empty dirs do not skip rule install",
+          mod.skip_rules_reason(cursor) is None)
 
     local = cursor / "plugins" / "local" / "ai-config"
     local.mkdir(parents=True)
     check("local plugin skips skill install",
           mod.skip_reason(cursor, claude, repo) == "ai-config Cursor plugin is already installed")
+    check("local plugin skips rule install",
+          mod.skip_rules_reason(cursor) == "ai-config Cursor plugin is already installed")
     local.rmdir()
     local.parent.rmdir()
 
@@ -41,6 +46,8 @@ with tempfile.TemporaryDirectory() as raw:
     cached.mkdir(parents=True)
     check("marketplace cache skips skill install",
           "Cursor plugin is already installed" in (mod.skip_reason(cursor, claude, repo) or ""))
+    check("marketplace cache skips rule install",
+          "Cursor plugin is already installed" in (mod.skip_rules_reason(cursor) or ""))
     shutil.rmtree(cursor / "plugins")
 
     listing = cursor / "plugins" / "marketplaces" / "morrison-lab" / "ai-config"
@@ -50,6 +57,10 @@ with tempfile.TemporaryDirectory() as raw:
     check(
         "marketplace catalog clone does not skip skill install",
         mod.skip_reason(cursor, claude, repo) is None,
+    )
+    check(
+        "marketplace catalog clone does not skip rule install",
+        mod.skip_rules_reason(cursor) is None,
     )
     shutil.rmtree(cursor / "plugins")
 
@@ -63,6 +74,8 @@ with tempfile.TemporaryDirectory() as raw:
     if linked:
         check("Claude skill symlink skips Cursor skill install",
               "claude/skills" in (mod.skip_reason(cursor, claude, repo) or "").replace("~/", ""))
+        check("Claude skill symlink does not skip rule install",
+              mod.skip_rules_reason(cursor) is None)
         sibling = root / "worktree"
         (sibling / "skills" / "ardi").mkdir(parents=True)
         check(
@@ -148,8 +161,72 @@ with tempfile.TemporaryDirectory() as raw:
         }
         check("sibling-worktree skill link is stacked", "ardi" in names)
         check("foreign skill link is not stacked", "foreign" not in names)
+        sibling_rule = sibling / "cursor-rules" / "base.mdc"
+        sibling_rule.parent.mkdir(parents=True, exist_ok=True)
+        sibling_rule.write_text("x\n", encoding="utf-8")
+        foreign_rule = root / "other" / "foreign.mdc"
+        foreign_rule.write_text("y\n", encoding="utf-8")
+        rules = cursor / "rules"
+        rules.mkdir(parents=True)
+        (rules / "base.mdc").symlink_to(sibling_rule)
+        (rules / "foreign.mdc").symlink_to(foreign_rule)
+        (rules / "real.mdc").write_text("leave me\n", encoding="utf-8")
+        rule_names = {
+            path.name
+            for path in mod.stacked_cursor_rule_paths(
+                cursor, repo, {repo.resolve(), sibling.resolve()}
+            )
+        }
+        check("sibling-worktree rule link is stacked", "base.mdc" in rule_names)
+        check("foreign rule link is not stacked", "foreign.mdc" not in rule_names)
+        check("real rule file is not stacked", "real.mdc" not in rule_names)
     else:
         print("SKIP: stacked_cursor_skill_paths (platform cannot create symlink)")
+
+with tempfile.TemporaryDirectory() as raw:
+    root = Path(raw)
+    cursor, repo = root / "cursor", root / "repo"
+    repo.mkdir()
+
+    def run_cli(*cli_args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable, str(SCRIPT),
+                "--cursor-dir", str(cursor),
+                "--repo-root", str(repo),
+                *cli_args,
+            ],
+            capture_output=True, text=True, check=False,
+        )
+
+    result = run_cli("--rules")
+    check("--rules exits 1 when no plugin", result.returncode == 1)
+    (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+    result = run_cli("--rules")
+    check("--rules exits 0 when plugin is installed", result.returncode == 0)
+    check(
+        "--rules prints the plugin skip reason",
+        "Cursor plugin is already installed" in result.stdout,
+    )
+    leftover = cursor / "rules" / "000-global-workflow.mdc"
+    leftover.parent.mkdir(parents=True)
+    rule_src = repo / "cursor-rules" / "000-global-workflow.mdc"
+    rule_src.parent.mkdir()
+    rule_src.write_text("x\n", encoding="utf-8")
+    try:
+        leftover.symlink_to(rule_src)
+        cli_ok = True
+    except OSError:
+        cli_ok = False
+    if cli_ok:
+        result = run_cli("--print-stacked-rules")
+        check(
+            "--print-stacked-rules lists this repo's leftover rule link",
+            str(leftover) in result.stdout,
+        )
+        check("--print-stacked-rules exits 0", result.returncode == 0)
+    else:
+        print("SKIP: --print-stacked-rules (platform cannot create symlink)")
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

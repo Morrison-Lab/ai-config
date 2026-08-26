@@ -97,7 +97,11 @@ Opening the clone in Cursor loads:
 - project hooks in [`.cursor/hooks.json`](.cursor/hooks.json), which run the `hooks/` catalog through [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py) (see [Cursor hook mapping](docs/cursor-hook-mapping.md))
 
 **User-global rules.**
-`bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
+Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`),
+or let `bootstrap.sh` link [`cursor-rules/`](cursor-rules/) into
+`${CURSOR_HOME:-$HOME/.cursor}/rules` when no plugin is already serving them.
+The plugin route and the `~/.cursor/rules` links are alternatives:
+stacking them loads every user-global rule twice.
 Files that exist in both `cursor-rules/` and `.cursor/rules/` must stay identical (`scripts/test_cursor_rules_sync.py`).
 
 **Skills in other workspaces.**
@@ -638,7 +642,7 @@ activated.")
 
 - `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`, and Cursor via plugin or `~/.cursor/skills/`)
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
-- `cursor-rules/` --- user-global Cursor rules (`~/.cursor/rules/`)
+- `cursor-rules/` --- user-global Cursor rules (Cursor plugin or `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
 - `.cursor/hooks/` --- adapter that runs the Claude `hooks/` catalog under that schema

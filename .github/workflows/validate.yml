@@ -31,6 +31,13 @@ jobs:
         run: python3 scripts/check-jules-review-workflow.py
       - name: Run Jules-review workflow tests
         run: python3 scripts/test_check_jules_review_workflow.py
+      - name: Check github-actions step-if memory
+        # ai-config#2307: GitHub auto-applies success() unless if: names a
+        # status-check function. This gate fails if the memory reintroduces
+        # the claim that any explicit if: discards that default.
+        run: python3 scripts/check-github-actions-step-if.py
+      - name: Run github-actions step-if memory tests
+        run: python3 scripts/test_check_github_actions_step_if.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
       - name: Check tui-alloc README defaults

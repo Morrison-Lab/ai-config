@@ -1489,8 +1489,8 @@ def main() -> int:
               for i in skip_issues))
 
     # Negative control, MINIMAL: the identical body with only the marker phrase
-    # deleted. It must read clean, which is what proves the assertion above is
-    # about the marker rather than about some other property of the fixture.
+    # deleted. It must NO LONGER read clean since quorum logic requires an
+    # explicit verdict, which proves the assertion above is about the marker.
     #
     # The earlier version of this control substituted a whole different body (an
     # Antigravity report with an explicit `Verdict: Clean`), so it routed through

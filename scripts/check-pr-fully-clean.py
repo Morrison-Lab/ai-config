@@ -1038,7 +1038,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
         unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
         if len(unique_authors) < quorum:
-            issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
+            if len(unique_authors) == 0:
+                issues.append(f"No valid clean review found for HEAD SHA {sha[:8]}.")
+            else:
+                issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:
             print(f"\u2713 Found {len(unique_authors)} clean review(s) evaluating HEAD SHA {sha[:8]}, meeting quorum of {quorum}.")
 

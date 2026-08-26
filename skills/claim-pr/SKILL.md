@@ -12,6 +12,7 @@ Before working a PR/MR or issue — fetching its branch, editing, or running
 `@claude` review cycles — post a brief comment so other people and the
 `@claude` CI bot know not to start a conflicting parallel session. **Resolve**
 (or post a closing comment on) the claim when the session ends.
+Posting a review is in scope too; the firing list below includes it.
 
 ## When this fires
 
@@ -19,8 +20,12 @@ Before working a PR/MR or issue — fetching its branch, editing, or running
   review-and-edit, or an iterative `@claude review` loop that pushes commits.
 - Before any **posted review** of a PR: adversarial review, code-review,
   self-review fallback, or any other pass that will post a SHA-stamped
-  review comment. Post the claim **before** dispatching the reviewer or
-  fetching the branch for review, not after the comment lands.
+  review comment.
+  Post the claim **before** dispatching the reviewer or fetching the
+  branch for review, not after the comment lands.
+  Unclaim-when-the-review-lands applies only to a **review-only** pass.
+  A session that is also driving the branch (implementing, ARDI) keeps
+  its write claim until that work ends.
 - Triggered by a prompt referencing a PR/issue by `#N` or URL that asks you to
   *change* something, **or** to review it and post the verdict.
 
@@ -64,8 +69,10 @@ gh pr comment <N> --body "<agent> is reviewing this PR --- please hold off on pu
 _Posted by <agent> (AI agent) --- not written by a human._"      # COMMENT_PR
 ```
 
-Unclaim that review-pass when the SHA-stamped review comment is posted
+Unclaim that review-only pass when the SHA-stamped review comment is posted
 (see Unclaim below), even if a watch on the PR continues.
+Do not unclaim a still-driving write claim just because a review comment
+landed in the same session.
 
 (`COMMENT_PR` / `COMMENT_ISSUE` are abstract operation tokens — resolve to your
 model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
@@ -79,6 +86,15 @@ so it can be resolved later:
 glab mr note create <N> --message "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
 
 _Posted by Claude Code (AI agent) --- not written by a human._"
+```
+
+A review-only session on GitLab uses the same resolvable discussion,
+with review-shaped wording:
+
+```bash
+glab mr note create <N> --message "<agent> is reviewing this MR --- please hold off on pushing to this branch until the review comment lands.
+
+_Posted by <agent> (AI agent) --- not written by a human._"
 ```
 
 > GitLab MR notes are resolvable discussions by default.
@@ -165,9 +181,13 @@ gh issue comment <N> --body "Done with my local session — unclaiming.
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
 
-After a posted review, unclaim the review-pass as soon as the
+After a **review-only** posted review, unclaim that pass as soon as the
 SHA-stamped review comment lands (the author needs the thread free to
-address findings):
+address findings).
+On GitHub, post a closing comment whose body includes `unclaiming` so
+claim detectors treat it as a release.
+On GitLab, **resolve** the review-claim discussion --- do not post a
+second note, which would leave the unresolved `hold off` discussion live.
 
 ```bash
 gh pr comment <N> --body "Review posted --- unclaiming.

@@ -394,8 +394,18 @@ See [`fully-clean.cases.md`](fully-clean.cases.md),
 
 **A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
 
-When a review run skips (e.g. self-modification workflow guard or quota limits) and falls back to a self-review or human review per [`self-review-fallback`](self-review-fallback.md), that fallback lets the ARDI iteration loop proceed in the absence of prior unresolved findings --- it never satisfies a merge gate.
-It does NOT wipe the slate clean, does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run, and does NOT clear the all-clear merge gate below.
+When a review run skips (e.g. self-modification workflow guard or quota
+limits) and falls back to a self-review or human review per
+[`self-review-fallback`](self-review-fallback.md),
+that fallback lets the ARDI iteration loop proceed
+in the absence of prior unresolved findings.
+It never satisfies an autonomous merge gate:
+an author self-review clears no merge grant,
+while an authentic human review approval does.
+It does NOT wipe the slate clean,
+does NOT license merging over an unaddressed `Needs more work` verdict
+or open finding list from an earlier or concurrent review run,
+and does NOT clear the all-clear merge gate above.
 
 - **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or ready to merge.
 - **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.

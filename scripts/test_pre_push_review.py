@@ -75,7 +75,7 @@ class TestPrePushReview(unittest.TestCase):
         # Missing fingerprint when expected
         is_valid, _, reason = reviewer.parse_review_verdict(valid, expected_commit_sha="99999999")
         self.assertFalse(is_valid)
-        self.assertIn("Mismatched", reason)
+        self.assertIn("mismatch", reason)
 
         # Short fingerprint SHA rejected
         short_sha_report = (
@@ -89,7 +89,7 @@ class TestPrePushReview(unittest.TestCase):
         )
         is_valid, _, reason = reviewer.parse_review_verdict(short_sha_report, expected_commit_sha="b2c4191f")
         self.assertFalse(is_valid)
-        self.assertIn("short", reason)
+        self.assertIn("mismatch", reason)
 
         # NOT APPROVED, DISAPPROVED, Never approve, Do not approve are NOT clean
         for neg in [
@@ -168,7 +168,7 @@ class TestPrePushReview(unittest.TestCase):
             expected_commit_sha="12345678abcdef00",
         )
         self.assertFalse(is_valid)
-        self.assertIn("Mismatched", reason)
+        self.assertIn("mismatch", reason)
 
         # Contradictory fingerprints in the same report (one matching, one differing) is rejected
         contradictory_report = (
@@ -183,7 +183,7 @@ class TestPrePushReview(unittest.TestCase):
         )
         is_valid, is_clean, reason = reviewer.parse_review_verdict(contradictory_report, expected_commit_sha=commit)
         self.assertFalse(is_valid)
-        self.assertIn("Mismatched or contradictory", reason)
+        self.assertIn("mismatch", reason)
 
         # Clean verdict followed by Needs work verdict yields is_clean=False
         multiple_verdicts_report = (
@@ -503,7 +503,14 @@ class TestPrePushReview(unittest.TestCase):
             with patch.object(reviewer, "log_error") as mock_log_error:
                 report, label = reviewer.execute_review("alternate", "prompt text")
                 self.assertIsNone(report)
-                mock_log_error.assert_called_with("No alternate AI CLI found (invoking agent 'codex' was excluded).")
+                mock_log_error.assert_called_with("No alternate AI CLI found (invoking agents ['codex'] were excluded).")
+
+        # When multiple harness markers coexist, ALL are excluded
+        mock_detect.return_value = ["claude", "codex", "antigravity"]
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": "111", "ANTIGRAVITY_AGENT": "1"}, clear=True):
+            with patch.object(reviewer, "get_next_alternate_engine", return_value="claude") as mock_get_next:
+                reviewer.execute_review("alternate", "prompt text")
+                mock_get_next.assert_called_with(["claude"])
 
     @patch("subprocess.run")
     def test_resolve_diff_local(self, mock_subproc):

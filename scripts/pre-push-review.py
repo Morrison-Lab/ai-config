@@ -182,13 +182,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         exp_sha = expected_commit_sha.lower()
         for found_sha_raw in sha_matches:
             found_sha = found_sha_raw.lower()
-            if len(found_sha) < 7 or len(exp_sha) < 7:
-                return False, False, f"Fingerprint SHA too short: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
-            if len(found_sha) > 40:
-                return False, False, f"Fingerprint SHA too long: found {found_sha_raw!r}."
-            min_len = min(len(found_sha), len(exp_sha))
-            if found_sha[:min_len] != exp_sha[:min_len]:
-                return False, False, f"Mismatched or contradictory Reviewed-Commit fingerprint: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
+            if found_sha != exp_sha:
+                return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", unfenced_report)
     if not verdict_matches:
@@ -513,23 +508,24 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 
     if engine in ["alternate", "round-robin"]:
         available = detect_available_engines()
-        invoker = ""
+        invokers = set()
         if os.environ.get("CLAUDE_SESSION_ID"):
-            invoker = "claude"
-        elif os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
-            invoker = "antigravity"
-        elif "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
-            invoker = "cursor"
-        elif os.environ.get("CODEX_THREAD_ID") or "codex" in os.environ.get("AGENT_NAME", "").lower():
-            invoker = "codex"
-        elif os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
-            invoker = "opencode"
+            invokers.add("claude")
+        if os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
+            invokers.add("antigravity")
+        if "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
+            invokers.add("cursor")
+        if os.environ.get("CODEX_THREAD_ID") or "codex" in os.environ.get("AGENT_NAME", "").lower():
+            invokers.add("codex")
+        if os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
+            invokers.add("opencode")
 
-        if invoker in available:
-            available.remove(invoker)
+        for inv in invokers:
+            if inv in available:
+                available.remove(inv)
 
         if not available:
-            log_error(f"No alternate AI CLI found (invoking agent '{invoker}' was excluded).")
+            log_error(f"No alternate AI CLI found (invoking agents {list(invokers)} were excluded).")
             return None, "None"
         cand = get_next_alternate_engine(available)
         runner, label = engine_dispatch[cand]

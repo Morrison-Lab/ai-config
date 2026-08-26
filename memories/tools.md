@@ -370,10 +370,10 @@ elif py -c "pass" >/dev/null 2>&1; then PY=py
 else echo "no working python launcher found"; exit 1
 fi
 ```
---- then invoke `$PY` for the real transform. This both avoids risking a
-second, possibly destructive run of a real script under a bare `||`
-fallback, and fails loudly instead of proceeding with an unverified
-command if neither launcher actually works. (ai-config#635,
+--- then invoke `$PY` for the real transform.
+This both avoids risking a second, possibly destructive run of a real
+script under a bare `||` fallback, and fails loudly instead of proceeding
+with an unverified command if neither launcher actually works. (ai-config#635,
 2026-07-22/23: hit repeatedly running `scripts/validate-skills.py`, and
 again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content

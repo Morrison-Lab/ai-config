@@ -43,6 +43,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-github-actions-step-if
+        name: check github-actions step-if memory
+        entry: python scripts/check-github-actions-step-if.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-github-actions-step-if
+        name: github-actions step-if memory tests
+        entry: python scripts/test_check_github_actions_step_if.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: markdownlint
         name: markdownlint (markdown style)
         entry: markdownlint-cli2

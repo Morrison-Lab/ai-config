@@ -6,9 +6,19 @@ terminates used to stall the whole sweep with no FAIL line (ai-config#2098,
 Windows 11, 2026-08-23). The runner must report FAIL on expiry rather than
 wait forever, and must continue to the next suite.
 
+Test case #4b/#4c cover that a suite's own kill-then-drain also has a
+bounded deadline: CPython's subprocess.run() retries communicate() with NO
+timeout after killing a timed-out process on Windows, which can hang again
+if a descendant inherited the pipe handle -- reverting the runner's own
+drain bound must FAIL, not hang.
+
 The other required hardening from that issue -- verdict() spawning
-sys.executable rather than a bare python3 -- is pinned as a source check
-against hooks/test-no-clobbering-push.py.
+sys.executable rather than a bare python3, which is a suspect for the same
+hang and guarantees a real interpreter either way -- is pinned as a source
+check against hooks/test-no-clobbering-push.py (case #5), and generalized
+(case #5b) to a corpus-wide scan: no hooks/test-*.py may invoke its subject
+via a bare "python3", since the same suspect mechanism (ai-config#2098)
+applies to every one of them, not just this one file.
 
 Run: python3 scripts/test_test_hooks.py
 """
@@ -17,6 +27,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -168,6 +179,22 @@ for raw in ("nan", "inf", "-inf"):
         check(f"{raw} env is fatal",
               "positive finite number" in str(exc), str(exc))
 
+# A genuinely finite, positive value can still crash the underlying
+# subprocess wait rather than FAIL one suite -- ai-config#2098 review
+# finding #3, measured directly above MAX_SUITE_TIMEOUT_S's own docstring.
+with patch.dict(os.environ, {
+        "HOOK_TEST_SUITE_TIMEOUT": str(th.MAX_SUITE_TIMEOUT_S)}):
+    check("the maximum itself is accepted",
+          th.suite_timeout_s() == th.MAX_SUITE_TIMEOUT_S)
+
+try:
+    with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": "1000000000"}):
+        th.suite_timeout_s()
+    check("a value that would overflow the subprocess wait is fatal", False)
+except SystemExit as exc:
+    check("a value that would overflow the subprocess wait is fatal",
+          "exceeds the" in str(exc), str(exc))
+
 check("timeout label drops trailing .0", th._timeout_label(600) == "600")
 check("timeout label keeps a fraction", th._timeout_label(0.5) == "0.5")
 check("captured None decodes to empty", th._decode_captured(None) == "")
@@ -177,7 +204,7 @@ check("captured bytes decode", th._decode_captured(b"hi") == "hi")
 # --- 4b. Production run_suites() applies suite_timeout_s() ----------------
 # Hang checks pass an explicit timeout=; env checks call suite_timeout_s()
 # in isolation. Neither exercises main()'s path: run_suites() with
-# timeout=None. Deleting that coalesce leaves subprocess.run(timeout=None).
+# timeout=None. Deleting that coalesce leaves communicate(timeout=None).
 
 with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
     hooks = Path(tmp)
@@ -186,18 +213,59 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
     th.HOOKS = str(hooks)
     try:
         with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": "12"}):
-            with patch.object(th.subprocess, "run") as mock_run:
-                mock_run.return_value = subprocess.CompletedProcess(
-                    args=[], returncode=0, stdout="ok\n", stderr="")
+            with patch.object(th.subprocess, "Popen") as mock_popen:
+                mock_proc = mock_popen.return_value
+                mock_proc.communicate.return_value = ("ok\n", "")
+                mock_proc.returncode = 0
                 _capture(lambda: th.run_suites())
                 timeouts = [
                     call.kwargs.get("timeout")
-                    for call in mock_run.call_args_list
+                    for call in mock_proc.communicate.call_args_list
                 ]
     finally:
         th.HOOKS = old
 check("production run_suites() applies suite_timeout_s()",
       timeouts == [12], repr(timeouts))
+
+
+# --- 4c. A descendant that inherits the pipe must not defeat the deadline -
+# ai-config#2098 review finding #1: CPython's own subprocess.run() retries
+# communicate() with NO timeout after killing a timed-out process on
+# Windows -- and that retry can hang forever if a descendant process
+# inherited the pipe write handle, since kill() only kills the direct
+# child. run_one_suite() must bound that retry itself (DRAIN_TIMEOUT_S)
+# rather than trusting subprocess.run()'s own internal handling.
+#
+# Reproduced here on Linux with the general shape rather than the
+# Windows-specific mechanism: a grandchild that inherits the pipe and
+# outlives the killed direct child defeats EOF-based reads identically on
+# any platform.
+
+HANG_WITH_DESCENDANT = """\
+import subprocess, sys, time
+# A detached grandchild that inherits our stdout/stderr pipe and outlives
+# us -- killing THIS process does not close ITS pipe handle.
+subprocess.Popen([sys.executable, "-c", "import time; time.sleep(2)"])
+print("started", flush=True)
+time.sleep(30)
+"""
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    desc_test, desc_subj = _write_pair(
+        hooks, "descendant", HANG_WITH_DESCENDANT)
+    old_drain = th.DRAIN_TIMEOUT_S
+    th.DRAIN_TIMEOUT_S = 0.5
+    try:
+        rc, stdout, stderr = _capture(
+            lambda: th.run_one_suite(desc_test, desc_subj, timeout=1))
+    finally:
+        th.DRAIN_TIMEOUT_S = old_drain
+check("a descendant holding the pipe still returns failure", rc == 1,
+      f"rc={rc}")
+check("a descendant holding the pipe reports output unavailable "
+      "rather than hanging",
+      "output unavailable" in stdout, repr(stdout))
 
 
 # --- 5. verdict() spawn uses this interpreter, not a bare python3 ---------
@@ -210,6 +278,23 @@ check("verdict() spawns sys.executable",
       "[sys.executable, hook_path]" in body, body)
 check("verdict() does not spawn a bare python3",
       '["python3", hook_path]' not in body, body)
+
+
+# --- 5b. No hooks/test-*.py invokes its hook via a bare "python3" ---------
+# Generalizes check #5: a bare "python3" (ai-config#2098's unverified but
+# unretired suspect for a Windows hang, and in any case a real gap for
+# whatever "python3" does or doesn't resolve to on a given machine's PATH)
+# applies to every hooks/test-*.py that spawns its subject, not just
+# test-no-clobbering-push.py -- review finding #2 named several others
+# still doing it.
+BARE_PYTHON3_INVOCATION = re.compile(r'\[\s*["\']python3["\']\s*,')
+offenders = [
+    test_file.name
+    for test_file in sorted((ROOT / "hooks").glob("test-*.py"))
+    if BARE_PYTHON3_INVOCATION.search(test_file.read_text(encoding="utf-8"))
+]
+check('no hooks/test-*.py spawns its hook via a bare "python3"',
+      not offenders, repr(offenders))
 
 
 print(f"\n{passes}/{passes + failures} checks passed")

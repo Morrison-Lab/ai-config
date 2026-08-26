@@ -463,9 +463,15 @@ LABEL_EXPECT = {
 
 
 def verdict(hook_path, repo, command, case_id=None):
-    # sys.executable, not a bare "python3": on Windows the App Execution
-    # Alias stub for python3.exe can block instead of erroring when no
-    # python3 exists on PATH (ai-config#2098).
+    # sys.executable, not a bare "python3": that guarantees the same
+    # interpreter running this test, rather than whatever (if anything)
+    # "python3" resolves to on the machine's PATH. ai-config#2098 flagged a
+    # bare "python3" as a suspect for a Windows hang -- the Windows App
+    # Execution Alias stub for python3.exe -- but that issue itself calls
+    # the mechanism unverified, and the redirector's documented behavior
+    # when invoked with an argument is to print an error and exit, not
+    # block. Keep sys.executable for the guaranteed-correct-interpreter
+    # reason; don't restate the blocking hypothesis as settled.
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(bash(command)),
         capture_output=True, text=True, cwd=repo,

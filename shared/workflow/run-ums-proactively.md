@@ -162,6 +162,53 @@ Building such an instrument is itself delegable sidecar work, not a reason to po
 - **Don't:** treat a factual correction as too small to record because no belief changed.
 - **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
 
+**Scrutiny of your work is a UMS trigger, and a questioned claim that was wrong is the path that looks like a closed Q&A.**
+The triggers above all fire on a discovery you made, or on a verdict, or on an admission.
+They miss the moment someone else scrutinizes the work: you read a review, you take critical feedback, or a claim is questioned.
+Nothing in those moments requires you to say "I was wrong", to Address a finding, or to wait for a clean verdict, so the existing checkpoints never see them.
+
+Three surfaces, one pass.
+They are not three rules.
+
+1. **You read a review of your work.**
+   The trigger is the read, not Address and not a clean verdict.
+   Rebut and Defer still get a pass: the review taught something even if you disagree.
+   A review with no findings still gets a short pass.
+   [`learn-from-review-findings`](learn-from-review-findings.md) still attaches the record-the-class and algorithmatize steps to Address.
+   This is the earlier bank, not a replacement for those steps.
+
+2. **You receive critical feedback on the work.**
+   Chat, a human PR comment, another agent's review, an adversarial-reviewer finding.
+   Not only a formal `@claude review` round, and not only feedback phrased as a behaviour correction.
+
+3. **A claim of yours is questioned, and the check shows it was wrong.**
+   "Are you sure about that?" is the given example.
+   Questioning is the prompt to check, not itself the recorded lesson.
+   If the check shows the claim was right, answering is enough.
+   If the check shows the claim was wrong, run UMS: answering with the corrected fact is not the pass.
+   That path is what the first-person-admission trigger and `hooks/remind-ums-after-error.py` miss by construction --- you never said "I was wrong", you just updated the answer, and the Q&A reads as closed.
+
+`hooks/remind-ums-on-scrutiny.py` is the decidable slice: a review-read, or a questioned claim followed by a correction, with no explicit UMS after it.
+It injects on the next prompt and never blocks.
+It stays unregistered until its authoring PR merges, per README.
+
+- **Do:** run UMS when you read a review of your work, before or as you start ARD, not after the verdict.
+- **Do:** run UMS when critical feedback arrives, including feedback that is not a formal review round.
+- **Do:** when a claim is questioned and the check shows it was wrong, run UMS as you correct the answer --- the discovery is the trigger, not a first-person admission.
+- **Don't:** wait for Address, a clean verdict, or an admission phrasing before the pass is owed.
+- **Don't:** treat answering "are you sure about that?" with the corrected fact as having banked the lesson.
+- **Don't:** run UMS merely because someone asked.
+  The questioning case fires if the claim was wrong.
+
+See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Are you sure about that?".
+
+(Directive from the user, 2026-08-25, in four successive expansions:
+run ums every time you read a review of your work,
+then any critical feedback,
+then every time your work or your claims are questioned,
+then the worked example that questioning triggers UMS if the claim was wrong.
+Tracked as [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261).)
+
 **Folding or pruning a finished record is a step of the pass, and which records are outstanding is a link-graph fact rather than something you remember.**
 `CLAUDE.md`'s ["Keep a running on-disk session lab notebook"](../../CLAUDE.md) section already names the moment: fold a finished notebook into durable memory, or prune it, during UMS once its content is captured elsewhere.
 It names no way to find the ones you have forgotten, so the set is left to recollection --- and recollection covers this session's notebook and nothing else.

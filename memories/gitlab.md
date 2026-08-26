@@ -14,7 +14,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
 - Installed via Homebrew (macOS) or system package manager --- verify with `which glab`.
 - Authenticated on your GitLab instance --- run `glab auth status` to verify host and username
 - Use for MR comments, pipeline checks, CI job logs, etc.
-- `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used. Just use `glab issue list` (no flag needed).
+- `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
+  Just use `glab issue list` (no flag needed).
 - No `GITLAB_TOKEN` env var --- glab uses its own config at `~/Library/Application Support/glab-cli/config.yml`
 - **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with
   `Unknown flag: --jq`.

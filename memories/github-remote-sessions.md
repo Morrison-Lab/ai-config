@@ -97,36 +97,41 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
     `d-morrison/ai-config` resolved only through the rename redirect, so
     nothing was visibly broken; `macros` was correctly left pointed at
     `the repository owner`.)
-- **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
+- **The proxy allows branch creation/push but BLOCKS branch deletion.**
+  Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push --- `git push origin --delete <b>` or `git push origin :<b>` --- is rejected.
   Observed verbatim: "send-pack: unexpected disconnect" / "remote end hung up", then a
   misleading "Everything up-to-date" (the proxy returns that no-op message instead of a
-  normal `failed to push some refs` error), but the command still exits non-zero. So a
-  throwaway branch (e.g. a push-capability probe) can't be cleaned up from the session;
+  normal `failed to push some refs` error), but the command still exits non-zero.
+  So a throwaway branch (e.g. a push-capability probe) can't be cleaned up from the session;
   delete it via the GitHub UI/API, or just leave it if it's identical to `main` and has
   no PR. (Seen on ai-config, 2026-06-28.)
 - **GitHub Pages sites (`<owner>.github.io`, incl. `rossjrw/pr-preview-action`
   PR-preview links) are policy-blocked in at least some sandboxes** --- both
   WebFetch and a direct `curl`/CONNECT through the agent proxy get a `403`
   (`gateway answered 403 to CONNECT (policy denial)`, confirmed via
-  `curl -sS "$HTTPS_PROXY/__agentproxy/status"`). Don't retry or assume it's
+  `curl -sS "$HTTPS_PROXY/__agentproxy/status"`).
+  Don't retry or assume it's
   transient --- treat it the same as an unavailable preview and fall back to
   rendering the chapter locally (rme's own CLAUDE.md already names this
   fallback for "no preview has deployed yet"; it also applies when the
   preview exists but the sandbox can't reach it).
   - **But try the `gh-pages` branch first --- the deployed HTML is usually
     readable through the authenticated MCP tools even when the served site
-    isn't.** `rossjrw/pr-preview-action` commits each build to `gh-pages`
+    isn't.**
+    `rossjrw/pr-preview-action` commits each build to `gh-pages`
     under `pr-preview/pr-<N>/`, so
     `mcp__github__get_file_contents` with `ref: refs/heads/gh-pages` and
     `path: pr-preview/pr-<N>/<page>.html` returns the exact bytes the blocked
-    URL would have served. That reaches the *real rendered artifact*, which a
+    URL would have served.
+    That reaches the *real rendered artifact*, which a
     local re-render only approximates, and it needs no Quarto toolchain.
     Large pages exceed the tool's token cap and get spilled to a file --- grep
     that file rather than reading it whole, and diff byte counts across two
     fetches to confirm you're looking at a genuinely new build rather than an
-    unchanged one. Check the branch's own commit log
+    unchanged one.
+    Check the branch's own commit log
     (`mcp__github__list_commits` with `sha: gh-pages` --- the `LIST_COMMITS`
     operation in [`tool-mappings.md`](../tool-mappings.md), verified by use in
     the session below) to see which build is actually deployed before drawing
@@ -138,16 +143,22 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
 - Consequence: you CANNOT poll PR review/CI state from a background Monitor.
   Rely on `mcp__github__subscribe_pr_activity`, which delivers review comments
   and CI *failures* --- but NOT CI success, new pushes, or merge-conflict
-  transitions. A self-check-in scheduler may be absent: rme's instructions
+  transitions.
+  A self-check-in scheduler may be absent: rme's instructions
   reference `send_later` (from the `claude-code-remote` MCP server), and the
   harness may expose its own (e.g. `ScheduleWakeup`) --- but in this remote rme
   session ToolSearch surfaced neither, so you can't arm the safety re-poll the
-  watch-guidance suggests. Say so rather than implying it's armed.
+  watch-guidance suggests.
+  Say so rather than implying it's armed.
 - rme runs TWO review workflows per push: `claude-code-review.yml` (sticky
   comment, gives the "ready to merge" verdict) and `claude.yml` agent post-step
-  (separate findings). They can DISAGREE --- one says clean while the other finds
-  nits. Reconcile BOTH before calling a PR clean; the agent post-step tends to
-  drip 1-2 pre-existing cosmetic nits per round. That drip is a reason to keep
+  (separate findings).
+  They can DISAGREE --- one says clean while the other finds
+  nits.
+  Reconcile BOTH before calling a PR clean;
+  the agent post-step tends to
+  drip 1-2 pre-existing cosmetic nits per round.
+  That drip is a reason to keep
   iterating, never a reason to stop or to ask whether to stop --- see
   `skills/ardi/SKILL.md`, "Stopping conditions".
 

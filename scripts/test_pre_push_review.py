@@ -551,7 +551,7 @@ class TestPrePushReview(unittest.TestCase):
             return m
 
         mock_subproc.side_effect = fake_run
-        diff, base_sha, label = reviewer.resolve_diff("head123", explicit_base="origin/main")
+        diff, base_sha, base_ref, label = reviewer.resolve_diff("head123", explicit_base="origin/main")
         self.assertIn("+line", diff)
         self.assertEqual(label, "origin/main")
 

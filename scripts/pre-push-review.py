@@ -75,7 +75,7 @@ def get_pr_base_branch(pr_number: int) -> Optional[str]:
     return None
 
 
-def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str, str]:
+def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str, str, str]:
     """Compute local git diff against the PR base branch or default main.
 
     Always diffs the provided head_sha to include unpushed commits.
@@ -108,7 +108,7 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
         sys.exit(1)
 
     label = f"{base_ref} (PR #{pr_number})" if pr_number else base_ref
-    return diff_res.stdout, base_sha, label
+    return diff_res.stdout, base_sha, base_ref, label
 
 
 def get_repo_guidelines(base_ref: str) -> str:
@@ -791,13 +791,13 @@ def main():
         text=True,
     ).stdout.strip()
 
-    diff, base_sha, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
+    diff, base_sha, base_ref, ref_name = resolve_diff(initial_head, pr_number=pr_num, explicit_base=args.base)
 
     if not diff.strip():
         print(f"Clean: No outgoing changes compared to {ref_name}.")
         sys.exit(0)
 
-    guidelines = get_repo_guidelines(base_sha)
+    guidelines = get_repo_guidelines(base_ref)
     full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
 
     with tempfile.TemporaryDirectory() as temp_dir:

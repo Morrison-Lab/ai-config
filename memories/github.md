@@ -1,9 +1,9 @@
 # GitHub & GitLab CLIs and APIs
 
-The GitHub MCP tool surface used in remote/web sessions lives in
-[`github-mcp-tools.md`](github-mcp-tools.md).
-What a repository transfer between owners carries, and silently does not, lives
-in [`github-repo-transfers.md`](github-repo-transfers.md).
+Remote/web MCP tools: [`github-mcp-tools.md`](github-mcp-tools.md).
+Owner transfers: [`github-repo-transfers.md`](github-repo-transfers.md).
+Closing-keyword parser traps:
+[`github-closing-keywords.md`](github-closing-keywords.md).
 
 ## Operational checklist pattern for write actions
 

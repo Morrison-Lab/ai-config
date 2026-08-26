@@ -416,7 +416,7 @@ pull requests share one number space.**
   harmless; check whether the target was open.
 
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
-message".
+message" and "A negated closing-keyword sentence still closes the issue".
 
 **A SHA's provenance is the question its source command answers, not merely
 that a command produced it.**

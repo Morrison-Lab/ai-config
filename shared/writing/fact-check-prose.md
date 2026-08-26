@@ -95,10 +95,12 @@ so.
   is still a finding: the filter, the mixture, the never-infected branch,
   and the defaults that produced the tables, not only the algebra on the
   page.
-  (UCD-SERG/shigella#31, 2026-08-25: `@eq-lpfilter` used max `lp__`, every
-  R runner used the median; `@eq-brt` was a truncated exponential, the
-  likelihood mixed in a uniform; the simulator evaluated a decay-only
-  curve while the design said evaluate `@eq-curve`.)
+  (UCD-SERG/shigella#31, 2026-08-25:
+  `@eq-lpfilter` used max `lp__`, every R runner used the median.
+  `@eq-brt` was a truncated exponential,
+  the likelihood mixed in a uniform.
+  The simulator evaluated a decay-only curve
+  while the design said evaluate `@eq-curve`.)
 
 ## What to report
 

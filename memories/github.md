@@ -1,4 +1,4 @@
-# GitHub CLI (`gh`) and PR/issue queue management
+# GitHub PR/issue queue management
 
 The `gh` CLI itself: [`gh-cli.md`](gh-cli.md).
 Remote/web MCP tools: [`github-mcp-tools.md`](github-mcp-tools.md).

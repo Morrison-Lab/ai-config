@@ -99,7 +99,7 @@ The dispatch this corpus requires is foreground
 Measured 2026-08-25 PDT on a Cursor Cloud Grok conductor in this repo:
 that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
-`flag-unassigned-worktree.py` warns on every such dispatch
+`flag-unassigned-worktree.py` emits a warning on every such dispatch
 because the Cursor adapter maps `Task` to `Agent`
 when `subagent_type` is not explore/plan/shell
 ([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
@@ -108,22 +108,23 @@ Deciding the child needs no worktree is fine;
 the schema has no `isolation` field to mark that decision.
 Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
 
-Record `git rev-parse HEAD` before the dispatch.
+Record `git rev-parse HEAD` before the dispatch,
+and run `git status --short`.
 After the child returns, obtain `Reviewed-Commit` from a harness paste
 that already carries Summary / Findings / Verdict,
 or from cursor-cloud `batch-fetch-details` with the child's
 `cloudAgentBcId`.
-The `Task` JSON `tool_result` has no review body
-(same file, "Cursor Cloud Task `tool_result` is identity-only").
+The `Task` JSON `tool_result` has no review body.
+If you cannot obtain `Reviewed-Commit`, do not push.
 Compare that line to the recorded sha and to `git rev-parse HEAD`.
 If the push refspec is not `HEAD`, compare against that ref:
 this check does not resolve a refspec the way
 `no-push-without-self-review.py` does.
-`git status --short` is a dirty-tree check, not a HEAD check.
+Re-run `git status --short` for uncommitted child edits.
 Cursor's adapter skips `no-push-without-self-review.py`
 (`SKIP_WITHOUT_TOOL_RESULT`),
 so a failed or skipped dispatch is not caught before the push.
-The push-enforcement check is the posted PR comment.
+The posted PR comment is the record, not a gate.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -144,7 +145,6 @@ Measured 2026-08-25 PDT: neither copy's declared restriction
 filtered the child's schemas.
 The `.claude/agents/` copy carries a `tools:` field;
 the `.opencode/` copy uses `permission: edit: deny` instead.
-Which path Cursor Cloud reads was not isolated.
 The Cursor Grok dispatch measured that day on
 [#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266)
@@ -164,11 +164,12 @@ is the instruction to use this route.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
 - **Do:** brief the child not to edit.
-  Record `HEAD` before the dispatch.
+  Record `HEAD` and `git status --short` before the dispatch.
   After it returns, obtain `Reviewed-Commit` from a harness paste
-  of the child's report or from `batch-fetch-details`,
-  and compare that sha to the recorded `HEAD` and to
-  `git rev-parse HEAD`.
+  of the child's report or from `batch-fetch-details`.
+  If you cannot obtain it, do not push.
+  Compare that sha to the recorded `HEAD` and to
+  `git rev-parse HEAD`, and re-run `git status --short`.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is

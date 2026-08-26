@@ -176,11 +176,6 @@ Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
 `delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
 **dispatches** as a cross-vendor second reviewer.
-`delegate-to-opencode` is a further CLI, not a member of that pairing;
-its skill excludes judgment-heavy review on the free and local tiers.
-A Cursor Cloud Claude `Task` child is a self-review dispatch
-(see [`memories/cursor.md`](../../memories/cursor.md)),
-not a member of this pairing.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

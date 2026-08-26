@@ -50,14 +50,12 @@ The same applies to a session whose reviewer is registered from a stale definiti
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
 **Cursor Cloud has a subagent dispatch.**
-Cursor Cloud's `Task` tool is that dispatch when the session can
-resolve the persona (measured 2026-08-25 PDT).
+When the session's `Task` tool lists `adversarial-reviewer`,
+that is the dispatch (measured 2026-08-25 PDT on a Grok conductor).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task` dispatch
 just ran: the subagent route was available.
-The prefix is inert on this route because the adapter skips the
-guard, which is not a reason to use it.
-If the persona does not resolve, that is the CLI-fallback case;
-the adapter still skips the guard, so say so in the review.
+If `Task` is not in the schema, or the persona does not resolve,
+that is the CLI-fallback case above.
 The Cursor-specific recipe is in
 [`memories/cursor.md`](../../memories/cursor.md).
 

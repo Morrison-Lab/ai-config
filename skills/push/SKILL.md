@@ -59,30 +59,31 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - an emergency.
 
 On a session whose pushes go through Morrison-Lab/ai-config's
-Cursor adapter, the prefix is inert for the adapter
+Cursor adapter, default: do not prefix.
+The prefix is inert for the adapter
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 makes the adapter run that guard
 (the skip and the `parse_report` gate are in the paragraph above).
-Do not use it for the adapter's sake while that skip holds.
-A push that carries nothing to review
-(`git diff origin/<default-branch>...HEAD` empty;
-the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
+If a native `PreToolUse` deny from
+`no-push-without-self-review` is observed on the push,
+prefix for that native guard.
+The empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)
+`--allow-empty` branch
 has no report to parse: do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+`git diff origin/<default-branch>...HEAD` empty is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
 After [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 makes the adapter run that guard,
 the prefix is the documented escape
 when the guard cannot see a verdict.
 The adapter skip makes the prefix inert for the adapter only.
-If Claude Code's native guard is also running
-(desktop third-party Claude hooks, or a Claude Code process),
-the prefix is that native guard's escape.
-Those two can run together
+Do not pair the project adapter with native Claude hooks
 (desktop Cursor with third-party Claude hooks plus this project adapter).
-Do not pair them.
-If they are already paired, the prefix is required for the native guard
-even though it is inert for the adapter
+If a native deny is observed, the prefix is required for that
+native guard even though it is inert for the adapter
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.

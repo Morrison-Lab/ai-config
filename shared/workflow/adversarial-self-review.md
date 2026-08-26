@@ -152,13 +152,14 @@ Call `parse_report()` on the recovered report
 in the checkout whose push follows;
 do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
-A push that carries nothing to review
-(`git diff origin/<default-branch>...HEAD` empty
-in the checkout whose push follows;
-the empty `pr-on-claim` branch) has no report to parse:
+The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
 do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
 If the dispatch errored, obtain a CLI review and still
 call `parse_report()` on the recovered file.
 If Claude Code's native guard is also running, the prefix

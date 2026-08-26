@@ -144,9 +144,12 @@ It is not a substitute for those checks.
 A harness paste of the child's own assistant message may corroborate it;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
-JSON-decode the assistant `text` field
-(`transcript.json` stores the body as a JSON string,
-so newlines arrive as escaped `\n`).
+`json.load` of `transcript.json` already yields the markdown
+string in the assistant `text` field.
+Do not `json.loads` that field's value a second time.
+The file stores the body as a JSON string
+(newlines appear as escaped `\n` on disk).
+The parser resolves that.
 `batch-fetch-details` can write a large `transcript.json`.
 Extract the last assistant `text` that carries Summary / Findings /
 Verdict / Reviewed-Commit
@@ -193,12 +196,16 @@ Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
 A push that carries nothing to review
-is decided by `git diff origin/<default-branch>...HEAD`
-in that checkout
-being empty
-(the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch,
-created with `--allow-empty`).
-Do not invent a report,
+is the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
+branch, created with `--allow-empty`.
+`git diff origin/<default-branch>...HEAD` empty
+in that checkout is tree equality against the merge-base,
+not "this branch carries nothing".
+An add-then-delete pair, a revert pair, or a branch
+whose only commits are `main` merges
+also produce an empty three-dot diff and still ship commits.
+Those are not the carve-out: obtain a review.
+For the `--allow-empty` case, do not invent a report,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
 Re-read `git rev-parse HEAD` in that checkout after the child returns.
@@ -261,7 +268,12 @@ A deletion line (`- [deleted]`) has no `->`,
 so it has no source ref for gate 6.
 This procedure does not cover a ref-deletion push
 (`git push origin :branch`).
-`verify_review` allows those because they ship no commits.
+On Claude Code a `:branch` deletion still needs a
+clean verdict to reach `verify_review`'s
+`if not commits` exit
+(the guard's own docstring).
+`--delete` / `-d` is never examined
+(`_argv_push`).
 If the dry-run is a deletion, stop:
 this is the wrong procedure, not a gate-6 miss.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
@@ -282,10 +294,13 @@ obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
 and still call `parse_report()` on that file.
 On a session whose pushes go through this repo's Cursor adapter,
-the adapter skip makes `ALLOW_UNREVIEWED_PUSH=1` inert
-for the adapter
+default: do not prefix `ALLOW_UNREVIEWED_PUSH=1`.
+The adapter skip makes it inert for the adapter
 (measured 2026-08-25 PDT on Cursor Cloud).
-Do not prefix it for the adapter's sake.
+If the pushing command is denied by a native
+`PreToolUse` `no-push-without-self-review` hook,
+that deny is the measurement that the native runner fired;
+then prefix for that native guard.
 Home Claude settings can exist on Cloud
 (measured 2026-08-26 PDT: `/home/ubuntu/.claude/settings.json`
 binds `no-push-without-self-review` under `PreToolUse`).
@@ -294,44 +309,72 @@ The in-tree writer of that path is `scripts/install-hooks.py`.
 Those settings do not make the Cursor adapter run Claude's hook runner.
 Whether Claude Code's native hook runner also fires on Cloud
 is unmeasured as of 2026-08-26 PDT.
+Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
-If the native runner also fires, the prefix is that native
-guard's escape even though it is inert for the adapter.
+Do not pair the project adapter with native Claude hooks.
+If they are already paired, the native deny is the
+observable that requires the prefix.
+
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
-same VM --- the prefix is that native guard's escape,
+same VM --- a native deny of the unprefixed push is the
+observable that the prefix is that native guard's escape,
 because Cursor JSONL omits `tool_result` and the native guard
 otherwise denies every push
 (desktop path measured against Cursor's third-party hook docs on
 2026-08-25).
-Do not pair the project adapter with native Claude hooks.
-If they are already paired, the prefix is required for the native
-guard even though it is inert for the adapter.
+
+When [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+lands, sweep every site this section names
+(`AGENTS.md`,
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md),
+[`skills/push/SKILL.md`](../skills/push/SKILL.md),
+both persona copies,
+[`docs/cursor-hook-mapping.md`](../docs/cursor-hook-mapping.md),
+`README.md`,
+and this file)
+so the adapter-skip claim does not outlive the skip.
+Compact copies stay until that landing.
 
 Refusal gates, in order
-(Do-Confirm; details in the procedure above).
+(Read-Do: reordering changes the answer;
+details in the procedure above).
 Pause points:
 before the `Task` dispatch (item 1's first half),
 and before `git push` of the reviewed branch
 (item 1's second half through item 6).
-Killer items:
-item 1's first half (empty status before dispatch),
-and item 2 (`parse_report` on the recovered file,
-not an author-assembled body).
 All six run in the checkout whose push follows.
+The empty `pr-on-claim` `--allow-empty` carve-out
+exempts item 1's first half, item 2,
+item 3's verdict/fingerprint clause, and item 4
+(no dispatch, so no report and no pre-dispatch sha).
+It does not exempt item 1's second half, item 5, or item 6.
+Say in the reply that the carve-out was used.
 
-1. `git status --short` empty before dispatch, and still empty after.
-2. Recover the last heading-bearing assistant `text` to a file;
-   call `parse_report()` on that file.
-3. Verdict is `clean` and the fingerprint prefix-matches HEAD,
-   unless `git diff origin/<default-branch>...HEAD` is empty
-   (say in the reply that this carve-out was used).
-4. HEAD is still the recorded sha.
-5. Same-argv dry-run succeeds; a reported new tip prefix-matches HEAD
+1. Confirm `git status --short` is empty before dispatch,
+   and still empty after.
+   **Killer item:** skipped before dispatch, the fingerprint
+   excludes the uncommitted work.
+   Carve-out: skip the before-dispatch half
+   (there is no dispatch); still confirm empty after.
+2. Write the last heading-bearing assistant `text` to a file
+   and call `parse_report()` on that file.
+   **Killer item:** an author-assembled body is not a report,
+   and `parse_report` then grades the wrong text.
+   Carve-out: skip (no report to parse;
+   do not refuse for lack of a verdict).
+3. Confirm the verdict is `clean` and the fingerprint
+   prefix-matches HEAD.
+   Carve-out: skip (no fingerprint;
+   the `--allow-empty` procedure is what decides).
+4. Confirm HEAD is still the recorded sha.
+   Carve-out: skip (no sha was recorded before a dispatch).
+5. Run the same-argv dry-run; confirm a reported new tip
+   prefix-matches HEAD
    (`Everything up-to-date` and `= [up to date]` are not a mismatch;
    a new-branch line with no sha is not a mismatch
    and also does not confirm the shipped tip).
-6. Source ref is `HEAD` or the recorded branch
+6. Confirm the source ref is `HEAD` or the recorded branch
    (a line with no `->` is not this procedure).
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
@@ -397,22 +440,24 @@ is the instruction to use this route.
   and also does not confirm the shipped tip),
   or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
-  The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch
-  (`git diff origin/<default-branch>...HEAD` empty in that checkout)
-  is the carve-out:
-  it has no report, that is not a reason to refuse the push,
+  The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
+  `--allow-empty` branch is the carve-out.
+  `git diff origin/<default-branch>...HEAD` empty in that checkout
+  is tree equality, not "this branch carries nothing".
+  A net-zero tree of other commits is not the carve-out:
+  obtain a review.
+  The `--allow-empty` case has no report,
+  that is not a reason to refuse the push,
   and the reply must say the carve-out was used.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
 - **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on a Cursor-adapter
-  push for the adapter's sake: the skip makes it inert there.
-  If Claude Code's native guard is also running, that prefix
-  is the native guard's escape, not an inert flag.
+  push by default: the skip makes it inert for the adapter.
+  Prefix only after a native `PreToolUse`
+  `no-push-without-self-review` deny of the unprefixed push.
   Do not pair the project adapter with native Claude hooks.
-  If they are already paired, the prefix is required for the
-  native guard even though it is inert for the adapter.
   If the dispatch errored or produced no report,
   obtain a CLI review and still call `parse_report()` on that file.
 - **Don't:** record HEAD, status, or the dry-run in a different

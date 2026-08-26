@@ -267,13 +267,16 @@ in the checkout whose push follows,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD
 ([`memories/cursor.md`](memories/cursor.md)).
-On that Cursor-adapter path, a push that carries nothing to review
-(`git diff origin/<default-branch>...HEAD` empty
-in the checkout whose push follows;
-the empty [`pr-on-claim`](shared/workflow/pr-on-claim.md) branch)
-has no report: do not invent one,
+On that Cursor-adapter path, the empty
+[`pr-on-claim`](shared/workflow/pr-on-claim.md)
+`--allow-empty` branch has no report:
+do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
 On Claude Code the same empty branch still needs
 `ALLOW_UNREVIEWED_PUSH=1` on the pushing command.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).

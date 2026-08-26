@@ -60,29 +60,40 @@ against the wrong criterion; reading the retired script's own source settled
 it, and the real check then found 7 multi-sentence lines a length check had
 passed over.)
 
-**This repo's own reformatter is not that check, and its output can fail it.**
+**The reformatter consumes the gate; it is still not the job CI runs.**
 `scripts/semantic-line-breaks.py` is the in-repo tool named for this
 convention, so it is the obvious thing to reach for when a line-break warning
 needs clearing.
-It is not what CI runs, and the two disagree about what a good line is.
+As of 2026-08-26 (ai-config#2085) it loads
+`scripts/vendor/gha-check-new-line-breaks.py`, which is the script at the SHA
+`.github/workflows/validate.yml` pins for
+`Morrison-Lab/gha/check-new-line-breaks`.
+Sentence splits and the mid-line-semicolon clause rule both come from that
+module's `split_sentences` and `classify_line`.
+A pin file next to the vendored copy must match the `uses:` SHA, so bumping
+the action without refreshing the vendor is a loud failure rather than a
+silent second implementation.
 
-The reformatter implements one sentence per line and nothing else.
-Its own docstring says as much --- "Never break a phrase mid-way at a column
-boundary" --- so it has no width policy, and it **joins** a hand-wrapped
-sentence back into a single line however long that line becomes.
-Corpus practice is the clause-wrapped 60-to-80 range this file opens with,
-which the reformatter undoes.
-
-Nothing runs it in CI.
+Nothing runs the reformatter in CI.
 `grep -rn "semantic-line-breaks.py" --include=*.yml .` returns no workflow;
-its only callers in the tree are its own test file and one docstring
-reference.
+the `new-line-breaks` job still calls the composite action directly.
+`--write` is now a preview of what that job will accept on the lines it
+reflows, not a second opinion.
+
+It still **joins** a hand-wrapped sentence that the gate would leave whole ---
+a comma-clause chain with no semicolon, the #2081 case, is one line after a
+reformat however long it is.
+Corpus practice is the clause-wrapped 60-to-80 range this file opens with.
+The construction #2085 closed is the pair of predicates the gate actually
+enforces (multi-sentence lines, and a line whose stripped text is at least 80
+characters with a mid-line semicolon), not every wrap a human would make.
+
 `MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
 exists either.
 
-Measured by copying two fragments out of `origin/main`, reformatting each
-copy with `--all`, and classifying both versions with the gate's own
-`classify_line`:
+Measured 2026-08-15, before #2085, by copying two fragments out of
+`origin/main`, reformatting each copy with `--all`, and classifying both
+versions with the gate's own `classify_line`:
 
 | fragment (at `origin/main`) | longest line | lines over 80 | clause-flagged |
 | --- | --- | --- | --- |
@@ -91,33 +102,36 @@ copy with `--all`, and classifying both versions with the gate's own
 | `grep-is-not-coverage.md` before | 79 | 0 | 0 |
 | `grep-is-not-coverage.md` after | 411 | 59 | 5 |
 
-So the reformatter clears the sentence rule and manufactures clause
-violations the gate then reports, on files that had none.
+So the pre-#2085 reformatter cleared the sentence rule and manufactured clause
+violations the gate then reported, on files that had none.
 The classifier was pinned in both directions first, per
 [`fail-fast`](../principles/fail-fast.md)'s negative-control rule: it returns
 `clause` on a padded semicolon line, `sentence` on a two-sentence line, and
 `None` on a short clean one.
 
-It still finds real violations, which is what makes it worth running --- the
-same two fragments carry 5 and 0 genuine multi-sentence lines at
+It still found real violations, which is what made a preview worth reading ---
+the same two fragments carry 5 and 0 genuine multi-sentence lines at
 `origin/main`.
-So use it as a **detector** and read its preview, which is its default when
-no `--write` is passed.
-Take the sentence splits it proposes, and break at a clause boundary yourself
-rather than accepting the joins.
+`--write` of that vintage was the defect; the default preview was the detector.
+Take the sentence splits it proposes.
+Clause splits now come from the same `classify_line` CI runs, so a semicolon
+join that would fail the gate is split rather than written.
 
-- **Do:** read the reformatter's preview and apply its sentence splits by
-  hand, wrapping at a clause boundary.
-- **Do:** re-run the gate after any reformat, since the joined lines are added
-  lines and the gate is diff-scoped.
-- **Don't:** treat `scripts/semantic-line-breaks.py` as the check CI runs ---
-  no workflow invokes it, and its output is not what the gate wants.
-- **Don't:** accept a join that puts a wrapped sentence back on one line; that
-  is the direction that trips the clause rule.
+- **Do:** run `scripts/semantic-line-breaks.py` on new prose and read the
+  preview; `--write` applies splits the gate's `classify_line` accepts.
+- **Do:** re-run the gate after any reformat, since the joined or split lines
+  are added lines and the gate is diff-scoped.
+- **Don't:** treat a green reformatter run as a substitute for the
+  `pull_request`-triggered `new-line-breaks` job --- that job is still
+  diff-scoped to added lines, and this script is not invoked by any workflow.
+- **Don't:** expect `--write` to wrap comma-clause chains to 80 columns.
+  That is #2081, not the gate, and this construction does not close it.
 
 (Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
-`_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
+`_DEFAULT_CLAUSE_MIN_LENGTH` is 80.
+The construction that retired the manufactured-clause half landed 2026-08-26
+as ai-config#2085.)
 
 **Third dated recurrence, 2026-08-21, and the tell is the tool's name.**
 An `ardia` sweep drove three PRs whose prose it had edited, ran
@@ -217,85 +231,76 @@ the run whose `event` is `pull_request`.
 - **Don't:** conclude the gate passed from a green check run alone --- confirm
   it was the `pull_request`-triggered one.
 
-**The disagreement has a second, sharper form: the gate splits a boundary the
-reformatter leaves whole.**
+**The disagreement had a second, sharper form: the gate split a boundary the
+reformatter left whole.**
+Closed as to the reformatter by #2085: `split_sentences` is now the gate's
+function, including `_SENT_BREAK_LOWER_RE`.
+The case record below is the 2026-08-21 measurement that showed the gap, kept
+because the durable-opener advice still applies to a boundary *neither* tool
+sees (a digit or an opening parenthesis after the period).
+
 The clause case above is the reformatter doing too much, joining wrapped lines
-the gate then flags.
+the gate then flagged.
 This is the reformatter doing too little, leaving two sentences on one line that
 the gate then flags as `Line packs more than one sentence`.
-The two tools carry different sentence-boundary rules.
-`scripts/semantic-line-breaks.py` has one break regex, `_SENT_BREAK_RE`, whose
-lookahead demands an uppercase letter or markup after the period, so a sentence
-ending in `.` before a lowercase word is no boundary to it.
-The gate carries that same branch plus a second one the reformatter lacks,
+Before #2085 the two tools carried different sentence-boundary rules.
+`scripts/semantic-line-breaks.py` had one break regex, `_SENT_BREAK_RE`, whose
+lookahead demanded an uppercase letter or markup after the period, so a sentence
+ending in `.` before a lowercase word was no boundary to it.
+The gate carries that same branch plus a second one,
 `_SENT_BREAK_LOWER_RE` (reported in `d-morrison/gha` #389, added by gha#425), matching
 `(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
 then a space, then a lowercase word.
-So `...rules, or agents. opencode instead reads...` is one line to the
+So `...rules, or agents. opencode instead reads...` was one line to the
 reformatter and two sentences to the gate, because the lowercased brand name
 `opencode` follows the period after `agents`.
-The reformatter does worse than fail to propose the split.
-It **undoes** the split once you have made it.
-`split_sentences()` collapses whitespace before applying `_SENT_BREAK_RE`, so a
-hand-break at a lowercase-follower boundary is joined back onto one line ---
-the reformatter reverts the very fix the gate is asking for.
+The reformatter did worse than fail to propose the split.
+It **undid** the split once you had made it.
+`split_sentences()` collapses whitespace before applying the break regex, so a
+hand-break at a lowercase-follower boundary was joined back onto one line ---
+the reformatter reverted the very fix the gate was asking for.
 
-That makes this case an exception to the remedy the section above gives.
-"Read the reformatter's preview and apply its sentence splits by hand" is sound
-for every boundary the reformatter can see, and silently destructive here,
-because re-running it after a correct hand-break restores the violation.
-The neighbouring guard rail does not cover it either: "don't accept a join that
-puts a wrapped sentence back on one line" is framed around the **clause** rule,
-and this is the **sentence** rule.
+That made this case an exception to the pre-#2085 remedy.
+"Read the reformatter's preview and apply its sentence splits by hand" was sound
+for every boundary the reformatter could see, and silently destructive here,
+because re-running it after a correct hand-break restored the violation.
 
-- **Do:** run the real `check-new-line-breaks.py` locally to catch a
-  lowercase-follower boundary, and hand-break after the period.
 - **Do:** treat a `.` before a lowercased package or brand name (`opencode`,
-  `renv`) opening a sentence as a boundary the gate will split.
-- **Don't:** read the reformatter leaving a line whole as evidence the gate
-  passes it --- the reformatter has no lowercase-follower branch.
-- **Don't:** re-run the reformatter over a hand-broken lowercase boundary.
-  It will rejoin it, and the rejoin is silent.
+  `renv`) opening a sentence as a boundary the gate will split; the
+  reformatter now splits it the same way.
+- **Do:** still reword an opener that is a digit or an opening parenthesis,
+  which neither the gate nor the reformatter treats as a sentence start.
+- **Don't:** hand-reimplement `_SENT_BREAK_LOWER_RE` in the reformatter ---
+  that is the second-implementation drift #2085 retired.
+- **Don't:** read a historical rejoin of a lowercase-follower break as current
+  behaviour; `reformat()` on that input now keeps the two lines.
 
 (Both mechanisms verified by source, read on 2026-08-21:
-the reformatter's single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
+the reformatter's then-single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
 and the gate's `_SENT_BREAK_LOWER_RE` at `check-new-line-breaks.py:140` in a
 fresh clone of `d-morrison/gha`, whose own `CLAUDE.md` records that gha#425
 closed gha#389 by adding that branch.
 The rejoin was reproduced directly rather than inferred: calling `reformat()`
-on `"...or agents.\nopencode instead reads..."` returns the two lines joined
-into one.)
+on `"...or agents.\nopencode instead reads..."` returned the two lines joined
+into one.
+Re-verified 2026-08-26 after #2085: the same `reformat()` call keeps the
+break.)
 
-**The durable fix at such a boundary is to break the line AND give the opener a
-form both tools recognize.**
-The pair above ends on a prohibition, which holds only for as long as everyone
-remembers it.
-Choosing the opener retires the prohibition instead, so the break stops
-depending on a habit.
+**The durable fix at a boundary neither tool sees is to break the line AND
+give the opener a form the gate recognizes.**
+Choosing the opener retires a prohibition that would otherwise depend on
+habit.
 
-The two tools recognize overlapping but unequal sets of openers.
-The reformatter carries only `_SENT_BREAK_RE`, whose lookahead class is
-``[A-Z"'`*\[]``.
-The gate carries that same branch plus `_SENT_BREAK_LOWER_RE`.
-Three cases fall out, and only the first is safe.
-
-- **An opener in that lookahead class** --- a capital letter, a backtick, an
-  asterisk, an opening bracket, or either quote --- is a boundary both tools
-  see.
-  The gate flags the unbroken line, and the reformatter leaves the break alone.
-- **A lowercase opener** is the trap the section above documents.
-  The gate flags it on its lower branch, and the reformatter rejoins the break.
-- **An opener in neither class**, such as a digit or an opening parenthesis, is
-  seen by neither.
-  The gate passes the unbroken two-sentence line, and the reformatter still
-  rejoins a break made there.
-
-The third case is the one worth naming, because both instruments go quiet at
-once.
-Nothing reports the violation and nothing preserves the fix, so a line packing
-two sentences survives every check this section describes.
-Choose an opener from the first case rather than leaving the gate to catch the
-mistake.
+The gate's sentence regexes --- which the reformatter now imports --- accept
+an opener in ``[A-Z"'`*\[]`` on the uppercase branch and a lowercase letter
+on `_SENT_BREAK_LOWER_RE`.
+A digit or an opening parenthesis is in neither class.
+That third case is the one worth naming, because both instruments go quiet
+at once.
+Nothing reports the violation and nothing preserves a hand-break there, so
+a line packing two sentences survives every check this section describes.
+Choose an opener from the first class rather than leaving the gate to catch
+the mistake.
 
 Bold and a bracketed link both qualify and are ordinary in this corpus, so the
 edit is often free.
@@ -303,22 +308,26 @@ edit is often free.
 the possessive, or `The gha README names ...`, which drops it.
 
 - **Do:** break at the period, then start the next line with a capital letter or
-  with markup --- a backtick, bold, or a link.
+  with markup --- a backtick, bold, or a link --- when the natural opener is a
+  digit or a parenthesis.
 - **Do:** confirm the break survived by re-running the reformatter and checking
   that the two sentences still land on separate output lines, since its preview
   is non-empty either way.
 - **Don't:** rely on the gate to catch an unbroken two-sentence line --- it is
   silent when the second sentence opens with a digit or a parenthesis.
-- **Don't:** leave a bare break behind a lowercase opener as the finished fix,
-  since a `--write` run rejoins it while the paragraph is still in scope.
+- **Don't:** expect a lowercase opener to rejoin under `--write` any longer;
+  that was the pre-#2085 trap, and the reformatter now uses the gate's lower
+  branch.
 
 (Measured 2026-08-24 against `Morrison-Lab/gha` at `9ad1cde` and this repo's
-`scripts/semantic-line-breaks.py`.
+then-local `scripts/semantic-line-breaks.py`.
 `classify_line` returns `sentence` for the unbroken line under a lowercase
 opener and under all six forms in the lookahead class, and `None` under a digit
 or an opening parenthesis.
-Calling `reformat()` on the broken pair rejoins it under a lowercase, digit, or
-parenthesis opener, and leaves it alone under all six of the class's forms.
+Calling `reformat()` on the broken pair rejoined it under a lowercase, digit, or
+parenthesis opener, and left it alone under all six of the class's forms.
+After #2085, the lowercase rejoin is gone; the digit and parenthesis rejoins
+remain, because the gate itself does not split those.
 The case is
 [ai-config#2127](https://github.com/Morrison-Lab/ai-config/pull/2127), where
 `shared/workflow/upgrade-to-gha.md:64` at `7f352648` was flagged
@@ -432,15 +441,18 @@ That asymmetry is the one worth remembering, because a hand-rolled pre-push
 scan naturally applies one length floor to both and then passes a line the
 gate rejects --- which is the specific way this was rediscovered, on the PR
 that added this very paragraph.
-Run it locally before pushing and fix what it names --- the script lives in a
-[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
-`check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:
+Run it locally before pushing and fix what it names.
+This repo vendors that script at the SHA `validate.yml` pins, so a
+gha checkout is not required:
 
 ```bash
 NLB_BASE_REF=origin/main \
 NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
-  python3 <gha-checkout>/check-new-line-breaks/check-new-line-breaks.py
+  python3 scripts/vendor/gha-check-new-line-breaks.py
 ```
+
+That path is the file `scripts/lib/nlb_gate.py` loads.
+Refreshing it after an action-pin bump is `python3 scripts/sync-nlb-checker.py`.
 
 **`NLB_PATHS_IGNORE` is the one input the local run needs and does not
 default to**, so a command without it over-reports on generated files this

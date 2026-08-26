@@ -517,5 +517,210 @@ expect(
 )
 
 
+# ---------------------------------------------------------------------------
+# Gate agreement (ai-config#2085).
+#
+# The reformatter must consume CI's checker, not a second copy of its
+# predicates. These tests pin the construction (the pin matches validate.yml,
+# the loaded module is the vendored file) and the two predicates that used
+# to disagree: the mid-line semicolon, and the lowercase-follower sentence.
+# ---------------------------------------------------------------------------
+
+nlb_gate = slb._nlb_gate
+checker = nlb_gate.load_nlb_checker()
+
+ci_sha = nlb_gate.parse_ci_nlb_sha()
+pin_sha = nlb_gate.read_vendor_pin()
+expect(
+    "vendor pin matches the SHA validate.yml pins",
+    ci_sha == pin_sha,
+    f"ci={ci_sha} pin={pin_sha}",
+)
+expect(
+    "assert_pin_matches_ci accepts the committed vendor copy",
+    nlb_gate.assert_pin_matches_ci() == ci_sha,
+)
+expect(
+    "parse_ci_nlb_sha returns a 40-char object id, not the short SHA in a comment",
+    len(ci_sha) == 40 and ci_sha != "209bfb76",
+    ci_sha,
+)
+expect(
+    "loaded checker is the vendored file CI pins",
+    Path(checker.__file__).resolve() == nlb_gate.VENDOR_PY.resolve(),
+    f"loaded {checker.__file__}",
+)
+
+# A pin mismatch is a loud error, not a silent import of the wrong script.
+with tempfile.TemporaryDirectory() as pin_dir:
+    yml = Path(pin_dir) / "validate.yml"
+    pin = Path(pin_dir) / "gha-check-new-line-breaks.pin"
+    yml.write_text(
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@"
+        + ("a" * 40)
+        + " # v2\n",
+        encoding="utf-8",
+    )
+    vendor = Path(pin_dir) / "checker.py"
+    vendor.write_text("classify_line = None\n", encoding="utf-8")
+    nlb_gate.write_vendor_pin("b" * 40, nlb_gate.file_sha256(vendor), pin)
+    raised = False
+    try:
+        nlb_gate.assert_pin_matches_ci(yml, pin, vendor)
+    except nlb_gate.NLBPinError as exc:
+        raised = True
+        expect(
+            "pin mismatch names both SHAs",
+            ("a" * 40) in str(exc) and ("b" * 40) in str(exc),
+            str(exc),
+        )
+    expect("pin mismatch raises NLBPinError", raised)
+
+    # Content-hash mismatch: git SHA matches, bytes were edited.
+    nlb_gate.write_vendor_pin("a" * 40, "c" * 64, pin)
+    raised_hash = False
+    try:
+        nlb_gate.assert_pin_matches_ci(yml, pin, vendor)
+    except nlb_gate.NLBPinError as exc:
+        raised_hash = True
+        expect(
+            "content-hash mismatch names sha256",
+            "sha256" in str(exc),
+            str(exc),
+        )
+    expect("content-hash mismatch raises NLBPinError", raised_hash)
+
+# Issue #2085: a line the old reformatter left whole, which CI rejected.
+ISSUE_2085 = (
+    "The **file-set** half of the pair-collision section does flag the shared "
+    "path, which is the cue to run the arithmetic below on it; what no conflict "
+    "scan above will report is the breach itself.\n"
+)
+expect(
+    "the #2085 line is a clause violation to the gate before reflow",
+    checker.classify_line(ISSUE_2085.strip()) == "clause",
+    repr(checker.classify_line(ISSUE_2085.strip())),
+)
+got_2085 = slb.reformat(ISSUE_2085)
+expect(
+    "reformat splits the #2085 semicolon line",
+    got_2085 == (
+        "The **file-set** half of the pair-collision section does flag the "
+        "shared path, which is the cue to run the arithmetic below on it;\n"
+        "what no conflict scan above will report is the breach itself.\n"
+    ),
+    repr(got_2085),
+)
+flagged_2085 = [
+    checker.classify_line(line)
+    for line in got_2085.splitlines()
+    if line.strip()
+]
+expect(
+    "every line of the #2085 reflow is gate-clean",
+    flagged_2085 == [None, None],
+    repr(flagged_2085),
+)
+
+# Lowercase-follower sentence (gate _SENT_BREAK_LOWER_RE; the old local
+# splitter left this whole and would rejoin a hand-break).
+LOWER = "The rules, or agents. opencode instead reads the mailbox.\n"
+expect(
+    "lowercase-follower is a sentence violation to the gate before reflow",
+    checker.classify_line(LOWER.strip()) == "sentence",
+    repr(checker.classify_line(LOWER.strip())),
+)
+got_lower = slb.reformat(LOWER)
+expect(
+    "reformat splits a lowercase-follower sentence boundary",
+    got_lower == (
+        "The rules, or agents.\n"
+        "opencode instead reads the mailbox.\n"
+    ),
+    repr(got_lower),
+)
+expect(
+    "reformat does not rejoin a hand-broken lowercase-follower boundary",
+    slb.reformat(
+        "The rules, or agents.\nopencode instead reads the mailbox.\n"
+    ) == got_lower,
+    repr(slb.reformat(
+        "The rules, or agents.\nopencode instead reads the mailbox.\n"
+    )),
+)
+
+# A short semicolon line is below NLB_CLAUSE_MIN_LENGTH; the gate leaves it,
+# so the reformatter must too.
+SHORT_SEMI = "Keep this; it is short.\n"
+expect(
+    "a short semicolon line is not a gate clause violation",
+    checker.classify_line(SHORT_SEMI.strip()) is None,
+)
+expect(
+    "reformat leaves a short semicolon line joined",
+    slb.reformat(SHORT_SEMI) == SHORT_SEMI,
+    repr(slb.reformat(SHORT_SEMI)),
+)
+
+# A semicolon inside a code span is not a clause boundary (the gate strips
+# markup first). Padding the line with words so a naive `;` search would fire.
+CODE_SEMI = (
+    "Run `python3 -m pytest; true` on the suite "
+    "and wait for every worker to finish the remaining cases.\n"
+)
+expect(
+    "a code-span semicolon is not a gate clause violation",
+    checker.classify_line(CODE_SEMI.strip()) is None,
+    f"len={len(checker.strip_inline_markup(CODE_SEMI.strip()))} "
+    f"reason={checker.classify_line(CODE_SEMI.strip())!r}",
+)
+expect(
+    "reformat does not split on a code-span semicolon",
+    slb.reformat(CODE_SEMI) == CODE_SEMI,
+    repr(slb.reformat(CODE_SEMI)),
+)
+
+# #2081 is the comma-clause join. The gate does not flag commas, so this
+# change must not start splitting them --- that would be a different issue.
+LONG_COMMA = (
+    "They are explicit that it disables the check outright rather than "
+    "allowlisting one host, so they advise pairing it with WebFetch permission "
+    "rules to bound which domains stay reachable, and they present this as one "
+    "of two remedies for a network that blocks the Anthropic API host.\n"
+)
+expect(
+    "a long comma-clause sentence is not a gate violation",
+    checker.classify_line(LONG_COMMA.strip()) is None,
+)
+expect(
+    "#2081 comma joins are unchanged (still one line)",
+    slb.reformat(LONG_COMMA) == LONG_COMMA,
+    f"len={len(slb.reformat(LONG_COMMA).strip())} "
+    f"lines={slb.reformat(LONG_COMMA).count(chr(10))}",
+)
+
+# Bullet continuation: first piece keeps the marker, later pieces indent.
+BULLET_SEMI = (
+    "- The **Don't:** count an explicit `raise` as louder than the incidental "
+    "error it replaces; an adversarial self-review caught it before merge.\n"
+)
+got_bullet = slb.reformat(BULLET_SEMI)
+expect(
+    "bullet semicolon split keeps the marker on the first piece only",
+    got_bullet.startswith("- ") and "\n  " in got_bullet,
+    repr(got_bullet),
+)
+bullet_reasons = [
+    checker.classify_line(checker.line_content(line))
+    for line in got_bullet.splitlines()
+    if line.strip()
+]
+expect(
+    "split bullet lines are gate-clean",
+    all(r is None for r in bullet_reasons) and len(bullet_reasons) >= 2,
+    f"{got_bullet!r} reasons={bullet_reasons!r}",
+)
+
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

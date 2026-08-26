@@ -55,11 +55,13 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
 
-Where Morrison-Lab/ai-config's Cursor adapter skips the guard
-(Cloud and desktop with that project open),
-the prefix is inert under every reviewer,
+On Cursor Cloud, Morrison-Lab/ai-config's Cursor adapter skips the
+guard, so the prefix is inert under every reviewer,
 including a CLI-delivered one.
-Do not use it, and compare `Reviewed-Commit` by hand instead.
+Do not use it there, and compare `Reviewed-Commit` by hand instead.
+On desktop with third-party Claude hooks enabled, the native guard
+still runs; the prefix is the escape
+(see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 

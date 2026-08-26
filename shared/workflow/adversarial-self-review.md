@@ -145,18 +145,18 @@ until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT);
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Do not prefix `ALLOW_UNREVIEWED_PUSH=1` where that adapter skips
-the guard (Cloud and desktop with that project open):
-the guard does not run, so the prefix is inert and misreports
-the session, including after a Task dispatch that errored.
+Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud:
+the adapter skips the guard there, so the prefix is inert and
+misreports the session, including after a Task dispatch that errored
+(see [`memories/cursor.md`](../../memories/cursor.md)
+for the desktop path, where native Claude hooks still run the guard).
 If that dispatch errored or produced no report,
 obtain a review via the CLI fallback above
 and still compare `Reviewed-Commit` by hand.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is also the CLI-fallback case above ---
-still with no override prefix on Cursor, Cloud or desktop: the guard
-does not run there under any reviewer, so compare `Reviewed-Commit`
-by hand instead.
+on Cursor Cloud still with no override prefix, because the adapter
+skips the guard there under any reviewer.
 
 ## Brief it with the diff and the standards, never with your rationale
 

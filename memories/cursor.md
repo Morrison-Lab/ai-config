@@ -134,11 +134,11 @@ an author-composed block with those headings does not.
 Name which route produced the verdict.
 Decode the assistant `text` before blanking fences.
 `batch-fetch-details` can write a large `transcript.json`.
-If the conductor cannot read it in-window, extract the child's
-assistant `text` with a deterministic decoder, or a subagent
-that returns that text verbatim.
+Extract the child's assistant `text` with a subagent that returns
+that text verbatim, or with a deterministic decoder.
 A paraphrase of the headings is an author-composed block
 and does not count.
+Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
@@ -166,11 +166,16 @@ If you cannot obtain `Reviewed-Commit`, do not push.
 The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
 Compare that sha to the recorded sha and to `git rev-parse HEAD`
-(prefix-match, as the guard does).
+by prefix-match (`c.startswith(reviewed_commit)`), as the guard does.
+The fingerprint is 7 to 40 hex digits, as `REVIEWED_COMMIT` requires.
+Optional `**` around the label and a backticked sha are allowed.
+A shorter string is not a fingerprint: do not push.
 If they differ, do not push.
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
+Read stdout and stderr (`2>&1`).
+The summary lines this section names write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
 or those commits are not the compared sha
@@ -196,9 +201,16 @@ The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
 obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
-and still compare `Reviewed-Commit` by hand;
-do not prefix `ALLOW_UNREVIEWED_PUSH=1` where this repo's Cursor
-adapter skips the guard (Cloud and desktop with this project open).
+and still compare `Reviewed-Commit` by hand.
+On Cursor Cloud the adapter skip makes
+`ALLOW_UNREVIEWED_PUSH=1` inert
+(measured 2026-08-25 PDT; Cloud has no home Claude settings).
+Do not prefix it there.
+On desktop, third-party Claude hooks still load
+`~/.claude/settings.json` and run the guard
+(measured against Cursor's third-party hook docs on 2026-08-25).
+The prefix is the escape on that path, because Cursor JSONL omits
+`tool_result` and the native guard otherwise denies every push.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -263,9 +275,10 @@ is the instruction to use this route.
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` where this repo's
-  Cursor adapter skips the guard (Cloud and desktop with this
-  project open).
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud,
+  where the adapter skip makes it inert.
+  On desktop with third-party Claude hooks enabled, that prefix
+  is the native-guard escape, not an inert flag.
   If the dispatch errored or produced no report,
   obtain a CLI review and still compare by hand.
 - **Don't:** treat a matching HEAD sha as covering a dry-run

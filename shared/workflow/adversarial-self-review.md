@@ -88,6 +88,10 @@ the author-dispatched cross-model, cross-harness reviewer's
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
+A split --- one all-clear and another not-clean, nits included --- is not
+100% all-clear, and `mwc` does not authorize merging it
+(ai-config#2274).
+ARD every item from every review, then request fresh reviews.
 If no qualifying reviewer is reachable, the merge waits ---
 "blocked on reviewer availability" is the honest status ---
 and arming an auto-merge while waiting is

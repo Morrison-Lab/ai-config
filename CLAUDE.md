@@ -725,7 +725,11 @@ Name the specific practice and gap, cite the rule or label the opinion as an opi
 
 The external-correction counterpart to the UMS triggers at the top of this file: those fire on a first-person admission ("I was wrong"), which is why `hooks/remind-ums-after-error.py` deliberately excludes correcting someone else.
 Agreeing with a reviewer is the commoner case and the one that machinery misses --- you admit nothing, you accept a finding --- so an accepted finding is a first-push miss to record and, where a decidable condition exists, to algorithmatize, per the goal that every PR gets a clean review on the first push.
-`hooks/remind-learn-from-review.py` is that trigger; like its sibling it only ever adds context and never blocks, and it stays unregistered until its PR merges, per README's activation gate.
+`hooks/remind-learn-from-review.py` is that trigger;
+like its sibling it only ever adds context and never blocks.
+It is registered in `hooks/hooks.json`,
+which binds it on the plugin path
+and is what `install-hooks.py --fix` binds on the non-plugin path.
 
 ## Tracking issues in upstream repos
 
@@ -1646,6 +1650,9 @@ recurred immediately in a `jq` filter reading a PR review body.)
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
+  A disagreement among reviews is not fully clean: any standing not-clean
+  --- nits included --- vetoes merge even with `mwc` active
+  (ai-config#2274).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

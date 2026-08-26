@@ -1,7 +1,8 @@
 # Delegation ladder
 
-Moved out of `preferences.md` (2026-08-26) when that file hit the
-1200-line cap; this section is self-contained.
+Moved out of `preferences.md` (2026-08-26)
+when that file hit the 1200-line cap;
+this section is self-contained.
 
 ## Delegate heavy work to another CLI first --- codex, agy, and now opencode
 
@@ -15,7 +16,7 @@ Moved out of `preferences.md` (2026-08-26) when that file hit the
 > so headless `agy --print` invocations
 > --- including adversarial review dispatch ---
 > remain usable.
-> The interactive subscription/extension is unaffected and not at quota --
+> The interactive subscription/extension is unaffected and not at quota ---
 > don't extrapolate this into "uninstall the extension".
 > Tracked as ai-config#1776.
 
@@ -68,10 +69,11 @@ which changes where it sits rather than just adding a row.**
 Its two tiers cost nothing,
 so for work a small model can actually do it goes *ahead* of codex and agy
 rather than behind them: there is no budget to conserve by skipping it.
-Capability is the binding constraint in its place, and it is unmeasured here ---
+Capability is the binding constraint in its place,
+and it is unmeasured here ---
 the local ids carry parameter counts from 2B to 30B,
-and the hosted ids are preview names nobody has benchmarked against this
-corpus's work.
+and the hosted ids are preview names
+nobody has benchmarked against this corpus's work.
 The local (`ollama/*`) tier is also the only destination anywhere in this
 ladder that *can* keep the payload on the machine,
 so it is the one route for work whose data must not leave.

@@ -403,10 +403,9 @@ and falls back to a self-review or human review per
 [`self-review-fallback`](self-review-fallback.md),
 that fallback lets the ARDI iteration loop proceed
 in the absence of prior unresolved findings.
-It never satisfies an autonomous merge gate:
-an author self-review clears no merge grant,
-and autonomous merging under `mwc` remains blocked,
-while authentic human review approval permits manual merging.
+It never satisfies an autonomous merge gate ---
+autonomous merging under `mwc` remains blocked per the merge gate above,
+and human approval is the only path.
 It does NOT wipe the slate clean,
 does NOT license merging over an unaddressed `Needs more work` verdict
 or open finding list from an earlier or concurrent review run,

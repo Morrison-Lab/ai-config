@@ -118,7 +118,8 @@ If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, recover the report from
 cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
-That transcript route discharges the check.
+That transcript route discharges the hand comparison this section
+specifies.
 A harness paste of the child's own assistant message may corroborate it;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
@@ -226,7 +227,10 @@ is the instruction to use this route.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
-  or the same-argv dry-run fails or does not show that sha,
+  or the same-argv dry-run fails,
+  or it lists commits other than that sha
+  (`Everything up-to-date` and a new-branch line with no sha
+  are not a mismatch),
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".

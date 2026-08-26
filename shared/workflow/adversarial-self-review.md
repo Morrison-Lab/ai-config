@@ -242,7 +242,7 @@ How Cursor Cloud obtains the child's structured report is in
 
 ## The mechanism
 
-[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case on Claude Code, per [`algorithmatize-checks`](algorithmatize-checks.md).
 It answers three questions rather than one, because provenance alone is not enough.
 
 *Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.

@@ -61,6 +61,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 State the verdict on its own line in that exact form.
 Return the structured report as this call's own message,
 not as a pointer to a file.
+Emit nothing after the fingerprint.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as
 `Needs more work`, an optional heading, and spaces around the colon.
@@ -68,7 +69,7 @@ Emphasis wrapping the whole verdict line is no verdict.
 Fenced content is blanked before both searches.
 An unclosed fence is no verdict.
 A fingerprint only inside a fence is no fingerprint.
-Anything else is no verdict.
+A verdict line in any other form is no verdict.
 
 You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).

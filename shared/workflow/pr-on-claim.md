@@ -23,15 +23,19 @@ cross-referenced **open PRs** --- the check `gi` runs before grabbing an issue.
 git fetch origin main -q
 git checkout -b <type>/<slug> origin/main
 git commit --allow-empty -m "start: <issue title> (closes #<N>)"
-ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD
+git push -u origin HEAD
 gh pr create --draft --title "<title>" --body "Closes #<N>
 
 WIP --- opened up front to claim the issue; implementing now."
 ```
 
-On Claude Code the pre-push guard still requires
-`ALLOW_UNREVIEWED_PUSH=1` on that `git push`:
-the guard requires a reviewer-call result
+On Claude Code prefix that push:
+
+```bash
+ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD
+```
+
+The guard requires a reviewer-call result
 before it reaches the commit comparison,
 including for an empty commit
 (see [`push`](../../skills/push/SKILL.md)).

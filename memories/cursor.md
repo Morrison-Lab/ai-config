@@ -356,7 +356,9 @@ This repo's Cursor adapter skips `no-push-without-self-review.py`
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so a failed or skipped dispatch is not caught before the push.
 The posted PR comment is the record, not a gate.
-If the dispatch errored or produced no report,
+If the dispatch errored, produced no report,
+or produced a report whose fingerprint cannot be recovered
+(including a stale-registered persona),
 obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md),
 write that reviewer's report to a file under `/tmp`,
@@ -557,7 +559,9 @@ is the instruction to use this route.
   Prefix only after a native `PreToolUse`
   `no-push-without-self-review` deny of the unprefixed push.
   Do not pair the project adapter with native Claude hooks.
-  If the dispatch errored or produced no report,
+  If the dispatch errored, produced no report,
+  or produced a report whose fingerprint cannot be recovered
+  (including a stale-registered persona),
   obtain a CLI review,
   write that reviewer's report to a file under `/tmp`,
   and call `parse_report()` on that file.

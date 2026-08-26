@@ -275,6 +275,9 @@ also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
 If the worktree script is missing, obtain a CLI review.
 Do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
 On that Cursor-adapter path, the empty
 [`pr-on-claim`](shared/workflow/pr-on-claim.md)
 `--allow-empty` branch has no report:

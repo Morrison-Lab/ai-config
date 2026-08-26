@@ -160,6 +160,9 @@ also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
 If the worktree script is missing, obtain a CLI review.
 Do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
 The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
 do not invent one,
 do not refuse that push for lack of a verdict,
@@ -172,7 +175,10 @@ Exit 1 means a diff; exit 128 means the command failed.
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.
-If the dispatch errored, obtain a CLI review,
+If the dispatch errored, produced no report,
+or produced a report whose fingerprint cannot be recovered
+(including a stale-registered persona),
+obtain a CLI review,
 write that reviewer's report to a file under `/tmp`,
 and call `parse_report()` on that file.
 If Claude Code's native guard is also running, the prefix

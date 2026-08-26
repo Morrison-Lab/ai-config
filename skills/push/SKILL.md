@@ -58,6 +58,10 @@ If the worktree script is missing, obtain a CLI review
 (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 If the verdict is not `clean`, or there is no fingerprint,
 or the fingerprint does not prefix-match HEAD, do not push.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review, write that reviewer's report to a file
+under `/tmp`, and call `parse_report()` on that file.
 On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
@@ -84,7 +88,8 @@ has no report to parse: do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
 The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
-equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0.
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
 Exit 1 means a diff; exit 128 means the command failed.
 `git diff origin/<default-branch>...HEAD` empty is tree equality,
 not "this branch carries nothing".

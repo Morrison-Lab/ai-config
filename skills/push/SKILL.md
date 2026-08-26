@@ -39,8 +39,30 @@ Never brief it with your rationale for the change, per [`adversarial-self-review
 
 Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
-`hooks/no-push-without-self-review.py` gates this.
-It admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
+`hooks/no-push-without-self-review.py` gates this on Claude Code.
+Morrison-Lab/ai-config's Cursor adapter skips that script
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+([`memories/cursor.md`](../../memories/cursor.md)).
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+call `parse_report()` from the worktree's
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
+on the report recovered from the child's transcript
+when the worktree hook script exists
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
+If the worktree script is missing, obtain a CLI review
+(see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+If the verdict is not `clean`, or there is no fingerprint,
+or the fingerprint does not prefix-match HEAD, do not push.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review, write that reviewer's report to a file
+under `/tmp`, and call `parse_report()` on that file.
+On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
 
@@ -50,6 +72,37 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - a review delivered by a separate CLI rather than a subagent, whose verdict never becomes an `Agent` call's result;
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
+
+On a session whose pushes go through Morrison-Lab/ai-config's
+Cursor adapter, default: do not prefix.
+The prefix is inert for the adapter
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+makes the adapter run that guard
+(the skip and the `parse_report` gate are earlier in this step).
+If a native `PreToolUse` deny from
+`no-push-without-self-review` is observed on the push,
+prefix for that native guard.
+The empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)
+`--allow-empty` branch
+has no report to parse: do not invent one,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
+Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
+`git diff origin/<default-branch>...HEAD` empty is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
+After [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+makes the adapter run that guard,
+the prefix is the documented escape
+when the guard cannot see a verdict.
+The adapter skip makes the prefix inert for the adapter only.
+Do not pair the project adapter with native Claude hooks
+(desktop Cursor with third-party Claude hooks plus this project adapter;
+see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 
@@ -109,7 +162,7 @@ A released PR would read as live-claimed, and this skill would refuse a legitima
 Derive the release terms rather than copying this list, which is a snapshot of what the corpus posts today: `grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/`.
 A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one --- see [`claim-pr`](../../shared/workflow/claim-pr.md).
 
-If the latest claim comment is from someone **other than you**, hasn't been unclaimed, and is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**
+The query returns the whole claim/release exchange, newest last, so read its **last** member: if that is a *claim* rather than a release, and it is from someone **other than you**, and it is still live --- the PR shows a push or comment within the last 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule --- **do not push.**
 Ask the user.
 An expired claim (over 2 idle hours) no longer blocks on its own, but take it over with a fresh claim comment and run this skill's other checks (branch-head advance, `@claude` run in flight) before pushing.
 

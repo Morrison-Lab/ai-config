@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exit successfully when Cursor already has the ai-config skill catalog.
+"""Exit successfully when Cursor already has the matching ai-config catalog.
 
 Cursor can load this repo's skills three ways, and stacking any two doubles
 the listing the same way a Claude plugin-plus-symlink install does
@@ -16,6 +16,12 @@ the listing the same way a Claude plugin-plus-symlink install does
 
 Bootstrap asks this script whether the first two are already live, and
 skips the third when they are.
+
+The Cursor plugin also ships ``cursor-rules/`` as user-global rules
+(``.cursor-plugin/plugin.json``). Bootstrap skips linking
+``~/.cursor/rules`` only when that plugin is installed. A live
+``~/.claude/skills`` catalog is not a skip for rules: Claude does not
+ship them (ai-config#2291).
 """
 from __future__ import annotations
 
@@ -93,27 +99,20 @@ def _repo_worktrees(repo_root: Path) -> set[Path]:
     return module.repo_worktrees(repo_root)
 
 
-def stacked_cursor_skill_paths(
-    cursor_dir: Path,
-    repo_root: Path,
-    repo_roots: set[Path] | None = None,
-) -> list[Path]:
-    """``~/.cursor/skills`` symlinks whose target sits in this repo.
-
-    The skip-path cleanup used to require ``readlink`` to equal this
-    checkout's ``skills/<name>``. A leftover link into a sibling worktree
-    then survived bootstrap while ``check-harness-installs.py`` still
-    reported it as ``stacked`` (ai-config#1729).
-    """
-    skills_dir = cursor_dir / "skills"
+def _resolved_repo_roots(
+    repo_root: Path, repo_roots: set[Path] | None
+) -> set[Path]:
     if repo_roots is None:
-        repo_roots = {repo_root.resolve()} | _repo_worktrees(repo_root)
-    else:
-        repo_roots = {Path(root).resolve() for root in repo_roots}
-    if not skills_dir.is_dir():
+        return {repo_root.resolve()} | _repo_worktrees(repo_root)
+    return {Path(root).resolve() for root in repo_roots}
+
+
+def _stacked_symlinks(install_dir: Path, repo_roots: set[Path]) -> list[Path]:
+    """Consumer-dir symlinks whose target sits in one of *repo_roots*."""
+    if not install_dir.is_dir():
         return []
     try:
-        children = list(skills_dir.iterdir())
+        children = list(install_dir.iterdir())
     except OSError:
         return []
     stacked: list[Path] = []
@@ -127,6 +126,39 @@ def stacked_cursor_skill_paths(
         if any(_is_relative_to(target, root) for root in repo_roots):
             stacked.append(child)
     return stacked
+
+
+def stacked_cursor_skill_paths(
+    cursor_dir: Path,
+    repo_root: Path,
+    repo_roots: set[Path] | None = None,
+) -> list[Path]:
+    """``~/.cursor/skills`` symlinks whose target sits in this repo.
+
+    The skip-path cleanup used to require ``readlink`` to equal this
+    checkout's ``skills/<name>``. A leftover link into a sibling worktree
+    then survived bootstrap while ``check-harness-installs.py`` still
+    reported it as ``stacked`` (ai-config#1729).
+    """
+    return _stacked_symlinks(
+        cursor_dir / "skills", _resolved_repo_roots(repo_root, repo_roots)
+    )
+
+
+def stacked_cursor_rule_paths(
+    cursor_dir: Path,
+    repo_root: Path,
+    repo_roots: set[Path] | None = None,
+) -> list[Path]:
+    """``~/.cursor/rules`` symlinks whose target sits in this repo.
+
+    Same leftover-cleanup rule as skills (ai-config#1729 / #2291): a link
+    into a sibling worktree is stacked, a real file is not, a foreign
+    symlink is not.
+    """
+    return _stacked_symlinks(
+        cursor_dir / "rules", _resolved_repo_roots(repo_root, repo_roots)
+    )
 
 
 def skip_reason(
@@ -151,6 +183,17 @@ def skip_reason(
     return None
 
 
+def skip_rules_reason(cursor_dir: Path) -> str | None:
+    """Why bootstrap should not link ``~/.cursor/rules``, or None to install.
+
+    Only a live Cursor plugin ships ``cursor-rules/``. A Claude skill
+    catalog does not, so it is not a skip here (ai-config#2291).
+    """
+    if plugin_installed(cursor_dir):
+        return "ai-config Cursor plugin is already installed"
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -170,12 +213,32 @@ def main() -> int:
         action="store_true",
         help="print leftover ~/.cursor/skills links that resolve into this repo",
     )
+    parser.add_argument(
+        "--print-stacked-rules",
+        action="store_true",
+        help="print leftover ~/.cursor/rules links that resolve into this repo",
+    )
+    parser.add_argument(
+        "--rules",
+        action="store_true",
+        help="check whether bootstrap should skip linking ~/.cursor/rules",
+    )
     args = parser.parse_args()
     cursor_dir = Path(args.cursor_dir)
     repo_root = Path(args.repo_root)
     if args.print_stacked:
         for path in stacked_cursor_skill_paths(cursor_dir, repo_root):
             print(path)
+        return 0
+    if args.print_stacked_rules:
+        for path in stacked_cursor_rule_paths(cursor_dir, repo_root):
+            print(path)
+        return 0
+    if args.rules:
+        reason = skip_rules_reason(cursor_dir)
+        if reason is None:
+            return 1
+        print(reason)
         return 0
     reason = skip_reason(
         cursor_dir, Path(args.claude_dir), repo_root

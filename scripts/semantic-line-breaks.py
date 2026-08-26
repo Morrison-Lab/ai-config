@@ -616,6 +616,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     if not args.write and changed_files:
         print('Preview only -- nothing was written. Re-run with --write to apply.')
+
+    print(
+        '\nNote: This tool does not implement the CI clause-break rule '
+        '(NLB_CLAUSE_BREAKS). A clean run here may still fail in CI if '
+        'a line >=80 chars contains a mid-line semicolon.'
+    )
     return 1 if errors else 0
 
 

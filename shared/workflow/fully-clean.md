@@ -238,6 +238,18 @@ a genuine clean automated Claude review verdict evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 
+**One more gate stacks on top (user directive, 2026-08-25):
+no merge under any grant, `mwc` included,
+without a 100% all-clear adversarial verdict at the shipping head from a
+reviewer meeting [`adversarial-self-review`](adversarial-self-review.md)'s
+independence bar.**
+It composes with the external-reviewer requirement above ---
+neither satisfies the other.
+When the external reviewer self-skips by design (workflow modification is
+the known case), autonomous merging stays blocked:
+human approval is the only path.
+Specification and mechanics live in that fragment.
+
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".
 
@@ -385,8 +397,19 @@ See [`fully-clean.cases.md`](fully-clean.cases.md),
 
 **A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
 
-When a review run skips (e.g. self-modification workflow guard or quota limits) and falls back to a self-review or human review per [`self-review-fallback`](self-review-fallback.md), that fallback authorizes **merging** only in the absence of prior unresolved findings.
-It does NOT wipe the slate clean, and it does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run.
+When a review run skips
+(e.g. self-modification workflow guard or quota limits)
+and falls back to a self-review or human review per
+[`self-review-fallback`](self-review-fallback.md),
+that fallback lets the ARDI iteration loop proceed
+in the absence of prior unresolved findings.
+It never satisfies an autonomous merge gate ---
+autonomous merging under `mwc` remains blocked per the merge gate above,
+and human approval is the only path.
+It does NOT wipe the slate clean,
+does NOT license merging over an unaddressed `Needs more work` verdict
+or open finding list from an earlier or concurrent review run,
+and does NOT clear the all-clear merge gate above.
 
 - **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or ready to merge.
 - **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.
@@ -676,6 +699,9 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+- **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
+
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)
@@ -686,3 +712,7 @@ finding.**
 **Deadlock -> escalate to a human.** If you and the reviewer(s) can't reach consensus on an item (a rebuttal was exchanged and neither side is budging), don't loop forever and don't unilaterally override the reviewer --- request a **human reviewer**, `@`-mention them in a comment summarizing the impasse, and surface the open item.
 
 **An automated reviewer's verdict on a disputed factual/technical claim is not stable across independent runs, even with identical evidence available each time.** Don't treat one round's "settled, no need to keep arguing" as durable: the very same review job, re-triggered later with no new code changes, can re-raise a claim it previously retracted --- and then retract it again on a subsequent run --- purely from re-deriving the question differently each time, not from anything changing in the PR. This means a rebuttal thread's outcome (however many rounds of citations and counter-citations) doesn't itself resolve a genuine deadlock the way a human's decision does; only escalating per the bullet above actually settles it. The one thing that DOES help going forward: fold the authoritative citation/evidence directly into the code or doc being reviewed (a comment, not just a PR conversation reply) --- a fresh reviewer run re-deriving the claim from scratch is more likely to find the citation sitting right next to what it's evaluating than to dig through prior thread history for it, though even that is not a guarantee against a bot that ignores context already in front of it.
+
+**Algorithmic safeguards:** Algorithmic checks and hooks can only invalidate, not validate, a PR.
+You still need to use your own judgment in addition to satisfying the algorithmic safeguards;
+they are a safety net, not a gold standard.

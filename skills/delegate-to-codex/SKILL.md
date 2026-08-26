@@ -17,7 +17,7 @@ reserve. Claude stays the orchestrator — it writes the prompts, assembles the
 stages, integrates the outputs — and is the **fallback** for anything codex
 can't finish. Exhaust the *current 5-hour codex window*, then fall back to Claude
 until the window resets. This skill is the mechanism; the preference lives in
-`memories/preferences.md` ("Delegate heavy work to codex first").
+`memories/delegation.md`.
 
 ## When this fires
 

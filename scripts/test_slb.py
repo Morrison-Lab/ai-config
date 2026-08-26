@@ -909,9 +909,14 @@ with tempfile.TemporaryDirectory() as _shim_dir:
         _help.returncode == 0,
         _help.stderr[-200:],
     )
+    # --all on a temp file outside the repo: deterministic (no base-ref git
+    # scoping, which CI's checkout cannot resolve), and still reaches the
+    # gate's config resolution, which is what needs PyYAML.
+    _probe = Path(_shim_dir) / "probe.md"
+    _probe.write_text("A short test sentence.\n", encoding="utf-8")
     _run = subprocess.run(
         [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"),
-         str(REPO_ROOT / "README.md")],
+         "--all", str(_probe)],
         capture_output=True, text=True, env=_env,
     )
     expect(

@@ -115,15 +115,14 @@ Record `git rev-parse HEAD` and `git rev-parse --abbrev-ref HEAD`
 before the dispatch,
 and run `git status --short`.
 If that status is not empty, do not dispatch: commit or stash first.
-After the child returns, take the last `Verdict:` line
-anchored at line start
-(optionally as a heading, as the guard's `VERDICT_LINE` does)
-from a harness paste of the child's own assistant message
-that already carries Summary / Findings / Verdict,
-or from cursor-cloud `batch-fetch-details`
+After the child returns, recover the report from
+cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
-An author-composed block with those headings is not a paste.
-If the paste is not clearly the child's, use the transcript route.
+That transcript route discharges the check.
+A harness paste of the child's own assistant message may corroborate it;
+an author-composed block with those headings does not.
+Name which route produced the verdict.
+Decode the assistant `text` before blanking fences.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
@@ -135,16 +134,17 @@ that is at least as long;
 do not pair open and close by count.
 If a fence never closes, treat the report as stating no verdict:
 do not push.
-Take the last `Verdict:` line against that blanked text,
-then the first `Reviewed-Commit` after it, still on the blanked text.
-The last `Verdict:` line must match `Ready for merge` or
-`Needs more work` or `Needs work` the way `VERDICT_LINE` does;
-a heading such as `Approved` is not a verdict.
+Take the last matching `Verdict:` line against that blanked text
+(`Ready for merge`, `Needs more work`, or `Needs work`);
+a trailing `Approved` is not a match, so skip it.
+Then take the first `Reviewed-Commit` after that match,
+still on the blanked text.
 The `Task` JSON `tool_result` has no review body.
 If you cannot obtain `Reviewed-Commit`, do not push.
 The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
-Compare that sha to the recorded sha and to `git rev-parse HEAD`.
+Compare that sha to the recorded sha and to `git rev-parse HEAD`
+(prefix-match, as the guard does).
 If they differ, do not push.
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
@@ -154,6 +154,8 @@ or you cannot tell from its output which commits would ship,
 or those commits are not the compared sha
 (prefix-match an abbreviated sha),
 do not push.
+`Everything up-to-date` means the push would ship nothing;
+that is not a fingerprint mismatch.
 A new branch's dry-run line is `[new branch]` with no sha.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
 If it is a branch name, that name must match the recorded branch.
@@ -215,11 +217,12 @@ is the instruction to use this route.
 - **Do:** commit first, then brief the child not to edit.
   Record `HEAD`, the branch name, and `git status --short`
   before the dispatch.
-  After it returns, take the last line-start `Verdict:`
+  After it returns, recover the report from `batch-fetch-details`
+  with `bcIds` and `includeTranscripts: true`
+  (a harness paste of the child may corroborate; name the route).
+  Take the last matching line-start `Verdict:`
   and the first `Reviewed-Commit` after it, both on
-  fence-blanked text, from a harness paste of the child's
-  report or from `batch-fetch-details` with `bcIds` and
-  `includeTranscripts: true`.
+  fence-blanked decoded text.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,

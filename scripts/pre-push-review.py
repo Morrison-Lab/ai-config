@@ -165,13 +165,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     unfenced_report = re.sub(r"<!--.*?-->", "", unfenced_report, flags=re.DOTALL)
 
     required_sections = [
-        ("Summary Verdict", ["### Summary Verdict", "## Summary Verdict", "### Verdict", "## Verdict"]),
-        ("Critical Findings", ["### Critical Findings", "## Critical Findings"]),
-        ("Observations", ["\n### Observations", "\n## Observations"]),
-        ("Verification Steps", ["\n### Verification Steps", "\n## Verification Steps", "\n### Verification", "\n## Verification"]),
+        ("Summary Verdict", [r"(?im)^#{2,3}\s+(?:Summary\s+)?Verdict"]),
+        ("Critical Findings", [r"(?im)^#{2,3}\s+Critical Findings"]),
+        ("Observations", [r"(?im)^#{2,3}\s+Observations"]),
+        ("Verification Steps", [r"(?im)^#{2,3}\s+Verification(?: Steps)?"]),
     ]
     for section_name, patterns in required_sections:
-        if not any(pat in ("\n" + unfenced_report) for pat in patterns):
+        if not any(re.search(pat, unfenced_report) for pat in patterns):
             return False, False, f"Missing required section: {section_name}"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
@@ -241,7 +241,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     else:
         is_clean = True
 
-    findings_matches = list(re.finditer(r"(?is)#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report))
+    findings_matches = list(re.finditer(r"(?im)^#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report, flags=re.DOTALL))
     if not findings_matches:
         return False, False, "Missing required section: Critical Findings"
 
@@ -260,7 +260,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|p0(?:[:\s]|$))\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -590,7 +590,7 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
 
     remote_sha = get_pr_head_sha(pr_number)
     # Fail safe: if remote_sha cannot be fetched or does not match commit_sha, fail closed.
-    if not remote_sha or (commit_sha and commit_sha != remote_sha):
+    if not remote_sha or not commit_sha or commit_sha != remote_sha:
         log_error(
             f"Local commit ({commit_sha[:8] if commit_sha else 'unknown'}) does not match remote PR head "
             f"({remote_sha[:8] if remote_sha else 'unresolved'}). Refusing to post verdict to the wrong revision."
@@ -694,6 +694,7 @@ def main():
     args = parser.parse_args()
 
     git_root = get_git_root()
+    os.chdir(git_root)
     pr_num = args.pr or get_current_pr()
 
     initial_head = subprocess.run(

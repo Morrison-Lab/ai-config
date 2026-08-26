@@ -525,6 +525,23 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch.object(reviewer, "get_pr_head_sha")
+    def test_post_review_empty_commit_sha_fails_closed(self, mock_get_sha, mock_subproc):
+        mock_get_sha.return_value = "remote_sha_9999"
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        mock_subproc.return_value = mock_res
+
+        res = reviewer.post_review_to_github(
+            pr_number=123,
+            report="### Summary Verdict\nVerdict: Ready for merge",
+            engine_name="OpenAI Codex",
+            commit_sha="",
+        )
+        self.assertFalse(res)
+        mock_subproc.assert_not_called()
+
+    @patch("subprocess.run")
+    @patch.object(reviewer, "get_pr_head_sha")
     def test_post_review_differing_head_sha_fails_closed(self, mock_get_sha, mock_subproc):
         mock_get_sha.return_value = "remote_sha_9999"
         mock_res = MagicMock()

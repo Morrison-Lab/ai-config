@@ -262,12 +262,14 @@ Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`,
-call `parse_report()` on the recovered report,
+call `parse_report()` on the recovered report
+in the checkout whose push follows,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD
 ([`memories/cursor.md`](memories/cursor.md)).
 On that Cursor-adapter path, a push that carries nothing to review
-(`git diff origin/<default-branch>...HEAD` empty;
+(`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows;
 the empty [`pr-on-claim`](shared/workflow/pr-on-claim.md) branch)
 has no report: do not invent one,
 do not refuse that push for lack of a verdict,

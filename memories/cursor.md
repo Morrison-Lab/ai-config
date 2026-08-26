@@ -120,9 +120,19 @@ Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
 Commit first.
 A review of uncommitted work names a commit that does not exist yet
 (`hooks/no-push-without-self-review.py`).
+Name the checkout whose `git push` follows
+(the isolated worktree, not the conductor's cwd).
+Brief the child with that checkout path.
+Run every git command in this section in that checkout
+(`git -C <checkout> ...`, or after `cd` to it).
+A `git -C` on the push that names a different directory
+than the gates is the wrong-repository bypass
+`iter_pushes` already grades
+(chained `-C`, `cd`/`pushd`, `REDIRECTED`; ai-config#1977).
 Record `git rev-parse HEAD` and `git rev-parse --abbrev-ref HEAD`
+in that checkout
 before the dispatch,
-and run `git status --short`.
+and run `git status --short` there.
 If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, recover the report from
 cursor-cloud `batch-fetch-details`
@@ -145,20 +155,28 @@ Two legal routes, and both must produce the report body
 (the last matching assistant `text`) as well as the
 `parse_report()` tuple:
 (a) a decoder reads `transcript.json` whose path contains
-the `cloudAgentBcId`, prints that last matching `text`,
-and calls `parse_report()` on it in one process;
+the `cloudAgentBcId`, writes that last matching `text`
+to a file, and calls `parse_report()` on the file contents
+in one process;
 (b) a subagent returns that last matching assistant `text`
-verbatim and the conductor calls `parse_report()` on that
-return without editing it.
+verbatim;
+the conductor writes that return to a file without editing it
+and calls `parse_report()` on the file contents.
 Do not require the same invocation for route (b).
-Route (a)'s printed text is the body to post.
+Do not re-emit the markdown through a shell command string.
+A backtick span inside a double-quoted body runs as
+command substitution and vanishes.
+A doubled backslash can collapse even inside a quoted heredoc.
+Post with `--body-file` / `-F body=@<file>`.
+Route (a)'s file is the body to post
+(`gh pr comment --body-file` / equivalent).
 Route (b)'s provenance is the subagent's verbatim return
-of the same selector.
+of the same selector, written to that file.
 The `parse_report()` tuple is the push gate, not the comment.
 Do not treat route (a) as returning only the tuple.
 Call `parse_report()` from
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
-on that recovered text
+on the file contents
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects).
 Do not paste a report body the conductor composed.
@@ -176,13 +194,14 @@ and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
 A push that carries nothing to review
 is decided by `git diff origin/<default-branch>...HEAD`
+in that checkout
 being empty
 (the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch,
 created with `--allow-empty`).
 Do not invent a report,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
-Re-read `git rev-parse HEAD` after the child returns.
+Re-read `git rev-parse HEAD` in that checkout after the child returns.
 If HEAD is not the recorded sha, the child wrote or HEAD moved:
 do not push; re-dispatch on the new HEAD.
 The fingerprint must prefix-match HEAD
@@ -193,8 +212,10 @@ If the fingerprint does not prefix-match HEAD, do not push.
 tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
 Provenance is the recovery route in this file:
 route (a) reads the `transcript.json` whose path contains the
-`cloudAgentBcId`;
-route (b) parses the subagent's verbatim return of the same selector.
+`cloudAgentBcId` and writes the body to a file;
+route (b) writes the subagent's verbatim return of the same
+selector to a file.
+Both routes call `parse_report()` on that file.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
 [#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
@@ -207,7 +228,8 @@ The remaining git-decidable refusal gates
 (`git status`, HEAD still recorded, dry-run tip, source ref,
 empty-diff carve-out) are tracked as
 [#2310](https://github.com/Morrison-Lab/ai-config/issues/2310).
-Run `git push --dry-run` with the same arguments as the push
+Run `git push --dry-run` in that checkout
+with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
 Read stdout and stderr (`2>&1`).
@@ -226,17 +248,27 @@ because `...` contains `..`.
 The left sha is the remote's current tip, not a commit this push adds.
 `Everything up-to-date` means the push would ship nothing;
 that is not a fingerprint mismatch.
+A per-ref `= [up to date]` line carries no sha.
+Treat it like `Everything up-to-date`:
+not a fingerprint mismatch.
 A new branch's dry-run line is `[new branch]` with no sha.
 That line is not a mismatch.
 It also does not confirm the shipped tip:
 the first push of a `cursor/<name>` branch is this case,
 so the dry-run only confirms the command would create that ref.
 The source-ref rule and the HEAD comparison remain.
+A deletion line (`- [deleted]`) has no `->`,
+so it has no source ref for gate 6.
+This procedure does not cover a ref-deletion push
+(`git push origin :branch`).
+`verify_review` allows those because they ship no commits.
+If the dry-run is a deletion, stop:
+this is the wrong procedure, not a gate-6 miss.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
 If it is a branch name, that name must match the recorded branch.
 Any other source ref (a tag, `FETCH_HEAD`, a raw sha) is not covered:
 do not push.
-Re-run `git status --short`.
+Re-run `git status --short` in that checkout.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
 fingerprint.
@@ -248,7 +280,7 @@ The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
 obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
-and still call `parse_report()` on the recovered report.
+and still call `parse_report()` on that file.
 On a session whose pushes go through this repo's Cursor adapter,
 the adapter skip makes `ALLOW_UNREVIEWED_PUSH=1` inert
 for the adapter
@@ -276,19 +308,31 @@ Do not pair the project adapter with native Claude hooks.
 If they are already paired, the prefix is required for the native
 guard even though it is inert for the adapter.
 
-Refusal gates, in order (Do-Confirm; details in the procedure above):
+Refusal gates, in order
+(Do-Confirm; details in the procedure above).
+Pause points:
+before the `Task` dispatch (item 1's first half),
+and before `git push` of the reviewed branch
+(item 1's second half through item 6).
+Killer items:
+item 1's first half (empty status before dispatch),
+and item 2 (`parse_report` on the recovered file,
+not an author-assembled body).
+All six run in the checkout whose push follows.
 
 1. `git status --short` empty before dispatch, and still empty after.
-2. Recover the last heading-bearing assistant `text`; call `parse_report()`.
+2. Recover the last heading-bearing assistant `text` to a file;
+   call `parse_report()` on that file.
 3. Verdict is `clean` and the fingerprint prefix-matches HEAD,
    unless `git diff origin/<default-branch>...HEAD` is empty
    (say in the reply that this carve-out was used).
 4. HEAD is still the recorded sha.
 5. Same-argv dry-run succeeds; a reported new tip prefix-matches HEAD
-   (`Everything up-to-date` is not a mismatch;
+   (`Everything up-to-date` and `= [up to date]` are not a mismatch;
    a new-branch line with no sha is not a mismatch
    and also does not confirm the shipped tip).
-6. Source ref is `HEAD` or the recorded branch.
+6. Source ref is `HEAD` or the recorded branch
+   (a line with no `->` is not this procedure).
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -331,26 +375,31 @@ is the instruction to use this route.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
 - **Do:** commit first, then brief the child not to edit.
+  Name the checkout whose push follows.
+  Brief the child with that checkout path.
   Record `HEAD`, the branch name, and `git status --short`
+  in that checkout
   before the dispatch.
   After it returns, recover the report from `batch-fetch-details`
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
-  Call `parse_report()` on the last assistant `text` that
-  carries Summary / Findings / Verdict / Reviewed-Commit.
+  Write the last assistant `text` that
+  carries Summary / Findings / Verdict / Reviewed-Commit
+  to a file, and call `parse_report()` on that file.
   If you cannot obtain a `clean` verdict and fingerprint,
   or HEAD is not still the recorded sha,
   or the fingerprint does not prefix-match HEAD,
   or `git status --short` is not empty,
   or the same-argv dry-run fails,
   or a reported new tip does not prefix-match HEAD
-  (`Everything up-to-date` is not a mismatch;
+  (`Everything up-to-date` and `= [up to date]` are not a mismatch;
   a new-branch line with no sha is not a mismatch
   and also does not confirm the shipped tip),
   or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
   The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch
-  (`git diff origin/<default-branch>...HEAD` empty) is the carve-out:
+  (`git diff origin/<default-branch>...HEAD` empty in that checkout)
+  is the carve-out:
   it has no report, that is not a reason to refuse the push,
   and the reply must say the carve-out was used.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
@@ -365,7 +414,11 @@ is the instruction to use this route.
   If they are already paired, the prefix is required for the
   native guard even though it is inert for the adapter.
   If the dispatch errored or produced no report,
-  obtain a CLI review and still call `parse_report()`.
+  obtain a CLI review and still call `parse_report()` on that file.
+- **Don't:** record HEAD, status, or the dry-run in a different
+  checkout than the push's `-C` or cwd.
+- **Don't:** re-emit the recovered markdown through a shell
+  command string; write it to a file and parse and post from that file.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
   that used different arguments, failed, or listed other refs.
 - **Don't:** treat a fingerprint that matches only the
@@ -373,7 +426,8 @@ is the instruction to use this route.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 - **Don't:** compose the fallback PR comment in the authoring
-  session; post the dispatched reviewer's report verbatim.
+  session; post the dispatched reviewer's report verbatim
+  from the recovered file.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 
@@ -397,8 +451,9 @@ pre-push guard.
   already carries Summary / Findings / Verdict / Reviewed-Commit;
   otherwise call
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
-  `includeTranscripts: true`, then quote the last assistant `text` that
-  carries those same sections --- not the last assistant message (which
+  `includeTranscripts: true`, then write the last assistant `text` that
+  carries those same sections to a file and quote from that file ---
+  not the last assistant message (which
   may be thinking or `tool_calls` with empty `text`), and not the whole
   file.
   `cloudAgentBcId` is a field on the Task JSON `tool_result`; `bcIds` is

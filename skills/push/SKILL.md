@@ -43,7 +43,8 @@ Address, rebut, or defer every finding it returns, then re-dispatch it, so the c
 Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 ([`memories/cursor.md`](../../memories/cursor.md)).
-Call `parse_report()` on the recovered report in that checkout.
+Call `parse_report()` on the recovered report
+in a checkout whose pushes go through that adapter.
 If the verdict is not `clean`, or the fingerprint does not
 prefix-match HEAD, do not push.
 On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.

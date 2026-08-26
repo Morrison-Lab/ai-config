@@ -58,9 +58,13 @@ A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
-If no qualifying entry remains, the merge waits;
+If no qualifying entry remains, autonomous merging waits ---
 it never falls through to a same-model or same-harness reviewer.
 A quota outage reroutes the dispatch --- it does not license skipping it.
+Waiting does not overrule a human:
+escalation to the repository owner per [`fully-clean`](fully-clean.md)'s
+deadlock rule ends in their manual review and merge decision,
+which is the one authority above this gate.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see

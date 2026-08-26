@@ -226,9 +226,18 @@
   A blank subagent re-reading what's already known is waste, not thoroughness.
 - Delegating implementation does NOT mean trusting an agent's "CLEAN, ready to merge" report blind.
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
-  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `d-morrison/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is a necessary check, and never the merge gate.
-  The merge gate is an adversarial verdict from outside my own context: per [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md), a cross-model, cross-harness reviewer's all-clear where reachable, otherwise human approval.
-  Since 2026-08-25 the author's inline diff read clears no merge grant.
+  ESPECIALLY when the bot review self-skipped:
+  a PR editing the review workflow itself --- the reusable `claude-code-review`
+  workflow in `d-morrison/gha`, or the repo's own caller that invokes it,
+  whatever it's named in that repo --- makes the `@claude` bot self-skip
+  (it 401s from a PR ref and only runs after merge),
+  and a quota skip has the same effect.
+  Then my own diff read is a necessary check --- and never the merge gate;
+  since 2026-08-25 the author's inline diff read clears no merge grant.
+  Autonomous merging under `mwc` stays blocked,
+  and human approval is the only path to landing such a PR,
+  with any available cross-model, cross-harness adversarial review
+  recorded alongside, never substituted for, that sign-off.
 - A verification artifact (state transcript, frame/state dump) is worthless unless something actually READS it.
   Put it where the reviewer looks: the `@claude` review bot reviews only the checked-out PR tree plus the diff, so a JSON linked by raw URL on a side/media branch is invisible to it --- inline a compact state summary in the PR conversation/diff (and add a line telling the reviewer to use it); a bare link is decoration.
   And the coordinator must actually read the dumps too --- don't build a verification tool and then keep trusting agents' written "I verified tick-by-tick" reports without ever reading a dump.
@@ -1002,7 +1011,9 @@ so attach it with `=` and keep other flags outside it.
 but has no measured headless dispatch mechanics here yet ---
 probe before relying on it.
 
-Exhaust the *current usage window* of each metered CLI in turn --- `codex`, then `agy` (roughly 5 hours for codex) --- then fall back to Claude until it resets.
+Exhaust the *current usage window* of each metered CLI in turn ---
+`codex` first (roughly 5 hours), then `agy` CLI as its own availability allows ---
+then fall back to Claude until a window resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
 
 **`opencode` has no window to exhaust, which changes where it sits rather than just adding a row.**

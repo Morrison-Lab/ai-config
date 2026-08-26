@@ -526,6 +526,31 @@ check("glab issue list: --all=false then --all, LAST wins, discharges",
       hook.command_has_issue_dupe_check(
           'glab issue list --all=false --search "x" --all'), True)
 
+# ---------------------- last-flag-wins (repeated --search/-S), ai-config#2324
+# review at 90912da5: RX_SEARCH_VALUE.search took the FIRST --search
+# occurrence, so a clean first value masked a narrowing LAST one that gh
+# itself actually applies.
+
+check("gh issue list: repeated --search, LAST one narrowed, does not "
+      "discharge",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --search "cp1252" '
+          '--search "is:open cp1252"'), False)
+check("glab issue list: repeated --search, LAST one narrowed, does not "
+      "discharge",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all --search "cp1252" '
+          '--search "is:open cp1252"'), False)
+check("gh issue list: repeated --search, LAST one clean, discharges "
+      "(last flag wins, same direction as _gh_state_is_all)",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --search "is:open cp1252" '
+          '--search "cp1252"'), True)
+check("glab issue list: repeated --search, LAST one clean, discharges",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all --search "is:open cp1252" '
+          '--search "cp1252"'), True)
+
 check("mcp search_issues query carrying is:open does not discharge",
       hook._mcp_is_issue_search("mcp__github__search_issues",
                                  {"query": "repo:o/r is:open cp1252"}),

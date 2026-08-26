@@ -421,16 +421,27 @@ def _command_rest(text, start):
 
 
 def _search_value_ok(rest_raw):
-    """True when --search/-S carries a non-empty value with no is:/state:
-    open|closed qualifier that would narrow an intended all-state search.
+    """True when the LAST --search/-S occurrence carries a non-empty value
+    with no is:/state: open|closed qualifier that would narrow an intended
+    all-state search.
+
+    Same last-flag-wins reasoning as `_gh_state_is_all`/`_glab_all_is_true`:
+    gh's and glab's Cobra/pflag parsing takes the LAST occurrence of a
+    repeated flag, so `--search "x" --search "is:open x"` runs only the
+    second, narrowed search --- the first, clean one is discarded and never
+    reaches the API. `RX_SEARCH_VALUE.search` finds the FIRST occurrence
+    instead, so it read the discarded clean value and discharged a reminder
+    for a search that gh actually narrowed to open issues (caught in review
+    on #2324, verified by direct execution of the reproducer above).
 
     `rest_raw` must be UNSTRIPPED (quotes intact) so the value token can be
     told apart from the flags around it, and so a quoted qualifier
     (`--search "is:open foo"`) is still inspected rather than erased.
     """
-    match = RX_SEARCH_VALUE.search(rest_raw)
-    if not match:
+    matches = list(RX_SEARCH_VALUE.finditer(rest_raw))
+    if not matches:
         return False
+    match = matches[-1]
     val = match.group("val")
     quoted = len(val) >= 2 and val[0] in "'\"" and val[-1] == val[0]
     if quoted:
@@ -493,14 +504,17 @@ def command_has_issue_dupe_check(command):
     `--state` value and no bare `is:`/`state:` qualifier in the query,
     command-position `gh issue list`/`ls` whose own flags include
     `--state all` (or gh's `-s all`) as the LAST `--state`/`-s` occurrence
-    (gh's Cobra/pflag parsing is last-flag-wins), `--search` (or gh's `-S`)
-    carrying a non-empty value, and no `is:`/`state:` qualifier inside that
-    value, or command-position `glab issue list`/`ls` with the same shape
-    using `--all`/`-A` (again the LAST occurrence, since a trailing
-    `=false` overrides an earlier bare flag) and `--search`. `--state open
+    (gh's Cobra/pflag parsing is last-flag-wins), and the LAST `--search`
+    (or gh's `-S`) occurrence carrying a non-empty value with no
+    `is:`/`state:` qualifier inside it, or command-position `glab issue
+    list`/`ls` with the same shape using `--all`/`-A` (again the LAST
+    occurrence, since a trailing `=false` overrides an earlier bare flag)
+    and the LAST `--search` occurrence, same as gh's. `--state open
     --search` does not qualify, and neither does `--state all --search "x"
-    --state open` --- the trailing `--state open` is what gh actually
-    parses. `glab --state all` does not qualify: that flag is not glab's.
+    --state open` or `--state all --search "x" --search "is:open x"` ---
+    the trailing `--state open` and the trailing `--search "is:open x"` are
+    what gh actually parses. `glab --state all` does not qualify: that flag
+    is not glab's.
     """
     text = strip_heredocs(command)
     for match in RX_GH_SEARCH_ISSUES.finditer(text):

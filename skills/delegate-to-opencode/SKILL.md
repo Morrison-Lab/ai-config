@@ -180,28 +180,12 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order
-across `codex`, `agy`, `opencode`, and `openrouter` ---
-`agy` API dispatch is out of service, its CLI dispatch is not.
+`memories/delegation.md`'s "Delegate heavy work to another CLI first" section
+holds the order across `codex`, `agy`, `opencode`, and `openrouter` ---
+including where OpenCode's own three cost tiers
+(free/local, the `opencode-go/*` subscription, and OpenRouter's prepaid
+balance) sit relative to `codex` and `agy`'s usage windows.
 Read it there rather than re-deriving it here.
-
-OpenCode spans multiple cost structures:
-- **Free hosted models via Zen (`opencode/*`, most but not all ending `-free`) & local Ollama tiers**:
-  Consume no metered window or API tokens.
-  For mechanical work a small model can perform,
-  free/local tiers go ahead of Codex and Claude on cost.
-- **OpenCode Go subscription (`opencode-go/*`, $10/mo)**:
-  Active monthly windowed tier providing access to hosted frontier models
-  without per-token charges.
-- **OpenRouter prepaid balance (`openrouter/*`)**: Billed per token.
-  Used when a task specifically benefits from frontier or stealth models
-  not carried by desktop subscription quotas.
-
-The practical shape is a filter rather than a queue:
-send mechanical bounded work to OpenCode's free/local tiers first,
-utilize active Go subscription and Codex windows next,
-draw on OpenRouter for specialized frontier/stealth models or fallback,
-and keep Claude for high-level orchestration and synthesis.
 
 ## Procedure
 

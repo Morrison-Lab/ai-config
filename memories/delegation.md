@@ -29,8 +29,10 @@ Adversarial review dispatch is governed separately ---
 by [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s
 independence-first order,
 not this cost-first ladder.
-Two of those CLIs are separately-billed plans with usage windows;
-the third is free.
+Three of those destinations are separately-billed plans with usage windows
+(`codex`, `agy`, and OpenCode's `opencode-go/*` tier);
+`opencode`'s free/local tiers cost nothing,
+and `openrouter` draws a prepaid balance rather than a window.
 Claude stays the orchestrator ---
 writes prompts, assembles stages, integrates outputs ---
 and is the fallback for any stage the delegate can't finish.
@@ -38,7 +40,8 @@ This is a standing default across all sessions,
 including ultracode/Workflow fan-outs,
 not occasional use.
 
-**Two of these are metered plans, and the rule is to try both before Claude's.
+**Three of these are metered plans, and the rule is to try all three before
+Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 `opencode`'s free and local tiers sit outside that window logic entirely, and
 `openrouter` is a prepaid balance rather than a window at all.**
 
@@ -82,8 +85,10 @@ against content the fix had already changed.
 but has no measured headless dispatch mechanics here yet ---
 probe before relying on it.
 
-Exhaust the *current usage window* of each metered CLI in turn ---
-`codex` first (roughly 5 hours), then `agy` CLI as its own availability allows ---
+Exhaust the *current usage window* of each metered destination in turn ---
+`codex` first (roughly 5 hours),
+then `agy` CLI as its own availability allows,
+then OpenCode's `opencode-go/*` window ---
 then fall back to Claude until a window resets.
 "Delegate first" means the current window,
 not abandoning Claude permanently.
@@ -99,10 +104,10 @@ the local ids carry parameter counts from 2B to 30B,
 and the hosted ids are preview names
 nobody has benchmarked against this corpus's work.
 **The discriminator between the free and local tiers is the provider
-prefix, not a `-free` id suffix**: `opencode models` on 2026-08-19 listed
-`opencode/big-pickle` (no `-free` suffix) alongside several ids that do
-carry one, all under the same hosted Zen provider, so the suffix is a
-pricing detail rather than the routing signal.
+prefix, not a `-free` id suffix.**
+See [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
+"Hosted-free versus local: the routing rule" section
+for the `opencode models` evidence and exact count.
 
 **A third OpenCode tier, `opencode-go/*`, is a $10/mo windowed
 subscription** rather than a free or local one, active and verified
@@ -117,9 +122,11 @@ references it (an unreferenced provider lists no `openrouter/*` ids at
 all), configured in the user-global `~/.config/opencode/opencode.jsonc`
 --- not `opencode.json`, which is a separate, repo-scoped config file ---
 and keyed by the `OPENROUTER_API_KEY` environment variable.
-Its draw is per-token rather than time-windowed, so "delegate first"
-means spending the free tiers and subscription windows above before
-drawing on OpenRouter credit or Claude tokens, not before it.
+Its draw is per-token rather than time-windowed,
+so "delegate first" means spending the free tiers and subscription windows
+above before drawing on OpenRouter credit or Claude tokens ---
+not spending OpenRouter credit before those free tiers and windows are
+exhausted.
 One class of OpenRouter model is worth the balance: anonymized frontier
 **stealth previews**, unbenchmarked but plausibly capable of judgment
 work the free/local tiers cannot do --- see

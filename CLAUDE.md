@@ -185,7 +185,7 @@ OpenRouter (prepaid credit balance for frontier/stealth previews).
 `agy` (Google Antigravity)'s **API** route was permanently retired for
 dispatched work (user directive, 2026-08-20, ai-config#1776).
 Only that route is out --- the `agy --print` CLI and the interactive
-desktop extension/plan mode are unaffected and not at quota.
+subscription/extension are unaffected and not at quota.
 `memories/delegation.md` carries the rule, the usage-window semantics
 across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.

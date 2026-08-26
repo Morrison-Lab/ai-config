@@ -6,11 +6,11 @@
 subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
 OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
 than duplicating the table here.
-Two facts specific to this machine's configuration, not restated there:
-- OpenRouter is reached through OpenCode's `openrouter` provider entry in
-  `~/.config/opencode/opencode.jsonc`, keyed by `OPENROUTER_API_KEY`.
-  The filename is `opencode.jsonc` --- `opencode.json` is a different, repo-scoped config.
-  See [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) for the activation mechanics.
+That includes the OpenRouter activation mechanics
+(the `~/.config/opencode/opencode.jsonc` provider entry
+and the `OPENROUTER_API_KEY` variable) ---
+see delegation.md's "A fourth destination" section, not a copy here.
+One fact specific to this machine's configuration, not covered there:
 - Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
 
 ## Cursor

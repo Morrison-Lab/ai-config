@@ -45,6 +45,16 @@ def _safe_fetch_json(url: str, timeout: int = 5) -> Tuple[dict, str]:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirectHandler)
     req = urllib.request.Request(url, headers={"User-Agent": "opencode-locality-check"})
     with opener.open(req, timeout=timeout) as resp:
+        # Belt-and-braces, not a live check: NoRedirectHandler.redirect_request
+        # always raises before opener.open() can return a response whose URL
+        # differs from the one we requested, so final_host below is always
+        # the same already-verified-loopback host and this block never
+        # actually catches an off-machine host today. Kept as an explicit
+        # second gate in case NoRedirectHandler's behaviour ever changes
+        # (e.g. a future edit that permits same-host redirects) --- see
+        # scripts/test_check_ollama_locality.py's
+        # test_real_redirect_is_refused_not_followed for the negative
+        # control proving redirects are refused, not silently followed.
         final_url = resp.geturl()
         final_host = urlparse(final_url).hostname
         if not final_host:

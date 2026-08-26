@@ -359,12 +359,24 @@ class TestLiveHTTPBehavior(_LiveServerCase):
         self.assertIn("0 resident models", msg)
 
     def test_real_redirect_is_refused_not_followed(self):
+        # The redirect target below is a LIVE, valid endpoint on this same
+        # server, serving a real cloud.disabled=true body -- following it
+        # would let the whole check SUCCEED. That makes the assertion below
+        # discriminating: it can only pass if NoRedirectHandler genuinely
+        # refused the redirect, never merely because some unrelated
+        # connection failed. (An earlier version of this test redirected to
+        # an unroutable port instead, so a refused redirect and a followed
+        # redirect that then failed to connect produced the identical
+        # failure message -- the test passed even with NoRedirectHandler
+        # removed entirely.)
         class RedirectingHandler(_FakeOllamaHandler):
             def do_GET(self):
                 if self.path == "/api/status":
                     self.send_response(302)
-                    self.send_header("Location", "http://127.0.0.1:1/elsewhere")
+                    self.send_header("Location", "/api/status-redirected")
                     self.end_headers()
+                elif self.path == "/api/status-redirected":
+                    self._send_json(self.status_body)
                 else:
                     super().do_GET()
 
@@ -382,7 +394,7 @@ class TestLiveHTTPBehavior(_LiveServerCase):
                 }),
             )
             self.assertFalse(ok)
-            self.assertIn("Cannot reach or verify live Ollama status", msg)
+            self.assertIn("HTTP redirects disallowed", msg)
         finally:
             server.shutdown()
             thread.join(timeout=5)

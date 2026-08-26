@@ -766,6 +766,7 @@ has already put it on `main` and pulled:
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
 python3 scripts/install-hooks.py                # report: registered / missing / stale
 python3 scripts/install-hooks.py --fix          # the call that actually registers
+python3 scripts/check-hook-catalog.py           # NOTE: documented but not registered
 ```
 
 **`--fix` is the load-bearing flag.**
@@ -795,8 +796,15 @@ mid-session `--fix` arms nothing until a restart.
 A hook whose authoring PR left it in the catalog allowlist of
 documented-but-inert hooks is absent from `hooks/hooks.json`, so this
 step cannot arm it.
-File the registration follow-up (manifest entry, drop from the allowlist,
-drop **not registered** from the README row) as its own issue and PR.
+`--fix` then prints `All hooks registered.` over that gap, because
+it iterates only the manifest.
+`check-hook-catalog.py` is the detector: it prints
+`NOTE: <script> is documented but not registered (known, ai-config#N)`.
+Search for an existing activation issue before filing a follow-up
+(the allowlist maps each entry to that tracker).
+If none is open, file one covering the manifest entry, dropping
+the allowlist row, dropping **not registered** from the README row,
+and repointing the issue number if the listed tracker has closed.
 That PR's merge is when this step can bind it.
 
 - **Do:** treat a documented-but-inert catalog row as a deferred

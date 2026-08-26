@@ -1,6 +1,8 @@
 {
   "entries": [
     { "path": "skills" },
-    { "path": "shared/sembr-skills/skills" }
+    { "path": "shared/sembr-skills/skills" },
+    { "path": "skills/adv" },
+    { "path": "skills/pre-push-review" }
   ]
 }

@@ -84,6 +84,7 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
     if not base_ref and pr_number:
         pr_base = get_pr_base_branch(pr_number)
         if pr_base:
+            subprocess.run(["git", "fetch", "origin", pr_base], capture_output=True)
             for cand in [f"origin/{pr_base}", pr_base]:
                 r = subprocess.run(["git", "rev-parse", "--verify", cand], capture_output=True, text=True)
                 if r.returncode == 0:

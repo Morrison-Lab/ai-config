@@ -210,7 +210,7 @@ The honest answer to the question was "nothing".)
 
 ## Query all available providers sequentially
 
-When obtaining adversarial reviews, we need a clean verdict from **every** pinned provider (e.g. Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude --- when Claude is not quota-blocked).
+When obtaining adversarial reviews, we need a clean verdict from **every** available provider. You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude). Every provider found reachable at the start of the cycle must be included in the pinned quorum. Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.

@@ -130,7 +130,7 @@ But also check, the same round, whether a *different* configured reviewer is rea
 (e.g. Copilot code review, if the repo/org has it) --
 not just whether the `@claude` bot specifically produced a verdict,
 since the two can fail independently (one quota-exhausted, the other working fine, or vice versa) --
-and request it in parallel with posting the self-review, not after.
+and request it following the sequential multi-provider quorum rules. Do not request them in parallel.
 Re-check reachability every round:
 a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
 can become reachable mid-session.

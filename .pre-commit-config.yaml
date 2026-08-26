@@ -62,6 +62,12 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: hook-runner-tests
+        name: hook-runner tests (scripts/test_hooks.py)
+        entry: python scripts/test_test_hooks.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: hook-catalog
         name: hook catalog (README table vs hooks/hooks.json)
         entry: python scripts/check-hook-catalog.py

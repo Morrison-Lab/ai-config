@@ -141,13 +141,21 @@ so newlines arrive as escaped `\n`).
 Extract the last assistant `text` that carries Summary / Findings /
 Verdict / Reviewed-Commit
 (same selector as the identity-only section below).
-Two legal routes:
-(a) a decoder reads `transcript.json` and calls `parse_report()`
-in one process, on the file whose path contains the `cloudAgentBcId`;
+Two legal routes, and both must produce the report body
+(the last matching assistant `text`) as well as the
+`parse_report()` tuple:
+(a) a decoder reads `transcript.json` whose path contains
+the `cloudAgentBcId`, prints that last matching `text`,
+and calls `parse_report()` on it in one process;
 (b) a subagent returns that last matching assistant `text`
-verbatim and the conductor calls `parse_report()` on that return
-without editing it.
+verbatim and the conductor calls `parse_report()` on that
+return without editing it.
 Do not require the same invocation for route (b).
+Route (a)'s printed text is the body to post.
+Route (b)'s provenance is the subagent's verbatim return
+of the same selector.
+The `parse_report()` tuple is the push gate, not the comment.
+Do not treat route (a) as returning only the tuple.
 Call `parse_report()` from
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
 on that recovered text
@@ -166,6 +174,10 @@ Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 `needs_work` is Needs more work or Needs work,
 and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
+A push that carries nothing to review
+(the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch)
+has no report to parse: do not invent one,
+and do not refuse that push for lack of a verdict.
 Re-read `git rev-parse HEAD` after the child returns.
 If HEAD is not the recorded sha, the child wrote or HEAD moved:
 do not push; re-dispatch on the new HEAD.
@@ -174,9 +186,16 @@ The fingerprint must prefix-match HEAD
 `parse_report` already lowercases the fingerprint.
 If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
-tracks a CLI wrapper over that call.
+tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
 Provenance (which file was parsed) is in that issue's scope too.
-Until that wrapper lands, the import is the instrument.
+Until that wrapper lands, the import is the instrument
+for recovering a Cursor Cloud `Task` child's report.
+[#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
+landed `scripts/pre-push-review.py` on `main` (measured 2026-08-26 PDT):
+a separate local-engine dispatcher with its own report contract
+(`parse_review_verdict`), not a wrapper over `parse_report()`
+and not this recovery path.
+Tracked as [#2309](https://github.com/Morrison-Lab/ai-config/issues/2309).
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
@@ -227,9 +246,13 @@ Do not prefix it for the adapter's sake.
 Home Claude settings can exist on Cloud
 (measured 2026-08-26 PDT: `/home/ubuntu/.claude/settings.json`
 binds `no-push-without-self-review` under `PreToolUse`).
-The writer of that file in this tree is `scripts/install-hooks.py`,
-not `bootstrap.sh`.
+That measurement does not say how this VM's copy got there.
+The in-tree writer of that path is `scripts/install-hooks.py`.
 Those settings do not make the Cursor adapter run Claude's hook runner.
+Whether Claude Code's native hook runner also fires on Cloud
+is unmeasured as of 2026-08-26 PDT.
+If it does, the prefix is that native guard's escape.
+If it does not, the prefix stays inert for the adapter.
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
 same VM --- the prefix is that native guard's escape,
@@ -240,6 +263,19 @@ otherwise denies every push
 Do not pair the project adapter with native Claude hooks.
 If they are already paired, the prefix is required for the native
 guard even though it is inert for the adapter.
+
+Refusal gates, in order (Do-Confirm; details in the procedure above):
+
+1. `git status --short` empty before dispatch, and still empty after.
+2. Recover the last heading-bearing assistant `text`; call `parse_report()`.
+3. Verdict is `clean` and the fingerprint prefix-matches HEAD,
+   unless the push carries nothing to review.
+4. HEAD is still the recorded sha.
+5. Same-argv dry-run succeeds; a reported new tip prefix-matches HEAD
+   (`Everything up-to-date` is not a mismatch;
+   a new-branch line with no sha is not a mismatch
+   and also does not confirm the shipped tip).
+6. Source ref is `HEAD` or the recorded branch.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -300,6 +336,9 @@ is the instruction to use this route.
   and also does not confirm the shipped tip),
   or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
+  The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch
+  is the carve-out: it has no report,
+  and that is not a reason to refuse the push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is

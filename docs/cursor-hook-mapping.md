@@ -75,8 +75,9 @@ Do not also run `install-hooks.py --fix` to "activate" these for Cursor.
 That path writes `~/.claude/settings.json` for Claude Code.
 Cursor Cloud can still have `~/.claude/settings.json`
 (measured 2026-08-26 PDT).
-The writer of that file in this tree is `scripts/install-hooks.py`,
-not `bootstrap.sh`.
+That measurement does not say how this VM's copy got there,
+or whether Claude Code's native hook runner also fires on Cloud
+(unmeasured as of 2026-08-26 PDT).
 Those settings do not make the Cursor adapter run Claude's hook runner.
 Desktop Cursor with third-party Claude hooks enabled loads that file natively
 and runs every source ([third-party hooks](https://cursor.com/docs/reference/third-party-hooks.md), fetched 2026-08-25);

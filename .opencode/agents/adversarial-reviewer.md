@@ -60,7 +60,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    Morrison-Lab/ai-config's Cursor adapter skips that guard
    until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
    (see [`memories/cursor.md`](../../memories/cursor.md)).
-   In that checkout the parent is required to call `parse_report()`
+   In a checkout whose pushes go through that adapter
+   the parent is required to call `parse_report()`
    on the recovered report
    and does not push unless the verdict is `clean` and the
    fingerprint prefix-matches HEAD.

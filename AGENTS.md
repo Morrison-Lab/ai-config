@@ -266,6 +266,10 @@ call `parse_report()` on the recovered report,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD
 ([`memories/cursor.md`](memories/cursor.md)).
+A push that carries nothing to review
+(the empty [`pr-on-claim`](shared/workflow/pr-on-claim.md) branch)
+has no report: do not invent one,
+and do not refuse that push for lack of a verdict.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review

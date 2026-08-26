@@ -153,7 +153,8 @@ do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
 A push that carries nothing to review
 (the empty `pr-on-claim` branch) has no report to parse:
-do not invent one.
+do not invent one,
+and do not refuse that push for lack of a verdict.
 If the dispatch errored, obtain a CLI review and still
 call `parse_report()`.
 If Claude Code's native guard is also running, the prefix

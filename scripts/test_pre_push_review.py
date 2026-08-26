@@ -817,5 +817,21 @@ class TestPrePushReview(unittest.TestCase):
                             self.assertEqual(report, "success report")
                             self.assertEqual(label, "Cursor Agent")
 
+
+    @patch("subprocess.run")
+    def test_antigravity_command_contract(self, mock_run):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "### Summary Verdict\nVerdict: Ready for merge"
+        with patch("shutil.which", return_value="/usr/local/bin/agy"):
+            with patch("os.path.isfile", return_value=True):
+                reviewer.run_antigravity_review("test prompt")
+                
+        called_args = mock_run.call_args[0][0]
+        self.assertEqual(called_args[0], "/usr/local/bin/agy")
+        self.assertIn("--mode", called_args)
+        self.assertIn("plan", called_args)
+        self.assertNotIn("-p", called_args)
+        self.assertNotIn("-", called_args)
+
 if __name__ == "__main__":
     unittest.main()

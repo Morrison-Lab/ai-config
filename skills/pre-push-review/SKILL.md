@@ -42,7 +42,7 @@ fi
 python3 "$REVIEW_SCRIPT"
 
 # Alternate among available models/engines across successive runs
-python3 "$REVIEW_SCRIPT" --engine alternate --exclude-engine "${AGENT_NAME:-human}"
+python3 "$REVIEW_SCRIPT" --engine alternate ${AGENT_NAME:+--exclude-engine "$AGENT_NAME"}
 
 # Review via Claude model through Antigravity CLI
 python3 "$REVIEW_SCRIPT" --engine agy-claude

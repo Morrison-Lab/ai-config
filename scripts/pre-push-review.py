@@ -295,7 +295,7 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--mode", "plan", "-p", "-"]
+    cmd = [agy_path, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
@@ -566,21 +566,35 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             "agy": "antigravity",
             "antigravity": "antigravity",
             "claude": "claude",
+            "claude code": "claude",
+            "claude-code": "claude",
             "cursor": "cursor",
+            "cursor agent": "cursor",
             "codex": "codex",
-            "opencode": "opencode"
+            "opencode": "opencode",
+            "open code": "opencode",
         }
         
         recognized = False
         for inv in list(invokers):
+            # Also try to normalize by substring if exact match fails
+            if inv not in alias_map:
+                for k, v in alias_map.items():
+                    if k in inv:
+                        alias_map[inv] = v
+                        break
+
             if inv in alias_map:
                 canon = alias_map[inv]
                 if canon in available:
                     available.remove(canon)
                 recognized = True
 
-        if not recognized and not sys.stdout.isatty():
+        if exclude_engine and not recognized:
             log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, cursor, antigravity). Unknown exclusions: {list(invokers)}")
+            return None, "None"
+        elif not invokers and not sys.stdout.isatty():
+            log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
             return None, "None"
 
         if not available:

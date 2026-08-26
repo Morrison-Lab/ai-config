@@ -30,7 +30,7 @@ if [ -n "$PRE_PUSH_REVIEW_LOCAL_DEV" ] && [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/
   REVIEW_SCRIPT="$GIT_ROOT/scripts/pre-push-review.py"
 fi
 
-python3 "$REVIEW_SCRIPT" --engine alternate --exclude-engine "${AGENT_NAME:-human}"
+python3 "$REVIEW_SCRIPT" --engine alternate ${AGENT_NAME:+--exclude-engine "$AGENT_NAME"}
 
 # Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode)
 python3 "$REVIEW_SCRIPT" --engine codex

@@ -25,6 +25,49 @@ Those are different independences, and this rule buys the second one only.
 **So the subagent is the floor, not the ceiling.**
 Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing, and its clean verdict is still not the one a PR is reported ready on while Claude is reachable (see [`fully-clean`](fully-clean.md)).
 
+## Cross-model and cross-harness are preferred, and the harness list is concrete
+
+(Directive from the user, 2026-08-25: "all reviews, even self-reviews, must be
+adversarial; don't do them yourself, use a subagent, preferably using a
+different model and harness".)
+
+Prefer a reviewer that differs from the authoring session in **both** model
+and harness --- that is the only configuration that buys independence of blind
+spot as well as of intent, which the same-vendor case above explicitly does
+not.
+On this machine the reachable harnesses are: **cursor**, **agy**, **opencode**,
+and **claude**.
+Dispatch through whichever differs from you first; when one is temporarily out
+of quota, move to the next rather than falling back to a same-harness pass.
+
+`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
+separate path and remains available --- see
+[`memories/preferences.md`](../../memories/preferences.md)'s delegate ladder.
+A retired API never disqualifies the CLI harness built on top of it.
+
+A quota skip never downgrades the requirement --- it reroutes it.
+The only accepted outputs are an adversarial verdict from a separate context;
+everything else (inline passes, skip notices, same-harness convenience) is
+non-compliance wearing a fallback costume.
+
+## No merge without a 100% all-clear adversarial verdict
+
+(Directive from the user, 2026-08-25: "you must not merge, even with mwc
+enabled, unless you have a 100% 'all clear' review verdict from an adversarial
+review".)
+
+This binds every repo and every grant, including the standing `mwc`
+exception: **mwc authorizes merging a PR that is fully clean, and fully clean
+now requires an all-clear adversarial verdict at the shipping head from a
+reviewer meeting this fragment's independence bar.**
+A Needs-more-work verdict blocks until re-dispatched clean at the new head.
+A skip notice, a stub, a same-harness subagent verdict, or silence clears
+nothing.
+If no compliant reviewer is reachable, the PR waits --- "blocked on reviewer
+availability" is the honest status, and arming an auto-merge while waiting is
+[Pattern 12](../../memories/mistake-patterns.md).
+
+
 ## What "separate" requires
 
 **Its own context window.**
@@ -153,12 +196,14 @@ That is also why the review comes **after** committing, which is where [`ardi`](
 The other cases have no guard and are prose rules here.
 
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.
+- **Do:** prefer a reviewer on a **different model and harness** from your own --- cursor, agy (CLI), opencode, or claude --- and move down that list when one is out of quota; report which harness produced each verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
-- **Do:** chase a cross-vendor reviewer on top of it wherever one is reachable.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
+- **Don't:** merge anything --- under any grant, `mwc` included --- without a 100% all-clear adversarial verdict at the shipping head.
+  A skip notice, a stub, an older-head verdict, or a same-harness convenience pass clears nothing.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

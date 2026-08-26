@@ -968,9 +968,12 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > service** (user directive, 2026-08-20; scope corrected 2026-08-23),
 > confirmed via a dispatched run's `429: prepayment credits depleted`.
 > Route no dispatched subagent work to it.
+> **The API and the CLI are two separate paths: the API is out of commission,
+> but the agy CLI is available** (user clarification, 2026-08-25) --- so
+> headless `agy --print` invocations, including adversarial review dispatch,
+> remain usable.
 > The interactive subscription/extension is unaffected and not at quota --
 > don't extrapolate this into "uninstall the extension".
-> The mechanics below are kept as measured history rather than as a live destination, so read the ladder as `opencode`, then `codex`, then Claude.
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
@@ -984,7 +987,7 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | Antigravity API --- **retired, out of service (interactive unaffected)** | none, and none is wanted --- the mechanics below are history |
+| `agy` (Google Antigravity) | API retired; **CLI available** (2026-08-25) | none --- `agy --print` mechanics below are live |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.

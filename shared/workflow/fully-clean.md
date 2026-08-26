@@ -238,6 +238,16 @@ a genuine clean automated Claude review verdict evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 
+**No merge at all --- under any grant, `mwc` included --- without a 100% all-clear
+verdict from an adversarial review meeting
+[`adversarial-self-review`](adversarial-self-review.md)'s independence bar,
+preferably a different model and harness than the authoring session**
+(user directive, 2026-08-25).
+A Needs-more-work verdict blocks until a compliant re-dispatch returns all-clear
+at the shipping head; a skip notice, a stub, or a stale-head verdict clears nothing.
+Where no compliant reviewer is reachable, the PR waits, and that waiting state
+is the honest status to report.
+
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".
 

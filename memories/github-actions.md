@@ -688,9 +688,9 @@ secrets under `pull_request`) has to be re-established explicitly.
 - **Do:** invoke the action from a `run:` step with `env(1)` setting
   `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
   every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
-- **Do:** pin Node to the action's `runs.using` (`node20` here via
-  `actions/setup-node`) when the wrap is a `run: node dist/index.js` rather
-  than `uses:`. The runner's vendored Node 20 is a `uses:` property.
+- **Do:** pin Node to the interpreter GitHub actually runs for that
+  `runs.using`, not the label in `action.yml`. Measured 2026-08-26 on run
+  32942088643: this action declares `node20` and was forced onto Node 24.
 - **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
   bundle) in its own step so a "could not start" comment can gate on it.
   Assertions left on the `jules` step fail before the process assigns

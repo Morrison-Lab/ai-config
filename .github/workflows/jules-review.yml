@@ -99,9 +99,9 @@ jobs:
       # on run 32942088643: the `uses:` step logged
       # `GITHUB_EVENT_NAME: pull_request` and then failed with
       # `Unsupported event: issue_comment`. The payload below is still
-      # required; the next two steps fetch the pinned action and start its
-      # `dist/index.js` under `env(1)` so the child, not the runner, sets
-      # the reserved names.
+      # required; later steps fetch the pinned action, pin Node, preflight
+      # the wrap inputs, and start `dist/index.js` under `env(1)` so the
+      # child, not the runner, sets the reserved names.
       - name: Resolve the PR into a pull_request event payload
         id: payload
         if: steps.detect.outputs.match == 'true'
@@ -149,16 +149,17 @@ jobs:
           git -C "$dest" checkout --quiet --detach FETCH_HEAD
           test -f "$dest/dist/index.js"
 
-      # The pinned action.yml says `runs: using: 'node20'`. A `uses:` step
-      # gets the runner's vendored Node 20; a bare `node` on `ubuntu-latest`
-      # does not. Pin 20 so an image bump cannot change the interpreter
-      # under a third-party bundle.
-      - name: Pin Node 20 to match the action's runs.using
+      # The pinned action.yml says `runs: using: 'node20'`. GitHub no longer
+      # runs that: measured 2026-08-26 on run 32942088643, the `uses:` step
+      # logged "Node.js 20 is deprecated ... forced to run on Node.js 24"
+      # for this same SHA. A bare `node` on `ubuntu-latest` is a third
+      # interpreter. Pin 24 so the wrap matches what `uses:` actually ran.
+      - name: Pin Node 24 to match what GitHub runs for this action
         id: setup-node
         if: steps.payload.outputs.same-repo == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "24"
 
       # Assertions that must fail before `node dist/index.js` starts. Kept
       # off the `jules` step so their outcome is addressable by the

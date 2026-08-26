@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: "20"
+          node-version: "24"
       - id: preflight
         run: echo preflight
       - env:
@@ -132,7 +132,7 @@ MISSING_PROSE = tweak("imperative prose", "review rules")
 
 MISSING_SETUP_NODE = tweak(
     "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
-    '        with:\n          node-version: "20"\n',
+    '        with:\n          node-version: "24"\n',
     "",
 )
 
@@ -141,6 +141,12 @@ MISSING_PREFLIGHT_ID = tweak("      - id: preflight\n        run: echo preflight
 MISSING_PREFLIGHT_GATE = tweak(
     "      - if: steps.preflight.outcome == 'failure'\n        run: echo could-not-start\n",
     "",
+)
+
+# Substring still present; line-anchored finder must still fail.
+COMMENTED_PREFLIGHT_GATE = tweak(
+    "      - if: steps.preflight.outcome == 'failure'\n        run: echo could-not-start\n",
+    "      - if: failure()\n        run: echo could-not-start\n      # steps.preflight.outcome\n",
 )
 
 
@@ -218,6 +224,12 @@ case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
 case_exits(
     "could-not-start omits preflight",
     MISSING_PREFLIGHT_GATE,
+    1,
+    "steps.preflight.outcome",
+)
+case_exits(
+    "could-not-start preflight only in a comment",
+    COMMENTED_PREFLIGHT_GATE,
     1,
     "steps.preflight.outcome",
 )

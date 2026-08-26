@@ -42,12 +42,15 @@ SHA_PIN_RE = re.compile(
     re.MULTILINE,
 )
 SETUP_NODE_RE = re.compile(r"uses:\s*actions/setup-node@")
-NODE_VERSION_RE = re.compile(r"node-version:\s*['\"]20['\"]")
+NODE_VERSION_RE = re.compile(r"node-version:\s*['\"]24['\"]")
 PREFLIGHT_ID_RE = re.compile(
     r"^[ \t]*(?:-\s+)?id:\s*preflight\s*$",
     re.MULTILINE,
 )
-PREFLIGHT_OUTCOME_RE = re.compile(r"steps\.preflight\.outcome")
+PREFLIGHT_OUTCOME_RE = re.compile(
+    r"^[ \t]*(?:-\s+)?(?:if:\s+)?steps\.preflight\.outcome",
+    re.MULTILINE,
+)
 
 
 def pre_jobs(text: str) -> str:
@@ -110,8 +113,9 @@ def findings(text: str) -> list[str]:
         out.append("missing extra_instructions that this corpus's prose is content")
     if not SETUP_NODE_RE.search(text) or not NODE_VERSION_RE.search(text):
         out.append(
-            "Node is unpinned; the action's runs.using is node20 so the wrap "
-            "needs actions/setup-node with node-version 20"
+            "Node is unpinned; GitHub forced this action onto Node 24 "
+            "(run 32942088643), so the wrap needs actions/setup-node "
+            "with node-version 24"
         )
     if not PREFLIGHT_ID_RE.search(text):
         out.append(

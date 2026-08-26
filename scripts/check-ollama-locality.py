@@ -8,7 +8,6 @@ Verifies:
 """
 
 import argparse
-import ipaddress
 import json
 import re
 import socket
@@ -18,6 +17,20 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 from typing import Optional, Tuple
+
+
+LITERAL_LOOPBACK_ADDRESSES = frozenset({"127.0.0.1", "::1"})
+
+
+def _is_literal_loopback_address(address: str) -> bool:
+    """True only for the two addresses the docs and refuse text name.
+
+    ``ipaddress.ip_address(x).is_loopback`` is true for the whole
+    127.0.0.0/8 range, not just 127.0.0.1, so relying on it lets an
+    endpoint like 127.0.0.2 or 127.255.255.255 pass a check whose refuse
+    message claims to require the literal address.
+    """
+    return address in LITERAL_LOOPBACK_ADDRESSES
 
 
 class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -37,7 +50,7 @@ def _safe_fetch_json(url: str, timeout: int = 5) -> Tuple[dict, str]:
         if not final_host:
             raise ValueError(f"No host in response URL {final_url!r}")
         addrs = {info[4][0] for info in socket.getaddrinfo(final_host, None)}
-        remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
+        remote = sorted(a for a in addrs if not _is_literal_loopback_address(a))
         if remote:
             raise ValueError(f"Final response URL {final_url} resolves off-machine: {', '.join(remote)}")
         data = json.loads(resp.read().decode("utf-8"))
@@ -84,14 +97,10 @@ def verify_locality(
     if not host:
         return False, f"No host in ollama baseURL {url!r}"
 
-    # Require literal loopback identifier
-    is_literal_loopback = (host == "localhost")
-    if not is_literal_loopback:
-        try:
-            ip = ipaddress.ip_address(host)
-            is_literal_loopback = ip.is_loopback
-        except ValueError:
-            is_literal_loopback = False
+    # Require literal loopback identifier: exactly 'localhost', '127.0.0.1',
+    # or '::1' -- not the whole 127.0.0.0/8 range ipaddress.is_loopback
+    # would otherwise license (see _is_literal_loopback_address above).
+    is_literal_loopback = (host == "localhost") or _is_literal_loopback_address(host)
 
     if not is_literal_loopback:
         return False, f"Ollama baseURL host {host!r} is not a literal loopback address ('localhost', '127.0.0.1', or '::1')."
@@ -101,7 +110,7 @@ def verify_locality(
     except OSError as exc:
         return False, f"Cannot resolve {host!r}: {exc}"
 
-    remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
+    remote = sorted(a for a in addrs if not _is_literal_loopback_address(a))
     if remote:
         return False, f"Ollama baseURL {url} resolves off-machine: {', '.join(remote)}"
 

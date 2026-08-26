@@ -2,12 +2,17 @@
 
 ## Available subscriptions & model providers
 
-Workstation configurations and delegation capabilities draw on multiple active subscriptions and API balances (measured 2026-08-25):
-- **OpenCode**: Reaches an active OpenCode Go subscription (`opencode-go/*`, $10/mo windowed), free hosted models via Zen (`opencode/*-free`), and local (`ollama/*`) models via `opencode` CLI (see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
-- **OpenRouter**: Backed by a prepaid credit balance and API key (`OPENROUTER_API_KEY`), reaching frontier models and stealth previews (`openrouter/*`) through OpenCode or direct API access (configured in `~/.config/opencode/opencode.json`, activated 2026-08-23).
-- **OpenAI ChatGPT**: Backed by ChatGPT Plus/Team/Enterprise via OpenAI Codex (`codex` CLI, see [`skills/delegate-to-codex`](../skills/delegate-to-codex/SKILL.md)).
-- **Anthropic Claude**: Backed by Claude Pro/Team via Claude Code (`claude` CLI).
-- **Google AI Ultra**: Backed by Google Antigravity desktop subscription (`agy` CLI) --- interactive desktop and plan mode only, as direct headless API dispatch is out of service.
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active
+subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
+OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+than duplicating the table here.
+Two facts specific to this machine's configuration, not restated there:
+- OpenRouter is reached through OpenCode's `openrouter` provider entry in
+  `~/.config/opencode/opencode.jsonc` (the actual filename this machine's
+  config uses --- not `opencode.json`, which is a different, repo-scoped
+  config file; see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)), keyed by the `OPENROUTER_API_KEY` environment variable.
+- Claude Code itself runs on a Claude Pro/Team subscription rather than a
+  metered API budget.
 
 ## Cursor
 

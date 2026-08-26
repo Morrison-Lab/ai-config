@@ -41,7 +41,7 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
 - **The result must conform to a schema and you have no cheap validator.**
   `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
 - **The destination tier is unavailable or exhausted.**
-  OpenCode Go operates on windowed request limits (similar to 5-hour subscription windows).
+  OpenCode Go operates on windowed **dollar** caps rather than request counts: $12 per 5 hours, $30 per week, $60 per month (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-08-25).
   When exhausted, fall back to Codex or OpenRouter per the ladder.
   Zen free tier rate-limiting and Ollama daemon reachability are availability states rather than window exhaustion.
 
@@ -67,8 +67,8 @@ Pointing that field at a LAN GPU box or a remote `OLLAMA_HOST` is ordinary usage
 Furthermore, resolving `baseURL` to loopback only verifies the initial connection hop: if Ollama Cloud offloading is enabled or cloud models are targeted, payloads can be forwarded off-machine through the local daemon.
 Locality is therefore licensed only when three conditions hold:
 1. The endpoint check in step 1 resolves `baseURL` strictly to loopback (`127.0.0.1` or `::1`).
-2. The Ollama daemon is configured in local-only mode (`OLLAMA_NO_CLOUD=1` or `disable_ollama_cloud: true`).
-3. The targeted model is verified as locally resident on-device (`ollama list` confirms the model exists locally).
+2. The running daemon confirms local-only mode live, via `GET /api/status` (`cloud.disabled: true`) --- not a static config flag such as `OLLAMA_NO_CLOUD=1`, which the daemon can ignore or the config can omit.
+3. The targeted model is verified as locally resident on-device via `GET /api/tags`, refusing any remote-backed, cloud, or absent model --- not `ollama list`, which `check-ollama-locality.py` never shells out to.
 Run these checks before sending data-triggered work, and record the verified endpoint and residency.
 Measured 2026-08-19 on this machine: `http://localhost:11434/v1`, resolving to `127.0.0.1` and `::1`.
 
@@ -143,11 +143,11 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `opencode`, and `openrouter` (`agy` API dispatch is out of service).
+`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `opencode`, and `openrouter` (`agy` API dispatch is out of service).
 Read it there rather than re-deriving it here.
 
 OpenCode spans multiple cost structures:
-- **Free hosted models via Zen (`opencode/*-free`) & local Ollama tiers**: Consume no metered window or API tokens.
+- **Free hosted models via Zen (`opencode/*`, most but not all ending `-free`) & local Ollama tiers**: Consume no metered window or API tokens.
   For mechanical work a small model can perform, free/local tiers go ahead of Codex and Claude on cost.
 - **OpenCode Go subscription (`opencode-go/*`, $10/mo)**: Active monthly windowed tier providing access to hosted frontier models without per-token charges.
 - **OpenRouter prepaid balance (`openrouter/*`)**: Billed per token.
@@ -189,14 +189,14 @@ opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 Measured 2026-08-19 on opencode 1.18.15: smoke-tests returned `PONG` in 13.3s local and 7.9s hosted.
 Go subscription verified 2026-08-25.
 
-Run `check-ollama-locality.py` (available in repository `scripts/` and packaged under `skills/delegate-to-opencode/scripts/`):
+Run `check-ollama-locality.py` (available in repository `scripts/` and packaged under `skills/delegate-to-opencode/scripts/`) against the **exact** model you intend to send data to, not a fixed example --- a pass for one `ollama/*` id says nothing about a different one:
 
 ```bash
 # In ai-config workspace:
-python3 scripts/check-ollama-locality.py "qwen2.5-coder:3b"
+python3 scripts/check-ollama-locality.py "<target-model>"
 
 # In consumer repository sessions (using installed skill bundle):
-python3 ~/.claude/skills/delegate-to-opencode/scripts/check-ollama-locality.py "qwen2.5-coder:3b"
+python3 ~/.claude/skills/delegate-to-opencode/scripts/check-ollama-locality.py "<target-model>"
 ```
 
 It exits 0 and prints the confirmation only when:

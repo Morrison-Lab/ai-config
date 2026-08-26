@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Unit tests for scripts/check-ollama-locality.py."""
 
+import http.server
 import importlib.util
 import json
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -13,6 +15,58 @@ spec = importlib.util.spec_from_file_location(
 )
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
+
+
+class _FakeOllamaHandler(http.server.BaseHTTPRequestHandler):
+    """Serves /api/status and /api/tags, and redirects everything else.
+
+    Runs as a real HTTP server on loopback so tests exercise the actual
+    urllib opener chain (NoRedirectHandler, ProxyHandler({})) instead of
+    mocking OpenerDirector.open --- a mock at that level never invokes
+    either handler, so a test built on it cannot show redirects are
+    refused or that proxies are bypassed.
+    """
+
+    status_body = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
+    tags_body = json.dumps({"models": []}).encode("utf-8")
+
+    def do_GET(self):
+        if self.path == "/api/status":
+            self._send_json(self.status_body)
+        elif self.path == "/api/tags":
+            self._send_json(self.tags_body)
+        elif self.path == "/redirect-me":
+            self.send_response(302)
+            self.send_header("Location", "http://127.0.0.1:1/elsewhere")
+            self.end_headers()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _send_json(self, body):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):  # silence test output
+        pass
+
+
+class _LiveServerCase(unittest.TestCase):
+    """Base class spinning up a real loopback HTTP server per test."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server = http.server.HTTPServer(("127.0.0.1", 0), _FakeOllamaHandler)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.thread.join(timeout=5)
 
 
 class TestCheckOllamaLocality(unittest.TestCase):
@@ -73,6 +127,25 @@ class TestCheckOllamaLocality(unittest.TestCase):
         ok, msg = checker.verify_locality("qwen2.5-coder:3b", cfg)
         self.assertFalse(ok)
         self.assertIn("Unsupported scheme 'ftp'", msg)
+
+    def test_loopback_range_beyond_127_0_0_1_refuses(self):
+        # ipaddress.ip_address(...).is_loopback treats all of 127.0.0.0/8
+        # as loopback; the refuse text (and the docs) name only
+        # '127.0.0.1'/'::1', so any other address in that range must
+        # still be refused.
+        for host in ("127.0.0.2", "127.255.255.255"):
+            cfg = json.dumps({
+                "provider": {
+                    "ollama": {
+                        "options": {
+                            "baseURL": f"http://{host}:11434/v1"
+                        }
+                    }
+                }
+            })
+            ok, msg = checker.verify_locality("qwen2.5-coder:3b", cfg)
+            self.assertFalse(ok, f"{host} should be refused")
+            self.assertIn("not a literal loopback address", msg)
 
     def test_non_literal_loopback_host_refuses(self):
         cfg = json.dumps({
@@ -179,6 +252,60 @@ class TestCheckOllamaLocality(unittest.TestCase):
 
     @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
+    def test_target_model_absent_refuses(self, mock_getaddrinfo, mock_open):
+        # A cleanly-formatted tags response that simply does not contain
+        # the requested model (distinct from the malformed-elements test
+        # above, which exercises defensive parsing rather than a normal
+        # absent-model refusal).
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
+        status_resp.__enter__.return_value = status_resp
+
+        tags_resp = MagicMock()
+        tags_resp.read.return_value = self.valid_tags_response
+        tags_resp.geturl.return_value = "http://localhost:11434/api/tags"
+        tags_resp.__enter__.return_value = tags_resp
+
+        mock_open.side_effect = [status_resp, tags_resp]
+
+        ok, msg = checker.verify_locality("some-other-model:latest", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("is not locally resident", msg)
+
+    @patch("urllib.request.OpenerDirector.open")
+    @patch("socket.getaddrinfo")
+    def test_target_model_backed_by_remote_refuses(self, mock_getaddrinfo, mock_open):
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
+        status_resp = MagicMock()
+        status_resp.read.return_value = json.dumps({"cloud": {"disabled": True}}).encode("utf-8")
+        status_resp.geturl.return_value = "http://localhost:11434/api/status"
+        status_resp.__enter__.return_value = status_resp
+
+        remote_backed_tags = json.dumps({
+            "models": [
+                {
+                    "name": "qwen2.5-coder:3b",
+                    "digest": "sha256:1234567890abcdef",
+                    "size": 1900000000,
+                    "remote_model": True,
+                }
+            ]
+        }).encode("utf-8")
+        tags_resp = MagicMock()
+        tags_resp.read.return_value = remote_backed_tags
+        tags_resp.geturl.return_value = "http://localhost:11434/api/tags"
+        tags_resp.__enter__.return_value = tags_resp
+
+        mock_open.side_effect = [status_resp, tags_resp]
+
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("backed by remote/cloud infrastructure", msg)
+
+    @patch("urllib.request.OpenerDirector.open")
+    @patch("socket.getaddrinfo")
     def test_valid_local_model_with_status_succeeds(self, mock_getaddrinfo, mock_open):
         mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 11434))]
         status_resp = MagicMock()
@@ -199,6 +326,66 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertIn("http://localhost:11434/v1", msg)
         self.assertIn("cloud.disabled=true", msg)
         self.assertIn("qwen2.5-coder:3b", msg)
+
+
+class TestLiveHTTPBehavior(_LiveServerCase):
+    """Exercises the real urllib opener chain against a loopback server.
+
+    These do not mock OpenerDirector.open, so they actually run
+    NoRedirectHandler and ProxyHandler({}) against real HTTP responses,
+    unlike every mocked test above.
+    """
+
+    def _config_for(self, path_suffix=""):
+        return json.dumps({
+            "provider": {
+                "ollama": {
+                    "options": {
+                        "baseURL": f"http://127.0.0.1:{self.port}{path_suffix}"
+                    }
+                }
+            }
+        })
+
+    def test_trailing_v1_slash_is_stripped_before_api_calls(self):
+        # baseURL carries a trailing /v1/ (as opencode's ollama provider
+        # entries do); the checker must strip it and hit /api/status and
+        # /api/tags directly on the host, not /v1/api/status.
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self._config_for("/v1/"))
+        self.assertFalse(ok)
+        # The fake server has an empty model list, so this refuses on
+        # residency rather than on reachability -- proof the /api/status
+        # and /api/tags calls themselves succeeded against the stripped path.
+        self.assertIn("0 resident models", msg)
+
+    def test_real_redirect_is_refused_not_followed(self):
+        class RedirectingHandler(_FakeOllamaHandler):
+            def do_GET(self):
+                if self.path == "/api/status":
+                    self.send_response(302)
+                    self.send_header("Location", "http://127.0.0.1:1/elsewhere")
+                    self.end_headers()
+                else:
+                    super().do_GET()
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), RedirectingHandler)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            ok, msg = checker.verify_locality(
+                "qwen2.5-coder:3b",
+                json.dumps({
+                    "provider": {
+                        "ollama": {"options": {"baseURL": f"http://127.0.0.1:{port}/v1"}}
+                    }
+                }),
+            )
+            self.assertFalse(ok)
+            self.assertIn("Cannot reach or verify live Ollama status", msg)
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
 
 
 if __name__ == "__main__":

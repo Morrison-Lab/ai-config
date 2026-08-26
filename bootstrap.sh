@@ -28,8 +28,8 @@ mkdir -p "$CLAUDE_DIR"
 
 # Symlink $src -> $dest unless something is already there. Shared with the
 # per-machine installers under dotfiles/, so both resolve collisions the same
-# way; the hint below is the part that differs, since check-install.py only
-# knows about ~/.claude.
+# way. check-install.py repairs only the Claude-style install manifest, so its
+# hint must not leak into Codex, VS Code, Gemini, or Cursor sections.
 # shellcheck disable=SC2034  # consumed by the sourced link-one.sh
 LINK_ONE_FIX_HINT="run scripts/check-install.py --fix to replace it with a link, or merge manually"
 # shellcheck source=scripts/lib/link-one.sh
@@ -77,6 +77,11 @@ for src in "$SCRIPT_DIR"/*/; do
     link_one "$src" "$dest"
   fi
 done
+
+# The remaining consumers do not share check-install.py's Claude manifest.
+# A collision there needs a scoped manual repair; pointing --consumer-dir at
+# one of these directories would install unrelated Claude entries into it.
+LINK_ONE_FIX_HINT="back it up or merge it manually, then rerun bootstrap.sh"
 
 # --- Codex skill wrappers: plugin and symlink installs are alternatives ---
 if [ -d "$SCRIPT_DIR/codex-skills" ]; then

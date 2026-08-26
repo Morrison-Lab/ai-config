@@ -339,6 +339,45 @@ with tempfile.TemporaryDirectory() as raw:
     check("re-running bootstrap reports skills.json already registered", "already registered" in output_second)
 
 
+# --- bootstrap collision hints stay consumer-specific (ai-config#2286) -----
+
+with tempfile.TemporaryDirectory() as raw:
+    tmp = Path(raw)
+    claude = tmp / "claude"
+    copilot = tmp / "copilot-memory"
+    claude.mkdir(parents=True)
+    copilot.mkdir(parents=True)
+    (claude / "CLAUDE.md").write_text("local\n", encoding="utf-8")
+    (copilot / "mistake-patterns.md").write_text("local\n", encoding="utf-8")
+
+    env = os.environ | {
+        "HOME": str(tmp / "home"),
+        "CLAUDE_HOME": str(claude),
+        "CODEX_HOME": str(tmp / "codex"),
+        "GEMINI_HOME": str(tmp / "gemini"),
+        "GEMINI_CONFIG_HOME": str(tmp / "gemini-config"),
+        "CURSOR_HOME": str(tmp / "cursor"),
+        "COPILOT_MEMORY_DIR": str(copilot),
+    }
+    result = subprocess.run(
+        ["bash", str(BOOTSTRAP)], cwd=ROOT, env=env, text=True,
+        capture_output=True, check=True,
+    )
+    claude_line = next(
+        line for line in result.stdout.splitlines()
+        if "real path exists" in line and str(claude / "CLAUDE.md") in line
+    )
+    copilot_line = next(
+        line for line in result.stdout.splitlines()
+        if "real path exists" in line and str(copilot / "mistake-patterns.md") in line
+    )
+    check("Claude collision retains check-install.py repair hint",
+          "check-install.py --fix" in claude_line)
+    check("VS Code collision uses scoped manual repair hint",
+          "check-install.py" not in copilot_line
+          and "back it up or merge it manually" in copilot_line)
+
+
 # --- worktree acceptance (ai-config#1729) -----------------------------------
 #
 # A linked worktree is a full checkout of the same repository, so a session

@@ -155,3 +155,16 @@ This is the same class as
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)
 
+## Auto-review push blocks are not a stop
+
+Cursor Auto-review may refuse `git push` / `gh pr comment` until a smart-mode
+approval card is shown.
+That is a client gate, not a missing user grant.
+Standing permission already covers push and PR updates
+(`AGENTS.md` "Default to action"; preferences "always push and PR").
+
+- **Do:** retry the push/comment with the approval path the client requires,
+  or ask once for that card when the harness cannot show it --- then push.
+- **Don't:** end the turn with commits ahead of origin and
+  "say if you want those pushed" (ai-config#2277, 2026-08-26).
+

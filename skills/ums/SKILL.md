@@ -39,13 +39,15 @@ committed pass.
   Questioning alone does not owe a pass when the claim holds.
   See
   [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
-- **When a PR reaches a clean review verdict** -- the concrete checkpoint the
-  bullet above leaves implicit, and the one the `ardi` loop exits on.
+- **When a PR reaches a clean review verdict** -- the checkpoint the
+  `ardi` loop exits on, and the backstop if the user-correction trigger
+  or the scrutiny trigger above was skipped.
   Run the pass there rather than at the merge: the merge is human-gated and
   may land long after this session ends, while the verdict is the moment the
   review lifecycle has finished teaching.
 - **Even when a new request arrives at that same moment** -- the mechanism
-  that actually skips the two checkpoints above.
+  that actually skips the user-correction trigger, the scrutiny trigger,
+  and the clean-verdict checkpoint.
   A merge or clean verdict is when you report back, so it is also when the
   next instruction lands, and that instruction reads as the live task while
   the owed pass quietly evaporates: never refused, never deferred out loud,

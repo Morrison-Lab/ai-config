@@ -190,6 +190,7 @@ def scan(path):
     last_question_txt = ""
     last_correction_at = -1
     last_correction_txt = ""
+    last_assistant_at = -1
 
     for i, m in enumerate(records(path)):
         if m.get("isSidechain"):
@@ -199,8 +200,11 @@ def scan(path):
         rec_type = m.get("type")
 
         if rec_type == "user":
-            prose = visible_prose(_text_of(blocks))
-            if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(prose):
+            raw = _text_of(blocks)
+            prose = visible_prose(raw)
+            # Paste markers on RAW text: a user-pasted review is often a
+            # blockquote or fence, which visible_prose strips.
+            if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(raw):
                 last_review_at = i
             if _is_tool_result(blocks):
                 continue
@@ -208,14 +212,20 @@ def scan(path):
             if hit:
                 last_question_at = i
                 last_question_txt = hit.group(0).strip()
-            elif last_question_at >= 0 and last_correction_at <= last_question_at:
-                # A later human turn closes an unanswered question so a
-                # later contrast in a new Q&A is not billed to the old one.
+            elif (
+                last_question_at >= 0
+                and last_correction_at <= last_question_at
+                and last_assistant_at > last_question_at
+            ):
+                # Close only after the assistant has replied without
+                # correcting, so a queued follow-up before that reply does
+                # not drop an in-flight "are you sure?" check.
                 last_question_at = -1
             continue
 
         if rec_type != "assistant":
             continue
+        last_assistant_at = i
 
         for b in blocks:
             if not isinstance(b, dict):

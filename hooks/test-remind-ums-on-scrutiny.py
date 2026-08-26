@@ -79,6 +79,10 @@ WRITE_HOOK = tool("Write", {
     "file_path": "hooks/remind-ums-on-scrutiny.py",
     "content": "REVIEW_PASTE = re.compile(r'**Claude finished|### Verdict')",
 })
+WRITE_FETCH = tool("Write", {
+    "file_path": "hooks/remind-ums-on-scrutiny.py",
+    "content": "get_review_comments /pulls/1/comments",
+})
 GREP_VERDICT = tool("Grep", {"pattern": "### Verdict"})
 TASK_VERDICT = tool("Task", {
     "prompt": "Review origin/main...HEAD. End with ### Verdict: Ready for merge",
@@ -101,10 +105,14 @@ REMIND = [
     ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),
     ([REVIEW], "review comments fetched, no UMS"),
     ([MCP_COMMENTS], "MCP get_comments is a review-read"),
+    ([Q, user("also check the other figure"), CONTRAST],
+     "a follow-up before any assistant reply keeps the question window"),
     ([Q, tool_result("checked"), CONTRAST],
      "a tool_result does not close the question window"),
     ([user("**Claude finished** reviewing HEAD. ### Verdict")],
      "user-pasted review body"),
+    ([user("> **Claude finished** reviewing HEAD.\n> ### Verdict")],
+     "user-pasted review as a blockquote"),
     ([REVIEW, FIX_SHARED], "editing shared/ after a review-read is the fix"),
     ([Q, WRONG, FIX_SHARED], "a corpus edit is not an explicit UMS pass"),
     ([UMS, Q, WRONG], "UMS before the correction does not count"),
@@ -132,6 +140,7 @@ SILENT = [
     ([txt("The `are you sure about that?` example is in the fragment."),
       WRONG], "inline-code mention of the example is not a user question"),
     ([WRITE_HOOK], "writing the matcher into a hook file is not a review-read"),
+    ([WRITE_FETCH], "writing a fetch pattern into a hook file is not a review-read"),
     ([GREP_VERDICT], "grepping the verdict heading is not a review-read"),
     ([TASK_VERDICT], "an adversarial-reviewer brief naming ### Verdict is not a review-read"),
     ([txt("I was wrong about this.")],

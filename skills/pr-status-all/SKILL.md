@@ -53,7 +53,10 @@ calls in one message) so they run at once. The fan-out is read-only, so it
 needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
-**Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out. Unbounded concurrent subagents will exhaust the session's token quota. Instead, abort the operation, warn the user that the queue is too large for a full dashboard, and suggest they use standard `gh pr list` or review a smaller subset.
+**Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out per-PR subagents.
+Unbounded concurrent subagents would exhaust the session's token quota.
+Instead, build a **condensed** table straight from Step 1's own fields (title, `headRefName`, `isDraft`, author) plus one cheap orchestrator-level `gh pr checks` pass per PR for CI state --- skip the seven-signal subagent depth (review currency, external-reviewer check, thread counts, behind-main) entirely.
+Label the table's heading "Condensed --- queue too large for full per-PR review (N open PRs)" so it reads as lower-fidelity rather than as the standard dashboard, and note that a full audit is available on a smaller subset or via `ardia`.
 
 Give each subagent its PR number, `headRefName`, and `isDraft`, and have it gather the **seven independent signals** below and return one structured row.
 Carry the disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST review* will silently misreport:
@@ -189,18 +192,18 @@ A Markdown table, one row per open PR, with these columns:
 
 | PR | Author | AI Review Verdict | CI State | Reviewers Requested | Next Step |
 |:---|:---|:---:|:---:|:---:|:---|
-| [#101](url) | `the repository owner` | [✅ Approved (Authoring Session)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
-| [#102](url) | `external-dev` | [✅ Clean (Adversarial Review)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
-| [#103](url) | `external-dev` | Out of date | 🟢 All Green | ➖ None (Request human review) | Request human review |
-| [#104](url) | `external-dev` | [❌ Needs Work (Adversarial Review)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
-| [#105](url) (Draft) | `external-dev` | None | ⏳ Pending (build) | - | Draft (Work in progress) |
+| [#101](url) | `the repository owner` | [✅ Approved (Round 3)](url) | 🟢 All Green | *Self-authored* (GitHub prevents requesting review from author) | Ready for self-merge |
+| [#102](url) | `external-dev` | [✅ Clean (Round 2)](url) | 🟢 All Green | `the repository owner` | Ready for human review |
+| [#103](url) | `external-dev` | [✅ Clean (Round 1)](url) | 🟢 All Green | ⚠️ None (Request human review) | Request human review |
+| [#104](url) | `external-dev` | [❌ Needs Work (Round 1)](url) | 🟢 All Green | - (AI review in progress) | Drive to clean (ARDI) |
+| [#105](url) (Draft) | `external-dev` | - | ⏳ Pending (build) | - | Draft (Work in progress) |
 
 - **PR** --- markdown link `[#<N>](https://github.com/<owner>/<repo>/pull/<N>)`, appended with `(Draft)` if `isDraft` is true.
 - **Author** --- author login.
-- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL.
+- **AI Review Verdict** --- hyperlinked directly to the latest review comment URL (e.g. `[✅ Clean (Round N)](https://github.com/...#issuecomment-...)`).
   Verified current with the latest commit (`.createdAt >= .lastCommitDate` and matching commit SHA).
-  - Specify the reviewer type: e.g. `✅ Clean (Adversarial Review)` or `(Authoring Session)`. An adversarial review is performed by a distinct subagent (e.g. `claude[bot]`, or containing the phrase "adversarial review" if a local subagent fallback).
-  - If there's no review for the latest commit, the answer should be "none" or "out of date", depending on which it is. Use `None` if there is no AI review at all, and `Out of date` if an AI review exists but predates the latest commit.
+  If the review predates the latest push, display `[⏳ In-Flight / Stale](url)`.
+  If no SHA is named, display `[⚠️ Unverified](url)`.
 - **CI State** --- `🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`.
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.

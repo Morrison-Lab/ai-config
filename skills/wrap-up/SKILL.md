@@ -80,8 +80,10 @@ List, don't bury:
 
 ### 3. Report a linked final summary
 
-- A table of the session's PRs/issues with outcomes, where **every** PR/MR/issue
-  number is a markdown link (repo policy — never a bare `#N`).
+- **Run the `pr-status-all` skill** to produce the report's PR table.
+  This is a standing user mandate (2026-08-25): every session end or clean stopping point gets a whole-queue dashboard, not just a list of the PRs this conversation happened to touch.
+  Respect that skill's own Safety Cap --- a queue over 10 open PRs gets its condensed table, not a skipped one.
+- Every PR/MR/issue number in the table is a markdown link (repo policy --- never a bare `#N`).
 - A Pacific-time timestamp (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`;
   the explicit `TZ` enforces PT on a machine set to any other zone) so "as of
   when" is unambiguous when the user re-reads it later.
@@ -134,6 +136,7 @@ reference, not a confirmation.
   which this embeds as step 4) — `wrap-up` is their session-level bookend.
 - **`spot-skill-opportunities`** — step 4's UMS pass checks whether it flagged
   a recurring pattern during the session that's still unbuilt.
+- **`pr-status-all`** --- step 3's PR table comes from this skill, not from a hand-built list of the session's own PRs; see its Safety Cap for what happens on a large open-PR queue.
 - **`checkpoint`** / **`compress-session`** — narrower-scoped snapshots taken
   *during* a session (a task-phase snapshot, a pre-compaction distillation);
   `wrap-up` is the full session-level close-out these feed into, not a

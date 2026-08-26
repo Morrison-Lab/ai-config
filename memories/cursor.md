@@ -87,8 +87,9 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud `Task` dispatches `adversarial-reviewer`
 
-A Cursor Cloud session can dispatch the `adversarial-reviewer` persona
-through `Task` (`subagent_type: adversarial-reviewer`).
+Measured 2026-08-26: a Cursor Cloud session can dispatch the
+`adversarial-reviewer` persona through `Task`
+(`subagent_type: adversarial-reviewer`).
 Morrison-Lab/ai-config ships that persona under both `.claude/agents/`
 and `.opencode/agents/`.
 Which path Cursor Cloud reads was not isolated.
@@ -98,41 +99,47 @@ The dispatch this corpus requires is foreground
 Measured 2026-08-26 on a Cursor Cloud Grok conductor in this repo:
 that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
-`flag-unassigned-worktree.py` may warn on this dispatch
+`flag-unassigned-worktree.py` warns on every such dispatch
 because the Cursor adapter maps `Task` to `Agent`
 when `subagent_type` is not explore/plan/shell
 ([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
 and that hook's `READ_ONLY` set is Explore/Plan.
-That warning is expected on this route.
-The check after the child returns is `git status`.
+Deciding the child needs no worktree is fine;
+the schema has no `isolation` field to mark that decision.
+Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
+
+Record `git rev-parse HEAD` before the dispatch.
+After the child returns, compare that sha to `git rev-parse HEAD`
+and to the child's `Reviewed-Commit` line.
+`git status --short` is a dirty-tree check, not a HEAD check.
 Cursor's adapter skips `no-push-without-self-review.py`
-(`SKIP_WITHOUT_TOOL_RESULT`);
-a failed or skipped dispatch is not caught before the push.
-The check is the parent's reading of the `Task` result
-and the posted PR comment.
+(`SKIP_WITHOUT_TOOL_RESULT`),
+so a failed or skipped dispatch is not caught before the push.
+The push-enforcement check is the parent's reading of the `Task`
+result and the posted PR comment.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-26 conductor listed `claude-opus-5-thinking-high`
 on its `Task` model list).
-The omit-`model` default was not separately measured.
-A same-vendor child buys independence of intent only.
-A Claude child of a Grok conductor also buys independence of vendor
-from the author.
-That is not independence from a GitHub `claude-review` primary;
-chasing a cross-vendor second reviewer is still
-[`self-review-fallback`](../shared/workflow/self-review-fallback.md).
+The `Task` schema documents that omitting `model` inherits the parent.
+That inherit path was not separately observed on a live omit.
+Don't omit `model` when the conductor is not Claude and Claude is listed:
+inherit keeps the author's vendor.
+Self-review is independence from the author.
+Independence from a Claude primary is the second-reviewer pairing,
+not this dispatch
+([`self-review-fallback`](../shared/workflow/self-review-fallback.md)).
 
-The persona's `tools:` frontmatter is instruction-level on
-Cursor Cloud, not a harness filter.
-The 2026-08-25 Cursor Grok dispatch measured on
+Measured 2026-08-25: the persona's `tools:` frontmatter is
+instruction-level on Cursor Cloud, not a harness filter.
+The Cursor Grok dispatch measured that day on
 [#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266)
 still received Write schemas.
-State read-only in the brief, and check `git status` after the
-child returns.
+State read-only in the brief.
 GitHub `claude-review` skipping for a missing
-`CLAUDE_CODE_OAUTH_TOKEN` or quota is a different channel from
-Claude models listed on that conductor's `Task` tool.
+`CLAUDE_CODE_OAUTH_TOKEN` or quota does not mean Claude is
+unreachable on that conductor's `Task` tool.
 
 [#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)
 is the instruction to use this route.
@@ -140,11 +147,12 @@ is the instruction to use this route.
 - **Do:** dispatch `Task` `adversarial-reviewer` in the foreground
   (`run_in_background` false) for every self-review in a Cursor
   session that can resolve the persona, including when GitHub
-  `claude-review` skipped.
+  `claude-review` skipped a run.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
-- **Do:** brief the child not to edit, and verify `git status`
-  is clean after it returns.
+- **Do:** brief the child not to edit.
+  Record `HEAD` before the dispatch, and after it returns compare
+  that sha to `git rev-parse HEAD` and to `Reviewed-Commit`.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
@@ -152,6 +160,8 @@ is the instruction to use this route.
 - **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on the grounds
   that the subagent route was unavailable, after a `Task`
   dispatch just ran.
+- **Don't:** treat a clean `git status` as proof the child did
+  not commit.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 

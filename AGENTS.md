@@ -257,7 +257,10 @@ It knows what the change was meant to say, so it reads the diff and recovers the
 Brief the reviewer with the diff and the standards, never with the rationale for the change.
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
-guards.
+guards on Claude Code.
+Cursor Cloud's adapter skips that guard
+(see the Cursor Cloud caveat below, and
+[`memories/cursor.md`](memories/cursor.md)).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -387,9 +390,10 @@ Non-obvious caveats worth knowing:
   default; run it as `~/.local/bin/pre-commit run --all-files`.
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
-- **Adversarial review:** Cursor Cloud `Task` with
-  `subagent_type: adversarial-reviewer`
-  (measured 2026-08-26 on this repo).
+- **Adversarial review:** a Cursor Cloud session dispatches
+  `adversarial-reviewer` through `Task`
+  (`subagent_type: adversarial-reviewer`,
+  measured 2026-08-26 on this repo).
   When the conductor is not Claude and a Claude model is listed
   for `Task`, pass that Claude model on `model`.
   Details are in [`memories/cursor.md`](memories/cursor.md).

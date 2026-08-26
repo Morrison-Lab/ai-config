@@ -49,8 +49,9 @@ Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
-Cursor Cloud's `Task` tool is the subagent dispatch when that
-session can resolve the persona.
+**Cursor Cloud has a subagent dispatch.**
+Cursor Cloud's `Task` tool is that dispatch when the session can
+resolve the persona (measured 2026-08-26).
 On that route the adapter skips the pre-push guard, so do not
 prefix `ALLOW_UNREVIEWED_PUSH=1` as if the subagent were missing.
 The Cursor-specific recipe is in

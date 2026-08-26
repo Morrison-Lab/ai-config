@@ -415,9 +415,11 @@ splits the line it sits on.**
 The lowercase-follower case above used to be a boundary the reformatter
 missed and the gate found.
 After #2085 they share that branch.
-This ellipsis case is a boundary **neither** tool is named for, and it arrives
-in the prose this corpus writes constantly: a quoted fragment trailing off, or
-a `[...]` elision inside a citation.
+This ellipsis case is a boundary neither tool is *named* for --- the regex
+matches characters, not a writer's intent --- but both now split it, because
+they share `_SENT_BREAK_RE`.
+It arrives in the prose this corpus writes constantly: a quoted fragment
+trailing off, or a `[...]` elision inside a citation.
 
 `_SENT_BREAK_RE` matches `[.!?]` followed by any run of closing punctuation
 `` [`"')\]*_] `` and then whitespace and an uppercase letter or markup.
@@ -438,9 +440,9 @@ segments, while `... continues` stayed one.
   finding rather than a false positive.
 - **Don't:** assume an ellipsis is inert because it is not a sentence end in
   ordinary reading --- the gate matches characters, not intent.
-- **Don't:** expect the reformatter to propose this split.
-  It shares the same regex branch, so it agrees the boundary exists and will
-  not surface it on a line it never had reason to touch.
+- **Don't:** skip `--write` on an ellipsis hit thinking the reformatter cannot
+  see it. It shares `_SENT_BREAK_RE`, so `--write` proposes the same split the
+  gate flags.
 
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**
 `NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a

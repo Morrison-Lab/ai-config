@@ -772,6 +772,42 @@ expect(
     f"{got_bullet!r} reasons={bullet_reasons!r}",
 )
 
+# Ellipsis-before-capital is a sentence boundary to the shared regex
+# (ai-config#2085: --write proposes the same split the gate flags).
+ELLIPSIS = "[...] Everything else follows on.\n"
+expect(
+    "an ellipsis before a capital is a sentence violation to the gate",
+    checker.classify_line(ELLIPSIS.strip()) == "sentence",
+)
+expect(
+    "reformat splits an ellipsis before a capital",
+    slb.reformat(ELLIPSIS) == "[...]\nEverything else follows on.\n",
+    repr(slb.reformat(ELLIPSIS)),
+)
+
+# Scoped path: if split_sentences returns a piece that is not a substring
+# of the paragraph, emit_gate_clean still has to run.
+FIND_MISS_CLAUSE = (
+    "The first independent clause is padded with enough words to push "
+    "the stripped length past eighty characters; then the second clause "
+    "follows on from there with more words."
+)
+orig_split = slb.split_sentences
+try:
+    slb.split_sentences = lambda text: [FIND_MISS_CLAUSE]
+    got_miss = slb.reformat("Unrelated short prose.\n", {1})
+finally:
+    slb.split_sentences = orig_split
+expect(
+    "scoped find-miss still emits through the gate (splits the clause)",
+    got_miss == (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;\n"
+        "then the second clause follows on from there with more words.\n"
+    ),
+    repr(got_miss),
+)
+
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

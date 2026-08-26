@@ -126,13 +126,16 @@ def _emit_prose_sentences(
         output.extend(raw_lines)
         return
 
+    def emit_clean(s: str, prefix: str) -> None:
+        pieces = _nlb_gate.emit_gate_clean(s)
+        for j, piece in enumerate(pieces):
+            line_prefix = prefix if j == 0 else indent_str
+            output.append(line_prefix + piece)
+
     if changed is None:
         for k, s in enumerate(sentences):
             prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
-            pieces = _nlb_gate.emit_gate_clean(s)
-            for j, piece in enumerate(pieces):
-                line_prefix = prefix if j == 0 else indent_str
-                output.append(line_prefix + piece)
+            emit_clean(s, prefix)
         return
 
     curr_pos = 0
@@ -140,7 +143,10 @@ def _emit_prose_sentences(
         prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
         s_idx = para_text.find(s, curr_pos)
         if s_idx == -1:
-            output.append(prefix + s)
+            # split_sentences returned a piece that is not a substring of
+            # para_text. Still emit through the gate so a scoped run cannot
+            # write a line classify_line would flag.
+            emit_clean(s, prefix)
             continue
         s_start = s_idx
         s_end = s_idx + len(s)
@@ -165,10 +171,7 @@ def _emit_prose_sentences(
             for line_idx in overlapping:
                 output.append(raw_lines[line_idx - orig_start_idx])
         else:
-            pieces = _nlb_gate.emit_gate_clean(s)
-            for j, piece in enumerate(pieces):
-                line_prefix = prefix if j == 0 else indent_str
-                output.append(line_prefix + piece)
+            emit_clean(s, prefix)
 
 
 def _flush_bq_prose(

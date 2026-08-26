@@ -58,7 +58,8 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
 - Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**:
   the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch.
-  (Verified on git 2.x; a review bot suggested the broken form on Morrison-Lab/gha#58.)
+  (Verified on git 2.x;
+a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
 ## Git — `gh pr merge --delete-branch` can orphan a stacked PR instead of retargeting it
 - GitHub's docs promise automatic retargeting: "If you delete a head branch

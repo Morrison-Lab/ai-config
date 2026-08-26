@@ -508,13 +508,6 @@ class TestPrePushReview(unittest.TestCase):
                 reviewer.execute_review("alternate", "prompt text")
                 mock_get_next.assert_called_with(["claude"])
 
-        # When Cursor is set via AGENT_NAME, cursor is excluded
-        mock_detect.return_value = ["claude", "cursor"]
-        with patch.dict(os.environ, {"AGENT_NAME": "Cursor Grok 4.6"}, clear=True):
-            with patch.object(reviewer, "get_next_alternate_engine", return_value="claude") as mock_get_next:
-                reviewer.execute_review("alternate", "prompt text")
-                mock_get_next.assert_called_with(["claude"])
-
         # When OPENCODE_SESSION_ID is set, opencode is excluded
         mock_detect.return_value = ["claude", "opencode"]
         with patch.dict(os.environ, {"OPENCODE_SESSION_ID": "123"}, clear=True):
@@ -798,24 +791,24 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch.object(reviewer, "detect_available_engines")
     def test_alternate_fallback_chain(self, mock_detect):
-        mock_detect.return_value = ["codex", "claude", "cursor"]
+        mock_detect.return_value = ["codex", "claude", "opencode"]
         
         call_count = 0
         def fake_codex(*a, **k):
             nonlocal call_count; call_count += 1; return None
         def fake_claude(*a, **k):
             nonlocal call_count; call_count += 1; return None
-        def fake_cursor(*a, **k):
+        def fake_opencode(*a, **k):
             nonlocal call_count; call_count += 1; return "success report"
             
         with patch.dict(os.environ, {"AGENT_NAME": "antigravity"}, clear=True):
-            with patch.object(reviewer, "get_next_alternate_engine", side_effect=["codex", "claude", "cursor"]):
+            with patch.object(reviewer, "get_next_alternate_engine", side_effect=["codex", "claude", "opencode"]):
                 with patch.object(reviewer, "run_codex_review", side_effect=fake_codex):
                     with patch.object(reviewer, "run_claude_review", side_effect=fake_claude):
-                        with patch.object(reviewer, "run_cursor_review", side_effect=fake_cursor):
+                        with patch.object(reviewer, "run_opencode_review", side_effect=fake_opencode):
                             report, label = reviewer.execute_review("alternate", "prompt")
                             self.assertEqual(report, "success report")
-                            self.assertEqual(label, "Cursor Agent")
+                            self.assertEqual(label, "OpenCode")
 
 
     @patch("subprocess.run")

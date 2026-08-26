@@ -465,7 +465,7 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 
 def detect_available_engines() -> List[str]:
-    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
+    """Return available local engines in preferred fallback priority: claude -> codex -> opencode -> agy."""
     engines = []
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
         engines.append("claude")
@@ -527,7 +527,6 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
         "claude": (run_claude_review, "Claude Code (Local)"),
-        "cursor": (run_cursor_review, "Cursor Agent"),
         "codex": (run_codex_review, "OpenAI Codex"),
         "dtc": (run_codex_review, "OpenAI Codex"),
         "opencode": (run_opencode_review, "OpenCode"),
@@ -568,8 +567,8 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             "claude": "claude",
             "claude code": "claude",
             "claude-code": "claude",
-            "cursor": "cursor",
-            "cursor agent": "cursor",
+            
+            
             "codex": "codex",
             "opencode": "opencode",
             "open code": "opencode",
@@ -752,7 +751,7 @@ def main():
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",
@@ -800,10 +799,14 @@ def main():
     guidelines = get_repo_guidelines(base_ref)
     full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
 
+    repo_root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
     with tempfile.TemporaryDirectory() as temp_dir:
         original_cwd = os.getcwd()
         try:
+            # Provide a read-only snapshot of the repository at the feature branch tip
+            subprocess.run(["git", "clone", "--shared", repo_root, temp_dir], check=True, capture_output=True)
             os.chdir(temp_dir)
+            subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)

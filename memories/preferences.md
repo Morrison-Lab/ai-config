@@ -179,7 +179,7 @@
   A rebuttal the reviewer still disputes does NOT count as clean.
   **`mergeable_state: clean` is NOT Fully Clean**: GitHub `CLEAN` is no-conflicts plus passing commit status, not a review verdict (only `dirty` means conflicts).
   It does NOT mean a review has approved the PR, or that the PR may be described as mergeable.
-  NEVER merge --- and never describe as mergeable --- a PR that lacks an authentic clean review verdict evaluating the HEAD SHA, even when GitHub reports `CLEAN`. (User correction, 2026-08-17, restated 2026-08-25.)
+  NEVER merge --- and never describe as mergeable --- a PR that lacks an authentic clean review verdict evaluating the HEAD SHA, even when GitHub reports `CLEAN` (user correction, 2026-08-17, restated 2026-08-25).
   Two gotchas when checking CI state: the field names/casing for these states vary by API surface (REST's lowercase `status`/`conclusion` vs `gh pr checks`'s uppercase `state`) --- don't hard-code one casing when scripting a check; and a workflow run blocked on `action_required` before any job starts can complete with zero check runs, invisible to a check-runs-only poll (`gh pr checks`, `get_check_runs`) --- and, verified directly against a real run, GitHub records NEITHER a matching commit/branch NOR a populated PR-linkage field for comment/dispatch-triggered runs, so no single `gh run list` filter reliably narrows to "runs for this PR" --- treat any such cross-check as best-effort, not exhaustive.
   See `shared/workflow/fully-clean.md` for the full detail.
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).

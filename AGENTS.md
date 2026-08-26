@@ -181,8 +181,10 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
   `--force-if-includes` (git 2.30+) closes that.
   Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
   A `stale info` refusal is not a reason to force either --- it means the remote branch is gone.
-  If this session already had a PR on that branch, read the PR's `state` before a plain push.
-  MERGED or CLOSED means do not recreate the deleted head (`memories/git.md`).
+  Query `gh pr list --state all --head <branch>` before a plain push.
+  MERGED means auto-delete, not a first publish: do not recreate
+  (see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
+  Otherwise a plain push is the fix.
   `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
   State the reason when you use it.
 

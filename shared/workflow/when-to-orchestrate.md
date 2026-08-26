@@ -121,3 +121,37 @@ single synthesis-stage agent's output at face value just because it validated
 against its schema --- a schema only checks shape, not substance; skim a
 judgment-heavy agent's actual result before building on it, the same way a
 Verify pass would.
+
+**"Mechanical, bounded" is about the reasoning each step needs, not about
+total output volume --- a cheap tier can still exhaust its own session budget
+purely from doing many precise edits, with no single edit being hard.**
+A task like "reformat 23 flagged lines across one large file, each a plain
+line-wrap with no wording change" reads as the canonical cheap-tier case:
+no judgment, a fixed mechanical rule, bounded scope.
+But each edit still costs real output tokens (locating the line, quoting
+enough context for a unique match, writing the replacement), and a
+budget-constrained tier can run out partway through a long enumerated list,
+stop, and report back asking whether to continue in a fresh session ---
+having completed only a fraction of the list, with no signal beyond its own
+final message that this happened.
+
+- **Do:** treat "many repetitions of a simple edit" as a volume signal
+  distinct from "hard reasoning", and either scope one dispatch to a small
+  batch (a handful of edits) or use a less budget-constrained tier
+  (Sonnet, not Haiku) once the count climbs into the dozens.
+- **Do:** verify a mechanical-edit dispatch actually finished the full list
+  it was given, not just that it reported success --- count the edits made,
+  or diff the touched region against what was asked for.
+- **Don't:** assume "mechanical, bounded" alone clears the cheap-tier bar
+  when the task is many instances of that mechanical edit, not one.
+- **Don't:** re-dispatch the same under-budgeted tier for the remainder ---
+  if it ran out once on this task shape, it will again; finish the rest at a
+  higher tier or by hand.
+
+(Morrison-Lab/ai-config#2250, 2026-08-26: a Haiku subagent dispatched to
+reformat 23 flagged lines in one file completed 6, then reported it was
+"at 8,362 tokens remaining" and recommended a fresh session for the rest.
+Resumed once more, it reported the identical status with no further
+progress.
+The remaining 17 (plus one more the checker caught on a subsequent local
+run) were finished by hand at this session's own tier.)

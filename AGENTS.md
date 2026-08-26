@@ -137,6 +137,7 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
 | upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
 
@@ -257,7 +258,44 @@ It knows what the change was meant to say, so it reads the diff and recovers the
 Brief the reviewer with the diff and the standards, never with the rationale for the change.
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
-guards.
+guards on Claude Code.
+Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch that persona through `Task`.
+Call `parse_report()` from the worktree's
+[`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
+on the report recovered from the child's transcript
+when the worktree hook script exists
+(see [`memories/cursor.md`](memories/cursor.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
+If the worktree script is missing, obtain a CLI review.
+Do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
+On that Cursor-adapter path, the empty
+[`pr-on-claim`](shared/workflow/pr-on-claim.md)
+`--allow-empty` branch has no report:
+do not invent one,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
+Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
+On Claude Code the same empty branch still needs
+`ALLOW_UNREVIEWED_PUSH=1` on the pushing command.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -332,6 +370,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+  A disagreement among reviews is not fully clean: any reviewer's standing
+  not-clean --- nits included --- vetoes merge even with `mwc` active.
+  ARD every item from every review, then request fresh reviews
+  (ai-config#2274).
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per

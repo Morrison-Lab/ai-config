@@ -9,13 +9,18 @@ verifying that:
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
   5. Missing or unparseable hooks.json fails loudly with usage exit code 2.
   6. Unparseable Python source in a hook fails loudly with a diagnostic.
+  7. The success line encodes on a cp1252 stdout (ai-config#2038).
+  8. parse_string_constants does not emit ast.Str DeprecationWarning.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent / "check-hook-output-shape.py"
@@ -226,6 +231,57 @@ proc = subprocess.run(
     cwd=str(ROOT),
 )
 check("real repository output shape is clean", proc.returncode == 0, f"\n{proc.stdout}{proc.stderr}")
+
+# --- 9. Success line encodes on cp1252 stdout (ai-config#2038) ---
+# The defect: every check passed, then print("\u2713 ...") raised
+# UnicodeEncodeError on a Windows cp1252 stream and the process exited 1.
+cp1252_env = os.environ.copy()
+cp1252_env["PYTHONIOENCODING"] = "cp1252"
+cp_proc = subprocess.run(
+    [sys.executable, str(SCRIPT)],
+    capture_output=True,
+    env=cp1252_env,
+    cwd=str(ROOT),
+)
+check(
+    "success path exits 0 on a cp1252 stdout (#2038)",
+    cp_proc.returncode == 0,
+    f"rc={cp_proc.returncode} stderr={cp_proc.stderr!r}",
+)
+try:
+    cp_text = cp_proc.stdout.decode("ascii")
+    cp_ascii = True
+except UnicodeDecodeError:
+    cp_text = ""
+    cp_ascii = False
+check(
+    "success stdout is ASCII (#2038)",
+    cp_ascii and "OK: Checked" in cp_text,
+    f"ascii={cp_ascii} out={cp_proc.stdout!r}",
+)
+
+# --- 10. parse_string_constants must not visit deprecated ast.Str (#2038) ---
+spec = importlib.util.spec_from_file_location("check_hook_output_shape", SCRIPT)
+mod = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(mod)
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always", DeprecationWarning)
+    strings, err = mod.parse_string_constants('x = "hello"\ny = "world"')
+check(
+    "parse_string_constants extracts string literals",
+    strings == {"hello", "world"} and err is None,
+    f"strings={strings!r} err={err!r}",
+)
+str_warnings = [
+    w for w in caught
+    if issubclass(w.category, DeprecationWarning) and "ast.Str" in str(w.message)
+]
+check(
+    "parse_string_constants emits no ast.Str DeprecationWarning (#2038)",
+    not str_warnings,
+    extra=repr([str(w.message) for w in str_warnings]),
+)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

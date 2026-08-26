@@ -249,7 +249,7 @@ def run(recs, sentinel_dir=None):
         sentinel_dir = tempfile.mkdtemp()
     try:
         p = subprocess.run(
-            ["python3", HOOK],
+            [sys.executable, HOOK],
             input=json.dumps({"transcript_path": tpath}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=sentinel_dir),
@@ -302,7 +302,7 @@ try:
         env = dict(os.environ, TMPDIR=shared)
         payload = json.dumps({"transcript_path": same_path})
         out = [
-            subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+            subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
                            text=True, env=env).stdout.strip()
             for _ in range(2)
         ]

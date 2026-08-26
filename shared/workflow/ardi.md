@@ -1,9 +1,19 @@
 Whenever you are working a PR/MR, run the full **ARDI** loop by default, without
 being asked: **A**ddress every flagged item, **R**ebut findings that are wrong,
 **D**efer out-of-scope items to tracked issues, then **I**terate with a fresh
-review --- repeating until the latest review is **fully clean**. Don't stop at
+review --- repeating until every reviewer's latest verdict is **fully clean**.
+Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
+
+Posting a review as comments, with no request to edit the branch, is not
+working the PR.
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+"Watch and ARDI every PR you touch" applies when you are driving the
+branch, not when you were asked only to read it.
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in
@@ -171,6 +181,11 @@ The one exception: if the human has explicitly granted the `mwc`
 instruction, not a self-authored one, so baking a self-merge step into a
 wakeup/loop prompt is fine for the rest of that session. See
 [`mwc`](../../skills/mwc/SKILL.md) for the grant's scope and limits.
+The Scope Limit still binds: a disagreement among reviews --- one all-clear
+and another with findings, nits included --- is not fully clean, so `mwc`
+does not authorize merging it.
+ARD every item from every review, then request fresh reviews
+(ai-config#2274).
 
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A
@@ -407,7 +422,7 @@ pull requests share one number space.**
   harmless; check whether the target was open.
 
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
-message".
+message" and "A negated closing-keyword sentence still closes the issue".
 
 **A SHA's provenance is the question its source command answers, not merely
 that a command produced it.**

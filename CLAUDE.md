@@ -662,7 +662,7 @@ The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
 The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
 Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
-`hooks/no-push-without-self-review.py` gates the pre-push case.
+`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
 The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
@@ -736,7 +736,11 @@ Name the specific practice and gap, cite the rule or label the opinion as an opi
 
 The external-correction counterpart to the UMS triggers at the top of this file: those fire on a first-person admission ("I was wrong"), which is why `hooks/remind-ums-after-error.py` deliberately excludes correcting someone else.
 Agreeing with a reviewer is the commoner case and the one that machinery misses --- you admit nothing, you accept a finding --- so an accepted finding is a first-push miss to record and, where a decidable condition exists, to algorithmatize, per the goal that every PR gets a clean review on the first push.
-`hooks/remind-learn-from-review.py` is that trigger; like its sibling it only ever adds context and never blocks, and it stays unregistered until its PR merges, per README's activation gate.
+`hooks/remind-learn-from-review.py` is that trigger;
+like its sibling it only ever adds context and never blocks.
+It is registered in `hooks/hooks.json`,
+which binds it on the plugin path
+and is what `install-hooks.py --fix` binds on the non-plugin path.
 
 ## Tracking issues in upstream repos
 
@@ -777,18 +781,29 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
-## Watch and ARDI every PR you touch — don't ask first
+## Watch and ARDI every PR you touch --- don't ask first
 
-When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs and all repos.
+"Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
+A request to post a review and leave findings, with no request to edit, is not that kind of touch.
+
+**Driving.**
+When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
+That answer is a standing yes across all PRs you are driving.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
+This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
+
+**Review-only.**
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 
@@ -1657,6 +1672,9 @@ recurred immediately in a `jq` filter reading a PR review body.)
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
+  A disagreement among reviews is not fully clean: any standing not-clean
+  --- nits included --- vetoes merge even with `mwc` active
+  (ai-config#2274).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

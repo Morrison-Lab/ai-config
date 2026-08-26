@@ -461,7 +461,7 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         if agent_name.endswith(".md"):
             agent_name = agent_name[:-3]
 
-        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "--file", prompt_file, "Review the attached diff."]
+        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "Review the attached diff.", "--file", prompt_file]
         if model:
             cmd.extend(["-m", model])
 

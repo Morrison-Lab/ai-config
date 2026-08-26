@@ -674,9 +674,9 @@ FINDING_PATTERNS = [
     r"#+\s*Issues",
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
-    r"\*\*Nits?\*\*",
+    r"(?:^|\n)\s*\*\*Nits?\*\*",
     r"#+\s*Non-blocking\b",
-    r"\*\*Non-blocking\*\*",
+    r"(?:^|\n)\s*\*\*Non-blocking\*\*",
     r"\*\*Location:\*\*",
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
@@ -692,9 +692,9 @@ FINDING_HEADING_PATTERNS = {
     r"#+\s*Issues",
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
-    r"\*\*Nits?\*\*",
+    r"(?:^|\n)\s*\*\*Nits?\*\*",
     r"#+\s*Non-blocking\b",
-    r"\*\*Non-blocking\*\*",
+    r"(?:^|\n)\s*\*\*Non-blocking\*\*",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -932,7 +932,9 @@ def check_latest_verdict(
     `approved_authors`. Skip only when identity is that login or its
     exclusive-bot mapping, so a later all-clear from a *different*
     reviewer still does not clear them, and a shared github-actions
-    APPROVED does not clear Claude.
+    APPROVED does not clear Claude. Applied before the global-latest
+    early return, because an empty-bodied later APPROVED does not
+    itself update `latest_verdict`.
 
     Items from a known review agent whose format cannot be classified are
     reported as "unreadable" (#1524) -- distinct from both "no verdict" (skipped)
@@ -948,6 +950,8 @@ def check_latest_verdict(
 
     latest_verdict = ""
     latest_when = ""
+    latest_identity = ""
+    latest_author = ""
     n_with_verdict = 0
     unreadable_items = []
     per_reviewer: Dict[str, Tuple[str, str, str]] = {}
@@ -963,10 +967,12 @@ def check_latest_verdict(
         elif verdict == "not-clean" or finding_pat:
             n_with_verdict += 1
             latest_verdict, latest_when = "not-clean", when
+            latest_identity, latest_author = identity, author
             per_reviewer[identity] = ("not-clean", when, author)
         elif verdict:
             n_with_verdict += 1
             latest_verdict, latest_when = verdict, when
+            latest_identity, latest_author = identity, author
             per_reviewer[identity] = (verdict, when, author)
 
     per_bits = ", ".join(
@@ -980,7 +986,10 @@ def check_latest_verdict(
         f"{per_suffix}"
     )
 
-    if latest_verdict == "not-clean":
+    if (
+        latest_verdict == "not-clean"
+        and not _approval_clears(latest_identity, latest_author, approved_authors)
+    ):
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"

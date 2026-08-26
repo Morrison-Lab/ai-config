@@ -632,6 +632,35 @@ def main() -> int:
             for i in cr_approved_issues
         ),
     )
+    copilot_empty_approved = (
+        "review",
+        "2026-08-26T01:00:00Z",
+        "",
+        "sha123",
+        "APPROVED",
+        "copilot-pull-request-reviewer[bot]",
+    )
+    cr_then_approved_ok, cr_then_approved_issues = checker.check_latest_verdict(
+        [copilot_cr, copilot_empty_approved],
+        approved_authors={"copilot-pull-request-reviewer[bot]"},
+    )
+    check(
+        "check_latest_verdict: Copilot empty APPROVED after CR is still "
+        "cleared when Copilot is in approved_authors",
+        cr_then_approved_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:"))
+            for i in cr_then_approved_issues
+        ),
+    )
+    cr_then_approved_uncleared_ok, cr_then_approved_uncleared = (
+        checker.check_latest_verdict([copilot_cr, copilot_empty_approved])
+    )
+    check(
+        "check_latest_verdict: Copilot empty APPROVED does not clear CR "
+        "without approved_authors",
+        (not cr_then_approved_uncleared_ok)
+        and any("Latest verdict-bearing review statement" in i for i in cr_then_approved_uncleared),
+    )
     jules_cr = (
         "review",
         "2026-08-26T00:00:00Z",
@@ -1503,6 +1532,26 @@ def main() -> int:
             "check_review_comments: a **Non-blocking** heading at HEAD is a "
             "finding (#2274)",
             (not nbb_ok) and any("Non-blocking" in i for i in nbb_issues),
+        )
+
+    inline_nit_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "The leftover item is a **nit** and does not block merge.\n\n"
+            "This is **non-blocking**.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_inline = json.dumps({"comments": [inline_nit_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_inline):
+        il_ok, il_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: inline **nit** / **non-blocking** prose "
+            "is not a finding heading",
+            il_ok and il_issues == [],
         )
 
     claude_nits_earlier = {

@@ -282,26 +282,27 @@ A Claude-only install then reports leftover Cursor rules as plugin
 leftovers, or a plugin-live install leaves them `ok`, and the helper
 tests stay green.
 
-- **Do:** drive a subprocess of the script through `main()` for any
-  classification that `main()` itself decides, especially a skip-reason
-  split.
-- **Do:** pair the helper tests with at least one assertion on
-  `main()` stdout so a wrong gate cannot stay green.
+- **Do:** invoke `main()` for any classification that `main()` itself
+  decides, especially a skip-reason split (subprocess or in-process).
+- **Do:** pair helper tests with at least one assertion on `main()`'s
+  result so a wrong gate cannot stay green.
 - **Don't:** treat an imported-helper check as coverage of the CLI's
   leftover or skip path.
 - **Don't:** key leftover classification on a skip that is true for more
   than the install path that actually serves that catalog.
 
-Prior occurrences in this repo already encode the same shape:
-`scripts/test_check_context_closure.py` refuses to call `positive_int()`
-directly because that stayed green against a `type=int` argparse
-regression, and `hooks/test-no-whole-file-punct-replace.py` smokes
-through `main()`.
+Prior occurrences in this repo already encode the same shape.
+`scripts/test_check_context_closure.py` still calls `positive_int()`
+directly for the happy path, and its argparse-rejection tests invoke
+`ccc.main(...)` in-process rather than only the helper, because a
+direct helper call stayed green against a `type=int` argparse
+regression.
+`hooks/test-no-whole-file-punct-replace.py` smokes through `main()`.
 3rd occurrence, 2026-08-26, Morrison-Lab/ai-config#2292: the first
 adversarial pass on leftover Cursor-rule gating caught helper-only
 tests in `scripts/test_check_harness_installs.py`; the follow-up drives
-`check-harness-installs.py` through `main()` so gating rule leftovers on
-the skill-catalog skip cannot pass.
+`check-harness-installs.py` through a subprocess of `main()` so gating
+rule leftovers on the skill-catalog skip cannot pass.
 Not a new hook: the decidable condition is "this CLI's skip-reason
 wiring", not a lexical pattern a pre-push scanner can see.
 

@@ -598,8 +598,10 @@ website render that collides.
 
 When you fix such a post-merge-only failure, don't stop at the fix — add a
 **cheap static check that runs on `pull_request`** so the bug class can't regress
-unnoticed. It needn't reproduce the whole heavy job; a few seconds of parsing
-that asserts the invariant is enough. Morrison-Lab/rme#970 added `check-render-headers`, a
+unnoticed.
+It needn't reproduce the whole heavy job; a few seconds of parsing
+that asserts the invariant is enough.
+Morrison-Lab/rme#970 added `check-render-headers`, a
 ~120-line Python + PyYAML script that asserts "no two of a render-list page's
 formats resolve to the same output file," runs in ~8s, and would have caught the
 original bug at PR time. Prevention (fix the scaffolder/template that emits the

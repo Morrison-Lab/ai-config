@@ -343,7 +343,8 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25;
+filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 

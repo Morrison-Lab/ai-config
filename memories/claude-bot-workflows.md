@@ -248,7 +248,8 @@ Triggering a review, and what becomes of the reply it writes, live in
   API error. The reusable `claude-code-review.yml` now accepts a **`show-full-output`** input
   (default false; added in dem-extra1/gha#1) that passes through to the action's
   `show_full_output` — flip it to print the raw error in the job log. The live consumer pin
-  `Morrison-Lab/gha@v1` may not carry it yet, so check the tag. You CANNOT side-channel the
+  `Morrison-Lab/gha@v1` may not carry it yet, so check the tag.
+  You CANNOT side-channel the
   error from a throwaway workflow on a feature branch: `claude-code-action` rejects `push`
   events (`Unsupported event type: push`) and refuses to run unless the workflow file is
   byte-identical to the default-branch copy (`Workflow validation failed … must … match the
@@ -515,7 +516,8 @@ not block `claude-review`.)
   regardless of `--disallowedTools`.** The action's TypeScript sets the `ALLOWED_TOOLS`
   env var at runtime, injecting `Bash(git add:*)`, `Bash(git commit:*)`,
   `Bash(git rm:*)`, and `git-push.sh`. The `--disallowedTools` CLI flag cannot
-  override an env var set by the same process. Evidence: `Morrison-Lab/gha` PR #134,
+  override an env var set by the same process.
+  Evidence: `Morrison-Lab/gha` PR #134,
   where a supposedly read-only `claude-code-review` run pushed commit `02af72b` to
   UCD-SERG/serodynamics PR #175. Upstream fix tracked in
   `anthropics/claude-code-action#1415` (draft PR #1433).
@@ -595,7 +597,12 @@ not block `claude-review`.)
   The one addition: when citing a count, name the job id, not just the PR,
   because different attempts on the same PR can carry materially different
   counts. (2026-08-20.)
-- **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `Morrison-Lab/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
+- **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.**
+  `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments.
+  If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading.
+  This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review.
+  Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text.
+  Filed with full evidence as `Morrison-Lab/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
 - **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
   never produced at all, so its absence is not an access problem.**
   `claude-code-review.yml@v1` has no `Resolve and upload execution file path`

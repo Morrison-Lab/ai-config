@@ -191,7 +191,8 @@ action than the patch you were about to write.
 
 (`UCD-SERG/serocalculator#614`, 2026-07-27: a raw `gh pr comment` heredoc
 posted as a review body was diagnosed against the `@v2` snapshot, then
-reproduced and patched locally. `Morrison-Lab/gha`'s `main` already carried
+reproduced and patched locally.
+`Morrison-Lab/gha`'s `main` already carried
 the fix (`gha#318`), and it handled three cases the local patch did not:
 `<<-` heredocs, unquoted tags, and CRLF transcripts --- that last one a
 bug the local patch would have shipped, since normalizing `\r` only for

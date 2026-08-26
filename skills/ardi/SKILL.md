@@ -126,7 +126,7 @@ sits unread.
    Its brief covers what an inline pass would have done --- the current PR diff against its base, each changed call path and edge case, the focused tests and the relevant lint/documentation checks --- and you Address, Rebut, or Defer every finding it returns.
    Note the skip in your ARD summary comment.
    **Re-check reviewer availability every round, not just once** -- a reviewer that was unavailable a few pushes ago can become available mid-session.
-   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires an external verdict at the current head whenever one is reachable, not just a self-review.
+   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires clean external verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
    "minor", "nit", "optional", "consider", "if you want" are for the user's

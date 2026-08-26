@@ -1118,3 +1118,63 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
   are parsed into session token budgets.
 - When an active budget is detected, the harness injects budget-monitoring instructions
   into dynamic system prompt sections and issues continuation prompts if the model finishes before expending the requested effort.
+
+## `check-install.py --consumer-dir` retargets the Claude manifest, not one file
+
+`--consumer-dir` retargets `collect()`, the whole Claude-shaped install
+list (`AGENTS.md`, `CLAUDE.md`, `skills/`, `commands/`, `memories/`, and
+the rest of that manifest).
+It is not a single-file repair, and it is not an arbitrary-consumer
+repair.
+
+Pointing it at a Copilot memory directory or a Gemini skills directory
+enumerates missing Claude-layout entries.
+`--fix` would create those as unrelated top-level links there.
+Measured 2026-08-26 on
+[ai-config#2286](https://github.com/Morrison-Lab/ai-config/issues/2286):
+`--consumer-dir` aimed at the Copilot memory dir listed 15 `missing`
+Claude-layout entries.
+`main()` only skips `--fix` when the consumer dir is absent; a live
+Copilot or Gemini directory is present, so that guard does not save it.
+
+`bootstrap.sh` therefore must not export the Claude-only hint
+`run scripts/check-install.py --fix` via file-scope `LINK_ONE_FIX_HINT`.
+Claude collisions pass that hint per call (`link_one_claude`).
+Codex, Gemini, Copilot, and Cursor inherit
+[`scripts/lib/link-one.sh`](../scripts/lib/link-one.sh)'s default
+(`remove it or replace it with a link manually`).
+Dotfiles/shiva is a third class:
+[`dotfiles/shiva/install.sh`](../dotfiles/shiva/install.sh) sets
+`LINK_ONE_FIX_HINT` to its `--adopt` message.
+Sharing the never-clobber helper is not sharing a hint.
+
+The default is not a backup instruction.
+`--fix` is the path that backs up
+(confirmed in `check-install.py --help`).
+
+A first-push review on
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290)
+(`ee2980bb`) flagged comments that grouped
+"Codex, Gemini, Copilot, Cursor, and the dotfiles installers" as keeping
+one backup/link instruction.
+That sentence was false for shiva and misnamed the default.
+Addressed in `adffe825` and `848539b7`.
+[`scripts/test_bootstrap_link_hints.py`](../scripts/test_bootstrap_link_hints.py)
+is the instrument: it runs real `bootstrap.sh` against colliding paths
+and asserts the Claude-only `--fix` string does not leak into other
+consumers, and that comments do not regroup dotfiles with the default
+inheriters.
+
+- **Do:** pass the `--fix` hint only on Claude `link_one` calls.
+- **Do:** name shiva's `--adopt` override separately from callers that
+  inherit the default.
+- **Don't:** assign Claude-only `LINK_ONE_FIX_HINT` at bootstrap file
+  scope.
+- **Don't:** point `--consumer-dir` at a Copilot, Gemini, Codex, or
+  Cursor path and run `--fix`.
+- **Don't:** write comments that group default-inheriters with callers
+  that override the hint, or call the default a backup/link instruction.
+
+(2026-08-26,
+[#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)

@@ -134,11 +134,61 @@ A reviewer that can edit turns a finding into a silent fix, which loses the find
 A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
 
-Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
+Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
 Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
+
+**Cursor Cloud has a subagent dispatch.**
+On Cursor Cloud, when the session's `Task` tool lists
+`adversarial-reviewer`, that is the dispatch
+(measured 2026-08-25 PDT on a Grok conductor).
+If `Task` is absent or does not list that persona,
+that is the CLI-fallback case above.
+Morrison-Lab/ai-config's Cursor adapter skips
+`no-push-without-self-review.py` until
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
+so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
+under any reviewer
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
+on the report recovered from the child's transcript
+when the worktree hook script exists
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
+If the worktree script is missing, obtain a CLI review.
+Do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
+The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
+do not invent one,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
+Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
+If the dispatch errored, produced no report,
+or produced a report whose fingerprint cannot be recovered
+(including a stale-registered persona),
+obtain a CLI review,
+write that reviewer's report to a file under `/tmp`,
+and call `parse_report()` on that file.
+If Claude Code's native guard is also running, the prefix
+is that guard's escape even when the adapter skip makes
+it inert for the adapter.
 
 ## Brief it with the diff and the standards, never with your rationale
 
@@ -228,7 +278,7 @@ How Cursor Cloud obtains the child's structured report is in
 
 ## The mechanism
 
-[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case on Claude Code, per [`algorithmatize-checks`](algorithmatize-checks.md).
 It answers three questions rather than one, because provenance alone is not enough.
 
 *Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.

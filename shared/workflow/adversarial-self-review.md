@@ -54,8 +54,8 @@ differ from the authoring session.
 This review order serves independence and measured availability,
 overriding [`preferences.md`](../../memories/preferences.md)'s cost-first
 delegation order for general work.
-A multi-backend harness qualifies only when configured
-to run a non-author model.
+A multi-backend harness qualifies only when both its harness
+and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
 If no qualifying entry remains, the merge waits;

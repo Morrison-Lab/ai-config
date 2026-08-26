@@ -226,8 +226,9 @@
   A blank subagent re-reading what's already known is waste, not thoroughness.
 - Delegating implementation does NOT mean trusting an agent's "CLEAN, ready to merge" report blind.
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
-  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `d-morrison/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is the ONLY review.
-  The merge gate is MY independent check, not the agent's word.
+  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `d-morrison/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is a necessary check, and never the merge gate.
+  The merge gate is an adversarial verdict from outside my own context: per [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md), a cross-model, cross-harness reviewer's all-clear where reachable, otherwise human approval.
+  Since 2026-08-25 the author's inline diff read clears no merge grant.
 - A verification artifact (state transcript, frame/state dump) is worthless unless something actually READS it.
   Put it where the reviewer looks: the `@claude` review bot reviews only the checked-out PR tree plus the diff, so a JSON linked by raw URL on a side/media branch is invisible to it --- inline a compact state summary in the PR conversation/diff (and add a line telling the reviewer to use it); a bare link is decoration.
   And the coordinator must actually read the dumps too --- don't build a verification tool and then keep trusting agents' written "I verified tick-by-tick" reports without ever reading a dump.
@@ -977,7 +978,8 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > don't extrapolate this into "uninstall the extension".
 > Tracked as ai-config#1776.
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
+For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
+Adversarial review dispatch is governed separately --- by [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s independence-first order, not this cost-first ladder.
 Two of those CLIs are separately-billed plans with usage windows, and the third is free.
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
@@ -991,10 +993,6 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
-General delegation order for ordinary work:
-exhaust each metered CLI's current usage window (`codex`, then `agy` CLI)
-before falling back to Claude;
-free `opencode` sits outside window logic entirely.
 Headless dispatch: `agy --print="<prompt>" [--effort low]`.
 The `--print` flag consumes the prompt argument,
 so attach it with `=` and keep other flags outside it.
@@ -1004,7 +1002,7 @@ so attach it with `=` and keep other flags outside it.
 but has no measured headless dispatch mechanics here yet ---
 probe before relying on it.
 
-Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
+Exhaust the *current usage window* of each metered CLI in turn --- `codex`, then `agy` (roughly 5 hours for codex) --- then fall back to Claude until it resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
 
 **`opencode` has no window to exhaust, which changes where it sits rather than just adding a row.**

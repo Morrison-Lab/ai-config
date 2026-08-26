@@ -175,8 +175,8 @@ using.
   commits between`; the commits are there, under a repository name `gh` is not
   looking at.
 
-(`Morrison-Lab/wai`, 2026-08-04: `git remote get-url origin` returned
-`https://github.com/Morrison-Lab/wai`, while `gh api repos/Morrison-Lab/wai`
+(`d-morrison/wai`, 2026-08-04: `git remote get-url origin` returned
+`https://github.com/d-morrison/wai`, while `gh api repos/d-morrison/wai`
 reported `Morrison-Lab/wai` and `gh api repos/Morrison-Lab/wai` returned that
 same `full_name`, confirming the redirect.
 The push succeeded --- with a `remote: This repository moved` notice naming

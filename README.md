@@ -232,7 +232,7 @@ bare wrappers, and removes only stale wrapper symlinks that point to the same
 checkout. Re-run it after enabling or disabling the plugin.
 
 The same goes for enabling the plugin from **more than one marketplace**:
-both `Morrison-Lab/ai-config` and `Morrison-Lab/ai-config` publish a plugin
+both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
 named `ai-config` from the same repo, so only one entry can own the
 `ai-config:` namespace and the rest are no-op collisions.
 Enable at most one.

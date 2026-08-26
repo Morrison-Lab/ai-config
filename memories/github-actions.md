@@ -689,21 +689,22 @@ secrets under `pull_request`) has to be re-established explicitly.
   `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
   every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
 - **Do:** pin Node to the interpreter GitHub actually runs for that
-  `runs.using`, not the label in `action.yml`. Measured 2026-08-26 on run
-  32942088643: this action declares `node20` and was forced onto Node 24.
+  `runs.using`, not the label in `action.yml`.
+  Measured 2026-08-26 on run 32942088643:
+  this action declares `node20` and was forced onto Node 24.
 - **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
   bundle) in its own step so a "could not start" comment can gate on it.
   Assertions left on the `jules` step fail before the process assigns
   `commentId`, and the notifier that excludes that step will not fire.
 - **Do:** gate a wrap checker on the `node ... dist/index.js` invocation
   line, not a substring comments also contain.
-- **Don't:** spawn `env` from Python without `shutil.which("env")`. Windows
-  Python outside Git Bash has no `env` on PATH, so the call raises
+- **Don't:** spawn `env` from Python without `shutil.which("env")`.
+  Windows Python outside Git Bash has no `env` on PATH, so the call raises
   `FileNotFoundError` before the suite can print its tally, and local
   pre-commit goes red while ubuntu CI stays green.
 - **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
-  rules-file input is deliberately unused. The empty string is the
-  documented disable value.
+  rules-file input is deliberately unused.
+  The empty string is the documented disable value.
 - **Do:** fetch a checker at the SHA the calling workflow **pins** when
   reproducing a diff-scoped CI gate locally, not the action's default branch.
   The first Do pins when *auditing* an action; the same applies when

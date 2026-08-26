@@ -23,12 +23,8 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Chasing an additional reviewer remains recommended at the push gate.
-At the merge gate a second, stricter review applies, defined below.
-It is distinct from the repo's configured PR reviewer:
-that reviewer satisfies criterion 2 of [`fully-clean`](fully-clean.md),
-while this gate needs an author-dispatched reviewer
-on a different model and harness than the authoring session.
+For merges, the next section adds a stricter gate still:
+a second adversarial review from a different model and harness.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -242,7 +238,8 @@ The other cases have no guard and are prose rules here.
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
   (foreground, read-only) for the pre-push self-review gate,
   and report which agent produced the verdict.
-- **Do:** chase a cross-vendor reviewer on top of it wherever reachable ---
+- **Do:** chase a cross-model, cross-harness reviewer
+  on top of it wherever reachable ---
   recommended at the push gate, required by the merge gate.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.

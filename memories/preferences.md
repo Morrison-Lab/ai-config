@@ -991,8 +991,8 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
 Headless dispatch: `agy --print="<prompt>" [--effort low]`.
-The prompt flag consumes the next token,
-so attach the prompt to the flag and keep other flags outside it.
+The `--print` flag consumes the prompt argument,
+so attach it with `=` and keep other flags outside it.
 
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)

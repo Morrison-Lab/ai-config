@@ -787,6 +787,37 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
+def _has_finding_patterns(body: str, state: str, finding_patterns: List[str]) -> bool:
+    if state in ("CHANGES_REQUESTED", "REJECTED"):
+        return True
+    scan_body = strip_cited_finding_vocab(body)
+    for pat in finding_patterns:
+        for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+            if pat in BARE_NOT_CLEAN_PATTERNS:
+                if not _is_marked_or_in_verdict_section(scan_body, match.start()):
+                    continue
+            prefix = scan_body[max(0, match.start() - 25):match.start()]
+            if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
+            if pat in (
+                r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+                r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+                r"\*\*Actionable Findings\*\*",
+                r"\*\*Detailed Findings\*\*",
+                r"#+\s*Issues",
+                r"#+\s*Remaining",
+            ):
+                suffix = scan_body[match.end():match.end() + 60]
+                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                    continue
+            if pat == r"changes\s+requested\b":
+                start = match.start()
+                pfx = scan_body[max(0, start - 25):start].lower()
+                if re.search(r"\bno\s+(\w+\s+)?$", pfx):
+                    continue
+            return True
+    return False
+
 def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     """Fail when the latest verdict-bearing statement is not clean.
 
@@ -883,7 +914,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
+        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
         verdict = classify_verdict(body)
 
         # Automated reviews must be authored by a recognized bot author.
@@ -905,7 +936,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
+        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
@@ -975,8 +1006,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     dated_matching = sorted((it for it in matching_items if it[1]), key=lambda it: it[1])
     latest_by_provider = {}
     for item in dated_matching:
-        provider = _detect_review_agent(item[2]) or item[5]
-        latest_by_provider[provider] = item
+        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _has_finding_patterns(item[2], item[4], finding_patterns):
+            provider = _detect_review_agent(item[2]) or item[5]
+            latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
 
     has_findings = False

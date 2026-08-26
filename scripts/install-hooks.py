@@ -141,9 +141,8 @@ def enabled_ai_config_plugin(settings: dict) -> str | None:
     Best-effort by design: this inspects only the settings.json this script
     reads, so it catches the common case (plugin enabled in the same file) and
     can miss a project-level enablement. It has no false positives. The
-    matching itself lives in `scripts/lib/plugin_overlap.py`, shared with
-    `check-plugin-overlap.py`, so the two warnings cannot drift apart; the
-    README caveat covers what this cannot see.
+    matching itself lives in `scripts/lib/plugin_overlap.py`; the README
+    caveat covers what this cannot see.
     """
     enabled = enabled_ai_config_plugins(settings)
     return enabled[0] if enabled else None

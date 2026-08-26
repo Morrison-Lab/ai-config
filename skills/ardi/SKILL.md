@@ -12,8 +12,11 @@ allowed-tools:
 
 # ARDI --- ARD + Iterate (single PR/MR)
 
-Drive one PR/MR to a clean review verdict by looping: read review → ARD every
-finding → push → post summary → re-request review → repeat until clean.
+Drive one PR/MR to a clean review verdict by looping: read every review → ARD every
+finding from every reviewer → push → post summary → re-request review from those
+reviewers → repeat until every reviewer's latest verdict is clean.
+A later all-clear from one reviewer does not clear another reviewer's standing
+not-clean, even with `mwc` active (ai-config#2274).
 
 ## Procedure
 
@@ -30,9 +33,13 @@ _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).
 (`COMMENT_PR` and the other bracketed tokens below are abstract operation tokens --- resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
-2. **Read the latest review.**
-Pull the most recent reviewer comment --- the `@claude` bot's, or a human's.
+2. **Read every review, not only the latest.**
+Pull the most recent reviewer comment --- the `@claude` bot's, or a human's ---
+and every other review that still has a standing verdict.
 Don't trust earlier cached verdicts --- actively poll until a review appears that references the commit you just pushed, then read **that** one.
+If one review is all-clear and another raises findings or nits, the findings
+win: ARD the union, then request fresh reviews. Do not merge on the all-clear,
+even with `mwc` (ai-config#2274).
 `gh pr checks` (`PR_CHECKS`) / `glab ci list` going green is about **CI state**, not the review verdict --- always parse the latest review *body* for findings.
 A user question about this PR that is not the word "status" still requires
 this fetch (see [`pr-status`](../pr-status/SKILL.md)).
@@ -302,11 +309,13 @@ The loop ends only at **fully clean**, which means **both**:
    in progress (see *Fix broken CI/workflows too* above, and
    `shared/workflow/fully-clean.md` for the check-run-vs-workflow-run and
    API-casing gotchas).
-2. **The latest review is totally clean** --- zero flagged items under any heading.
+2. **Every reviewer's latest verdict is totally clean** --- zero flagged items under any heading.
    "Looks good" / "no findings" / "approved" with no follow-on bullets.
    Every item that wasn't directly **Addressed** is either **Deferred** to a tracked issue or **Rebutted with a rebuttal that actually convinced the reviewer** (they didn't re-raise it on the next round).
    A rebuttal the reviewer still disputes does **not** count as clean.
    Don't stop at "ready with one minor nit."
+   A later all-clear from one reviewer does not clear another reviewer's standing
+   not-clean, even with `mwc` (ai-config#2274).
    **That review must be a genuine posted verdict at the current head, from an external reviewer if one is reachable** -- check availability again right before declaring clean, not just at the round where self-review first started; an inferred "probably clean" from green CI and resolved threads does not satisfy this.
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and

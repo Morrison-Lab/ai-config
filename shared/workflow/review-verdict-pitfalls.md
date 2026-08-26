@@ -307,9 +307,15 @@ A finding about a line the later commits never touched is still live at the curr
 
 So before declaring clean on one reviewer's verdict, re-read the *other* reviewer's most substantive prior review and check each of its findings against the current code, exactly as you would a fresh one --- verify, then Address, Rebut, or Defer.
 A clean verdict answers "did the reviewer who spoke find anything"; it does not answer "did the reviewer who went quiet leave anything real behind".
+That disagreement also vetoes merge, including under `mwc`: ARD every item
+from every review, then request fresh reviews. A later all-clear from a
+different reviewer does not supersede a standing not-clean
+(ai-config#2274).
 
 - **Do:** sweep a silent-since-earlier reviewer's prior findings against the current head before reporting clean, treating a stale-head or suppressed finding as live until checked.
+- **Do:** ARD the union of findings, then request a fresh round, when reviews disagree.
 - **Don't:** read one reviewer's clean verdict as evidence that a different reviewer's earlier backlog is empty.
+- **Don't:** merge on that all-clear while another review still has standing findings, even with `mwc` active.
 
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.

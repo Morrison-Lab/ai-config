@@ -5,15 +5,18 @@ Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
-4. The LATEST verdict-bearing statement across the whole review history is clean.
+4. Every reviewer's latest verdict-bearing statement is clean.
 
 Criterion 4 is deliberately scoped wider than criteria 2 and 3, which look only
 at items evaluating the current HEAD SHA. An explicit "Needs more work" posted
 against an EARLIER commit falls outside them entirely, and a later comment that
 states no verdict raises no finding either -- so the PR reads clean while its
 last actual verdict was "Needs more work". Absence of a verdict is not a
-clearing: only a later CLEAN verdict supersedes an earlier not-clean one.
-See shared/workflow/fully-clean.md and Morrison-Lab/ai-config#1275.
+clearing: only a later CLEAN verdict from the SAME reviewer supersedes that
+reviewer's earlier not-clean (the ordinary ARDI iterate path, #1275).
+A later CLEAN from a different reviewer does not: any reviewer's standing
+not-clean vetoes, including under mwc (ai-config#2274).
+See shared/workflow/fully-clean.md.
 
 Which repository is being asked about is resolved once, at startup, and threaded
 through every `gh` call. It is NOT hardcoded: the same value reaches the PR
@@ -225,6 +228,14 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "verdict: block": "Jules",
 }
 
+# Logins that are one reviewer, never shared. Claude and Antigravity both post
+# as github-actions, so they cannot live here; Jules posts as jules[bot], and
+# its body marker (`verdict: block`) is only present on the not-clean form.
+EXCLUSIVE_BOT_IDENTITY: Dict[str, str] = {
+    "jules": "Jules",
+    "jules[bot]": "Jules",
+}
+
 
 # Workflow STATUS notices, which are not reviews. Every one of these is posted
 # by `github-actions[bot]`, so the comment-admission test below -- bot author OR
@@ -279,6 +290,52 @@ def has_review_body_marker(body: str) -> bool:
     """True when *body* carries a marker that makes it read as a review."""
     body_lower = body.lower()
     return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
+
+
+def _reviewer_identity(body: str, author: str = "") -> str:
+    """Stable identity for per-reviewer latest-verdict grouping (#2274).
+
+    GitHub Actions posts Claude and Antigravity under the same bot login, so
+    author alone cannot tell two reviewers apart. Exclusive bots (Jules) are
+    keyed on login first, because their body marker is not stable across
+    verdicts. Shared-login reviewers are keyed on a known agent marker from
+    the FIRST non-empty line; fall back to the login; then to "unknown".
+
+    The first line, not the first paragraph: semantic line breaks often put
+    the header and the next sentence in one paragraph, and a quote of
+    ``**Claude finished**`` on line 2 must not inherit Claude's identity.
+    Cited finding vocabulary is blanked first so a code span still does not
+    match.
+    """
+    login = str(author or "").strip()
+    exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
+    if exclusive:
+        return exclusive
+    scan = strip_cited_finding_vocab(body or "")
+    first_line = next((ln.strip() for ln in scan.splitlines() if ln.strip()), "")
+    agent = _detect_review_agent(first_line)
+    if agent:
+        return agent
+    if login:
+        return login
+    return "unknown"
+
+
+def _approval_clears(
+    identity: str, author: str, approved_authors: set
+) -> bool:
+    """True when this reviewer's own later GitHub APPROVED supersedes them.
+
+    `approved_authors` is logins. Skip only when this identity is that login
+    (Copilot) or the exclusive-bot mapping of that login (Jules). A shared
+    login such as github-actions must not clear Claude because a sibling
+    bot later APPROVED.
+    """
+    if author not in approved_authors:
+        return False
+    if identity == author:
+        return True
+    return EXCLUSIVE_BOT_IDENTITY.get(author.lower()) == identity
 
 
 def _detect_review_agent(body: str) -> Optional[str]:
@@ -605,6 +662,41 @@ BARE_NOT_CLEAN_PATTERNS = {
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
+# Criterion 3 (HEAD) and criterion 4 (per-reviewer latest) share this list.
+# Headings such as ``## Nits`` are findings even when ``### Verdict`` says
+# Ready for merge: fully-clean.md's "findings win" rule, and #2274's nits
+# veto. Keep the two scans on one list so a heading added for one cannot
+# vanish from the other.
+FINDING_PATTERNS = [
+    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    r"\*\*Actionable Findings\*\*",
+    r"\*\*Detailed Findings\*\*",
+    r"#+\s*Issues",
+    r"#+\s*Remaining",
+    r"#+\s*Nits?\b",
+    r"\*\*Nits?\*\*",
+    r"#+\s*Non-blocking\b",
+    r"\*\*Non-blocking\*\*",
+    r"\*\*Location:\*\*",
+    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+    r"changes\s+requested\b",
+    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+]
+FINDING_HEADING_PATTERNS = {
+    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    r"\*\*Actionable Findings\*\*",
+    r"\*\*Detailed Findings\*\*",
+    r"#+\s*Issues",
+    r"#+\s*Remaining",
+    r"#+\s*Nits?\b",
+    r"\*\*Nits?\*\*",
+    r"#+\s*Non-blocking\b",
+    r"\*\*Non-blocking\*\*",
+}
+
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
 # finished against free-form English -- the first version covered `not` and
 # `once` and review immediately produced `but not`, `almost`, `however` and
@@ -787,13 +879,60 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
-    """Fail when the latest verdict-bearing statement is not clean.
+def _unresolved_finding_pattern(body: str) -> Optional[str]:
+    """Return the first unmatched finding pattern in *body*, or None.
+
+    Same scan criterion 3 uses on HEAD items. A ``## Nits`` heading with
+    real items is a finding even when ``classify_verdict`` returns clean
+    because the same body also says Ready for merge (#2274).
+    """
+    scan_body = strip_cited_finding_vocab(body)
+    for pat in FINDING_PATTERNS:
+        for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+            if pat in BARE_NOT_CLEAN_PATTERNS:
+                if not _is_marked_or_in_verdict_section(scan_body, match.start()):
+                    continue
+            prefix = scan_body[max(0, match.start() - 25):match.start()]
+            if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
+            if pat in FINDING_HEADING_PATTERNS:
+                suffix = scan_body[match.end():match.end() + 60]
+                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                    continue
+            if pat == r"changes\s+requested\b":
+                start = match.start()
+                pfx = scan_body[max(0, start - 25):start].lower()
+                if re.search(r"\bno\s+(\w+\s+)?$", pfx):
+                    continue
+            return pat
+    return None
+
+
+def check_latest_verdict(
+    all_items: List[tuple],
+    approved_authors: Optional[set] = None,
+) -> Tuple[bool, List[str]]:
+    """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
     Walks every automated review item chronologically -- not just those
-    evaluating HEAD -- and keeps the last one that states a verdict at all.
+    evaluating HEAD -- and keeps the last one that states a verdict at all,
+    both globally (for the scan line agents already read) and per reviewer.
+
     Items stating no verdict are skipped rather than treated as clearing,
-    which is the distinction this check exists to enforce.
+    which is the distinction this check exists to enforce (#1275).
+
+    A later CLEAN from the SAME reviewer supersedes that reviewer's earlier
+    not-clean (ordinary ARDI iterate). A later CLEAN from a DIFFERENT
+    reviewer does not: any standing not-clean vetoes, including under mwc
+    (ai-config#2274). Reviewers are keyed on `_reviewer_identity`, because
+    Claude and Antigravity both post as `github-actions[bot]`.
+
+    Formal-review authors whose latest GitHub state is APPROVED have
+    superseded their own earlier CHANGES_REQUESTED; pass those logins as
+    `approved_authors`. Skip only when identity is that login or its
+    exclusive-bot mapping, so a later all-clear from a *different*
+    reviewer still does not clear them, and a shared github-actions
+    APPROVED does not clear Claude.
 
     Items from a known review agent whose format cannot be classified are
     reported as "unreadable" (#1524) -- distinct from both "no verdict" (skipped)
@@ -805,23 +944,40 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     (fail-fast.md, "report what a check *examined*, not only what it *found*").
     """
     dated = sorted((it for it in all_items if it[1]), key=lambda it: it[1])
+    approved_authors = set(approved_authors or [])
 
     latest_verdict = ""
     latest_when = ""
     n_with_verdict = 0
     unreadable_items = []
-    for _kind, when, body, _oid, state, *_ in dated:
+    per_reviewer: Dict[str, Tuple[str, str, str]] = {}
+    for item in dated:
+        _kind, when, body, _oid, state = item[:5]
+        author = item[5] if len(item) > 5 else ""
         verdict = classify_verdict(body, state)
+        identity = _reviewer_identity(body, author)
+        finding_pat = _unresolved_finding_pattern(body)
         if verdict == "unreadable":
             agent = _detect_review_agent(body) or "unknown"
             unreadable_items.append((when, agent))
+        elif verdict == "not-clean" or finding_pat:
+            n_with_verdict += 1
+            latest_verdict, latest_when = "not-clean", when
+            per_reviewer[identity] = ("not-clean", when, author)
         elif verdict:
             n_with_verdict += 1
             latest_verdict, latest_when = verdict, when
+            per_reviewer[identity] = (verdict, when, author)
 
+    per_bits = ", ".join(
+        f"{identity}={verdict}"
+        for identity, (verdict, _when, _author) in sorted(per_reviewer.items())
+    )
+    per_suffix = f"; per-reviewer: {per_bits}" if per_bits else ""
     print(
         f"  verdict scan: examined {len(dated)} dated automated review item(s), "
         f"{n_with_verdict} bore a verdict, latest = {latest_verdict or 'NONE'}"
+        f"{per_suffix}"
     )
 
     if latest_verdict == "not-clean":
@@ -830,18 +986,34 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
             "and no later comment supersedes it with a clean verdict"
         ]
 
+    # Global latest is clean (or NONE), but another reviewer's latest may
+    # still be not-clean -- the #2274 hole: a later all-clear from a
+    # different reviewer used to supersede.
+    issues = []
+    for identity, (verdict, when, author) in sorted(per_reviewer.items()):
+        if verdict != "not-clean":
+            continue
+        if _approval_clears(identity, author, approved_authors):
+            continue
+        issues.append(
+            f"Latest verdict-bearing statement from {identity} ({when}) is "
+            "NOT clean; a later all-clear from a different reviewer does "
+            "not supersede it (ai-config#2274). ARD every finding from "
+            "every review, then request fresh reviews."
+        )
+
     # Unreadable reviews are reported but do NOT block -- they are a warning,
     # not a verdict.  The caller surfaces them so a human (or a later agent
     # session) can see that a review arrived but could not be read, rather than
     # the misleading "no review" message that previously triggered a wasted
     # self-review fallback round.
-    issues = []
     for when, agent in unreadable_items:
         issues.append(
             f"NOTE: Review from {agent} ({when}) has a format the verdict "
             "classifier cannot read -- not treated as 'no review'"
         )
-    return True, issues
+    blocking = [i for i in issues if not i.startswith("NOTE: ")]
+    return len(blocking) == 0, issues
 
 
 def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
@@ -915,8 +1087,15 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
 
     # Criterion 4, evaluated over the WHOLE review history rather than only the
     # items matching HEAD: a not-clean verdict at an earlier commit stands until
-    # a later CLEAN verdict supersedes it.
-    _verdict_ok, verdict_issues = check_latest_verdict(all_items)
+    # a later CLEAN from the SAME reviewer supersedes it. A later CLEAN from a
+    # different reviewer does not (ai-config#2274).
+    _verdict_ok, verdict_issues = check_latest_verdict(
+        all_items,
+        approved_authors={
+            author for author, state in author_latest_state.items()
+            if state == "APPROVED"
+        },
+    )
     issues.extend(verdict_issues)
 
     # Match items evaluating the target HEAD commit SHA
@@ -957,21 +1136,6 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
-    # Inspect ALL matching items for HEAD SHA (not just an empty trailing formal review object)
-    finding_patterns = [
-        r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
-        r"\*\*Actionable Findings\*\*",
-        r"\*\*Detailed Findings\*\*",
-        r"#+\s*Issues",
-        r"#+\s*Remaining",
-        r"\*\*Location:\*\*",
-        r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
-        r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-        r"changes\s+requested\b",
-        r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
-        r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
-    ]
-
     has_findings = False
     for item in matching_items:
         body = item[2]
@@ -980,37 +1144,13 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
 
-        # Scan a copy with cited finding vocabulary (code spans, fenced blocks,
-        # double-quoted spans) blanked out, so a clean verdict that merely quotes
-        # finding vocabulary is not read as raising a finding (#1202).
-        scan_body = strip_cited_finding_vocab(body)
-        for pat in finding_patterns:
-            for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-                if pat in BARE_NOT_CLEAN_PATTERNS:
-                    if not _is_marked_or_in_verdict_section(scan_body, match.start()):
-                        continue
-                prefix = scan_body[max(0, match.start() - 25):match.start()]
-                if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
-                    continue
-                if pat in (
-                    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-                    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
-                    r"\*\*Actionable Findings\*\*",
-                    r"\*\*Detailed Findings\*\*",
-                    r"#+\s*Issues",
-                    r"#+\s*Remaining",
-                ):
-                    suffix = scan_body[match.end():match.end() + 60]
-                    if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
-                        continue
-                if pat == r"changes\s+requested\b":
-                    start = match.start()
-                    pfx = scan_body[max(0, start - 25):start].lower()
-                    if re.search(r"\bno\s+(\w+\s+)?$", pfx):
-                        continue
-                has_findings = True
-                issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
-                break
+        matched = _unresolved_finding_pattern(body)
+        if matched:
+            has_findings = True
+            issues.append(
+                f"Review comment for SHA {sha[:8]} contains findings "
+                f"(matched pattern '{matched}')"
+            )
 
     if not has_findings and not issues:
         print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")

@@ -186,7 +186,9 @@ fragment; the fragment's copy is authoritative.
    like once the incident clears, and why a job that is `cancelled` with zero
    recorded steps is an outage casualty rather than a failure to debug.
 
-2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+   A later all-clear from a different reviewer does not supersede a standing
+   not-clean (ai-config#2274).
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,
    from an external reviewer if one is reachable --- self-review is a

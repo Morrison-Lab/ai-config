@@ -102,10 +102,11 @@ Issue create --- a qualifying tracker search, not a listing of open issues:
 [`check-open-prs-before-duplicating`](../shared/workflow/check-open-prs-before-duplicating.md).
 A bug fixed and closed last week is exactly the duplicate an open-state search
 cannot see. Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode
-crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed
-them; three of the four would have been caught by an `--state open` search,
-but a bug fixed and closed last week is exactly the duplicate an open-state
-search cannot see.
+crash accumulated four concurrently-open issues (#1984, #2040, #2048, #2049)
+before #2086 closed all four together.
+What that case measures is that no search of any kind ran before each filing.
+The all-state requirement guards the separate closed-duplicate risk above,
+which that case's timeline happens not to exercise.
 
 The hook prompts that search. It does not adjudicate whether the terms were
 good --- that is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md).

@@ -90,11 +90,26 @@ Worked-example case records for the rules below live in
    other from the inside --- one feels like a measurement, the other like
    waiting --- so that rule loads and matches nothing here.
 
+   A non-empty population is necessary and **not sufficient**, because the
+   population grows while the poll runs.
+   Measured on the corrected run: the total went 13, then 16, 17, 18 across
+   two minutes, as later workflows registered their checks.
+   So a threshold only rules out the empty case, and a poller that happened to
+   observe zero pending at total 13 would have exited before five further
+   checks existed.
+   Require the terminal reading to repeat --- zero pending **and** an
+   unchanged total across two consecutive polls --- and print the total each
+   tick, so growth is visible rather than inferred.
+
    - **Do:** require a non-empty population before reading zero-pending as
      done, and report how many check runs were examined.
+   - **Do:** confirm the total is unchanged since the previous poll, since the
+     population grows as workflows register.
    - **Don't:** arm a poller assuming the push already created the checks ---
      a draft-to-ready transition creates them on a separate event, so a
      poller armed at push time can run entirely inside a zero-check window.
+   - **Don't:** treat a single zero-pending reading as terminal, however large
+     the population was when you took it.
 
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A poller exited on an empty check list".

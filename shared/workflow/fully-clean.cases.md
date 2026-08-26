@@ -1078,3 +1078,26 @@ The corrected form asserts the population and prints what it examined:
 
 Re-armed that way, the same head reported its real state.
 
+The corrected poller then exposed a second hole in the same loop.
+Its per-tick trace was:
+
+```
+t=150s total=13 pending=1
+t=180s total=13 pending=1
+t=210s total=16 pending=2
+t=240s total=17 pending=2
+t=270s total=18 pending=1
+```
+
+The population is not fixed.
+It grew from 13 to 18 while the poll ran, as later workflows registered their
+checks.
+A non-empty-population guard therefore rules out the empty case and nothing
+else: had `pending` reached 0 at `t=180s`, the loop would have exited
+satisfied, with 13 checks examined and five not yet created.
+
+The guard that closes it is repetition rather than a larger threshold ---
+zero pending **and** an unchanged total across two consecutive polls.
+Printing the total each tick is what made the growth visible; a loop that
+reports only its exit condition cannot show it.
+

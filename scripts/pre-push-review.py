@@ -266,6 +266,21 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if is_clean and not is_clean_findings:
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
+
+    observations_match = re.search(r"(?i)### Observations & Non-Blocking Suggestions(.*?)(?:###|$)", unfenced_report, re.DOTALL)
+    if is_clean and observations_match:
+        obs_body = observations_match.group(1).strip()
+        if obs_body and not re.match(r"^\s*(?:none(?:\.|)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
+            # Check that ALL non-empty lines start with [P3], [P4], [INFO], or a list marker followed by them
+            for line in obs_body.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # Remove markdown list markers like -, *, 1.
+                line = re.sub(r"^(?:[-*]|\d+\.)\s+", "", line)
+                if not re.match(r"^(?:\[P3\]|\[P4\]|\[INFO\]|\[MINOR\]|P3:|P4:|INFO:|MINOR:)(?:\s|$)", line, flags=re.IGNORECASE):
+                    return False, False, f"Contradictory output: unclassified free-text observation '{line[:50]}...'"
+
     if is_clean:
         blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|(?<!\bno )(?<!\bzero )(?<!non-)\bcritical\s+(?:bug|flaw|regression|vulnerability)|(?<!\bno )(?<!\bzero )(?<!non-)\bsevere\s+bug|(?<!\bprevents\s)(?<!\bprevent\s)(?<!\bpreventing\s)(?<!\bno\s)(?<!\bzero\s)(?<!non-)\b(?:causes\s+data\s+loss|data\s+loss)|(?<!\bno )(?<!\bzero )(?<!non-)\bmerge\s+should\s+be\s+withheld|(?<!\bno )(?<!\bzero )(?<!non-)\bmust\s+not\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bshould\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s*(?::|\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?)))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
@@ -297,11 +312,11 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    
-    if len(prompt) > 800000:
+
+    if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
-        
+
     cmd = [agy_path, "--print", prompt, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
@@ -358,11 +373,11 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(cursor_path) and not shutil.which("agent"):
         return None
 
-    
-    if len(prompt) > 800000:
+
+    if len(prompt.encode("utf-8")) > 800000:
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
-        
+
     cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
@@ -567,9 +582,10 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             invokers.add("codex")
         if os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("opencode")
-        if not invokers:
-            log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
-            return None, "None"
+        if not invokers and exclude_engine:
+            pass # No invoker identified implicitly, but explicit exclude provided
+        elif not invokers and not exclude_engine:
+            pass # No invoker identified, select from all
 
         alias_map = {
             "dtc": "codex",
@@ -727,6 +743,7 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   - ### Critical Findings",
         "     None. (or numbered list of blocking bugs / contract regressions)",
         "   - ### Observations & Non-Blocking Suggestions",
+        "     Every observation MUST be explicitly prefixed with a machine-readable non-blocking severity label: [INFO] or [MINOR]. Do not include conversational filler.",
         "   - ### Verification Steps",
         f"   Reviewed-Commit: {head_sha}",
     ]

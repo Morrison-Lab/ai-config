@@ -48,7 +48,7 @@ class TestPrePushReview(unittest.TestCase):
             "### Critical Findings\n"
             "None.\n\n"
             "### Observations & Non-Blocking Suggestions\n"
-            "Looks clean and well-structured.\n\n"
+            "[INFO] Looks clean and well-structured.\n\n"
             "### Verification Steps\n"
             "- All unit tests passed.\n"
             f"Reviewed-Commit: {commit}"
@@ -847,7 +847,7 @@ class TestPrePushReview(unittest.TestCase):
 
 
     def test_verdict_negated_blockers_accepted(self):
-        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\nObservation: prevents data loss.\nNo critical vulnerability was introduced.\n### Verification Steps\nNone"
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] prevents data loss.\n[INFO] No critical vulnerability was introduced.\n### Verification Steps\nNone"
         is_valid, is_clean, _ = reviewer.parse_review_verdict(report)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
@@ -863,6 +863,38 @@ class TestPrePushReview(unittest.TestCase):
         huge_prompt = "A" * 800001
         self.assertIsNone(reviewer.run_antigravity_review(huge_prompt))
         self.assertIsNone(reviewer.run_cursor_review(huge_prompt))
+
+
+    def test_verdict_contradiction_in_observations(self):
+        commit = "12345678abcdef00"
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\nObservation: The command always crashes before producing output.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output: unclassified free-text observation", reason)
+
+    def test_multibyte_oversized_prompts(self):
+        multibyte_prompt = "🔥" * 200001
+        self.assertTrue(len(multibyte_prompt) < 800000)
+        self.assertTrue(len(multibyte_prompt.encode("utf-8")) > 800000)
+        self.assertIsNone(reviewer.run_antigravity_review(multibyte_prompt))
+        self.assertIsNone(reviewer.run_cursor_review(multibyte_prompt))
+
+    @patch.object(reviewer, "run_antigravity_review", return_value="report")
+    @patch.object(reviewer, "run_cursor_review", return_value="report")
+    @patch.object(reviewer, "run_codex_review", return_value="report")
+    @patch.object(reviewer, "run_claude_review", return_value="report")
+    @patch.object(reviewer, "run_opencode_review", return_value="report")
+    def test_alternate_invocation_without_agent_name(self, mock_opencode, mock_claude, mock_codex, mock_cursor, mock_anti):
+        import os
+        orig_agent = os.environ.get("AGENT_NAME")
+        if "AGENT_NAME" in os.environ:
+            del os.environ["AGENT_NAME"]
+        try:
+            report, label = reviewer.execute_review("alternate", "prompt", exclude_engine="")
+            self.assertEqual(report, "report")
+        finally:
+            if orig_agent is not None:
+                os.environ["AGENT_NAME"] = orig_agent
 
 if __name__ == "__main__":
     unittest.main()

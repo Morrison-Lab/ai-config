@@ -91,7 +91,6 @@ UMS_WORD = getattr(_ums, "UMS_WORD", None)
 # verdict heading, is not a review-read.
 REVIEW_FETCH = re.compile(
     r"get_review_comments|get_reviews|get_comments|"
-    r"pull_request_read|"
     r"/pulls/\d+/(comments|reviews)\b|"
     r"/issues/\d+/comments|"
     r"gh\s+pr\s+view\b[^\n]*(--comments|\bcomments\b|\breviews\b)",
@@ -163,6 +162,13 @@ def _text_of(blocks):
     return "\n".join(parts)
 
 
+def _is_tool_result(blocks):
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") == "tool_result":
+            return True
+    return False
+
+
 def _is_correction(prose):
     if not prose.strip():
         return False
@@ -196,10 +202,16 @@ def scan(path):
             prose = visible_prose(_text_of(blocks))
             if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(prose):
                 last_review_at = i
+            if _is_tool_result(blocks):
+                continue
             hit = QUESTIONING.search(prose)
             if hit:
                 last_question_at = i
                 last_question_txt = hit.group(0).strip()
+            elif last_question_at >= 0 and last_correction_at <= last_question_at:
+                # A later human turn closes an unanswered question so a
+                # later contrast in a new Q&A is not billed to the old one.
+                last_question_at = -1
             continue
 
         if rec_type != "assistant":

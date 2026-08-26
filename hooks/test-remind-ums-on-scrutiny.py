@@ -50,6 +50,13 @@ def user(s):
     return {"type": "user", "message": {"content": [{"type": "text", "text": s}]}}
 
 
+def tool_result(s="ok"):
+    return {
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "content": s}]},
+    }
+
+
 Q = user("are you sure about that?")
 WRONG = txt("You're right to ask -- I was wrong, the count is 12 not 9.")
 SILENT_UPDATE = txt("That count was wrong -- it is 12.")
@@ -78,8 +85,12 @@ TASK_VERDICT = tool("Task", {
     "description": "adversarial review",
 })
 MCP_COMMENTS = tool("CallDynamicTool", {
+    "toolName": "get_comments",
+    "arguments": {"pullNumber": 2262},
+})
+MCP_CHECKS = tool("CallDynamicTool", {
     "toolName": "pull_request_read",
-    "arguments": {"method": "get_comments", "pullNumber": 2262},
+    "arguments": {"method": "get_check_runs", "pullNumber": 2262},
 })
 
 
@@ -89,7 +100,9 @@ REMIND = [
     ([Q, CONTRAST], "closed Q&A contrast without admission: it's 12, not 9"),
     ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),
     ([REVIEW], "review comments fetched, no UMS"),
-    ([MCP_COMMENTS], "MCP pull_request_read get_comments is a review-read"),
+    ([MCP_COMMENTS], "MCP get_comments is a review-read"),
+    ([Q, tool_result("checked"), CONTRAST],
+     "a tool_result does not close the question window"),
     ([user("**Claude finished** reviewing HEAD. ### Verdict")],
      "user-pasted review body"),
     ([REVIEW, FIX_SHARED], "editing shared/ after a review-read is the fix"),
@@ -101,6 +114,9 @@ REMIND = [
 SILENT = [
     ([Q], "questioning with no later correction"),
     ([Q, CONFIRM], "questioning then confirming the claim"),
+    ([Q, CONFIRM, user("ok, continue."), CONTRAST],
+     "a later human turn closes an unanswered question"),
+    ([MCP_CHECKS], "MCP get_check_runs is CI, not a review-read"),
     ([Q, CONFIRM_CORRECT], "restating 'the correct figure is N' is confirmation"),
     ([Q, CONFIRM_ACTUALLY], "'actually, it is N' restates a confirmed claim"),
     ([Q, CONFIRM_NOT_IN_DOUBT], "'not' without a digit is not a contrast correction"),

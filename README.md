@@ -28,7 +28,8 @@ Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
 After bootstrapping, confirm the symlinks resolved and the skills are visible:
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config ~/.cursor/rules
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config
+# ~/.cursor/rules is linked only when no Cursor plugin is already serving those rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 python3 scripts/check-harness-installs.py    # audit every installed harness
 ```

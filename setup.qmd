@@ -24,7 +24,8 @@ Run it again any time you add a new top-level dir to the repo.
 ### Verify the install
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.cursor/rules
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills
+# ~/.cursor/rules is linked only when no Cursor plugin is already serving those rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 

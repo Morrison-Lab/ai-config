@@ -491,7 +491,7 @@ Every hook must ship a companion `test-<name>.py` beside it in the same change b
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
 *tested* guard cannot regress unnoticed and an *untested* one cannot hide.
-Each suite has a 600-second deadline
+Each suite has a 900-second deadline
 (override with `HOOK_TEST_SUITE_TIMEOUT`);
 a hung suite reports FAIL rather than stalling the sweep.
 The runner gates `validate` and pre-commit.

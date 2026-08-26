@@ -41,11 +41,11 @@ HOOKS = os.path.join(ROOT, "hooks")
 
 # Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
 # slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
-# mutation rounds) finished in 178s. 600s is about 3x that, so a slow
-# Windows box has headroom, while the hang that never terminated across
-# 120s and 420s kills (ai-config#2098) still FAILs instead of stalling
-# the sweep. Override with HOOK_TEST_SUITE_TIMEOUT.
-DEFAULT_SUITE_TIMEOUT_S = 600
+# mutation rounds) finished in 178s. 900s is about 5x that, so a slow
+# Windows box has headroom past the 420s kill of the hang that never
+# produced output (ai-config#2098) while still FAILing an infinite
+# stall. Override with HOOK_TEST_SUITE_TIMEOUT.
+DEFAULT_SUITE_TIMEOUT_S = 900
 
 # Hooks that ship without a test today. An explicit, reviewable list -- not a
 # silent gap. A new hook is expected to bring its test; this list should only
@@ -63,13 +63,13 @@ def suite_timeout_s():
     except ValueError:
         sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} is not a number")
     # nan and inf both pass `value <= 0` (nan comparisons are false;
-    # inf is positive). On Python 3.12.3 (measured 2026-08-26),
-    # subprocess.run(timeout=nan) raises ValueError immediately and
-    # timeout=inf raises OverflowError; either would abort the whole
-    # sweep with no per-suite FAIL. timeout=-inf expires immediately
-    # as TimeoutExpired. Rejecting all three names the bad env var
-    # instead of crashing, and does not treat -inf as a zero-second
-    # deadline.
+    # inf is positive). On POSIX Python 3.12.3 (Linux, measured
+    # 2026-08-26), subprocess.run(timeout=nan) raises ValueError
+    # immediately and timeout=inf raises OverflowError, even for an
+    # instant child; either would abort the whole sweep with no
+    # per-suite FAIL. timeout=-inf raises TimeoutExpired immediately.
+    # Rejecting all three names the bad env var instead of crashing,
+    # and does not treat -inf as a zero-second deadline.
     if not math.isfinite(value) or value <= 0:
         sys.exit(
             f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be a positive "

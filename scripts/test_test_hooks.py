@@ -134,13 +134,15 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
 
 # --- 4. HOOK_TEST_SUITE_TIMEOUT parsing ----------------------------------
 
-check("default timeout is 600s", th.suite_timeout_s() == 600)
+with patch.dict(os.environ):
+    os.environ.pop("HOOK_TEST_SUITE_TIMEOUT", None)
+    check("default timeout is 900s", th.suite_timeout_s() == 900)
 
 with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": "12"}):
     check("env override is honored", th.suite_timeout_s() == 12)
 
 with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": ""}):
-    check("empty env keeps the default", th.suite_timeout_s() == 600)
+    check("empty env keeps the default", th.suite_timeout_s() == 900)
 
 try:
     with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": "nope"}):

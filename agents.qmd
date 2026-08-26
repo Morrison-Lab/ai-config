@@ -30,8 +30,9 @@ so the restriction is not a universal harness guarantee.
 All but one of them also keep `Bash`, which *can* run write-capable shell
 commands (`git push`, `rm`, a redirect); for those, staying read-only is
 instruction-level discipline, not a harness guarantee (see the note below the
-table). Each agent returns a report; only the calling session, which keeps full
-tool access, applies fixes or writes anything, on the user's go-ahead.
+table). Each agent returns a report.
+The calling session dispositions findings and applies fixes,
+even when a harness still grants the worker Write schemas.
 
 `adversarial-reviewer` is the one that is not a fan-out worker but a **critic**
 --- it reviews the calling session's own diff rather than investigating the

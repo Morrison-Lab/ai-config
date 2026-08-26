@@ -470,7 +470,7 @@ The `@claude` bot's own behaviour lives in
 
 ## A repo/org rename breaks Actions `uses:` refs -- and repointing the owner is not the fix
 
-`Morrison-Lab/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
+`d-morrison/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
 recurs for any renamed owner.
 GitHub Actions does **not** follow repository-rename redirects when resolving a
 `uses:` ref, so every caller naming the old owner fails at run preparation,
@@ -513,7 +513,7 @@ Three things to know, in the order they bite.
 Before any blanket find-and-replace, establish **which** repos actually moved --
 see `github.md`'s note on `raw.githubusercontent.com` following rename
 redirects, which is the probe that answers it.
-In the ucdavis/bcs sweep exactly two of nine `Morrison-Lab/*` references had
+In the ucdavis/bcs sweep exactly two of nine `d-morrison/*` references had
 moved, so a blanket replace would have broken the other seven.
 Historical references in a changelog are a separate case: they record what was
 true when written, so leave them alone.

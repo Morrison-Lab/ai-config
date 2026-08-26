@@ -7,7 +7,7 @@ what a run does once it starts, split at the 1200-line gate.
 
 ## Re-triggering the @claude PR *review* (the repository owner Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
-  `Morrison-Lab/psw`, moved there from `Morrison-Lab/psw`): the review workflow
+  `Morrison-Lab/psw`, moved there from `d-morrison/psw`): the review workflow
   is `.github/workflows/claude-code-review.yml`
   and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
   (ai-config's *own* bot uses different names --- `claude-review.yml` /

@@ -95,7 +95,7 @@ Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude
 Code's five, so a `false` there loses to the repo's checked-in `true`
 ([settings docs](https://code.claude.com/docs/en/settings)).
 Likewise enable the plugin from at most **one** marketplace:
-`Morrison-Lab/ai-config` and `Morrison-Lab/ai-config` publish the same plugin,
+`Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin,
 so a second entry is a no-op collision.
 `bootstrap.sh` warns about both cases via
 `scripts/check-plugin-overlap.py`.

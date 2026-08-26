@@ -24,6 +24,13 @@ jobs:
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
         run: python3 scripts/check-links.py
+      - name: Check Jules mention-dispatch wrap
+        # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
+        # like a wrap and is a no-op. This gate fails if the mention path
+        # is dropped or if the action is invoked via uses: again.
+        run: python3 scripts/check-jules-review-workflow.py
+      - name: Run Jules-review workflow tests
+        run: python3 scripts/test_check_jules_review_workflow.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
       - name: Check tui-alloc README defaults
@@ -74,11 +81,17 @@ jobs:
           python3 scripts/test_codex_plugin_enabled.py
           python3 scripts/test_bootstrap_codex_plugin.py
       - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
+        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills or
+        # ~/.cursor/rules links.
         run: |
           python3 scripts/test_cursor_plugin_enabled.py
           python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
+          python3 scripts/test_cursor_hook_adapter.py
+      - name: Run bootstrap consumer-hint tests
+        # check-install.py --fix is Claude-only. A collision in Copilot, Gemini,
+        # Codex, or Cursor must not print that hint (ai-config#2286).
+        run: python3 scripts/test_bootstrap_link_hints.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must
@@ -139,6 +152,11 @@ jobs:
         run: python3 scripts/check-hook-output-shape.py
       - name: Run hook-output-shape check tests
         run: python3 scripts/test_check_hook_output_shape.py
+      - name: Run pre-push-review tool tests
+        # pre-push-review.py executes local adversarial AI code reviews using
+        # workstation subscription CLIs. Unit tests mock the CLI/subprocess boundaries
+        # and verify diff extraction, fallback chains, and forge attribution.
+        run: python3 scripts/test_pre_push_review.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
         # this repo is currently ~4x the shipped budget (ai-config#897), so a

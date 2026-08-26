@@ -394,7 +394,7 @@ A one-shot status poll is not babysitting.
 A PR-activity subscription is not a loop.
 PR-activity webhooks (`subscribe_pr_activity`) do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
 Subscribe when that tool exists, and re-arm a periodic check-in using whatever wake mechanism this session has.
-Claude Code: `/loop`, `send_later`, or `CronCreate`.
+Claude Code: `/loop`, `send_later`, `CronCreate`, or a `schedule` timer.
 Another harness: its own scheduler or timer.
 A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
 Start the loop if it is not already running, then answer.

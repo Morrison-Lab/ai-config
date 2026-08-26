@@ -71,6 +71,11 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   A fallback self-review or reviewer skip notice does NOT grant approval or satisfy `mwc`.
 - **Fix**: Run `scripts/check-pr-fully-clean.py` (or verify all its criteria) before ever declaring a PR fully clean.
   Only report clean when all CI checks pass AND an automated AI review evaluating the exact HEAD SHA has posted an approved / ready verdict with zero open findings.
+## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
+- **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
+- **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it") and [`ardi.md`](../shared/workflow/ardi.md).
+- **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer or cron before concluding any turn, and report the timer and firing time.
 
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.

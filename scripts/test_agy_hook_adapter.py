@@ -1024,5 +1024,35 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 1)
         self.assertIn("stop-hook.py", mock_run.call_args_list[0].args[0])
 
+        # Now the PreInvocation half: a UserPromptSubmit hook keyed by
+        # "script" (rather than "command") must also execute on the
+        # PreInvocation dispatch path (adapter's UserPromptSubmit handling),
+        # not just on Stop.
+        mock_run.reset_mock()
+        mock_stdout.seek(0)
+        mock_stdout.truncate(0)
+
+        ups_script_hooks_def = {
+            "hooks": {
+                "UserPromptSubmit": [{"script": "python3 /path/to/prompt-hook.py"}]
+            }
+        }
+        with patch('builtins.open', mock_open(read_data=json.dumps(ups_script_hooks_def))):
+            mock_result = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "context"}), stderr="")
+            mock_run.return_value = mock_result
+
+            payload = {"invocationNum": 1, "prompt": "hello"}
+            mock_stdin.seek(0)
+            mock_stdin.truncate(0)
+            mock_stdin.write(json.dumps(payload))
+            mock_stdin.seek(0)
+
+            self.adapter.main()
+
+        self.assertEqual(mock_run.call_count, 1)
+        self.assertIn("prompt-hook.py", mock_run.call_args_list[0].args[0])
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("injectSteps"), [{"ephemeralMessage": "context"}])
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,7 @@ Every agent in this repo omits `Edit` and `Write` from its Claude Code
 Claude Code honors that allowlist (the `tools:` field, documented at
 <https://code.claude.com/docs/en/sub-agents> and in this repo since
 [ai-config#341](https://github.com/Morrison-Lab/ai-config/pull/341);
-still the Claude Code path as of 2026-08-26).
+still the mechanism Claude Code uses as of 2026-08-26).
 Some other harnesses still grant Write schemas to the same persona
 (Cursor Cloud Task, measured 2026-08-25 PDT on
 [ai-config#2265](https://github.com/Morrison-Lab/ai-config/pull/2265),
@@ -32,7 +32,8 @@ commands (`git push`, `rm`, a redirect); for those, staying read-only is
 instruction-level discipline, not a harness guarantee (see the note below the
 table). Each agent returns a report.
 The calling session dispositions findings and applies fixes,
-even when a harness still grants the worker Write schemas.
+even when a harness still grants the worker Write schemas,
+on the user's go-ahead.
 
 `adversarial-reviewer` is the one that is not a fan-out worker but a **critic**
 --- it reviews the calling session's own diff rather than investigating the
@@ -66,10 +67,10 @@ The Claude Code versus other-harness split for `Edit`/`Write` is in
 `adversarial-reviewer` is the persona that currently carries the
 Write-schema hedge.
 The `.opencode/` mirrors are not all the same: opencode's own permission block
-can deny `edit` or `bash` outright, in which case that surface is
+can deny `bash` outright, in which case that surface is
 harness-enforced there.
-A harness that still grants Write schemas when loading that copy is not
-bound by that block; which copy Cursor Cloud reads was not isolated
+A harness that still grants Write schemas is not bound by that block.
+Which copy Cursor Cloud reads was not isolated
 (measured 2026-08-25 PDT).
 
 ## How they're invoked

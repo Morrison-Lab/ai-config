@@ -168,6 +168,10 @@ for path in persona_paths:
         f"{rel} still tells the child not to apply a correction",
         "Do not apply a correction" in text,
     )
+    check(
+        f"{rel} bans any write tool by category, not by name list",
+        "Do not use any tool that writes, edits, moves, or deletes a file" in text,
+    )
 
 doc_text = (ROOT / "agents.qmd").read_text(encoding="utf-8")
 check(

@@ -83,6 +83,10 @@ secrets) lives alongside this skill in
 [`models-template.jsonc`](models-template.jsonc), one representative entry
 per model family. Use it as the per-family schema to copy from in Step 2, and
 to seed `oaicopilot.models` on a fresh machine (swap in your workspace URL).
+For Databricks entries, its operational limits follow WAI's
+[`tbl-databricks-oaicopilot-defaults`](https://github.com/Morrison-Lab/wai/blob/main/chapters/ai-tools/byok-vscode-databricks.qmd#tbl-databricks-oaicopilot-defaults),
+verified against Databricks' pay-per-token limits on 2026-08-26. These values
+are deliberately smaller than some models' provider maximum context windows.
 
 ## Step 1: Diff requested models against what's already registered
 
@@ -116,18 +120,40 @@ Compare against the requested list. Report which are already present
 
 ## Step 2: Infer each new entry's parameters from its closest sibling
 
-Never invent parameters from scratch. For each missing model, find the
+Never invent parameters from scratch. For each missing model, first classify
+its provider and quota tier, then find the
 **closest already-configured sibling**: same family prefix (same
 `gpt-5.x`/`claude`/`gemini`/`llama` line) and, ideally, the most recent
 version within that line, then copy its schema verbatim except for `id` (and
 `family`, if the extension's `family` convention encodes the version, e.g.
-`gpt-5.4` vs `gpt-5.4-mini`). Carry over unchanged:
+`gpt-5.4` vs `gpt-5.4-mini`). Carry over unchanged when the sibling has the
+same provider and quota tier:
 
 - `baseUrl` / `apiMode` (per-provider, essentially never changes)
 - `context_length`, `max_tokens` or `max_completion_tokens`
 - `vision`
 - `reasoning_effort` (GPT-family reasoning models only)
 - `owned_by`
+
+For Databricks pay-per-token endpoints, use the current WAI table linked in
+Step 0 rather than copying a provider-maximum window from a model card or a
+sibling in another tier. As verified on 2026-08-26, the operational groups
+are:
+
+- GPT-5.6 Sol/Terra/Luna: 400,000 context, 16,000 output, no delay.
+- Claude, GPT-5.5 through GPT-5, and Gemini: 64,000 context, 16,000 output,
+  and 15,000 ms delay.
+- Inkling: 64,000 context, 8,192 output, and 15,000 ms delay.
+- GPT OSS: 131,072 context, 25,000 output, no delay.
+- Llama 4, Llama 3, and Gemma 3: 128,000 context, 8,192 output, no delay.
+
+OAICopilot advertises input capacity as `context_length - max_tokens`.
+Therefore, the 64,000/16,000 default exposes about 48,000 input tokens and can
+be too small for a large agent harness's system prompt. If that happens,
+reduce loaded tools/instructions or raise `context_length` only after checking
+the workspace's actual quota tier or provisioned-throughput capacity. Record
+the departure as an intentional local override; do not silently replace the
+quota-aware default with the model's full provider window.
 
 Do not duplicate single-instance flags from the sibling (e.g. `useForCommitGeneration: true` --- at most one model across the entire configuration should carry this flag).
 
@@ -222,6 +248,8 @@ case). Tell the user they may need to reopen the Copilot Chat model picker
 ## Anti-patterns
 
 - Guessing parameters from scratch instead of copying a sibling's schema.
+- Copying a provider-maximum context window into a quota-limited Databricks
+  workspace without first applying the operational tier from WAI's table.
 - Reformatting or reordering existing `oaicopilot.models` entries while adding
   new ones.
 - Assuming the served-entity name already carries the `owned_by-` prefix

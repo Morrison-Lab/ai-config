@@ -123,21 +123,15 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
-**Self-review is the immediate fallback so the PR never stalls --
-but declaring the PR clean still requires an external verdict whenever one is reachable.**
-Don't wait to self-review: post it right away, same as above.
-But also check, the same round, whether a *different* configured reviewer is reachable
-(e.g. Copilot code review, if the repo/org has it) --
-not just whether the `@claude` bot specifically produced a verdict,
-since the two can fail independently (one quota-exhausted, the other working fine, or vice versa) --
-and request it following the sequential multi-provider quorum rules. Do not request them in parallel.
-Re-check reachability every round:
+**Execute the sequential multi-provider review loop when the primary reviewer fails.**
+Don't stall the PR waiting on the primary bot. Instead, fall back to the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`. 
+Pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent) and query them sequentially, one at a time. Do not request them in parallel.
+Re-check reachability at the start of every cycle:
 a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
-can become reachable mid-session.
+can become reachable mid-session and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
-confirm a genuine all-clear review is posted at the current head from an external reviewer, if one is reachable --
-a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
-doesn't satisfy this once an external verdict is obtainable.
+confirm a genuine all-clear review is posted at the current head from all reachable providers --
+a clean state you inferred yourself from green CI and resolved threads doesn't satisfy this once external verdicts are obtainable.
 Merging autonomously under `mwc` (merge-when-confident) unconditionally requires an automated clean Claude review verdict evaluating the HEAD commit;
 a fallback self-review allows iteration and unblocks PR progress, but NEVER authorizes autonomous merge under MWC.
 

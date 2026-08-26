@@ -215,13 +215,12 @@ Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.
 If any provider rejects the diff with findings, you must address the feedback.
-If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider.
-If you successfully address the feedback by rebutting on the existing diff and commit without making any changes, you do not need to restart.
+If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider. When restarting the cycle due to code changes, you must proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request, so that providers do not redundantly re-raise settled non-code issues on the new diff.
 You must submit your rebuttal to the provider and obtain their explicit acceptance of all your rebuttals to discharge the need for their clean verdict.
 Only after the provider has explicitly confirmed that zero findings remain open may you continue to the next provider.
 Repeat this until all pinned providers have explicitly confirmed that zero findings remain open on the exact same codebase state (the same commit and working tree).
 
 The set of required providers must be pinned at the start of the review cycle.
 If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry, or explicitly request user permission to drop it from the quorum.
-If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle (e.g. all providers are offline or removed), you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle (for example, if all external providers AND the local fallback self-review subagent are offline or fail), you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed. Do not bypass the review gate.
 If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving --- halt the review process and escalate to the user for a tie-breaking decision.

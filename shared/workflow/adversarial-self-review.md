@@ -24,7 +24,11 @@ Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
 Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing.
-Readiness reporting and merging are different gates, and the next section gives the merge one a harder bar: since 2026-08-25 a cross-model and cross-harness adversarial review is required outright for any merge, not an optional enhancement.
+Readiness reporting and merging are different gates,
+and the next section gives the merge one a harder bar.
+Since 2026-08-25 a cross-model and cross-harness adversarial review is
+required outright for any merge,
+not an optional enhancement.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -47,6 +51,9 @@ The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 belongs in the same ladder wherever installed.
 Dispatch through whichever differs from you first;
 when one is temporarily out of quota, move to the next.
+Order by measured headless readiness ---
+`agy` CLI, `opencode`, then `codex` and `claude` --- with `cursor` last:
+it is named in the inventory but not yet probed headless here.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
@@ -65,10 +72,7 @@ the external automated PR reviewer's clean verdict at head, wherever a repo
 has one --- stands unchanged, and an author-dispatched subagent verdict never
 satisfies that external gate.
 What is added: a merge additionally requires a 100% all-clear adversarial
-verdict at the shipping head from a reviewer on a different model and harness
-than the authoring session.
-The same-harness floor covers the push gate only;
-at the merge gate it does not clear anything.
+verdict at the shipping head from that cross-model, cross-harness reviewer.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
@@ -208,7 +212,8 @@ The other cases have no guard and are prose rules here.
   (foreground, read-only) for the pre-push self-review gate,
   and report which agent produced the verdict.
 - **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own (cursor, codex, agy CLI, opencode, or claude).
+  from your own (agy CLI, opencode, codex, or claude;
+  `cursor` once its headless dispatch is measured).
 - **Do:** move down that list when one is out of quota,
   and report which harness produced each verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.

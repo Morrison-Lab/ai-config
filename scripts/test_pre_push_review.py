@@ -574,6 +574,8 @@ class TestPrePushReview(unittest.TestCase):
     @patch("subprocess.run")
     @patch("shutil.which", return_value="/opt/homebrew/bin/gh")
     def test_post_review_posts_issue_comment(self, mock_which, mock_subproc):
+        old_get_pr = reviewer.get_pr_head_sha
+        reviewer.get_pr_head_sha = lambda x: "local_sha_1111"
         mock_res = MagicMock()
         mock_res.returncode = 0
         mock_subproc.return_value = mock_res
@@ -589,6 +591,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("comment", cmd_called)
         self.assertIn("123", cmd_called)
         self.assertIn("--body-file", cmd_called)
+        reviewer.get_pr_head_sha = old_get_pr
 
     @patch("shutil.which", return_value=None)
     def test_post_review_missing_gh_returns_false(self, mock_which):

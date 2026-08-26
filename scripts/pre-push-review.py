@@ -305,6 +305,25 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if is_clean and not is_clean_findings:
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
+    # As a final safety check, verify that the whole report doesn't contain contradictory blockers
+    # like "do not merge", "must be fixed", or "failed verification"
+    if is_clean:
+        contradictory_patterns = [
+            r"(?i)\bdo not merge\b",
+            r"(?i)\bmust be fixed\b",
+            r"(?i)\bfail(?:ed)? verification\b",
+            r"(?i)\bcannot merge\b",
+            r"(?i)\bnot ready\b",
+            r"(?i)\bneeds work\b"
+        ]
+
+        # Strip out the Summary Verdict header so we don't accidentally match it if it's there
+        body_without_verdict = re.sub(r"(?is)^#{2,3}\s+Summary Verdict.*?(?=^#{2,3}|\Z)", "", clean_report)
+
+        for pat in contradictory_patterns:
+            if re.search(pat, body_without_verdict):
+                return False, False, f"Report contains contradictory blocking prose: {pat}"
+
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 
 
@@ -581,10 +600,13 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
     if not shutil.which("gh"):
         log_error("gh CLI is not installed or not in PATH; cannot post review to GitHub.")
         return False
-        
+
     if commit_sha:
         remote_sha = get_pr_head_sha(pr_number)
-        if remote_sha and remote_sha != commit_sha:
+        if not remote_sha:
+            log_error("Cannot post review: failed to resolve remote PR headRefOid.")
+            return False
+        if remote_sha != commit_sha:
             log_error(f"Cannot post review: local HEAD ({commit_sha[:8]}) does not match PR headRefOid ({remote_sha[:8]}). Push your changes first.")
             return False
 

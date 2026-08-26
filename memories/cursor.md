@@ -111,7 +111,8 @@ and did not list `isolation`.
 because the Cursor adapter maps `Task` to `Agent`
 when `subagent_type` is not explore/plan/shell
 ([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
-and that hook's `READ_ONLY` set is Explore/Plan.
+and [`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py)'s
+`READ_ONLY` set is Explore/Plan.
 Deciding the child needs no worktree is fine;
 the schema has no `isolation` field to mark that decision.
 Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
@@ -249,11 +250,11 @@ is the instruction to use this route.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
-  or the same-argv dry-run fails,
-  or it lists commits other than that sha
-  (`Everything up-to-date` and a new-branch line with no sha
-  are not a mismatch),
-  do not push.
+   or the same-argv dry-run fails,
+   or it lists commits other than that sha
+   (`Everything up-to-date` and a new-branch line with no sha
+   are not a mismatch),
+   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
@@ -267,6 +268,8 @@ is the instruction to use this route.
   that used different arguments, failed, or listed other refs.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
+- **Don't:** compose the fallback PR comment in the authoring
+  session; post the dispatched reviewer's report verbatim.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 

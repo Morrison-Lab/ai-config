@@ -1,7 +1,8 @@
 # Project Workflow
 
 > [!NOTE]
-> These workflow rules are specific to Conductor-driven execution tracks and are advisory guidelines for structuring tasks. They do not override the universal lab policies in `AGENTS.md`.
+> These workflow rules are specific to Conductor-driven execution tracks and are advisory guidelines for structuring tasks.
+> They do not override the universal lab policies in `AGENTS.md`.
 
 
 ## Guiding Principles

@@ -30,7 +30,6 @@ the repo's configured PR reviewer (often `@claude`) satisfies criterion 2 of
 [`fully-clean`](fully-clean.md),
 while this gate needs an author-dispatched reviewer on a different model and
 harness than the authoring session.
-The next section raises the bar for merges above what a push gate needs.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -54,8 +53,9 @@ belongs in the same ladder wherever installed.
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Among qualifying entries, dispatch through whichever differs from you first;
-when one is temporarily out of quota, move to the next.
+Dispatch in priority order ---
+`agy` CLI or `opencode` first, then `codex` / `claude`, then `cursor` ---
+moving down when one is out of quota.
 Known-good headless entry points are the `agy` CLI and `opencode`,
 followed by `codex` and `claude` where installed,
 with `cursor` last --- named in the inventory but not yet probed headless here.

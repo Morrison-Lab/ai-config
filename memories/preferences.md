@@ -990,6 +990,9 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly (mechanics below) |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
+Headless `agy`, in one line: `agy --print="<prompt>" [--effort low]`.
+Full mechanics, flags, and measured quirks are in the `agy --print` section below.
+
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)
 but has no measured headless dispatch mechanics here yet ---

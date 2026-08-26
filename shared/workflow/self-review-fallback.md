@@ -139,7 +139,7 @@ Merging autonomously under `mwc` (merge-when-confident) unconditionally requires
 a fallback self-review allows iteration and unblocks PR progress, but NEVER authorizes autonomous merge under MWC.
 
 **Weight two reviewers' agreement by whether they share a vendor, and prefer a cross-vendor second reviewer over a second run of the same one.**
-The section above says to check whether a *different* configured reviewer is reachable, and treats every second reviewer as interchangeable.
+When pinning a quorum of available providers, do not treat every second reviewer as interchangeable.
 They are not.
 Two reviewers built on the same vendor's models share their training and so share their blind spots, which means a defect both of them pass over is one neither was ever likely to catch.
 Their agreement therefore measures the shared blind spot rather than the diff.

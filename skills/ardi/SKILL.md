@@ -324,7 +324,7 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.

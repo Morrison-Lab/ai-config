@@ -62,6 +62,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    Write the label plainly on its own line: emphasis around it is tolerated.
 
 State the verdict on its own line in that exact form.
+Return the structured report as this call's own message,
+not as a pointer to a file.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) treats anything else as no verdict.
 

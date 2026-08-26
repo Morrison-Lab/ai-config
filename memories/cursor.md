@@ -155,17 +155,22 @@ The file stores the body as a JSON string
 The parser resolves that.
 Records carry a `role` the decoder must filter on.
 `batch-fetch-details` can write a large `transcript.json`.
-Extract the last assistant `text` that carries Summary / Findings /
+Take the last assistant `text`.
+That record must itself carry Summary / Findings /
 Verdict / Reviewed-Commit.
+Do not scan backward to an earlier matching assistant message.
+If the last assistant text lacks those headings, there is no report.
 The role filter is load-bearing.
 The user brief also carries those headings
 (it specifies the required report shape).
 A decoder that takes the last matching `text`
 without filtering `role == assistant`
 grades the brief when the child produced no report.
+A decoder that scans backward past a later assistant message
+grades a draft when the child errored after quoting the shape.
 The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
-the `cloudAgentBcId`, writes that last matching assistant `text`
+the `cloudAgentBcId`, writes that last assistant `text`
 to a file outside the checkout (under `/tmp`),
 and calls `parse_report()` on the file contents
 in one process.
@@ -174,12 +179,18 @@ never from an unverified subagent return.
 Fetch only the `cloudAgentBcId` from a `Task` dispatch whose
 `subagent_type` was `adversarial-reviewer`.
 Do not fetch a sibling child's transcript.
-The posted body is that recovered file.
+The posted body is that recovered file,
+then the agent-authorship disclosure marker
+after a blank line
+(see [`disclose-agent-authorship`](../shared/workflow/disclose-agent-authorship.md)).
+The child does not write the marker.
 Do not re-emit the markdown through a shell command string.
 A backtick span inside a double-quoted body runs as
 command substitution and vanishes.
 A doubled backslash can collapse even inside a quoted heredoc.
-Post with `--body-file` / `-F body=@<file>`.
+Write the recovered file plus the marker to a comment file
+under `/tmp`, and post that file
+with `--body-file` / `-F body=@<file>`.
 The `parse_report()` tuple is the push gate, not the comment.
 Do not treat the recovered file as returning only the tuple.
 Call `parse_report()` from the **worktree's**
@@ -188,20 +199,23 @@ on the file contents
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects)
 when that file exists in the pushing checkout.
-On Cursor Cloud, `~/.claude/hooks` is a directory symlink into the
-primary checkout only when that checkout is ai-config
-(`~/.claude/hooks -> /workspace/hooks`,
-measured 2026-08-26 PDT: same inode as
-`/workspace/hooks/no-push-without-self-review.py`,
-and `/workspace` was `main` at `21a2e2aa`).
-Do not import that path from an ai-config worktree:
+Measured 2026-08-26 PDT on this VM, whose primary checkout
+is ai-config:
+`~/.claude/hooks -> /workspace/hooks`,
+and `~/.claude/hooks/no-push-without-self-review.py`
+shares an inode with
+`/workspace/hooks/no-push-without-self-review.py`
+(`/workspace` was `main` at `21a2e2aa`).
+That measurement does not say what the path is
+when the primary checkout is not ai-config.
+Do not import `~/.claude/hooks/` from an ai-config worktree:
 it is a different revision from the branch under review.
 If `hooks/no-push-without-self-review.py` is missing
-from the pushing checkout and that checkout is not ai-config,
-import from `~/.claude/hooks/no-push-without-self-review.py`
-(the ai-config clone).
-If the script is missing in an ai-config checkout,
-obtain a CLI review
+from the pushing checkout,
+and that checkout is not ai-config,
+and `~/.claude/hooks/no-push-without-self-review.py` exists,
+import from that path.
+Otherwise obtain a CLI review
 ([`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)).
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
@@ -361,6 +375,7 @@ lands, sweep every site this section names
 `CLAUDE.md`,
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md),
 [`skills/push/SKILL.md`](../skills/push/SKILL.md),
+[`pr-on-claim`](../shared/workflow/pr-on-claim.md),
 both persona copies,
 [`docs/cursor-hook-mapping.md`](../docs/cursor-hook-mapping.md),
 `README.md` (the hook table describes the script,
@@ -370,7 +385,9 @@ so the adapter-skip claim does not outlive the skip.
 Compact copies stay until that landing.
 
 Refusal gates, in order
-(Read-Do: reordering changes the answer;
+(item 1's pre-dispatch recording must precede the dispatch,
+or item 4 has nothing to compare against;
+reordering 2 with 3, or 5 with 6, does not change the answer;
 details in the procedure above).
 Pause points:
 before the `Task` dispatch (item 1's first half),
@@ -394,12 +411,15 @@ Say in the reply that the carve-out was used.
    (there is no dispatch); still confirm empty after.
 2. Confirm the `cloudAgentBcId` came from a `Task` whose
    `subagent_type` was `adversarial-reviewer`.
-   Write the last heading-bearing assistant `text`
-   to a file outside the checkout (under `/tmp`)
+   Take the last assistant `text`;
+   it must itself carry the headings.
+   Write that text to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
    **Killer item:** an author-assembled body is not a report,
    and `parse_report` then grades the wrong text.
    A real report from the wrong dispatch also fails this gate.
+   Scanning backward to an earlier matching assistant message
+   also fails this gate.
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -525,7 +545,7 @@ is the instruction to use this route.
   not commit.
 - **Don't:** compose the fallback PR comment in the authoring
   session; post the dispatched reviewer's report verbatim
-  from the recovered file.
+  from the recovered file, then the disclosure marker.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 

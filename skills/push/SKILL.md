@@ -50,8 +50,9 @@ when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/` from an ai-config worktree
 (there it resolves into the primary checkout).
-If the script is missing and the checkout is not ai-config,
-import from `~/.claude/hooks/` (the ai-config clone);
+If the worktree script is missing and the checkout is not ai-config
+and `~/.claude/hooks/no-push-without-self-review.py` exists,
+import from that path;
 otherwise obtain a CLI review
 (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 If the verdict is not `clean`, or there is no fingerprint,
@@ -72,8 +73,7 @@ Cursor adapter, default: do not prefix.
 The prefix is inert for the adapter
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 makes the adapter run that guard
-(the skip and the `parse_report` gate are in
-[step 0](#0-a-separate-subagent-reviewed-this-diff-and-cleared-it)).
+(the skip and the `parse_report` gate are earlier in this step).
 If a native `PreToolUse` deny from
 `no-push-without-self-review` is observed on the push,
 prefix for that native guard.

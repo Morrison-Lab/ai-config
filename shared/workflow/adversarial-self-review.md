@@ -154,8 +154,9 @@ when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/` from an ai-config worktree
 (there it resolves into the primary checkout).
-If the script is missing and the checkout is not ai-config,
-import from `~/.claude/hooks/` (the ai-config clone);
+If the worktree script is missing and the checkout is not ai-config
+and `~/.claude/hooks/no-push-without-self-review.py` exists,
+import from that path;
 otherwise obtain a CLI review.
 Do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.

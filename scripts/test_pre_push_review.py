@@ -865,10 +865,18 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIsNone(reviewer.run_cursor_review(huge_prompt))
 
 
+
     
+    def test_verdict_mislabeled_blocker(self):
+        commit = "12345678abcdef00"
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[MINOR] The command crashes on every invocation and is not ready for merge.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output: clean verdict but report contains blocking phrase", reason)
+
     def test_verdict_observations_header_variants(self):
         commit = "12345678abcdef00"
-        
+
         # Test "## Observations"
         report1 = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n## Observations\nObservation: The command always crashes before producing output.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report1, expected_commit_sha=commit)
@@ -907,14 +915,14 @@ class TestPrePushReview(unittest.TestCase):
         orig_agent = os.environ.get("AGENT_NAME")
         if "AGENT_NAME" in os.environ:
             del os.environ["AGENT_NAME"]
-        
+
         # Clear specific env vars that might leak harness status
         env_vars = ["CLAUDE_SESSION_ID", "GEMINI_SESSION_ID", "ANTIGRAVITY_AGENT", "OPENCODE_SESSION_ID", "CODEX_THREAD_ID"]
         orig_envs = {k: os.environ.get(k) for k in env_vars}
         for k in env_vars:
             if k in os.environ:
                 del os.environ[k]
-                
+
         try:
             report, label = reviewer.execute_review("alternate", "prompt", exclude_engine="")
             self.assertEqual(report, "report")

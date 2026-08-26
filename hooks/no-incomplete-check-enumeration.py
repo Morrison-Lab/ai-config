@@ -63,10 +63,14 @@ RX_DECLARE = re.compile(
 
 # Incomplete instruments for a terminal clean claim.
 # `gh pr checks` can omit runs (bcs#651); `statusCheckRollup` is a short
-# rollup that is not the complete instrument (ai-config#2277).
+# rollup that is not the complete instrument (ai-config#2277). Paginated
+# `commits/<sha>/check-runs` and MCP `get_check_runs` cover the check-run
+# half only --- same demotion as in RX_COMPLETE's docstring.
 RX_PARTIAL = re.compile(
     r"gh\s+pr\s+checks|"
-    r"\bstatusCheckRollup\b",
+    r"\bstatusCheckRollup\b|"
+    r"commits/[0-9a-f]{7,40}/check-runs|"
+    r"\bget_check_runs\b",
     re.I,
 )
 
@@ -160,8 +164,9 @@ def main() -> int:
         "decision": "block",
         "reason": (
             f"Your message declares a PR clean -- \"{hit.group(0).strip()}\" -- but the "
-            "supporting reading in this transcript is `gh pr checks` or "
-            "`statusCheckRollup`, neither of which is the complete instrument for a "
+            "supporting reading in this transcript is `gh pr checks`, "
+            "`statusCheckRollup`, paginated `commits/<sha>/check-runs`, or "
+            "MCP `get_check_runs` --- none of which is the complete instrument for a "
             "terminal clean claim.\n\n"
             "Measured 2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: `gh pr checks` printed "
             "21 rows, all passing, while the commit endpoint returned 24 runs including "

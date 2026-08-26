@@ -76,6 +76,29 @@ Worked-example case records for the rules below live in
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A `check_suite.completed` wake at a superseded head".
 
+   **A polling loop needs the same negative control a sweep does, because an
+   EMPTY check list satisfies "nothing is pending" exactly as well as a
+   finished one.**
+   Every rule above concerns a list that came back **short**; this is the case
+   where it comes back **empty**, which none of them reaches.
+   "Not yet started" and "finished successfully" produce an identical reading,
+   which is [`fail-fast`](../principles/fail-fast.md)'s
+   pass-path-equals-failure-path shape failing in the dangerous direction ---
+   it reports a PR ready.
+   [`batch-merge-and-resolve`](batch-merge-and-resolve.md) states the
+   governing rule for a **sweep**, and a sweep and a poll do not resemble each
+   other from the inside --- one feels like a measurement, the other like
+   waiting --- so that rule loads and matches nothing here.
+
+   - **Do:** require a non-empty population before reading zero-pending as
+     done, and report how many check runs were examined.
+   - **Don't:** arm a poller assuming the push already created the checks ---
+     a draft-to-ready transition creates them on a separate event, so a
+     poller armed at push time can run entirely inside a zero-check window.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A poller exited on an empty check list".
+
    **A check-run NAME is not unique across workflows, so a name alone does not
    identify which check passed.**
    Two workflows in one repo can each define a job with the same name, and

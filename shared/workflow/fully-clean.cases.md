@@ -1040,3 +1040,41 @@ The second wake named the live head, and still arrived inside that window.
 What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
 What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
 Compare the first, then run the second.)
+
+## A poller exited on an empty check list
+
+Measured 2026-08-26 on
+[wai#120](https://github.com/Morrison-Lab/wai/pull/120).
+
+A background poller watching the PR head reported:
+
+```
+wai#120 CHECKS COMPLETE after 30s
+--- reviews ---
+0
+```
+
+with no conclusion lines between the two headings, because the check-runs
+list was empty.
+The terminal condition was:
+
+```bash
+pend=$(gh api ".../check-runs" --jq '[.check_runs[]|select(.status!="completed")]|length')
+if [ "$pend" = "0" ]; then   # true before any check exists
+```
+
+Workflow runs for that head were created at `22:06:42Z`.
+The poller had exited at about `22:03:30Z`.
+It had been armed immediately after `git push`, while the PR was still a
+draft, and the checks were created by the later `ready_for_review`
+transition --- so it ran entirely inside a window where the head legitimately
+carried zero checks, and read that as completion.
+
+The corrected form asserts the population and prints what it examined:
+
+```bash
+[ "${total:-0}" -ge "$EXPECTED_MIN" ] && [ "$pend" = "0" ]
+```
+
+Re-armed that way, the same head reported its real state.
+

@@ -129,6 +129,25 @@ check(
     and CLAUDE_HINT in src,
 )
 
+# Comments must keep bootstrap's default inheriters distinct from
+# dotfiles/shiva's --adopt hint (ai-config#2286 fallback review).
+link_one_src = (ROOT / "scripts/lib/link-one.sh").read_text(encoding="utf-8")
+check(
+    "link-one.sh does not group dotfiles with default-hint inheriters",
+    "and the dotfiles installers" not in link_one_src
+    and "backup/link" not in link_one_src,
+)
+check(
+    "link-one.sh names shiva's --adopt hint separately",
+    "adopt" in link_one_src and "Dotfiles installers" in link_one_src,
+)
+check(
+    "bootstrap.sh says the collision hint differs from dotfiles",
+    "the hint is the part that differs" in src
+    and "backup/link" not in src
+    and "adopt" in src,
+)
+
 
 # --- Behavioral check against the real bootstrap ---------------------------
 with tempfile.TemporaryDirectory() as raw:

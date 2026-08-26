@@ -657,7 +657,7 @@ The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
 The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
 Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
-`hooks/no-push-without-self-review.py` gates the pre-push case.
+`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
 The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
@@ -729,7 +729,11 @@ Name the specific practice and gap, cite the rule or label the opinion as an opi
 
 The external-correction counterpart to the UMS triggers at the top of this file: those fire on a first-person admission ("I was wrong"), which is why `hooks/remind-ums-after-error.py` deliberately excludes correcting someone else.
 Agreeing with a reviewer is the commoner case and the one that machinery misses --- you admit nothing, you accept a finding --- so an accepted finding is a first-push miss to record and, where a decidable condition exists, to algorithmatize, per the goal that every PR gets a clean review on the first push.
-`hooks/remind-learn-from-review.py` is that trigger; like its sibling it only ever adds context and never blocks, and it stays unregistered until its PR merges, per README's activation gate.
+`hooks/remind-learn-from-review.py` is that trigger;
+like its sibling it only ever adds context and never blocks.
+It is registered in `hooks/hooks.json`,
+which binds it on the plugin path
+and is what `install-hooks.py --fix` binds on the non-plugin path.
 
 ## Tracking issues in upstream repos
 

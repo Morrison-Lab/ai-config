@@ -99,6 +99,42 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 A dispatched reviewer makes that concrete, because the finding now has an author who is not you: give each one Address, Rebut, or Defer-to-a-tracked-issue per [`ard`](../../skills/ard/SKILL.md), in writing, exactly as for a finding from the PR's own reviewer.
 "I know why that is fine" is a Rebut, and a Rebut is something you would be willing to post.
 
+## The posted fallback comment is the reviewer's report, not an author composite
+
+When the self-review is posted as a PR comment, the comment body **is**
+the dispatched reviewer's structured report, then the required
+disclosure marker from
+[`disclose-agent-authorship`](disclose-agent-authorship.md).
+The marker is forge attribution, not author recap.
+Dispatching the reviewer and then writing a different review body is the
+same failure as reviewing inline, one step later: the authoring session
+still composed the text that readers treat as the review.
+
+Measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
+A foreground `Task` dispatch
+(`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`, catalog name
+"Final review HEAD f71c02ea") ran on `f71c02ea`.
+The posted comment was author-assembled, labeled
+"Fallback self-review", copied the child's
+`### Verdict: Ready for merge` and `Reviewed-Commit` lines, and wrapped
+them in a 16-item
+"Round history that was Addressed, Rebutted, or Deferred" ledger.
+That comment is the wrap, not the parent `Task` JSON.
+How Cursor Cloud obtains the child's structured report is in
+[`memories/cursor.md`](../../memories/cursor.md).
+
+- **Do:** post the dispatched reviewer's structured report
+  (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
+- **Don't:** wrap the verdict in the authoring session's ARD round-history
+  recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
+
 ## The mechanism
 
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).

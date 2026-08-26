@@ -676,6 +676,9 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+- **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
+
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)
@@ -686,3 +689,7 @@ finding.**
 **Deadlock -> escalate to a human.** If you and the reviewer(s) can't reach consensus on an item (a rebuttal was exchanged and neither side is budging), don't loop forever and don't unilaterally override the reviewer --- request a **human reviewer**, `@`-mention them in a comment summarizing the impasse, and surface the open item.
 
 **An automated reviewer's verdict on a disputed factual/technical claim is not stable across independent runs, even with identical evidence available each time.** Don't treat one round's "settled, no need to keep arguing" as durable: the very same review job, re-triggered later with no new code changes, can re-raise a claim it previously retracted --- and then retract it again on a subsequent run --- purely from re-deriving the question differently each time, not from anything changing in the PR. This means a rebuttal thread's outcome (however many rounds of citations and counter-citations) doesn't itself resolve a genuine deadlock the way a human's decision does; only escalating per the bullet above actually settles it. The one thing that DOES help going forward: fold the authoritative citation/evidence directly into the code or doc being reviewed (a comment, not just a PR conversation reply) --- a fresh reviewer run re-deriving the claim from scratch is more likely to find the citation sitting right next to what it's evaluating than to dig through prior thread history for it, though even that is not a guarantee against a bot that ignores context already in front of it.
+
+**Algorithmic safeguards:** Algorithmic checks and hooks can only invalidate, not validate, a PR.
+You still need to use your own judgment in addition to satisfying the algorithmic safeguards;
+they are a safety net, not a gold standard.

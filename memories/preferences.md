@@ -98,9 +98,9 @@
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
 - **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
   When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
-- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
-  The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
-  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
+- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, missed item, or scrutiny of the work.**
+  The moment the user corrects your behavior, you realize you made an incorrect claim or missed something, you read a review of your work, you receive critical feedback, or a questioned claim ("are you sure about that?") turns out to be wrong, run UMS right then --- do not wait for the task to finish, Address, a clean verdict, a first-person admission, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
+  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section --- a corrected understanding, a false claim about state, and a questioned claim that was wrong all fire immediately, and that section holds the rationale and case records (User directive / CAI, 2026-08-05 and 2026-08-25, [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261)).
 - **Proactive Immediate Fixes for Self-Acknowledged / Realized Mistakes (In-Flight Work & Directives)**: Whenever realizing, discovering, or acknowledging a mistake, bug, gap, missed instruction, or oversight in your own in-flight work or directive-following (whether self-discovered or pointed out by the user), take immediate, proactive corrective action to fix it permanently (implement the fix/skill/memory update, commit on a dedicated branch, open a PR, request review, and drive to clean) in the exact same turn without waiting for a user prompt or follow-up instruction. (For out-of-scope codebase bugs discovered incidentally, file a tracking issue per `report-mistakes-proactively` instead). (User directive / correction, 2026-08-17.)
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
 - When opening a GitHub PR, trigger AI review (`@claude review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
@@ -194,7 +194,6 @@
   Otherwise fix any dispatch/workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
   Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer.
   (User directive / CAI, 2026-08-17.)
-
 
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
   The answer is a standing yes.
@@ -320,6 +319,8 @@
   The existing instruction already covered this; the gap was execution discipline in a fast multi-merge loop, not missing guidance --- re-read this bullet at the top of every "pick the next backlog item" cycle.
   In a multi-AGENT pipeline, UMS runs at BOTH levels: each subagent runs UMS once ITS PR merges (it stops after reporting CLEAN, so the coordinator resumes it post-merge with a "your PR merged, run UMS" nudge --- or the agent-launch spec bakes in a final UMS step), and the coordinator runs its own UMS for the cross-PR orchestration learnings no single subagent can see (merge-order sequencing, conflict-cascade handling, pipeline mechanics).
   Each agent writes its OWN memory file plus one MEMORY.md index line to keep the conflict surface small; avoid rewriting shared memory bodies concurrently. (Learned on sparta 2026-07-01.)
+- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus`).
+  For any PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
 - Keep it simple.
   Don't over-explain or ask permission for straightforward fixes --- just do them.
 - Don't re-ask a decision that's already settled and built.
@@ -439,7 +440,6 @@
   - **Don't:** leave a file unstaged for hours on an untested belief about who owns it.
   (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
   Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
-
 
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.

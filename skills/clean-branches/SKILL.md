@@ -152,7 +152,10 @@ Look for branch naming patterns that reference issues:
 #### e. Check for active work claims
 
 ```bash
-# Look for recent "working on this" / claim comments on any linked MR/issue
+gh pr view <N> --json comments \
+  -q '.comments[] | select(.body | test("hold off|paws off|back off"; "i"))
+      | select((.body | test("unclaim|released|PR is free|now mergeable"; "i")) | not)
+      | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
 If a claim comment exists within the last 24 hours → **Active**, skip.

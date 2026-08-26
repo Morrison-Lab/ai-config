@@ -47,14 +47,32 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
-## Status requests do not make issues report-only
+## Run UMS when work is scrutinized
 
-Treat a request for status as a request to inspect live state and finish every
-safe, in-scope, concrete action that inspection reveals. A report is the recap
-after the work, not a substitute for it. When an issue cannot be fixed
-directly, carry it forward with an actual next action. Every issue noticed,
-however small or outside the current task's scope, must at minimum be filed in
-the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
+When you read a review of your work, receive critical feedback on it,
+or a questioned claim ("are you sure about that?") turns out to be wrong,
+run `ums` in that turn.
+Do not wait for a clean verdict, an accepted finding, or a first-person
+admission.
+Answering with the corrected fact is not the pass.
+The full rule, including the Do/Don't pair, is
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
+Questioning alone does not owe a pass: the check has to show the claim
+was wrong.
+
+## Status and diagnostic requests do not make issues report-only
+
+Treat any request for status or diagnostic inquiry
+("why did X happen?", "why did you do Y?", "did you do Z?")
+as a mandate to inspect live state, diagnose the root cause,
+and complete every safe, in-scope, concrete repair in that very same turn.
+A report or explanation is the recap after the work is shipped,
+not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt.
+When an issue cannot be fixed directly in the session,
+carry it forward with an actual next action.
+Every issue noticed, however small or outside the current task's scope,
+must at minimum be filed in the owning GitHub, GitLab, or equivalent tracker.
+File it before reporting it.
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 
@@ -314,6 +332,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+- **Revert premature or defective merges immediately.**
+  If a PR is merged incorrectly, prematurely, or without clean external review approval,
+  open a revert PR on `main` immediately and continue on the original PR branch per
+  [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
 
 ## Request review and drive every started PR to clean
 

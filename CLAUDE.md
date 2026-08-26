@@ -23,7 +23,7 @@ passes. See README.md, "Shared content".
 @shared/workflow/run-ums-proactively.md
 
 Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
-The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, and a corrected belief or a corrected false state-claim that never gets banked because nothing merged --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
+The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, and answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 

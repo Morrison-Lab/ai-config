@@ -50,6 +50,14 @@ repo's Antigravity `plugins/ai-config` is a false positive.
 Leftover `ok` symlinks under `~/.cursor/skills` whose target is this
 checkout or a sibling worktree are **stacked**, not healthy.
 
+The plugin also ships `cursor-rules/` as user-global rules
+(`.cursor-plugin/plugin.json` `"rules": "cursor-rules"`).
+A live plugin is a skip for `~/.cursor/rules` too, not a second install.
+A Claude skill catalog does not ship those rules, so it is not a skip
+there.
+Leftover `ok` symlinks under `~/.cursor/rules` whose target is this
+checkout or a sibling worktree are **stacked**, not healthy.
+
 Full `bootstrap.sh` installs `~/.claude/skills` first, so the
 `~/.cursor/skills` link path almost never runs.
 Do not "fix" tests to expect `~/.cursor/skills/ardi` after a full
@@ -124,12 +132,20 @@ The identity-only JSON is the parent `Task` `tool_result` for child
 `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
 That comment does not contain the JSON.)
 
-## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
+## Jules allowlist skips `cursor[bot]` outside OWNER/MEMBER/COLLABORATOR
 
 [`.github/workflows/jules-review.yml`](../.github/workflows/jules-review.yml)
 requires `author_association` in OWNER/MEMBER/COLLABORATOR.
-Comments from a Cursor Cloud run post as `cursor[bot]` / `NONE`, so
-an `@jules review` comment from that identity is skipped.
+Comments from a Cursor Cloud run post as `cursor[bot]`.
+A 2026-08-25 memory recorded that identity as `NONE` on
+[#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).
+A live REST re-read on 2026-08-26 of the same `@jules review` comment
+([5415839558](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839558))
+returns `CONTRIBUTOR`, as do `cursor[bot]` comments on
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).
+`CONTRIBUTOR` is still outside the allowlist, so an `@jules review`
+comment from that identity is skipped either way.
+Prefer the live association over the stored `NONE`.
 
 This is the same class as
 [`self-review-fallback.cases.md`](../shared/workflow/self-review-fallback.cases.md)
@@ -137,13 +153,61 @@ This is the same class as
 ([#1417](https://github.com/Morrison-Lab/ai-config/pull/1417) /
 [#1433](https://github.com/Morrison-Lab/ai-config/issues/1433), 2026-08-12:
 `claude[bot]` / `CONTRIBUTOR`).
-2nd occurrence, 2026-08-25, #2234; the association this time is `NONE`.
+2nd occurrence, 2026-08-25, #2234 (the skip is real; the stored
+`NONE` is not what that comment shows on 2026-08-26).
+
+`jules-review.yml` also starts a skipped run on every PR comment, because
+`on: issue_comment` fires before the job `if:`.
+That skip is the `@jules` substring pre-filter, not this allowlist.
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290) had zero
+`@jules` comments; its skipped Jules runs do not count as a recurrence.
 
 - **Do:** have a human OWNER/MEMBER/COLLABORATOR post `@jules review`
   (the workflow trigger is a trusted comment containing that mention).
+- **Do:** re-read `author_association` on the comment you care about
+  rather than inheriting a stored Cursor Cloud value.
 - **Don't:** re-post the same request from a session whose comments post
-  as `cursor[bot]` / `NONE` --- the gate that skipped it skips the retry.
+  as `cursor[bot]` outside OWNER/MEMBER/COLLABORATOR --- the gate that
+  skipped it skips the retry.
+- **Don't:** count a skipped `jules-review.yml` run as this allowlist
+  miss unless the triggering comment actually contained `@jules`.
 
-(Measured 2026-08-25 on
-[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).)
+(Allowlist skip measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234);
+association on that `@jules` comment re-read 2026-08-26 as
+`CONTRIBUTOR`. #2290 had no `@jules` mention.)
+
+## Cursor Cloud `gh` writes can 403 while the PR-comment tool still posts
+
+Measured 2026-08-26 on a Cursor Cloud run driving
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290):
+`gh issue comment` and a Copilot review-request POST returned
+`403 Resource not accessible by integration`.
+`gh api user` returned the same 403.
+`gh issue create` and `gh pr view` succeeded in the same session.
+PR conversation comments posted through Cursor's `ManagePullRequest`
+`post_comment` action (example:
+[comment 5423368708](https://github.com/Morrison-Lab/ai-config/pull/2290#issuecomment-5423368708)).
+
+This is a session-token measurement, not a standing GitHub outage.
+Re-attempt `gh` writes before reporting them blocked, per
+[`github-mcp-tools.md`](github-mcp-tools.md)'s 403-as-measurement note.
+
+- **Do:** fall back to Cursor's `ManagePullRequest` `post_comment` when
+  `gh pr comment` 403s in a Cursor Cloud session, and disclose agent
+  authorship in the body.
+- **Don't:** treat a 403 on one write surface as covering every `gh`
+  write --- `gh issue create` worked in the same run that could not
+  comment.
+
+## Cursor CLI requires `--trust` for non-interactive execution
+
+When running `cursor-agent` or the Cursor CLI non-interactively (without a TTY, such as in a subprocess or automated script),
+the `--trust` flag is strictly required even in `plan` mode.
+
+If `--trust` is omitted, the agent will prompt for workspace trust confirmation and hang indefinitely waiting for standard input,
+leading to silent timeouts in automated tools.
+Do not remove this flag in the name of tighter sandboxing for automated review scripts.
+
+(Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
 

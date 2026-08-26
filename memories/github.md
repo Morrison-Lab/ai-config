@@ -1,9 +1,9 @@
 # GitHub & GitLab CLIs and APIs
 
-The GitHub MCP tool surface used in remote/web sessions lives in
-[`github-mcp-tools.md`](github-mcp-tools.md).
-What a repository transfer between owners carries, and silently does not, lives
-in [`github-repo-transfers.md`](github-repo-transfers.md).
+Remote/web MCP tools: [`github-mcp-tools.md`](github-mcp-tools.md).
+Owner transfers: [`github-repo-transfers.md`](github-repo-transfers.md).
+Closing-keyword parser traps:
+[`github-closing-keywords.md`](github-closing-keywords.md).
 
 ## Operational checklist pattern for write actions
 
@@ -50,13 +50,12 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   `resolveReviewThread` to resolve it, `addComment` for a top-level summary,
   and `pullRequest{ headRefOid mergeable reviewThreads statusCheckRollup }`
   for the fully-clean sweep.
-  Note `statusCheckRollup.contexts` needs inline fragments, since a
-  `CheckRun` and a legacy `StatusContext` carry different fields
-  (`name`/`status`/`conclusion` versus `context`/`state`).
-  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round
-  with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD
-  summary, and clean-state verification all went through GraphQL, and
-  `core` reset 11 minutes later.)
+  Note `statusCheckRollup.contexts` needs inline fragments, since `CheckRun` and `StatusContext` carry different fields (`name`/`status`/`conclusion` versus `context`/`state`).
+  `CheckRun.status` (`CheckStatusState`: `QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED` --- measured 2026-08-25) has non-terminal states like `REQUESTED` (pre-queue) and `WAITING` (protection/approvals).
+  `StatusContext.state` (`StatusState`: `EXPECTED`, `PENDING`, `SUCCESS`, `FAILURE`, `ERROR` --- measured 2026-08-25) treats `EXPECTED` as non-terminal.
+  Gating code must fail-closed: require `CheckRun.status === 'COMPLETED'` and `StatusContext.state` in terminal states (`SUCCESS`, `FAILURE`, `ERROR` --- or require `state === 'SUCCESS'` on every context for an all-green gate),
+  treating any other status or state as still in progress rather than allow-listing expected pending values.
+  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000 --- the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
 - **A session's egress proxy can block GraphQL entirely, as a session-scoped
   policy rather than an account-level quota --- distinct from the rate-limit
   case above, and easy to conflate with it.**
@@ -1196,5 +1195,5 @@ interpolation), same as `--body-file` on the porcelain command.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 
-(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows
-session; the REST PATCH succeeded immediately on the same body file.)
+(Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
+the REST PATCH succeeded immediately on the same body file.)

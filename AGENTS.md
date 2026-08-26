@@ -47,6 +47,19 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
+## Run UMS when work is scrutinized
+
+When you read a review of your work, receive critical feedback on it,
+or a questioned claim ("are you sure about that?") turns out to be wrong,
+run `ums` in that turn.
+Do not wait for a clean verdict, an accepted finding, or a first-person
+admission.
+Answering with the corrected fact is not the pass.
+The full rule, including the Do/Don't pair, is
+[`shared/workflow/run-ums-proactively.md`](shared/workflow/run-ums-proactively.md).
+Questioning alone does not owe a pass: the check has to show the claim
+was wrong.
+
 ## Status and diagnostic requests do not make issues report-only
 
 Treat any request for status or diagnostic inquiry
@@ -97,7 +110,7 @@ In every session --- at session start, and again periodically during long sessio
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer copies / symlinks.**
-   Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, `~/.cursor/rules`, and when needed `~/.cursor/skills`) contain up-to-date symlinks.
+   Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, and when needed `~/.cursor/rules` and `~/.cursor/skills`) contain up-to-date symlinks.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 

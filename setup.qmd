@@ -15,7 +15,8 @@ bash ~/ai-config/bootstrap.sh
 
 `bootstrap.sh` symlinks Claude assets into `~/.claude/`,
 generated Codex wrappers into `${CODEX_HOME:-$HOME/.codex}/skills`,
-Cursor user rules into `${CURSOR_HOME:-$HOME/.cursor}/rules`,
+Cursor user rules into `${CURSOR_HOME:-$HOME/.cursor}/rules`
+when no Cursor plugin is already serving them,
 and --- when no Cursor plugin or Claude skill install is already
 serving the catalog --- Cursor skills into `~/.cursor/skills/`.
 Run it again any time you add a new top-level dir to the repo.
@@ -23,7 +24,8 @@ Run it again any time you add a new top-level dir to the repo.
 ### Verify the install
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.cursor/rules
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills
+# ~/.cursor/rules is linked only when no Cursor plugin is already serving those rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 
@@ -34,7 +36,8 @@ Each wrapper reads the matching canonical workflow from `skills/<name>/SKILL.md`
 and adapts Claude-specific metadata/tools to Codex.
 
 In Cursor, open **Customize -> Rules** and confirm
-the `cursor-rules/` files appear as user rules.
+the `cursor-rules/` files appear as user rules
+(from the plugin, or from `~/.cursor/rules/` when no plugin is installed).
 Skills appear under **Customize -> Skills** from the plugin,
 from `~/.claude/skills`, or from `~/.cursor/skills/`.
 

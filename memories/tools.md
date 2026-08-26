@@ -370,10 +370,10 @@ elif py -c "pass" >/dev/null 2>&1; then PY=py
 else echo "no working python launcher found"; exit 1
 fi
 ```
-— then invoke `$PY` for the real transform. This both avoids risking a
-second, possibly destructive run of a real script under a bare `||`
-fallback, and fails loudly instead of proceeding with an unverified
-command if neither launcher actually works. (ai-config#635,
+--- then invoke `$PY` for the real transform.
+This both avoids risking a second, possibly destructive run of a real
+script under a bare `||` fallback, and fails loudly instead of proceeding
+with an unverified command if neither launcher actually works. (ai-config#635,
 2026-07-22/23: hit repeatedly running `scripts/validate-skills.py`, and
 again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
@@ -1117,3 +1117,66 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
+
+## `subprocess.run(encoding="utf-8")` on Windows with Python <3.15 defaults to locale encoding
+
+Prior to Python 3.15 (PEP 686 --- measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
+When a CLI tool (such as `gh pr view --json`) outputs UTF-8 text containing non-ASCII characters or emojis, capturing output without specifying UTF-8 encoding corrupts characters (mojibake) or raises `UnicodeDecodeError`.
+Setting `encoding="utf-8"` automatically selects text mode, making `text=True` redundant.
+Distinct from the print-side charmap failure earlier in this file (a UnicodeEncodeError writing emoji to a cp1252 console) --- this section is about decoding child-process output, the opposite direction of the same locale default.
+
+- **Do:** specify `encoding="utf-8"` explicitly when capturing text stdout on Windows: `subprocess.run(["gh", ...], capture_output=True, encoding="utf-8")`.
+- **Don't:** rely on `text=True` alone without `encoding="utf-8"` when reading CLI output containing non-ASCII text.
+
+## Windows PowerShell 5.1 `>` redirection writes UTF-16LE, corrupting `--body-file` payloads
+
+In Windows PowerShell 5.1 and earlier (measured 2026-08-25 on Windows 11), `echo` / `Write-Output` redirected with `>` writes UTF-16LE with a byte order mark (BOM) by default.
+Passing such a file to CLI tools expecting UTF-8 via `--body-file` or `gh api -F "body=@file"` corrupts the payload with null bytes (`^@`).
+
+- **Do:** write payload files as BOM-free UTF-8 using .NET (`[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`) or Python before passing to `--body-file` or `-F body=@<file>`.
+- **Don't:** redirect output with `>` in PowerShell 5.1 for API payload files, and don't pass multi-line or Markdown text inline via `--body "..."` or `-f body="..."` where shells expand backticks.
+
+## Disk exhaustion corrupts state silently --- edits, writes, and git gc
+
+At or near 0 bytes free, tools fail mid-operation without clean errors:
+partially written files, truncated content, corrupted archives.
+Measured 2026-08-20 on Windows 11, Morrison-Lab/ai-config.
+
+Failure modes observed:
+
+- Edit/write tools return success but the file is truncated or partial.
+- Python raises `OSError: [Errno 28] No space left on device` on `open()` ---
+  the honest case; treat any write error at low disk as corruption until
+  verified.
+- `git add` / `git commit` fail on a silently corrupted file.
+
+`git gc --prune=now` (or any repack) on a full disk is its own tier of damage:
+the pack file is partially written, leaving unresolved deltas and
+`error: Could not read <sha>` on every later fetch or pull.
+Deleting loose objects does not help --- the new pack still resolves deltas
+against the missing objects and fails.
+Unrecoverable locally; the only fix is `rm -rf .git && git clone ...`.
+Never run gc when disk is low, and re-clone immediately if fetch starts
+failing after one.
+
+Recovery for edited files: free space first (browser caches, temp dirs,
+Recycle Bin), then verify each suspect file (`wc -l`, `git diff`) against a
+known-good state before trusting it.
+
+Prevention: check free space before any batch of file edits.
+When space is critically low, prefer a Python script written to a temp `.py`
+file over inline edit calls --- it can check space first and fail cleanly.
+
+- **Do:** verify file integrity after any edit made while disk was low.
+- **Do:** skip `git gc` whenever free space is tight.
+- **Don't:** trust an edit tool success response from a full-disk system.
+
+## OpenCode CLI `--file` argument is greedy
+
+The OpenCode CLI's `--file` argument is an array and greedily consumes all positional arguments that follow it.
+Positional prompt strings must be passed *before* `--file` to avoid them being parsed as missing file paths.
+
+- **Do**: `opencode run "my prompt here" --file file1.txt file2.txt`
+- **Don't**: `opencode run --file file1.txt file2.txt "my prompt here"` (it will fail with "File not found: my prompt here").
+
+(Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).

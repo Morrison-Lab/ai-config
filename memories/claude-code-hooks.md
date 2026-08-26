@@ -186,6 +186,20 @@ The user ran `/reload-plugins`.
 No user correction was given --- the finding is inferred from the incident.
 Verified against the scripts rather than recalled: the docstrings quoted above, `classify()`'s existence test, and the note's placement inside the non-`--fix` branch.)
 
+2nd occurrence, 2026-08-26, Morrison-Lab/ai-config#2292 post-merge on
+Cursor Cloud: `install-hooks.py --fix` ran while `check-install.py`
+reported 15 missing including `hooks`, writing 47 bindings into a
+newly created `~/.claude/settings.json` that pointed at
+`$HOME/.claude/hooks/` before that directory existed.
+`check-install.py --fix` immediately afterwards placed the 15
+symlinks, and a later `install-hooks.py` report was
+`registered=47 missing=0 stale=0`.
+Cursor Cloud does not load Claude `PreToolUse` hooks, so Bash in that
+session did not die; the settings.json was still the
+registered-but-absent state the 2026-08-05 incident produced.
+The order in the Do bullet above is the recovery as well as the
+prevention.
+
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
 
 The two sections above are about *which calls* a hook blocks.

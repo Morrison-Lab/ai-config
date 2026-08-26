@@ -55,10 +55,15 @@ grant --- that grant's scope limit is a **fully clean** PR, and a PR one human
 action short of a reachable reviewer is not one.)
 
 2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
-Cursor Cloud comments post as `cursor[bot]` / `NONE`, so the same
-OWNER/MEMBER/COLLABORATOR allowlist on `jules-review.yml` skipped the
-request.
-Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
+Cursor Cloud comments post as `cursor[bot]`.
+A 2026-08-25 memory recorded that identity as `NONE`;
+a 2026-08-26 REST re-read of the `@jules review` comment
+([5415839558](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839558))
+returns `CONTRIBUTOR`.
+Either value is outside OWNER/MEMBER/COLLABORATOR, so the same
+allowlist on `jules-review.yml` skipped the request.
+Do not re-post from a session whose comments post as `cursor[bot]`
+outside that allowlist;
 a human OWNER/MEMBER/COLLABORATOR comment is the unblock
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 

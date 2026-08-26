@@ -136,7 +136,9 @@ reference, not a confirmation.
   which this embeds as step 4) — `wrap-up` is their session-level bookend.
 - **`spot-skill-opportunities`** — step 4's UMS pass checks whether it flagged
   a recurring pattern during the session that's still unbuilt.
-- **`pr-status-all`** --- step 3's PR table comes from this skill, not from a hand-built list of the session's own PRs; see its Safety Cap for what happens on a large open-PR queue.
+- **`pr-status-all`** --- step 3's PR table comes from this skill, not from a
+  hand-built list of the session's own PRs.
+  See its Safety Cap for what happens on a large open-PR queue.
 - **`checkpoint`** / **`compress-session`** — narrower-scoped snapshots taken
   *during* a session (a task-phase snapshot, a pre-compaction distillation);
   `wrap-up` is the full session-level close-out these feed into, not a

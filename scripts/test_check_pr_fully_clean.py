@@ -82,7 +82,16 @@ def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch=
     pr.pr_num = pr_num
     pr.repo = repo
     pr._fetcher = checker.run_cmd
-    pr._data = {"headRefOid": sha, "reviewDecision": review_decision, "headRefName": branch}
+    import json
+    out = checker.run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
+    if isinstance(out, str):
+        data = json.loads(out)
+    else:
+        data = {}
+    data["headRefOid"] = sha
+    data["reviewDecision"] = review_decision
+    data["headRefName"] = branch
+    pr._data = data
     pr._check_runs = None
     return original_check_review_comments(pr)
 

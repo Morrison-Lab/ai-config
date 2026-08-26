@@ -840,11 +840,8 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
 
 def check_review_comments(pr) -> Tuple[bool, List[str]]:
     pr_num, sha, repo, review_decision, branch = pr.pr_num, pr.head_sha, pr.repo, pr.review_decision, pr.branch
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
-    data = json.loads(out)
-
-    comments = data.get("comments", [])
-    reviews = data.get("reviews", [])
+    comments = [{"author": {"login": c.author_login}, "createdAt": c.created_at, "body": c.body} for c in pr.get_comments()]
+    reviews = [{"state": r.state, "author": {"login": r.author_login}, "submittedAt": r.submitted_at, "body": r.body, "commit": {"oid": r.commit_oid}} for r in pr.get_reviews()]
 
     issues = []
 

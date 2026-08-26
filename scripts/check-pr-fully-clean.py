@@ -642,7 +642,7 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
-    r"^\s*[:.\-]*\s*(?:none\b(?!\s+of\b)|nothing\b|0\b|n/a\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|\bnone\s+identified\b|\bnone\s+remaining\b|\bno\s+new\b)",
+    r"^\s*[*_:.\-]*\s*(?:none\b(?!\s+of\b)|nothing\b|0\b|n/a\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|\bnone\s+identified\b|\bnone\s+remaining\b|\bno\s+new\b)",
     re.IGNORECASE,
 )
 

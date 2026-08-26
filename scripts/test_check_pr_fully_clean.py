@@ -1532,6 +1532,32 @@ def main() -> int:
             nn_ok and nn_issues == [],
         )
 
+    # Bold-wrapped negations: '**None.**' under an empty section heading is the
+    # commonest AI-reviewer phrasing for "nothing here", so the negation suffix
+    # must see through leading emphasis markers (review finding on #2298).
+    for label, section in (
+        ("'## Nits' + '**None.**'", "## Nits\n\n**None.**\n\n"),
+        ("'## Nits' + '**None identified.**'", "## Nits\n\n**None identified.**\n\n"),
+        ("'## Non-blocking' + '**None.**'", "## Non-blocking\n\n**None.**\n\n"),
+    ):
+        bold_none_at_head = {
+            "createdAt": "2026-08-26T01:00:00Z",
+            "author": {"login": "github-actions"},
+            "body": (
+                "**Claude finished** review\n\n"
+                + section
+                + "### Verdict\n\n**Ready for merge**\n\n"
+                "(reviewed at `sha123`)"
+            ),
+        }
+        mock_bold_none = json.dumps({"comments": [bold_none_at_head], "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_bold_none):
+            bn_ok, bn_issues = checker.check_review_comments("2298", "sha123", TEST_REPO)
+            check(
+                f"check_review_comments: {label} is not a finding (#2298)",
+                bn_ok and bn_issues == [],
+            )
+
     nits_bold_at_head = {
         "createdAt": "2026-08-26T01:00:00Z",
         "author": {"login": "github-actions"},

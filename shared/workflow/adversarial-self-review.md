@@ -54,14 +54,13 @@ On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
 (measured 2026-08-25 PDT on a Grok conductor).
 This repo's Cursor adapter skips `no-push-without-self-review.py`
-when that adapter is the active hook path,
+on Cursor Cloud,
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT);
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a Cursor `Task`
-dispatch that returned a usable verdict when that adapter
-is the active hook path:
+dispatch that returned a usable verdict on Cursor Cloud:
 the guard does not run, so the prefix is inert and misreports
 the session.
 If that dispatch errored or produced no report,

@@ -141,12 +141,10 @@ The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
 Compare that sha to the recorded sha and to `git rev-parse HEAD`.
 If they differ, do not push.
-If the push refspec is not `HEAD`, compare against that named ref.
-This check covers one named ref.
-If the push is not a single named ref, do not treat a matching
-HEAD sha as covering it.
-The examples `--all` and `--tags` are illustrative;
-`--follow-tags` on a named ref is also out of coverage.
+Resolve what the push would ship with `git push --dry-run`
+(the guard exempts dry-run from review).
+If that output lists refs other than the compared sha,
+do not push.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -209,6 +207,7 @@ is the instruction to use this route.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
+  or `git push --dry-run` lists refs other than that sha,
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
@@ -218,8 +217,8 @@ is the instruction to use this route.
   dispatch that returned a usable verdict.
   If the dispatch errored or produced no report,
   that is the CLI-fallback case.
-- **Don't:** treat a matching HEAD sha as covering a push
-  that is not a single named ref, including `--follow-tags`.
+- **Don't:** treat a matching HEAD sha as covering a dry-run
+  that lists other refs.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 

@@ -243,7 +243,7 @@ def run(prompt, recs, sentinel_dir=None, tool_name="Agent"):
     if tpath:
         payload["transcript_path"] = tpath
     try:
-        p = subprocess.run(["python3", HOOK], input=json.dumps(payload),
+        p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                            capture_output=True, text=True,
                            env=dict(os.environ, TMPDIR=sentinel_dir))
     finally:
@@ -291,7 +291,7 @@ for got, want, desc in CONTRACT:
     print(f"  {got:<7} {desc}")
 
 # A malformed payload must fail OPEN and silent rather than break the launch.
-p = subprocess.run(["python3", HOOK], input="not json at all",
+p = subprocess.run([sys.executable, HOOK], input="not json at all",
                    capture_output=True, text=True)
 ok = p.returncode == 0 and not p.stdout.strip()
 wrong += not ok
@@ -372,7 +372,7 @@ for prompt, desc in SM_SILENT:
 _pd = tempfile.mkdtemp()
 try:
     proto = subprocess.run(
-        ["python3", HOOK],
+        [sys.executable, HOOK],
         input=json.dumps({"tool_name": "SendMessage",
                           "tool_input": {"to": "lead", "message": {
                               "type": "shutdown_request",

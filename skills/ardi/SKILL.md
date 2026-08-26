@@ -65,7 +65,7 @@ sits unread.
      so a login filter silently drops a standing not-clean.
      ```bash
      gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
-       | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"))] | .[] | {created: .created_at, user: .user.login, body: .body}'   # READ_PR_COMMENTS
+       | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"; "i"))] | .[] | {created: .created_at, user: .user.login, body: .body}'   # READ_PR_COMMENTS
      ```
      Completed Claude runs start the body with `**Claude finished`.
      Read every matching comment, not only the newest.

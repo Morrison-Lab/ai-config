@@ -392,10 +392,13 @@
 - Avoid nested function calls and nested function definitions where feasible --- prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over `f(g(h(x)))`, and prefer top-level function definitions over functions defined inside other functions.
   Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
-- When mentioning GitLab/GitHub pipelines, jobs, or commits in prose, always hyperlink them:
+- Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
+  Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
+  Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
   - Jobs: `[job 11056](https://host/project/-/jobs/11056)`
   - Commits: `[320d7ad](https://host/project/-/commit/320d7ad)`
+  - PRs/reviews: `[PR 668](https://github.com/owner/repo/pull/668)`, `[review 5025211582](https://github.com/owner/repo/pull/668#pullrequestreview-5025211582)`
 - When linking to MRs/PRs, link to the bottom of the page so the user doesn't have to scroll:
   - GitLab: use a specific note anchor (e.g., `#note_11437`); there is no symbolic "latest" anchor
   - GitHub: use a specific comment anchor (e.g., `#issuecomment-4739921085`); there is no symbolic "latest" anchor

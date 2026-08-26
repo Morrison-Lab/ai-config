@@ -441,6 +441,17 @@ rather than the gaps **between** its items.
 The result is a valid tight item that renders inconsistently beside its loose
 neighbours.
 
+**A branch-side fix, reverted line by line.**
+A real conflict --- not the clean auto-merges the other two cases in this
+section describe --- can still resolve silently toward `main`'s side, discarding
+a fix the branch made without ever raising a marker.
+Because the restored text is byte-identical to `main`'s copy, the reverted
+line produces zero diff against `main` and is invisible to an ordinary PR-diff
+review.
+[`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one
+line at a time" section owns this case, including the pre-merge-tip-to-merge
+comparison that is the only check able to see it.
+
 **A threshold breach that exists only in the sum.**
 A file under a size, count, or coverage cap can take an append from two branches
 that each stay under it and land over it once both merge.

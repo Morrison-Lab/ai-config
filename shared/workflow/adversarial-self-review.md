@@ -49,14 +49,11 @@ Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
-Cursor Cloud's `Task` tool is the subagent dispatch when the session
-can resolve the persona
-(`subagent_type: adversarial-reviewer`, `run_in_background` false,
-and `model` set to a listed Claude slug when the conductor is not
-Claude).
-The Cursor-specific routing, including that Cursor's adapter skips
-the pre-push guard and that `tools:` is instruction-level rather
-than a harness filter, is in
+Cursor Cloud's `Task` tool is the subagent dispatch when that
+session can resolve the persona.
+On that route the adapter skips the pre-push guard, so do not
+prefix `ALLOW_UNREVIEWED_PUSH=1` as if the subagent were missing.
+The Cursor-specific recipe is in
 [`memories/cursor.md`](../../memories/cursor.md).
 
 ## Brief it with the diff and the standards, never with your rationale

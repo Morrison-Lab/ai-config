@@ -89,27 +89,38 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 A Cursor Cloud session can dispatch the `adversarial-reviewer` persona
 through `Task` (`subagent_type: adversarial-reviewer`).
-This tree ships that persona under both `.claude/agents/` and
-`.opencode/agents/`.
+Morrison-Lab/ai-config ships that persona under both `.claude/agents/`
+and `.opencode/agents/`.
 Which path Cursor Cloud reads was not isolated.
-An unresolved `subagent_type` returns an error,
-which `hooks/no-push-without-self-review.py` does not admit as a verdict.
 
-The dispatch this corpus requires is foreground.
-Measured 2026-08-26 on this Cursor Cloud Grok conductor:
-the `Task` schema listed `run_in_background`
-(same requirement
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
-names for the Claude `Agent` tool)
+The dispatch this corpus requires is foreground
+(`run_in_background` false).
+Measured 2026-08-26 on a Cursor Cloud Grok conductor in this repo:
+that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
-`flag-unassigned-worktree.py` may warn,
-because that hook's `READ_ONLY` set is Explore/Plan
-and this dispatch classifies as write-capable.
+`flag-unassigned-worktree.py` may warn on this dispatch
+because the Cursor adapter maps `Task` to `Agent`
+when `subagent_type` is not explore/plan/shell
+([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
+and that hook's `READ_ONLY` set is Explore/Plan.
 That warning is expected on this route.
 The check after the child returns is `git status`.
+Cursor's adapter skips `no-push-without-self-review.py`
+(`SKIP_WITHOUT_TOOL_RESULT`);
+a failed or skipped dispatch is not caught before the push.
+The check is the parent's reading of the `Task` result
+and the posted PR comment.
+
 When the conductor is not Claude, pass a listed Claude slug on `model`
-(this conductor listed `claude-opus-5-thinking-high`).
+(that 2026-08-26 conductor listed `claude-opus-5-thinking-high`
+on its `Task` model list).
 The omit-`model` default was not separately measured.
+A same-vendor child buys independence of intent only.
+A Claude child of a Grok conductor also buys independence of vendor
+from the author.
+That is not independence from a GitHub `claude-review` primary;
+chasing a cross-vendor second reviewer is still
+[`self-review-fallback`](../shared/workflow/self-review-fallback.md).
 
 The persona's `tools:` frontmatter is instruction-level on
 Cursor Cloud, not a harness filter.
@@ -121,20 +132,10 @@ State read-only in the brief, and check `git status` after the
 child returns.
 GitHub `claude-review` skipping for a missing
 `CLAUDE_CODE_OAUTH_TOKEN` or quota is a different channel from
-Cursor's listed Claude models on `Task`.
+Claude models listed on that conductor's `Task` tool.
 
-A same-vendor child buys independence of intent only.
-A Claude child on a Grok diff also buys independence of vendor
-blind spot, which is the cross-vendor half of
-[`self-review-fallback`](../shared/workflow/self-review-fallback.md).
-
-Measured 2026-08-25 on those same PRs:
-a Cursor Grok session posted author-assembled fallback comments
-while `Task` plus Claude was listed.
-The correction, filed as
-[#2270](https://github.com/Morrison-Lab/ai-config/issues/2270),
-was to run the review in that session using a subagent,
-and to consider using the Claude model.
+[#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)
+is the instruction to use this route.
 
 - **Do:** dispatch `Task` `adversarial-reviewer` in the foreground
   (`run_in_background` false) for every self-review in a Cursor
@@ -148,6 +149,9 @@ and to consider using the Claude model.
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on the grounds
+  that the subagent route was unavailable, after a `Task`
+  dispatch just ran.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 
@@ -186,7 +190,10 @@ The wrap is
 [ai-config#2234 comment 5415839535](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
 The identity-only JSON is the parent `Task` `tool_result` for child
 `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
-That comment does not contain the JSON.)
+That comment does not contain the JSON.
+The same author wrap recurred 2026-08-25 on
+[#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
+[#2266](https://github.com/Morrison-Lab/ai-config/pull/2266).)
 
 ## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
 

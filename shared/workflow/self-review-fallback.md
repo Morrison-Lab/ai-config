@@ -104,6 +104,10 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+On Cursor Cloud, that dispatch is `Task`, not a missing-reviewer case:
+a skipped GitHub `claude-review` is a different channel.
+The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
+A Claude child of a non-Claude conductor is independent of the author, not of a Claude primary.
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**
 Dispatching and then composing a different comment is the same failure as
@@ -167,17 +171,17 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`.
+So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
 Those two are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-This corpus can also **dispatch** a cross-vendor reviewer itself:
-[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
-[`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md),
-and, when the conductor is not Claude and a Claude model is listed,
-a Cursor Cloud `Task` child
-(see [`memories/cursor.md`](../../memories/cursor.md)).
+`delegate-to-codex` is the only cross-vendor *second* reviewer this corpus can
+**dispatch** itself.
+A Cursor Cloud Claude `Task` child is a self-review dispatch
+(see [`memories/cursor.md`](../../memories/cursor.md)),
+not a member of this pairing:
+it is independent of a non-Claude author, not of a Claude primary.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

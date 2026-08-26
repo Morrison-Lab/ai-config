@@ -238,6 +238,18 @@ a genuine clean automated Claude review verdict evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 
+**One more gate stacks on top (user directive, 2026-08-25):
+no merge under any grant, `mwc` included,
+without a 100% all-clear adversarial verdict at the shipping head from a
+reviewer meeting [`adversarial-self-review`](adversarial-self-review.md)'s
+independence bar.**
+It composes with the external-reviewer requirement above ---
+neither satisfies the other.
+When the external reviewer self-skips by design (workflow modification is
+the known case), autonomous merging stays blocked:
+human approval is the only path.
+Specification and mechanics live in that fragment.
+
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".
 
@@ -385,8 +397,19 @@ See [`fully-clean.cases.md`](fully-clean.cases.md),
 
 **A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
 
-When a review run skips (e.g. self-modification workflow guard or quota limits) and falls back to a self-review or human review per [`self-review-fallback`](self-review-fallback.md), that fallback authorizes **merging** only in the absence of prior unresolved findings.
-It does NOT wipe the slate clean, and it does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run.
+When a review run skips
+(e.g. self-modification workflow guard or quota limits)
+and falls back to a self-review or human review per
+[`self-review-fallback`](self-review-fallback.md),
+that fallback lets the ARDI iteration loop proceed
+in the absence of prior unresolved findings.
+It never satisfies an autonomous merge gate ---
+autonomous merging under `mwc` remains blocked per the merge gate above,
+and human approval is the only path.
+It does NOT wipe the slate clean,
+does NOT license merging over an unaddressed `Needs more work` verdict
+or open finding list from an earlier or concurrent review run,
+and does NOT clear the all-clear merge gate above.
 
 - **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or ready to merge.
 - **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.

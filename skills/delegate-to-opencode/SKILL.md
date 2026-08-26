@@ -18,7 +18,7 @@ The local tier also does something none of the other destinations can: it keeps 
 Claude stays the orchestrator.
 It writes the prompt, runs the delegate, validates what comes back, and does the synthesis.
 This skill is the mechanism.
-The budget preference it plugs into lives in `memories/preferences.md` ("Delegate heavy work to another CLI first").
+The budget preference it plugs into lives in `memories/delegation.md`.
 
 ## Why this is a shell-out and not a subagent
 
@@ -139,7 +139,7 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, and `opencode`.
+`memories/delegation.md` holds the order across `codex`, `agy`, and `opencode`.
 Read it there rather than re-deriving it here.
 
 Two things follow from opencode not being a metered plan at all, and they are what make its position unlike the other two:

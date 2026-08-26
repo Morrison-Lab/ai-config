@@ -28,7 +28,8 @@ Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
 After bootstrapping, confirm the symlinks resolved and the skills are visible:
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config ~/.cursor/rules
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config
+# ~/.cursor/rules is linked only when no Cursor plugin is already serving those rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 python3 scripts/check-harness-installs.py    # audit every installed harness
 ```
@@ -97,7 +98,11 @@ Opening the clone in Cursor loads:
 - project hooks in [`.cursor/hooks.json`](.cursor/hooks.json), which run the `hooks/` catalog through [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py) (see [Cursor hook mapping](docs/cursor-hook-mapping.md))
 
 **User-global rules.**
-`bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
+Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`),
+or let `bootstrap.sh` link [`cursor-rules/`](cursor-rules/) into
+`${CURSOR_HOME:-$HOME/.cursor}/rules` when no plugin is already serving them.
+The plugin route and the `~/.cursor/rules` links are alternatives:
+stacking them loads every user-global rule twice.
 Files that exist in both `cursor-rules/` and `.cursor/rules/` must stay identical (`scripts/test_cursor_rules_sync.py`).
 
 **Skills in other workspaces.**
@@ -390,7 +395,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
-| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs (not registered -- see ai-config#1717) |
+| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
@@ -638,7 +643,7 @@ activated.")
 
 - `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`, and Cursor via plugin or `~/.cursor/skills/`)
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
-- `cursor-rules/` --- user-global Cursor rules (`~/.cursor/rules/`)
+- `cursor-rules/` --- user-global Cursor rules (Cursor plugin or `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
 - `.cursor/hooks/` --- adapter that runs the Claude `hooks/` catalog under that schema

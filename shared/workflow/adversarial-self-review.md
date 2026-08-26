@@ -217,7 +217,7 @@ Once one provider gives a clean review, move on to the next one.
 If any provider rejects the diff with findings, you must address the feedback.
 If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider.
 If you successfully address the feedback by rebutting on the existing diff and commit without making any changes, you do not need to restart.
-A successful rebuttal discharges the need for that provider's clean verdict.
+You must successfully rebut all of a provider's findings to discharge the need for their clean verdict.
 Simply continue to the next provider.
 Repeat this until all pinned providers have either signed off with a clean verdict or accepted a rebuttal on the exact same codebase state (the same commit and working tree).
 

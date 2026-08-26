@@ -56,7 +56,7 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(valid, expected_commit_sha=commit)
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
-        
+
         # Test various explicit clean findings strings
         clean_findings = [
             "No critical findings.",
@@ -467,13 +467,13 @@ class TestPrePushReview(unittest.TestCase):
     def test_execute_review_alternate_invoker_exclusion(self, mock_detect, mock_codex):
         mock_detect.return_value = ["claude", "codex"]
         mock_codex.return_value = "### Summary Verdict\nVerdict: Ready for merge"
-        
+
         # When CLAUDE_SESSION_ID is set, Claude is excluded from 'alternate'
         with patch.dict(os.environ, {"CLAUDE_SESSION_ID": "12345"}):
             with patch.object(reviewer, "get_next_alternate_engine", return_value="codex") as mock_get_next:
                 reviewer.execute_review("alternate", "prompt text")
                 mock_get_next.assert_called_with(["codex"])
-                
+
         # When CODEX_THREAD_ID is set and only codex is available, it fails and returns None
         mock_detect.return_value = ["codex"]
         with patch.dict(os.environ, {"CODEX_THREAD_ID": "67890"}):
@@ -570,7 +570,7 @@ class TestPrePushReview(unittest.TestCase):
         mock_file = MagicMock()
         mock_file.name = "/tmp/mockfile"
         mock_tf.return_value.__enter__.return_value = mock_file
-        
+
         valid_report = (
             "### Summary Verdict\nVerdict: Ready for merge\n\n"
             "### Critical Findings\nNone.\n\n"
@@ -598,7 +598,8 @@ class TestPrePushReview(unittest.TestCase):
         cursor_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--trust", cursor_cmd)
         self.assertIn("--print", cursor_cmd)
-        
+        self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt")
+
         # Test Antigravity runner
         mock_which.return_value = "/opt/homebrew/bin/agy"
         out_agy = reviewer.run_antigravity_review("prompt", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
@@ -607,13 +608,14 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
-        # Test OpenCode runner uses tempfile stdin pipe and pure mode
+        # Test OpenCode runner uses bounded file mechanism
         mock_which.return_value = "/opt/homebrew/bin/opencode"
         out_oc = reviewer.run_opencode_review("prompt", model="anthropic/claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        self.assertIn("prompt", oc_cmd)
+        self.assertIn("--file", oc_cmd)
+        self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 

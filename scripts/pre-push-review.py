@@ -97,7 +97,8 @@ def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: 
                 base_ref = cand
                 break
         if not base_ref:
-            base_ref = "HEAD~1"
+            log_error("Could not determine base branch (tried origin/main, origin/master, main, master). Please provide PR branch or ensure main exists.")
+            sys.exit(1)
 
     mb_res = subprocess.run(["git", "merge-base", head_sha, base_ref], capture_output=True, text=True)
     base_sha = mb_res.stdout.strip() if mb_res.returncode == 0 else base_ref
@@ -159,7 +160,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Strip fenced code blocks using CommonMark rules (handles nested same-character fences correctly)
     unfenced_report = strip_fences(report)
-    
+
     # Strip HTML comments to prevent hiding clean skeletons or blockers
     unfenced_report = re.sub(r"<!--.*?-->", "", unfenced_report, flags=re.DOTALL)
 
@@ -209,7 +210,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         "not ready for merge", "do not approve", "never approve"
     }
     # Avoid matching 'no' or 'not' which often appear in positive rationales like 'no blocking issues'
-    core_negation_pattern = r"\b(do not merge|cannot merge|fail|failed|reject|rejected|blocked|needs work|changes requested|not ready|unapproved)\b"
+    core_negation_pattern = r"\b(do not merge|cannot merge|fail|failed|reject|rejected|blocked|needs work|changes requested|not ready|unapproved|cannot approve|do not approve|never approve|not approved|disapproved)\b"
 
     parsed_verdicts = []
     for v_str in verdict_matches:
@@ -346,13 +347,11 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     cmd = [cursor_path, "--print", "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
-    cmd.append(prompt)
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
     try:
-        # Prompt is passed as an argument because `agent` doesn't natively support stdin
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
         return None
@@ -404,12 +403,16 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
 
-    cmd = [opencode_path, "run", "--agent", "plan", "--pure"]
-    if model:
-        cmd.extend(["-m", model])
-    cmd.append(prompt)
-
+    prompt_file = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
+            tf.write(prompt)
+            prompt_file = tf.name
+
+        cmd = [opencode_path, "run", "--agent", "plan", "--pure", "--file", prompt_file, "Review the attached diff."]
+        if model:
+            cmd.extend(["-m", model])
+
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: OpenCode review timed out after 360s.", file=sys.stderr)
@@ -417,6 +420,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     except Exception as e:
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
+    finally:
+        if prompt_file:
+            try:
+                os.remove(prompt_file)
+            except OSError:
+                pass
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()

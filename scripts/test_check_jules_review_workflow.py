@@ -192,6 +192,14 @@ COMMENTED_SUCCESS = tweak(
     "      - run: |\n      # if: success()\n",
 )
 
+# success() on an earlier step is not the node step's gate.
+FETCH_ONLY_SUCCESS = tweak("      - if: success()\n        run: |\n", "      - run: |\n")
+FETCH_ONLY_SUCCESS = tweak(
+    "      - env:\n          JULES_PR_REVIEWER_SHA:",
+    "      - if: success()\n        env:\n          JULES_PR_REVIEWER_SHA:",
+    FETCH_ONLY_SUCCESS,
+)
+
 MISSING_PREFLIGHT_GATE = tweak(
     "      - if: steps.preflight.outcome == 'failure'\n        run: echo could-not-start\n",
     "",
@@ -324,6 +332,12 @@ case_exits("Node pin only in comments", COMMENTED_SETUP_NODE, 1, "Node is unpinn
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
 case_exits("missing success() gate", MISSING_SUCCESS, 1, "success()")
 case_exits("success() only in a comment", COMMENTED_SUCCESS, 1, "success()")
+case_exits(
+    "success() only on a non-node step",
+    FETCH_ONLY_SUCCESS,
+    1,
+    "success()",
+)
 case_exits(
     "could-not-start omits preflight",
     MISSING_PREFLIGHT_GATE,

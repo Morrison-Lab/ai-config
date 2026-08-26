@@ -63,6 +63,19 @@ PREFLIGHT_OUTCOME_RE = re.compile(
 )
 
 
+def yaml_steps(text: str) -> list[str]:
+    """Split on YAML list items that start a step (`- ` at line start)."""
+    return re.split(r"(?=^[ \t]*- )", text, flags=re.MULTILINE)
+
+
+def node_step_requires_success(text: str) -> bool:
+    """The step that runs node dist/index.js must itself require success()."""
+    for step in yaml_steps(text):
+        if NODE_INVOCATION_RE.search(step) and SUCCESS_GATE_RE.search(step):
+            return True
+    return False
+
+
 def extra_instructions_block(text: str) -> str:
     """The YAML block scalar under INPUT_EXTRA_INSTRUCTIONS, not the rest of the file."""
     match = re.search(
@@ -155,10 +168,11 @@ def findings(text: str) -> list[str]:
         out.append(
             "missing preflight step (id: preflight) for wrap inputs before node"
         )
-    if not SUCCESS_GATE_RE.search(text):
+    if not node_step_requires_success(text):
         out.append(
-            "wrap steps do not require success(); an explicit if: replaces "
-            "the default and a failed pin would still spawn node"
+            "the node dist/index.js step does not require success(); "
+            "an explicit if: replaces the default and a failed pin "
+            "would still spawn node"
         )
     if not PREFLIGHT_OUTCOME_RE.search(text):
         out.append(

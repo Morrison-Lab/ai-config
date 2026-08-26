@@ -143,7 +143,7 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, `opencode`, and `openrouter` (`agy` API dispatch is out of service; its CLI dispatch is not).
+`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, `opencode`, and `openrouter` --- `agy` API dispatch is out of service, its CLI dispatch is not.
 Read it there rather than re-deriving it here.
 
 OpenCode spans multiple cost structures:

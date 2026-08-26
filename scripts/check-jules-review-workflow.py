@@ -20,7 +20,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "jules-review.yml"
-USES_ACTION_RE = re.compile(r"uses:\s*sanjay3290/jules-pr-reviewer@")
+USES_ACTION_RE = re.compile(
+    r"^[ \t]*(?:-\s+)?uses:\s*sanjay3290/jules-pr-reviewer@",
+    re.MULTILINE,
+)
 CHILD_EVENT_NAME_RE = re.compile(
     r"^[ \t]*GITHUB_EVENT_NAME=pull_request[ \t]*\\?\s*$",
     re.MULTILINE,
@@ -64,8 +67,17 @@ PREFLIGHT_OUTCOME_RE = re.compile(
 
 
 def yaml_steps(text: str) -> list[str]:
-    """Split on YAML list items that start a step (`- ` at line start)."""
-    return re.split(r"(?=^[ \t]*- )", text, flags=re.MULTILINE)
+    """Split on YAML list items that start a workflow step, not Markdown lists.
+
+    `INPUT_EXTRA_INSTRUCTIONS` is a block scalar on the Jules step and can
+    grow `- ` list items. Splitting on every `^[ \\t]*- ` would put
+    `success()` and `node ... dist/index.js` in different chunks.
+    """
+    return re.split(
+        r"(?=^[ \t]*- (?:name|id|uses|run|if|env|with|continue-on-error|timeout-minutes):)",
+        text,
+        flags=re.MULTILINE,
+    )
 
 
 def node_step_requires_success(text: str) -> bool:

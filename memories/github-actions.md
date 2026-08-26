@@ -410,14 +410,16 @@ The `@claude` bot's own behaviour lives in
   and a fail-closed output write is the second layer for the case the guard
   dies before writing.
 
-  What makes it hard to catch is that the bug is usually **masked by a second
-  mechanism** rather than being visible.
+  What makes a later `failure()` / `always()` copy hard to catch is that a
+  fail-closed write usually **masks** it.
   A guard written to fail closed writes its output before exiting
   (`echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 1`), and outputs are captured
   from failed steps too, so the condition happens to evaluate correctly.
   Every test passes, and the protection is entirely accidental --- it evaporates
   the moment the guard fails *before* reaching that write, which is exactly what
   a rate limit, a network error, or a `set -e` abort produces.
+  That evaporate story is not true of a non-status `if:`: GitHub still
+  auto-applies `success()`, so a failed guard already skips those steps.
 
   So spell out both halves: `if: success() && steps.guard.outputs.blocked != 'true'`.
   And prefer `!= 'true'` over `== 'false'` for the output test, because a guard
@@ -428,8 +430,8 @@ The `@claude` bot's own behaviour lives in
     a guard's output.
   - **Do:** treat a fail-closed output write as the second layer, and say so in
     the comment, so nobody later "simplifies" the condition on the strength of it.
-  - **Don't:** rely on a non-zero exit alone to skip steps that carry their own
-    `if:`.
+  - **Don't:** rely on a non-zero exit alone to skip steps whose `if:`
+    names `always()` or `failure()`.
   - **Don't:** infer from a passing test that the condition is right, when a
     fail-closed write could be doing the work instead.
 

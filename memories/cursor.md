@@ -175,9 +175,13 @@ Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
 A push that carries nothing to review
-(the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch)
-has no report to parse: do not invent one,
-and do not refuse that push for lack of a verdict.
+is decided by `git diff origin/<default-branch>...HEAD`
+being empty
+(the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch,
+created with `--allow-empty`).
+Do not invent a report,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
 Re-read `git rev-parse HEAD` after the child returns.
 If HEAD is not the recorded sha, the child wrote or HEAD moved:
 do not push; re-dispatch on the new HEAD.
@@ -187,7 +191,10 @@ The fingerprint must prefix-match HEAD
 If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
 tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
-Provenance (which file was parsed) is in that issue's scope too.
+Provenance is the recovery route in this file:
+route (a) reads the `transcript.json` whose path contains the
+`cloudAgentBcId`;
+route (b) parses the subagent's verbatim return of the same selector.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
 [#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
@@ -196,6 +203,10 @@ a separate local-engine dispatcher with its own report contract
 (`parse_review_verdict`), not a wrapper over `parse_report()`
 and not this recovery path.
 Tracked as [#2309](https://github.com/Morrison-Lab/ai-config/issues/2309).
+The remaining git-decidable refusal gates
+(`git status`, HEAD still recorded, dry-run tip, source ref,
+empty-diff carve-out) are tracked as
+[#2310](https://github.com/Morrison-Lab/ai-config/issues/2310).
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
@@ -251,8 +262,9 @@ The in-tree writer of that path is `scripts/install-hooks.py`.
 Those settings do not make the Cursor adapter run Claude's hook runner.
 Whether Claude Code's native hook runner also fires on Cloud
 is unmeasured as of 2026-08-26 PDT.
-If it does, the prefix is that native guard's escape.
-If it does not, the prefix stays inert for the adapter.
+The prefix stays inert for the adapter either way.
+If the native runner also fires, the prefix is that native
+guard's escape even though it is inert for the adapter.
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
 same VM --- the prefix is that native guard's escape,
@@ -269,7 +281,8 @@ Refusal gates, in order (Do-Confirm; details in the procedure above):
 1. `git status --short` empty before dispatch, and still empty after.
 2. Recover the last heading-bearing assistant `text`; call `parse_report()`.
 3. Verdict is `clean` and the fingerprint prefix-matches HEAD,
-   unless the push carries nothing to review.
+   unless `git diff origin/<default-branch>...HEAD` is empty
+   (say in the reply that this carve-out was used).
 4. HEAD is still the recorded sha.
 5. Same-argv dry-run succeeds; a reported new tip prefix-matches HEAD
    (`Everything up-to-date` is not a mismatch;
@@ -337,8 +350,9 @@ is the instruction to use this route.
   or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
   The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md) branch
-  is the carve-out: it has no report,
-  and that is not a reason to refuse the push.
+  (`git diff origin/<default-branch>...HEAD` empty) is the carve-out:
+  it has no report, that is not a reason to refuse the push,
+  and the reply must say the carve-out was used.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is

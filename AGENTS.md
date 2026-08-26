@@ -258,7 +258,7 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
-This repo's Cursor adapter skips `no-push-without-self-review.py`
+Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`,
@@ -266,10 +266,14 @@ call `parse_report()` on the recovered report,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD
 ([`memories/cursor.md`](memories/cursor.md)).
-A push that carries nothing to review
-(the empty [`pr-on-claim`](shared/workflow/pr-on-claim.md) branch)
+On that Cursor-adapter path, a push that carries nothing to review
+(`git diff origin/<default-branch>...HEAD` empty;
+the empty [`pr-on-claim`](shared/workflow/pr-on-claim.md) branch)
 has no report: do not invent one,
-and do not refuse that push for lack of a verdict.
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+On Claude Code the same empty branch still needs
+`ALLOW_UNREVIEWED_PUSH=1` on the pushing command.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review

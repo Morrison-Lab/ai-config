@@ -64,9 +64,11 @@ makes the adapter run that guard
 (the skip and the `parse_report` gate are in the paragraph above).
 Do not use it for the adapter's sake while that skip holds.
 A push that carries nothing to review
-(the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
+(`git diff origin/<default-branch>...HEAD` empty;
+the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
 has no report to parse: do not invent one,
-and do not refuse that push for lack of a verdict.
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
 After [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 makes the adapter run that guard,
 the prefix is the documented escape

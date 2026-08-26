@@ -39,8 +39,7 @@ including ultracode/Workflow fan-outs,
 not occasional use.
 
 **Two of these are metered plans, and the rule is to try both before Claude's.
-`opencode`'s free and local tiers sit outside that window logic entirely, and
-`openrouter` is a prepaid balance rather than a window at all.**
+`opencode`'s free and local tiers sit outside that window logic entirely, and `openrouter` is a prepaid balance rather than a window at all.**
 
 | CLI / Provider | plan | skill |
 |---|---|---|
@@ -88,72 +87,27 @@ then fall back to Claude until a window resets.
 "Delegate first" means the current window,
 not abandoning Claude permanently.
 
-**`opencode`'s free and local tiers have no window to exhaust,
-which changes where they sit rather than just adding a row.**
-Those two tiers cost nothing,
-so for work a small model can actually do it goes *ahead* of codex and agy
-rather than behind them: there is no budget to conserve by skipping it.
-Capability is the binding constraint in its place,
-and it is unmeasured here ---
-the local ids carry parameter counts from 2B to 30B,
-and the hosted ids are preview names
-nobody has benchmarked against this corpus's work.
-**The discriminator between the free and local tiers is the provider
-prefix, not a `-free` id suffix**: `opencode models` on 2026-08-19 listed
-`opencode/big-pickle` (no `-free` suffix) alongside several ids that do
-carry one, all under the same hosted Zen provider, so the suffix is a
-pricing detail rather than the routing signal.
+**`opencode`'s free and local tiers have no window to exhaust, which changes where they sit rather than just adding a row.**
+Those two tiers cost nothing, so for work a small model can actually do it goes *ahead* of codex and agy rather than behind them: there is no budget to conserve by skipping it.
+Capability is the binding constraint in its place, and it is unmeasured here --- the local ids carry parameter counts from 2B to 30B, and the hosted ids are preview names nobody has benchmarked against this corpus's work.
+**The discriminator between the free and local tiers is the provider prefix, not a `-free` id suffix**: `opencode models` on 2026-08-19 listed `opencode/big-pickle` (no `-free` suffix) alongside several ids that do carry one, all under the same hosted Zen provider, so the suffix is a pricing detail rather than the routing signal.
 
-**A third OpenCode tier, `opencode-go/*`, is a $10/mo windowed
-subscription** rather than a free or local one, active and verified
-2026-08-25.
-It behaves like `codex`'s window --- exhaust it before falling back ---
-not like the free/local tiers above.
+**A third OpenCode tier, `opencode-go/*`, is a $10/mo windowed subscription** rather than a free or local one, active and verified 2026-08-25.
+It behaves like `codex`'s window --- exhaust it before falling back --- not like the free/local tiers above.
 
-**A fourth destination, OpenRouter, is neither windowed nor free: it draws
-on a prepaid credit balance**, active and verified 2026-08-25.
-`opencode` reaches it as an ordinary provider once a config entry
-references it (an unreferenced provider lists no `openrouter/*` ids at
-all), configured in the user-global `~/.config/opencode/opencode.jsonc`
---- not `opencode.json`, which is a separate, repo-scoped config file ---
-and keyed by the `OPENROUTER_API_KEY` environment variable.
-Its draw is per-token rather than time-windowed, so "delegate first"
-means spending the free tiers and subscription windows above before
-drawing on OpenRouter credit or Claude tokens, not before it.
-One class of OpenRouter model is worth the balance: anonymized frontier
-**stealth previews**, unbenchmarked but plausibly capable of judgment
-work the free/local tiers cannot do --- see
-[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A
-third destination" section for the activation mechanics, the stealth
-roster query, and the data-sensitivity rule (a hosted destination's
-payload leaves the machine regardless of billing tier, so a data
-trigger forbids `openrouter/*` exactly as it forbids `opencode/*` and
-`opencode-go/*`).
-The local (`ollama/*`) tier is also the only destination anywhere in this
-ladder that *can* keep the payload on the machine,
-so it is the one route for work whose data must not leave.
-That is a property of the endpoint its provider entry is configured with,
-not of the `ollama/` prefix,
-which reads the same when the `baseURL` points at a LAN box or a remote
-`OLLAMA_HOST`.
-So the claim is licensed by the loopback check in that skill's step 1
-rather than by the model id,
-and the check refuses rather than passing when the config cannot be read.
-[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the
-mechanics and the hosted-versus-local routing rule.
+**A fourth destination, OpenRouter, is neither windowed nor free: it draws on a prepaid credit balance**, active and verified 2026-08-25.
+`opencode` reaches it as an ordinary provider once a config entry references it (an unreferenced provider lists no `openrouter/*` ids at all), configured in the user-global `~/.config/opencode/opencode.jsonc` --- not `opencode.json`, which is a separate, repo-scoped config file --- and keyed by the `OPENROUTER_API_KEY` environment variable.
+Its draw is per-token rather than time-windowed, so "delegate first" means spending the free tiers and subscription windows above before drawing on OpenRouter credit or Claude tokens, not before it.
+One class of OpenRouter model is worth the balance: anonymized frontier **stealth previews**, unbenchmarked but plausibly capable of judgment work the free/local tiers cannot do --- see [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section for the activation mechanics, the stealth roster query, and the data-sensitivity rule (a hosted destination's payload leaves the machine regardless of billing tier, so a data trigger forbids `openrouter/*` exactly as it forbids `opencode/*` and `opencode-go/*`).
+The local (`ollama/*`) tier is also the only destination anywhere in this ladder that *can* keep the payload on the machine, so it is the one route for work whose data must not leave.
+That is a property of the endpoint its provider entry is configured with, not of the `ollama/` prefix, which reads the same when the `baseURL` points at a LAN box or a remote `OLLAMA_HOST`.
+So the claim is licensed by the loopback check in that skill's step 1 rather than by the model id, and the check refuses rather than passing when the config cannot be read.
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
 The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
-`delegate-to-codex` operationalizes the codex mechanics ---
-background runner plus DONE-marker poll, `--output-schema`,
-exhaustion detection, Claude fallback ---
-and those transfer to `agy`, whose CLI exposes the same shape:
-`--print` for non-interactive,
-`--json-schema` for structured output,
-`--effort`, `--model`, and `--sandbox`.
+`delegate-to-codex` operationalizes the codex mechanics --- background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback --- and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
-**`agy --print` CONSUMES THE NEXT TOKEN as its prompt,
-so a flag placed between the two becomes the prompt.**
-This is the whole of what makes `agy` usable headlessly,
-and getting it wrong looks exactly like a broken tool:
+**`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**
+This is the whole of what makes `agy` usable headlessly, and getting it wrong looks exactly like a broken tool:
 
 ```bash
 agy --print "Reply with only the word BANANA."                 # -> BANANA
@@ -162,20 +116,12 @@ agy --print="Reply with only the word BANANA." --effort low    # -> BANANA
 agy --print --effort low "Reply with only the word BANANA."    # -> explains what --effort does
 ```
 
-That last line is the failure, and its output is the proof:
-the CLI answers the prompt `--effort`,
-because `--print` took `--effort` as its value
-and the real prompt fell out as an unconsumed positional.
-So the rule is about **position**, not syntax ---
-either keep the prompt immediately after `--print`,
-or bind it with `=` and put other flags after.
+That last line is the failure, and its output is the proof: the CLI answers the prompt `--effort`, because `--print` took `--effort` as its value and the real prompt fell out as an unconsumed positional.
+So the rule is about **position**, not syntax --- either keep the prompt immediately after `--print`, or bind it with `=` and put other flags after.
 
-**Both forms exit 0**, so the drop is invisible
-to any caller keying on exit status,
-which is what a delegation wrapper keys on.
+**Both forms exit 0**, so the drop is invisible to any caller keying on exit status, which is what a delegation wrapper keys on.
 
-Measured 2026-08-15 and re-measured 2026-08-16,
-`agy` 1.1.13 at `~/.local/bin/agy`.
+Measured 2026-08-15 and re-measured 2026-08-16, `agy` 1.1.13 at `~/.local/bin/agy`.
 Three space-form and three equals-form runs of the same prompt,
 with nothing between the flag and the prompt,
 all returned `BANANA`.

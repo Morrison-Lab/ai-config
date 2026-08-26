@@ -2,24 +2,14 @@
 
 ## Available subscriptions & model providers
 
-[`memories/delegation.md`](delegation.md) is the canonical catalog of active
-subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
-OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
-than duplicating the table here.
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go, OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather than duplicating the table here.
 Two facts specific to this machine's configuration, not restated there:
-- OpenRouter is reached through OpenCode's `openrouter` provider entry in
-  `~/.config/opencode/opencode.jsonc` (the actual filename this machine's
-  config uses --- not `opencode.json`, which is a different, repo-scoped
-  config file; see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)), keyed by the `OPENROUTER_API_KEY` environment variable.
-- Claude Code itself runs on a Claude Pro/Team subscription rather than a
-  metered API budget.
+- OpenRouter is reached through OpenCode's `openrouter` provider entry in `~/.config/opencode/opencode.jsonc` (the actual filename this machine's config uses --- not `opencode.json`, which is a different, repo-scoped config file; see [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)), keyed by the `OPENROUTER_API_KEY` environment variable.
+- Claude Code itself runs on a Claude Pro/Team subscription rather than a metered API budget.
 
 ## Cursor
 
-See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior
-(`.cursorignore` sandbox writes and hidden worktrees, plugin vs
-`~/.cursor/skills` vs `~/.claude/skills`, and not wiring Claude hooks into
-the Cursor plugin).
+See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior (`.cursorignore` sandbox writes and hidden worktrees, plugin vs `~/.cursor/skills` vs `~/.claude/skills`, and not wiring Claude hooks into the Cursor plugin).
 
 ## Codex plugin marketplace renames require a remove/re-add migration
 

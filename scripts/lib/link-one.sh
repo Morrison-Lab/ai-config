@@ -10,18 +10,25 @@
 # Usage:
 #   LINK_ONE_FIX_HINT="how to resolve a collision in this context"   # optional
 #   . "<repo>/scripts/lib/link-one.sh"
-#   link_one /abs/path/in/repo /abs/path/at/destination
+#   link_one /abs/path/in/repo /abs/path/at/destination [hint]
 #
-# The hint is a parameter because the two callers resolve a collision
-# differently: bootstrap.sh points at scripts/check-install.py --fix, which
-# only knows about ~/.claude, so it would be wrong advice for a dotfile.
+# An optional third argument overrides LINK_ONE_FIX_HINT for that call.
+# The hint is a parameter because callers resolve a collision differently:
+# bootstrap.sh passes scripts/check-install.py --fix only for ~/.claude
+# links. That script's --consumer-dir retargets a whole Claude-style
+# manifest, so the same hint is wrong for Codex, Gemini, Copilot, and
+# Cursor (ai-config#2286). Those callers inherit this file's default
+# (remove it or replace it with a link manually). Dotfiles installers
+# set their own LINK_ONE_FIX_HINT; shiva's is the --adopt path.
 
 # Advice printed when a real (non-symlink) path blocks the link. Overridable by
-# the caller; the default says nothing tool-specific.
+# the caller or by a per-call third argument; the default says nothing
+# tool-specific.
 : "${LINK_ONE_FIX_HINT:=remove it or replace it with a link manually}"
 
 link_one() {
   local src="$1" dest="$2" name
+  local hint="${3:-${LINK_ONE_FIX_HINT:-remove it or replace it with a link manually}}"
   name="$(basename "$dest")"
 
   if [ -L "$dest" ]; then
@@ -41,7 +48,7 @@ link_one() {
   # the built-in in remote sessions. Rename ours if that's not what you want.
   if [ -e "$dest" ]; then
     printf 'skip  %s (real path exists at %s -- %s)\n' \
-      "$name" "$dest" "$LINK_ONE_FIX_HINT"
+      "$name" "$dest" "$hint"
     return
   fi
 

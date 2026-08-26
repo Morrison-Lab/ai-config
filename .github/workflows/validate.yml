@@ -312,7 +312,7 @@ jobs:
           # CLAUDE.md and every other root-level .md -- the action's own
           # default is `*.md` (ai-config#962).
           globs: '*.md'
-          paths-ignore: 'codex-skills/**,conductor/**,docs/**,_site/**,.quarto/**'
+          paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'
           # Quoted: a composite action's inputs are strings, unlike the
           # reusable workflow's typed `boolean`.
           fail: 'true'

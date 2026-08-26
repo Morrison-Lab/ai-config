@@ -93,12 +93,25 @@ class TestPrePushReview(unittest.TestCase):
 
         # NOT APPROVED, DISAPPROVED, Never approve, Do not approve are NOT clean
         for neg in [
-            "NOT APPROVED", "DISAPPROVED", "UNAPPROVED", "BLOCKED", "NEEDS WORK",
-            "CHANGES REQUESTED", "Not ready for merge", "Do not approve", "Never approve", "Cannot approve"
+            "Verdict: NOT APPROVED.",
+            "Verdict: DISAPPROVED.",
+            "Verdict: UNAPPROVED.",
+            "Verdict: BLOCKED.",
+            "Verdict: NEEDS WORK.",
+            "Verdict: CHANGES REQUESTED.",
+            "Verdict: Not ready for merge.",
+            "Verdict: Cannot approve",
+            "Verdict: Never approve",
+            "Verdict: Do not approve",
+            "Verdict: Ready for merge — must not merge.",
+            "Verdict: Ready for merge — should not be merged.",
+            "Verdict: Ready for merge — unsafe to merge.",
+            "Verdict: Ready for merge — not safe to merge.",
+            "Verdict: Ready for merge — cannot merge.",
         ]:
             neg_report = (
                 f"### Summary Verdict\n"
-                f"Verdict: {neg}\n\n"
+                f"{neg}\n\n"
                 "### Critical Findings\n"
                 "1. Bug found.\n\n"
                 "### Observations\nNone.\n\n"
@@ -695,15 +708,18 @@ class TestPrePushReview(unittest.TestCase):
             self.assertEqual(e5, "antigravity")
 
 
+    @patch.object(reviewer, "get_pr_head_sha")
     @patch("subprocess.run")
-    def test_post_review_to_github_failure_handling(self, mock_subproc):
+    def test_post_review_to_github_failure_handling(self, mock_subproc, mock_get_sha):
+        mock_get_sha.return_value = "12345678"
         fail_mock = MagicMock()
         fail_mock.returncode = 1
         fail_mock.stderr = "GitHub API 404 Not Found"
         mock_subproc.return_value = fail_mock
 
-        res = reviewer.post_review_to_github(123, "report content", "OpenAI Codex")
+        res = reviewer.post_review_to_github(123, "report content", "OpenAI Codex", commit_sha="12345678")
         self.assertFalse(res)
+        mock_subproc.assert_called_once()
 
 
 if __name__ == "__main__":

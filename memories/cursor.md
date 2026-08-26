@@ -178,9 +178,12 @@ Read stdout and stderr (`2>&1`).
 The summary lines this section names write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
-or those commits are not the compared sha
+or the new tip (right of `..`) is not the compared sha
 (prefix-match an abbreviated sha),
 do not push.
+Git's dry-run summary is `old..new`.
+The left sha is the remote's current tip, not a commit this push adds.
+Compare only the new tip.
 `Everything up-to-date` means the push would ship nothing;
 that is not a fingerprint mismatch.
 A new branch's dry-run line is `[new branch]` with no sha.
@@ -267,7 +270,7 @@ is the instruction to use this route.
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
   or the same-argv dry-run fails,
-  or it lists commits other than that sha
+  or the new tip (right of `..`) is not that sha
   (`Everything up-to-date` and a new-branch line with no sha
   are not a mismatch),
   do not push.

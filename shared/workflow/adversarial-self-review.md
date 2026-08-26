@@ -41,14 +41,21 @@ The **merge gate** (see [`fully-clean`](fully-clean.md)) requires more:
 a reviewer differing from the authoring session in **both** model and harness,
 the only configuration that also buys independence of blind spot.
 
-The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI), **opencode**, **claude**, and `codex` wherever installed ([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
+The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
+**opencode**, **claude**, and `codex` wherever installed
+([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Dispatch in independence-and-availability order --- `agy` CLI or `opencode` first, then `codex`, then `claude` ---
-where each entry qualifies only if both its model and harness differ from the authoring session.
-This review order serves independence and measured availability, overriding [`delegation.md`](../../memories/delegation.md)'s cost-first delegation order for general work.
-A multi-backend harness qualifies only when both its harness and its configured model differ from the authoring session.
+Dispatch in independence-and-availability order ---
+`agy` CLI or `opencode` first, then `codex`, then `claude` ---
+where each entry qualifies only if both its model and harness
+differ from the authoring session.
+This review order serves independence and measured availability,
+overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
+delegation order for general work.
+A multi-backend harness qualifies only when both its harness
+and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
 If no qualifying entry remains, autonomous merging waits ---
@@ -59,11 +66,16 @@ escalation to the repository owner per [`fully-clean`](fully-clean.md)'s
 deadlock rule ends in their manual review and merge decision,
 which is the one authority above this gate.
 
+`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
+separate path and remains available --- see
+[`delegation.md`](../../memories/delegation.md)'s delegate ladder.
+A retired API never disqualifies a CLI harness
+that operates on a separate path from it.
 
-`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a separate path and remains available --- see [`delegation.md`](../../memories/delegation.md)'s delegate ladder.
-A retired API never disqualifies a CLI harness that operates on a separate path from it.
-
-A second directive the same day sets the merge consequence: "you must not merge, even with mwc enabled, unless you have a 100% 'all clear' review verdict from an adversarial review".
+A second directive the same day sets the merge consequence:
+"you must not merge, even with mwc enabled,
+unless you have a 100% 'all clear' review verdict
+from an adversarial review".
 
 This **adds** a gate and replaces none.
 Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
@@ -88,12 +100,18 @@ and arming an auto-merge while waiting is
 
 The merge-side rules live with the gate they serve:
 
-- **Do:** for any merge, use a reviewer on a **different model and harness** from your own (agy, opencode, codex, claude only for sessions authored outside Claude, or cursor once its headless dispatch is measured), and report which harness produced each verdict.
+- **Do:** for any merge, use a reviewer on a **different model and harness**
+  from your own
+  (agy CLI, opencode, codex,
+  claude only for sessions authored outside Claude,
+  or cursor once its headless dispatch is measured),
+  and report which harness produced each verdict.
 - **Don't:** merge anything --- under any grant, `mwc` included ---
   without a 100% all-clear adversarial verdict at the shipping head.
   A skip notice, a stub, an older-head verdict,
   or a same-harness convenience pass clears nothing.
-- **Don't:** reuse a passing same-harness pre-push verdict to satisfy the merge gate.
+- **Don't:** reuse a passing same-harness pre-push verdict
+  to satisfy the merge gate.
   A merge needs its own cross-model, cross-harness verdict
   evaluating the shipping head.
 
@@ -337,32 +355,60 @@ waiting for?".
 Five commits were sitting unpushed behind a self-imposed review queue while
 the branch's conflict with `main` had to be re-resolved twice.
 The honest answer to the question was "nothing".)
-
 ## Query all available providers sequentially
 
-When obtaining adversarial reviews, you need a clean verdict from **every** available provider.
-You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, OpenCode, Codex, and Claude).
-Every provider found reachable at the start of the cycle must be included in the pinned quorum.
-Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).
+When obtaining adversarial reviews,
+you need a clean verdict from **every** available provider.
+You must define the initial pinned quorum
+by performing an exhaustive discovery/availability check
+across the complete enumerated set of known providers
+(e.g., Cursor, OpenCode, Codex, and Claude).
+Every provider found reachable at the start of the cycle
+must be included in the pinned quorum.
+Any exclusion of a known provider must be recorded explicitly with its reason
+(e.g., quota blocked, CLI offline).
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
-Once one provider gives a clean review, move on to the next one.
-If any provider rejects the diff with findings, you must address the feedback.
-When you make fixes, **do not hold the branch**: push the verified fixes immediately.
-Pushing the new commit naturally restarts the sequential query process against the new HEAD from the first provider.
-When requesting review on the new push, proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
-This ensures providers do not redundantly re-raise settled non-code issues on the new diff.
-You must submit your rebuttal to the provider and request a new review.
-This allows them to post a clean verdict at HEAD that supersedes their previous findings.
-Only after the provider posts a new clean verdict may you continue to the next provider in the quorum.
-Continue this iterative loop of review, fix, and push until the current HEAD receives clean verdicts from the entire pinned quorum.
+Once one provider gives a clean review,
+move on to the next one.
+If any provider rejects the diff with findings,
+you must address the feedback.
+When you make fixes,
+**do not hold the branch**:
+push the verified fixes immediately.
+Pushing the new commit naturally restarts the sequential query process
+against the new HEAD from the first provider.
+When requesting review on the new push,
+proactively carry forward any previously accepted rebuttals
+from earlier providers into your initial review request.
+This ensures providers do not redundantly re-raise settled non-code issues
+on the new diff.
+You must submit your rebuttal to the provider
+and request a new review.
+This allows them to post a clean verdict at HEAD
+that supersedes their previous findings.
+Only after the provider posts a new clean verdict
+may you continue to the next provider in the quorum.
+Continue this iterative loop of review, fix, and push
+until the current HEAD receives clean verdicts from the entire pinned quorum.
 
 The set of required providers must be pinned at the start of the review cycle.
-If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry.
-Alternatively, explicitly request user permission to drop it from the quorum.
-If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle, you must fail closed and wait until at least one becomes reachable.
-This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
-Alternatively, request explicit user permission to proceed.
+If a pinned provider drops offline or experiences transient operational failures
+(e.g. 500 errors, rate limits),
+you must wait and retry.
+Alternatively,
+request explicit user permission to drop it from the quorum.
+If the quorum size is zero at the start of the cycle,
+or drops to zero at any point during the cycle,
+you must fail closed and wait until at least one becomes reachable.
+This applies if, for example,
+all external providers and the local fallback self-review subagent
+are offline or fail.
+Alternatively,
+request explicit user permission to proceed.
 Do not bypass the review gate.
-If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving ---
+If any provider (or combination of providers) creates an unbounded loop ---
+whether through irreconcilably contradictory requirements,
+self-contradictory oscillation,
+or endless non-contradictory goalpost-moving ---
 halt the review process and escalate to the user for a tie-breaking decision.

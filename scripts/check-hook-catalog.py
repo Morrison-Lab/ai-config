@@ -57,11 +57,7 @@ README = os.path.join(ROOT, "README.md")
 # means removing it from here.
 #
 # Keyed per entry rather than sharing one issue number, so a
-# reader of the printed NOTE is sent to the tracker for that
-# hook. The remaining entry is inert BY THE GATE: README's
-# activation rule makes the hooks.json entry itself the
-# plugin-path activation, so it is registered by the follow-up
-# after its authoring PR merges.
+# reader of the printed NOTE is sent to the tracker for that hook.
 KNOWN_UNREGISTERED = {
     # Inert BY THE GATE: README's activation rule makes the hooks.json entry
     # itself the plugin-path activation, so this is registered by the

@@ -619,7 +619,8 @@ registers what the gate had been holding back --- the bare invocation only
 reports.
 `--fix` binds only what is already in `hooks/hooks.json`.
 A hook still on the catalog allowlist of documented-but-inert hooks
-needs its registration PR first; that merge is when 3.75 can bind it.
+needs its registration PR first.
+That merge is when 3.75 can bind it.
 On a plugin-enabled machine nothing is owed, and `--fix` there double-registers
 every hook rather than helping, per the mutually-exclusive section above.
 

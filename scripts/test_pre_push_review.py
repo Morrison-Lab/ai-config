@@ -784,6 +784,44 @@ Tests failed.
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report)
         self.assertFalse(is_clean)
         self.assertFalse(is_valid)
+        self.assertIn("blocking", reason)
+
+        # Edge case: Negation of data loss
+        report_clean = """### Summary Verdict
+Verdict: Ready for merge
+
+### Critical Findings
+None.
+
+### Observations
+There is absolutely no risk of data loss here. Also, zero blocking bugs.
+
+### Verification Steps
+Tests passed.
+"""
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report_clean)
+        self.assertTrue(is_clean)
+        self.assertTrue(is_valid)
+        self.assertEqual(reason, "Verdict: CLEAN")
+        
+        # Edge case: Blocker in the Summary Verdict section itself
+        report_verdict_blocker = """### Summary Verdict
+Verdict: Ready for merge
+Actually, wait, do not merge this.
+
+### Critical Findings
+None.
+
+### Observations
+None.
+
+### Verification Steps
+None.
+"""
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report_verdict_blocker)
+        self.assertFalse(is_clean)
+        self.assertFalse(is_valid)
+        self.assertIn("do not merge", reason.lower())
 
 if __name__ == "__main__":
     unittest.main()

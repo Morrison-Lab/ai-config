@@ -318,16 +318,17 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             r"(?i)\bneeds work\b",
             r"(?i)\b(?:blocking|critical) (?:bug|issue|finding)\b",
             r"(?i)\brequires changes\b",
-            r"(?i)(?<!no )\bdata[- ]loss\b",
+            r"(?i)\bdata[- ]loss\b",
             r"(?i)\bchanges requested\b"
         ]
 
-        # Strip out the Summary Verdict header so we don't accidentally match it if it's there
-        body_without_verdict = re.sub(r"(?ism)^#{2,3}\s+Summary Verdict.*?(?=^#{2,3}|\Z)", "", clean_report)
-
         for pat in contradictory_patterns:
-            if re.search(pat, body_without_verdict):
-                return False, False, f"Report contains contradictory blocking prose: {pat}"
+            for match in re.finditer(pat, clean_report):
+                prefix = clean_report[max(0, match.start() - 35):match.start()]
+                # Catch negations like "no data loss", "no risk of data loss", "zero blocking bugs"
+                if re.search(r"(?i)\b(?:no|not|without|zero)(?:\s+\w+){0,4}\s*$", prefix):
+                    continue
+                return False, False, f"Report contains contradictory blocking prose: {match.group()}"
 
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 

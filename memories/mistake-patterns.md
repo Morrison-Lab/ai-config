@@ -58,15 +58,16 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
-  (or a paginated `commits/<sha>/check-runs` read plus review criteria)
   before a terminal clean / ready-to-merge claim.
   Read exit 0 as clean,
   exit 1 with `  - ` bullets as not-clean,
   any other exit as the check failing to answer.
+  A paginated `commits/<sha>/check-runs` read is the check-run half only
+  (progress reports, criterion 1); it does not authorize the terminal claim.
 - **Don't:** Declare clean from `gh pr checks` or `statusCheckRollup` alone,
   however current they look.
   Progress reports ("8 success, 0 pending") are fine;
-  "Ready for merge" is not until the complete instrument agrees.
+  "Ready for merge" is not until `check-pr-fully-clean.py` exits 0.
 
 ## Pattern 5d: Failing to Learn From Mistakes
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.

@@ -29,13 +29,25 @@ committed pass.
   **A user correction is a mandatory immediate trigger.** Persist the lesson
   before resuming the main task; never wait for the user to invoke UMS or
   remind you a second time.
-- **When a PR reaches a clean review verdict** -- the concrete checkpoint the
-  bullet above leaves implicit, and the one the `ardi` loop exits on.
+- **When you read a review of your work, receive critical feedback on it,
+  or a questioned claim turns out to be wrong.**
+  The trigger is the scrutiny, not Address, not a clean verdict, and not
+  a first-person admission.
+  "Are you sure about that?" is the questioning case: check the claim, and
+  if it was wrong, run UMS --- answering with the corrected fact is not
+  the pass.
+  Questioning alone does not owe a pass when the claim holds.
+  See
+  [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
+- **When a PR reaches a clean review verdict** -- the checkpoint the
+  `ardi` loop exits on, and the backstop if the user-correction trigger
+  or the scrutiny trigger above was skipped.
   Run the pass there rather than at the merge: the merge is human-gated and
   may land long after this session ends, while the verdict is the moment the
   review lifecycle has finished teaching.
 - **Even when a new request arrives at that same moment** -- the mechanism
-  that actually skips the two checkpoints above.
+  that actually skips the user-correction trigger, the scrutiny trigger,
+  and the clean-verdict checkpoint.
   A merge or clean verdict is when you report back, so it is also when the
   next instruction lands, and that instruction reads as the live task while
   the owed pass quietly evaporates: never refused, never deferred out loud,
@@ -97,6 +109,20 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
+   - **When the target memory file is already at the 1200-line cap**,
+     recover lines (re-wrap or drop) or split the file.
+     A fold has two shapes and neither escapes every gate: a new source
+     line trips `scripts/test_check_memory_file_size.py`, while folding
+     the sentence into an existing line leaves the count flat but makes
+     that line a changed line the new-line-breaks gate can flag.
+     A net-positive append fails
+     `scripts/test_check_memory_file_size.py`
+     even when every new sentence is a real lesson
+     (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
+     ai-config#2262: `origin/main` was exactly 1200 lines, and a
+     +5-line append reddened `validate`.
+     Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291;
+     `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
    - **When step 2 routed the item to a repo other than ai-config, grep the
      ai-config corpus too** -- "the whole `memories/` directory" above means
      the *destination's*, so a repo-local entry can duplicate or contradict a

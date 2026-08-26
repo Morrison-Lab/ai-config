@@ -1,7 +1,8 @@
 Whenever you are working a PR/MR, run the full **ARDI** loop by default, without
 being asked: **A**ddress every flagged item, **R**ebut findings that are wrong,
 **D**efer out-of-scope items to tracked issues, then **I**terate with a fresh
-review --- repeating until the latest review is **fully clean**. Don't stop at
+review --- repeating until every reviewer's latest verdict is **fully clean**.
+Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
 
@@ -156,9 +157,12 @@ as a self-authored merge). Drive to fully clean, report ready, and leave the
 merge --- and any other destructive one-off, e.g. a `gh workflow run` that
 force-pushes --- for explicit human authorization.
 
-Because the loop ends there, **the clean verdict is also where `ums` runs** ---
-don't hold the pass for the merge, which is on the human's clock rather than
+Because the loop ends there, **the clean verdict remains a UMS checkpoint** ---
+don't hold that pass for the merge, which is on the human's clock rather than
 this session's and may land after a `/clear` or not at all.
+**Reading the review is an earlier checkpoint than the verdict.**
+Run UMS when the review arrives (Rebut and Defer included), not only once
+every finding is Addressed or the round comes back clean.
 See `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate";
 the merge-time pass in `post-merge` then only has to cover what the merge
 itself taught.
@@ -168,6 +172,11 @@ The one exception: if the human has explicitly granted the `mwc`
 instruction, not a self-authored one, so baking a self-merge step into a
 wakeup/loop prompt is fine for the rest of that session. See
 [`mwc`](../../skills/mwc/SKILL.md) for the grant's scope and limits.
+The Scope Limit still binds: a disagreement among reviews --- one all-clear
+and another with findings, nits included --- is not fully clean, so `mwc`
+does not authorize merging it.
+ARD every item from every review, then request fresh reviews
+(ai-config#2274).
 
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A
@@ -404,7 +413,7 @@ pull requests share one number space.**
   harmless; check whether the target was open.
 
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
-message".
+message" and "A negated closing-keyword sentence still closes the issue".
 
 **A SHA's provenance is the question its source command answers, not merely
 that a command produced it.**

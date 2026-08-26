@@ -28,7 +28,8 @@ Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
 After bootstrapping, confirm the symlinks resolved and the skills are visible:
 
 ```sh
-ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config ~/.cursor/rules
+ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config
+# ~/.cursor/rules is linked only when no Cursor plugin is already serving those rules
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 python3 scripts/check-harness-installs.py    # audit every installed harness
 ```
@@ -97,7 +98,11 @@ Opening the clone in Cursor loads:
 - project hooks in [`.cursor/hooks.json`](.cursor/hooks.json), which run the `hooks/` catalog through [`.cursor/hooks/adapt-claude-hooks.py`](.cursor/hooks/adapt-claude-hooks.py) (see [Cursor hook mapping](docs/cursor-hook-mapping.md))
 
 **User-global rules.**
-`bootstrap.sh` links [`cursor-rules/`](cursor-rules/) into `${CURSOR_HOME:-$HOME/.cursor}/rules`, so the always-on workflow rules apply in every other Cursor workspace too.
+Install this repo as a Cursor plugin from GitHub (`Morrison-Lab/ai-config`),
+or let `bootstrap.sh` link [`cursor-rules/`](cursor-rules/) into
+`${CURSOR_HOME:-$HOME/.cursor}/rules` when no plugin is already serving them.
+The plugin route and the `~/.cursor/rules` links are alternatives:
+stacking them loads every user-global rule twice.
 Files that exist in both `cursor-rules/` and `.cursor/rules/` must stay identical (`scripts/test_cursor_rules_sync.py`).
 
 **Skills in other workspaces.**
@@ -390,11 +395,12 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
-| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs (not registered -- see ai-config#1717) |
+| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
+| `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-09-01) while the standing directive forbids the Copilot request it would demand |
 | `no-unshipped-commit.py` | `Stop` | blocks a completion reply after a commit with no later push or PR creation |
@@ -427,6 +433,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a separate `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved), or the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`; a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
 | `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
+| `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed (not registered -- see ai-config#2282) |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -485,7 +492,10 @@ Every hook must ship a companion `test-<name>.py` beside it in the same change b
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
 *tested* guard cannot regress unnoticed and an *untested* one cannot hide.
-It gates `validate` and pre-commit.
+Each suite has a 900-second deadline
+(override with `HOOK_TEST_SUITE_TIMEOUT`);
+a hung suite reports FAIL rather than stalling the sweep.
+The runner gates `validate` and pre-commit.
 One hook is untested today
 (`inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in
@@ -616,6 +626,10 @@ same session.
 On the non-plugin path it runs `install-hooks.py --fix`, which is the call that
 registers what the gate had been holding back --- the bare invocation only
 reports.
+`--fix` binds only what is already in `hooks/hooks.json`.
+A hook still on the catalog allowlist of documented-but-inert hooks
+needs its registration PR first.
+That merge is when 3.75 can bind it.
 On a plugin-enabled machine nothing is owed, and `--fix` there double-registers
 every hook rather than helping, per the mutually-exclusive section above.
 
@@ -637,7 +651,7 @@ activated.")
 
 - `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`, and Cursor via plugin or `~/.cursor/skills/`)
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
-- `cursor-rules/` --- user-global Cursor rules (`~/.cursor/rules/`)
+- `cursor-rules/` --- user-global Cursor rules (Cursor plugin or `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace
 - `.cursor/hooks.json` --- Cursor-native project hooks (Cloud agents load these)
 - `.cursor/hooks/` --- adapter that runs the Claude `hooks/` catalog under that schema

@@ -539,6 +539,35 @@ for --- the shape
 narrower question passes the same way".
 Had #1358 still been open, merging #1361 would have closed it.)
 
+## A negated closing-keyword sentence still closes the issue
+
+(`Morrison-Lab/ai-config#1718`, squash `b67a4cfe`, 2026-08-20: the squash
+message contained `Closes #1717 is deliberately NOT used`, then `Refs #1717`.
+The PR body used only `Refs #1717` and did not contain a closing keyword.
+GitHub still closed [#1717](https://github.com/Morrison-Lab/ai-config/issues/1717)
+at `2026-08-20T06:40:40Z`.
+
+The number was the right tracker, and the sentence was trying not to close it.
+GitHub's parser matches `KEYWORD #N` as a substring and does not read the rest
+of the sentence
+(docs retrieved 2026-08-26:
+<https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue>).
+The authoring PR therefore closed the registration follow-up it had left
+unregistered, and the hook stayed out of `hooks/hooks.json`
+until #2275 / #2294 recovered it.
+
+This is the sibling of "An invented `Closes` in a merge commit message"
+above, not a restatement of it: there the number was wrong, here the number
+was right and the negation was ignored.
+It is also not the partial-ship case in
+[`issue-first.md`](issue-first.md), where `Closes #N` is used on purpose and
+closes leftover sub-items.
+
+Keep the number off the keyword (`the closing keyword was not used for #1717`;
+`Refs #1717` only).
+Do not write a sentence that places a closing keyword next to `#N` in order
+to say you are not using it.)
+
 ## A review round surfacing five findings your own conventions already covered
 
 ([gha#219](https://github.com/Morrison-Lab/gha/issues/219)/[#220](https://github.com/Morrison-Lab/gha/pull/220): one review round surfaced five findings --- a DRY

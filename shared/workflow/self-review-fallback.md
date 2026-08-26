@@ -104,6 +104,30 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch through `Task`.
+If `Task` is absent or does not list that persona, that is the
+CLI-fallback case in
+[`adversarial-self-review`](adversarial-self-review.md).
+The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
+
+**The posted comment is that reviewer's report, not a recap the author writes around it.**
+Dispatching and then composing a different comment is the same failure as
+reviewing inline, one step later.
+See [`adversarial-self-review`](adversarial-self-review.md)
+("The posted fallback comment is the reviewer's report")
+and [`memories/cursor.md`](../../memories/cursor.md).
+
+- **Do:** post the dispatched reviewer's structured report
+  (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
+- **Don't:** wrap the verdict in the authoring session's ARD round-history
+  recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
 **Self-review is the immediate fallback so the PR never stalls --
 but declaring the PR clean still requires an external verdict whenever one is reachable.**
@@ -149,13 +173,15 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
-Those two are not interchangeable, which is why the preference still needs
+So the pairing above is now Copilot and `delegate-to-codex`.
+Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the only cross-vendor reviewer this corpus can
-**dispatch** itself.
+`delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
+**dispatches** for that pairing.
+The Cursor `Task` route above is the same-session self-review
+dispatch, not this second-reviewer pairing.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.
@@ -206,7 +232,7 @@ A reviewer that is up and unreachable-by-you hands it to **a human**, in one ste
 The tell is a **permission or identity** answer rather than a capacity one:
 a `403 Resource not accessible by integration` on a dispatch (the token lacks `actions: write`),
 or a comment-triggered run reporting **skipped** rather than failed, which means its job `if:` rejected you ---
-usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR`.
+usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR` or `NONE`.
 The reviewer completing on somebody else's branch the same day settles that it is up.
 
 Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).
@@ -229,6 +255,50 @@ The "don't re-post a request that was skipped" instruction just above is the one
 since it is correct about the gate and silent about the capability claim underneath it.
 Re-derive which of the two you are in each round rather than carrying the classification forward.
 See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
+
+**Publish a dispatched review verbatim --- the posting session transports it, it does not edit it.**
+When the reviewing subagent returns,
+its structured report --- summary, findings, and verdict --- *is* the review.
+The report's entire value is its independence from the authoring session.
+To summarize it, regroup it, translate it into the session's own status prose, or soften its verdict is to discard that value.
+The rewritten version then comes from the party the separate reviewer exists to check.
+A reader cannot tell filtered-out findings from absent ones,
+so a softened publication reads as a cleaner review than occurred.
+
+Post the reviewer's report as received:
+the findings in its order and wording,
+the summary and verdict lines intact,
+attributed to the reviewer,
+with the reviewed commit SHA
+and a one-line header naming what produced it.
+This is the same requirement as the Cursor Cloud route above;
+this section adds that it holds wherever a dispatched review is published,
+not only in that harness.
+
+Publication is **one comment per review**.
+When review rounds follow, each round gets its own comment ---
+several rounds are never bundled into one combined post.
+"As received" governs the content, not the container:
+convert the reviewer's raw output into clean markdown
+--- findings as a numbered list, the verdict stated as its own line ---
+while preserving the wording of every finding and the verdict.
+Publishing a JSON dump or other structured output inside code fences
+is not conversion; it substitutes the reviewer's formatting for readability
+without adding anything the reviewer said.
+The publishing session adds nothing else:
+no status framing, no assessment of the findings,
+no commentary inside the review comment.
+The session's own dispositions of the findings (addressed / rebutted / deferred)
+go in separate follow-up comments or commit messages ---
+never interleaved into the published review body.
+
+- **Do:** publish each review round as its own comment,
+  converted to clean markdown with every finding's wording and the verdict preserved.
+- **Do:** post your dispositions as separate follow-ups, after the reviews are on the record.
+- **Don't:** paraphrase, filter, reorder, summarize, or re-frame a review before publishing it.
+- **Don't:** bundle several rounds into one comment,
+  publish raw structured output (a JSON dump) as the review's form,
+  or add your own commentary to a review comment.
 
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.

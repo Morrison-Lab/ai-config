@@ -31,6 +31,30 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-jules-review-workflow
+        name: check Jules mention-dispatch wrap
+        entry: python scripts/check-jules-review-workflow.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-jules-review-workflow
+        name: Jules-review workflow tests
+        entry: python scripts/test_check_jules_review_workflow.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: check-github-actions-step-if
+        name: check github-actions step-if memory
+        entry: python scripts/check-github-actions-step-if.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-github-actions-step-if
+        name: github-actions step-if memory tests
+        entry: python scripts/test_check_github_actions_step_if.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: markdownlint
         name: markdownlint (markdown style)
         entry: markdownlint-cli2
@@ -47,6 +71,12 @@ repos:
       - id: enforcement-hook-tests
         name: enforcement-hook tests (hooks/test-*.py)
         entry: python scripts/test_hooks.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: hook-runner-tests
+        name: hook-runner tests (scripts/test_hooks.py)
+        entry: python scripts/test_test_hooks.py
         language: python
         pass_filenames: false
         always_run: true

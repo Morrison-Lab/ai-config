@@ -177,7 +177,7 @@ def run(recs, sentinel_dir=None):
         sentinel_dir = tempfile.mkdtemp()
     try:
         p = subprocess.run(
-            ["python3", HOOK],
+            [sys.executable, HOOK],
             input=json.dumps({"transcript_path": tpath}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=sentinel_dir),
@@ -225,7 +225,7 @@ try:
         env = dict(os.environ, TMPDIR=shared)
         payload = json.dumps({"transcript_path": same_path})
         out = [
-            subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+            subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
                            text=True, env=env).stdout.strip()
             for _ in range(2)
         ]
@@ -245,10 +245,10 @@ for got, want, desc in seq:
 # Degenerate inputs must fail OPEN and SILENT, never crash.
 print("\nfails open and silent:")
 degenerate = []
-p = subprocess.run(["python3", HOOK], input="not json", capture_output=True, text=True)
+p = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, text=True)
 degenerate.append((("silent" if not p.stdout.strip() else "REMIND") if p.returncode == 0
                    else f"EXIT{p.returncode}", "silent", "unparseable payload"))
-p = subprocess.run(["python3", HOOK], input=json.dumps({"transcript_path": "/nope"}),
+p = subprocess.run([sys.executable, HOOK], input=json.dumps({"transcript_path": "/nope"}),
                    capture_output=True, text=True)
 degenerate.append((("silent" if not p.stdout.strip() else "REMIND") if p.returncode == 0
                    else f"EXIT{p.returncode}", "silent", "missing transcript"))

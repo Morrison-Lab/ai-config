@@ -371,10 +371,10 @@ elif py -c "pass" >/dev/null 2>&1; then PY=py
 else echo "no working python launcher found"; exit 1
 fi
 ```
-— then invoke `$PY` for the real transform. This both avoids risking a
-second, possibly destructive run of a real script under a bare `||`
-fallback, and fails loudly instead of proceeding with an unverified
-command if neither launcher actually works. (ai-config#635,
+--- then invoke `$PY` for the real transform.
+This both avoids risking a second, possibly destructive run of a real
+script under a bare `||` fallback, and fails loudly instead of proceeding
+with an unverified command if neither launcher actually works. (ai-config#635,
 2026-07-22/23: hit repeatedly running `scripts/validate-skills.py`, and
 again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
@@ -388,34 +388,38 @@ On a Windows console defaulting to cp1252, a Python script that prints a Unicode
 UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
 ```
 
-Two of this repo's checks do exactly that, and `PYTHONIOENCODING=utf-8` fixes both:
+`PYTHONIOENCODING=utf-8` is a caller-side workaround for scripts that still print the glyph:
 
 ```sh
 PYTHONIOENCODING=utf-8 python3 scripts/check-links.py
 PYTHONIOENCODING=utf-8 python3 scripts/check-vendored-drift.py
 ```
 
-**The failure lands on the success path, which is what makes it worth a note rather than a shrug.**
-Both scripts print their check mark only after finding nothing wrong, so the crash happens *because* the check passed.
-The script exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
+**The failure lands on the success path, which is what makes it a broken check rather than a verdict.**
+The script prints the check mark only after finding nothing wrong, so the crash happens *because* the check passed.
+The process exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
 Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links across 463 markdown files.`, then died on `print("\u2713 no broken relative links")` with rc=1.
-Under `PYTHONIOENCODING=utf-8` the same invocation printed the check mark and exited 0.
-`check-vendored-drift.py` behaves identically.
+The same shape was still present on `scripts/check-hook-output-shape.py` as of 2026-08-26 (ai-config#2038): an all-green run under `PYTHONIOENCODING=cp1252` exited 1 on the success line.
 
-The corpus already learned this once and never wrote it down: `scripts/validate-skills.py` opens `main()` with `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`, while `scripts/check-pr-fully-clean.py` prints a bare `\u2713` with no such guard.
-Setting the environment variable is the portable way to cover every script at once without touching any of them.
+The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
+`sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169);
+it still depends on the stream supporting `reconfigure`.
+ASCII cannot fail the encoding.
+Issue [#2080](https://github.com/Morrison-Lab/ai-config/issues/2080) tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
 
 Distinct from the `LC_ALL=C.UTF-8` material in [`fail-fast`](../shared/principles/fail-fast.md) and `memories/debugging.md`, which is an **input**-side problem --- `grep -P` failing to *match* a non-ASCII pattern under a non-UTF-8 locale.
 This one is **output**-side, in the interpreter, on a string the script already holds.
 Different layer, different fix; do not reach for one when you have the other.
 
-- **Do:** set `PYTHONIOENCODING=utf-8` when running a repo Python check from a Windows shell.
+- **Do:** print ASCII on a script's own success or failure line, so a cp1252 stdout cannot turn a green run into exit 1 (ai-config#2038).
+- **Do:** set `PYTHONIOENCODING=utf-8` when running a remaining glyph-printing check from a Windows shell.
 - **Do:** read the traceback's last line before believing a red check --- a `UnicodeEncodeError` on a `print` says nothing about what the check found.
 - **Don't:** treat a nonzero exit from these scripts as a finding, or start hunting for the broken link or the drifted vendored file it never reported.
-- **Don't:** "fix" it by deleting the check mark from the script.
-  The glyph is fine everywhere else, and the environment variable is the portable remedy.
+- **Don't:** leave a Unicode check mark on a success `print` and rely on the caller to set `PYTHONIOENCODING` --- that is a workaround, not a fix.
 
-(2026-08-06, verified both ways on this machine while running the pre-push checks for `Morrison-Lab/ai-config#1224`.)
+(2026-08-06, verified both ways while running the pre-push checks for `Morrison-Lab/ai-config#1224`.
+ASCII-on-the-success-line adopted 2026-08-26 for #2038;
+the 2026-08-06 wording had treated deleting the glyph as the wrong fix.)
 
 opencode's Bash tool on this box has its own failure mode and workaround;
 see [`opencode-bash-windows.md`](opencode-bash-windows.md).
@@ -1118,3 +1122,66 @@ while `_selftest.yml` was green on `main`.)
   If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
   Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
   If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
+
+## `subprocess.run(encoding="utf-8")` on Windows with Python <3.15 defaults to locale encoding
+
+Prior to Python 3.15 (PEP 686 --- measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
+When a CLI tool (such as `gh pr view --json`) outputs UTF-8 text containing non-ASCII characters or emojis, capturing output without specifying UTF-8 encoding corrupts characters (mojibake) or raises `UnicodeDecodeError`.
+Setting `encoding="utf-8"` automatically selects text mode, making `text=True` redundant.
+Distinct from the print-side charmap failure earlier in this file (a UnicodeEncodeError writing emoji to a cp1252 console) --- this section is about decoding child-process output, the opposite direction of the same locale default.
+
+- **Do:** specify `encoding="utf-8"` explicitly when capturing text stdout on Windows: `subprocess.run(["gh", ...], capture_output=True, encoding="utf-8")`.
+- **Don't:** rely on `text=True` alone without `encoding="utf-8"` when reading CLI output containing non-ASCII text.
+
+## Windows PowerShell 5.1 `>` redirection writes UTF-16LE, corrupting `--body-file` payloads
+
+In Windows PowerShell 5.1 and earlier (measured 2026-08-25 on Windows 11), `echo` / `Write-Output` redirected with `>` writes UTF-16LE with a byte order mark (BOM) by default.
+Passing such a file to CLI tools expecting UTF-8 via `--body-file` or `gh api -F "body=@file"` corrupts the payload with null bytes (`^@`).
+
+- **Do:** write payload files as BOM-free UTF-8 using .NET (`[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`) or Python before passing to `--body-file` or `-F body=@<file>`.
+- **Don't:** redirect output with `>` in PowerShell 5.1 for API payload files, and don't pass multi-line or Markdown text inline via `--body "..."` or `-f body="..."` where shells expand backticks.
+
+## Disk exhaustion corrupts state silently --- edits, writes, and git gc
+
+At or near 0 bytes free, tools fail mid-operation without clean errors:
+partially written files, truncated content, corrupted archives.
+Measured 2026-08-20 on Windows 11, Morrison-Lab/ai-config.
+
+Failure modes observed:
+
+- Edit/write tools return success but the file is truncated or partial.
+- Python raises `OSError: [Errno 28] No space left on device` on `open()` ---
+  the honest case; treat any write error at low disk as corruption until
+  verified.
+- `git add` / `git commit` fail on a silently corrupted file.
+
+`git gc --prune=now` (or any repack) on a full disk is its own tier of damage:
+the pack file is partially written, leaving unresolved deltas and
+`error: Could not read <sha>` on every later fetch or pull.
+Deleting loose objects does not help --- the new pack still resolves deltas
+against the missing objects and fails.
+Unrecoverable locally; the only fix is `rm -rf .git && git clone ...`.
+Never run gc when disk is low, and re-clone immediately if fetch starts
+failing after one.
+
+Recovery for edited files: free space first (browser caches, temp dirs,
+Recycle Bin), then verify each suspect file (`wc -l`, `git diff`) against a
+known-good state before trusting it.
+
+Prevention: check free space before any batch of file edits.
+When space is critically low, prefer a Python script written to a temp `.py`
+file over inline edit calls --- it can check space first and fail cleanly.
+
+- **Do:** verify file integrity after any edit made while disk was low.
+- **Do:** skip `git gc` whenever free space is tight.
+- **Don't:** trust an edit tool success response from a full-disk system.
+
+## OpenCode CLI `--file` argument is greedy
+
+The OpenCode CLI's `--file` argument is an array and greedily consumes all positional arguments that follow it.
+Positional prompt strings must be passed *before* `--file` to avoid them being parsed as missing file paths.
+
+- **Do**: `opencode run "my prompt here" --file file1.txt file2.txt`
+- **Don't**: `opencode run --file file1.txt file2.txt "my prompt here"` (it will fail with "File not found: my prompt here").
+
+(Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).

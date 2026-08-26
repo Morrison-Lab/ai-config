@@ -23,7 +23,98 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing, and its clean verdict is still not the one a PR is reported ready on while Claude is reachable (see [`fully-clean`](fully-clean.md)).
+For merges, the next section adds a stricter gate still:
+a second adversarial review from a different model and harness.
+
+## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
+
+(Directive from the user, 2026-08-25: "all reviews, even self-reviews, must be
+adversarial; don't do them yourself, use a subagent, preferably using a
+different model and harness".)
+
+Two gates meet here, and they have different independence bars.
+
+The **self-review duty** (gating a push) takes an adversarial subagent on any
+harness, same-harness included --- that floor buys independence of intent,
+which is what a push gate needs.
+The **merge gate** (see [`fully-clean`](fully-clean.md)) requires more:
+a reviewer differing from the authoring session in **both** model and harness,
+the only configuration that also buys independence of blind spot.
+
+The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
+**opencode**, **claude**, and `codex` wherever installed
+([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
+From the authoring session's perspective the ladder filters itself:
+any entry sharing your model or your harness does not qualify for this gate,
+whatever the list says.
+Dispatch in independence-and-availability order ---
+`agy` CLI or `opencode` first, then `codex`, then `claude` ---
+where each entry qualifies only if both its model and harness
+differ from the authoring session.
+This review order serves independence and measured availability,
+overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
+delegation order for general work.
+A multi-backend harness qualifies only when both its harness
+and its configured model differ from the authoring session.
+`cursor` stays out of the active ladder until its headless dispatch
+is probed here.
+If no qualifying entry remains, autonomous merging waits ---
+it never falls through to a same-model or same-harness reviewer.
+A quota outage reroutes the dispatch --- it does not license skipping it.
+Waiting does not overrule a human:
+escalation to the repository owner per [`fully-clean`](fully-clean.md)'s
+deadlock rule ends in their manual review and merge decision,
+which is the one authority above this gate.
+
+`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
+separate path and remains available --- see
+[`delegation.md`](../../memories/delegation.md)'s delegate ladder.
+A retired API never disqualifies a CLI harness
+that operates on a separate path from it.
+
+A second directive the same day sets the merge consequence:
+"you must not merge, even with mwc enabled,
+unless you have a 100% 'all clear' review verdict
+from an adversarial review".
+
+This **adds** a gate and replaces none.
+Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
+--- including the external automated PR reviewer's clean verdict at head,
+wherever a repo has one ---
+and an author-dispatched subagent verdict never satisfies that external gate.
+What is added: a merge additionally requires
+the author-dispatched cross-model, cross-harness reviewer's
+100% all-clear adversarial verdict at the shipping head.
+A Needs-more-work verdict blocks until a compliant re-dispatch returns
+all-clear at the new head.
+A skip notice, a stub, or a stale-head verdict clears nothing.
+A split --- one all-clear and another not-clean, nits included --- is not
+100% all-clear, and `mwc` does not authorize merging it
+(ai-config#2274).
+ARD every item from every review, then request fresh reviews.
+If no qualifying reviewer is reachable, the merge waits ---
+"blocked on reviewer availability" is the honest status ---
+and arming an auto-merge while waiting is
+[Pattern 12](../../memories/mistake-patterns.md).
+
+
+The merge-side rules live with the gate they serve:
+
+- **Do:** for any merge, use a reviewer on a **different model and harness**
+  from your own
+  (agy CLI, opencode, codex,
+  claude only for sessions authored outside Claude,
+  or cursor once its headless dispatch is measured),
+  and report which harness produced each verdict.
+- **Don't:** merge anything --- under any grant, `mwc` included ---
+  without a 100% all-clear adversarial verdict at the shipping head.
+  A skip notice, a stub, an older-head verdict,
+  or a same-harness convenience pass clears nothing.
+- **Don't:** reuse a passing same-harness pre-push verdict
+  to satisfy the merge gate.
+  A merge needs its own cross-model, cross-harness verdict
+  evaluating the shipping head.
+
 
 ## What "separate" requires
 
@@ -43,11 +134,61 @@ A reviewer that can edit turns a finding into a silent fix, which loses the find
 A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
 
-Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
+Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
 Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
+
+**Cursor Cloud has a subagent dispatch.**
+On Cursor Cloud, when the session's `Task` tool lists
+`adversarial-reviewer`, that is the dispatch
+(measured 2026-08-25 PDT on a Grok conductor).
+If `Task` is absent or does not list that persona,
+that is the CLI-fallback case above.
+Morrison-Lab/ai-config's Cursor adapter skips
+`no-push-without-self-review.py` until
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
+so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
+under any reviewer
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
+on the report recovered from the child's transcript
+when the worktree hook script exists
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
+If the worktree script is missing, obtain a CLI review.
+Do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
+The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
+do not invent one,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
+Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
+If the dispatch errored, produced no report,
+or produced a report whose fingerprint cannot be recovered
+(including a stale-registered persona),
+obtain a CLI review,
+write that reviewer's report to a file under `/tmp`,
+and call `parse_report()` on that file.
+If Claude Code's native guard is also running, the prefix
+is that guard's escape even when the adapter skip makes
+it inert for the adapter.
 
 ## Brief it with the diff and the standards, never with your rationale
 
@@ -99,9 +240,45 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 A dispatched reviewer makes that concrete, because the finding now has an author who is not you: give each one Address, Rebut, or Defer-to-a-tracked-issue per [`ard`](../../skills/ard/SKILL.md), in writing, exactly as for a finding from the PR's own reviewer.
 "I know why that is fine" is a Rebut, and a Rebut is something you would be willing to post.
 
+## The posted fallback comment is the reviewer's report, not an author composite
+
+When the self-review is posted as a PR comment, the comment body **is**
+the dispatched reviewer's structured report, then the required
+disclosure marker from
+[`disclose-agent-authorship`](disclose-agent-authorship.md).
+The marker is forge attribution, not author recap.
+Dispatching the reviewer and then writing a different review body is the
+same failure as reviewing inline, one step later: the authoring session
+still composed the text that readers treat as the review.
+
+Measured 2026-08-25 on
+[ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
+A foreground `Task` dispatch
+(`bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`, catalog name
+"Final review HEAD f71c02ea") ran on `f71c02ea`.
+The posted comment was author-assembled, labeled
+"Fallback self-review", copied the child's
+`### Verdict: Ready for merge` and `Reviewed-Commit` lines, and wrapped
+them in a 16-item
+"Round history that was Addressed, Rebutted, or Deferred" ledger.
+That comment is the wrap, not the parent `Task` JSON.
+How Cursor Cloud obtains the child's structured report is in
+[`memories/cursor.md`](../../memories/cursor.md).
+
+- **Do:** post the dispatched reviewer's structured report
+  (Summary / Findings / Verdict / Reviewed-Commit) as the fallback comment,
+  then append the required disclosure marker.
+  How Cursor Cloud obtains that report is in
+  [`memories/cursor.md`](../../memories/cursor.md).
+- **Don't:** wrap the verdict in the authoring session's ARD round-history
+  recap in the same comment.
+- **Don't:** omit the disclosure marker, or treat that marker as license to
+  add an ARD ledger.
+- **Don't:** paraphrase a missing reviewer body as Ready for merge.
+
 ## The mechanism
 
-[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case on Claude Code, per [`algorithmatize-checks`](algorithmatize-checks.md).
 It answers three questions rather than one, because provenance alone is not enough.
 
 *Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.
@@ -116,9 +293,13 @@ That is also why the review comes **after** committing, which is where [`ardi`](
 
 The other cases have no guard and are prose rules here.
 
-- **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.
+- **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
+  (foreground, read-only) for the pre-push self-review gate,
+  and report which agent produced the verdict.
+- **Do:** at merge time, satisfy the separate cross-model, cross-harness
+  gate defined under "Cross-model and cross-harness reviews are required
+  for merging, and the harness list is concrete" above.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
-- **Do:** chase a cross-vendor reviewer on top of it wherever one is reachable.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.

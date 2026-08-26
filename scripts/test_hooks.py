@@ -23,9 +23,18 @@ This runner does two things:
 explicit, reviewable debt; adding a NEW hook without a test fails this check.
 Tracked in ai-config#1080 -- write those tests, then empty the allowlist.
 
+A hung suite used to stall the whole sweep with no timeout and nothing on
+stdout (ai-config#2098, observed on Windows). Each suite now has a deadline;
+expiry prints FAIL and the runner continues. Override with
+HOOK_TEST_SUITE_TIMEOUT (seconds). Killing the suite on expiry is not
+itself enough on Windows: `subprocess.run()`'s own retry-after-kill can
+hang again if a descendant process inherited a pipe handle, so this runner
+does its own bounded drain instead (see DRAIN_TIMEOUT_S).
+
 Run: python3 scripts/test_hooks.py
 """
 import glob
+import math
 import os
 import subprocess
 import sys
@@ -33,10 +42,83 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
+# Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
+# slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
+# mutation rounds) finished in 178s. 900s is about 5x that, so a slow
+# Windows box has headroom past the 420s kill of the hang that never
+# produced output (ai-config#2098) while still FAILing an infinite
+# stall. Override with HOOK_TEST_SUITE_TIMEOUT.
+DEFAULT_SUITE_TIMEOUT_S = 900
+
+# The largest HOOK_TEST_SUITE_TIMEOUT this runner accepts. A genuinely
+# finite, positive value can still crash the sweep: Popen.communicate()'s
+# poll()-based selector (selectors.PollSelector -- CPython's subprocess
+# module deliberately avoids epoll/kqueue here, per its own comment about
+# not spending an extra file descriptor) converts the timeout to
+# milliseconds as a C int, so a value above roughly INT_MAX ms
+# (~2147483s, ~24.9 days) raises OverflowError -- measured directly
+# through the real path (Linux, Python 3.11.15, 2026-08-26:
+# `Popen(...).communicate(timeout=1e9)` raises "timeout is too large")
+# and reported independently on Python 3.12.3 for
+# HOOK_TEST_SUITE_TIMEOUT=1000000000. Windows uses blocking reads on
+# child threads instead of a selector, so the exact boundary there is
+# unmeasured; the cap stays far below every candidate boundary. That exception is not caught
+# anywhere a per-suite FAIL could absorb it, so it aborts the whole sweep
+# exactly like the nan/inf cases below. One day is far more than any suite
+# should ever need and stays safely under that boundary on every platform
+# this runner targets.
+MAX_SUITE_TIMEOUT_S = 86400
+
 # Hooks that ship without a test today. An explicit, reviewable list -- not a
 # silent gap. A new hook is expected to bring its test; this list should only
 # ever shrink. See ai-config#1080.
 KNOWN_UNTESTED = {"inject-local-time.sh"}
+
+
+def suite_timeout_s():
+    """Seconds a single hooks/test-*.py may run before the runner FAILs it."""
+    raw = os.environ.get("HOOK_TEST_SUITE_TIMEOUT")
+    if raw is None or raw == "":
+        return DEFAULT_SUITE_TIMEOUT_S
+    try:
+        value = float(raw)
+    except ValueError:
+        sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} is not a number")
+    # nan and inf both pass `value <= 0` (nan comparisons are false;
+    # inf is positive). On POSIX Python 3.12.3 (Linux, measured
+    # 2026-08-26), subprocess.run(timeout=nan) raises ValueError
+    # immediately and timeout=inf raises OverflowError, even for an
+    # instant child; either would abort the whole sweep with no
+    # per-suite FAIL. timeout=-inf raises TimeoutExpired immediately.
+    # Rejecting all three names the bad env var instead of crashing,
+    # and does not treat -inf as a zero-second deadline.
+    if not math.isfinite(value) or value <= 0:
+        sys.exit(
+            f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be a positive "
+            "finite number")
+    if value > MAX_SUITE_TIMEOUT_S:
+        sys.exit(
+            f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} exceeds the "
+            f"{MAX_SUITE_TIMEOUT_S}s maximum (a larger value can overflow "
+            "the underlying subprocess wait and crash the whole sweep "
+            "instead of FAILing one suite)")
+    return value
+
+
+def _timeout_label(timeout):
+    """Render a timeout for the FAIL line without a trailing .0."""
+    if timeout == int(timeout):
+        return str(int(timeout))
+    return str(timeout)
+
+
+def _decode_captured(blob):
+    """TimeoutExpired.stdout/stderr may be str, bytes, or None."""
+    if blob is None:
+        return ""
+    if isinstance(blob, bytes):
+        return blob.decode("utf-8", errors="replace")
+    return blob
 
 
 def test_for(subject_basename):
@@ -57,8 +139,64 @@ def subjects():
     return out
 
 
-def run_suites():
+# After killing a timed-out suite, how long to wait for its output to drain
+# before giving up on capturing it. subprocess.run()'s OWN TimeoutExpired
+# handling calls communicate() a second time with NO timeout on Windows, to
+# collect output for the exception -- see CPython's subprocess.py: "Windows
+# accumulates the output in a single blocking read() call run on child
+# threads ... communicate() after kill() is required to collect that". kill()
+# only kills the direct child; a descendant that inherited the pipe write
+# handle (e.g. a git helper a suite spawned) can keep that pipe open past the
+# child's death, so the unbounded second communicate() never sees EOF and the
+# whole sweep hangs again -- past the deadline this runner exists to enforce.
+# Doing our own bounded retry, and giving up on the output rather than
+# waiting forever, is what keeps the per-suite deadline a real deadline.
+DRAIN_TIMEOUT_S = 5
+
+
+def run_one_suite(test_path, subject, timeout):
+    """Run one suite against its subject. Returns 0 on pass, 1 on fail."""
+    rel_test = os.path.relpath(test_path, ROOT)
+    print(f"RUN: {rel_test}", flush=True)
+    proc = subprocess.Popen(
+        [sys.executable, test_path, subject],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            stdout, stderr = proc.communicate(timeout=DRAIN_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            stdout = stderr = None
+            proc.stdout.close()
+            proc.stderr.close()
+        print(f"FAIL: {rel_test} (timed out after {_timeout_label(timeout)}s)")
+        sys.stdout.write(_decode_captured(stdout))
+        sys.stderr.write(_decode_captured(stderr))
+        if stdout is None and stderr is None:
+            # Known trade-off: only the direct child was killed above, so
+            # a descendant that inherited the pipe survives as an orphan
+            # until it exits on its own. Killing the whole process group
+            # (start_new_session=True) would close that, at the cost of
+            # changing signal semantics for every well-behaved suite.
+            print("(output unavailable: a descendant process still held the "
+                  "pipe after the suite was killed)")
+        return 1
+    tail = (stdout.strip().splitlines() or ["(no output)"])[-1]
+    if proc.returncode == 0:
+        print(f"PASS: {rel_test} -- {tail}")
+        return 0
+    print(f"FAIL: {rel_test} (exit {proc.returncode})")
+    sys.stdout.write(stdout)
+    sys.stderr.write(stderr)
+    return 1
+
+
+def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
+    if timeout is None:
+        timeout = suite_timeout_s()
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     for test_path in tests:
@@ -69,16 +207,7 @@ def run_suites():
             print(f"FAIL: {rel_test} has no subject at {rel_subj}")
             failures += 1
             continue
-        proc = subprocess.run(
-            [sys.executable, test_path, subject], capture_output=True, text=True)
-        tail = (proc.stdout.strip().splitlines() or ["(no output)"])[-1]
-        if proc.returncode == 0:
-            print(f"PASS: {rel_test} -- {tail}")
-        else:
-            print(f"FAIL: {rel_test} (exit {proc.returncode})")
-            sys.stdout.write(proc.stdout)
-            sys.stderr.write(proc.stderr)
-            failures += 1
+        failures += run_one_suite(test_path, subject, timeout)
     return failures, len(tests)
 
 

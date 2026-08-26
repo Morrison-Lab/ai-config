@@ -189,7 +189,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             if found_sha != exp_sha:
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
-    verdict_matches = re.findall(r"(?im)^(?:(?:###\s*)?(?:Summary\s+)?Verdict:\s*)?(.+)$", summary_text)
+    verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
     if not verdict_matches:
         bold_matches = re.findall(
             r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",

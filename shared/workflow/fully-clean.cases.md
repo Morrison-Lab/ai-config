@@ -124,8 +124,10 @@ a terminal clean claim,
 a partial reading (`gh pr checks` or `statusCheckRollup`),
 and no complete enumeration since the last push.
 
-- **Do:** take a clean verdict from `check-pr-fully-clean.py`
-  or a paginated `commits/<sha>/check-runs` read.
+- **Do:** take a fully-clean verdict from `check-pr-fully-clean.py`.
+  A paginated `commits/<sha>/check-runs` read covers the check-run half only;
+  pair it with the review criteria when the claim is terminal fully-clean
+  (see Pattern 5c in `memories/mistake-patterns.md`).
 - **Don't:** report a PR clean from `gh pr checks` counts,
   however current the reading is ---
   currency and completeness are different properties,

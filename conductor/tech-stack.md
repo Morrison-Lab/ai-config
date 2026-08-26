@@ -1,7 +1,7 @@
 # Technology Stack: `ai-config`
 
 ## Core Languages & Runtimes
-- **Python 3.10+**: Core implementation language for repository validation, skill wrapper generation, link checking, hook implementations, and standalone test suites.
+- **Python 3.10+** (as of Aug 2026): Core implementation language for repository validation, skill wrapper generation, link checking, hook implementations, and standalone test suites.
 - **Bash / POSIX Shell**: Portability layer for `bootstrap.sh`, harness setup scripts, and environment lifecycle management.
 - **Markdown & Quarto**: Authoring formats for human/agent documentation, skill manuals, shared fragments, and website compilation (`_quarto.yml`).
 

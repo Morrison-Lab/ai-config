@@ -516,7 +516,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         invoker = ""
         if os.environ.get("CLAUDE_SESSION_ID"):
             invoker = "claude"
-        elif os.environ.get("GEMINI_SESSION_ID") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
+        elif os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
             invoker = "antigravity"
         elif "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
             invoker = "cursor"

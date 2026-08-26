@@ -39,7 +39,6 @@
   "globs": ["**/*.md"],
   "ignores": [
     "codex-skills/**",   // generated from skills/ by sync-codex-skill-wrappers.py
-    "conductor/**",      // Conductor SDD scaffolding
     ".aider*",           // aider chat logs
     "**/node_modules/**",
     "docs/**",           // built site output

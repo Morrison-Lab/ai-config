@@ -14,7 +14,7 @@
 
 ## Task Workflow
 
-All tasks follow a strict lifecycle:
+All tasks follow a lifecycle (subordinate to the universal rules in AGENTS.md):
 
 ### Standard Task Workflow
 

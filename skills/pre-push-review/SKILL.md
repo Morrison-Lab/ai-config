@@ -22,7 +22,7 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 
 1. Computes the local outgoing diff against `origin/main` (or the detected PR base / explicit base branch).
 2. Injects universal repository standards (`AGENTS.md`).
-3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
+3. Dispatches to the selected engine or auto-fallback chain in plan/read-only mode (`claude` -> `cursor` -> `codex` -> `opencode` -> `agy`), or alternates round-robin across available models.
 4. Strictly parses and validates structured findings (Summary Verdict, Critical Findings, Observations, Verification Steps, and Reviewed-Commit SHA).
 5. Exits nonzero on blocking `Needs work` findings (unless `--allow-findings` is specified) and optionally posts verified review notes directly to the GitHub PR.
 

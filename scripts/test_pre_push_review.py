@@ -462,21 +462,44 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "OpenAI Codex")
         mock_claude.assert_called_once()
         mock_codex.assert_called_once()
+    @patch.object(reviewer, "run_claude_review")
     @patch.object(reviewer, "run_codex_review")
     @patch.object(reviewer, "detect_available_engines")
-    def test_execute_review_alternate_invoker_exclusion(self, mock_detect, mock_codex):
+    def test_execute_review_alternate_invoker_exclusion(self, mock_detect, mock_codex, mock_claude):
         mock_detect.return_value = ["claude", "codex"]
         mock_codex.return_value = "### Summary Verdict\nVerdict: Ready for merge"
+        mock_claude.return_value = "### Summary Verdict\nVerdict: Ready for merge"
 
         # When CLAUDE_SESSION_ID is set, Claude is excluded from 'alternate'
-        with patch.dict(os.environ, {"CLAUDE_SESSION_ID": "12345"}):
+        with patch.dict(os.environ, {"CLAUDE_SESSION_ID": "12345"}, clear=True):
             with patch.object(reviewer, "get_next_alternate_engine", return_value="codex") as mock_get_next:
                 reviewer.execute_review("alternate", "prompt text")
                 mock_get_next.assert_called_with(["codex"])
 
+        # When ANTIGRAVITY_AGENT is set, antigravity is excluded
+        mock_detect.return_value = ["claude", "antigravity"]
+        with patch.dict(os.environ, {"ANTIGRAVITY_AGENT": "1"}, clear=True):
+            with patch.object(reviewer, "get_next_alternate_engine", return_value="claude") as mock_get_next:
+                reviewer.execute_review("alternate", "prompt text")
+                mock_get_next.assert_called_with(["claude"])
+
+        # When Cursor is set via AGENT_NAME, cursor is excluded
+        mock_detect.return_value = ["claude", "cursor"]
+        with patch.dict(os.environ, {"AGENT_NAME": "Cursor Grok 4.6"}, clear=True):
+            with patch.object(reviewer, "get_next_alternate_engine", return_value="claude") as mock_get_next:
+                reviewer.execute_review("alternate", "prompt text")
+                mock_get_next.assert_called_with(["claude"])
+
+        # When OPENCODE_SESSION_ID is set, opencode is excluded
+        mock_detect.return_value = ["claude", "opencode"]
+        with patch.dict(os.environ, {"OPENCODE_SESSION_ID": "123"}, clear=True):
+            with patch.object(reviewer, "get_next_alternate_engine", return_value="claude") as mock_get_next:
+                reviewer.execute_review("alternate", "prompt text")
+                mock_get_next.assert_called_with(["claude"])
+
         # When CODEX_THREAD_ID is set and only codex is available, it fails and returns None
         mock_detect.return_value = ["codex"]
-        with patch.dict(os.environ, {"CODEX_THREAD_ID": "67890"}):
+        with patch.dict(os.environ, {"CODEX_THREAD_ID": "67890"}, clear=True):
             with patch.object(reviewer, "log_error") as mock_log_error:
                 report, label = reviewer.execute_review("alternate", "prompt text")
                 self.assertIsNone(report)

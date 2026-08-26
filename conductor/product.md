@@ -3,7 +3,7 @@
 ## Overview
 `ai-config` is the centralized, portable configuration repository and multi-agent workflow framework for Morrison-Lab. It provides vendor-neutral instruction layering, shared skills, memories, commands, hooks, and automated testing across diverse AI coding agent harnesses.
 
-## Target Audience & Supported Harnesses
+## Target Audience & Supported Harnesses (as of Aug 2026)
 - **Claude Code**: Direct import via `@path`, custom commands, subagents, and hooks.
 - **Google Antigravity & Gemini CLI**: Workspace discovery via `.agents/` manifests, global plugin bundles, and rules.
 - **OpenAI Codex CLI**: Generated skill wrappers in `codex-skills/` and automated tool mapping.

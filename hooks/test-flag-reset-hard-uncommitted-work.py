@@ -247,7 +247,7 @@ SHOULD_STAY_SILENT = [
 def verdict(hook_path, repo, command):
     payload = bash(command)
     proc = subprocess.run(
-        ["python3", hook_path], input=json.dumps(payload),
+        [sys.executable, hook_path], input=json.dumps(payload),
         capture_output=True, text=True, cwd=repo,
     )
     if proc.returncode != 0:

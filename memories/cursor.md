@@ -727,3 +727,16 @@ Do not remove this flag in the name of tighter sandboxing for automated review s
 
 (Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
 
+## Auto-review push blocks are not a stop
+
+Cursor Auto-review may refuse `git push` / `gh pr comment` until a smart-mode
+approval card is shown.
+That is a client gate, not a missing user grant.
+Standing permission already covers push and PR updates
+(`AGENTS.md` "Default to action"; preferences "always push and PR").
+
+- **Do:** retry the push/comment with the approval path the client requires,
+  or ask once for that card when the harness cannot show it --- then push.
+- **Don't:** end the turn with commits ahead of origin and
+  "say if you want those pushed" (ai-config#2277, 2026-08-26).
+

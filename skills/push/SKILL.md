@@ -57,7 +57,8 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 
 Where Morrison-Lab/ai-config's Cursor adapter skips the guard
 (Cloud and desktop with that project open),
-the prefix is inert.
+the prefix is inert under every reviewer,
+including a CLI-delivered one.
 Do not use it, and compare `Reviewed-Commit` by hand instead.
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.

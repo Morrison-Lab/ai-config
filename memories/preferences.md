@@ -987,11 +987,13 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly (mechanics below) |
+| `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
-Headless `agy`, in one line: `agy --print="<prompt>" [--effort low]`.
-Full mechanics, flags, and measured quirks are in the `agy --print` notes under Delegate heavy work below.
+Headless dispatch: `agy --print="<prompt>" [--effort low]`.
+The prompt flag consumes the next token,
+so attach the prompt to the flag and keep other flags outside it.
+Further measured quirks appear in the delegate notes in this section.
 
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)

@@ -46,22 +46,22 @@ a reviewer differing from the authoring session in **both** model and harness,
 the only configuration that also buys independence of blind spot.
 
 The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
-**opencode**, and **claude**;
-[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)'s `codex`
-belongs in the same ladder wherever installed.
+**opencode**, **claude**, and `codex` wherever installed
+([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Dispatch in priority order ---
+Dispatch in independence-and-availability order ---
 `agy` CLI or `opencode` first, then `codex`, then `claude`
-(qualifying only for sessions authored outside Claude), then `cursor` ---
+(qualifying only for sessions authored outside Claude) ---
 moving down when one is out of quota.
-Known-good headless entry points are the `agy` CLI and `opencode`,
-followed by `codex` and `claude` where installed,
-with `cursor` last --- named in the inventory but not yet probed headless here.
-A qualifying harness must itself differ from the authoring session's harness,
-and a multi-backend one must additionally be configured
+This review order serves independence and measured availability,
+overriding [`preferences.md`](../../memories/preferences.md)'s cost-first
+delegation order for general work.
+A multi-backend harness qualifies only when configured
 to run a non-author model.
+`cursor` stays out of the active ladder until its headless dispatch
+is probed here.
 If no qualifying entry remains, the merge waits;
 it never falls through to a same-model or same-harness reviewer.
 A quota outage reroutes the dispatch --- it does not license skipping it.
@@ -83,7 +83,8 @@ Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
 wherever a repo has one ---
 and an author-dispatched subagent verdict never satisfies that external gate.
 What is added: a merge additionally requires
-that reviewer's 100% all-clear adversarial verdict at the shipping head.
+the author-dispatched cross-model, cross-harness reviewer's
+100% all-clear adversarial verdict at the shipping head.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.

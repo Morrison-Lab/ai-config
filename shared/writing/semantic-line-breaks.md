@@ -172,8 +172,11 @@ above, so the answer was one read away.
 
 - **Do:** name the check you actually ran when reporting a line-break result,
   and say whether it was the gate or the reformatter.
-- **Don't:** read the reformatter's silence as a gate pass --- it has no width
-  policy, so it is silent about precisely the violation it creates.
+- **Don't:** keep teaching the pre-#2085 reformatter's silence as a gate pass.
+  That vintage had no semicolon rule, so it was silent about the violation
+  it created.
+  After #2085 the reformatter splits those lines.
+  A clean run still is not the `pull_request`-triggered job.
 
 **Fourth dated recurrence, 2026-08-24, the same day as #2085.**
 PR #2071 carried a memory entry whose added lines passed a deliberate scoped
@@ -194,8 +197,11 @@ lesson, until review consolidated it here instead.
 
 - **Do:** search this fragment and the open issues for the root cause before
   banking a SemBr failure as a new memory entry.
-- **Don't:** treat a clean scoped reformatter run on your own added lines as
-  covering what the clause rule will read differently.
+- **Don't:** treat a 2026-08-24 clean scoped reformatter run as covering the
+  clause rule --- that vintage had no semicolon split, which is why #2085
+  exists.
+  After #2085, `--write` splits what `classify_line` flags.
+  It still is not the diff-scoped CI job.
 
 **A green check run named for this gate may never have run it, and both runs
 carry the same name.**
@@ -469,8 +475,11 @@ locally, so a local run **of `check-new-line-breaks.py`** cannot silently
 under-report that case.
 Naming the script matters only when this sentence is read out of its
 subsection, where "a local run" could otherwise be taken for
-`scripts/semantic-line-breaks.py` --- which has no semicolon rule, per "This
-repo's own reformatter is not that check" above.
+`scripts/semantic-line-breaks.py`.
+That script now consumes this same checker (ai-config#2085), but it is a
+reformatter of named files, not the diff-scoped job.
+It does not apply `NLB_PATHS_IGNORE`, and it does not restrict itself to
+lines added since `NLB_BASE_REF`.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

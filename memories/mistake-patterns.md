@@ -23,7 +23,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 4: Incomplete Workflow Follow-Through
 - **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
 - **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
-- **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+- **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md). That "watch and ARDI" default applies when you are driving the branch, not when you were asked only to review it --- see [`reviewing-prs.md`](reviewing-prs.md) ("Review-only is not working the PR").
 - **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
 ## Pattern 5: Bypassing Existing Repo Knowledge

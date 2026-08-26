@@ -26,6 +26,10 @@ PARTIAL_ROLLUP = {"type": "assistant", "message": {"content": [
 CHECKER = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"}}]}}
+CHECKER_2277 = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-pr-fully-clean.py 2277 "
+                   "-R Morrison-Lab/ai-config"}}]}}
 ENDPOINT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "gh api repos/ucdavis/bcs/commits/a5f4f3f2/check-runs?per_page=100 --paginate"}}]}}
@@ -50,7 +54,7 @@ CASES = [
      "the real incident: declared fully clean off gh pr checks alone"),
     ([PARTIAL_ROLLUP, say("#2277 is ready for merge.")], True,
      "statusCheckRollup alone cannot back a terminal clean claim"),
-    ([PARTIAL_ROLLUP, CHECKER, say("#2277 is fully clean.")], False,
+    ([PARTIAL_ROLLUP, CHECKER_2277, say("#2277 is fully clean.")], False,
      "rollup then checker -- claim rests on the complete read"),
     ([PARTIAL_ROLLUP, say("8 success, 0 pending on the rollup.")], False,
      "rollup progress report is not a terminal claim"),

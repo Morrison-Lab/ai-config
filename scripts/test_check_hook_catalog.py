@@ -308,6 +308,9 @@ check("urllib 403 is unfetchable skip",
 check("urllib 200 open is open",
       _fetch_with_urlopen(lambda *a, **k: _OpenBody(b'{"state":"open"}'))
       == "open")
+check("urllib 200 closed is closed",
+      _fetch_with_urlopen(lambda *a, **k: _OpenBody(b'{"state":"closed"}'))
+      == "closed")
 
 seen_urls = []
 

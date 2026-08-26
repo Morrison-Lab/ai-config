@@ -152,14 +152,19 @@ it; use the correct private tracker and redact sensitive details when needed.
 
 @shared/workflow/flag-session-boundaries.md
 
-Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
+This could be a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, or an open question answered with nothing pending.
+Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.
 A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 
 ## Flag good moments to run `compress-session`, too
 
-The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
+The mid-task counterpart is covered in the fragment above.
+Don't wait for automatic compaction to guess what matters.
+Flag it yourself (using the same `⚠️ **FLAG** ---` tag) once a session has grown large with a live task still in flight.
+This applies when there are many tool calls, long tool outputs no longer needed, or a session is already through one auto-compaction.
 Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
 ## Actively manage quota usage: models, compaction, and workflow structure
@@ -343,7 +348,7 @@ Boxed (a `===` line above and below the labeled block):
 Prefixed, no box (informational, frequent):
 
 - 📊 **UPDATE** — status or progress.
-- ⚠️ **FLAG** — non-blocking heads-up or risk.
+- ⚠️ **FLAG** --- non-blocking heads-up or risk.
 - ✔️ **DONE** — a completed action.
 - 🟢 **ALL CLEAR** — nothing needs the user right now; work continues in the background. The recap's standing sign-off.
 
@@ -710,7 +715,9 @@ Its second half is the general principle: best practice outranks repo precedent 
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
-The proactive counterpart to issue-first above: when a mistake shows up in any medium — code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else — even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
+The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else),
+even if it is out of scope for the current task, flag it in chat (`⚠️ **FLAG** ---`),
+and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 

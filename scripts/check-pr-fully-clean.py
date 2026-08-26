@@ -345,12 +345,22 @@ def _detect_review_agent(body: str) -> Optional[str]:
     is not a review; it means the comment is not one of the agents whose format
     we recognise.  A new agent or a format change lands here until its marker is
     added to ``REVIEW_AGENT_MARKERS``.
+
+    The earliest marker in the text wins, not dict order. Claude's marker is
+    first in the table, so a first-line Antigravity header that later quotes
+    ``**Claude finished**`` would otherwise inherit Claude (#2274).
     """
     body_lower = body.lower()
+    best_pos = None
+    best_name = None
     for marker, name in REVIEW_AGENT_MARKERS.items():
-        if marker in body_lower:
-            return name
-    return None
+        pos = body_lower.find(marker)
+        if pos < 0:
+            continue
+        if best_pos is None or pos < best_pos:
+            best_pos = pos
+            best_name = name
+    return best_name
 
 
 def is_non_review_notice(body: str) -> bool:

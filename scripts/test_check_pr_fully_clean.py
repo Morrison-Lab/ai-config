@@ -551,6 +551,33 @@ def main() -> int:
         checker._reviewer_identity(quoted_claude_same_para, "github-actions")
         == "Antigravity",
     )
+    quoted_claude_on_agy_first_line = (
+        "### \U0001f916 Antigravity Agent Report --- see **Claude finished** "
+        "from round 1"
+    )
+    check(
+        "_reviewer_identity: leftmost marker on the first line wins, not "
+        "REVIEW_AGENT_MARKERS dict order",
+        checker._reviewer_identity(quoted_claude_on_agy_first_line, "github-actions")
+        == "Antigravity",
+    )
+    items_first_line_quote = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            quoted_claude_on_agy_first_line + "\n\nVerdict: Clean / Ready for merge.",
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    fl_ok, fl_issues = checker.check_latest_verdict(items_first_line_quote)
+    check(
+        "check_latest_verdict: Antigravity header quoting Claude on the same "
+        "line does not collapse the two reviewers (#2274)",
+        (not fl_ok) and any("Claude" in i and "different reviewer" in i for i in fl_issues),
+    )
     items_same_para = [
         items_cross_reviewer[0],
         (

@@ -41,9 +41,11 @@ a row can name every hook correctly and still tell a reader the wrong event.
 When a tracker cannot be fetched (offline, timeout, or rate limit), this check
 prints `SKIP` and does not fail. That skip is the documented offline path, not
 a silent pass: the line is visible, and tests assert it. A 404/410 is not a
-skip -- a missing tracker is the same class of defect as a closed one. Inject
-states via `HOOK_CATALOG_ISSUE_STATES` (a JSON object of `{issue: state}`, or
-the token `unfetchable`) so tests never hit the network.
+skip -- a missing tracker is the same class of defect as a closed one. Fixture
+tests inject states via `HOOK_CATALOG_ISSUE_STATES` (a JSON object of
+`{issue: state}`, or the token `unfetchable`) so those cases never hit the
+network. A separate live case fetches; the urllib 404 path is locked with a
+stub, not by a live GET that can skip.
 
 Hard-gating rather than advisory. Unlike a file-length threshold, nothing here
 is a judgment call -- the two sets either match or they do not.
@@ -85,7 +87,9 @@ KNOWN_UNREGISTERED = {
 }
 
 # Public repo (measured 2026-08-26); unauthenticated GET works. A token, when
-# present, stays under a higher rate limit. Override via GITHUB_REPOSITORY.
+# present, stays under a higher rate limit. Do not read GITHUB_REPOSITORY:
+# KNOWN_UNREGISTERED numbers belong to this repo, and a fork CI run would
+# 404 them against the fork. Override via HOOK_CATALOG_REPO only in tests.
 DEFAULT_REPO = "Morrison-Lab/ai-config"
 ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
 UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
@@ -208,7 +212,7 @@ def fetch_issue_state(number):
     if injected is not None:
         return injected.get(str(number))
 
-    repo = os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
+    repo = os.environ.get("HOOK_CATALOG_REPO", DEFAULT_REPO)
     url = f"https://api.github.com/repos/{repo}/issues/{int(number)}"
     headers = {
         "User-Agent": "ai-config-check-hook-catalog",

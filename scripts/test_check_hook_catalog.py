@@ -12,12 +12,15 @@ the way this particular check could silently pass forever -- a README whose
 table shape changed would otherwise make every set comparison compare nothing.
 """
 import importlib.util
+import io
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).parent / "check-hook-catalog.py"
 ROOT = Path(__file__).parent.parent
@@ -250,21 +253,76 @@ case("injected tracker states must be an object",
      want_fail=True, needle="must be a JSON object",
      allowlisted=test_allow, issue_states="[]")
 
-# Live HTTP 404 (issue 9999 does not exist). Tests the urllib path, not the
-# injected `missing` token. An offline miss is a visible skip, not a PASS.
-with tempfile.TemporaryDirectory() as td:
-    root = make_repo(
-        td, [("a.py", "Stop", "")],
-        [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
-        allowlisted=test_allow)
-    rc, out = run(root, issue_states=None)
-    if "SKIP: could not fetch" in out:
-        skip("HTTP 404 is a missing tracker", "issue 9999 could not be fetched")
-    else:
-        check("HTTP 404 is a missing tracker",
-              rc != 0 and "which does not exist" in out)
-        if rc == 0 or "which does not exist" not in out:
-            print(f"      rc={rc}\n{out}")
+# urllib 404/410 must return `missing`, not None. A live GET of issue 9999
+# cannot lock that: both a 404-as-skip regression and a real offline miss
+# print `SKIP: could not fetch` and would skip() to rc=0. Stub urlopen so
+# the mapping cannot skip-pass.
+def _http_error(code):
+    return urllib.error.HTTPError(
+        "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1",
+        code, "err", None, io.BytesIO(b""))
+
+
+class _OpenBody:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read(self):
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def _fetch_with_urlopen(side_effect, extra_env=None):
+    saved = {
+        key: os.environ.get(key)
+        for key in ("HOOK_CATALOG_ISSUE_STATES", "HOOK_CATALOG_REPO",
+                    "GITHUB_REPOSITORY")
+    }
+    os.environ.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    os.environ.pop("HOOK_CATALOG_REPO", None)
+    if extra_env:
+        os.environ.update(extra_env)
+    try:
+        with patch.object(_catalog.urllib.request, "urlopen",
+                          side_effect=side_effect):
+            return _catalog.fetch_issue_state(1)
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+check("urllib 404 is missing, not skip",
+      _fetch_with_urlopen(_http_error(404)) == "missing")
+check("urllib 410 is missing, not skip",
+      _fetch_with_urlopen(_http_error(410)) == "missing")
+check("urllib 403 is unfetchable skip",
+      _fetch_with_urlopen(_http_error(403)) is None)
+check("urllib 200 open is open",
+      _fetch_with_urlopen(lambda *a, **k: _OpenBody(b'{"state":"open"}'))
+      == "open")
+
+seen_urls = []
+
+
+def _capture_open(request, timeout=None):
+    seen_urls.append(request.full_url)
+    return _OpenBody(b'{"state":"open"}')
+
+
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_REPOSITORY": "some-fork/ai-config"})
+check("fork GITHUB_REPOSITORY is not the issues host",
+      seen_urls == [
+          "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1"
+      ])
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",

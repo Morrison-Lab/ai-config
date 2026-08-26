@@ -8,13 +8,10 @@ OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
 than duplicating the table here.
 Two facts specific to this machine's configuration, not restated there:
 - OpenRouter is reached through OpenCode's `openrouter` provider entry in
-  `~/.config/opencode/opencode.jsonc` (the actual filename this machine's
-  config uses, not `opencode.json`, which is a different, repo-scoped
-  config file), keyed by the `OPENROUTER_API_KEY` environment variable.
-  See [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)
-  for the activation mechanics.
-- Claude Code itself runs on a Claude Pro/Team subscription rather than a
-  metered API budget.
+  `~/.config/opencode/opencode.jsonc`, keyed by `OPENROUTER_API_KEY`.
+  The filename is `opencode.jsonc` --- `opencode.json` is a different, repo-scoped config.
+  See [`skills/delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) for the activation mechanics.
+- Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
 
 ## Cursor
 

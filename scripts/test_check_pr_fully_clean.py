@@ -64,6 +64,9 @@ def check(name: str, condition: bool):
 
 
 # Compatibility wrappers for refactored check_ci_runs and check_review_comments
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.pull_request import PullRequest
 
 original_check_ci_runs = checker.check_ci_runs

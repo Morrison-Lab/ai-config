@@ -2,8 +2,9 @@
 """Keep user-global cursor-rules/ in sync with the project copies.
 
 ``.cursor/rules/`` is what Cursor loads when this repo is the workspace.
-``cursor-rules/`` is what ``bootstrap.sh`` links into ``~/.cursor/rules`` so
-the same always-on workflow rules apply in every other workspace.
+``cursor-rules/`` is what the Cursor plugin ships as user-global rules,
+and what ``bootstrap.sh`` links into ``~/.cursor/rules`` when no plugin
+is already serving them.
 
 Files that exist in both places must be byte-identical. Project-only rules
 (currently ``002-use-repo-skills.mdc``) live only under ``.cursor/rules/``.

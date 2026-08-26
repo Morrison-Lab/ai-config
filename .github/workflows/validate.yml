@@ -74,7 +74,8 @@ jobs:
           python3 scripts/test_codex_plugin_enabled.py
           python3 scripts/test_bootstrap_codex_plugin.py
       - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills links.
+        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills or
+        # ~/.cursor/rules links.
         run: |
           python3 scripts/test_cursor_plugin_enabled.py
           python3 scripts/test_bootstrap_cursor_plugin.py

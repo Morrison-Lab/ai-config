@@ -211,17 +211,58 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
   link_one "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 fi
 
-# --- Cursor rules: symlink cursor-rules into ~/.cursor/rules ---
+# --- Cursor rules: plugin or ~/.cursor/rules, not two ---
 # User-global rules live in cursor-rules/ (every workspace). Project rules
 # live in .cursor/rules/ (this repo as a Cursor workspace) and are not
 # copied here --- 002-use-repo-skills.mdc is this-repo-only.
+# A marketplace/local Cursor plugin already ships cursor-rules via
+# .cursor-plugin/plugin.json, so linking ~/.cursor/rules on top doubles
+# the catalog (same class as ai-config#1409 / #2291). Claude skill
+# installs do not ship these rules, so they are not a skip here.
 if [ -d "$SCRIPT_DIR/cursor-rules" ]; then
   printf '\n--- Cursor rules ---\n'
-  mkdir -p "$CURSOR_DIR/rules"
-  for src in "$SCRIPT_DIR"/cursor-rules/*; do
-    [ -f "$src" ] || [ -d "$src" ] || continue
-    link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
-  done
+  skip_cursor_rules=""
+  if command -v python3 >/dev/null 2>&1; then
+    set +e
+    skip_cursor_rules="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+      --rules \
+      --cursor-dir "$CURSOR_DIR" \
+      --repo-root "$SCRIPT_DIR")"
+    skip_cursor_rc=$?
+    set -e
+    if [ "$skip_cursor_rc" -eq 0 ]; then
+      # Same care as the skills skip: remove leftover ~/.cursor/rules
+      # symlinks that resolve into this checkout or a sibling worktree.
+      # Never clobber a real file or a foreign link.
+      removed=0
+      if [ -d "$CURSOR_DIR/rules" ]; then
+        stacked_paths="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+          --print-stacked-rules \
+          --cursor-dir "$CURSOR_DIR" \
+          --repo-root "$SCRIPT_DIR")"
+        while IFS= read -r dest; do
+          [ -n "$dest" ] || continue
+          if [ -L "$dest" ]; then
+            rm "$dest"
+            removed=$((removed + 1))
+          fi
+        done <<EOF
+$stacked_paths
+EOF
+      fi
+      printf 'skip  Cursor rules (%s; removed %d stale rule link(s))\n' \
+        "$skip_cursor_rules" "$removed"
+    else
+      skip_cursor_rules=""
+    fi
+  fi
+  if [ -z "$skip_cursor_rules" ]; then
+    mkdir -p "$CURSOR_DIR/rules"
+    for src in "$SCRIPT_DIR"/cursor-rules/*; do
+      [ -f "$src" ] || [ -d "$src" ] || continue
+      link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
+    done
+  fi
 fi
 
 # --- Cursor skills: plugin or ~/.claude/skills or ~/.cursor/skills, not two ---

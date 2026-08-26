@@ -28,14 +28,15 @@ The hook that commit shipped therefore never landed in `hooks/hooks.json`.
 Registration had to be recovered later as #2275 / #2294.
 
 GitHub's docs (retrieved 2026-08-26) state the syntax as
-`KEYWORD #ISSUE-NUMBER` (optional colon, also uppercase).
-They do not say the parser ignores a following negation, and this instance
-shows it does not:
+`KEYWORD #ISSUE-NUMBER` (optional colon, also uppercase):
 <https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue>
+They do not say the parser ignores a following negation.
+This instance shows the parser still closes.
 
 The parser also runs on commit messages merged to the default branch, not
 only on the PR body.
-#1718's PR body used `Refs #1717` and did not contain the closing keyword.
+The PR body of #1718 used `Refs #1717` and did not contain the closing
+keyword.
 The squash message did.
 
 ## Distinct from two nearby `Closes` traps
@@ -57,5 +58,5 @@ The squash message did.
 - **Don't:** write `Closes #N is deliberately NOT used` (or any
   `Closes` / `Fixes` / `Resolves` `#N` substring) in a commit message or
   PR body.
-- **Don't:** treat backticks, a following dash, or a later `Refs #N`
-  as protection --- the keyword-plus-number substring is enough.
+- **Don't:** treat a following dash, or a later `Refs #N`, as protection
+  --- the keyword-plus-number substring is enough.

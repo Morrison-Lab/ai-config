@@ -553,8 +553,8 @@ of the sentence
 (docs retrieved 2026-08-26:
 <https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue>).
 The authoring PR therefore closed the registration follow-up it had left
-unregistered, and the hook stayed out of `hooks/hooks.json` until #2275 /
-#2294 recovered it.
+unregistered, and the hook stayed out of `hooks/hooks.json`
+until #2275 / #2294 recovered it.
 
 This is the sibling of "An invented `Closes` in a merge commit message"
 above, not a restatement of it: there the number was wrong, here the number

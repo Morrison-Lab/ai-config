@@ -47,7 +47,7 @@ standing yes (see `preferences.md`).
 - Check `mergeStateStatus` in addition to `mergeable`. A PR can be
   `"MERGEABLE"` but `"BLOCKED"` when branch protection requires at least one
   approving review and only bot/comment reviews exist. Fix: request
-  `the repository owner` as reviewer (`gh pr edit <N> --add-reviewer Morrison-Lab` —
+  `the repository owner` as reviewer (`gh pr edit <N> --add-reviewer <reviewer>` —
   `EDIT_PR`) and leave a note that the PR is clean and ready. Don't attempt to
   force-merge.
   **Except in `Lacaedemon/sparta`, which never requests `the repository owner`** --- see

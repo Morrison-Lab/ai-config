@@ -378,7 +378,7 @@ Re-run `sync-codex-skill-wrappers.py` after any frontmatter edit, since the Code
 
 Then, as their own explicit steps (don't leave them buried in a comment):
 
-1. **Request the reviewer:** `gh pr edit --add-reviewer Morrison-Lab` (`EDIT_PR`; see
+1. **Request the reviewer:** `gh pr edit --add-reviewer <reviewer>` (`EDIT_PR`; see
    `request-pr-review`).
 2. **Drive to clean:** run the `ardi` skill on the new PR until the verdict has
    zero findings.

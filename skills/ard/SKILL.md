@@ -225,7 +225,7 @@ glab api -X PUT "projects/:id/merge_requests/<N>/discussions/<discussion_id>?res
   you and the reviewer reach an impasse (your rebuttal didn't convince them,
   their re-raise didn't convince you), **escalate to a human reviewer** —
   request `the repository owner` via the `request-pr-review` skill (or
-  `gh pr edit <N> --add-reviewer Morrison-Lab`, which bypasses that skill and so
+  `gh pr edit <N> --add-reviewer <reviewer>`, which bypasses that skill and so
   does **not** inherit its `Lacaedemon/sparta` exception --- in sparta, escalate
   to the user in chat instead of requesting a reviewer) and `@`-mention them
   with the impasse --- rather than resolving unilaterally or looping forever.

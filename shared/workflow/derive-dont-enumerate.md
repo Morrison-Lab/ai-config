@@ -65,7 +65,7 @@ What is added here is the tell, and the step from *the same idea worded differen
 - **Don't:** read the closedness test above as clearing a derived list --- it answers whether the set can grow, not whether your pattern found all of it.
 - **Don't:** treat a non-empty result as evidence the pattern was wide enough; an incomplete match looks exactly like a complete one.
 
-(Morrison-Lab/ai-config#1178, 2026-08-06: encoding a repo-scoped reviewer exception, `git grep -n 'add-reviewer the repository owner' -- skills/` returned eight hits across six files, including sites a reviewer's own enumeration had missed --- which is this fragment's rule working, and is why the list was trusted.
+(d-morrison/ai-config#1178, 2026-08-06: encoding a repo-scoped reviewer exception, `git grep -n 'add-reviewer the repository owner' -- skills/` returned eight hits across six files, including sites a reviewer's own enumeration had missed --- which is this fragment's rule working, and is why the list was trusted.
 It also missed `skills/claude-agent-workflow/SKILL.md:118`, which requests the same reviewer as `gh api -X POST repos/.../pulls/$PR_NUMBER/requested_reviewers -f "reviewers[]=the repository owner"`.
 A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squashed into `7a5b2ce0` --- and widened the sweep prescribed in `skills/request-pr-review/SKILL.md` to `add-reviewer the repository owner|requested_reviewers.*the repository owner`, so until then the incomplete pattern had been the corpus's own documented derivation.
 The alternatives were already enumerated twice in the same repository: `hooks/no-unreviewed-pr.py` matches five command forms for this one effect --- `gh pr create --reviewer/-r`, `gh pr edit --add-reviewer`, a `-X POST` to the `requested_reviewers` endpoint, and two `request_copilot_review` tool names --- and `tool-mappings.yml` is an effect-to-command registry whose `REQUEST_COPILOT_REVIEW` row carries the REST form outright.
@@ -88,12 +88,12 @@ accepted review findings of this shape, in one afternoon:
 
 - A quoting sweep derived its sites from `cli: gh api`, a **field** spelling,
   and missed the same command in a sibling `github_mcp:` field and embedded
-  mid-value after `git log` (Morrison-Lab/ai-config#1476, round 1: 6 sites
+  mid-value after `git log` (d-morrison/ai-config#1476, round 1: 6 sites
   claimed, 8 real).
-- An owner-rename sweep derived from the literal `Morrison-Lab/ai-config` and
-  missed the dead `Morrison-Lab.github.io/ai-config` domain in `_quarto.yml`'s
+- An owner-rename sweep derived from the literal `d-morrison/ai-config` and
+  missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
   `site-url` --- a genuinely broken reference, not mere staleness, invisible
-  to the slash form (Morrison-Lab/ai-config#1482, round 1).
+  to the slash form (d-morrison/ai-config#1482, round 1).
   The broken plugin refs (`ai-config@the repository owner`) and marketplace key
   (`"the repository owner"`) had needed their own second pattern in the same sweep for
   the same reason.
@@ -168,7 +168,7 @@ checkable rather than implied.
 It derives the live set for one or more repos and reports which PRs are stalled, with a configurable threshold:
 
 ```bash
-python3 scripts/pr-sweep.py -R Morrison-Lab/ai-config -R ucdavis/bcs
+python3 scripts/pr-sweep.py -R d-morrison/ai-config -R ucdavis/bcs
 python3 scripts/pr-sweep.py -R owner/name --stale-minutes 15 --json
 ```
 
@@ -186,7 +186,7 @@ This is the cheap standing sweep that says where to point it.
 `scripts/pr-overlap.py` is its sibling, deriving the open-PR set the same way and answering the other set-level question --- which pairs of open PRs share a file:
 
 ```bash
-python3 scripts/pr-overlap.py -R Morrison-Lab/ai-config
+python3 scripts/pr-overlap.py -R d-morrison/ai-config
 ```
 
 The split is worth keeping straight, because "stalled" is a property of each PR and "collides" is a property of the **pair**, so no per-PR sweep can reach it however carefully it is run.
@@ -226,7 +226,7 @@ Derive the population first, then the intersection over it, and publish both cou
   emptiness is the one claim that makes the derivation rule vacuous rather than merely unsupported.
 - **Don't:** read a correct conclusion as evidence the premise held --- a collision-free result is the usual case whether or not anyone counted.
 
-(Morrison-Lab/ai-config#1435, 2026-08-12.
+(d-morrison/ai-config#1435, 2026-08-12.
 Its PR body closed with "No other PR of mine is open, so there is no merge-order constraint and nothing to collide with", and the review confirmed the PR clean without touching that sentence.
 Ten PRs were open at merge time, eight of them under the same account.
 The post-merge sweep derived each one's file set against its own merge base and found 0 of 10 touching `shared/writing/ambiguous-reference.md` --- so the conclusion held and its stated reason did not.)
@@ -259,7 +259,7 @@ And base-versus-delta is one instance of a general shape: any two figures in one
 - **Don't:** read "I derived the number in this sentence" as covering the sentence.
   The figure you derived is the one you were thinking about.
 
-(Morrison-Lab/ai-config#1437, 2026-08-12, review finding 1.
+(d-morrison/ai-config#1437, 2026-08-12, review finding 1.
 The case record directly above shipped reading "Ten PRs were open at merge time, seven of them under the same account", and now reads "eight of them".
 The total was derived against #1435's merge instant, `21:50:27Z`, and was right.
 The subset was not: at that instant `the repository owner` held eight of the ten (#1393, #1411, #1413, #1417, #1420, #1421, #1422, #1436), with `claude[bot]` holding #1427 and #1434.
@@ -301,7 +301,7 @@ When a body carries both, they have to agree, and a figure that disagrees with t
 - **Don't:** reach for the empty-set section's remedy here;
   that one is discharged by deriving the population, and this one by subtracting from a population already derived.
 
-(Morrison-Lab/ai-config#1455, 2026-08-13, review round 1, non-blocking.
+(d-morrison/ai-config#1455, 2026-08-13, review round 1, non-blocking.
 Its "Merge order" section read "No constraint against the **5** other open PRs" and then listed four: #1452, #1422, #1420, #1393.
 The finding, verbatim: "A live count shows 5 open PRs *total* including #1455 itself, so there are 4 *other* open PRs, not 5 --- an off-by-one in the population count."
 Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not: at #1455's creation, `20:22:48Z`, the open set was #1393, #1420, #1422, #1452, and #1455 itself --- 5 total and 4 others, unchanged at the review's own `20:30:47Z`.
@@ -328,9 +328,9 @@ The remedy is this fragment's own rule, applied to a smaller population: derive 
 - **Don't:** treat a within-file population as exempt from this fragment's rule merely because it cannot grow while you work;
   it still needs deriving rather than guessing.
 
-(Morrison-Lab/ai-config#1864, 2026-08-21, review comment [3834448521](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834448521): a PR bumped `shared/workflow/verify-the-right-artifact.md`'s "interpreter's own defaults" section from "fifth" to "sixth adjacent artifact", correctly, but its own back-reference sweep grepped for `four recognizable shapes` and `a fifth adjacent` --- strings that, by construction, cannot match `sixth` or `The five above`.
+(d-morrison/ai-config#1864, 2026-08-21, review comment [3834448521](https://github.com/d-morrison/ai-config/pull/1864#discussion_r3834448521): a PR bumped `shared/workflow/verify-the-right-artifact.md`'s "interpreter's own defaults" section from "fifth" to "sixth adjacent artifact", correctly, but its own back-reference sweep grepped for `four recognizable shapes` and `a fifth adjacent` --- strings that, by construction, cannot match `sixth` or `The five above`.
 The downstream section "A sixth: the fact that a check ran..." kept its stale ordinal and collided with the newly bumped one.
-The author's own fix commit named the mechanism directly ([comment 3834476467](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834476467)): "I grepped for the strings I *expected* to be stale...
+The author's own fix commit named the mechanism directly ([comment 3834476467](https://github.com/d-morrison/ai-config/pull/1864#discussion_r3834476467)): "I grepped for the strings I *expected* to be stale...
 Derive the population of ordinals; do not search for the ones you predict.")
 
 ## In review
@@ -344,7 +344,7 @@ This is [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-d
 - **Don't:** hand an agent a list of item numbers when something else can add to that set while the work runs.
 - **Don't:** treat "every item on my list was handled" as evidence that everything was handled --- that is the claim the list cannot support.
 
-(Morrison-Lab/ai-config#960, 2026-07-30/31: agents were dispatched with enumerated PR numbers, and one brief said "#937, #939, #943, #946 are already CLEAN --- leave them alone", which was true when written.
+(d-morrison/ai-config#960, 2026-07-30/31: agents were dispatched with enumerated PR numbers, and one brief said "#937, #939, #943, #946 are already CLEAN --- leave them alone", which was true when written.
 Both #943 and #946 gained an open review thread within minutes, and nothing was watching them for 73 minutes.
 Then #953 and #954 were opened by other sessions afterward, so no brief contained them, and #954 sat with two failing checks for 26 minutes.
 Later still came #957.

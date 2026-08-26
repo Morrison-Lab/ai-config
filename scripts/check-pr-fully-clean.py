@@ -193,6 +193,8 @@ def resolve_repo(explicit: str = "") -> str:
 
 
 def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
+    if str(Path(__file__).resolve().parent.parent) not in sys.path:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from scripts.lib.pull_request import PullRequest
     pr = PullRequest(pr_num, repo, fetcher=run_cmd)
     return pr.head_sha, pr.branch, pr.state, pr.commit_date, pr.review_decision

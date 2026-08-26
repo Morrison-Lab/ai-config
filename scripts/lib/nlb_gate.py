@@ -97,15 +97,20 @@ def parse_ci_nlb_with(validate_yml: Path | None = None) -> dict[str, object]:
     """
     path = VALIDATE_YML if validate_yml is None else validate_yml
     # Lazy, guarded import: PyYAML is needed only to resolve CI's NLB config,
-    # and the reformatter must stay usable (--help, error messages) without it.
-    # Same friendly-exit convention as validate-skills.py / sync-codex-skill-wrappers.py.
+    # and the reformatter must stay usable (--help, explicit-config calls)
+    # without it. Raised as NLBPinError rather than sys.exit so a caller's
+    # per-item error handling (semantic-line-breaks.py's per-path loop) can
+    # report it and continue instead of dying mid-batch with no summary --
+    # unlike validate-skills.py's module-scope guard, this one fires from
+    # inside a per-sentence call chain, so a process exit here is not a
+    # clean, contained exit.
     try:
         import yaml
     except ImportError:
-        sys.exit(
+        raise NLBPinError(
             "nlb_gate: PyYAML is required to resolve CI's NLB config from"
             " validate.yml -- run `pip install pyyaml`."
-        )
+        ) from None
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     matches: list[dict[str, object]] = []
     for job in (doc.get("jobs") or {}).values():

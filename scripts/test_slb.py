@@ -947,7 +947,6 @@ import subprocess
 import tempfile
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPTS_DIR.parent
 
 with tempfile.TemporaryDirectory() as _shim_dir:
     (Path(_shim_dir) / "yaml.py").write_text(
@@ -979,6 +978,24 @@ with tempfile.TemporaryDirectory() as _shim_dir:
         and "pip install pyyaml" in (_run.stderr + _run.stdout)
         and "Traceback" not in (_run.stderr + _run.stdout),
         (_run.stderr + _run.stdout)[-300:],
+    )
+    # Multi-path contract: the missing dependency is reported per path and
+    # the run still reaches its summary line, instead of the first path
+    # killing the whole batch (finding on #2322's delta review).
+    _probe2 = Path(_shim_dir) / "probe2.md"
+    _probe2.write_text("Another short sentence.\n", encoding="utf-8")
+    _multi = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"),
+         "--all", str(_probe), str(_probe2)],
+        capture_output=True, text=True, env=_env,
+    )
+    _multi_out = _multi.stderr + _multi.stdout
+    expect(
+        "multi-path run without PyYAML reports each path and summarizes",
+        _multi_out.count("pip install pyyaml") >= 2
+        and "Done (" in _multi_out
+        and "Traceback" not in _multi_out,
+        _multi_out[-400:],
     )
 
 print(f"\n{passes} passed, {failures} failed")

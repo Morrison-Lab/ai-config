@@ -50,6 +50,14 @@ repo's Antigravity `plugins/ai-config` is a false positive.
 Leftover `ok` symlinks under `~/.cursor/skills` whose target is this
 checkout or a sibling worktree are **stacked**, not healthy.
 
+The plugin also ships `cursor-rules/` as user-global rules
+(`.cursor-plugin/plugin.json` `"rules": "cursor-rules"`).
+A live plugin is a skip for `~/.cursor/rules` too, not a second install.
+A Claude skill catalog does not ship those rules, so it is not a skip
+there.
+Leftover `ok` symlinks under `~/.cursor/rules` whose target is this
+checkout or a sibling worktree are **stacked**, not healthy.
+
 Full `bootstrap.sh` installs `~/.claude/skills` first, so the
 `~/.cursor/skills` link path almost never runs.
 Do not "fix" tests to expect `~/.cursor/skills/ardi` after a full

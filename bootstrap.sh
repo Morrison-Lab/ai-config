@@ -28,12 +28,21 @@ mkdir -p "$CLAUDE_DIR"
 
 # Symlink $src -> $dest unless something is already there. Shared with the
 # per-machine installers under dotfiles/, so both resolve collisions the same
-# way; the hint below is the part that differs, since check-install.py only
-# knows about ~/.claude.
-# shellcheck disable=SC2034  # consumed by the sourced link-one.sh
-LINK_ONE_FIX_HINT="run scripts/check-install.py --fix to replace it with a link, or merge manually"
+# way; the hint is the part that differs. check-install.py --fix is Claude-only
+# (--consumer-dir retargets a whole Claude-style manifest, so pointing it at a
+# Copilot memory dir or a Gemini skills dir creates unrelated top-level links
+# there; ai-config#2286). Non-Claude bootstrap consumers inherit link-one.sh's
+# default (remove it or replace it with a link manually). Dotfiles installers
+# set their own hint; shiva's is --adopt.
 # shellcheck source=scripts/lib/link-one.sh
 . "$SCRIPT_DIR/scripts/lib/link-one.sh"
+
+# Claude collisions may recommend check-install.py --fix; other consumers
+# must not inherit that hint.
+link_one_claude() {
+  link_one "$1" "$2" \
+    "run scripts/check-install.py --fix to replace it with a link, or merge manually"
+}
 
 # --- Top-level files (CLAUDE.md, etc.) ---
 shopt -s nullglob
@@ -41,7 +50,7 @@ for src in "$SCRIPT_DIR"/*.md; do
   [ -f "$src" ] || continue
   fname="$(basename "$src")"
   [[ "$fname" == "README.md" ]] && continue   # don't symlink repo README
-  link_one "$src" "$CLAUDE_DIR/$fname"
+  link_one_claude "$src" "$CLAUDE_DIR/$fname"
 done
 
 # --- Directories (skills, commands, memories, etc.) ---
@@ -70,11 +79,11 @@ for src in "$SCRIPT_DIR"/*/; do
   if [ -d "$dest" ] && [ ! -L "$dest" ]; then
     shopt -s dotglob
     for child in "$src"/*; do
-      link_one "$child" "$dest/$(basename "$child")"
+      link_one_claude "$child" "$dest/$(basename "$child")"
     done
     shopt -u dotglob
   else
-    link_one "$src" "$dest"
+    link_one_claude "$src" "$dest"
   fi
 done
 
@@ -211,17 +220,58 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
   link_one "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 fi
 
-# --- Cursor rules: symlink cursor-rules into ~/.cursor/rules ---
+# --- Cursor rules: plugin or ~/.cursor/rules, not two ---
 # User-global rules live in cursor-rules/ (every workspace). Project rules
 # live in .cursor/rules/ (this repo as a Cursor workspace) and are not
 # copied here --- 002-use-repo-skills.mdc is this-repo-only.
+# A marketplace/local Cursor plugin already ships cursor-rules via
+# .cursor-plugin/plugin.json, so linking ~/.cursor/rules on top doubles
+# the catalog (same class as ai-config#1409 / #2291). Claude skill
+# installs do not ship these rules, so they are not a skip here.
 if [ -d "$SCRIPT_DIR/cursor-rules" ]; then
   printf '\n--- Cursor rules ---\n'
-  mkdir -p "$CURSOR_DIR/rules"
-  for src in "$SCRIPT_DIR"/cursor-rules/*; do
-    [ -f "$src" ] || [ -d "$src" ] || continue
-    link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
-  done
+  skip_cursor_rules=""
+  if command -v python3 >/dev/null 2>&1; then
+    set +e
+    skip_cursor_rules="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+      --rules \
+      --cursor-dir "$CURSOR_DIR" \
+      --repo-root "$SCRIPT_DIR")"
+    skip_cursor_rc=$?
+    set -e
+    if [ "$skip_cursor_rc" -eq 0 ]; then
+      # Same care as the skills skip: remove leftover ~/.cursor/rules
+      # symlinks that resolve into this checkout or a sibling worktree.
+      # Never clobber a real file or a foreign link.
+      removed=0
+      if [ -d "$CURSOR_DIR/rules" ]; then
+        stacked_paths="$(python3 "$SCRIPT_DIR/scripts/cursor-plugin-enabled.py" \
+          --print-stacked-rules \
+          --cursor-dir "$CURSOR_DIR" \
+          --repo-root "$SCRIPT_DIR")"
+        while IFS= read -r dest; do
+          [ -n "$dest" ] || continue
+          if [ -L "$dest" ]; then
+            rm "$dest"
+            removed=$((removed + 1))
+          fi
+        done <<EOF
+$stacked_paths
+EOF
+      fi
+      printf 'skip  Cursor rules (%s; removed %d stale rule link(s))\n' \
+        "$skip_cursor_rules" "$removed"
+    else
+      skip_cursor_rules=""
+    fi
+  fi
+  if [ -z "$skip_cursor_rules" ]; then
+    mkdir -p "$CURSOR_DIR/rules"
+    for src in "$SCRIPT_DIR"/cursor-rules/*; do
+      [ -f "$src" ] || [ -d "$src" ] || continue
+      link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
+    done
+  fi
 fi
 
 # --- Cursor skills: plugin or ~/.claude/skills or ~/.cursor/skills, not two ---

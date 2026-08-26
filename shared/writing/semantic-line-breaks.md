@@ -411,11 +411,12 @@ matcher disagrees with the gate.)
 
 **An ellipsis is a sentence boundary to the gate, so a quotation or an elision
 splits the line it sits on.**
-The lowercase-follower case above is a boundary the reformatter misses and the
-gate finds.
-This one is a boundary **neither** tool is named for, and it arrives in the
-prose this corpus writes constantly: a quoted fragment trailing off, or a
-`[...]` elision inside a citation.
+The lowercase-follower case above used to be a boundary the reformatter
+missed and the gate found.
+After #2085 they share that branch.
+This ellipsis case is a boundary **neither** tool is named for, and it arrives
+in the prose this corpus writes constantly: a quoted fragment trailing off, or
+a `[...]` elision inside a citation.
 
 `_SENT_BREAK_RE` matches `[.!?]` followed by any run of closing punctuation
 `` [`"')\]*_] `` and then whitespace and an uppercase letter or markup.

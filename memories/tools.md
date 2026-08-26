@@ -1170,3 +1170,13 @@ file over inline edit calls --- it can check space first and fail cleanly.
 - **Do:** verify file integrity after any edit made while disk was low.
 - **Do:** skip `git gc` whenever free space is tight.
 - **Don't:** trust an edit tool success response from a full-disk system.
+
+## OpenCode CLI `--file` argument is greedy
+
+The OpenCode CLI's `--file` argument is an array and greedily consumes all positional arguments that follow it.
+Positional prompt strings must be passed *before* `--file` to avoid them being parsed as missing file paths.
+
+- **Do**: `opencode run "my prompt here" --file file1.txt file2.txt`
+- **Don't**: `opencode run --file file1.txt file2.txt "my prompt here"` (it will fail with "File not found: my prompt here").
+
+(Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).

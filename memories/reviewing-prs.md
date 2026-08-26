@@ -1,8 +1,9 @@
 # Reviewing someone else's PR
 
 Satellite of [`preferences.md`](preferences.md).
-`preferences.md` is at the 1200-line gate,
-so new review-scope lessons land here rather than as appends there.
+`preferences.md` hit the 1200-line gate when this file was split out
+(measured ~1200 lines at the split; 1130 on `main` as of 2026-08-26),
+so new review-scope lessons still land here rather than as appends there.
 
 Source: [UCD-SERG/shigella#31](https://github.com/UCD-SERG/shigella/pull/31), 2026-08-25.
 

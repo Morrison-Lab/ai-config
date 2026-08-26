@@ -29,9 +29,11 @@ gh pr create --draft --title "<title>" --body "Closes #<N>
 WIP --- opened up front to claim the issue; implementing now."
 ```
 
-On Claude Code the empty commit is a shipped commit,
-so the pre-push guard still requires
-`ALLOW_UNREVIEWED_PUSH=1` on that `git push`
+On Claude Code the pre-push guard still requires
+`ALLOW_UNREVIEWED_PUSH=1` on that `git push`:
+the guard requires a reviewer-call result
+before it reaches the commit comparison,
+including for an empty commit
 (see [`push`](../../skills/push/SKILL.md)).
 
 **Do not `Closes` a parent issue on a partial ship.** `Closes #<N>` in the

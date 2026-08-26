@@ -154,23 +154,28 @@ The file stores the body as a JSON string
 (newlines appear as escaped `\n` on disk).
 The parser resolves that.
 Records carry a `role` the decoder must filter on.
-`batch-fetch-details` can write a large `transcript.json`.
-Take the last assistant `text`.
-That record must itself carry Summary / Findings /
-Verdict / Reviewed-Commit.
-Do not scan backward to an earlier matching assistant message.
-If the last assistant text lacks those headings, there is no report.
+`json.load` of `transcript.json` returns a dict
+with a `messages` key (measured 2026-08-26 PDT on Cursor Cloud);
+iterate that list, not the dict.
+Take the last assistant record whose `text` is a non-empty string.
+Thinking and `tool_calls` records have empty or null `text`;
+they are not candidate records.
+That last non-empty assistant `text` must itself carry
+Summary / Findings / Verdict / Reviewed-Commit.
+Do not skip a later non-empty assistant text
+to reach an earlier matching one.
+If that last non-empty text lacks those headings, there is no report.
 The role filter is load-bearing.
 The user brief also carries those headings
 (it specifies the required report shape).
 A decoder that takes the last matching `text`
 without filtering `role == assistant`
 grades the brief when the child produced no report.
-A decoder that scans backward past a later assistant message
+A decoder that skips a later non-empty assistant text
 grades a draft when the child errored after quoting the shape.
 The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
-the `cloudAgentBcId`, writes that last assistant `text`
+the `cloudAgentBcId`, writes that last non-empty assistant `text`
 to a file outside the checkout (under `/tmp`),
 and calls `parse_report()` on the file contents
 in one process.
@@ -192,7 +197,9 @@ Write the recovered file plus the marker to a comment file
 under `/tmp`, and post that file
 with `--body-file` / `-F body=@<file>`.
 The `parse_report()` tuple is the push gate, not the comment.
-Do not treat the recovered file as returning only the tuple.
+The recovered file is both the `parse_report()` input
+and the posted comment body (then the disclosure marker).
+The tuple is only the push gate.
 Call `parse_report()` from the **worktree's**
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
 on the file contents
@@ -259,7 +266,9 @@ The fingerprint must prefix-match HEAD
 If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
 tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
-Provenance is the recovery route above.
+The recovered transcript file is what supplies the report
+on Cursor Cloud;
+Claude Code reads the same report from the `Agent` call's `tool_result`.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
 [#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
@@ -387,7 +396,8 @@ Compact copies stay until that landing.
 Refusal gates, in order
 (item 1's pre-dispatch recording must precede the dispatch,
 or item 4 has nothing to compare against;
-reordering 2 with 3, or 5 with 6, does not change the answer;
+gate 3 consumes the tuple gate 2 produces;
+reordering 5 with 6 does not change the answer;
 details in the procedure above).
 Pause points:
 before the `Task` dispatch (item 1's first half),
@@ -411,15 +421,16 @@ Say in the reply that the carve-out was used.
    (there is no dispatch); still confirm empty after.
 2. Confirm the `cloudAgentBcId` came from a `Task` whose
    `subagent_type` was `adversarial-reviewer`.
-   Take the last assistant `text`;
-   it must itself carry the headings.
+   Take the last assistant record whose `text` is a non-empty string
+   (thinking and `tool_calls` with empty `text` are not candidates);
+   that text must itself carry the headings.
    Write that text to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
    **Killer item:** an author-assembled body is not a report,
    and `parse_report` then grades the wrong text.
    A real report from the wrong dispatch also fails this gate.
-   Scanning backward to an earlier matching assistant message
-   also fails this gate.
+   Skipping a later non-empty assistant text
+   to reach an earlier matching one also fails this gate.
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -492,15 +503,16 @@ is the instruction to use this route.
   After it returns, recover the report from `batch-fetch-details`
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
-  Write the last assistant `text` that
-  carries Summary / Findings / Verdict / Reviewed-Commit
-  to a file outside the checkout (under `/tmp`;
+  Write the last non-empty assistant `text`
+  (thinking and `tool_calls` with empty `text` are not candidates).
+  That text must itself carry
+  Summary / Findings / Verdict / Reviewed-Commit.
+  Write it to a file outside the checkout (under `/tmp`;
   role filter is load-bearing;
   the user brief also carries those headings),
   and call `parse_report()` on that file
   from the worktree's `hooks/no-push-without-self-review.py`
-  (not `~/.claude/hooks/`, which resolves into the
-  primary checkout).
+  (see the import rule in the procedure above).
   If you cannot obtain a `clean` verdict and fingerprint,
   or HEAD is not still the recorded sha,
   or the fingerprint does not prefix-match HEAD,
@@ -569,11 +581,13 @@ pre-push guard.
   already carries Summary / Findings / Verdict / Reviewed-Commit;
   otherwise call
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
-  `includeTranscripts: true`, then write the last assistant `text` that
-  carries those same sections to a file outside the checkout
+  `includeTranscripts: true`, then write the last non-empty assistant `text`
+  (thinking and `tool_calls` with empty `text` are not candidates).
+  That text must itself carry those same sections.
+  Write it to a file outside the checkout
   (under `/tmp`) and quote from that file ---
-  not the last assistant message (which
-  may be thinking or `tool_calls` with empty `text`), not the user brief
+  not an earlier matching assistant text reached by skipping
+  a later non-empty one, not the user brief
   (the brief also carries those headings; the role filter is load-bearing),
   and not the whole file.
   `cloudAgentBcId` is a field on the Task JSON `tool_result`; `bcIds` is

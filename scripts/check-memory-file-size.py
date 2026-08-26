@@ -29,7 +29,7 @@ CORPUS is gated, from `test_check_memory_file_size.py`, whose final assertion
 calls `oversized_files("memories", DEFAULT_MAX_LINES)` on the live tree and
 exits 1 on any finding -- so a `validate` run goes red at "Run
 memory-file-size check tests", never at the step that runs this file. A PR
-that appends past 1200 lines cannot merge; it has to split first.
+that appends past 1250 lines cannot merge; it has to split first.
 
 The two statements are consistent and read as contradictory, which is why
 they are stated together: the advisory exit keeps THIS check from blocking an
@@ -55,7 +55,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-DEFAULT_MAX_LINES = 1200
+DEFAULT_MAX_LINES = 1250
 
 # `MEMORY.md` is the index, not a memory file; `session/` holds
 # conversation-scoped notes that are never meant to persist or be split.

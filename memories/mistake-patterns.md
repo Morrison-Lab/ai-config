@@ -164,7 +164,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   Branch protection does not substitute either:
   it gates native approvals, not verdicts posted as comments.
   Merge synchronously instead,
-  only after CI and the all-clear review verdict are both verified clean at the shipping head.
+  only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
+  CI green and the all-clear verdict both verified at the shipping head.
   If something is found already armed, disable it at once ---
   `gh pr merge <N> --repo <r> --disable-auto`,
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---

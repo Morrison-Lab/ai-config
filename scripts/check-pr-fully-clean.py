@@ -984,7 +984,6 @@ def check_latest_verdict(
     approved_authors: Optional[set] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
->>>>>>> origin/main
 
     Walks every automated review item chronologically -- not just those
     evaluating HEAD -- and keeps the last one that states a verdict at all,
@@ -1138,7 +1137,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        author_assoc = c.get("authorAssociation", "").upper()
+        author_assoc = (c.get("authorAssociation") or "").upper()
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _detect_review_agent(body) is not None
         )
@@ -1158,7 +1157,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
         author_login = (r.get("author") or {}).get("login", "")
-        author_assoc = r.get("authorAssociation", "").upper()
+        author_assoc = (r.get("authorAssociation") or "").upper()
         # A formal review carries a real commit.oid, so admitting one attributes
         # it to HEAD with no body-content check. Scope admission to automated bot
         # authors, including CLI agents posting under human accounts

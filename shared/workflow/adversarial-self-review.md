@@ -45,7 +45,8 @@ The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI), **openc
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Dispatch in independence-and-availability order --- `agy` CLI or `opencode` first, then `codex`, then `claude` --- where each entry qualifies only if both its model and harness differ from the authoring session.
+Dispatch in independence-and-availability order --- `agy` CLI or `opencode` first, then `codex`, then `claude` ---
+where each entry qualifies only if both its model and harness differ from the authoring session.
 This review order serves independence and measured availability, overriding [`delegation.md`](../../memories/delegation.md)'s cost-first delegation order for general work.
 A multi-backend harness qualifies only when both its harness and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
@@ -363,4 +364,5 @@ If the quorum size is zero at the start of the cycle, or drops to zero at any po
 This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
 Alternatively, request explicit user permission to proceed.
 Do not bypass the review gate.
-If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving --- halt the review process and escalate to the user for a tie-breaking decision.
+If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving ---
+halt the review process and escalate to the user for a tie-breaking decision.

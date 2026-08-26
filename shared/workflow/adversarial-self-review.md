@@ -68,7 +68,7 @@ which is the one authority above this gate.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
-[`memories/preferences.md`](../../memories/preferences.md)'s delegate ladder.
+[`preferences.md`](../../memories/preferences.md)'s delegate ladder.
 A retired API never disqualifies a CLI harness
 that operates on a separate path from it.
 

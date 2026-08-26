@@ -988,7 +988,10 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > Tracked as ai-config#1776.
 
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
-Adversarial review dispatch is governed separately --- by [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s independence-first order, not this cost-first ladder.
+Adversarial review dispatch is governed separately ---
+by [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)'s
+independence-first order,
+not this cost-first ladder.
 Two of those CLIs are separately-billed plans with usage windows, and the third is free.
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.

@@ -66,7 +66,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    and does not push unless the verdict is `clean` and the
    fingerprint prefix-matches HEAD.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
-   Write the label plainly on its own line: emphasis around it is tolerated, but the guard reads the first fingerprint AFTER your verdict, so put it last.
+   Write the label plainly on its own line: emphasis around it is tolerated, but `parse_report` reads the first fingerprint AFTER your verdict, so put it last.
 
 State the verdict on its own line in that exact form.
 `parse_report()` (Claude Code's pre-push guard, and the

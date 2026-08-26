@@ -155,16 +155,23 @@ Extract the last assistant `text` that carries Summary / Findings /
 Verdict / Reviewed-Commit
 (same selector as the identity-only section below).
 Two legal routes, and both must produce the report body
-(the last matching assistant `text`) as well as the
-`parse_report()` tuple:
+(the last matching assistant `text` from `transcript.json`).
+The `parse_report()` tuple always comes from that file
+(route (a)), never from an unverified subagent return:
 (a) a decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last matching `text`
 to a file, and calls `parse_report()` on the file contents
 in one process;
 (b) a subagent returns that last matching assistant `text`
 verbatim;
-the conductor writes that return to a file without editing it
-and calls `parse_report()` on the file contents.
+the conductor writes that return to a file without editing it.
+Route (b) is legal for the posted body only when that file
+is byte-identical to route (a)'s file.
+If they differ, refuse: do not call `parse_report()` on the
+subagent return.
+A partial return that drops a trailing `Needs more work`
+can leave an earlier quoted `Ready for merge` as the last
+verdict line `parse_report` reads.
 Do not require the same invocation for route (b).
 Do not re-emit the markdown through a shell command string.
 A backtick span inside a double-quoted body runs as
@@ -172,9 +179,11 @@ command substitution and vanishes.
 A doubled backslash can collapse even inside a quoted heredoc.
 Post with `--body-file` / `-F body=@<file>`.
 Route (a)'s file is the body to post
-(`gh pr comment --body-file` / equivalent).
+(`gh pr comment --body-file` / equivalent)
+and the input to `parse_report()`.
 Route (b)'s provenance is the subagent's verbatim return
-of the same selector, written to that file.
+of the same selector, written to a file that matches
+route (a)'s file.
 The `parse_report()` tuple is the push gate, not the comment.
 Do not treat route (a) as returning only the tuple.
 Call `parse_report()` from
@@ -221,8 +230,8 @@ Provenance is the recovery route in this file:
 route (a) reads the `transcript.json` whose path contains the
 `cloudAgentBcId` and writes the body to a file;
 route (b) writes the subagent's verbatim return of the same
-selector to a file.
-Both routes call `parse_report()` on that file.
+selector to a file that must match route (a)'s file.
+`parse_report()` always runs on route (a)'s file.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
 [#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
@@ -266,16 +275,17 @@ so the dry-run only confirms the command would create that ref.
 The source-ref rule and the HEAD comparison remain.
 A deletion line (`- [deleted]`) has no `->`,
 so it has no source ref for gate 6.
-This procedure does not cover a ref-deletion push
-(`git push origin :branch`).
-On Claude Code a `:branch` deletion still needs a
-clean verdict to reach `verify_review`'s
-`if not commits` exit
+`--delete` / `-d` is not this procedure.
+`_argv_push` never examines it.
+Treat it as an ordinary git push,
+not as a reviewed feature-branch push.
+`git push origin :branch` is also not this procedure.
+On Claude Code it still needs a clean verdict
+to reach `verify_review`'s `if not commits` exit
 (the guard's own docstring).
-`--delete` / `-d` is never examined
-(`_argv_push`).
-If the dry-run is a deletion, stop:
-this is the wrong procedure, not a gate-6 miss.
+On this Cursor-adapter path it is not a gate-6 miss
+of the feature-branch recipe;
+it is a different command.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
 If it is a branch name, that name must match the recorded branch.
 Any other source ref (a tag, `FETCH_HEAD`, a raw sha) is not covered:
@@ -312,8 +322,6 @@ is unmeasured as of 2026-08-26 PDT.
 Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
 Do not pair the project adapter with native Claude hooks.
-If they are already paired, the native deny is the
-observable that requires the prefix.
 
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
@@ -374,8 +382,11 @@ Say in the reply that the carve-out was used.
    (`Everything up-to-date` and `= [up to date]` are not a mismatch;
    a new-branch line with no sha is not a mismatch
    and also does not confirm the shipped tip).
-6. Confirm the source ref is `HEAD` or the recorded branch
-   (a line with no `->` is not this procedure).
+6. Confirm the source ref is `HEAD` or the recorded branch.
+   A deletion line (`- [deleted]`) is a different command
+   (`--delete` / `-d` is an ordinary push;
+   `:branch` is not this feature-branch recipe),
+   not a gate-6 miss.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`

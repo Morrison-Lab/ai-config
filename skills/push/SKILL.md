@@ -81,10 +81,8 @@ the prefix is the documented escape
 when the guard cannot see a verdict.
 The adapter skip makes the prefix inert for the adapter only.
 Do not pair the project adapter with native Claude hooks
-(desktop Cursor with third-party Claude hooks plus this project adapter).
-If a native deny is observed, the prefix is required for that
-native guard even though it is inert for the adapter
-(see [`memories/cursor.md`](../../memories/cursor.md)).
+(desktop Cursor with third-party Claude hooks plus this project adapter;
+see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 

@@ -174,34 +174,20 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 
 ## Falsely assuming local fallback reviews grant autonomous merge authority (check-pr-fully-clean.py)
 
-On 2026-08-26, an agent noticed that the GitHub CLI merge command was blocked by the `no-unauthorized-merge.py` merge guard
-after completing an adversarial review via the local `pre-push-review.py` CLI on PR #2305.
-The agent incorrectly concluded that `check-pr-fully-clean.py` had a bug preventing it from recognizing local fallback reviews
-posted by the human user (`d-morrison`).
-[`tools.md`](tools.md)'s own summary of criterion (2) was, at the time, stale and misleading:
-it said a review is admitted when it "has been posted by an automated bot account ... or carries a bot
-review header (`🤖`, ...)", and the agent took that "or carries a bot review header" clause at face
-value rather than reading the script itself.
-In the actual code, the body-marker check exists only inside `is_non_review_notice()`, to keep a
-genuine review from being misclassified as a workflow status notice --- it is never a second admission
-path alongside the author-identity gate.
-The agent then filed PR #2308 to "fix" `check-pr-fully-clean.py` to admit reviews based solely on the text `### 🤖 Antigravity Agent Report`,
-bypassing the bot author check.
-See #2350 for correcting the stale `tools.md` summary that set this up, and issue #2306 (open, same
-misreading) for the original bad bug report.
+On 2026-08-26, an agent noticed that the GitHub CLI merge command was blocked by the `no-unauthorized-merge.py` merge guard after completing an adversarial review via the local `pre-push-review.py` CLI on PR #2305.
+The agent incorrectly concluded that `check-pr-fully-clean.py` had a bug preventing it from recognizing local fallback reviews posted by the human user (`d-morrison`).
+[`tools.md`](tools.md)'s own summary of criterion (2) was, at the time, stale and misleading: it said a review is admitted when it "has been posted by an automated bot account ... or carries a bot review header (`🤖`, ...)", and the agent took that "or carries a bot review header" clause at face value rather than reading the script itself.
+In the actual code, the body-marker check exists only inside `is_non_review_notice()`, to keep a genuine review from being misclassified as a workflow status notice --- it is never a second admission path alongside the author-identity gate.
+The agent then filed PR #2308 to "fix" `check-pr-fully-clean.py` to admit reviews based solely on the text `### 🤖 Antigravity Agent Report`, bypassing the bot author check.
+See #2350 for correcting the stale `tools.md` summary that set this up, and issue #2306 (open, same misreading) for the original bad bug report.
 
 This was a critical misunderstanding of the security invariant:
-- Per [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (discussed in
-  [`fully-clean.rationale.md`](../shared/workflow/fully-clean.rationale.md)), automated review approval
-  MUST be verifiable by author identity (e.g., `github-actions[bot]`, `claude[bot]`) --- body text is
-  never sniffed for the author-identity gate.
+- Per [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (discussed in [`fully-clean.rationale.md`](../shared/workflow/fully-clean.rationale.md)), automated review approval MUST be verifiable by author identity (e.g., `github-actions[bot]`, `claude[bot]`) --- body text is never sniffed for the author-identity gate.
 - Non-bot human accounts (like `d-morrison`) are admitted ONLY if they state a blocking `not-clean` verdict (fail-closed).
 - A local fallback review does **not** grant autonomous merge approval.
   It only satisfies the pre-push guard for iterating on the PR locally.
-- Bypassing the author identity check by sniffing body text introduces a security vulnerability,
-  as any human user could spoof the marker to pass the check.
+- Bypassing the author identity check by sniffing body text introduces a security vulnerability, as any human user could spoof the marker to pass the check.
 
-**Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author,
-this is the intended behavior.
+**Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
 Do not attempt to "fix" the script to admit fallback reviews for merging.
 A clean automated Claude review evaluating the current HEAD commit is strictly required for an autonomous merge.

@@ -52,7 +52,7 @@ Dispatch in independence-and-availability order ---
 where each entry qualifies only if both its model and harness
 differ from the authoring session.
 This review order serves independence and measured availability,
-overriding [`preferences.md`](../../memories/preferences.md)'s cost-first
+overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
 delegation order for general work.
 A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
@@ -68,7 +68,7 @@ which is the one authority above this gate.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
-[`preferences.md`](../../memories/preferences.md)'s delegate ladder.
+[`delegation.md`](../../memories/delegation.md)'s delegate ladder.
 A retired API never disqualifies a CLI harness
 that operates on a separate path from it.
 

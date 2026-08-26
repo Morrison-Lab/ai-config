@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import os
+import subprocess
 import sys
 import tempfile
 from contextlib import redirect_stderr, redirect_stdout
@@ -153,12 +154,48 @@ try:
         th.suite_timeout_s()
     check("non-positive env is fatal", False)
 except SystemExit as exc:
-    check("non-positive env is fatal", "must be positive" in str(exc), str(exc))
+    check("non-positive env is fatal",
+          "positive finite number" in str(exc), str(exc))
+
+for raw in ("nan", "inf", "-inf"):
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": raw}):
+            th.suite_timeout_s()
+        check(f"{raw} env is fatal", False)
+    except SystemExit as exc:
+        check(f"{raw} env is fatal",
+              "positive finite number" in str(exc), str(exc))
 
 check("timeout label drops trailing .0", th._timeout_label(600) == "600")
 check("timeout label keeps a fraction", th._timeout_label(0.5) == "0.5")
 check("captured None decodes to empty", th._decode_captured(None) == "")
 check("captured bytes decode", th._decode_captured(b"hi") == "hi")
+
+
+# --- 4b. Production run_suites() applies suite_timeout_s() ----------------
+# Hang checks pass an explicit timeout=; env checks call suite_timeout_s()
+# in isolation. Neither exercises main()'s path: run_suites() with
+# timeout=None. Deleting that coalesce leaves subprocess.run(timeout=None).
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    _write_pair(hooks, "ok", OK)
+    old = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_SUITE_TIMEOUT": "12"}):
+            with patch.object(th.subprocess, "run") as mock_run:
+                mock_run.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="ok\n", stderr="")
+                _capture(lambda: th.run_suites())
+                timeouts = [
+                    call.kwargs.get("timeout")
+                    for call in mock_run.call_args_list
+                ]
+    finally:
+        th.HOOKS = old
+check("production run_suites() applies suite_timeout_s()",
+      timeouts == [12], repr(timeouts))
 
 
 # --- 5. verdict() spawn uses this interpreter, not a bare python3 ---------

@@ -501,8 +501,8 @@ def verdict(hook_path, repo, command, case_id=None):
 # This is not a shortcut: the guard is read-only by construction (`ls-remote`,
 # `rev-parse`, `merge-base`, `cat-file`, `log`), so no variant can leave a
 # fixture in a state a later variant would see. Rebuilding per variant cost
-# 28 x 15 = 420 repo-plus-bare-remote constructions and pushed the suite past
-# two minutes; building once costs 28 and loses nothing.
+# 32 x 15 = 480 repo-plus-bare-remote constructions and pushed the suite past
+# two minutes; building once costs 32 and loses nothing.
 _BUILT = {}
 
 

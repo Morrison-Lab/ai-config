@@ -31,6 +31,7 @@ HOOK_TEST_SUITE_TIMEOUT (seconds).
 Run: python3 scripts/test_hooks.py
 """
 import glob
+import math
 import os
 import subprocess
 import sys
@@ -39,7 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
 # Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
-# slowest suite (test-no-clobbering-push: 28 scratch git repos plus 17
+# slowest suite (test-no-clobbering-push: 32 scratch git repos plus 17
 # mutation rounds) finished in 178s. 600s is about 3x that, so a slow
 # Windows box has headroom, while the hang that never terminated across
 # 120s and 420s kills (ai-config#2098) still FAILs instead of stalling
@@ -61,8 +62,13 @@ def suite_timeout_s():
         value = float(raw)
     except ValueError:
         sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} is not a number")
-    if value <= 0:
-        sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be positive")
+    # nan and inf both pass `value <= 0` (nan comparisons are false;
+    # inf is positive). subprocess.run(timeout=nan) does not expire, so
+    # they would restore the unbounded wait this runner exists to bound.
+    if not math.isfinite(value) or value <= 0:
+        sys.exit(
+            f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be a positive "
+            "finite number")
     return value
 
 

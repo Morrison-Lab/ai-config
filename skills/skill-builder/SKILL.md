@@ -364,9 +364,16 @@ lines around tables (MD058).
 Its scope is **Markdown only** (`globs: '*.md'`), minus the `paths-ignore` set --- `codex-skills/**`, `docs/**`, `_site/**`, `.quarto/**`.
 So it scans every `.md` the skill touches, and it never scans the generated wrappers, which must not be hand-edited to satisfy a gate that does not read them.
 
-`scripts/semantic-line-breaks.py` is **not** that gate, and its output can fail it --- the reformatter has no width policy, so it joins hand-wrapped sentences and manufactures the very long-line-with-a-semicolon violation the gate rejects.
-Run it to *read* the sentence splits it proposes, and take the verdict from the real check, whose runnable command is in [`semantic-line-breaks`](../../shared/writing/semantic-line-breaks.md).
-It only flags **lines this branch actually changed against `origin/main`**, so run it against every file the skill touches, not just the new `SKILL.md`.
+`scripts/semantic-line-breaks.py` is **not** that gate.
+As of ai-config#2085 it loads the same checker the gate pins, so `--write`
+splits a mid-line semicolon the gate would flag rather than manufacturing
+one.
+The script is still a reformatter of named files, not the diff-scoped job:
+take the verdict from the real check, whose runnable command is in
+[`semantic-line-breaks`](../../shared/writing/semantic-line-breaks.md).
+The gate only flags **lines this branch actually changed against `origin/main`**,
+so run the reformatter against every file the skill touches, not just the new
+`SKILL.md`.
 Add `--write` to apply once you've confirmed the diff is what you expect.
 **Don't reach for `--all` by default** --- it widens the reformat to the whole file, and on a file with pre-existing hard-wrapped (but otherwise CI-clean) prose it can rewrite hundreds of untouched lines into a large, unrelated-looking diff.
 Prefer the scoped mode, and if it under-fixes a paragraph (a same-sentence line shows up as "still would change" on a second scoped run even though `git diff origin/main` shows that region untouched), just fix that one paragraph by hand instead of widening scope.

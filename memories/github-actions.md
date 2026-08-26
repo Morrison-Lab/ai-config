@@ -400,6 +400,8 @@ The `@claude` bot's own behaviour lives in
   (expressions docs, read 2026-08-26).
   The older claim that *any* explicit step `if:` discards that default is
   false ([ai-config#2307](https://github.com/Morrison-Lab/ai-config/issues/2307)).
+  Gated by
+  [`scripts/check-github-actions-step-if.py`](../scripts/check-github-actions-step-if.py).
   Keep writing `success() &&` so a later `failure()` copy cannot fail-open
   the step.
   The default condition on a step is `success()`, which is why a failing step

@@ -13,6 +13,7 @@ index in that directory.
 | File | Title | Covers |
 |------|-------|--------|
 | [`preferences.md`](preferences.md) | User preferences (cross-workspace) | Standing working rules: never-assume/always-verify, record learnings as you go, cite sources for tool-behavior claims, issue-first, and the ARDI / fully-clean definitions. |
+| [`reviewing-prs.md`](reviewing-prs.md) | Reviewing someone else's PR | Leftover-artifact findings follow what the PR is landing, owner scope vs the author's mechanical box, review-only is not ARDI, and post every finding already in hand, split from `preferences.md` at the 1200-line gate (UCD-SERG/shigella#31). |
 | [`github.md`](github.md) | GitHub & GitLab CLIs and APIs | `glab` and the GitLab Discussions API, GitHub access from bash in remote sessions, and PR / issue queue management (the GII startup sweep, stacked-PR pitfalls). Most `gh` CLI content now lives in `gh-cli.md`. |
 | [`gh-cli.md`](gh-cli.md) | GitHub CLI (`gh`) | The `gh` CLI behavior, rate limits, pagination, handling `GH_PAGER`, GraphQL vs REST pools, and fallback strategies. Split out of `github.md`. |
 | [`github-mcp-tools.md`](github-mcp-tools.md) | GitHub MCP tools (Claude Code remote/web sessions) | The GitHub MCP tool surface used when `gh` is unavailable: tool selection, scope and owner-string quirks, review/comment/thread mechanics, and per-tool failure modes. Split out of `github.md` (ai-config#694 pattern) pre-emptively at 1199 lines, just under the 1200-line gate. |

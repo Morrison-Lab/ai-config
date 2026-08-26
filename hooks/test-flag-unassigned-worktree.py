@@ -105,7 +105,7 @@ if not os.path.isfile(HOOK):
 
 def verdict(payload):
     p = subprocess.run(
-        ["python3", HOOK],
+        [sys.executable, HOOK],
         input=json.dumps(payload),
         capture_output=True, text=True,
     )

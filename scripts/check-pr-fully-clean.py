@@ -1013,7 +1013,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 break
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
-        unique_authors = set(item[5] for item in matching_items if len(item) > 5)
+        unique_authors = set(item[5] for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
         if len(unique_authors) < quorum:
             issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:

@@ -884,5 +884,43 @@ expect(
 )
 
 
+# PyYAML must stay optional for everything except CI-config resolution: the
+# reformatter's --help (and any pre-parse path) must work on a machine with no
+# PyYAML, and a run that genuinely needs the config must exit with the
+# friendly install message, never a raw ModuleNotFoundError traceback
+# (review finding on #2322: an unguarded module-scope import broke both).
+import subprocess
+import tempfile
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPTS_DIR.parent
+
+with tempfile.TemporaryDirectory() as _shim_dir:
+    (Path(_shim_dir) / "yaml.py").write_text(
+        'raise ImportError("yaml blocked for test")\n', encoding="utf-8"
+    )
+    _env = dict(os.environ, PYTHONPATH=_shim_dir)
+    _help = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"), "--help"],
+        capture_output=True, text=True, env=_env,
+    )
+    expect(
+        "--help works without PyYAML",
+        _help.returncode == 0,
+        _help.stderr[-200:],
+    )
+    _run = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"),
+         str(REPO_ROOT / "README.md")],
+        capture_output=True, text=True, env=_env,
+    )
+    expect(
+        "yaml-needing run without PyYAML exits with the friendly message",
+        _run.returncode != 0
+        and "pip install pyyaml" in (_run.stderr + _run.stdout)
+        and "Traceback" not in (_run.stderr + _run.stdout),
+        (_run.stderr + _run.stdout)[-300:],
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

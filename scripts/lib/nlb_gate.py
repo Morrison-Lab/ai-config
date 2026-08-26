@@ -39,8 +39,6 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-import yaml
-
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = SCRIPTS_DIR.parent
@@ -98,6 +96,16 @@ def parse_ci_nlb_with(validate_yml: Path | None = None) -> dict[str, object]:
     the same step, one by regex and one by parsing the YAML structure.
     """
     path = VALIDATE_YML if validate_yml is None else validate_yml
+    # Lazy, guarded import: PyYAML is needed only to resolve CI's NLB config,
+    # and the reformatter must stay usable (--help, error messages) without it.
+    # Same friendly-exit convention as validate-skills.py / sync-codex-skill-wrappers.py.
+    try:
+        import yaml
+    except ImportError:
+        sys.exit(
+            "nlb_gate: PyYAML is required to resolve CI's NLB config from"
+            " validate.yml -- run `pip install pyyaml`."
+        )
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     matches: list[dict[str, object]] = []
     for job in (doc.get("jobs") or {}).values():

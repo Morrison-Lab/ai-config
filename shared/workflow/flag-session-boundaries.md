@@ -157,7 +157,8 @@ If a recommendation applies,
 prefix your recommendation with the `⚠️ **FLAG** ---` tag and present it.
 Regardless of whether a recommendation applies,
 output `wrap-up`'s full report.
-Ensure the (possibly adjusted) stopping point declaration remains the final thing in your response (subject to the CI exception above).
+For a clean stopping point, ensure the (possibly adjusted) stopping point declaration remains the final thing in your response (subject to the CI exception above).
+For a non-clean stopping point, ensure the open questions and pending tasks are placed after the stopping point declaration, so they remain the final and most visible element in your response, per `wrap-up`'s visibility rule.
 
 - **Do:** run `wrap-up` when a session hits a natural stopping point.
 - **Do:** prefix any recommendation with the flag, instead of offering to take on more tasks.

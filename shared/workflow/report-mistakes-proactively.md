@@ -18,7 +18,7 @@ a product one.
 
 1. **Say something in chat.** Surface the mistake as a one-line `⚠️ **FLAG** ---`
    (per `CLAUDE.md`'s chat-output-tagging convention) so the user sees it
-   now --- but don't stop there; chat is not durable.
+   now — but don't stop there; chat is not durable.
    The flag is a heads-up, not a request.
    Ending it with an offer ("worth an issue --- say the word and I'll file
    it") is the failure this rule exists to prevent, dressed as courtesy.

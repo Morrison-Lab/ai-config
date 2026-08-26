@@ -1060,6 +1060,19 @@ Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-0
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
 
+## Do not present personal workspaces as a bypass for organization policy
+
+- When documenting alternatives to an administrator-disabled cloud feature,
+  scope any personal-workspace path to personally owned repositories.
+- Do not advise connecting organization-owned repositories through a personal
+  workspace; that bypasses workspace governance and moves code outside the
+  organization's controls.
+- Treat repository authorization and workspace policy as separate gates; both
+  must permit the integration.
+
+(Learned from the review of Morrison-Lab/wai#85 on 2026-08-23; the corrected
+guidance received a clean review on 2026-08-24.)
+
 ## Default new capabilities on for the owner's own repos, opt-out elsewhere
 
 When adding an optional capability to a repo the user personally owns and

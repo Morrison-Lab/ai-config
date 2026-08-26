@@ -970,8 +970,9 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > Route no API-dispatched subagent work to it.
 > **The API and the CLI are two separate paths: the API is out of commission,
 > but the agy CLI is available** (user clarification, 2026-08-25),
-> so headless `agy --print` invocations --- including adversarial review
-> dispatch --- remain usable.
+> so headless `agy --print` invocations
+> --- including adversarial review dispatch ---
+> remain usable.
 > The interactive subscription/extension is unaffected and not at quota --
 > don't extrapolate this into "uninstall the extension".
 > Tracked as ai-config#1776.
@@ -990,6 +991,10 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
+General delegation order for ordinary work:
+exhaust each metered CLI's current usage window (`codex`, then `agy` CLI)
+before falling back to Claude;
+free `opencode` sits outside window logic entirely.
 Headless dispatch: `agy --print="<prompt>" [--effort low]`.
 The `--print` flag consumes the prompt argument,
 so attach it with `=` and keep other flags outside it.

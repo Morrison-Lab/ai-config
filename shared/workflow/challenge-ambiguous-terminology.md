@@ -18,9 +18,8 @@ review. When the ambiguity is resolvable by reading the code or spec yourself,
 resolve it and note the correction; when it genuinely depends on the author's
 intent, ask rather than assume.
 
-**Cross-repo citations have a merge-order trap.** Citing a specific file path
-or construct in another repo is itself unverifiable --- and will 404 a link
-checker --- if the PR that adds it hasn't merged yet.
+**Cross-repo citations have a merge-order trap.**
+Citing a specific file path or construct in another repo is itself unverifiable if the PR that adds it hasn't merged yet --- and a link checker will not save you, on any case measured here: a backticked path is not a link, so nothing crawls it.
 
 Don't fix this by promising a future edit ("cite it generically for now, then
 tighten the citation once it merges") --- that's still a citation that needs
@@ -53,6 +52,26 @@ already-established fact again --- even though the evergreen-conditional phrasin
 had already landed on `main` in the same session --- because nothing
 prompted a check of this guideline while writing a brand-new citation, only
 once a review flagged it after the fact.)
+
+**Fifth occurrence, 2026-08-24, and the first one SAME-repo.**
+`CLAUDE.md` already says this section applies to a same-repo sibling PR unchanged, and this is that case: ai-config prose citing a construct in ai-config's own `hooks/`, where the four above are all `gha`'s `CLAUDE.md` citing `d-morrison/ai-config`.
+Note what does **not** distinguish them, since the obvious contrast is wrong: none of the five had a link checker behind it.
+The four cross-repo cases cite a backticked bare path and a repo-root link, and each escapes a checker for its own reason: a backticked path is not a link, so nothing crawls it, while the repo-root link resolves fine.
+So the 404 warning never fired on any measured case, and it would not have fired on this one either.
+
+**The new observation is why thorough review does not catch it.**
+Every reviewer verifies the claim against the branch the claim is *about*, which is the correct artifact for its truth --- so it passes, and the more carefully that branch is checked, the more settled the sentence looks.
+The question nobody asks is which artifact the *reader* will be standing on, because that is a question about the claim's audience rather than its truth.
+So this is the one trap in this section where verification effort runs the wrong way.
+
+- **Do:** settle it from the **PR's own state** (`gh pr view <N> --json state`), or from an empty `git diff <base> <branch> -- <path>`, per [`pr-on-claim`](pr-on-claim.md) --- not by grepping for the name, which succeeds once your own citing sentence lands on the target branch, and not by `git merge-base --is-ancestor`, which never discharges in a squash-merging repo because the squash commit excludes the branch's own commits.
+- **Don't:** rely on a link checker to catch a premature citation, in either direction --- a backticked path and a bare construct name are both invisible to one.
+
+(Measured on [ai-config#2207](https://github.com/Morrison-Lab/ai-config/pull/2207), whose prose described a constant in `hooks/require-agent-disclosure.py` in the present tense.
+That constant exists only on [#2185](https://github.com/Morrison-Lab/ai-config/pull/2185), open at the time, and its introducing commit was an ancestor of neither `main` nor the citing branch.
+Twelve pre-push adversarial rounds ran on that PR without raising it, and the round that did raise it had itself executed the regex, the commit ancestry, and the timestamps against `#2185` --- all correct, and all about the wrong branch.
+Two separately-dispatched same-vendor passes then raised it nine minutes apart, once the diff was read as something about to become `main`: a session verification pass at `05:27:25Z` (comment `5405924657`) and the repo's own `claude-review` at `05:36:44Z`.
+Naming both matters, because the *later* `claude-review` round at `05:46:39Z` reports zero findings and **Ready for merge** --- it confirmed the fix rather than raising anything, so a reader comparing only the two `claude-review` comments finds one raise, not two.)
 
 **A cross-repo citation can also name the wrong repository, with nothing
 pending and nothing to wait for.**

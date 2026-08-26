@@ -2,6 +2,7 @@
 """Comprehensive unit and integration test suite for the Persistent Orchestrator."""
 
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -237,20 +238,58 @@ class TestSpecializedSubagents(unittest.TestCase):
         self.assertIn("Find AST parsers", res.data["query"])
 
     def test_reviewer_adversarial_check(self):
+        import importlib.util
+        from orchestrator.model_adapters import ModelResponse
+        checker_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "check-pr-fully-clean.py")
+        spec = importlib.util.spec_from_file_location("checker", checker_path)
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+
         agent = self.registry.get_for_role("reviewer")
 
         # Clean code
-        task_clean = Task(title="Review clean diff", role="reviewer", payload={"diff": "+ def foo(): return 42", "dry_run": True})
-        ctx = SubagentContext(task=task_clean, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
-        res_clean = agent.execute(task_clean, ctx)
-        self.assertTrue(res_clean.success)
-        self.assertEqual(res_clean.data["verdict"], "CLEAN")
+        posted_comments = []
+        def mock_run(cmd, *args, **kwargs):
+            if "gh" in cmd and "comment" in cmd:
+                body_idx = cmd.index("--body") + 1
+                posted_comments.append(cmd[body_idx])
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-        # Unsafe code
-        task_unsafe = Task(title="Review unsafe diff", role="reviewer", payload={"diff": "+ eval(user_input)", "dry_run": True})
-        res_unsafe = agent.execute(task_unsafe, ctx)
-        self.assertFalse(res_unsafe.success)
-        self.assertEqual(res_unsafe.data["verdict"], "BLOCKED")
+        mock_adapter = unittest.mock.MagicMock()
+        mock_adapter.invoke.return_value = ModelResponse(
+            success=True,
+            content="CLEAN: No issues found.",
+            model_used="mock-model",
+            provider=ModelProvider.OLLAMA,
+            execution_time_seconds=0.1,
+        )
+
+        with unittest.mock.patch("shutil.which", return_value="/usr/bin/gh"), \
+             unittest.mock.patch("subprocess.run", side_effect=mock_run), \
+             unittest.mock.patch.object(agent.model_router, "route_task", return_value=(mock_adapter, "mock-model")):
+            task_clean = Task(
+                title="Review clean diff",
+                role="reviewer",
+                payload={"diff": "+ def foo(): return 42", "dry_run": False, "pr_number": 9999, "repo_slug": "Morrison-Lab/ai-config"}
+            )
+            ctx = SubagentContext(task=task_clean, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+            res_clean = agent.execute(task_clean, ctx)
+            self.assertTrue(res_clean.success)
+            self.assertEqual(res_clean.data["verdict"], "CLEAN")
+            self.assertEqual(len(posted_comments), 1)
+            self.assertEqual(checker.classify_verdict(posted_comments[0]), "clean")
+
+            # Unsafe code
+            task_unsafe = Task(
+                title="Review unsafe diff",
+                role="reviewer",
+                payload={"diff": "+ eval(user_input)", "dry_run": False, "pr_number": 9999, "repo_slug": "Morrison-Lab/ai-config"}
+            )
+            res_unsafe = agent.execute(task_unsafe, ctx)
+            self.assertFalse(res_unsafe.success)
+            self.assertEqual(res_unsafe.data["verdict"], "BLOCKED")
+            self.assertEqual(len(posted_comments), 2)
+            self.assertEqual(checker.classify_verdict(posted_comments[1]), "not-clean")
 
     def test_coordinator_dynamic_decomposition(self):
         agent = self.registry.get_for_role("coordinator")
@@ -400,6 +439,19 @@ class TestSpecializedSubagents(unittest.TestCase):
         res = agent.execute(task, ctx)
         self.assertFalse(res.success)
         self.assertEqual(res.data["verdict"], "BLOCKED")
+
+    def test_reviewer_subagent_empty_diff_without_branch_blocks(self):
+        agent = self.registry.get_for_role("reviewer")
+        task = Task(
+            title="Review empty diff with no branch",
+            role="reviewer",
+            payload={"diff": "", "dry_run": False},
+        )
+        ctx = SubagentContext(task=task, state_store=self.store, worker_id="w1", workspace_root=self.temp_dir.name)
+        res = agent.execute(task, ctx)
+        self.assertFalse(res.success)
+        self.assertEqual(res.data["verdict"], "BLOCKED")
+        self.assertIn("Empty implementation diff to review", res.error)
 
     def test_extract_files_from_markdown_discards_stubs_and_self_referential_blocks(self):
         from orchestrator.subagents import extract_files_from_markdown
@@ -1126,116 +1178,63 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
             self.assertFalse(AIConfigProtocols.check_repo_allows_mwc(repo_root=Path(empty_dir), repo_slug="external/foo"))
 
     def test_is_pr_fully_clean_detection(self):
-        import json
         from unittest.mock import MagicMock
         from orchestrator.pr_claim_manager import PRClaimManager
 
         mgr = PRClaimManager(repo_slug="Morrison-Lab/ai-config")
 
-        # 1. Clean PR
-        clean_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-                {"name": "check-links", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Ready for merge"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, clean_json, ""))
+        # 1. Clean PR exit code 0 delegates and returns True
+        mgr._run_cmd = MagicMock(return_value=(0, "Morrison-Lab/ai-config#2112 is FULLY CLEAN on HEAD c1427642!", ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertTrue(is_clean)
-        self.assertIn("fully clean", reason)
+        self.assertEqual(reason, "PR is fully clean across CI and review")
+        call_args = mgr._run_cmd.call_args[0][0]
+        self.assertIn("check-pr-fully-clean.py", call_args[1])
+        self.assertEqual(call_args[2], "2112")
+        self.assertEqual(call_args[3:], ["-R", "Morrison-Lab/ai-config"])
 
-        # 2. Failing CI check
-        dirty_ci_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "FAILURE"},
-            ],
-            "reviews": [],
-            "comments": [],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, dirty_ci_json, ""))
+        # 2. Not clean PR with blocking bullet points parses reasons (excluding informational NOTEs)
+        not_clean_output = (
+            "Checking ARDI / fully-clean status for Morrison-Lab/ai-config#2112...\n"
+            "PR #2112: state=OPEN, HEAD=c1427642\n"
+            "Notes:\n"
+            "  - NOTE: Review from Claude has a format the verdict classifier cannot read\n"
+            "PR is NOT fully clean:\n"
+            "  - Latest verdict-bearing review statement is NOT clean\n"
+            "  - Check 'validate' failed with conclusion=FAILURE\n"
+        )
+        mgr._run_cmd = MagicMock(return_value=(1, not_clean_output, ""))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("failed", reason)
+        self.assertIn("Latest verdict-bearing review statement is NOT clean", reason)
+        self.assertIn("Check 'validate' failed with conclusion=FAILURE", reason)
+        self.assertNotIn("NOTE:", reason)
 
-        # 3. Blocking AI review verdict ("Needs more work")
-        dirty_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Needs more work."}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, dirty_review_json, ""))
+        # 3. Usage or repo resolution error (exit 2) fails closed
+        mgr._run_cmd = MagicMock(return_value=(2, "", "Repository could not be resolved"))
         is_clean, reason = mgr.is_pr_fully_clean(2112)
         self.assertFalse(is_clean)
-        self.assertIn("needs more work", reason.lower())
+        self.assertIn("Repository could not be resolved", reason)
 
-        # 4. Alternative blocking verdict phrasing ("Blocked on human review")
-        blocked_human_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "Claude finished review\n\nVerdict: Blocked on human review"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, blocked_human_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        # 4. Post-print crash (out contains banner, err contains actual traceback) prefers err
+        banner_out = "Checking ARDI / fully-clean status for Morrison-Lab/ai-config#999...\n"
+        tb_err = (
+            "Traceback (most recent call last):\n"
+            "  File 'check-pr-fully-clean.py', line 123, in <module>\n"
+            "RuntimeError: Command failed (gh pr view): GraphQL: Could not resolve to a PullRequest"
+        )
+        mgr._run_cmd = MagicMock(return_value=(1, banner_out, tb_err))
+        is_clean, reason = mgr.is_pr_fully_clean(999)
         self.assertFalse(is_clean)
-        self.assertIn("blocked", reason.lower())
+        self.assertIn("RuntimeError: Command failed", reason)
+        self.assertNotIn("Checking ARDI", reason)
 
-        # 5. Production Claude review header format ("**Claude finished** -- ...")
-        prod_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "**Claude finished** -- adversarial review\n\n### Verdict\nClean / Approved"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, prod_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
+        # 5. Explicit repo slug override threaded to check-pr-fully-clean.py
+        mgr._run_cmd = MagicMock(return_value=(0, "clean", ""))
+        is_clean, reason = mgr.is_pr_fully_clean(2112, repo_slug="OtherOrg/other-repo")
         self.assertTrue(is_clean)
-        self.assertIn("fully clean", reason)
-
-        # 6. Missing Claude review (fallback self-review only, or no comments)
-        missing_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "### Fallback Self-Review\nVerdict: Clean"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, missing_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("missing automated claude review", reason.lower())
-
-        # 7. Closed PR notice with em-dash ("No action \u2014 PR is closed/merged")
-        closed_pr_emdash_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "**Claude finished** -- review\n\nVerdict: No action \u2014 PR is closed/merged"}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, closed_pr_emdash_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("blocking verdict", reason.lower())
-
-        # 8. Stub review (Claude completed but no positive clean/approved verdict)
-        stub_review_json = json.dumps({
-            "statusCheckRollup": [
-                {"name": "validate", "status": "COMPLETED", "conclusion": "SUCCESS"},
-            ],
-            "reviews": [],
-            "comments": [{"body": "**Claude finished** -- review\n\nI examined the files but got cut short."}],
-        })
-        mgr._run_cmd = MagicMock(return_value=(0, stub_review_json, ""))
-        is_clean, reason = mgr.is_pr_fully_clean(2112)
-        self.assertFalse(is_clean)
-        self.assertIn("does not contain a recognized positive clean/approved verdict", reason)
+        call_args = mgr._run_cmd.call_args[0][0]
+        self.assertEqual(call_args[3:], ["-R", "OtherOrg/other-repo"])
 
     def test_cli_ingest_issues_dry_run_and_claim_pr_flags(self):
         from orchestrator.cli import build_parser

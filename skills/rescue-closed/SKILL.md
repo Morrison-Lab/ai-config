@@ -108,7 +108,9 @@ Before touching any item, **claim it** (`claim-pr`) so parallel sessions or the
 **Issue:**
 
 ```bash
-gh issue reopen <N> --comment "Reviving: <why it still matters>."   # REOPEN_ISSUE
+gh issue reopen <N> --comment "Reviving: <why it still matters>.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"   # REOPEN_ISSUE
 ```
 
 If reopening is wrong — a messy thread, or scope has shifted — file a fresh issue

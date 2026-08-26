@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Exercise bootstrap's Cursor skill skip when a plugin or Claude catalog is live.
+"""Exercise bootstrap's Cursor skill and rule skip when a plugin is live.
 
 A full bootstrap always installs ``~/.claude/skills`` first, and Cursor
 discovers that directory, so the Cursor section must not also link
 ``~/.cursor/skills`` on top. A marketplace/local Cursor plugin is the other
-skip. The remaining install path is covered by unit tests on
+skill skip. The remaining skill-install path is covered by unit tests on
 ``skip_reason()`` with empty Claude and Cursor dirs.
+
+The plugin also ships ``cursor-rules/``. Bootstrap must not also link
+``~/.cursor/rules`` on top of that (ai-config#2291). A live Claude skill
+catalog is not a skip for rules.
 """
 from __future__ import annotations
 
@@ -35,9 +39,9 @@ def run_bootstrap(
     stale_link: bool | str = False,
 ) -> tuple[Path, str]:
     cursor = tmp / "cursor"
-    cursor.mkdir(parents=True)
+    cursor.mkdir(parents=True, exist_ok=True)
     if with_plugin:
-        (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+        (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True, exist_ok=True)
     if stale_link:
         dest = cursor / "skills" / "ardi"
         dest.parent.mkdir(parents=True)
@@ -71,8 +75,9 @@ with tempfile.TemporaryDirectory() as raw:
     check("plugin present skips ~/.cursor/skills/ardi",
           not (cursor / "skills" / "ardi").exists())
     check("plugin skip is reported", "Cursor plugin is already installed" in output)
-    check("user-global rules still install",
-          (cursor / "rules" / "000-global-workflow.mdc").exists())
+    check("plugin present skips ~/.cursor/rules",
+          not (cursor / "rules" / "000-global-workflow.mdc").exists())
+    check("plugin skip reports Cursor rules", "skip  Cursor rules" in output)
 
 try:
     with tempfile.TemporaryDirectory() as raw:
@@ -98,6 +103,29 @@ if can_link:
             "plugin skip removes a repo link that is not skills/<name>",
             not (cursor / "skills" / "ardi").exists(),
         )
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        home = tmp / "stale-rule"
+        cursor = home / "cursor"
+        dest = cursor / "rules" / "000-global-workflow.mdc"
+        dest.parent.mkdir(parents=True)
+        dest.symlink_to(ROOT / "cursor-rules" / "000-global-workflow.mdc")
+        real = cursor / "rules" / "001-code-quality.mdc"
+        real.write_text("do not clobber\n", encoding="utf-8")
+        foreign_target = tmp / "foreign.mdc"
+        foreign_target.write_text("foreign\n", encoding="utf-8")
+        foreign = cursor / "rules" / "foreign.mdc"
+        foreign.symlink_to(foreign_target)
+        cursor, output = run_bootstrap(home, with_plugin=True)
+        check(
+            "plugin skip removes this checkout's stale rule link",
+            not dest.exists(),
+        )
+        check("skip reports stale-rule removal", "stale rule link" in output)
+        check("plugin skip does not clobber a real rule file",
+              real.is_file() and not real.is_symlink())
+        check("plugin skip does not remove a foreign rule symlink",
+              foreign.is_symlink() and foreign.exists())
 else:
     print("SKIP: stale-link removal (platform cannot create symlink)")
 
@@ -110,6 +138,10 @@ with tempfile.TemporaryDirectory() as raw:
           "claude/skills" in output.replace("~/", ""))
     check("no-plugin path does not claim a plugin skip",
           "Cursor plugin is already installed" not in output)
+    check(
+        "Claude catalog skip still installs user-global rules",
+        (cursor / "rules" / "000-global-workflow.mdc").is_symlink(),
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

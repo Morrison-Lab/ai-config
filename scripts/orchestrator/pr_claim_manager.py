@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 from typing import Any, Dict, List, Optional
 
 from .worktree_manager import WorktreeManager
@@ -200,106 +201,37 @@ class PRClaimManager:
         return True
 
     def is_pr_fully_clean(self, pr_number: int, repo_slug: Optional[str] = None) -> tuple[bool, str]:
-        """Check if PR has 100% clean CI checks and an approved / clean review verdict."""
+        """Check if PR has 100% clean CI checks and an approved / clean review verdict.
+
+        Delegates to scripts/check-pr-fully-clean.py, this repository's authoritative verification tool.
+        """
         effective_repo = self.get_effective_repo_slug(repo_slug)
-        cmd = ["gh", "pr", "view", str(pr_number), "--json", "statusCheckRollup,reviews,comments"]
+        script_path = Path(__file__).resolve().parent.parent / "check-pr-fully-clean.py"
+        cmd = [sys.executable, str(script_path), str(pr_number)]
         if effective_repo:
             cmd.extend(["-R", effective_repo])
 
         rc, out, err = self._run_cmd(cmd)
-        if rc != 0:
-            return False, f"Failed to query PR #{pr_number} metadata: {err}"
+        if rc == 0:
+            return True, "PR is fully clean across CI and review"
 
-        try:
-            data = json.loads(out)
-        except Exception as exc:
-            return False, f"Failed to parse PR #{pr_number} JSON: {exc}"
+        out_lines = [line.strip() for line in (out or "").splitlines() if line.strip()]
+        blocking_reasons = []
+        for line in out_lines:
+            if line.startswith("- ") and not line.startswith("- NOTE:"):
+                blocking_reasons.append(line[2:])
 
-        # 1. Check CI statusCheckRollup
-        checks = data.get("statusCheckRollup", [])
-        for chk in checks:
-            name = chk.get("name") or chk.get("context", "unknown")
-            status = chk.get("status")
-            conclusion = (chk.get("conclusion") or chk.get("state") or "").upper()
-            if status != "COMPLETED":
-                return False, f"Check '{name}' is still in progress (status={status})"
-            if conclusion not in ["SUCCESS", "SKIPPED", "NEUTRAL"]:
-                return False, f"Check '{name}' failed with conclusion={conclusion}"
+        if blocking_reasons:
+            return False, "; ".join(blocking_reasons)
 
-        # 2. Check reviews and comments for clean approval
-        reviews = data.get("reviews", [])
-        has_changes_requested = any(r.get("state") in ["CHANGES_REQUESTED", "DISMISSED"] for r in reviews)
-        if has_changes_requested:
-            return False, "PR has CHANGES_REQUESTED review"
+        err_lines = [line.strip() for line in (err or "").splitlines() if line.strip()]
+        if err_lines:
+            return False, err_lines[-1]
 
-        comments = data.get("comments", [])
-        claude_reviews = [
-            c for c in comments
-            if "claude finished review" in c.get("body", "").lower()
-            or "**claude finished" in c.get("body", "").lower()
-        ]
-        if not claude_reviews:
-            return False, "Missing automated Claude review evaluating PR (required for merge under mwc)"
+        if out_lines:
+            return False, out_lines[-1]
 
-        latest_review = (
-            claude_reviews[-1].get("body", "")
-            .lower()
-            .replace("\u2014", "--")
-            .replace("\u2013", "--")
-        )
-
-        blocking_phrases = [
-            "needs more work",
-            "needs work",
-            "blocked",
-            "blocked on human review",
-            "changes requested",
-            "not clean",
-            "not ready",
-            "impasse",
-            "deadlock",
-            "finding 1 (blocking)",
-            "finding (blocking)",
-            "verdict\n\n**needs more work",
-            "verdict\n\n**needs work",
-            "no action -- pr is closed",
-            "no action -- pr is merged",
-        ]
-        for phrase in blocking_phrases:
-            if phrase in latest_review:
-                return False, f"Latest AI review has blocking verdict ('{phrase}')"
-
-        # Require an explicit positive clean / approved verdict signal
-        positive_verdict_phrases = [
-            "verdict:\n\n**ready",
-            "verdict:\n\n**clean",
-            "verdict:\n\n**approved",
-            "verdict:\nready",
-            "verdict:\nclean",
-            "verdict:\napproved",
-            "verdict\n\nclean",
-            "verdict\n\napproved",
-            "verdict\n\nready",
-            "clean / approved",
-            "clean/approved",
-            "ready for merge",
-            "approved for merge",
-            "### verdict\n\nclean",
-            "### verdict\n\napproved",
-            "### verdict\n\nready",
-            "### verdict\nclean",
-            "### verdict\napproved",
-            "### verdict\nready",
-            "### verdict\n\n**clean",
-            "### verdict\n\n**approved",
-            "### verdict\n\n**ready",
-            "verdict:\n\nclean",
-            "verdict:\n\nready",
-        ]
-        if not any(phrase in latest_review for phrase in positive_verdict_phrases):
-            return False, "Latest AI review does not contain a recognized positive clean/approved verdict"
-
-        return True, "PR is fully clean across CI and review"
+        return False, f"check-pr-fully-clean exited with code {rc}"
 
     def merge_pr_under_mwc(
         self,

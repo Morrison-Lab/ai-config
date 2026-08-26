@@ -52,12 +52,17 @@ DEFAULT_SUITE_TIMEOUT_S = 900
 
 # The largest HOOK_TEST_SUITE_TIMEOUT this runner accepts. A genuinely
 # finite, positive value can still crash the sweep: Popen.communicate()'s
-# underlying epoll-based selector converts the timeout to milliseconds as a
-# C int, so a value above roughly INT_MAX ms (~2147483s, ~24.9 days) raises
-# OverflowError -- measured directly (Linux, Python 3.11.15, 2026-08-26:
-# `select.epoll().poll(2147484)` raises "timeout is too large";
-# `2147483` does not) and reported independently on Python 3.12.3 for
-# HOOK_TEST_SUITE_TIMEOUT=1000000000. That exception is not caught
+# poll()-based selector (selectors.PollSelector -- CPython's subprocess
+# module deliberately avoids epoll/kqueue here, per its own comment about
+# not spending an extra file descriptor) converts the timeout to
+# milliseconds as a C int, so a value above roughly INT_MAX ms
+# (~2147483s, ~24.9 days) raises OverflowError -- measured directly
+# through the real path (Linux, Python 3.11.15, 2026-08-26:
+# `Popen(...).communicate(timeout=1e9)` raises "timeout is too large")
+# and reported independently on Python 3.12.3 for
+# HOOK_TEST_SUITE_TIMEOUT=1000000000. Windows uses blocking reads on
+# child threads instead of a selector, so the exact boundary there is
+# unmeasured; the cap stays far below every candidate boundary. That exception is not caught
 # anywhere a per-suite FAIL could absorb it, so it aborts the whole sweep
 # exactly like the nan/inf cases below. One day is far more than any suite
 # should ever need and stays safely under that boundary on every platform
@@ -170,6 +175,11 @@ def run_one_suite(test_path, subject, timeout):
         sys.stdout.write(_decode_captured(stdout))
         sys.stderr.write(_decode_captured(stderr))
         if stdout is None and stderr is None:
+            # Known trade-off: only the direct child was killed above, so
+            # a descendant that inherited the pipe survives as an orphan
+            # until it exits on its own. Killing the whole process group
+            # (start_new_session=True) would close that, at the cost of
+            # changing signal semantics for every well-behaved suite.
             print("(output unavailable: a descendant process still held the "
                   "pipe after the suite was killed)")
         return 1

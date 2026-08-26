@@ -1,5 +1,7 @@
 # Google Antigravity & `agy` CLI
-<!-- vintage: 2026-08-26 -->
+
+Claims below about Antigravity's runtime behavior were checked 2026-08-26 unless a claim carries its own date.
+Re-verify against a live install before relying on any of them, since the primary docs were egress-blocked from this session.
 
 ## Hook architecture and schema mapping
 
@@ -23,6 +25,8 @@ the exact token spelling as certain. -->
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
   - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
+  - The plugin matcher's `mcp__github__.*` alternative assumes Antigravity names MCP tool calls with Claude Code's `mcp__<server>__<tool>` convention.
+    That is unverified (2026-08-26): the confirmed Antigravity `toolCall.name` values are only `run_command`, `invoke_subagent`, `send_message`, and `define_subagent`, so if the real MCP names differ, the `mcp__github__.*` branch silently never fires --- re-verify against a live install before relying on it as a gate.
   - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
@@ -40,7 +44,8 @@ the exact token spelling as certain. -->
   - Claude hooks in `hooks/hooks.json` are grouped and output `{"decision": "block", "reason": "..."}`.
     An adapter must translate `block` to `continue`.
 - **`PreInvocation`**: Fired before the model call.
-  Its documented input fields are `invocationNum`, `initialNumSteps`, `conversationId`, `workspacePaths`, `transcriptPath`, `artifactDirectoryPath`, and `modelName` --- **no prompt text field at all**.
+  Its documented input fields are `invocationNum`, `initialNumSteps`, `conversationId`, `workspacePaths`, `transcriptPath`, and `artifactDirectoryPath` --- **no prompt text field at all**.
+  A seventh field, `modelName`, is an inference from secondary-source synthesis (checked 2026-08-26), not shown in the example payload those sources reproduce --- treat it as unconfirmed.
   The adapter's `prompt` extraction (`prompt` / `userPrompt` / `message`, then a `messages` scan for an explicit user/human-authored entry) is therefore a defensive fallback for a payload shape not observed in production, not a mapping of a documented field.
   Expect `prompt` to be empty on a real Antigravity invocation unless a future payload version adds one.
   The scan never falls back to an arbitrary last message regardless of role, since that could silently substitute the model's own prior turn for the user's prompt.

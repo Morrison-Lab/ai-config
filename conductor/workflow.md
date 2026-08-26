@@ -79,8 +79,8 @@ All tasks follow a lifecycle (subordinate to the universal rules in AGENTS.md):
         a list of all created/modified files, and the core "why" for the change.
     - **Step 9.3: Attach Note:** Use the `git notes` command to attach the
         summary to the commit.
-        `bash # The note content from the previous step is passed via the -m flag. git notes add -m "<note content>"
-        <commit_hash>`
+        Run `git notes add -m "<note content>" <commit_hash>`.
+        The note content from the previous step is passed via the `-m` flag.
 
 10. **Get and Record Task Commit SHA:**
 

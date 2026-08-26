@@ -394,26 +394,32 @@ The `@claude` bot's own behaviour lives in
   Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure;
   instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check).
   Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
-- **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
-  guard step's failure does not skip the steps that follow it.**
+- **An `if:` that names a status-check function (`always` / `failure` /
+  `cancelled`) replaces the default `success()`.**
+  GitHub auto-applies `success()` when the condition has no such function
+  (expressions docs, read 2026-08-26).
+  The older claim that *any* explicit step `if:` discards that default is
+  false ([ai-config#2307](https://github.com/Morrison-Lab/ai-config/issues/2307)).
+  Keep writing `success() &&` so a later `failure()` copy cannot fail-open
+  the step.
   The default condition on a step is `success()`, which is why a failing step
   normally ends a job's useful work.
-  Adding `if: steps.guard.outputs.blocked != 'true'` silently discards that,
-  so the step now runs *whatever* happened upstream, including a guard step
-  that exited non-zero because it could not establish whether the work was
-  safe to do.
-  This is the [`fail-fast`](../shared/principles/fail-fast.md) violation that
-  looks most like diligence: the guard is present, its logic is right, and its
-  verdict is simply not consulted on the one path it was written for.
+  Adding `if: steps.guard.outputs.blocked != 'true'` does not discard that
+  default, because it names no status-check function.
+  A later `failure()` or `always()` on that same `if:` would override it,
+  and a fail-closed output write is the second layer for the case the guard
+  dies before writing.
 
-  What makes it hard to catch is that the bug is usually **masked by a second
-  mechanism** rather than being visible.
+  What makes a later `failure()` / `always()` copy hard to catch is that a
+  fail-closed write usually **masks** it.
   A guard written to fail closed writes its output before exiting
   (`echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 1`), and outputs are captured
   from failed steps too, so the condition happens to evaluate correctly.
   Every test passes, and the protection is entirely accidental --- it evaporates
   the moment the guard fails *before* reaching that write, which is exactly what
   a rate limit, a network error, or a `set -e` abort produces.
+  That evaporate story is not true of a non-status `if:`: GitHub still
+  auto-applies `success()`, so a failed guard already skips those steps.
 
   So spell out both halves: `if: success() && steps.guard.outputs.blocked != 'true'`.
   And prefer `!= 'true'` over `== 'false'` for the output test, because a guard
@@ -424,8 +430,8 @@ The `@claude` bot's own behaviour lives in
     a guard's output.
   - **Do:** treat a fail-closed output write as the second layer, and say so in
     the comment, so nobody later "simplifies" the condition on the strength of it.
-  - **Don't:** rely on a non-zero exit alone to skip steps that carry their own
-    `if:`.
+  - **Don't:** rely on a non-zero exit alone to skip steps whose `if:`
+    names `always()` or `failure()`.
   - **Don't:** infer from a passing test that the condition is right, when a
     fail-closed write could be doing the work instead.
 
@@ -444,9 +450,10 @@ The `@claude` bot's own behaviour lives in
     step does **not** fix it, because `outcome` reports the status *before*
     `continue-on-error` is applied --- only `conclusion` reflects it.
     Nothing was swallowed; there was no output to swallow.
-  - **Here: the guard ran, failed, and was ignored.**
-    The output existed and the condition read it, but the dropped `success()`
-    meant the step's *failure* carried no weight.
+  - **Here: the older writeup said the guard ran, failed, and was ignored.**
+    That diagnosis assumed the false lead; see #2307.
+    Restore an explicit `success() &&` so a later `failure()` cannot
+    fail-open the step, not because a non-status `if:` already did.
 
   So the diagnostic question differs.
   For #350 you ask "can this guard's own gate be true in the scenario it
@@ -606,8 +613,27 @@ if (process.env.GITHUB_EVENT_PATH) {
 this.eventName = process.env.GITHUB_EVENT_NAME;
 ```
 
-Step-level `env:` overrides those, so a workflow triggered by anything can
-present the action with the event it demands.
+Step-level `env:` on a `uses:` step does **not** override those.
+GitHub documents `GITHUB_*` as reserved
+(https://docs.github.com/en/actions/reference/workflows-and-actions/variables,
+checked 2026-08-26):
+"You can't overwrite the value of the default environment variables named
+`GITHUB_*` and `RUNNER_*`."
+The runner still *prints* the YAML `env:` values in the step log, so the wrap
+looks applied.
+Measured 2026-08-26 on
+[run 32942088643](https://github.com/Morrison-Lab/ai-config/actions/runs/32942088643):
+the `uses: sanjay3290/jules-pr-reviewer` step logged
+`GITHUB_EVENT_NAME: pull_request` and then failed with
+`Unsupported event: issue_comment`.
+That was the wrap #857 shipped, and every `@jules` mention since has failed
+the same way (#2280).
+
+The override that actually reaches `Context()` is `env(1)` on a `run:` step
+that starts `node dist/index.js` as a child.
+`env(1)` sets the child's environment after the runner's reserved-name merge.
+A workflow triggered by `issue_comment` can still present the action with
+`pull_request` this way.
 For a `pull_request` gate the payload is close to one API call, because
 `GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
 delivers --- near enough to work, not near enough to skip the field check
@@ -619,11 +645,29 @@ below:
           gh api "${{ github.event.issue.pull_request.url }}" \
             | jq '{pull_request: .}' > "$RUNNER_TEMP/pr_event.json"
 
-      - uses: some/action@<sha>
+      - name: Fetch the action at the pinned SHA
+        run: |
+          dest="$RUNNER_TEMP/the-action"
+          git init --quiet "$dest"
+          git -C "$dest" remote add origin https://github.com/owner/the-action.git
+          git -C "$dest" fetch --depth 1 origin <sha>
+          git -C "$dest" checkout --quiet --detach FETCH_HEAD
+
+      - name: Run the action under a synthetic pull_request event
         env:
-          GITHUB_EVENT_NAME: pull_request
-          GITHUB_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+          INPUT_SOME_INPUT: value
+          SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+          ACTION_DIR: ${{ runner.temp }}/the-action
+        run: |
+          env \
+            GITHUB_EVENT_NAME=pull_request \
+            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \
+            node "$ACTION_DIR/dist/index.js"
 ```
+
+`action.yml` defaults are applied only by a `uses:` step.
+A `run: node dist/index.js` invocation must set every `INPUT_*` the JS reads,
+including the ones a `uses:` step would have inherited.
 
 Two things make this safe rather than merely clever, and both need checking
 before relying on it:
@@ -648,10 +692,33 @@ secrets under `pull_request`) has to be re-established explicitly.
   `payload` before concluding its trigger is fixed --- `src/` for a legible
   version of the gate, and `dist/` to confirm what the pinned SHA actually
   runs, since the bundle is what Actions executes and it can lag `src/`.
-
+- **Do:** invoke the action from a `run:` step with `env(1)` setting
+  `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
+  every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
+- **Do:** pin Node to the interpreter GitHub actually runs for that
+  `runs.using`, not the label in `action.yml`.
+  Measured 2026-08-26 on run 32942088643:
+  this action declares `node20` and was forced onto Node 24.
+- **Do:** write `success()` on wrap steps even though GitHub auto-applies
+  it when `if:` has no status-check function.
+  The could-not-start notifier uses `failure()`, which overrides that
+  default, and a copy onto the node step would spawn node after a failed pin.
+- **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
+  bundle) in its own step so a "could not start" comment can gate on it.
+  Assertions left on the `jules` step fail before the process assigns
+  `commentId`, and the notifier that excludes that step will not fire.
+- **Do:** gate a wrap checker on the `node ... dist/index.js` invocation
+  line, not a substring comments also contain.
+- **Don't:** spawn `env` from Python without `shutil.which("env")`.
+  Windows Python outside Git Bash has no `env` on PATH, so the call raises
+  `FileNotFoundError` before the suite can print its tally, and local
+  pre-commit goes red while ubuntu CI stays green.
+- **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
+  rules-file input is deliberately unused.
+  The empty string is the documented disable value.
 - **Do:** fetch a checker at the SHA the calling workflow **pins** when
   reproducing a diff-scoped CI gate locally, not the action's default branch.
-  The bullet above pins when *auditing* an action; the same applies when
+  The first Do pins when *auditing* an action; the same applies when
   *running* one to validate a fix pre-push, where a shallow default-branch
   clone yields a plausible script with no sign it is the wrong one.
   Measured 2026-08-19: `ai-config`'s `validate.yml` pins
@@ -669,6 +736,9 @@ secrets under `pull_request`) has to be re-established explicitly.
   `eventName` guard alone.
 - **Don't:** assume the API response is a drop-in payload without checking
   every field the action reads.
+- **Don't:** treat a `uses:` step's logged `env:` as evidence the process
+  received those values --- reserved `GITHUB_*` names are printed and then
+  ignored.
 
 (Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
 needed an `issue_comment` trigger, which its pinned action rejects outright.
@@ -682,7 +752,14 @@ Worth noting how, since it is the cheap lesson here.
 The reviewer inferred the citation was unverifiable because the case note named
 only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
 question in one command, and the same off-by-one had already shipped into the
-workflow comment that makes the same claim.)
+workflow comment that makes the same claim.
+The wrap this case shipped --- YAML `env:` on the `uses:` step --- did not
+work.
+Measured 2026-08-26 on run 32942088643 / #2280: the step logged the override
+and the action still saw `issue_comment`.
+The working form is `env(1)` around `node dist/index.js`, recorded in
+`.github/workflows/jules-review.yml` and gated by
+`scripts/check-jules-review-workflow.py`.)
 
 ## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
 

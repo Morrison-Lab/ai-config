@@ -136,8 +136,13 @@ That comment does not contain the JSON.)
 
 [`.github/workflows/jules-review.yml`](../.github/workflows/jules-review.yml)
 requires `author_association` in OWNER/MEMBER/COLLABORATOR.
-Comments from a Cursor Cloud run post as `cursor[bot]` / `NONE`, so
-an `@jules review` comment from that identity is skipped.
+Comments from a Cursor Cloud run post as `cursor[bot]`.
+Association has been measured as `NONE`
+(2026-08-25, [#2234](https://github.com/Morrison-Lab/ai-config/pull/2234))
+and as `CONTRIBUTOR`
+(2026-08-26, [#2290](https://github.com/Morrison-Lab/ai-config/pull/2290)).
+Both sit outside OWNER/MEMBER/COLLABORATOR, so an `@jules review`
+comment from that identity is skipped either way.
 
 This is the same class as
 [`self-review-fallback.cases.md`](../shared/workflow/self-review-fallback.cases.md)
@@ -145,18 +150,29 @@ This is the same class as
 ([#1417](https://github.com/Morrison-Lab/ai-config/pull/1417) /
 [#1433](https://github.com/Morrison-Lab/ai-config/issues/1433), 2026-08-12:
 `claude[bot]` / `CONTRIBUTOR`).
-2nd occurrence, 2026-08-25, #2234; the association this time is `NONE`.
-3rd occurrence, 2026-08-26, #2290; still `cursor[bot]` / `NONE`.
+2nd occurrence, 2026-08-25, #2234; the association that time is `NONE`.
+
+`jules-review.yml` also starts a skipped run on every PR comment, because
+`on: issue_comment` fires before the job `if:`.
+That skip is the `@jules` substring pre-filter, not this allowlist.
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290) had zero
+`@jules` comments; its skipped Jules runs do not count as a recurrence.
 
 - **Do:** have a human OWNER/MEMBER/COLLABORATOR post `@jules review`
   (the workflow trigger is a trusted comment containing that mention).
+- **Do:** re-read `author_association` on the comment you care about;
+  Cursor Cloud has posted both `NONE` and `CONTRIBUTOR`.
 - **Don't:** re-post the same request from a session whose comments post
-  as `cursor[bot]` / `NONE` --- the gate that skipped it skips the retry.
+  as `cursor[bot]` outside OWNER/MEMBER/COLLABORATOR --- the gate that
+  skipped it skips the retry.
+- **Don't:** count a skipped `jules-review.yml` run as this allowlist
+  miss unless the triggering comment actually contained `@jules`.
 
 (Measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234);
-3rd occurrence measured 2026-08-26 on
-[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)
+association re-measured 2026-08-26 on
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290)
+as `CONTRIBUTOR`, with no `@jules` mention on that PR.)
 
 ## Cursor Cloud `gh` writes can 403 while the PR-comment tool still posts
 

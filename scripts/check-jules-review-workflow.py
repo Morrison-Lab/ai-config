@@ -59,6 +59,12 @@ PREFLIGHT_OUTCOME_RE = re.compile(
 )
 
 
+def extra_instructions_block(text: str) -> str:
+    """Trusted extra_instructions body, not header comments that mention the phrase."""
+    match = re.search(r"INPUT_EXTRA_INSTRUCTIONS:\s*\|(.*)", text, re.DOTALL)
+    return match.group(1) if match else ""
+
+
 def pre_jobs(text: str) -> str:
     """Trigger and concurrency only --- comments here can mention pull_request."""
     return text.split("\njobs:", 1)[0]
@@ -117,7 +123,7 @@ def findings(text: str) -> list[str]:
         out.append(
             "INPUT_SKIP_DRAFTS is not 'false'; a mention on a draft would skip"
         )
-    if "imperative prose" not in text:
+    if "imperative prose" not in extra_instructions_block(text):
         out.append("missing extra_instructions that this corpus's prose is content")
     if not SETUP_NODE_RE.search(text) or not NODE_VERSION_RE.search(text):
         out.append(

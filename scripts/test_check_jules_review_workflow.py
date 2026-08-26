@@ -8,6 +8,7 @@ matching test red. A check that has never been watched fail is a guess.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -121,6 +122,16 @@ COMMENTED_ONLY_DIST = tweak(
     "            # start its dist/index.js under env(1)\n",
 )
 
+COMMENTED_CHILD_PATH = tweak(
+    '            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\\n',
+    '            # GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\\n',
+)
+
+COMMENTED_SHA = tweak(
+    "          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
+    "          # JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
+)
+
 MISSING_SHA = tweak(
     "          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
     "",
@@ -134,6 +145,17 @@ COMMENTED_SKIP_DRAFTS = tweak(
 )
 
 MISSING_PROSE = tweak("imperative prose", "review rules")
+
+# Header/comment still names the phrase; extra_instructions does not.
+COMMENTED_PROSE = tweak(
+    "name: Jules PR Review\n",
+    "name: Jules PR Review\n# corpus's own imperative prose\n",
+)
+COMMENTED_PROSE = tweak(
+    "imperative prose addressed",
+    "review rules addressed",
+    COMMENTED_PROSE,
+)
 
 MISSING_SETUP_NODE = tweak(
     "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
@@ -183,6 +205,27 @@ check("live workflow exists", LIVE.is_file())
 live_code, live_out = run_check(LIVE)
 check("live workflow is clean", live_code == 0, live_out)
 
+live_text = LIVE.read_text(encoding="utf-8")
+live_without_node, n_node = re.subn(
+    r"^[ \t]*node[ \t].*dist/index\.js.*\n",
+    "            # node dist/index.js under env(1)\n",
+    live_text,
+    count=1,
+    flags=re.MULTILINE,
+)
+check("live workflow has one node dist/index.js invocation", n_node == 1)
+check(
+    "live workflow still names dist/index.js after stripping the invocation",
+    live_without_node.count("dist/index.js") >= 2,
+    f"count={live_without_node.count('dist/index.js')}",
+)
+case_exits(
+    "live workflow without node invocation",
+    live_without_node,
+    1,
+    "node ... dist/index.js",
+)
+
 case_exits("minimal valid wrap", MINIMAL_OK, 0)
 
 # Unique negatives: each needle is the finding that would vanish if that
@@ -224,12 +267,19 @@ case_exits(
     "GITHUB_EVENT_PATH=",
 )
 case_exits(
+    "GITHUB_EVENT_PATH only in a comment",
+    COMMENTED_CHILD_PATH,
+    1,
+    "GITHUB_EVENT_PATH=",
+)
+case_exits(
     "dist/index.js only in comments",
     COMMENTED_ONLY_DIST,
     1,
     "node ... dist/index.js",
 )
 case_exits("missing SHA pin", MISSING_SHA, 1, "40-character pin")
+case_exits("SHA pin only in a comment", COMMENTED_SHA, 1, "40-character pin")
 case_exits("missing INPUT_SKIP_DRAFTS", MISSING_SKIP_DRAFTS, 1, "INPUT_SKIP_DRAFTS")
 case_exits(
     "INPUT_SKIP_DRAFTS only in a comment",
@@ -238,6 +288,12 @@ case_exits(
     "INPUT_SKIP_DRAFTS",
 )
 case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is content")
+case_exits(
+    "imperative prose only in a header comment",
+    COMMENTED_PROSE,
+    1,
+    "prose is content",
+)
 case_exits("unpinned Node", MISSING_SETUP_NODE, 1, "Node is unpinned")
 case_exits("Node pin only in comments", COMMENTED_SETUP_NODE, 1, "Node is unpinned")
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")

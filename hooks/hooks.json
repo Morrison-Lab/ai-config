@@ -525,6 +525,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-incomplete-check-enumeration.py\"",
+            "timeout": 10,
+            "script": "no-incomplete-check-enumeration.py",
+            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks, which omits check runs. Distinct from no-stale-pr-status.py, which asks whether a reading is current."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
             "timeout": 10,
             "script": "no-unfiled-finding.py",

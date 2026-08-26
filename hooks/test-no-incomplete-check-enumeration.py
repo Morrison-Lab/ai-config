@@ -72,7 +72,7 @@ CASES = [
     ([PARTIAL, MCP_ENDPOINT, say("#651 is fully clean.")], True,
      "get_check_runs is check-half only, not a fully-clean read"),
     ([PARTIAL_ROLLUP, ENDPOINT, say("#2277 is ready for merge.")], True,
-     "rollup plus check-runs still misses review criteria"),
+     "rollup plus check-runs still lacks check-pr-fully-clean.py"),
     ([PARTIAL, say("13 pass, 5 pending -- update-snapshots still running.")], False,
      "a progress report is honest and must not be blocked"),
     ([PARTIAL, say("Waiting on the three OS legs; I'll report when they land.")], False,

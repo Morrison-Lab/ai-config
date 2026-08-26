@@ -193,16 +193,9 @@ def resolve_repo(explicit: str = "") -> str:
 
 
 def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json",
-                   "headRefOid,headRefName,state,commits,reviewDecision"])
-    data = json.loads(out)
-    head_sha = data["headRefOid"]
-    commits = data.get("commits", [])
-    commit_date = ""
-    if commits:
-        commit_date = commits[-1].get("committedDate", "")
-    review_decision = data.get("reviewDecision") or ""
-    return head_sha, data["headRefName"], data["state"], commit_date, review_decision
+    from scripts.lib.pull_request import PullRequest
+    pr = PullRequest(pr_num, repo, fetcher=run_cmd)
+    return pr.head_sha, pr.branch, pr.state, pr.commit_date, pr.review_decision
 
 
 def _is_bot_author(login: Optional[str]) -> bool:

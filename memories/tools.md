@@ -370,7 +370,7 @@ elif py -c "pass" >/dev/null 2>&1; then PY=py
 else echo "no working python launcher found"; exit 1
 fi
 ```
-— then invoke `$PY` for the real transform. This both avoids risking a
+--- then invoke `$PY` for the real transform. This both avoids risking a
 second, possibly destructive run of a real script under a bare `||`
 fallback, and fails loudly instead of proceeding with an unverified
 command if neither launcher actually works. (ai-config#635,
@@ -1123,6 +1123,7 @@ while `_selftest.yml` was green on `main`.)
 Prior to Python 3.15 (PEP 686 --- measured 2026-08-25 on Python 3.13 / Windows 11), `subprocess.run(..., text=True)` on Windows defaults to `locale.getencoding()` (typically the ANSI code page `cp1252`) rather than UTF-8 unless Python UTF-8 mode (`PYTHONUTF8=1` / `-X utf8`) is enabled.
 When a CLI tool (such as `gh pr view --json`) outputs UTF-8 text containing non-ASCII characters or emojis, capturing output without specifying UTF-8 encoding corrupts characters (mojibake) or raises `UnicodeDecodeError`.
 Setting `encoding="utf-8"` automatically selects text mode, making `text=True` redundant.
+Distinct from the print-side charmap failure earlier in this file (a UnicodeEncodeError writing emoji to a cp1252 console) --- this section is about decoding child-process output, the opposite direction of the same locale default.
 
 - **Do:** specify `encoding="utf-8"` explicitly when capturing text stdout on Windows: `subprocess.run(["gh", ...], capture_output=True, encoding="utf-8")`.
 - **Don't:** rely on `text=True` alone without `encoding="utf-8"` when reading CLI output containing non-ASCII text.

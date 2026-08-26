@@ -52,11 +52,10 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   for the fully-clean sweep.
   Note `statusCheckRollup.contexts` needs inline fragments, since `CheckRun` and `StatusContext` carry different fields (`name`/`status`/`conclusion` versus `context`/`state`).
   `CheckRun.status` (`CheckStatusState`: `QUEUED`, `IN_PROGRESS`, `REQUESTED`, `WAITING`, `PENDING`, `COMPLETED` --- measured 2026-08-25) has non-terminal states like `REQUESTED` (pre-queue) and `WAITING` (protection/approvals).
-  `StatusContext.state` (`StatusState`: `EXPECTED`, `PENDING`, `SUCCESS`, `FAILURE`, `ERROR`) treats `EXPECTED` as non-terminal.
-  Gating code must fail-closed: require `CheckRun.status === 'COMPLETED'` and `StatusContext.state` in terminal states (`SUCCESS`, `FAILURE`, `ERROR` --- or `StatusState === 'SUCCESS'` for all-green checks),
+  `StatusContext.state` (`StatusState`: `EXPECTED`, `PENDING`, `SUCCESS`, `FAILURE`, `ERROR` --- measured 2026-08-25) treats `EXPECTED` as non-terminal.
+  Gating code must fail-closed: require `CheckRun.status === 'COMPLETED'` and `StatusContext.state` in terminal states (`SUCCESS`, `FAILURE`, `ERROR` --- or require `state === 'SUCCESS'` on every context for an all-green gate),
   treating any other status or state as still in progress rather than allow-listing expected pending values.
-  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000;
-  the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
+  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round with `graphql` at 4922/5000 --- the round's reply, thread-resolve, ARD summary, and clean-state verification all went through GraphQL, and `core` reset 11 minutes later.)
 - **A session's egress proxy can block GraphQL entirely, as a session-scoped
   policy rather than an account-level quota --- distinct from the rate-limit
   case above, and easy to conflate with it.**

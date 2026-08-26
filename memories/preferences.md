@@ -394,7 +394,7 @@
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
-  When mentioning GitLab/GitHub pipelines, jobs, or commits:
+  Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
   - Jobs: `[job 11056](https://host/project/-/jobs/11056)`
   - Commits: `[320d7ad](https://host/project/-/commit/320d7ad)`

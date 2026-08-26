@@ -746,6 +746,7 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "     Every observation MUST be explicitly prefixed with a machine-readable non-blocking severity label: [INFO] or [MINOR]. Do not include conversational filler.",
         "   - ### Verification Steps",
         f"   Reviewed-Commit: {head_sha}",
+        "CRITICAL: The 'Reviewed-Commit' fingerprint MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
     ]
 
     if guidelines:

@@ -599,10 +599,11 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(res)
         mock_subproc.assert_not_called()
 
+    @patch("os.makedirs")
     @patch("tempfile.NamedTemporaryFile")
     @patch("subprocess.run")
     @patch("shutil.which")
-    def test_runner_model_forwarding(self, mock_which, mock_subproc, mock_tf):
+    def test_runner_model_forwarding(self, mock_which, mock_subproc, mock_tf, mock_makedirs):
         mock_file = MagicMock()
         mock_file.name = "/tmp/mockfile"
         mock_tf.return_value.__enter__.return_value = mock_file
@@ -627,11 +628,12 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("gpt-5.6-sol", cmd_args)
 
     @patch("builtins.open", new_callable=mock_open)
+    @patch("os.makedirs")
     @patch("os.unlink")
     @patch("tempfile.NamedTemporaryFile")
     @patch("subprocess.run")
     @patch("shutil.which")
-    def test_all_runners_cli_contracts(self, mock_which, mock_subproc, mock_tf, mock_unlink, mock_file_open):
+    def test_all_runners_cli_contracts(self, mock_which, mock_subproc, mock_tf, mock_unlink, mock_makedirs, mock_file_open):
         mock_file = MagicMock()
         mock_file.name = "/tmp/mockfile"
         mock_tf.return_value.__enter__.return_value = mock_file

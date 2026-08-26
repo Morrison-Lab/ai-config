@@ -266,7 +266,8 @@ call `parse_report()` on the recovered report
 from the worktree's
 [`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
 (see [`memories/cursor.md`](memories/cursor.md);
-do not import `~/.claude/hooks/`),
+do not import `~/.claude/hooks/`, which resolves into the
+primary checkout),
 in the checkout whose push follows,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.

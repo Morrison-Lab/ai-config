@@ -57,19 +57,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
-   Morrison-Lab/ai-config's Cursor adapter skips that guard
-   until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
-   (see [`memories/cursor.md`](../../memories/cursor.md)).
-   In a checkout whose pushes go through that adapter
-   the parent is required to call `parse_report()`
-   on the recovered report
-   from the worktree's `hooks/no-push-without-self-review.py`
-   (see [`memories/cursor.md`](../../memories/cursor.md);
-   do not import `~/.claude/hooks/`)
-   and does not push unless the verdict is `clean` and the
-   fingerprint prefix-matches HEAD.
+   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it last.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
-   Write the label plainly on its own line: emphasis around it is tolerated, but `parse_report` reads the first fingerprint AFTER your verdict, so put it last.
+   Write the label plainly on its own line: emphasis around it is tolerated.
 
 State the verdict on its own line in that exact form.
 `parse_report()` (Claude Code's pre-push guard, and the

@@ -165,32 +165,20 @@ grades the brief when the child produced no report.
 Route (a) is the instrument.
 A decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last matching assistant `text`
-to a file, and calls `parse_report()` on the file contents
+to a file outside the checkout (under `/tmp`),
+and calls `parse_report()` on the file contents
 in one process.
 The `parse_report()` tuple always comes from that file,
 never from an unverified subagent return.
-Route (b) is corroboration only:
-a subagent returns that last matching assistant `text` verbatim;
-the conductor writes that return to a file without editing it.
-Route (b) is legal for the posted body only when that file
-is byte-identical to route (a)'s file.
-If they differ, refuse: do not call `parse_report()` on the
-subagent return.
-Do not run route (b) alone.
-A partial return that drops a trailing `Needs more work`
-can leave an earlier quoted `Ready for merge` as the last
-verdict line `parse_report` reads.
-Do not require the same invocation for route (b).
+A harness paste or a subagent's verbatim return of the
+same selector may corroborate the recovered body;
+it is never the input to `parse_report()`,
+and the posted body is route (a)'s file.
 Do not re-emit the markdown through a shell command string.
 A backtick span inside a double-quoted body runs as
 command substitution and vanishes.
 A doubled backslash can collapse even inside a quoted heredoc.
 Post with `--body-file` / `-F body=@<file>`.
-Route (a)'s file is the body to post
-(`gh pr comment --body-file` / equivalent)
-and the input to `parse_report()`.
-Route (b) is corroboration of that same selector,
-written to a file that matches route (a)'s file.
 The `parse_report()` tuple is the push gate, not the comment.
 Do not treat route (a) as returning only the tuple.
 Call `parse_report()` from the **worktree's**
@@ -198,9 +186,18 @@ Call `parse_report()` from the **worktree's**
 on the file contents
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects).
-Do not import `~/.claude/hooks/no-push-without-self-review.py`:
-that path is a copy, not a symlink
-(measured 2026-08-26 PDT on Cursor Cloud).
+Do not import `~/.claude/hooks/no-push-without-self-review.py`.
+On Cursor Cloud that path is a directory symlink into the
+primary checkout
+(`~/.claude/hooks -> /workspace/hooks`,
+measured 2026-08-26 PDT: same inode as
+`/workspace/hooks/no-push-without-self-review.py`,
+and `/workspace` was `main` at `21a2e2aa`).
+It is a different revision from the worktree under review,
+not a stale duplicate of the worktree file.
+On a branch that edits `parse_report` itself,
+the worktree copy is unreviewed code grading its own review;
+the `~/.claude` path would have been `main`'s.
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -242,10 +239,11 @@ If the fingerprint does not prefix-match HEAD, do not push.
 tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
 Provenance is the recovery route in this file:
 route (a) reads the `transcript.json` whose path contains the
-`cloudAgentBcId` and writes the body to a file;
-route (b) is corroboration only:
-it writes the subagent's verbatim return of the same
-selector to a file that must match route (a)'s file.
+`cloudAgentBcId` and writes the body to a file outside the
+checkout (under `/tmp`);
+a harness paste or a subagent's verbatim return of the same
+selector may corroborate that body and is never the input
+to `parse_report()`.
 `parse_report()` always runs on route (a)'s file.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
@@ -287,9 +285,8 @@ because `...` contains `..`.
 The left sha is the remote's current tip, not a commit this push adds.
 `Everything up-to-date` means the push would ship nothing;
 that is not a fingerprint mismatch.
-A per-ref `= [up to date]` line carries no sha.
-Treat it like `Everything up-to-date`:
-not a fingerprint mismatch.
+A `--verbose` or `--porcelain` run can also emit per-ref
+`= [up to date]`; this recipe does not use those flags.
 A new branch's dry-run line is `[new branch]` with no sha.
 That line is not a mismatch.
 It also does not confirm the shipped tip:
@@ -381,9 +378,7 @@ exempts item 1's first half, item 2,
 item 3's verdict/fingerprint clause, and item 4
 (no dispatch, so no report and no pre-dispatch sha).
 It does not exempt item 1's second half, item 5, or item 6.
-The positive test is two commands in that checkout:
-`git rev-list --count origin/<default-branch>..HEAD` equals 1,
-and `git diff HEAD^ HEAD` is empty.
+The positive test is the two-command test in the procedure above.
 Say in the reply that the carve-out was used.
 
 1. Confirm `git status --short` is empty before dispatch,
@@ -392,7 +387,8 @@ Say in the reply that the carve-out was used.
    excludes the uncommitted work.
    Carve-out: skip the before-dispatch half
    (there is no dispatch); still confirm empty after.
-2. Write the last heading-bearing assistant `text` to a file
+2. Write the last heading-bearing assistant `text`
+   to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
    **Killer item:** an author-assembled body is not a report,
    and `parse_report` then grades the wrong text.
@@ -406,7 +402,7 @@ Say in the reply that the carve-out was used.
    Carve-out: skip (no sha was recorded before a dispatch).
 5. Run the same-argv dry-run; confirm a reported new tip
    prefix-matches HEAD
-   (`Everything up-to-date` and `= [up to date]` are not a mismatch;
+   (`Everything up-to-date` is not a mismatch;
    a new-branch line with no sha is not a mismatch
    and also does not confirm the shipped tip).
 6. Confirm the source ref is `HEAD` or the recorded branch.
@@ -468,29 +464,27 @@ is the instruction to use this route.
   (a harness paste of the child may corroborate; name the route).
   Write the last assistant `text` that
   carries Summary / Findings / Verdict / Reviewed-Commit
-  to a file (role filter is load-bearing;
+  to a file outside the checkout (under `/tmp`;
+  role filter is load-bearing;
   the user brief also carries those headings),
   and call `parse_report()` on that file
   from the worktree's `hooks/no-push-without-self-review.py`
-  (not `~/.claude/hooks/`).
+  (not `~/.claude/hooks/`, which resolves into the
+  primary checkout).
   If you cannot obtain a `clean` verdict and fingerprint,
   or HEAD is not still the recorded sha,
   or the fingerprint does not prefix-match HEAD,
   or `git status --short` is not empty,
   or the same-argv dry-run fails,
   or a reported new tip does not prefix-match HEAD
-  (`Everything up-to-date` and `= [up to date]` are not a mismatch;
+  (`Everything up-to-date` is not a mismatch;
   a new-branch line with no sha is not a mismatch
   and also does not confirm the shipped tip),
   or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
   The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
   `--allow-empty` branch is the carve-out.
-  The positive test is
-  `git rev-list --count origin/<default-branch>..HEAD` equals 1
-  and `git diff HEAD^ HEAD` empty in that checkout.
-  `git diff origin/<default-branch>...HEAD` empty in that checkout
-  is tree equality, not "this branch carries nothing".
+  The positive test is the two-command test in the procedure above.
   A net-zero tree of other commits is not the carve-out:
   obtain a review.
   The `--allow-empty` case has no report,
@@ -510,7 +504,8 @@ is the instruction to use this route.
 - **Don't:** record HEAD, status, or the dry-run in a different
   checkout than the push's `-C` or cwd.
 - **Don't:** re-emit the recovered markdown through a shell
-  command string; write it to a file and parse and post from that file.
+  command string; write it to a file outside the checkout
+  (under `/tmp`) and parse and post from that file.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
   that used different arguments, failed, or listed other refs.
 - **Don't:** treat a fingerprint that matches only the
@@ -544,7 +539,8 @@ pre-push guard.
   otherwise call
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
   `includeTranscripts: true`, then write the last assistant `text` that
-  carries those same sections to a file and quote from that file ---
+  carries those same sections to a file outside the checkout
+  (under `/tmp`) and quote from that file ---
   not the last assistant message (which
   may be thinking or `tool_calls` with empty `text`), not the user brief
   (the brief also carries those headings; the role filter is load-bearing),

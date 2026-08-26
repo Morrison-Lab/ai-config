@@ -74,7 +74,8 @@ User-level `~/.cursor/hooks.json` is not available in cloud agents.
 Do not also run `install-hooks.py --fix` to "activate" these for Cursor.
 That path writes `~/.claude/settings.json` for Claude Code.
 Cursor Cloud can still have `~/.claude/settings.json`
-(measured 2026-08-26 PDT).
+(measured 2026-08-26 PDT on this VM,
+whose primary checkout is ai-config).
 That measurement does not say how this VM's copy got there,
 or whether Claude Code's native hook runner also fires on Cloud
 (unmeasured as of 2026-08-26 PDT).

@@ -43,9 +43,10 @@ Address, rebut, or defer every finding it returns, then re-dispatch it, so the c
 Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 ([`memories/cursor.md`](../../memories/cursor.md)).
-Call `parse_report()` on the report recovered from the child's transcript
-from the worktree's
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+call `parse_report()` from the worktree's
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
+on the report recovered from the child's transcript
 when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/`:

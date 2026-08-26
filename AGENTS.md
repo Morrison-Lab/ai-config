@@ -262,9 +262,9 @@ Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`.
-Call `parse_report()` on the report recovered from the child's transcript
-from the worktree's
+Call `parse_report()` from the worktree's
 [`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
+on the report recovered from the child's transcript
 when that file exists
 (see [`memories/cursor.md`](memories/cursor.md)).
 Do not import `~/.claude/hooks/`:

@@ -148,8 +148,8 @@ Morrison-Lab/ai-config's Cursor adapter skips
 so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
 under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Call `parse_report()` on the report recovered from the child's transcript
-from the worktree's `hooks/no-push-without-self-review.py`
+Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
+on the report recovered from the child's transcript
 when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/`:
@@ -169,8 +169,9 @@ Exit 1 means a diff; exit 128 means the command failed.
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.
-If the dispatch errored, obtain a CLI review and still
-call `parse_report()` on the recovered file.
+If the dispatch errored, obtain a CLI review,
+write that reviewer's report to a file under `/tmp`,
+and call `parse_report()` on that file.
 If Claude Code's native guard is also running, the prefix
 is that guard's escape even when the adapter skip makes
 it inert for the adapter.

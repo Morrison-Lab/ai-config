@@ -342,8 +342,9 @@ so a failed or skipped dispatch is not caught before the push.
 The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
 obtain a review via the CLI fallback in
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
-and still call `parse_report()` on that file.
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md),
+write that reviewer's report to a file under `/tmp`,
+and call `parse_report()` on that file.
 On a session whose pushes go through this repo's Cursor adapter,
 default: do not prefix `ALLOW_UNREVIEWED_PUSH=1`.
 The adapter skip makes it inert for the adapter
@@ -538,7 +539,9 @@ is the instruction to use this route.
   `no-push-without-self-review` deny of the unprefixed push.
   Do not pair the project adapter with native Claude hooks.
   If the dispatch errored or produced no report,
-  obtain a CLI review and still call `parse_report()` on that file.
+  obtain a CLI review,
+  write that reviewer's report to a file under `/tmp`,
+  and call `parse_report()` on that file.
 - **Don't:** record HEAD, status, or the dry-run in a different
   checkout than the push's `-C` or cwd.
 - **Don't:** re-emit the recovered markdown through a shell

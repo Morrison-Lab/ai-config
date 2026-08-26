@@ -4,6 +4,10 @@
 The live memory is the known-clean control. Each finding has its own
 otherwise-valid fixture so deleting that finder turns the matching test
 red. A check that has never been watched fail is a guess.
+
+False-claim fixtures inject into the step-if bullet, not the file tail:
+required phrases also occur later in the same file, and a tail append is
+outside the section the checker scans.
 """
 from __future__ import annotations
 
@@ -15,6 +19,7 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parent / "check-github-actions-step-if.py"
 ROOT = Path(__file__).resolve().parent.parent
 LIVE = ROOT / "memories" / "github-actions.md"
+SECTION_START = "- **An `if:` that names a status-check function"
 
 passes = 0
 failures = 0
@@ -46,6 +51,14 @@ def write_fixture(tmpdir: str, body: str) -> Path:
     return path
 
 
+def insert_in_section(text: str, extra: str) -> str:
+    i = text.find(SECTION_START)
+    if i < 0:
+        raise AssertionError("section heading missing from live fixture")
+    nl = text.find("\n", i)
+    return text[: nl + 1] + extra + text[nl + 1 :]
+
+
 def case_exits(
     name: str,
     body: str,
@@ -71,6 +84,7 @@ check(
 )
 
 live_text = LIVE.read_text(encoding="utf-8")
+check("live memory has one step-if heading", live_text.count(SECTION_START) == 1)
 check(
     "live memory still names the retracted any-explicit claim as false",
     "older claim that *any* explicit step" in live_text,
@@ -80,27 +94,50 @@ check(
     "Writing any explicit step-level" not in live_text,
 )
 
-# Unique negatives: restore one false claim, keep the rest of the live file.
+# Unique negatives: restore one false claim INSIDE the bullet.
 case_exits(
-    "old heading restored",
-    live_text + "\nWriting any explicit step-level `if:` REPLACES success().\n",
+    "old heading restored in the bullet",
+    insert_in_section(
+        live_text,
+        "Writing any explicit step-level `if:` REPLACES success().\n",
+    ),
     1,
     "Writing any explicit step-level",
 )
 case_exits(
-    "old silently-discards body restored",
-    live_text + "\nAdding an if: silently discards that default.\n",
+    "old silently-discards body restored in the bullet",
+    insert_in_section(
+        live_text,
+        "Adding an if: silently discards that default.\n",
+    ),
     1,
     "silently discards that",
 )
 case_exits(
-    "old own-if Don't restored",
-    live_text + "\nDon't skip steps that carry their own `if:`.\n",
+    "old own-if Don't restored in the bullet",
+    insert_in_section(
+        live_text,
+        "Don't skip steps that carry their own `if:`.\n",
+    ),
     1,
     "steps that carry their own",
 )
 
+# Section-scoping control: the same false heading after the file must not
+# trip the checker. Whole-file search is the defect this replaces.
+case_exits(
+    "false heading outside the step-if bullet is ignored",
+    live_text + "\nWriting any explicit step-level `if:` REPLACES success().\n",
+    0,
+)
+
 # Unique negatives: drop one required phrase, keep the rest.
+case_exits(
+    "retraction sentence removed",
+    live_text.replace("older claim that *any* explicit step", "older claim that a step"),
+    1,
+    "older claim that *any* explicit step",
+)
 case_exits(
     "recommended success() && removed",
     live_text.replace("success() &&", "success() and"),
@@ -117,15 +154,20 @@ case_exits(
     1,
     "auto-applies",
 )
+
+# Deleting the #2307 writeup heading is not a clean pass: later copies of
+# auto-applies / success() && in the Jules wrap Do must not satisfy the gate.
+gutted = live_text.replace(SECTION_START, "- **A step if: that names a status function")
+check("writeup heading removal actually applied", SECTION_START not in gutted)
 case_exits(
-    "status-check function wording removed",
-    live_text.replace("status-check function", "status function"),
+    "step-if bullet heading removed",
+    gutted,
     1,
-    "status-check function",
+    "missing step-if bullet",
 )
 
-# Empty file is not a clean pass: required phrases are gone.
-case_exits("empty file is not clean", "", 1, "success() &&")
+# Empty file is not a clean pass: the bullet is gone.
+case_exits("empty file is not clean", "", 1, "missing step-if bullet")
 
 # Missing file is a usage error, not a clean pass.
 missing_code, missing_out = run_check(ROOT / "no-such-github-actions.md")

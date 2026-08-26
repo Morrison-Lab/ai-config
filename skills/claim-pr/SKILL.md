@@ -12,16 +12,32 @@ Before working a PR/MR or issue — fetching its branch, editing, or running
 `@claude` review cycles — post a brief comment so other people and the
 `@claude` CI bot know not to start a conflicting parallel session. **Resolve**
 (or post a closing comment on) the claim when the session ends.
+Posting a review is in scope too; the firing list below includes it.
 
 ## When this fires
 
 - Before any **write** session on a PR/issue: fix, implement, debug, refactor,
   review-and-edit, or an iterative `@claude review` loop that pushes commits.
+- Before any **posted review** of a PR: adversarial review, code-review,
+  self-review fallback, or any other pass that will post a SHA-stamped
+  review comment.
+  Post the claim **before** dispatching the reviewer or fetching the
+  branch for review, not after the comment lands.
+  Unclaim-when-the-review-lands applies only to a **review-only** pass.
+  A session that is also driving the branch (implementing, ARDI) keeps
+  its write claim until that work ends.
 - Triggered by a prompt referencing a PR/issue by `#N` or URL that asks you to
-  *change* something.
+  *change* something, **or** to review it and post the verdict.
 
-It does **NOT** fire for read-only inspection — "show me PR #X", "what's the
-status of #Y", "explain the diff on #Z". Those don't risk a parallel session.
+It does **NOT** fire for read-only inspection that will not post ---
+"show me PR #X", "what's the status of #Y", "explain the diff on #Z".
+Those don't risk a parallel session.
+A persistent watch after a review has landed is not a standing claim;
+re-claim only when a new review round starts.
+Do not claim every open PR at the start of a sweep --- claim the one
+whose review is starting, unclaim a **review-only** pass when that
+review lands, then claim the next.
+A write/ARDI sweep keeps its write claim until that work ends.
 
 ## Claim (start of session)
 
@@ -42,6 +58,21 @@ gh issue comment <N> --body "Claude Code CLI (local session) is working on this 
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
 
+A review-only session uses the same `hold off` invariant so existing
+detectors still match, and names the review so authors know when they
+can push again:
+
+```bash
+gh pr comment <N> --body "<agent> is reviewing this PR --- please hold off on pushing to this branch until the review comment lands.
+
+_Posted by <agent> (AI agent) --- not written by a human._"      # COMMENT_PR
+```
+
+Unclaim that review-only pass when the SHA-stamped review comment is posted
+(see Unclaim below), even if a watch on the PR continues.
+Do not unclaim a still-driving write claim just because a review comment
+landed in the same session.
+
 (`COMMENT_PR` / `COMMENT_ISSUE` are abstract operation tokens — resolve to your
 model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
@@ -54,6 +85,15 @@ so it can be resolved later:
 glab mr note create <N> --message "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
 
 _Posted by Claude Code (AI agent) --- not written by a human._"
+```
+
+A review-only session on GitLab uses the same resolvable discussion,
+with review-shaped wording:
+
+```bash
+glab mr note create <N> --message "<agent> is reviewing this MR --- please hold off on pushing to this branch until the review comment lands.
+
+_Posted by <agent> (AI agent) --- not written by a human._"
 ```
 
 > GitLab MR notes are resolvable discussions by default.
@@ -129,6 +169,10 @@ glab api --method PUT \
   -f "resolved=true"
 ```
 
+A review-only unclaim on GitLab is this same resolve step.
+Do not post a second note.
+An unresolved `hold off` discussion stays a live claim.
+
 ### GitHub — post a closing comment
 
 ```bash
@@ -138,6 +182,18 @@ _Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_P
 gh issue comment <N> --body "Done with my local session — unclaiming.
 
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
+```
+
+After a **review-only** posted review on GitHub, unclaim that pass as soon
+as the SHA-stamped review comment lands (the author needs the thread
+free to address findings).
+The closing comment's body must include `unclaiming` so claim detectors
+treat it as a release.
+
+```bash
+gh pr comment <N> --body "Review posted --- unclaiming.
+
+_Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
 ```
 
 ## Notes

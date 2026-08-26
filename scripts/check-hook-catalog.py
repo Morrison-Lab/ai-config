@@ -67,7 +67,7 @@ KNOWN_UNREGISTERED = {
     # Inert BY THE GATE: README's activation rule makes the hooks.json entry
     # itself the plugin-path activation, so this is registered by the
     # follow-up after its authoring PR merges.
-    "no-incomplete-check-enumeration.py": 1717,
+    "remind-ums-on-scrutiny.py": 2261,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

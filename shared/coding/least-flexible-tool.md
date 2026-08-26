@@ -145,7 +145,8 @@ leaving the next.
 That `Don't` fires on a second *widening*.
 Here a widening and a run of **narrowings** sit in one matcher's history, which is the same rule from the other side: a pattern that cannot locate a token is equally unable to decide either direction.
 
-On [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185) --- unmerged as of 2026-08-24, so `git grep COMMENT_FLAG_RE` finds nothing on `main` until it lands --- `COMMENT_FLAG_RE` in `hooks/require-agent-disclosure.py` decides whether a `gh issue|pr close|reopen` segment posts a comment, which it does only when `--comment` or its shorthand `-c` is present.
+`COMMENT_FLAG_RE` in `hooks/require-agent-disclosure.py` decides whether a `gh issue|pr close|reopen` segment posts a comment, which it does only when `--comment` or its shorthand `-c` is present.
+It is defined on [ai-config#2185](https://github.com/Morrison-Lab/ai-config/pull/2185)'s branch only, that PR being open as of 2026-08-24.
 Its short-flag alternative was edited four times on that branch, through five forms.
 It began as `-c\s`, matching only the spaced spelling.
 `-c(?:\s|=|\S)` accepts the attached and `=` spellings `gh` also takes, and puts `-c` within reach of the middle of a word --- executed against a **compliant** `gh issue close 5 -R Morrison-Lab/ai-config`, it is the one of the five that warns, on the `-co` inside `ai-config`.

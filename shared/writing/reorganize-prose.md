@@ -244,9 +244,7 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
   files in a multi-document repo --- when doing so removes a forward
   reference, a duplicate, or a split between related content, as part of the
   prose edit already in front of you.
-- **Do:** run the self-reference and back-reference sweeps, the line-level
-  checks, the asset migration check, and a bidirectional content-preservation
-  diff on anything you relocate.
+- **Do:** run the self-reference and back-reference sweeps, the line-level checks, the asset migration check, and a bidirectional content-preservation diff on anything you relocate, and on any scripted whole-file rewrite (asserting file growth is a cheap pre-filter for an intended insertion, but the bidirectional word diff is the actual gate).
 - **Don't:** treat a section as anchored to its current file or position
   merely because that is where it was originally drafted.
 - **Don't:** relocate content and stop at "the words are all still there

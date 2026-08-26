@@ -205,11 +205,14 @@ def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
     return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
-def _is_bot_author(login: str) -> bool:
+def _is_bot_author(login: Optional[str]) -> bool:
     """Return True if *login* belongs to an automated review bot."""
+    login_str = str(login or "")
+    if not login_str:
+        return False
     return (
-        login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-        or login.endswith("[bot]")
+        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        or login_str.endswith("[bot]")
     )
 
 
@@ -541,8 +544,10 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
+    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
 # Applies to EVERY not-clean pattern, not to one named member.
@@ -561,6 +566,10 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 # stay not-clean.
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+)
+NOT_CLEAN_NEGATION_SUFFIX = re.compile(
+    r"^\s*[:.\-]*\s*(?:none\b(?!\s+of\b)|nothing\b|0\b|n/a\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|\bnone\s+identified\b|\bnone\s+remaining\b|\bno\s+new\b)",
+    re.IGNORECASE,
 )
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
@@ -590,6 +599,10 @@ BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
     r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+}
+BARE_NOT_CLEAN_PATTERNS = {
+    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -674,6 +687,29 @@ def _sentence_remainder(text: str, start: int) -> str:
     return text[start:stop]
 
 
+def _is_marked_pattern(scan: str, match_start: int) -> bool:
+    """Return True if match is marked on its line (e.g. heading, bullet, bold, or label)."""
+    line_start = scan.rfind("\n", 0, match_start) + 1
+    return bool(BARE_CLEAN_MARKED.search(scan[line_start:match_start]))
+
+
+def _is_marked_or_in_verdict_section(scan: str, match_start: int) -> bool:
+    """Return True if match is marked on its line or located in the Verdict section paragraph."""
+    if _is_marked_pattern(scan, match_start):
+        return True
+    last_verdict = -1
+    for m in re.finditer(r"(?:^|\n)[ \t]*#{1,4}[ \t]*verdict\b", scan, re.IGNORECASE):
+        if m.start() < match_start:
+            last_verdict = m.start()
+    if last_verdict != -1:
+        between = scan[last_verdict:match_start]
+        after_header = re.sub(r"^\s*#{1,4}\s*verdict\b\s*", "", between, flags=re.IGNORECASE)
+        # Bounded by the immediate verdict paragraph (no blank line or header between verdict and match)
+        if not re.search(r"\n\s*\n", after_header) and not re.search(r"\n[ \t]*#{1,4}[ \t]+", after_header):
+            return True
+    return False
+
+
 def classify_verdict(body: str, state: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
@@ -697,9 +733,16 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if pat in BARE_NOT_CLEAN_PATTERNS:
+                if not _is_marked_or_in_verdict_section(scan, match.start()):
+                    continue
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
+            if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
+                suffix = scan[match.end():match.end() + 60]
+                if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                    continue
             return "not-clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:
@@ -709,8 +752,7 @@ def classify_verdict(body: str, state: str = "") -> str:
             # the marking, and it already excludes a preceding negation by
             # adjacency.
             if pat in BARE_CLEAN_PATTERNS:
-                line_start = scan.rfind("\n", 0, match.start()) + 1
-                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                if not _is_marked_pattern(scan, match.start()):
                     continue
                 prefix = scan[max(0, match.start() - 40):match.start()]
                 if CLEAN_NEGATION_PREFIX.search(prefix):
@@ -842,18 +884,14 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             continue
 
         is_bot_author = _is_bot_author(author_login)
-        # "**claude finished" and "### verdict" are the canonical review markers
-        # CLAUDE.md prescribes ("Completed runs start the body with
-        # `**Claude finished`"). The older "claude finished review" marker was a
-        # near-miss: the real body reads "**Claude finished** -- adversarial
-        # review", so "review" never follows "finished" directly and the marker
-        # matched nothing. Measured on Morrison-Lab/ai-config#1267, where all four
-        # review comments were posted under a human login and both verdict-bearing
-        # ones carried "### Verdict" -- so admission failed, all_items was empty,
-        # and every body-content criterion below was evaluated over nothing.
-        is_review_header = has_review_body_marker(body)
+        verdict = classify_verdict(body)
 
-        if is_bot_author or is_review_header:
+        # Automated reviews must be authored by a recognized bot author.
+        # A comment whose author is missing, null, or a non-bot account is admitted
+        # ONLY if it states a blocking (not-clean) verdict -- fail closed.
+        if is_bot_author:
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+        elif verdict == "not-clean":
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
 
     for r in reviews:
@@ -927,10 +965,11 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         r"#+\s*Issues",
         r"#+\s*Remaining",
         r"\*\*Location:\*\*",
-        r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
-        r"\bNeeds\s+more\s+work\b",
-        r"\bNeeds\s+work\b",
+        r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+        r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
         r"changes\s+requested\b",
+        r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+        r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
     ]
 
     has_findings = False
@@ -947,13 +986,31 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+                if pat in BARE_NOT_CLEAN_PATTERNS:
+                    if not _is_marked_or_in_verdict_section(scan_body, match.start()):
+                        continue
+                prefix = scan_body[max(0, match.start() - 25):match.start()]
+                if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                    continue
+                if pat in (
+                    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
+                    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+                    r"\*\*Actionable Findings\*\*",
+                    r"\*\*Detailed Findings\*\*",
+                    r"#+\s*Issues",
+                    r"#+\s*Remaining",
+                ):
+                    suffix = scan_body[match.end():match.end() + 60]
+                    if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
+                        continue
                 if pat == r"changes\s+requested\b":
                     start = match.start()
-                    prefix = scan_body[max(0, start - 25):start].lower()
-                    if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                    pfx = scan_body[max(0, start - 25):start].lower()
+                    if re.search(r"\bno\s+(\w+\s+)?$", pfx):
                         continue
                 has_findings = True
                 issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
+                break
 
     if not has_findings and not issues:
         print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")

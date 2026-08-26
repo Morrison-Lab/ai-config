@@ -632,18 +632,18 @@ class ReviewerSubagent(BaseSubagent):
             except Exception:
                 pass
 
-            # Fail-fast if no diff found for a real branch review
-            if not diff.strip():
-                return SubagentResult(
-                    success=False,
-                    data={
-                        "verdict": "BLOCKED",
-                        "findings": [{"level": "ERROR", "message": f"No implementation diff found on branch '{branch_name}' against origin/main."}],
-                        "model_used": "empty-diff-check",
-                    },
-                    error=f"Empty implementation diff on branch '{branch_name}'.",
-                    execution_time_seconds=time.time() - start_time,
-                )
+        # Fail-fast if no diff found to review
+        if not diff.strip() and not dry_run:
+            return SubagentResult(
+                success=False,
+                data={
+                    "verdict": "BLOCKED",
+                    "findings": [{"level": "ERROR", "message": f"No implementation diff found to review (branch: '{branch_name or 'none'}')."}],
+                    "model_used": "empty-diff-check",
+                },
+                error=f"Empty implementation diff to review (branch: '{branch_name or 'none'}').",
+                execution_time_seconds=time.time() - start_time,
+            )
 
         findings: List[Dict[str, Any]] = []
         is_clean = True
@@ -684,6 +684,45 @@ class ReviewerSubagent(BaseSubagent):
                     verdict = "NEEDS_WORK"
                     is_clean = False
                     findings.append({"level": "WARN", "message": resp.content[:300]})
+            else:
+                verdict = "BLOCKED"
+                is_clean = False
+                findings.append({"level": "ERROR", "message": f"Adversarial reviewer model invocation failed: {resp.error or 'Empty response'}"})
+
+        # Post adversarial review comment to GitHub PR if pr_number is in payload
+        pr_number = task.payload.get("pr_number")
+        repo_slug = task.payload.get("repo_slug")
+        if pr_number and not dry_run and shutil.which("gh"):
+            try:
+                cmd_pr = ["gh", "pr", "comment", str(pr_number)]
+                if repo_slug:
+                    cmd_pr.extend(["-R", repo_slug])
+                if is_clean:
+                    review_body = (
+                        f"## Orchestrator Subagent Self-Review Report\n\n"
+                        f"### Verdict\n\n"
+                        f"**Ready for merge**\n\n"
+                        f"Independent subagent adversarial review (`{model_used}`) verified:\n"
+                        f"- Implementation diff audited against repository standards and security guidelines.\n"
+                        f"- Clean verdict issued with 0 blocking findings.\n\n"
+                        f"_Posted by Claude Code (AI agent) --- not written by a human._\n"
+                    )
+                else:
+                    findings_summary = "\n".join(f"- {f.get('level', 'WARN')}: {f.get('message', '')}" for f in findings)
+                    review_body = (
+                        f"## Orchestrator Subagent Self-Review Report\n\n"
+                        f"### Verdict\n\n"
+                        f"**Needs more work**\n\n"
+                        f"Independent subagent adversarial review (`{model_used}`) identified findings:\n"
+                        f"{findings_summary}\n\n"
+                        f"_Posted by Claude Code (AI agent) --- not written by a human._\n"
+                    )
+                cmd_pr.extend(["--body", review_body])
+                proc = subprocess.run(cmd_pr, capture_output=True, text=True, check=False, timeout=30)
+                if proc.returncode != 0:
+                    logger.warning("Failed to post adversarial review comment to PR #%s (exit %d): %s", pr_number, proc.returncode, proc.stderr.strip())
+            except Exception as exc:
+                logger.warning("Failed to post adversarial review comment to PR #%s: %s", pr_number, exc)
 
         elapsed = time.time() - start_time
         return SubagentResult(

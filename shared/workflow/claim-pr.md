@@ -1,7 +1,7 @@
 Before starting a work session on a GitHub PR or issue --- i.e. before fetching
-the branch, making edits, or invoking an automated review cycle --- post a brief
-comment on the PR/issue so other people and any automated review bots know not
-to start a conflicting parallel session.
+the branch, making edits, posting a review, or invoking an automated review
+cycle --- post a brief comment on the PR/issue so other people and any
+automated review bots know not to start a conflicting parallel session.
 
 Use:
 
@@ -24,9 +24,24 @@ After the session ends (PR merged, issue closed, or work otherwise paused), foll
 
 Skip the claim step if the most recent comment already says you are working on
 it **and that claim is still live under the expiration rule below**.
-This applies to any task that will push commits to a PR branch or run
-iterative review loops. It does **not** apply to read-only inspection (showing a
-PR, checking status, explaining a diff) --- those don't risk a parallel session.
+This applies to any task that will push commits to a PR branch, run
+iterative review loops, or post a review.
+A posted review races HEAD the same way a write session does: other sessions
+push while the reviewer is still reading, and the posted comment then stamps
+a SHA that is already stale.
+Post the claim **before** the review starts, and unclaim when the
+SHA-stamped review comment lands so the author can address findings.
+A persistent watch is not a standing claim --- re-claim only when a new
+review round starts.
+It does **not** apply to read-only inspection that will not post (showing a
+PR, checking status, explaining a diff).
+
+- **Do:** post a `hold off` claim before starting a posted review of a PR.
+- **Do:** unclaim when that review comment is posted.
+- **Don't:** skip the claim because the session is "only reviewing" and not
+  pushing --- the collision is on HEAD, not on the working tree.
+- **Don't:** leave a review-pass claim standing after the verdict lands, or
+  claim every open PR at the start of a sweep.
 
 This includes a PR **you opened yourself**: in repos with an active `@claude`
 agent (`claude.yml`), the agent can push commits to your branch on PR activity

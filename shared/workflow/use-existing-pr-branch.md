@@ -191,6 +191,9 @@ was no longer attached to a PR.
   pushing a fix to a branch whose PR you have not re-read this round.
 - **Do:** read `git push`'s own output on that push, and treat `* [new branch]`
   on a branch you have been pushing to as the PR having merged.
+- **Do:** treat a `--dry-run` that prints `* [new branch]` for a branch this
+  session already published as the same tell; query the PR's `state` and do
+  not proceed to the live push if it is MERGED or CLOSED.
 - **Do:** settle whether a repo deletes merged head branches from other merged
   PRs' branches, or from the PR's timeline, before concluding that a tell was
   unavailable.

@@ -81,8 +81,30 @@ git push --force-with-lease --force-if-includes
 **The `stale info` failure is not a reason to force, and reaching for one there is the specific reflex [`memories/git.md`](../../memories/git.md) exists to stop.**
 After a squash-merge with auto-delete removes the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race with another session.
 It is not one, and that file says so in as many words: the lease is unsatisfiable rather than violated, "`--force` is unnecessary, and there is nothing to race".
-One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch, so a **plain push** is the fix, or `git fetch --prune` and a retry when you want the remote-tracking ref corrected too.
-That is consistent with the point above: where the remote ref does not exist, there is nothing for any force to overwrite.
+One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch.
+That create is safe only when this branch did not already have a PR.
+A squash-merge with auto-delete also leaves `ls-remote` empty.
+A `--dry-run` of `git push -u origin <branch>` then prints `* [new branch]`
+and often `Would set upstream of ...`, which is the recreate tell
+[`use-existing-pr-branch`](use-existing-pr-branch.md) names for a live push.
+Query that PR's `state` before pushing.
+If it is MERGED or CLOSED, do not recreate the deleted head;
+open a follow-up off `origin/<default-branch>`
+(see [`post-merge`](../../skills/post-merge/SKILL.md) step 1.25).
+If there was no such PR, a **plain push** is the fix, or `git fetch --prune`
+and a retry when you want the remote-tracking ref corrected too.
+That is consistent with the point above: where the remote ref does not exist
+and no merged PR owned it, there is nothing for any force to overwrite.
+
+3rd occurrence of this class, 2026-08-26 PDT, Cursor Cloud, ai-config#2272:
+the Address dry-run printed `* [new branch]` and `Would set upstream of ...`
+after the squash-merge auto-deleted the head.
+`gh pr view` showed MERGED.
+A live push would have recreated the deleted branch.
+Prior records: [`memories/git.md`](../../memories/git.md) #857 -> #872
+(intentional same-name follow-up from new `main`),
+and this file's live-push tell in
+[`use-existing-pr-branch`](use-existing-pr-branch.md).
 
 So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.
 If you reach for it, say in the same breath what the lease refused and why forcing is right --- and if the answer is `stale info`, it is not.
@@ -174,7 +196,9 @@ The extra commit is squashed cleanly at PR merge, so history tidiness is preserv
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.
   (That is upstream `master`'s wording.
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
-- **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
+- **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone.
+- **Do:** when `ls-remote` is empty for a branch this session already had a PR on, read that PR's `state` before treating the next push as a first publish.
+- **Don't:** read empty `ls-remote` or a dry-run `* [new branch]` line as proof this is a new feature branch.
 - **Do:** re-read a file before editing it whenever a checkout, pull, or
   reset has happened since your last read of it.
 - **Don't:** claim a fix in changelog or prose text that the pushed patch

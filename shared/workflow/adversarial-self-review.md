@@ -156,6 +156,8 @@ primary checkout),
 in the checkout whose push follows;
 do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
+If that checkout has no `hooks/` directory,
+obtain a CLI review.
 The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
 do not invent one,
 do not refuse that push for lack of a verdict,

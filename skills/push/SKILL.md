@@ -50,8 +50,11 @@ from the worktree's
 do not import `~/.claude/hooks/`, which resolves into the
 primary checkout),
 in a checkout whose pushes go through that adapter.
-If the verdict is not `clean`, or the fingerprint does not
-prefix-match HEAD, do not push.
+If that checkout has no `hooks/` directory,
+obtain a CLI review
+(see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+If the verdict is not `clean`, or there is no fingerprint,
+or the fingerprint does not prefix-match HEAD, do not push.
 On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.

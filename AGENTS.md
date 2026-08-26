@@ -271,6 +271,9 @@ primary checkout),
 in the checkout whose push follows,
 and do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
+If that checkout has no `hooks/` directory,
+obtain a CLI review
+(see [`adversarial-self-review`](shared/workflow/adversarial-self-review.md)).
 On that Cursor-adapter path, the empty
 [`pr-on-claim`](shared/workflow/pr-on-claim.md)
 `--allow-empty` branch has no report:

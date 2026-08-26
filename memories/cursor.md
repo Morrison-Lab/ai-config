@@ -146,12 +146,14 @@ A harness paste of the child's own assistant message may corroborate
 the recovered body;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
+Measured 2026-08-26 PDT on Cursor Cloud:
 `json.load` of `transcript.json` already yields the markdown
 string in the assistant `text` field.
 Do not `json.loads` that field's value a second time.
 The file stores the body as a JSON string
 (newlines appear as escaped `\n` on disk).
 The parser resolves that.
+Records carry a `role` the decoder must filter on.
 `batch-fetch-details` can write a large `transcript.json`.
 Extract the last assistant `text` that carries Summary / Findings /
 Verdict / Reviewed-Commit
@@ -170,10 +172,10 @@ and calls `parse_report()` on the file contents
 in one process.
 The `parse_report()` tuple always comes from that file,
 never from an unverified subagent return.
-A harness paste or a subagent's verbatim return of the
-same selector may corroborate the recovered body;
-it is never the input to `parse_report()`,
-and the posted body is route (a)'s file.
+Fetch only the `cloudAgentBcId` from a `Task` dispatch whose
+`subagent_type` was `adversarial-reviewer`.
+Do not fetch a sibling child's transcript.
+The posted body is route (a)'s file.
 Do not re-emit the markdown through a shell command string.
 A backtick span inside a double-quoted body runs as
 command substitution and vanishes.
@@ -198,6 +200,14 @@ not a stale duplicate of the worktree file.
 On a branch that edits `parse_report` itself,
 the worktree copy is unreviewed code grading its own review;
 the `~/.claude` path would have been `main`'s.
+This import is for an ai-config worktree.
+If the pushing checkout has no `hooks/` directory,
+that is the CLI-fallback case in
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md);
+obtain a CLI review.
+`~/.claude/hooks` resolves into the primary checkout
+only when that checkout is ai-config.
+In another repo's session that path is the ai-config clone.
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -237,14 +247,7 @@ The fingerprint must prefix-match HEAD
 If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
 tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
-Provenance is the recovery route in this file:
-route (a) reads the `transcript.json` whose path contains the
-`cloudAgentBcId` and writes the body to a file outside the
-checkout (under `/tmp`);
-a harness paste or a subagent's verbatim return of the same
-selector may corroborate that body and is never the input
-to `parse_report()`.
-`parse_report()` always runs on route (a)'s file.
+Provenance is the recovery route above.
 Until that wrapper lands, the import is the instrument
 for recovering a Cursor Cloud `Task` child's report.
 [#2255](https://github.com/Morrison-Lab/ai-config/pull/2255)
@@ -273,7 +276,8 @@ Without `--porcelain`, the summary lines this section names
 write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
-or a reported new tip does not prefix-match HEAD,
+or any reported new tip does not prefix-match HEAD,
+or the dry-run listed other refs,
 do not push.
 Git's dry-run summary is `old..new` for a fast-forward,
 and `old...new` for a forced non-fast-forward
@@ -356,11 +360,13 @@ otherwise denies every push
 When [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 lands, sweep every site this section names
 (`AGENTS.md`,
+`CLAUDE.md`,
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md),
 [`skills/push/SKILL.md`](../skills/push/SKILL.md),
 both persona copies,
 [`docs/cursor-hook-mapping.md`](../docs/cursor-hook-mapping.md),
-`README.md`,
+`README.md` (the hook table describes the script,
+not a harness skip),
 and this file)
 so the adapter-skip claim does not outlive the skip.
 Compact copies stay until that landing.
@@ -400,12 +406,14 @@ Say in the reply that the carve-out was used.
    the two-command test above is what decides).
 4. Confirm HEAD is still the recorded sha.
    Carve-out: skip (no sha was recorded before a dispatch).
-5. Run the same-argv dry-run; confirm a reported new tip
+5. Run the same-argv dry-run; confirm every reported new tip
    prefix-matches HEAD
    (`Everything up-to-date` is not a mismatch;
    a new-branch line with no sha is not a mismatch
    and also does not confirm the shipped tip).
-6. Confirm the source ref is `HEAD` or the recorded branch.
+   If the dry-run listed other refs (`[new tag]`,
+   `push.followTags`), do not push.
+6. Confirm every source ref is `HEAD` or the recorded branch.
    A deletion line (`- [deleted]`) is a different command
    (`_argv_push` excludes `--delete` / `-d`,
    so the guard never sees that push;
@@ -476,11 +484,12 @@ is the instruction to use this route.
   or the fingerprint does not prefix-match HEAD,
   or `git status --short` is not empty,
   or the same-argv dry-run fails,
-  or a reported new tip does not prefix-match HEAD
+  or any reported new tip does not prefix-match HEAD
   (`Everything up-to-date` is not a mismatch;
   a new-branch line with no sha is not a mismatch
   and also does not confirm the shipped tip),
-  or the source ref is not `HEAD` and is not the recorded branch,
+  or any source ref is not `HEAD` and is not the recorded branch,
+  or the dry-run listed other refs,
   do not push.
   The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
   `--allow-empty` branch is the carve-out.

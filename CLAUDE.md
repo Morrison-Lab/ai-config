@@ -177,12 +177,16 @@ So the lever there is to **recommend** a change rather than make one.
 When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-One such budget remains, and the standing preference is to try it first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`).
+Two metered CLI budgets remain, and the standing preference is to try
+both before Claude: `codex` first (ChatGPT plan, operationalized by
+`delegate-to-codex`), then `agy` CLI as availability allows.
 `agy` (Google Antigravity)'s API route was the second and is permanently out of service (user directive, 2026-08-20), so route no dispatched subagent work to it.
 Scope corrected 2026-08-23: the interactive subscription/extension is unaffected and not at quota.
 ai-config#1776 tracks the retirement.
 `opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
-`memories/delegation.md` carries the rule and the usage-window semantics across `opencode`, `codex`, and `agy` (CLI available since 2026-08-25; API retired).
+`memories/delegation.md` carries the rule and the usage-window semantics
+across `opencode`, `codex`, and `agy`
+(CLI available since 2026-08-25; API retired).
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**

@@ -46,9 +46,11 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
-Headless dispatch: `agy --print="<prompt>" [--effort low]`.
-The `--print` flag consumes the prompt argument,
-so attach it with `=` and keep other flags outside it.
+Headless dispatch: `agy --print="<prompt>" [--effort low]`,
+or `agy --print "<prompt>" [--effort low]`.
+The `--print` flag consumes the next token as its prompt argument,
+so keep the prompt immediately after `--print` (via space or `=`)
+and keep other flags outside it.
 
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)

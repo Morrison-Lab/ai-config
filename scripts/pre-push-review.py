@@ -265,7 +265,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -560,9 +560,20 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
             return None, "None"
 
-        for inv in invokers:
-            if inv in available:
-                available.remove(inv)
+        alias_map = {
+            "dtc": "codex",
+            "dto": "opencode",
+            "agy": "antigravity",
+            "antigravity": "antigravity",
+            "claude": "claude",
+            "cursor": "cursor",
+            "codex": "codex",
+            "opencode": "opencode"
+        }
+        for inv in list(invokers):
+            canon = alias_map.get(inv, inv)
+            if canon in available:
+                available.remove(canon)
 
         if not available:
             log_error(f"No alternate AI CLI found (invoking agents {list(invokers)} were excluded).")

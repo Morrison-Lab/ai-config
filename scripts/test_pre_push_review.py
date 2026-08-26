@@ -768,5 +768,31 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean, f"Should be clean but got: {reason}")
 
+
+    def test_benign_p0_p1_wording(self):
+        commit = "12345678abcdef0012345678abcdef0012345678"
+    def test_benign_p0_p1_wording(self):
+        commit = "12345678abcdef0012345678abcdef0012345678"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "No P0 or P1 findings.\n"
+            "P2 test coverage verified.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_clean, f"Should be clean but got: {reason}")
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch.object(reviewer, "detect_available_engines", return_value=["codex", "claude"])
+    def test_alternate_fails_without_invoker(self, mock_detect):
+        report, label = reviewer.execute_review("alternate", "prompt")
+        self.assertIsNone(report)
+        self.assertEqual(label, "None")
+
 if __name__ == "__main__":
     unittest.main()

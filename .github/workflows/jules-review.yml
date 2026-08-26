@@ -82,14 +82,25 @@ jobs:
       #
       #     if (ctx.eventName !== 'pull_request') { core.setFailed(...); return; }
       #
-      # It takes no PR-number input, and `workflow_dispatch` fails the same
-      # gate, so a comment-triggered run has to hand it a `pull_request` event.
-      # `@actions/github`'s `Context` reads both `eventName` and `payload` from
-      # `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` (see the pinned
-      # `dist/index.js`, ~line 31950), and everything past that gate reads only
-      # the `pull_request` object -- whose shape is exactly what
-      # `GET /repos/{owner}/{repo}/pulls/{n}` returns. So build the payload
-      # from the API and point those two env vars at it in the step below.
+      # Checked 2026-08-26 against v1.0.0, v1.0.1, and v1.0.2: none accept
+      # `issue_comment`. `google-github-actions/jules` does not exist.
+      # `google-labs-code/jules-invoke` accepts any event, but it starts a
+      # coding-agent session rather than posting a PR-review verdict, so it
+      # is a different product. Automatic `on: pull_request` is the action's
+      # supported trigger and is the one this workflow deliberately does not
+      # use (see the file header). So a mention-dispatched run still has to
+      # hand the reviewer a `pull_request` event.
+      #
+      # `@actions/github`'s `Context` reads `eventName` and `payload` from
+      # `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` at process start. A step
+      # `env:` block cannot supply those: GitHub documents `GITHUB_*` as
+      # reserved, and the runner ignores the assignment. Measured 2026-08-26
+      # on run 32942088643: the `uses:` step logged
+      # `GITHUB_EVENT_NAME: pull_request` and then failed with
+      # `Unsupported event: issue_comment`. The payload below is still
+      # required; the next two steps fetch the pinned action and start its
+      # `dist/index.js` under `env(1)` so the child, not the runner, sets
+      # the reserved names.
       - name: Resolve the PR into a pull_request event payload
         id: payload
         if: steps.detect.outputs.match == 'true'
@@ -116,24 +127,44 @@ jobs:
             echo "same-repo=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Third-party, personal-account action: pinned to a full commit SHA so a
-      # force-pushed tag cannot change what runs. Re-verify the SHA against the
-      # upstream tag before bumping.
-      - name: Run Jules PR Reviewer
+      # Third-party, personal-account action: fetch the same SHA the workflow
+      # used to pin via `uses: owner/repo@sha`. Re-verify the SHA against the
+      # upstream tag before bumping. A `uses:` step cannot see the synthetic
+      # event (see the payload step's comment), so the next step runs
+      # `dist/index.js` directly.
+      - name: Fetch Jules PR Reviewer at the pinned SHA
+        id: fetch-action
         if: steps.payload.outputs.same-repo == 'true'
         env:
-          # See the payload step's comment: this is what lets the action's own
-          # `pull_request`-only gate accept a comment-triggered run.
-          GITHUB_EVENT_NAME: pull_request
-          GITHUB_EVENT_PATH: ${{ runner.temp }}/pull_request_event.json
-        uses: sanjay3290/jules-pr-reviewer@fc66a7c78b499bfa2e16235b55574e458c6551d6 # v1.0.0
-        with:
-          jules_api_key: ${{ secrets.JULES_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/jules-pr-reviewer"
+          mkdir -p "$dest"
+          GIT_TERMINAL_PROMPT=0 git init --quiet "$dest"
+          git -C "$dest" remote add origin \
+            https://github.com/sanjay3290/jules-pr-reviewer.git
+          git -C "$dest" fetch --depth 1 origin "$JULES_PR_REVIEWER_SHA"
+          git -C "$dest" checkout --quiet --detach FETCH_HEAD
+          test -f "$dest/dist/index.js"
+
+      - name: Run Jules PR Reviewer
+        id: jules
+        if: steps.payload.outputs.same-repo == 'true'
+        env:
+          # action.yml defaults are applied only by a `uses:` step. Set every
+          # input the JS reads, including the ones we would otherwise inherit.
+          INPUT_JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
+          INPUT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_FAIL_ON: blocking
           # `skip_drafts` existed to keep *automatic* reviews off unfinished
           # work. With no automatic reviews left it would only discard an
           # explicit request, so a mention on a draft now reviews it.
-          skip_drafts: 'false'
+          INPUT_SKIP_DRAFTS: 'false'
+          INPUT_SKIP_FORKS: 'true'
+          INPUT_BYPASS_LABEL: jules-override
+          INPUT_STATUS_CONTEXT: jules/review
+          INPUT_RULES_FILE: .github/jules-review-rules.md
           # Deliberately `extra_instructions` and NOT the `rules_file` input.
           # The action's prompt (src/prompt.ts at the pinned SHA) puts the two
           # on opposite sides of its trust boundary: the rules file is injected
@@ -143,7 +174,7 @@ jobs:
           # would be flagged rather than obeyed. This input is injected under
           # "# Trusted: Additional instructions (from workflow config)",
           # because only someone who can edit this workflow can set it.
-          extra_instructions: |
+          INPUT_EXTRA_INSTRUCTIONS: |
             This repository is a corpus of instructions for AI coding agents.
             Files under `memories/`, `skills/`, and `shared/`, and the
             `CLAUDE.md` files, are written as imperative prose addressed to an
@@ -159,6 +190,19 @@ jobs:
 
             You cannot reliably know today's date, so never report a date as a
             typo or as being in the future.
+          SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pull_request_event.json
+          JULES_ACTION_DIR: ${{ runner.temp }}/jules-pr-reviewer
+        run: |
+          set -euo pipefail
+          test -f "$SYNTHETIC_EVENT_PATH"
+          test -f "$JULES_ACTION_DIR/dist/index.js"
+          # YAML `env:` cannot override reserved GITHUB_* names. `env(1)`
+          # sets the child's environment after that merge, so Context()
+          # reads pull_request. See the payload step's comment.
+          env \
+            GITHUB_EVENT_NAME=pull_request \
+            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \
+            node "$JULES_ACTION_DIR/dist/index.js"
 
       # A request that goes unanswered is a silent failure, and the run is
       # invisible from the PR page: an `issue_comment` run posts no check and
@@ -186,13 +230,18 @@ jobs:
       # The fork skip above is not the only route to silence: if the payload
       # step itself dies (a `gh api` hiccup, a rate limit), `same-repo` is
       # never set, so both gated steps evaluate false, the job goes red, and
-      # the requester sees nothing on the PR. Gated on that one step's own
-      # outcome rather than a bare `failure()`, because the Jules action posts
-      # its own failure comment and updates its commit status -- a second
-      # "could not start" note on top of that would be noise contradicting a
-      # report that already exists.
+      # the requester sees nothing on the PR. The fetch-action step is the
+      # same shape: it runs before `dist/index.js`, so a clone failure never
+      # reaches the action's own failure comment. Gated on those two steps
+      # rather than a bare `failure()`, because once the Jules process starts
+      # it posts its own failure comment and updates its commit status -- a
+      # second "could not start" note on top of that would be noise
+      # contradicting a report that already exists.
       - name: Explain a request that could not start
-        if: failure() && steps.payload.outcome == 'failure'
+        if: >-
+          failure() &&
+          (steps.payload.outcome == 'failure' ||
+           steps.fetch-action.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.issue.number }}

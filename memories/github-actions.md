@@ -606,8 +606,27 @@ if (process.env.GITHUB_EVENT_PATH) {
 this.eventName = process.env.GITHUB_EVENT_NAME;
 ```
 
-Step-level `env:` overrides those, so a workflow triggered by anything can
-present the action with the event it demands.
+Step-level `env:` on a `uses:` step does **not** override those.
+GitHub documents `GITHUB_*` as reserved
+(https://docs.github.com/en/actions/reference/workflows-and-actions/variables,
+checked 2026-08-26):
+"You can't overwrite the value of the default environment variables named
+`GITHUB_*` and `RUNNER_*`."
+The runner still *prints* the YAML `env:` values in the step log, so the wrap
+looks applied.
+Measured 2026-08-26 on
+[run 32942088643](https://github.com/Morrison-Lab/ai-config/actions/runs/32942088643):
+the `uses: sanjay3290/jules-pr-reviewer` step logged
+`GITHUB_EVENT_NAME: pull_request` and then failed with
+`Unsupported event: issue_comment`.
+That was the wrap #857 shipped, and every `@jules` mention since has failed
+the same way (#2280).
+
+The override that actually reaches `Context()` is `env(1)` on a `run:` step
+that starts `node dist/index.js` as a child.
+`env(1)` sets the child's environment after the runner's reserved-name merge.
+A workflow triggered by `issue_comment` can still present the action with
+`pull_request` this way.
 For a `pull_request` gate the payload is close to one API call, because
 `GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
 delivers --- near enough to work, not near enough to skip the field check
@@ -619,11 +638,29 @@ below:
           gh api "${{ github.event.issue.pull_request.url }}" \
             | jq '{pull_request: .}' > "$RUNNER_TEMP/pr_event.json"
 
-      - uses: some/action@<sha>
+      - name: Fetch the action at the pinned SHA
+        run: |
+          dest="$RUNNER_TEMP/the-action"
+          git init --quiet "$dest"
+          git -C "$dest" remote add origin https://github.com/owner/the-action.git
+          git -C "$dest" fetch --depth 1 origin <sha>
+          git -C "$dest" checkout --quiet --detach FETCH_HEAD
+
+      - name: Run the action under a synthetic pull_request event
         env:
-          GITHUB_EVENT_NAME: pull_request
-          GITHUB_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+          INPUT_SOME_INPUT: value
+          SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+          ACTION_DIR: ${{ runner.temp }}/the-action
+        run: |
+          env \
+            GITHUB_EVENT_NAME=pull_request \
+            GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \
+            node "$ACTION_DIR/dist/index.js"
 ```
+
+`action.yml` defaults are applied only by a `uses:` step.
+A `run: node dist/index.js` invocation must set every `INPUT_*` the JS reads,
+including the ones a `uses:` step would have inherited.
 
 Two things make this safe rather than merely clever, and both need checking
 before relying on it:
@@ -648,10 +685,12 @@ secrets under `pull_request`) has to be re-established explicitly.
   `payload` before concluding its trigger is fixed --- `src/` for a legible
   version of the gate, and `dist/` to confirm what the pinned SHA actually
   runs, since the bundle is what Actions executes and it can lag `src/`.
-
+- **Do:** invoke the action from a `run:` step with `env(1)` setting
+  `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
+  every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
 - **Do:** fetch a checker at the SHA the calling workflow **pins** when
   reproducing a diff-scoped CI gate locally, not the action's default branch.
-  The bullet above pins when *auditing* an action; the same applies when
+  The first Do pins when *auditing* an action; the same applies when
   *running* one to validate a fix pre-push, where a shallow default-branch
   clone yields a plausible script with no sign it is the wrong one.
   Measured 2026-08-19: `ai-config`'s `validate.yml` pins
@@ -669,6 +708,9 @@ secrets under `pull_request`) has to be re-established explicitly.
   `eventName` guard alone.
 - **Don't:** assume the API response is a drop-in payload without checking
   every field the action reads.
+- **Don't:** treat a `uses:` step's logged `env:` as evidence the process
+  received those values --- reserved `GITHUB_*` names are printed and then
+  ignored.
 
 (Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
 needed an `issue_comment` trigger, which its pinned action rejects outright.
@@ -682,7 +724,14 @@ Worth noting how, since it is the cheap lesson here.
 The reviewer inferred the citation was unverifiable because the case note named
 only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
 question in one command, and the same off-by-one had already shipped into the
-workflow comment that makes the same claim.)
+workflow comment that makes the same claim.
+The wrap this case shipped --- YAML `env:` on the `uses:` step --- did not
+work.
+Measured 2026-08-26 on run 32942088643 / #2280: the step logged the override
+and the action still saw `issue_comment`.
+The working form is `env(1)` around `node dist/index.js`, recorded in
+`.github/workflows/jules-review.yml` and gated by
+`scripts/check_jules_review_workflow.py`.)
 
 ## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
 

@@ -150,7 +150,7 @@ under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
 on the report recovered from the child's transcript
-when that file exists
+when the worktree hook script exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/`:
 it is a different revision from the branch under review.

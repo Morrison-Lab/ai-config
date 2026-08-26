@@ -206,7 +206,7 @@ Call `parse_report()` from the **worktree's**
 on the file contents
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects)
-when that file exists in the pushing checkout.
+when the worktree hook script exists in the pushing checkout.
 Measured 2026-08-26 PDT on this VM, whose primary checkout
 is ai-config:
 `~/.claude/hooks -> /workspace/hooks`,
@@ -233,6 +233,9 @@ If that path is missing on the default branch, obtain a CLI review.
 Do not import `~/.claude/hooks/` for that copy either.
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
+The recovered report file under `/tmp` is what the author reads
+to Address, Rebut, or Defer each finding.
+The transcript prohibition does not cover that file.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
@@ -244,6 +247,8 @@ Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 `needs_work` is Needs more work or Needs work,
 and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
+Address, Rebut, or Defer each finding from the recovered report file,
+then re-dispatch.
 A push that carries nothing to review
 is the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
 branch, created with `--allow-empty`.
@@ -401,12 +406,11 @@ so the adapter-skip claim does not outlive the skip.
 Compact copies stay until that landing.
 
 Refusal gates, in order.
-This is a Read-Do checklist
-(items 1 through 4 must run in that order;
-reordering 5 with 6 does not change the answer).
+This is a Read-Do checklist.
 Item 1's pre-dispatch recording must precede the dispatch,
 or item 4 has nothing to compare against.
 Gate 3 consumes the tuple gate 2 produces.
+Reordering 5 with 6 does not change the answer.
 Details in the procedure above.
 Pause points:
 before the `Task` dispatch (item 1's first half),

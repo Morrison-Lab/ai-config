@@ -23,7 +23,7 @@ cross-referenced **open PRs** --- the check `gi` runs before grabbing an issue.
 git fetch origin main -q
 git checkout -b <type>/<slug> origin/main
 git commit --allow-empty -m "start: <issue title> (closes #<N>)"
-git push -u origin HEAD
+ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD
 gh pr create --draft --title "<title>" --body "Closes #<N>
 
 WIP --- opened up front to claim the issue; implementing now."

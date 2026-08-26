@@ -68,6 +68,7 @@ Emphasis wrapping the whole verdict line is no verdict.
 Fenced content is blanked before both searches.
 An unclosed fence is no verdict.
 A fingerprint only inside a fence is no fingerprint.
+Anything else is no verdict.
 
 You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).

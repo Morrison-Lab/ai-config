@@ -10,7 +10,7 @@ there; anything about how a Quarto site is configured or rendered belongs
 here.
 
 ## Quarto HTML sites (build & layout gotchas)
-Hit while adding a mobile within-chapter TOC to `Morrison-Lab/rme` (#929); apply to
+Hit while adding a mobile within-chapter TOC to `d-morrison/rme` (#929); apply to
 any Quarto website (rme, psw, qwt, …).
 - **Single-file `quarto render <file>.qmd` serves cached compiled theme CSS.**
   Edits to `custom.scss` / theme SCSS may NOT appear in the output — Quarto reuses
@@ -70,7 +70,7 @@ To compute the repo-relative path: strip `os.getenv("QUARTO_PROJECT_DIR")`
   document's own front matter lists** — even formats the project's `_quarto.yml`
   doesn't configure.
 Verified from a clean state (`rm -rf _site .quarto` first,
-  no priming single-file renders) on `Morrison-Lab/macros`: `_quarto.yml` there
+  no priming single-file renders) on `d-morrison/macros`: `_quarto.yml` there
   configures only `format: html:`, yet a bare `quarto render` still produced
   `.pdf`, `.docx`, and reveal.js `.html` output for every doc whose own front
   matter lists those formats — the project config sets the *default* for docs
@@ -94,7 +94,7 @@ A Lua file that returns a shortcode table (for example
   `Shortcode 'slidebreak' not found`.
 Put the path under front-matter or
   project metadata `shortcodes:` instead (e.g.
-  `shortcodes: [../_extensions/Morrison-Lab/slidebreak/slidebreak.lua]`), even
+  `shortcodes: [../_extensions/d-morrison/slidebreak/slidebreak.lua]`), even
   when the file lives inside `_extensions/`. (Observed directly in
   UCD-SERG/serocalculator, 2026-07-22: switching the same Lua path from
   `filters:` to `shortcodes:` made the shortcode render and removed the
@@ -264,8 +264,8 @@ Note what the toolchain question actually turns on: a `pdf:` anywhere in that sw
 - **Don't:** read the project-level `format:` block as the format set --- a per-document block replaces it.
 - **Don't:** expect `freeze: auto` to remove the toolchain requirement --- freeze skips chunk *execution*, not the pandoc/LaTeX render, so a frozen PDF document still needs TinyTeX on the runner.
 
-(Measured 2026-08-24 on `Morrison-Lab/macros`, whose `_quarto.yml` declares `format: html` only while `demo-shortcode.qmd` and `demo-include-in-header.qmd` each declare their own `pdf:` and `revealjs:` blocks --- demonstrating the macros reaching the LaTeX preamble being the entire point of those two pages.
-Caught in self-review on [macros#83](https://github.com/Morrison-Lab/macros/pull/83) before the TinyTeX removal merged.)
+(Measured 2026-08-24 on `d-morrison/macros`, whose `_quarto.yml` declares `format: html` only while `demo-shortcode.qmd` and `demo-include-in-header.qmd` each declare their own `pdf:` and `revealjs:` blocks --- demonstrating the macros reaching the LaTeX preamble being the entire point of those two pages.
+Caught in self-review on [macros#83](https://github.com/d-morrison/macros/pull/83) before the TinyTeX removal merged.)
 
 ## quarto-actions/setup with tinytex — two shared-runner failure signatures (win, 2026-07)
 

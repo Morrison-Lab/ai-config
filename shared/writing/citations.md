@@ -484,7 +484,7 @@ Those two own the internal case; this section owns the external one.
 `[Theorem 15](https://Morrison-Lab.github.io/rme/chapters/math-prereqs.html#thm-log-prod)`,
 in *Regression Models for Epidemiology*.
 That number is literally an ordinal position.
-In `Morrison-Lab/rme`, `thm-log-prod` is the 15th theorem div in
+In `d-morrison/rme`, `thm-log-prod` is the 15th theorem div in
 `chapters/algebra.qmd`, which is the first file `chapters/math-prereqs.qmd`
 includes, so a theorem added above it in any earlier include moves it:
 `grep -n '{#thm-' chapters/algebra.qmd | grep -n 'thm-log-prod'` returns

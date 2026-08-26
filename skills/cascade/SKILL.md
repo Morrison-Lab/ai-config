@@ -19,7 +19,7 @@ so every open branch in a stack stays synced with what's beneath it.
 "Cascade" never means merging the PRs themselves into `main`;
 merging PRs is a separate, human-gated action (`merge-it`).
 (A bare "Cascade" was misread exactly that way on the
-`Morrison-Lab/rme` #1035–#1042 stack, 2026-07-17 —
+`d-morrison/rme` #1035–#1042 stack, 2026-07-17 —
 this skill exists to pin the meaning.)
 
 ## Procedure

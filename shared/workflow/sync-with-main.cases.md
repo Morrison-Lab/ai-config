@@ -90,7 +90,7 @@ discover a conflict --- let it merge within the hour instead of stalling.)
 
 ## An add/add conflict on a shared config file
 
-(`Morrison-Lab/altdoc#7` vs `#18`: both independently added a `jarl.toml`
+(`d-morrison/altdoc#7` vs `#18`: both independently added a `jarl.toml`
 excluding the same fixture directory for the same `jarl-check` failure;
 `#18` merged first, `#7`'s merge conflicted on the new file, resolved by
 keeping `#18`'s more detailed comment and re-confirming `#7`'s diff against

@@ -292,7 +292,7 @@ and the only positive evidence is a run that reached the model.
 This is the failure recorded in
 [`review-verdict-pitfalls`](../../shared/workflow/review-verdict-pitfalls.md)'s
 eighth case and its cross-repo variant:
-seven `claude-review` runs on `Morrison-Lab/altdoc` #95 and #96
+seven `claude-review` runs on `d-morrison/altdoc` #95 and #96
 failing in the 26-to-35-second band
 with `is_error: true`, `total_cost_usd: 0`, and no permission denials,
 while the same reviewer returned a full verdict on another owner's repo

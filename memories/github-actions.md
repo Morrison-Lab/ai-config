@@ -12,7 +12,7 @@ The `@claude` bot's own behaviour lives in
   Single-quoted scalars preserve backslashes as-is (e.g. `'foo\.bar'` for that same
   single backslash), which is usually easier to reason about in workflow templates.
   This applies to `branches-or-tags-to-list` / regex inputs in reusable-workflow YAML.
-  (Morrison-Lab/altdoc#30.)
+  (d-morrison/altdoc#30.)
 - **YAML scalar escaping in composite action metadata:** Output descriptions in `action.yml`
   (and workflow inputs) containing single quotes inside single-quoted strings (e.g.
   `'description: 'true' if head repo...'`) fail strict YAML parsing in GitHub Actions unless
@@ -305,7 +305,7 @@ The `@claude` bot's own behaviour lives in
   an ordinary `render_docs()`. An unrecognized `$ALTDOC_*` variable is left in
   the settings file verbatim rather than dropped, so pointing
   `include-in-header` at one before the altdoc pin supports it fails the Quarto
-  build outright rather than degrading. (`Morrison-Lab/altdoc#103`/`#104`,
+  build outright rather than degrading. (`d-morrison/altdoc#103`/`#104`,
   `ucdavis/bcs#528`, `UCD-SERG/serocalculator#626`.)
 - **`NEWS.md` section headers need a blank line before them.** A bullet that ends
   immediately before a `## Next-section` heading (no blank line) can cause

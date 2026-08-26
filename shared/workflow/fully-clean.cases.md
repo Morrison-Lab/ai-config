@@ -44,7 +44,7 @@ quota problem needing a fix.)
 
 ## "`status` itself can be stale" --- duration from log timestamps
 
-(`Morrison-Lab/altdoc#96`, 2026-07-30: `claude-review` had failed six times
+(`d-morrison/altdoc#96`, 2026-07-30: `claude-review` had failed six times
    in ~26 seconds each, the signature of the model call failing at auth.
    A re-run was polled twice, three minutes apart, and read `in_progress`
    both times --- reported as "the reviewer has recovered", and acted on by
@@ -263,7 +263,7 @@ after a clean `Ready for merge` verdict on an otherwise all-green head.)
 
 ## One finding can own two threads
 
-(`Morrison-Lab/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
+(`d-morrison/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
 parameter opened `PRRT_...TyfeQ` alongside the original `PRRT_...TyeRc`;
 resolving the original left the re-raise outstanding, caught only by a
 mechanical sweep of all seven threads.)
@@ -377,7 +377,7 @@ Jules returned `VERDICT: approve` on the new head about four minutes later.)
 
 ## The cross-repo test that localizes a durable credential failure
 
-(Morrison-Lab/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
 times across those two PRs -- six on #96, one on #95 -- each run finishing in
 the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
 permission denials.
@@ -387,7 +387,7 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 `04:08:50Z -> 04:11:41Z`.
 So the service was fine and the `the repository owner` credential was not, which no
 number of re-runs would have shown.
-Tracked in Morrison-Lab/altdoc#99.)
+Tracked in d-morrison/altdoc#99.)
 
 ## The zero-cost signature is necessary, not sufficient, for "quota"
 
@@ -906,7 +906,7 @@ verdict.)
 
 (Morrison-Lab/gha#520 / #521, 2026-08-19.)
 
-`Morrison-Lab/rme#1072`'s `review / claude-review` check was red.
+`d-morrison/rme#1072`'s `review / claude-review` check was red.
 The cause was in the run's result object rather than in the PR.
 Abridged below --- it also carried `terminal_reason: "api_error"` and `permission_denials_count: 42`.
 

@@ -114,7 +114,7 @@ import tempfile
 # is installed as a plugin the registration lives in this repo's own
 # `hooks/hooks.json` under `${CLAUDE_PLUGIN_ROOT}`, so there is nothing in the
 # user's settings to remove and the remedy silently does nothing
-# (ai-config#1709). That shape is now the common one: `Morrison-Lab/rme#1074`
+# (ai-config#1709). That shape is now the common one: `d-morrison/rme#1074`
 # migrates off the submodule, and `Morrison-Lab/gha`'s
 # `run-claude-review-attempt` installs the plugin for every review run.
 #

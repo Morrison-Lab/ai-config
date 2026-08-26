@@ -229,7 +229,7 @@ Recovered as #1003.)
 
 ## Use the existing PR branch, not the harness-specified branch --- A PR whose head branch lives in a different repo entirely (not just a scope-restricted...
 
-(`Morrison-Lab/altdoc#20` → `#22`, 2026-07-14: `#20` compared `etiennebacher/altdoc:main` against the fork's `main` and hit a real `NEWS.md`/`tests/testthat/helper.R` conflict with no push access to fix it on that PR;
+(`d-morrison/altdoc#20` → `#22`, 2026-07-14: `#20` compared `etiennebacher/altdoc:main` against the fork's `main` and hit a real `NEWS.md`/`tests/testthat/helper.R` conflict with no push access to fix it on that PR;
 `#22` redid the sync from a fork-local branch and merged clean.)
 
 ## Do the review yourself when the @claude workflow doesn't produce a verdict --- Stub review
@@ -272,11 +272,11 @@ The reading half surfaced separately, when the user asked why fetching and diges
 
 ## Detect concepts defined only in prose, never formalized
 
-(Found by hand on `Morrison-Lab/rme#706`: a "conditional predicted risk" quantity introduced only as plain prose right before two definitions that depended on it, and a "collapsibility bias" concept defined in one sentence crammed inside a *different* concept's definition div.)
+(Found by hand on `d-morrison/rme#706`: a "conditional predicted risk" quantity introduced only as plain prose right before two definitions that depended on it, and a "collapsibility bias" concept defined in one sentence crammed inside a *different* concept's definition div.)
 
 ## Detect hypothetical examples where real data is already available
 
-(Found by hand on `Morrison-Lab/rme#706`: a logistic-regression chapter's worked examples used invented covariate-specific risks and made-up exposure proportions throughout, even though the chapter already loads and fits models on its real running WCGS dataset elsewhere.)
+(Found by hand on `d-morrison/rme#706`: a logistic-regression chapter's worked examples used invented covariate-specific risks and made-up exposure proportions throughout, even though the chapter already loads and fits models on its real running WCGS dataset elsewhere.)
 
 ## Encoding reusable feedback into ai-config --- Put the memory in the repo where it belongs, and don't wait for confirmation to do it
 

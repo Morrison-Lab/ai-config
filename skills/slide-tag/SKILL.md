@@ -112,8 +112,8 @@ different repo. Bumping a submodule pin means: fetch the submodule's
 upstream, check out its new commit, `git add <submodule-path>` in the parent
 repo, and commit — no tag involved. `check-dependency-updates` (`cdu`)'s
 "Git submodules" step covers this; `use-math-macros` covers it specifically
-for the `Morrison-Lab/macros` submodule as part of a broader macro-conversion
+for the `d-morrison/macros` submodule as part of a broader macro-conversion
 pass. Don't reach for `slide-tag` on a "slide the submodule" request — the
 name similarity is coincidental. (Confirmed on ai-config's own session
-history: sliding the `macros` submodule pin in `Morrison-Lab/rme`#983 and
+history: sliding the `macros` submodule pin in `d-morrison/rme`#983 and
 `ucdavis/epi204`#361 was done by hand, `slide-tag` doesn't apply.)

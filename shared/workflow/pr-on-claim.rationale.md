@@ -290,7 +290,7 @@ returns lowercase `status`/`conclusion` (`completed`, `skipped`), while
 Don't generalize from either repo. sparta#898 is real, and so is the opposite;
 the deciding factor is whether that repo's review workflow gates on
 `github.event.pull_request.draft`, which is a property of the workflow, not
-something to assume. (Morrison-Lab/altdoc#55, 2026-07-25: the draft's
+something to assume. (d-morrison/altdoc#55, 2026-07-25: the draft's
 synchronize-triggered `review / claude-review` reported `skipped`, so marking
 ready seconds after the push was safe and the subsequent `ready_for_review`
 run posted a normal verdict.)

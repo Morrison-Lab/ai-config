@@ -238,7 +238,7 @@ against a manual `gh pr checks` call showing the check had already resolved.)
 `bootstrap.sh` only reaches local CLI sessions --- a consumer repo's
 `claude`/`claude-code-review` bots (running via `Morrison-Lab/gha`'s reusable
 workflows and `anthropics/claude-code-action`) get nothing from it. The
-pattern that worked, with no workflow changes needed, on `Morrison-Lab/rme#982`
+pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
 and `ucdavis/epi204#360`:
 
 1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`
@@ -565,7 +565,7 @@ When issuing single-line Bash calls across multiple repo checkouts in the
 same session, either prefix every command with an explicit `cd
 /path/to/repo &&`, or use `git -C /path/to/repo <command>` for read-only
 checks — don't rely on remembering which directory the last call left you
-in. (Session sliding the `macros` submodule pin in `Morrison-Lab/rme` and
+in. (Session sliding the `macros` submodule pin in `d-morrison/rme` and
 `ucdavis/epi204`, 2026-07-04.)
 
 **A parallel batch is the same trap in its sharpest form.**

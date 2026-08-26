@@ -100,7 +100,7 @@ Escalated; the human merged past it.)
 
 ## "The same sync is needed when the review fix is to CODE BEHAVIOR"
 
-(Morrison-Lab/altdoc#78, 2026-07-27: review round 2 established that mkdocs
+(d-morrison/altdoc#78, 2026-07-27: review round 2 established that mkdocs
 serves `/man/foo/`, not `/man/foo.html`; the code and the PR body were
 corrected that round, while `NEWS.md` kept saying links point at `.html` under
 "`mkdocs` and `quarto_website`" through two further clean review rounds.
@@ -174,7 +174,7 @@ approach --- caught in a second review round.)
 
 ## "A bot that re-raises an item as 'not addressed'" --- check timestamps
 
-(Morrison-Lab/altdoc#34: a `\pkg{}` rendering rebuttal
+(d-morrison/altdoc#34: a `\pkg{}` rendering rebuttal
 carrying a `pandoc` run that disproved the finding's implied hazard was
 posted about a minute before the follow-up review job started; that review
 reported the item "wasn't addressed in `9398d5d`" and re-posted the

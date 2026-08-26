@@ -111,7 +111,7 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
   `path`/`head_branch`, sort by `run_number`) is far more reliable than
   grepping the raw JSON text, since a single workflow run's JSON blob is
   usually one unbroken line with no per-field markers to grep on the same
-  line. (`Morrison-Lab/altdoc#16`: confirmed `jarl-check`'s failures via
+  line. (`d-morrison/altdoc#16`: confirmed `jarl-check`'s failures via
   `lint.yml`'s run history on `main` going back 4+ commits before reporting it
   as pre-existing and out of scope.)
 
@@ -591,7 +591,7 @@ Hit across ucdavis/bcs#264 (the snapr-based `expect_snapshot_data` suite):
 A workflow that triggers only on `push:` to `main` (deploy/publish/release jobs)
 never runs on pull requests, so a bug it would catch stays invisible until after
 merge — and then it fails on `main`, where no one is watching a specific PR.
-Hit on Morrison-Lab/rme#966/#967: the Quarto **publish** workflow (push-to-main
+Hit on d-morrison/rme#966/#967: the Quarto **publish** workflow (push-to-main
 only) went red the moment the concept-map appendix merged and stayed red for two
 days across several later merges, because no PR ever ran the full multi-format
 website render that collides.
@@ -601,7 +601,7 @@ When you fix such a post-merge-only failure, don't stop at the fix — add a
 unnoticed.
 It needn't reproduce the whole heavy job; a few seconds of parsing
 that asserts the invariant is enough.
-Morrison-Lab/rme#970 added `check-render-headers`, a
+d-morrison/rme#970 added `check-render-headers`, a
 ~120-line Python + PyYAML script that asserts "no two of a render-list page's
 formats resolve to the same output file," runs in ~8s, and would have caught the
 original bug at PR time. Prevention (fix the scaffolder/template that emits the
@@ -966,7 +966,7 @@ occurrence, not the flagged one.)
   self-reference. Deliberate downlit behavior (r-lib/downlit#106, #195) —
   not worth forking downlit over, since even its local-package hooks emit
   pkgdown's `reference/` layout, not altdoc's `man/`.
-- Fixed generally in the `Morrison-Lab/altdoc` fork (altdoc#25/#26): the
+- Fixed generally in the `d-morrison/altdoc` fork (altdoc#25/#26): the
   post-render rewrite pass converts the documented package's rdrr-form
   self-links to page-relative `man/` links, alongside the recorded-site-URL
   form it already handled. A consumer repo just needs its renv altdoc pin at

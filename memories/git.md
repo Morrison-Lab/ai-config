@@ -151,7 +151,7 @@ by #328.)
   change working-tree content, so the suite reads the correctly-resolved file.
   Don't discard a run's results on this basis; the problem is with the commit,
   not the run.
-- (`Morrison-Lab/altdoc#61`, 2026-07-25: a `NEWS.md` conflict was resolved in the
+- (`d-morrison/altdoc#61`, 2026-07-25: a `NEWS.md` conflict was resolved in the
   editor and left unstaged; caught only because `git status` was checked for an
   unrelated reason before pushing.)
 

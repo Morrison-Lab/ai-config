@@ -168,7 +168,7 @@ Triggering a review, and what becomes of the reply it writes, live in
   no `@claude` comment" as "review ran clean" on a PR that touches
   `claude-code-review.yml` — check the `claude-review` job log for the
   `self_mod=true` notice, and do a manual review in its place (same playbook as
-  the quota-skip case below). (Morrison-Lab/altdoc#14.)
+  the quota-skip case below). (d-morrison/altdoc#14.)
 - **`grep -qxF` for literal fixed-string line matching in workflow files.** Flags: `-q`
   = quiet, `-x` = full-line match, `-F` = treat pattern as a fixed string (not a
   regex). Omitting `-F` makes `.` in file paths (e.g.

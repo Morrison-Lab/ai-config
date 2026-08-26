@@ -135,7 +135,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   bug — a stray `---` left next to a `{{< slidebreak >}}` rendering a
   spurious `<hr>` in every non-`revealjs` Quarto profile, invisible from
   reading the `.qmd` source alone — that a purely-local read wouldn't have
-  surfaced. (`Morrison-Lab/rme#1009`, several rounds: a background
+  surfaced. (`d-morrison/rme#1009`, several rounds: a background
   `renv::restore()` in `/tmp/rme-<issue>-worktree` sat at "renv installed,
   nothing else" after the worktree was removed and re-created at the same
   path — verified the actual chapter content instead via this gh-pages
@@ -180,7 +180,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   have a real, fixable root cause). `RENV_CONFIG_INSTALL_REMOTES=false` (see the
   worktree bullet above) sidesteps it entirely, since the actual installed
   versions come from `renv.lock`'s pinned SHAs regardless of where `Remotes:`
-  points. (`Morrison-Lab/rme#772`, tracked in `Morrison-Lab/rme#994` and `Morrison-Lab/rme#996`, fixed centrally in
+  points. (`d-morrison/rme#772`, tracked in `d-morrison/rme#994` and `d-morrison/rme#996`, fixed centrally in
   `Morrison-Lab/gha#241`.)
 - **R in these containers defaults to the `C` locale**, so
   `read.delim(..., fileEncoding="UTF-8")` (or any read) of a file with multibyte
@@ -193,8 +193,8 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   lists a GitHub `Remotes:` entry for a repo the session's git proxy hasn't
   scoped in, renv activation (via `.Rprofile`) aborts on startup — every
   subsequent `R` call errors before loading any package (e.g. bcs's
-  `Morrison-Lab/altdoc@recursive-qmd-search`: a plain `curl` to
-  `api.github.com/repos/Morrison-Lab/altdoc/...` 403'd with `"GitHub access to
+  `d-morrison/altdoc@recursive-qmd-search`: a plain `curl` to
+  `api.github.com/repos/d-morrison/altdoc/...` 403'd with `"GitHub access to
   this repository is not enabled for this session. Use add_repo to request
   access."` — this is the *session repo-scope* check, not a general network
   block; the same 403 hits `renv`/`pak`'s own `api.github.com` calls even
@@ -242,7 +242,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   remove the dead functions `main` removed). Verify main's tree with
   `git show origin/main:<file>` reads rather than a shallow-clone range diff
   (see below). (UCD-SERG/serocalculator#503 pinned
-  `Morrison-Lab/altdoc@recursive-qmd-search`; fixing the consumer's docs build
+  `d-morrison/altdoc@recursive-qmd-search`; fixing the consumer's docs build
   required altdoc PR #27 into that branch, and altdoc PR #28 caught the branch
   up to main's jarl-clean state, 2026-07.)
 - **Scope-blocked GitHub repo, but you only need its *datasets* (an R data
@@ -297,14 +297,14 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   `veccompare` from the PPM snapshot; the repo owner verified via this
   endpoint before concluding they were genuinely archived.)
 - **`snapr` is not on CRAN or P3M**: install from the GitHub tarball.
-  `curl -L https://codeload.github.com/Morrison-Lab/snapr/tar.gz/refs/heads/main -o /tmp/snapr.tar.gz`
+  `curl -L https://codeload.github.com/d-morrison/snapr/tar.gz/refs/heads/main -o /tmp/snapr.tar.gz`
   then in R, install `readr` first (a direct `snapr` `Imports:` dependency):
   `install.packages("readr")`, then
   `install.packages("/tmp/snapr.tar.gz", repos=NULL, type="source")`.
   `snapr::expect_snapshot_data()` silently skips snapshot generation/comparison when
   `NOT_CRAN` is unset (respects the standard CRAN-skip convention):
   `NOT_CRAN=true Rscript -e 'devtools::test()'`.
-- The `latex-macros` submodule (Morrison-Lab/macros) is uninitialized on a fresh
+- The `latex-macros` submodule (d-morrison/macros) is uninitialized on a fresh
   clone → `git submodule update --init latex-macros` before any render, else
   `{{< include latex-macros/macros.qmd >}}` fails for every chapter.
 - More generally, when Quarto errors with `Include directive failed` / `could
@@ -425,7 +425,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   debugging the diff.
   Recovery is the same `git checkout -- tests/testthat/_snaps/` as above, then
   one clean run, alone.
-  (`Morrison-Lab/altdoc#61`, 2026-07-25: two overlapping `test_local()` runs;
+  (`d-morrison/altdoc#61`, 2026-07-25: two overlapping `test_local()` runs;
   one failed on a quarto render and the other on a docsify test, and the
   docsify error silently deleted `_sidebar.md` and `index.html` --- 58 lines of
   committed snapshots.)

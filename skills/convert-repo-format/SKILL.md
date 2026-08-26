@@ -113,7 +113,7 @@ Add what the target needs; remove what only the source needed. Per target:
 - Docs are built by **altdoc** (not pkgdown, no `_quarto.yml`) via the
   `docs.yaml` workflow. The `rpt` template uses the lab's own altdoc config —
   a committed `altdoc/` directory (`altdoc/quarto_website.yml`, `_extensions/`,
-  `scripts/`) plus a custom `Morrison-Lab/altdoc` fork — so `render_docs()`
+  `scripts/`) plus a custom `d-morrison/altdoc` fork — so `render_docs()`
   generates `.qmd` files into `altdoc/man/` from `man/*.Rd` at build time (not
   committed), then renders the site. Mirror `rpt`'s `altdoc/` directory rather
   than configuring altdoc from scratch.
@@ -192,7 +192,7 @@ the body, and ARDI it to clean.
 - **`macros/` is a git submodule** in `qwt`/`qbt` — add it with
   `git submodule add <url> macros`, don't copy the files. Read `<url>` from the
   target template's `.gitmodules` (currently
-  `https://github.com/Morrison-Lab/macros`).
+  `https://github.com/d-morrison/macros`).
 - **Generated files** (`man/`, `NAMESPACE`, `README.md`, `_site/`/`docs/`/
   `_manuscript/`) are build outputs — regenerate them, don't hand-edit.
 - When the conversion is between the two **light-package** Quarto formats

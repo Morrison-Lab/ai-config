@@ -87,7 +87,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`fix-forward-references`](skills/fix-forward-references/SKILL.md) | `ffr` | Detect and rearrange/reword forward-pointing references ("see below") in prose |
 | [`detect-informal-definitions`](skills/detect-informal-definitions/SKILL.md) | | Find concepts defined with definitional precision that never got wrapped in a formal definition div |
 | [`detect-hypothetical-examples`](skills/detect-hypothetical-examples/SKILL.md) | | Find worked examples using invented numbers when a real dataset is already available |
-| [`use-math-macros`](skills/use-math-macros/SKILL.md) | `macroize` | Rewrite manuscript math onto the shared Morrison-Lab/macros submodule |
+| [`use-math-macros`](skills/use-math-macros/SKILL.md) | `macroize` | Rewrite manuscript math onto the shared d-morrison/macros submodule |
 | [`tidy`](skills/tidy/SKILL.md) | | Clean up code or prose without changing behavior |
 | [`simplify`](skills/simplify/SKILL.md) | | Reduce a file or function to its essential parts |
 

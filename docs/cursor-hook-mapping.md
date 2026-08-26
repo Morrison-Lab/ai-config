@@ -73,7 +73,9 @@ User-level `~/.cursor/hooks.json` is not available in cloud agents.
 
 Do not also run `install-hooks.py --fix` to "activate" these for Cursor.
 That path writes `~/.claude/settings.json` for Claude Code.
-Cursor Cloud has no `~/.claude`.
+Cursor Cloud can still have that file after `bootstrap.sh`
+(measured 2026-08-26 PDT);
+those settings do not make the Cursor adapter run Claude's hook runner.
 Desktop Cursor with third-party Claude hooks enabled loads that file natively
 and runs every source ([third-party hooks](https://cursor.com/docs/reference/third-party-hooks.md), fetched 2026-08-25);
 the adapter's tick sentinel does not collapse adapter-plus-native.

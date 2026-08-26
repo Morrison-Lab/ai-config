@@ -127,28 +127,33 @@ If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, recover the report from
 cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
-That transcript is the admissible source for the hand comparison
-this section specifies, not a substitute for it.
+That transcript is the admissible source for `parse_report()`,
+the HEAD fingerprint check, the dry-run tip check,
+and the source-ref check below.
+It is not a substitute for those checks.
 A harness paste of the child's own assistant message may corroborate it;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
-Decode the assistant `text` before calling `parse_report()`.
+JSON-decode the assistant `text` field
+(`transcript.json` stores the body as a JSON string,
+so newlines arrive as escaped `\n`).
 `batch-fetch-details` can write a large `transcript.json`.
 Extract the child's assistant `text` with a subagent that returns
 that text verbatim, or with a deterministic decoder.
-A paraphrase of the headings is an author-composed block
-and does not count.
+Call `parse_report()` from
+[`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
+on that printed text
+in the same invocation that read the transcript file
+whose path contains the `cloudAgentBcId`
+(`importlib.util.spec_from_file_location`;
+the module loads with no side effects).
+Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
 [Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
 The `Task` JSON `tool_result` has no review body.
-Call `parse_report()` from
-[`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
-on the decoded text
-(`importlib.util.spec_from_file_location`;
-the module loads with no side effects).
 Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 `parse_report` returns `(verdict, reviewed_commit)`:
 `clean` is Ready for merge,
@@ -164,6 +169,7 @@ The fingerprint must prefix-match HEAD
 If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
 tracks a CLI wrapper over that call.
+Provenance (which file was parsed) is in that issue's scope too.
 Until that wrapper lands, the import is the instrument.
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
@@ -209,19 +215,23 @@ obtain a review via the CLI fallback in
 and still call `parse_report()` on the recovered report.
 On a session whose pushes go through this repo's Cursor adapter,
 the adapter skip makes `ALLOW_UNREVIEWED_PUSH=1` inert
+for the adapter
 (measured 2026-08-25 PDT on Cursor Cloud).
-Do not prefix it on that path.
+Do not prefix it for the adapter's sake.
 Home Claude settings can exist on Cloud after `bootstrap.sh`
 (measured 2026-08-26 PDT: `/home/ubuntu/.claude/settings.json`
 binds `no-push-without-self-review` under `PreToolUse`).
 Those settings do not make the Cursor adapter run Claude's hook runner.
-If Claude Code's native guard is the one running ---
+If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
-same VM --- the prefix is the escape,
+same VM --- the prefix is that native guard's escape,
 because Cursor JSONL omits `tool_result` and the native guard
 otherwise denies every push
 (desktop path measured against Cursor's third-party hook docs on
 2026-08-25).
+Do not pair the project adapter with native Claude hooks.
+If they are already paired, the prefix is required for the native
+guard even though it is inert for the adapter.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -286,9 +296,12 @@ is the instruction to use this route.
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
 - **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on a Cursor-adapter
-  push, where the skip makes it inert.
-  If Claude Code's native guard is the one running, that prefix
-  is the escape, not an inert flag.
+  push for the adapter's sake: the skip makes it inert there.
+  If Claude Code's native guard is also running, that prefix
+  is the native guard's escape, not an inert flag.
+  Do not pair the project adapter with native Claude hooks.
+  If they are already paired, the prefix is required for the
+  native guard even though it is inert for the adapter.
   If the dispatch errored or produced no report,
   obtain a CLI review and still call `parse_report()`.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
@@ -337,10 +350,7 @@ The wrap is
 [ai-config#2234 comment 5415839535](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839535).
 The identity-only JSON is the parent `Task` `tool_result` for child
 `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
-That comment does not contain the JSON.
-The same author wrap recurred 2026-08-25 PDT on
-[#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
-[#2266](https://github.com/Morrison-Lab/ai-config/pull/2266).)
+That comment does not contain the JSON.)
 
 ## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
 

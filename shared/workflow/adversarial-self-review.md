@@ -140,27 +140,25 @@ Where no second context is reachable at all, say so in the review itself rather 
 On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
 (measured 2026-08-25 PDT on a Grok conductor).
-Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
-until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+If `Task` is absent or does not list that persona,
+that is the CLI-fallback case above.
+Morrison-Lab/ai-config's Cursor adapter skips
+`no-push-without-self-review.py` until
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
+so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
+under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Call `parse_report()` on the recovered report.
-Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on a Cursor-adapter push:
-Morrison-Lab/ai-config's Cursor adapter skips the guard there,
-so the prefix is inert and
-misreports the session, including after a Task dispatch that errored
-(see [`memories/cursor.md`](../../memories/cursor.md)
-for the path where Claude Code's native guard is the one running).
-If that dispatch errored or produced no report,
-obtain a review via the CLI fallback above
-and still call `parse_report()` on the recovered report.
+Call `parse_report()` on the recovered report;
+do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD.
 A push that carries nothing to review
 (the empty `pr-on-claim` branch) has no report to parse:
 do not invent one.
-If `Task` is not in the schema, or it does not list
-`adversarial-reviewer`, that is also the CLI-fallback case above ---
-on a Cursor-adapter session still with no override prefix, because
-Morrison-Lab/ai-config's Cursor adapter skips the guard there
-under any reviewer.
+If the dispatch errored, obtain a CLI review and still
+call `parse_report()`.
+If Claude Code's native guard is also running, the prefix
+is that guard's escape even when the adapter skip makes
+it inert for the adapter.
 
 ## Brief it with the diff and the standards, never with your rationale
 

@@ -42,9 +42,10 @@ Address, rebut, or defer every finding it returns, then re-dispatch it, so the c
 `hooks/no-push-without-self-review.py` gates this on Claude Code.
 Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
-(measured 2026-08-25 PDT;
-[`memories/cursor.md`](../../memories/cursor.md));
-call `parse_report()` on the recovered report in that checkout.
+([`memories/cursor.md`](../../memories/cursor.md)).
+Call `parse_report()` on the recovered report in that checkout.
+If the verdict is not `clean`, or the fingerprint does not
+prefix-match HEAD, do not push.
 On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
@@ -63,14 +64,24 @@ so the prefix is inert under every reviewer,
 including a CLI-delivered one.
 Do not use it on that adapter path while that skip holds.
 When a recovered report exists, call `parse_report()` on it instead.
+If the verdict is not `clean`, or the fingerprint does not
+prefix-match HEAD, do not push.
 A push that carries nothing to review
 (the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
 has no report to parse: do not invent one.
-After that restore, the prefix is again the documented escape
+After [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+restores the adapter's running of that guard,
+the prefix is again the documented escape
 when the guard cannot see a verdict.
-If Claude Code's native guard is the one running
+The adapter skip makes the prefix inert for the adapter only.
+If Claude Code's native guard is also running
 (desktop third-party Claude hooks, or a Claude Code process),
-the prefix is the escape
+the prefix is that native guard's escape.
+Those two can run together
+(desktop Cursor with third-party Claude hooks plus this project adapter).
+Do not pair them.
+If they are already paired, the prefix is required for the native guard
+even though it is inert for the adapter
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.

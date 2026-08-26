@@ -259,11 +259,12 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
 This repo's Cursor adapter skips `no-push-without-self-review.py`
-until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
-(see [`memories/cursor.md`](memories/cursor.md)).
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
-dispatch that persona through `Task`
-and call `parse_report()` on the recovered report
+dispatch that persona through `Task`,
+call `parse_report()` on the recovered report,
+and do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD
 ([`memories/cursor.md`](memories/cursor.md)).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 

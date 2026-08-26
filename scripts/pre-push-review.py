@@ -675,12 +675,24 @@ def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> s
     driver_name = os.environ.get("AGENT_NAME") or engine_name
     driver_lower = driver_name.lower()
     try:
-        import importlib.util
+        import ast
         checker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-pr-fully-clean.py")
-        spec = importlib.util.spec_from_file_location("check_pr", checker_path)
-        check_pr = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(check_pr)
-        forbidden_markers = [m.lower() for m in list(check_pr.REVIEW_BODY_MARKERS) + list(check_pr.REVIEW_AGENT_MARKERS.keys())]
+        with open(checker_path, "r", encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename=checker_path)
+        body_markers, agent_markers = [], []
+        for node in tree.body:
+            target = None
+            if getattr(node, "value", None) is None: continue
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                target = node.targets[0].id
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                target = node.target.id
+            if target == "REVIEW_BODY_MARKERS" and isinstance(node.value, (ast.List, ast.Tuple)):
+                body_markers = [elt.value for elt in node.value.elts if isinstance(elt, ast.Constant)]
+            elif target == "REVIEW_AGENT_MARKERS" and isinstance(node.value, ast.Dict):
+                agent_markers = [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+        forbidden_markers = [m.lower() for m in body_markers + agent_markers]
+        if not forbidden_markers: raise ValueError
     except Exception:
         forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
 

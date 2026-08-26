@@ -990,6 +990,8 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- `agy --print` mechanics below are live |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
+`cursor` was named for the machine inventory by the user (2026-08-25, CLI installed) but has no measured headless dispatch mechanics here yet --- probe before relying on it.
+
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
 

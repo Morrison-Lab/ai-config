@@ -23,7 +23,8 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing, and its clean verdict is still not the one a PR is reported ready on while Claude is reachable (see [`fully-clean`](fully-clean.md)).
+Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing.
+Readiness reporting and merging are different gates, and the next section gives the merge one a harder bar: since 2026-08-25 a cross-model and cross-harness adversarial review is required outright for any merge, not an optional enhancement.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -36,7 +37,7 @@ Two gates meet here, and they have different independence bars.
 The **self-review duty** (gating a push) takes an adversarial subagent on any
 harness, same-harness included --- that floor buys independence of intent,
 which is what a push gate needs.
-The **merge gate** ([`fully-clean`](fully-clean.md), below) requires more:
+The **merge gate** (see [`fully-clean`](fully-clean.md)) requires more:
 a reviewer differing from the authoring session in **both** model and harness,
 the only configuration that also buys independence of blind spot.
 
@@ -54,21 +55,18 @@ separate path and remains available --- see
 A retired API never disqualifies the CLI harness operating on a separate
 path from it.
 
-## No merge without a 100% all-clear adversarial verdict
-
-(Directive from the user, 2026-08-25: "you must not merge, even with mwc
-enabled, unless you have a 100% 'all clear' review verdict from an adversarial
-review".)
+A second directive the same day sets the merge consequence: "you must not
+merge, even with mwc enabled, unless you have a 100% 'all clear' review
+verdict from an adversarial review".
 
 This **adds** a gate and replaces none.
 Every requirement [`fully-clean`](fully-clean.md) already sets --- including
 the external automated PR reviewer's clean verdict at head, wherever a repo
 has one --- stands unchanged, and an author-dispatched subagent verdict never
 satisfies that external gate.
-What is added: a merge additionally requires a 100% all-clear verdict at the
-shipping head from an adversarial review meeting this fragment's independence
-bar, delivered by a reviewer on a different model and harness than the
-authoring session.
+What is added: a merge additionally requires a 100% all-clear adversarial
+verdict at the shipping head from a reviewer on a different model and harness
+than the authoring session.
 The same-harness floor covers the push gate only;
 at the merge gate it does not clear anything.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns

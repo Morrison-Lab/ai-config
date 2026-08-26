@@ -124,9 +124,9 @@ sits unread.
    Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
    The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
    Its brief covers what an inline pass would have done --- the current PR diff against its base, each changed call path and edge case, the focused tests and the relevant lint/documentation checks --- and you Address, Rebut, or Defer every finding it returns.
-    Note the skip in your ARD summary comment.
-    **Re-check reviewer availability every round, not just once** -- a reviewer that was unavailable a few pushes ago can become available mid-session.
-    A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires an external verdict at the current head whenever one is reachable, not just a self-review.
+   Note the skip in your ARD summary comment.
+   **Re-check reviewer availability every round, not just once** -- a reviewer that was unavailable a few pushes ago can become available mid-session.
+   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires an external verdict at the current head whenever one is reachable, not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
    "minor", "nit", "optional", "consider", "if you want" are for the user's
@@ -324,7 +324,7 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.

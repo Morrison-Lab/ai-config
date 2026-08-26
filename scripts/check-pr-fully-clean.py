@@ -844,7 +844,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, issues
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "", quorum: int = 1) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 

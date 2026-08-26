@@ -368,10 +368,12 @@ So it scans every `.md` the skill touches, and it never scans the generated wrap
 As of ai-config#2085 it loads the same checker the gate pins, so `--write`
 splits a mid-line semicolon the gate would flag rather than manufacturing
 one.
-It is still a reformatter of named files, not the diff-scoped job: take the
-verdict from the real check, whose runnable command is in
+The script is still a reformatter of named files, not the diff-scoped job:
+take the verdict from the real check, whose runnable command is in
 [`semantic-line-breaks`](../../shared/writing/semantic-line-breaks.md).
-It only flags **lines this branch actually changed against `origin/main`**, so run it against every file the skill touches, not just the new `SKILL.md`.
+The gate only flags **lines this branch actually changed against `origin/main`**,
+so run the reformatter against every file the skill touches, not just the new
+`SKILL.md`.
 Add `--write` to apply once you've confirmed the diff is what you expect.
 **Don't reach for `--all` by default** --- it widens the reformat to the whole file, and on a file with pre-existing hard-wrapped (but otherwise CI-clean) prose it can rewrite hundreds of untouched lines into a large, unrelated-looking diff.
 Prefer the scoped mode, and if it under-fixes a paragraph (a same-sentence line shows up as "still would change" on a second scoped run even though `git diff origin/main` shows that region untouched), just fix that one paragraph by hand instead of widening scope.

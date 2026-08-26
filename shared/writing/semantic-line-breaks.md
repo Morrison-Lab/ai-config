@@ -245,10 +245,11 @@ The case record below is the 2026-08-21 measurement that showed the gap, kept
 because the durable-opener advice still applies to a boundary *neither* tool
 sees (a digit or an opening parenthesis after the period).
 
-The clause case above is the reformatter doing too much, joining wrapped lines
+The clause case above was the reformatter doing too much, joining wrapped lines
 the gate then flagged.
-This is the reformatter doing too little, leaving two sentences on one line that
-the gate then flags as `Line packs more than one sentence`.
+This lowercase-follower case was the reformatter doing too little, leaving two
+sentences on one line that the gate then flagged as
+`Line packs more than one sentence`.
 Before #2085 the two tools carried different sentence-boundary rules.
 `scripts/semantic-line-breaks.py` had one break regex, `_SENT_BREAK_RE`, whose
 lookahead demanded an uppercase letter or markup after the period, so a sentence

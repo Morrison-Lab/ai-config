@@ -663,7 +663,7 @@ expect(
 )
 
 # A semicolon inside a code span is not a clause boundary (the gate strips
-# markup first). Padding the line with words so a naive `;` search would fire.
+# markup first). This line is short enough that classify_line returns None.
 CODE_SEMI = (
     "Run `python3 -m pytest; true` on the suite "
     "and wait for every worker to finish the remaining cases.\n"
@@ -678,6 +678,57 @@ expect(
     "reformat does not split on a code-span semicolon",
     slb.reformat(CODE_SEMI) == CODE_SEMI,
     repr(slb.reformat(CODE_SEMI)),
+)
+
+# Same masking, but classify_line returns "clause" so emit_gate_clean
+# actually calls split_clauses. A naive text.split(";") would emit three
+# pieces; the mask must keep the code-span semicolon unsplit.
+CLAUSE_AND_CODE_SEMI = (
+    "The first independent clause is padded with enough words to push "
+    "the stripped length past eighty characters; then run `pytest; true` "
+    "and wait for every remaining worker to finish those cases.\n"
+)
+expect(
+    "a long line with a prose semicolon is a clause violation",
+    checker.classify_line(CLAUSE_AND_CODE_SEMI.strip()) == "clause",
+    f"len={len(checker.strip_inline_markup(CLAUSE_AND_CODE_SEMI.strip()))} "
+    f"reason={checker.classify_line(CLAUSE_AND_CODE_SEMI.strip())!r}",
+)
+got_clause_code = slb.reformat(CLAUSE_AND_CODE_SEMI)
+expect(
+    "reformat splits the prose semicolon and keeps the code-span one",
+    got_clause_code == (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;\n"
+        "then run `pytest; true` "
+        "and wait for every remaining worker to finish those cases.\n"
+    ),
+    repr(got_clause_code),
+)
+naive_pieces = [
+    p.strip()
+    for p in CLAUSE_AND_CODE_SEMI.strip().split(";")
+    if p.strip()
+]
+expect(
+    "naive semicolon split of that fixture yields three pieces",
+    len(naive_pieces) == 3,
+    repr(naive_pieces),
+)
+expect(
+    "split_clauses keeps the code-span semicolon (two pieces)",
+    nlb_gate.split_clauses(CLAUSE_AND_CODE_SEMI.strip(), checker)
+    == [
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;",
+        "then run `pytest; true` "
+        "and wait for every remaining worker to finish those cases.",
+    ],
+)
+expect(
+    "every line of the clause-and-code-span reflow is gate-clean",
+    [checker.classify_line(ln.strip()) for ln in got_clause_code.splitlines()]
+    == [None, None],
 )
 
 # #2081 is the comma-clause join. The gate does not flag commas, so this

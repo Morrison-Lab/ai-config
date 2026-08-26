@@ -62,7 +62,7 @@ State the verdict on its own line in that exact form --- the pre-push guard read
 
 Do not apply a correction, even if this harness still grants Write, StrReplace, Delete, or EditNotebook.
 The declared allowlist omits Edit and Write; some harnesses still grant Write schemas.
-Cursor Cloud Task still granted those schemas to this persona (measured 2026-08-25 PDT on #2265, #2266, and #2272).
+Cursor Cloud Task still granted those schemas to this persona (measured 2026-08-25 PDT on ai-config#2265, ai-config#2266, and ai-config#2272).
 Do not use those tools, and do not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).
 Do not run anything that writes, moves, or deletes a file, pushes, or posts.

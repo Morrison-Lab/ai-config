@@ -775,7 +775,8 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 "Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
 A request to post a review and leave findings, with no request to edit, is not that kind of touch.
 
-**Driving.** When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
+**Driving.**
+When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
 That answer is a standing yes across all PRs you are driving.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
 
@@ -786,7 +787,8 @@ Only post the mention when a round pushed no code (all Rebut/Defer).
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
 
-**Review-only.** Do not start ARDI, do not push fixes, and do not merge.
+**Review-only.**
+Do not start ARDI, do not push fixes, and do not merge.
 Leave the findings and stop unless asked to iterate.
 A later request to iterate is a driving request.
 

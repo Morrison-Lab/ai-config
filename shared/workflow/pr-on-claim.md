@@ -29,6 +29,17 @@ gh pr create --draft --title "<title>" --body "Closes #<N>
 WIP --- opened up front to claim the issue; implementing now."
 ```
 
+On Claude Code prefix that push:
+
+```bash
+ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD
+```
+
+The guard requires a reviewer-call result
+before it reaches the commit comparison,
+including for an empty commit
+(see [`push`](../../skills/push/SKILL.md)).
+
 **Do not `Closes` a parent issue on a partial ship.** `Closes #<N>` in the
 draft body is the default because most issues are one slice. If the issue
 (or a later comment) splits into independent cases and this PR only

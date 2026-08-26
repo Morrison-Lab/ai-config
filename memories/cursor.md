@@ -158,8 +158,10 @@ Records carry a `role` the decoder must filter on.
 with a `messages` key (measured 2026-08-26 PDT on Cursor Cloud);
 iterate that list, not the dict.
 Take the last assistant record whose `text` is a non-empty string.
-Thinking and `tool_calls` records have empty or null `text`;
-they are not candidate records.
+Thinking and `tool_calls` records usually omit the `text` key
+(measured 2026-08-26 PDT: the key is absent, not null and not empty).
+Read it with `.get("text")`.
+A missing, null, or empty value is not a candidate.
 That last non-empty assistant `text` must itself carry
 Summary / Findings / Verdict / Reviewed-Commit.
 Do not skip a later non-empty assistant text
@@ -220,6 +222,15 @@ from the pushing checkout, obtain a CLI review
 Do not import `~/.claude/hooks/`:
 it is a different revision from the branch under review,
 and in some install shapes a real copy a `git pull` does not refresh.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also call `parse_report()` from `origin/<default-branch>`'s copy
+(`git show origin/<default-branch>:hooks/no-push-without-self-review.py`
+written under `/tmp`).
+Do not push unless both copies return `clean`
+with a fingerprint that prefix-matches HEAD.
+If that path is missing on the default branch, obtain a CLI review.
+Do not import `~/.claude/hooks/` for that copy either.
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -389,12 +400,14 @@ and this file)
 so the adapter-skip claim does not outlive the skip.
 Compact copies stay until that landing.
 
-Refusal gates, in order
-(item 1's pre-dispatch recording must precede the dispatch,
-or item 4 has nothing to compare against;
-gate 3 consumes the tuple gate 2 produces;
-reordering 5 with 6 does not change the answer;
-details in the procedure above).
+Refusal gates, in order.
+This is a Read-Do checklist
+(items 1 through 4 must run in that order;
+reordering 5 with 6 does not change the answer).
+Item 1's pre-dispatch recording must precede the dispatch,
+or item 4 has nothing to compare against.
+Gate 3 consumes the tuple gate 2 produces.
+Details in the procedure above.
 Pause points:
 before the `Task` dispatch (item 1's first half),
 and before `git push` of the reviewed branch
@@ -418,7 +431,8 @@ Say in the reply that the carve-out was used.
 2. Confirm the `cloudAgentBcId` came from a `Task` whose
    `subagent_type` was `adversarial-reviewer`.
    Take the last assistant record whose `text` is a non-empty string
-   (thinking and `tool_calls` with empty `text` are not candidates);
+   (thinking and `tool_calls` usually omit `text`; use `.get`;
+   they are not candidates);
    that text must itself carry the headings.
    Write that text to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
@@ -500,7 +514,8 @@ is the instruction to use this route.
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
   Write the last non-empty assistant `text`
-  (thinking and `tool_calls` with empty `text` are not candidates).
+  (thinking and `tool_calls` usually omit `text`; use `.get`;
+  they are not candidates).
   That text must itself carry
   Summary / Findings / Verdict / Reviewed-Commit.
   Write it to a file outside the checkout (under `/tmp`;
@@ -579,7 +594,8 @@ pre-push guard.
 - **Do:** recover the report from
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
   `includeTranscripts: true`, then write the last non-empty assistant `text`
-  (thinking and `tool_calls` with empty `text` are not candidates).
+  (thinking and `tool_calls` usually omit `text`; use `.get`;
+  they are not candidates).
   That text must itself carry
   Summary / Findings / Verdict / Reviewed-Commit.
   Write it to a file outside the checkout

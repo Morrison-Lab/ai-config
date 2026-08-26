@@ -51,6 +51,9 @@ when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not import `~/.claude/hooks/`:
 it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
 If the worktree script is missing, obtain a CLI review
 (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 If the verdict is not `clean`, or there is no fingerprint,

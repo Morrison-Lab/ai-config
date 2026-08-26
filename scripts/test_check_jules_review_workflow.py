@@ -67,7 +67,9 @@ jobs:
             GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\
             node "$JULES_ACTION_DIR/dist/index.js"
         env:
+          INPUT_FAIL_ON: blocking
           INPUT_SKIP_DRAFTS: 'false'
+          INPUT_SKIP_FORKS: 'true'
           INPUT_RULES_FILE: ''
           INPUT_EXTRA_INSTRUCTIONS: |
             Files are written as imperative prose addressed to an AI reader.
@@ -102,8 +104,8 @@ YAML_ONLY_EVENT_NAME = tweak(
     "",
 )
 YAML_ONLY_EVENT_NAME = tweak(
-    "        env:\n          INPUT_SKIP_DRAFTS:",
-    "        env:\n          GITHUB_EVENT_NAME: pull_request\n          INPUT_SKIP_DRAFTS:",
+    "        env:\n          INPUT_FAIL_ON:",
+    "        env:\n          GITHUB_EVENT_NAME: pull_request\n          INPUT_FAIL_ON:",
     YAML_ONLY_EVENT_NAME,
 )
 
@@ -145,6 +147,13 @@ COMMENTED_SKIP_DRAFTS = tweak(
     "          # INPUT_SKIP_DRAFTS: 'false'\n",
 )
 
+MISSING_SKIP_FORKS = tweak("          INPUT_SKIP_FORKS: 'true'\n", "")
+
+COMMENTED_SKIP_FORKS = tweak(
+    "          INPUT_SKIP_FORKS: 'true'\n",
+    "          # INPUT_SKIP_FORKS: 'true'\n",
+)
+
 MISSING_PROSE = tweak("imperative prose", "review rules")
 
 # Header/comment still names the phrase; extra_instructions does not.
@@ -172,15 +181,30 @@ TRAILING_PROSE = tweak(
 MISSING_SETUP_NODE = tweak(
     "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
     '        with:\n          node-version: "24"\n',
-    "",
+    '          node-version: "24"\n',
 )
 
 # Substring still present; line-anchored finder must still fail.
 COMMENTED_SETUP_NODE = tweak(
-    "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
-    '        with:\n          node-version: "24"\n',
-    "      # uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
-    '      #   with:\n      #     node-version: "24"\n',
+    "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n",
+    "      # uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n",
+)
+
+WRONG_NODE_VERSION = tweak(
+    '          node-version: "24"\n',
+    '          node-version: "20"\n',
+)
+
+COMMENTED_NODE_VERSION = tweak(
+    '          node-version: "24"\n',
+    '          # node-version: "24"\n',
+)
+
+MISSING_FAIL_ON = tweak("          INPUT_FAIL_ON: blocking\n", "")
+
+COMMENTED_FAIL_ON = tweak(
+    "          INPUT_FAIL_ON: blocking\n",
+    "          # INPUT_FAIL_ON: blocking\n",
 )
 
 MISSING_PREFLIGHT_ID = tweak("      - id: preflight\n        run: echo preflight\n", "")
@@ -314,6 +338,13 @@ case_exits(
     1,
     "INPUT_SKIP_DRAFTS",
 )
+case_exits("missing INPUT_SKIP_FORKS", MISSING_SKIP_FORKS, 1, "INPUT_SKIP_FORKS")
+case_exits(
+    "INPUT_SKIP_FORKS only in a comment",
+    COMMENTED_SKIP_FORKS,
+    1,
+    "INPUT_SKIP_FORKS",
+)
 case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is content")
 case_exits(
     "imperative prose only in a header comment",
@@ -329,6 +360,20 @@ case_exits(
 )
 case_exits("unpinned Node", MISSING_SETUP_NODE, 1, "Node is unpinned")
 case_exits("Node pin only in comments", COMMENTED_SETUP_NODE, 1, "Node is unpinned")
+case_exits("node-version is not 24", WRONG_NODE_VERSION, 1, 'node-version is not "24"')
+case_exits(
+    "node-version only in a comment",
+    COMMENTED_NODE_VERSION,
+    1,
+    'node-version is not "24"',
+)
+case_exits("missing INPUT_FAIL_ON", MISSING_FAIL_ON, 1, "INPUT_FAIL_ON")
+case_exits(
+    "INPUT_FAIL_ON only in a comment",
+    COMMENTED_FAIL_ON,
+    1,
+    "INPUT_FAIL_ON",
+)
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
 case_exits("missing success() gate", MISSING_SUCCESS, 1, "success()")
 case_exits("success() only in a comment", COMMENTED_SUCCESS, 1, "success()")

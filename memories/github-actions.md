@@ -394,17 +394,21 @@ The `@claude` bot's own behaviour lives in
   Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure;
   instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check).
   Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
-- **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
-  guard step's failure does not skip the steps that follow it.**
+- **An `if:` that names a status-check function (`always` / `failure` /
+  `cancelled`) replaces the default `success()`.**
+  GitHub auto-applies `success()` when the condition has no such function
+  (expressions docs, read 2026-08-26).
+  The older claim that *any* explicit step `if:` discards that default is
+  false ([ai-config#2307](https://github.com/Morrison-Lab/ai-config/issues/2307)).
+  Keep writing `success() &&` so a later `failure()` copy cannot fail-open
+  the step.
   The default condition on a step is `success()`, which is why a failing step
   normally ends a job's useful work.
-  Adding `if: steps.guard.outputs.blocked != 'true'` silently discards that,
-  so the step now runs *whatever* happened upstream, including a guard step
-  that exited non-zero because it could not establish whether the work was
-  safe to do.
-  This is the [`fail-fast`](../shared/principles/fail-fast.md) violation that
-  looks most like diligence: the guard is present, its logic is right, and its
-  verdict is simply not consulted on the one path it was written for.
+  Adding `if: steps.guard.outputs.blocked != 'true'` does not discard that
+  default, because it names no status-check function.
+  A later `failure()` or `always()` on that same `if:` would override it,
+  and a fail-closed output write is the second layer for the case the guard
+  dies before writing.
 
   What makes it hard to catch is that the bug is usually **masked by a second
   mechanism** rather than being visible.
@@ -444,9 +448,10 @@ The `@claude` bot's own behaviour lives in
     step does **not** fix it, because `outcome` reports the status *before*
     `continue-on-error` is applied --- only `conclusion` reflects it.
     Nothing was swallowed; there was no output to swallow.
-  - **Here: the guard ran, failed, and was ignored.**
-    The output existed and the condition read it, but the dropped `success()`
-    meant the step's *failure* carried no weight.
+  - **Here: the older writeup said the guard ran, failed, and was ignored.**
+    That diagnosis assumed the false lead; see #2307.
+    Restore an explicit `success() &&` so a later `failure()` cannot
+    fail-open the step, not because a non-status `if:` already did.
 
   So the diagnostic question differs.
   For #350 you ask "can this guard's own gate be true in the scenario it
@@ -692,6 +697,10 @@ secrets under `pull_request`) has to be re-established explicitly.
   `runs.using`, not the label in `action.yml`.
   Measured 2026-08-26 on run 32942088643:
   this action declares `node20` and was forced onto Node 24.
+- **Do:** write `success()` on wrap steps even though GitHub auto-applies
+  it when `if:` has no status-check function.
+  The could-not-start notifier uses `failure()`, which overrides that
+  default, and a copy onto the node step would spawn node after a failed pin.
 - **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
   bundle) in its own step so a "could not start" comment can gate on it.
   Assertions left on the `jules` step fail before the process assigns

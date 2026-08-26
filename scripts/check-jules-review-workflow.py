@@ -156,13 +156,29 @@ def findings(text: str) -> list[str]:
         out.append(
             "INPUT_SKIP_DRAFTS is not 'false'; a mention on a draft would skip"
         )
+    if not re.search(
+        r"^[ \t]*INPUT_SKIP_FORKS:\s*'true'", text, re.MULTILINE
+    ):
+        out.append(
+            "INPUT_SKIP_FORKS is not 'true'; empty getBooleanInput throws "
+            "before commentId"
+        )
     if "imperative prose" not in extra_instructions_block(text):
         out.append("missing extra_instructions that this corpus's prose is content")
-    if not SETUP_NODE_RE.search(text) or not NODE_VERSION_RE.search(text):
+    if not SETUP_NODE_RE.search(text):
         out.append(
-            "Node is unpinned; GitHub forced this action onto Node 24 "
-            "(run 32942088643), so the wrap needs actions/setup-node "
-            "with node-version 24"
+            "Node is unpinned; missing actions/setup-node "
+            "(run 32942088643 forced this action onto Node 24)"
+        )
+    if not NODE_VERSION_RE.search(text):
+        out.append(
+            'node-version is not "24"; GitHub forced this action onto '
+            "Node 24 (run 32942088643)"
+        )
+    if not re.search(r"^[ \t]*INPUT_FAIL_ON:\s*blocking\s*$", text, re.MULTILINE):
+        out.append(
+            "INPUT_FAIL_ON is not blocking; empty getInput fails "
+            "VALID_FAIL_ON and returns before commentId"
         )
     if not PREFLIGHT_ID_RE.search(text):
         out.append(
@@ -171,8 +187,9 @@ def findings(text: str) -> list[str]:
     if not node_step_requires_success(text):
         out.append(
             "the node dist/index.js step does not require success(); "
-            "an explicit if: replaces the default and a failed pin "
-            "would still spawn node"
+            "GitHub auto-applies success() only when if: has no "
+            "status-check function, so always()/failure() on this "
+            "step would spawn node after a failed pin"
         )
     if not PREFLIGHT_OUTCOME_RE.search(text):
         out.append(

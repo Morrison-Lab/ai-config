@@ -101,8 +101,15 @@ RX_GL_ISSUE_URL = re.compile(
 RX_SHORTHAND = re.compile(
     r"\b([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#(\d+)\b",
 )
-RX_BARE_ISSUE = re.compile(
-    r"\b(?:issues?|implement(?:ing)?|closes|fixes|resolves)\s+#?(\d+)\b",
+# implement/closes/fixes/resolves require '#': "implement 2-factor" is not
+# issue #2. Singular "issue N" may omit the hash; plural "issues" may not,
+# because "issues 3 times" is ordinary prose.
+RX_TASK_HASH = re.compile(
+    r"\b(?:implement(?:ing)?|closes|fixes|resolves)\s+#(\d+)\b",
+    re.I,
+)
+RX_ISSUE_WORD = re.compile(
+    r"\bissue\s+#?(\d+)\b|\bissues\s+#(\d+)\b",
     re.I,
 )
 # A pull URL is not an issue, even though GitHub shares the number space.
@@ -127,12 +134,7 @@ RX_FETCH_EXTRA = re.compile(
     re.MULTILINE,
 )
 
-RX_CLOSED_STATE = re.compile(
-    r'"state"\s*:\s*"closed"'
-    r"|^[ \t]*state:[ \t]*closed\b"
-    r"|^[ \t]*State:[ \t]*closed\b",
-    re.I | re.M,
-)
+RX_HEADER_CLOSED = re.compile(r"^state:\s*closed\b", re.I | re.M)
 
 # Fallback stems if tool-mappings.yml cannot be read. Tests that care about
 # the mapping file load it directly; these keep the hook failing open rather
@@ -247,11 +249,18 @@ def load_mapping_stems(path=None):
     return stems
 
 
+# A later user message retargets only with these forms. Incidental
+# `owner/repo#N` citations (how recurrences are named) must not steal
+# the issue the session is already implementing.
+RETARGET_FORGES = frozenset({"github", "gitlab", "task", "issue-word"})
+
+
 def find_issue_ref(text):
     """Return the primary forge-issue ref in user prose, or None.
 
     Pull URLs are ignored. The first GitHub/GitLab issue URL wins, then
-    `owner/repo#N`, then implement/issue/fix + number.
+    implement/closes/fixes/resolves + `#N`, then `issue N`, then
+    `owner/repo#N`.
     """
     if not text or not isinstance(text, str):
         return None
@@ -274,6 +283,23 @@ def find_issue_ref(text):
             "number": matched.group(3),
             "forge": "gitlab",
         }
+    matched = RX_TASK_HASH.search(stripped)
+    if matched:
+        return {
+            "owner": "",
+            "repo": "",
+            "number": matched.group(1),
+            "forge": "task",
+        }
+    matched = RX_ISSUE_WORD.search(stripped)
+    if matched:
+        number = matched.group(1) or matched.group(2)
+        return {
+            "owner": "",
+            "repo": "",
+            "number": number,
+            "forge": "issue-word",
+        }
     matched = RX_SHORTHAND.search(stripped)
     if matched:
         return {
@@ -281,14 +307,6 @@ def find_issue_ref(text):
             "repo": matched.group(2),
             "number": matched.group(3),
             "forge": "shorthand",
-        }
-    matched = RX_BARE_ISSUE.search(stripped)
-    if matched:
-        return {
-            "owner": "",
-            "repo": "",
-            "number": matched.group(1),
-            "forge": "bare",
         }
     return None
 
@@ -445,6 +463,36 @@ def load_entries(transcript_path):
     return entries
 
 
+def result_is_closed(text):
+    """True when this tool_result is the issue's own state, and it is closed.
+
+    Parses JSON when the whole result is an object, accepts a bare
+    `CLOSED` from `gh issue view --jq .state`, and otherwise reads only
+    the metadata header (before a `--` or blank-line body). A substring
+    `"state": "closed"` inside an OPEN issue's body must not count.
+    """
+    if not text or not isinstance(text, str):
+        return False
+    stripped = text.strip()
+    bare = stripped.strip("\"'")
+    if bare.lower() == "closed":
+        return True
+    try:
+        data = json.loads(stripped)
+    except (ValueError, TypeError):
+        data = None
+    if isinstance(data, dict):
+        return str(data.get("state") or "").lower() == "closed"
+    if isinstance(data, str):
+        return data.lower() == "closed"
+    header = stripped
+    for sep in ("\n--\n", "\n\n"):
+        if sep in stripped:
+            header = stripped.split(sep, 1)[0]
+            break
+    return bool(RX_HEADER_CLOSED.search(header))
+
+
 def evaluate(entries, stems=None):
     """Return a verdict dict or None (silent).
 
@@ -460,7 +508,9 @@ def evaluate(entries, stems=None):
         if not is_user_prose(entry):
             continue
         found = find_issue_ref(user_text(entry))
-        if found:
+        if not found:
+            continue
+        if issue is None or found.get("forge") in RETARGET_FORGES:
             naming_idx = idx
             issue = found
     if issue is None:
@@ -470,15 +520,15 @@ def evaluate(entries, stems=None):
     fetch_before = False
     view_after = False
     fetch_after = False
-    closed_after = False
-    pending_view_ids = {}
+    views_after_ids = []
+    view_results = {}
 
     def note_view(where_after, tool_id=None):
         nonlocal view_before, view_after
         if where_after:
             view_after = True
             if tool_id:
-                pending_view_ids[tool_id] = True
+                views_after_ids.append(tool_id)
         else:
             view_before = True
 
@@ -511,8 +561,14 @@ def evaluate(entries, stems=None):
             ):
                 note_fetch(after)
         for tool_use_id, text in _tool_result_text(entry):
-            if after and pending_view_ids.get(tool_use_id) and RX_CLOSED_STATE.search(text):
-                closed_after = True
+            if tool_use_id:
+                view_results[tool_use_id] = text
+
+    closed_after = False
+    if views_after_ids:
+        last_id = views_after_ids[-1]
+        if last_id in view_results:
+            closed_after = result_is_closed(view_results[last_id])
 
     if closed_after:
         kind = "closed"

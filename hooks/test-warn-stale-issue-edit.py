@@ -163,6 +163,26 @@ check(
     "99",
 )
 check(
+    "implement 2-factor is not an issue",
+    subject.find_issue_ref("implement 2-factor auth on the login page"),
+    None,
+)
+check(
+    "implementing a dated sentence is not an issue",
+    subject.find_issue_ref("implementing 2026-08-26 the remaining slice"),
+    None,
+)
+check(
+    "fixes 3 bugs is not an issue",
+    subject.find_issue_ref("this PR fixes 3 bugs in the parser"),
+    None,
+)
+check(
+    "issue 2282 without hash still counts",
+    subject.find_issue_ref("please grab issue 2282")["number"],
+    "2282",
+)
+check(
     "pull URL is not an issue",
     subject.find_issue_ref(
         "Review https://github.com/Morrison-Lab/ai-config/pull/2317"
@@ -328,6 +348,60 @@ check(
     "stale systemMessage mentions predate",
     "predate" in (out.get("systemMessage") or ""),
     True,
+)
+
+two_factor = write_transcript([
+    user("Please implement 2-factor auth on the login form."),
+])
+out = run_hook(two_factor)
+check("implement 2-factor does not arm the write guard", warned(out), False)
+
+closed_then_open = write_transcript([
+    NAMING,
+    VIEW,
+    VIEW_CLOSED,
+    tool("Bash", {"command": "gh issue view 2282 --json state"}, "v2"),
+    result('{"state":"OPEN"}', "v2"),
+    FETCH,
+])
+out = run_hook(closed_then_open)
+check("latest view OPEN after an earlier CLOSED is silent", warned(out), False)
+
+jq_closed = write_transcript([
+    NAMING,
+    tool("Bash", {"command": "gh issue view 2282 --jq .state"}, "jq1"),
+    result("CLOSED\n", "jq1"),
+    FETCH,
+])
+out = run_hook(jq_closed)
+check("bare jq CLOSED counts as closed", kind_of(out), "closed")
+
+quoted_in_body = write_transcript([
+    NAMING,
+    tool("Bash", {"command": "gh issue view 2282"}, "b1"),
+    result(
+        "title:\tGuard\nstate:\tOPEN\n--\n"
+        "The matcher must not treat a body that quotes "
+        '{"state": "closed"} as the issue state.\n',
+        "b1",
+    ),
+    FETCH,
+])
+out = run_hook(quoted_in_body)
+check("OPEN header with closed JSON in the body is silent", warned(out), False)
+
+followup_shorthand = write_transcript([
+    NAMING,
+    VIEW,
+    VIEW_OPEN,
+    FETCH,
+    user("look at ucdavis/rampp#140 for the incident"),
+])
+out = run_hook(followup_shorthand)
+check(
+    "incidental owner/repo#N follow-up does not retarget",
+    warned(out),
+    False,
 )
 
 

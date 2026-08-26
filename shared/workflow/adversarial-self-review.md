@@ -52,12 +52,13 @@ Where no second context is reachable at all, say so in the review itself rather 
 **Cursor Cloud has a subagent dispatch.**
 When the session's `Task` tool lists `adversarial-reviewer`,
 that is the dispatch (measured 2026-08-25 PDT on a Grok conductor).
+On that surface the pre-push guard never runs;
+compare `Reviewed-Commit` by hand
+(see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task` dispatch
 just ran: the subagent route was available.
-If `Task` is not in the schema, or the persona does not resolve,
-that is the CLI-fallback case above.
-The Cursor-specific recipe is in
-[`memories/cursor.md`](../../memories/cursor.md).
+If `Task` is not in the schema, or it does not list
+`adversarial-reviewer`, that is the CLI-fallback case above.
 
 ## Brief it with the diff and the standards, never with your rationale
 

@@ -113,9 +113,11 @@ and run `git status --short`.
 After the child returns, obtain `Reviewed-Commit` from a harness paste
 that already carries Summary / Findings / Verdict,
 or from cursor-cloud `batch-fetch-details` with the child's
-`cloudAgentBcId`.
+`cloudAgentBcId` and `includeTranscripts: true`.
 The `Task` JSON `tool_result` has no review body.
 If you cannot obtain `Reviewed-Commit`, do not push.
+The verdict must be Ready for merge; do not push a Needs more work
+report even when the fingerprint matches.
 Compare that line to the recorded sha and to `git rev-parse HEAD`.
 If the push refspec is not `HEAD`, compare against that ref:
 this check does not resolve a refspec the way
@@ -141,7 +143,8 @@ Independence from a Claude primary is the second-reviewer pairing,
 not this dispatch
 ([`self-review-fallback`](../shared/workflow/self-review-fallback.md)).
 
-Measured 2026-08-25 PDT: neither copy's declared restriction
+Measured 2026-08-25 PDT: neither the `.claude/agents/` copy
+nor the `.opencode/agents/` copy's declared restriction
 filtered the child's schemas.
 The `.claude/agents/` copy carries a `tools:` field;
 the `.opencode/` copy uses `permission: edit: deny` instead.
@@ -150,6 +153,7 @@ The Cursor Grok dispatch measured that day on
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266)
 still received Write schemas.
 State read-only in the brief.
+Tracked as [#2281](https://github.com/Morrison-Lab/ai-config/issues/2281).
 GitHub `claude-review` skipping for a missing
 `CLAUDE_CODE_OAUTH_TOKEN` or quota does not mean Claude is
 unreachable on that conductor's `Task` tool.
@@ -159,15 +163,18 @@ is the instruction to use this route.
 
 - **Do:** dispatch `Task` `adversarial-reviewer` in the foreground
   (`run_in_background` false) for every self-review in a Cursor
-  session that can resolve the persona, including when GitHub
+  session whose `Task` tool lists `adversarial-reviewer`,
+  including when GitHub
   `claude-review` skipped a run.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
 - **Do:** brief the child not to edit.
   Record `HEAD` and `git status --short` before the dispatch.
   After it returns, obtain `Reviewed-Commit` from a harness paste
-  of the child's report or from `batch-fetch-details`.
-  If you cannot obtain it, do not push.
+  of the child's report or from `batch-fetch-details`
+  with `includeTranscripts: true`.
+  If you cannot obtain it, or the verdict is not Ready for merge,
+  do not push.
   Compare that sha to the recorded `HEAD` and to
   `git rev-parse HEAD`, and re-run `git status --short`.
 - **Don't:** treat a skipped GitHub `claude-review` as "no

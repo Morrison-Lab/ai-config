@@ -258,10 +258,13 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
-Cursor's project adapter skips that guard when that adapter is the
-active hook path ([`memories/cursor.md`](memories/cursor.md)).
-Do not also enable `~/.claude/settings.json` on Desktop:
-pairing the two is a lockout, not a second check.
+Cursor's project adapter skips `no-push-without-self-review.py`
+when that adapter is the active hook path
+(measured 2026-08-25 PDT;
+[`memories/cursor.md`](memories/cursor.md)).
+On Desktop, leave third-party Claude hooks off while this
+project adapter is enabled; pairing both sources is not a
+second check.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -391,8 +394,8 @@ Non-obvious caveats worth knowing:
   default; run it as `~/.local/bin/pre-commit run --all-files`.
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
-- **Adversarial review:** when `Task` is listed, a Cursor Cloud
-  conductor in this repo can dispatch `adversarial-reviewer`
+- **Adversarial review:** when `Task` lists `adversarial-reviewer`,
+  a Cursor Cloud conductor in this repo can dispatch that persona
   through `Task`
   (`subagent_type: adversarial-reviewer`,
   measured 2026-08-25 PDT on this repo).

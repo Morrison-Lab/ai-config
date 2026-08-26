@@ -120,6 +120,7 @@ The remedy was the hook `hooks/no-incomplete-check-enumeration.py`, which fires 
 
 - **Do:** take a clean verdict from `check-pr-fully-clean.py` or a paginated `commits/<sha>/check-runs` read.
 - **Don't:** report a PR clean from `gh pr checks` counts, however current the reading is --- currency and completeness are different properties, and only one of them has a hook watching it.
+- **Don't:** treat GraphQL `statusCheckRollup` as the complete instrument either --- same incomplete class as `gh pr checks` (ai-config#2277, 2026-08-26: a "Ready for merge" claim rested on the rollup; `check-pr-fully-clean.py` exited 1 for missing automated review, and the hook now matches both partial surfaces).
 
 ## Criterion 2's verdict-vs-findings disagreement rate, measured
 

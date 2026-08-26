@@ -41,12 +41,15 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
 
 ## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
-- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
+- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished --- or declaring clean from a short rollup (`gh pr checks`, `statusCheckRollup`) that can omit failing runs with no warning.
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): told user Morrison-Lab/ai-config#1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` --- a PR is not ready until ALL CI checks pass AND review is clean.
-- **Fix**: Always run `gh pr checks <N>` or `gh pr view <N> --json statusCheckRollup` before declaring a PR ready.
-  Never say "ready to merge" unless every check is green.
-  If CI is failing, say so and fix it first.
+  Re-hit 2026-08-26 on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277): reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict; `check-pr-fully-clean.py` exited 1 (`No automated review...`).
+  The earlier "Fix" below once recommended those short rollups --- that was the wrong instrument for a terminal claim.
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"), `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
+- **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>` (or a paginated `commits/<sha>/check-runs` read plus review criteria) before a terminal clean / ready-to-merge claim.
+  Read exit 0 as clean, exit 1 with `  - ` bullets as not-clean, any other exit as the check failing to answer.
+- **Don't:** Declare clean from `gh pr checks` or `statusCheckRollup` counts alone, however current they look --- a short list and a clean list are the same observable.
+  Progress reports ("8 success, 0 pending") are fine; "Ready for merge" is not until the complete instrument agrees.
 
 ## Pattern 5d: Failing to Learn From Mistakes
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.

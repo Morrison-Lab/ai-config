@@ -18,6 +18,11 @@ HOOK = sys.argv[1]
 
 PARTIAL = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 651 -R ucdavis/bcs"}}]}}
+# GraphQL rollup is the same incomplete class as `gh pr checks`
+# (ai-config#2277, 2026-08-26).
+PARTIAL_ROLLUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "gh pr view 2277 --json statusCheckRollup"}}]}}
 CHECKER = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"}}]}}
@@ -43,6 +48,8 @@ def say(text):
 CASES = [
     ([PARTIAL, say("#651 is fully clean at a5f4f3f2.")], True,
      "the real incident: declared fully clean off gh pr checks alone"),
+    ([PARTIAL_ROLLUP, say("#2277 is ready for merge.")], True,
+     "statusCheckRollup is the same incomplete class as gh pr checks"),
     ([PARTIAL, say("21 pass, 0 pending -- ready to merge.")], True,
      "'ready to merge' backed only by the partial list"),
     ([PARTIAL, say("All checks green, so this is ready for merge.")], True,

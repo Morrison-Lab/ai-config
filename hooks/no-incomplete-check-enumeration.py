@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Stop-hook guard: catch declaring a PR clean on `gh pr checks` alone.
+"""Stop-hook guard: catch declaring a PR clean on a short check list alone.
 
-`gh pr checks` does not enumerate every check run on a head. Measured
-2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: it printed 21 rows, all passing,
-while `commits/<sha>/check-runs` returned 24 runs, one of them a `failure`
-(`review / antigravity-review`). The PR was reported fully clean on the
-strength of the shorter list.
+`gh pr checks` and GraphQL `statusCheckRollup` do not enumerate every check
+run on a head. Measured 2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: `gh pr
+checks` printed 21 rows, all passing, while `commits/<sha>/check-runs`
+returned 24 runs, one of them a `failure` (`review / antigravity-review`).
+The PR was reported fully clean on the strength of the shorter list.
+Re-hit 2026-08-26 on Morrison-Lab/ai-config#2277: a terminal "Ready for
+merge" was backed by `statusCheckRollup` rather than `gh pr checks`; the
+rollup matched the endpoint that time (8==8), but the claim still rested on
+an instrument that can omit runs with no warning -- same incomplete class.
 
 That omission is invisible by construction. A short list and a clean list are
 the same observable -- there is no gap in the output, no warning, and the
@@ -15,14 +19,14 @@ than a rule to remember.
 
 It is distinct from its sibling `no-stale-pr-status.py`, which asks whether a
 reading is CURRENT. A reading can be perfectly current and still incomplete;
-that hook's RX_QUERY accepts `gh pr checks` as a fresh reading, correctly for
-staleness and insufficiently for completeness. This one asks whether the
-reading could SEE everything.
+that hook's RX_QUERY accepts `gh pr checks` / `statusCheckRollup` as a fresh
+reading, correctly for staleness and insufficiently for completeness. This
+one asks whether the reading could SEE everything.
 
 The condition is decidable from the transcript:
 
     message declares the PR clean
-    AND `gh pr checks` appears
+    AND a partial rollup (`gh pr checks` or `statusCheckRollup`) appears
     AND no complete enumeration appears after the last push
 
 where a complete enumeration is `check-pr-fully-clean.py` (which consumes the
@@ -52,8 +56,12 @@ RX_DECLARE = re.compile(
     re.I,
 )
 
-# The incomplete instrument.
-RX_PARTIAL = re.compile(r"gh\s+pr\s+checks", re.I)
+# Incomplete instruments: short rollups that can omit check runs silently.
+RX_PARTIAL = re.compile(
+    r"gh\s+pr\s+checks|"
+    r"\bstatusCheckRollup\b",
+    re.I,
+)
 
 # Instruments that see every check run on the head.
 RX_COMPLETE = re.compile(
@@ -146,13 +154,16 @@ def main() -> int:
         "decision": "block",
         "reason": (
             f"Your message declares a PR clean -- \"{hit.group(0).strip()}\" -- but the "
-            "supporting reading in this transcript is `gh pr checks`, which does NOT "
-            "enumerate every check run on the head.\n\n"
+            "supporting reading in this transcript is `gh pr checks` or "
+            "`statusCheckRollup`, which does NOT enumerate every check run on the "
+            "head.\n\n"
             "Measured 2026-08-19 on ucdavis/bcs#651 at a5f4f3f2: `gh pr checks` printed "
             "21 rows, all passing, while the commit endpoint returned 24 runs including "
             "a `failure`. The PR was reported fully clean on the shorter list. A short "
             "list and a clean list look identical -- there is no gap in the output and "
-            "no warning, so neither the reader nor you can tell them apart.\n\n"
+            "no warning, so neither the reader nor you can tell them apart. "
+            "`statusCheckRollup` is the same incomplete class "
+            "(ai-config#2277, 2026-08-26).\n\n"
             "Run an instrument that sees every run, then report from it:\n\n"
             "    python3 scripts/check-pr-fully-clean.py <PR> -R <owner>/<repo>\n\n"
             "reading its EXIT STATUS three ways -- 0 clean, 1 a verdict of not-clean "

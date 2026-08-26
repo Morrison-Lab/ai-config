@@ -128,12 +128,25 @@ MISSING_SHA = tweak(
 
 MISSING_SKIP_DRAFTS = tweak("          INPUT_SKIP_DRAFTS: 'false'\n", "")
 
+COMMENTED_SKIP_DRAFTS = tweak(
+    "          INPUT_SKIP_DRAFTS: 'false'\n",
+    "          # INPUT_SKIP_DRAFTS: 'false'\n",
+)
+
 MISSING_PROSE = tweak("imperative prose", "review rules")
 
 MISSING_SETUP_NODE = tweak(
     "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
     '        with:\n          node-version: "24"\n',
     "",
+)
+
+# Substring still present; line-anchored finder must still fail.
+COMMENTED_SETUP_NODE = tweak(
+    "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
+    '        with:\n          node-version: "24"\n',
+    "      # uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
+    '      #   with:\n      #     node-version: "24"\n',
 )
 
 MISSING_PREFLIGHT_ID = tweak("      - id: preflight\n        run: echo preflight\n", "")
@@ -218,8 +231,15 @@ case_exits(
 )
 case_exits("missing SHA pin", MISSING_SHA, 1, "40-character pin")
 case_exits("missing INPUT_SKIP_DRAFTS", MISSING_SKIP_DRAFTS, 1, "INPUT_SKIP_DRAFTS")
+case_exits(
+    "INPUT_SKIP_DRAFTS only in a comment",
+    COMMENTED_SKIP_DRAFTS,
+    1,
+    "INPUT_SKIP_DRAFTS",
+)
 case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is content")
 case_exits("unpinned Node", MISSING_SETUP_NODE, 1, "Node is unpinned")
+case_exits("Node pin only in comments", COMMENTED_SETUP_NODE, 1, "Node is unpinned")
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
 case_exits(
     "could-not-start omits preflight",

@@ -41,8 +41,14 @@ SHA_PIN_RE = re.compile(
     r"^[ \t]*JULES_PR_REVIEWER_SHA:\s*[0-9a-f]{40}\s*$",
     re.MULTILINE,
 )
-SETUP_NODE_RE = re.compile(r"uses:\s*actions/setup-node@")
-NODE_VERSION_RE = re.compile(r"node-version:\s*['\"]24['\"]")
+SETUP_NODE_RE = re.compile(
+    r"^[ \t]*(?:-\s+)?uses:\s*actions/setup-node@",
+    re.MULTILINE,
+)
+NODE_VERSION_RE = re.compile(
+    r"^[ \t]*node-version:\s*['\"]24['\"]",
+    re.MULTILINE,
+)
 PREFLIGHT_ID_RE = re.compile(
     r"^[ \t]*(?:-\s+)?id:\s*preflight\s*$",
     re.MULTILINE,
@@ -105,7 +111,9 @@ def findings(text: str) -> list[str]:
         )
     if not SHA_PIN_RE.search(text):
         out.append("missing 40-character pin for sanjay3290/jules-pr-reviewer")
-    if not re.search(r"INPUT_SKIP_DRAFTS:\s*'false'", text):
+    if not re.search(
+        r"^[ \t]*INPUT_SKIP_DRAFTS:\s*'false'", text, re.MULTILINE
+    ):
         out.append(
             "INPUT_SKIP_DRAFTS is not 'false'; a mention on a draft would skip"
         )

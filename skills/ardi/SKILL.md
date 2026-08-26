@@ -38,8 +38,8 @@ Pull the most recent reviewer comment --- the `@claude` bot's, or a human's ---
 and every other review that still has a standing verdict.
 Don't trust earlier cached verdicts --- actively poll until a review appears that references the commit you just pushed, then read **that** one.
 If one review is all-clear and another raises findings or nits, the findings
-win: ARD the union, then request fresh reviews. Do not merge on the all-clear,
-even with `mwc` (ai-config#2274).
+win: ARD the union, then request fresh reviews.
+Do not merge on the all-clear, even with `mwc` (ai-config#2274).
 `gh pr checks` (`PR_CHECKS`) / `glab ci list` going green is about **CI state**, not the review verdict --- always parse the latest review *body* for findings.
 A user question about this PR that is not the word "status" still requires
 this fetch (see [`pr-status`](../pr-status/SKILL.md)).

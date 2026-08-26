@@ -307,10 +307,10 @@ A finding about a line the later commits never touched is still live at the curr
 
 So before declaring clean on one reviewer's verdict, re-read the *other* reviewer's most substantive prior review and check each of its findings against the current code, exactly as you would a fresh one --- verify, then Address, Rebut, or Defer.
 A clean verdict answers "did the reviewer who spoke find anything"; it does not answer "did the reviewer who went quiet leave anything real behind".
-That disagreement also vetoes merge, including under `mwc`: ARD every item
-from every review, then request fresh reviews. A later all-clear from a
-different reviewer does not supersede a standing not-clean
-(ai-config#2274).
+That disagreement also vetoes merge, including under `mwc`.
+ARD every item from every review, then request fresh reviews.
+A later all-clear from a different reviewer does not supersede a standing
+not-clean (ai-config#2274).
 
 - **Do:** sweep a silent-since-earlier reviewer's prior findings against the current head before reporting clean, treating a stale-head or suppressed finding as live until checked.
 - **Do:** ARD the union of findings, then request a fresh round, when reviews disagree.

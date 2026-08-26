@@ -31,7 +31,8 @@ All tasks follow a lifecycle (subordinate to the universal rules in AGENTS.md):
     - Write one or more unit tests that clearly define the expected behavior
         and acceptance criteria for the task.
     - **CRITICAL:** Run the tests and confirm that they fail as expected.
-        This is the "Red" phase of TDD. Do not proceed until you have failing tests.
+        This is the "Red" phase of TDD.
+        Do not proceed until you have failing tests.
 
 4. **Implement to Pass Tests (Green Phase):**
 
@@ -73,10 +74,12 @@ All tasks follow a lifecycle (subordinate to the universal rules in AGENTS.md):
     - **Step 9.1: Get Commit Hash:** Obtain the hash of the *just-completed
         commit* (`git log -1 --format="%H"`).
     - **Step 9.2: Draft Note Content:** Create a detailed summary for the
-        completed task. This should include the task name, a summary of changes,
+        completed task.
+        This should include the task name, a summary of changes,
         a list of all created/modified files, and the core "why" for the change.
     - **Step 9.3: Attach Note:** Use the `git notes` command to attach the
-        summary to the commit. `bash # The note content from the previous step is passed via the -m flag. git notes add -m "<note content>"
+        summary to the commit.
+        `bash # The note content from the previous step is passed via the -m flag. git notes add -m "<note content>"
         <commit_hash>`
 
 10. **Get and Record Task Commit SHA:**
@@ -153,7 +156,8 @@ that also concludes a phase in `plan.md`.
     - Before execution, announce the exact shell command used to run tests.
     - **Example Announcement:** "Running automated test suite: `CI=true npm test`"
     - Execute the announced command.
-    - If tests fail, proactively inspect logs, root-cause the failure, and iterate to repair failures until clean per `AGENTS.md`. If genuinely blocked on an external requirement, file an issue and escalate.
+    - If tests fail, proactively inspect logs, root-cause the failure, and iterate to repair failures until clean per `AGENTS.md`.
+    If genuinely blocked on an external requirement, file an issue and escalate.
 
 4. **Propose a Detailed, Actionable Verification Summary:**
 
@@ -169,7 +173,8 @@ that also concludes a phase in `plan.md`.
 6. **Identify Target Commit for Report:**
 
     - Do NOT create a new empty commit for checkpointing.
-    - Identify the hash of the last functional commit made during this phase. This will be the target for the verification report.
+    - Identify the hash of the last functional commit made during this phase.
+    This will be the target for the verification report.
 
 7. **Attach Auditable Verification Report using Git Notes:**
 

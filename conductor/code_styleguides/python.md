@@ -35,7 +35,8 @@ Style Guide.
 - **Whitespace:** Avoid extraneous whitespace.
   Surround binary operators with
     single spaces.
-- **Docstrings:** Use `"""triple double quotes"""`. Every public module,
+- **Docstrings:** Use `"""triple double quotes"""`.
+  Every public module,
     function, class, and method must have a docstring.
   - **Format:** Start with a one-line summary.
         Include `Args:`, `Returns:`,

@@ -1,7 +1,8 @@
 # Specification: Pre-Push AI Code Review Integration
 
 ## Overview
-Integrate and standardize the `pre-push-review` tool and skill across all supported AI agent harnesses (Antigravity/Gemini, Claude Code, Codex CLI). The tool executes a single-pass adversarial code review on local outgoing branch commits against the base branch, utilizing local desktop subscription quota (`agy`, `claude`, `codex`) rather than consuming cloud CI tokens or API credits.
+Integrate and standardize the `pre-push-review` tool and skill across all supported AI agent harnesses (Antigravity/Gemini, Claude Code, Codex CLI).
+The tool executes a single-pass adversarial code review on local outgoing branch commits against the base branch, utilizing local desktop subscription quota (`agy`, `claude`, `codex`) rather than consuming cloud CI tokens or API credits.
 
 ## Functional Requirements
 1. **Engine Selection & Auto-Detection**:

@@ -63,6 +63,24 @@ The splitting rule directly above already existed and was simply not applied
 when #847 was filed, which is the argument for stating its consequence rather
 than only its instruction.)
 
+## A closing keyword plus #N closes #N even when the sentence negates it
+
+GitHub's parser matches `KEYWORD #N` as a substring.
+It does not read the rest of the sentence.
+A line that says the keyword is not being used still closes the issue
+when the keyword sits next to the number.
+The squash commit of #1718 closed #1717 that way, and the hook that commit
+shipped stayed unregistered until #2275 / #2294.
+
+- **Do:** keep the number off the keyword (`Refs #N`, or "the closing
+  keyword was not used for #N").
+- **Don't:** write a sentence that places a closing keyword next to #N
+  in order to say you are not using it.
+
+See [`ardi.cases.md`](ardi.cases.md), "A negated closing-keyword sentence
+still closes the issue", and
+[`github-closing-keywords.md`](../../memories/github-closing-keywords.md).
+
 ## Deferring a request out of the current change is allowed, and the tracking issue is what allows it
 
 The rule at the top governs work you are about to start.

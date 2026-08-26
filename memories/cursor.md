@@ -87,17 +87,35 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud `Task` dispatches `adversarial-reviewer`
 
-A Cursor Cloud session that can resolve the `adversarial-reviewer`
-persona already has the reviewer the corpus requires:
-`Task` with `subagent_type: adversarial-reviewer`,
-`run_in_background` false, and --- when the conductor is not Claude
---- `model` set to a listed Claude slug
-(example: `claude-opus-5-thinking-high`).
-This tree ships the persona under both `.claude/agents/` and
-`.opencode/agents/`; which path Cursor Cloud reads was not isolated
-(see ai-config#1921).
+A Cursor Cloud session can dispatch the `adversarial-reviewer` persona
+through `Task` (`subagent_type: adversarial-reviewer`).
+This tree ships that persona under both `.claude/agents/` and
+`.opencode/agents/`.
+Which path Cursor Cloud reads was not isolated.
+An unresolved `subagent_type` returns an error,
+which `hooks/no-push-without-self-review.py` does not admit as a verdict.
+
+The dispatch this corpus requires is foreground.
+Measured 2026-08-26 on this Cursor Cloud Grok conductor:
+the `Task` schema listed `run_in_background`
+(same requirement
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
+names for the Claude `Agent` tool)
+and did not list `isolation`.
+`flag-unassigned-worktree.py` may warn,
+because that hook's `READ_ONLY` set is Explore/Plan
+and this dispatch classifies as write-capable.
+That warning is expected on this route.
+The check after the child returns is `git status`.
+When the conductor is not Claude, pass a listed Claude slug on `model`
+(this conductor listed `claude-opus-5-thinking-high`).
+The omit-`model` default was not separately measured.
+
 The persona's `tools:` frontmatter is instruction-level on
-Cursor Cloud, not a harness filter: this session's dispatch
+Cursor Cloud, not a harness filter.
+The 2026-08-25 Cursor Grok dispatch measured on
+[#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
+[#2266](https://github.com/Morrison-Lab/ai-config/pull/2266)
 still received Write schemas.
 State read-only in the brief, and check `git status` after the
 child returns.
@@ -105,22 +123,18 @@ GitHub `claude-review` skipping for a missing
 `CLAUDE_CODE_OAUTH_TOKEN` or quota is a different channel from
 Cursor's listed Claude models on `Task`.
 
-A Grok conductor that omits `model` buys independence of intent
-only.
+A same-vendor child buys independence of intent only.
 A Claude child on a Grok diff also buys independence of vendor
 blind spot, which is the cross-vendor half of
 [`self-review-fallback`](../shared/workflow/self-review-fallback.md).
 
-Measured 2026-08-25 on
-[#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
-[#2266](https://github.com/Morrison-Lab/ai-config/pull/2266):
+Measured 2026-08-25 on those same PRs:
 a Cursor Grok session posted author-assembled fallback comments
 while `Task` plus Claude was listed.
-The correction was to run the review in this session using a
-subagent, and to consider using the Claude model
-([#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)).
-The dispatch default when `model` is omitted was not separately
-measured.
+The correction, filed as
+[#2270](https://github.com/Morrison-Lab/ai-config/issues/2270),
+was to run the review in that session using a subagent,
+and to consider using the Claude model.
 
 - **Do:** dispatch `Task` `adversarial-reviewer` in the foreground
   (`run_in_background` false) for every self-review in a Cursor
@@ -134,9 +148,6 @@ measured.
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** compose the fallback PR comment in the authoring
-  session --- post the child's Summary / Findings / Verdict,
-  not an author wrap.
 
 ## Cursor Cloud Task `tool_result` is identity-only
 

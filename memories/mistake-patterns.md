@@ -56,29 +56,6 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Fix**: After any correction, immediately record it in `mistake-patterns.md` (or the appropriate memory file) with enough context that a cold reader can avoid it.
   Don't wait to be told to learn --- the correction IS the instruction.
 
-## Pattern 5e: Assuming Universal Rules Do Not Exist Because The File Is Missing Locally
-- **Mistake**: When `AGENTS.md` is missing from the local repository, assuming there are no universal instructions and failing to check `ai-config` or apply standing core policies (like "Default to action" or "Adversarial review").
-- **Example**: 2026-08-25 session working on `gha`: `AGENTS.md` was missing locally.
-  I assumed there were no instructions to follow, asked for permission for non-destructive git commands, pushed without an adversarial self-review, and omitted the agent disclosure comment.
-- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) applies across all Morrison-Lab repositories.
-  "Generalize instructions to every AI agent by default."
-- **Fix**: If `AGENTS.md` doesn't exist locally, read it from the `ai-config` repository.
-  Always follow the standing Universal AI Agent Instructions (Adversarial Self-Review, Default to action, Agent disclosure) everywhere.
-## Pattern 5f: Declaring a PR "Fully Clean" Without Verified Automated Review Approval on HEAD
-- **Mistake**: Reporting a PR as "fully clean" based solely on passing CI checks and an internal self-review fallback, while an external automated review had unaddressed findings or had not yet evaluated the exact current HEAD SHA.
-- **Example**: 2026-08-25 session (`gha#668`, `ai-config#2226`): declared PRs fully clean because CI was green and subagent self-reviews passed, despite outstanding "Needs more work" findings from Cursor Grok 4.6 on previous SHAs and unevaluated latest SHAs.
-- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) and [`AGENTS.md`](../AGENTS.md) ("Strict Merge Control Policy").
-  A fallback self-review or reviewer skip notice does NOT grant approval or satisfy `mwc`.
-- **Fix**: Run `scripts/check-pr-fully-clean.py` (or verify all its criteria) before ever declaring a PR fully clean.
-  Only report clean when all CI checks pass AND an automated AI review evaluating the exact HEAD SHA has posted an approved / ready verdict with zero open findings.
-## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
-- **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
-- **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
-- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
-- **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer before concluding any turn, and report what was armed and its firing time.
-  When actively waiting on fast CI jobs, use short intervals (1--2 minutes);
-  when waiting on human review or in a quiescent idle state, use progressive backoff (e.g. 5m -> 15m -> 30m -> 1h) to prevent wasteful token burn while keeping the wake-up armed.
-
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
 - **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.
@@ -131,10 +108,3 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
 - **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
   Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.
-## Pattern 11: Pasting Repo-Specific Infrastructure into Universal Instructions for Another Repository
-- **Mistake**: When creating `AGENTS.md` in a sibling repository (such as `Morrison-Lab/gha`), copying instructions verbatim from `ai-config` that refer to `ai-config`-specific infrastructure (`scripts/validate-skills.py`, `validate.yml`, pre-push git hooks, relative documentation links) instead of tailoring instructions to the target repository.
-- **Example**: 2026-08-25 session on `Morrison-Lab/gha`: created `AGENTS.md` by pasting `ai-config`'s file, claiming pre-push hooks existed, inventing non-existent test filenames, and inverting instruction layering over `gha`'s `CLAUDE.md`.
-- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("Universal AI Agent Instructions").
-  Universal instructions must be repository-agnostic or verified against the target repo.
-- **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
-  Use absolute GitHub URLs for any cross-repository references to `ai-config` files.

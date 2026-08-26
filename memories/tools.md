@@ -1135,30 +1135,37 @@ Passing such a file to CLI tools expecting UTF-8 via `--body-file` or `gh api -F
 - **Do:** write payload files as BOM-free UTF-8 using .NET (`[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`) or Python before passing to `--body-file` or `-F body=@<file>`.
 - **Don't:** redirect output with `>` in PowerShell 5.1 for API payload files, and don't pass multi-line or Markdown text inline via `--body "..."` or `-f body="..."` where shells expand backticks.
 
-## Disk exhaustion causes silent edit tool failures and file corruption
+## Disk exhaustion corrupts state silently --- edits, writes, and git gc
 
-When the disk is at or near 0 bytes free, the edit tool (and write tool) can
-fail mid-operation: the file is partially written or truncated, and the error
-message may not clearly indicate which file was affected.
+At or near 0 bytes free, tools fail mid-operation without clean errors:
+partially written files, truncated content, corrupted archives.
+Measured 2026-08-20 on Windows 11, Morrison-Lab/ai-config.
 
-Observed failure modes on Windows 11 (measured 2026-08-20):
-- `OSError: [Errno 28] No space left on device` on `open()` for writing
-- Edit tool returns success but the file is truncated or contains partial content
-- `git add` / `git commit` fails on the corrupted file
+Failure modes observed:
 
-Recovery: clean disk space first (Chrome/Edge cache, temp files, Recycle Bin),
-then verify the corrupted file with `wc -l` or `git diff` against a known good
-state before trusting it.
+- Edit/write tools return success but the file is truncated or partial.
+- Python raises `OSError: [Errno 28] No space left on device` on `open()` ---
+  the honest case; treat any write error at low disk as corruption until
+  verified.
+- `git add` / `git commit` fail on a silently corrupted file.
 
-Prevention: check free space before any batch of file edits. When disk space is
-critically low, use Python scripts written to a temp `.py` file (via `write`
-tool) and executed, rather than inline edit tool calls --- the Python script can
-check free space before writing and fail cleanly.
+`git gc --prune=now` (or any repack) on a full disk is its own tier of damage:
+the pack file is partially written, leaving unresolved deltas and
+`error: Could not read <sha>` on every later fetch or pull.
+Deleting loose objects does not help --- the new pack still resolves deltas
+against the missing objects and fails.
+Unrecoverable locally; the only fix is `rm -rf .git && git clone ...`.
+Never run gc when disk is low, and re-clone immediately if fetch starts
+failing after one.
 
-- **Do:** clean temp/cache files before edits when disk space is low.
-- **Do:** verify file integrity (`wc -l`, `git diff`) after edits on a low-disk
-  system.
-- **Do:** use Python scripts for file modifications when the edit tool fails on
-  disk space.
-- **Don't:** trust an edit tool "success" response when disk space was
-  critically low --- always verify the result.
+Recovery for edited files: free space first (browser caches, temp dirs,
+Recycle Bin), then verify each suspect file (`wc -l`, `git diff`) against a
+known-good state before trusting it.
+
+Prevention: check free space before any batch of file edits.
+When space is critically low, prefer a Python script written to a temp `.py`
+file over inline edit calls --- it can check space first and fail cleanly.
+
+- **Do:** verify file integrity after any edit made while disk was low.
+- **Do:** skip `git gc` whenever free space is tight.
+- **Don't:** trust an edit tool success response from a full-disk system.

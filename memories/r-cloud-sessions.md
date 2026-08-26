@@ -37,7 +37,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
     267 packages), when `R-CMD-check.yaml`'s own
     `RENV_CONFIG_REPOS_OVERRIDE: https://packagemanager.posit.co/cran/__linux__/noble/latest`
     was sitting right there in the workflow file the whole time.
-  - the repository owner GitHub-only pkgs → r-universe `https://Morrison-Lab.r-universe.dev`
+  - the repository owner GitHub-only pkgs → r-universe `https://d-morrison.r-universe.dev`
     has `dobson`, `regress3d` (and more), but NOT `rmb` — and `rmb`'s standard
     install channels (tarball/clone via `github.com`/`codeload`, plus
     `api.github.com` for renv/pak) are proxy-blocked when the repo isn't in

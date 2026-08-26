@@ -53,13 +53,18 @@ Where no second context is reachable at all, say so in the review itself rather 
 On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
 (measured 2026-08-25 PDT on a Grok conductor).
-On Cursor Cloud the pre-push guard never runs;
+This repo's Cursor adapter skips `no-push-without-self-review.py`
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+(measured 2026-08-25 PDT);
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a Cursor `Task`
-dispatch just ran: the subagent route was available.
+dispatch that returned a usable verdict:
+the subagent route was available.
+If that dispatch errored or produced no report,
+that is the CLI-fallback case above.
 If `Task` is not in the schema, or it does not list
-`adversarial-reviewer`, that is the CLI-fallback case above.
+`adversarial-reviewer`, that is also the CLI-fallback case above.
 
 ## Brief it with the diff and the standards, never with your rationale
 

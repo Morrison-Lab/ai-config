@@ -262,9 +262,9 @@ Cursor's project adapter skips `no-push-without-self-review.py`
 when that adapter is the active hook path
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](memories/cursor.md)).
-On Desktop, leave third-party Claude hooks off while this
-project adapter is enabled (measured 2026-08-25 PDT):
-enabling both runs the native guard, which denies every push.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch that persona through `Task` instead
+(same file).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review

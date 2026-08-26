@@ -108,25 +108,48 @@ Deciding the child needs no worktree is fine;
 the schema has no `isolation` field to mark that decision.
 Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
 
+Commit first.
+A review of uncommitted work names a commit that does not exist yet
+(`hooks/no-push-without-self-review.py`).
 Record `git rev-parse HEAD` before the dispatch,
 and run `git status --short`.
-After the child returns, obtain `Reviewed-Commit` from a harness paste
-that already carries Summary / Findings / Verdict,
-or from cursor-cloud `batch-fetch-details` with the child's
-`cloudAgentBcId` and `includeTranscripts: true`.
+If that status is not empty, do not dispatch: commit or stash first.
+After the child returns, take the last `Verdict:` line
+anchored at line start
+(optionally as a heading, as the guard's `VERDICT_LINE` does)
+from a harness paste that already carries Summary / Findings / Verdict,
+or from cursor-cloud `batch-fetch-details`
+with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
+`cloudAgentBcId` is a field on the Task JSON `tool_result`;
+`bcIds` is the tool parameter.
+How to retrieve that paste or transcript is
+[Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
+Blank fenced blocks before taking that verdict:
+this corpus quotes those strings constantly (ai-config#1297).
+Take the first `Reviewed-Commit` after that verdict line.
 The `Task` JSON `tool_result` has no review body.
 If you cannot obtain `Reviewed-Commit`, do not push.
 The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
-Compare that line to the recorded sha and to `git rev-parse HEAD`.
-If the push refspec is not `HEAD`, compare against that ref:
-this check does not resolve a refspec the way
-`no-push-without-self-review.py` does.
-Re-run `git status --short` for uncommitted child edits.
-Cursor's adapter skips `no-push-without-self-review.py`
-(`SKIP_WITHOUT_TOOL_RESULT`),
+Compare that sha to the recorded sha and to `git rev-parse HEAD`.
+If they differ, do not push.
+If the push refspec is not `HEAD`, compare against that named ref.
+This check covers one named ref.
+It does not cover `--all`, `--tags`, `--mirror`, `--follow-tags`,
+or `push.default=matching`;
+do not treat a matching HEAD sha as covering those pushes.
+Re-run `git status --short`.
+If it is not empty, do not push:
+uncommitted child edits (or leftover dirty files) are not in the
+fingerprint.
+This repo's Cursor adapter skips `no-push-without-self-review.py`
+(`SKIP_WITHOUT_TOOL_RESULT`) until
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so a failed or skipped dispatch is not caught before the push.
 The posted PR comment is the record, not a gate.
+If the dispatch errored or produced no report,
+that is the CLI-fallback case in
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md).
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -168,22 +191,25 @@ is the instruction to use this route.
   `claude-review` skipped a run.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
-- **Do:** brief the child not to edit.
+- **Do:** commit first, then brief the child not to edit.
   Record `HEAD` and `git status --short` before the dispatch.
-  After it returns, obtain `Reviewed-Commit` from a harness paste
-  of the child's report or from `batch-fetch-details`
-  with `includeTranscripts: true`.
+  After it returns, take the last line-start `Verdict:`
+  (fences blanked) and the first `Reviewed-Commit` after it,
+  from a harness paste of the child's report or from
+  `batch-fetch-details` with `bcIds` and `includeTranscripts: true`.
   If you cannot obtain it, or the verdict is not Ready for merge,
+  or HEAD differs, or `git status --short` is not empty,
   do not push.
-  Compare that sha to the recorded `HEAD` and to
-  `git rev-parse HEAD`, and re-run `git status --short`.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on the grounds
-  that the subagent route was unavailable, after a `Task`
-  dispatch just ran.
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task`
+  dispatch that returned a usable verdict.
+  If the dispatch errored or produced no report,
+  that is the CLI-fallback case.
+- **Don't:** treat a matching HEAD sha as covering `--all`,
+  `--tags`, `--mirror`, or `push.default=matching`.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 

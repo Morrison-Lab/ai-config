@@ -1134,3 +1134,31 @@ Passing such a file to CLI tools expecting UTF-8 via `--body-file` or `gh api -F
 
 - **Do:** write payload files as BOM-free UTF-8 using .NET (`[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))`) or Python before passing to `--body-file` or `-F body=@<file>`.
 - **Don't:** redirect output with `>` in PowerShell 5.1 for API payload files, and don't pass multi-line or Markdown text inline via `--body "..."` or `-f body="..."` where shells expand backticks.
+
+## Disk exhaustion causes silent edit tool failures and file corruption
+
+When the disk is at or near 0 bytes free, the edit tool (and write tool) can
+fail mid-operation: the file is partially written or truncated, and the error
+message may not clearly indicate which file was affected.
+
+Observed failure modes on Windows 11 (measured 2026-08-20):
+- `OSError: [Errno 28] No space left on device` on `open()` for writing
+- Edit tool returns success but the file is truncated or contains partial content
+- `git add` / `git commit` fails on the corrupted file
+
+Recovery: clean disk space first (Chrome/Edge cache, temp files, Recycle Bin),
+then verify the corrupted file with `wc -l` or `git diff` against a known good
+state before trusting it.
+
+Prevention: check free space before any batch of file edits. When disk space is
+critically low, use Python scripts written to a temp `.py` file (via `write`
+tool) and executed, rather than inline edit tool calls --- the Python script can
+check free space before writing and fail cleanly.
+
+- **Do:** clean temp/cache files before edits when disk space is low.
+- **Do:** verify file integrity (`wc -l`, `git diff`) after edits on a low-disk
+  system.
+- **Do:** use Python scripts for file modifications when the edit tool fails on
+  disk space.
+- **Don't:** trust an edit tool "success" response when disk space was
+  critically low --- always verify the result.

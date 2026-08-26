@@ -2,14 +2,15 @@
 
 ## Guiding Principles
 
-1.  **The Plan is the Source of Truth:** All work must be tracked in `plan.md`
-2.  **The Tech Stack is Deliberate:** Changes to the tech stack must be
+1. **The Plan is the Source of Truth:** All work must be tracked in `plan.md`
+2. **The Tech Stack is Deliberate:** Changes to the tech stack must be
     documented in `tech-stack.md` *before* implementation
-3.  **Test-Driven Development:** Write unit tests before implementing
+3. **Test-Driven Development:** Write unit tests before implementing
     functionality
-4.  **High Code Coverage:** Aim for >80% code coverage for all modules
-5.  **User Experience First:** Every decision should prioritize user experience
-6.  **Non-Interactive & CI-Aware:** Prefer non-interactive commands. Use
+4. **High Code Coverage:** Aim for >80% code coverage for all modules
+5. **User Experience First:** Every decision should prioritize user experience
+6. **Non-Interactive & CI-Aware:** Prefer non-interactive commands.
+        Use
     `CI=true` for watch-mode tools (tests, linters) to ensure single execution.
 
 ## Task Workflow
@@ -18,95 +19,98 @@ All tasks follow a lifecycle (subordinate to the universal rules in AGENTS.md):
 
 ### Standard Task Workflow
 
-1.  **Select Task:** Choose the next available task from `plan.md` in sequential
+1. **Select Task:** Choose the next available task from `plan.md` in sequential
     order
 
-2.  **Mark In Progress:** Before beginning work, edit `plan.md` and change the
+2. **Mark In Progress:** Before beginning work, edit `plan.md` and change the
     task from `[ ]` to `[~]`
 
-3.  **Write Failing Tests (Red Phase):**
+3. **Write Failing Tests (Red Phase):**
 
-    -   Create a new test file for the feature or bug fix.
-    -   Write one or more unit tests that clearly define the expected behavior
+    - Create a new test file for the feature or bug fix.
+    - Write one or more unit tests that clearly define the expected behavior
         and acceptance criteria for the task.
-    -   **CRITICAL:** Run the tests and confirm that they fail as expected. This
-        is the "Red" phase of TDD. Do not proceed until you have failing tests.
+    - **CRITICAL:** Run the tests and confirm that they fail as expected.
+        This is the "Red" phase of TDD. Do not proceed until you have failing tests.
 
-4.  **Implement to Pass Tests (Green Phase):**
+4. **Implement to Pass Tests (Green Phase):**
 
-    -   Write the minimum amount of application code necessary to make the
+    - Write the minimum amount of application code necessary to make the
         failing tests pass.
-    -   Run the test suite again and confirm that all tests now pass. This is
+    - Run the test suite again and confirm that all tests now pass.
+        This is
         the "Green" phase.
 
-5.  **Refactor (Optional but Recommended):**
+5. **Refactor (Optional but Recommended):**
 
-    -   With the safety of passing tests, refactor the implementation code and
+    - With the safety of passing tests, refactor the implementation code and
         the test code to improve clarity, remove duplication, and enhance
         performance without changing the external behavior.
-    -   Rerun tests to ensure they still pass after refactoring.
+    - Rerun tests to ensure they still pass after refactoring.
 
-6.  **Verify Coverage:** Run coverage reports using the project's chosen tools.
+6. **Verify Coverage:** Run coverage reports using the project's chosen tools.
     For example, in a Python project, this might look like: `bash pytest
-    --cov=app --cov-report=html` Target: >80% coverage for new code. The
+    --cov=app --cov-report=html` Target: >80% coverage for new code.
+        The
     specific tools and commands will vary by language and framework.
 
-7.  **Document Deviations:** If implementation differs from tech stack:
+7. **Document Deviations:** If implementation differs from tech stack:
 
-    -   **STOP** implementation
-    -   Update `tech-stack.md` with new design
-    -   Add dated note explaining the change
-    -   Resume implementation
+    - **STOP** implementation
+    - Update `tech-stack.md` with new design
+    - Add dated note explaining the change
+    - Resume implementation
 
-8.  **Commit Code Changes:**
+8. **Commit Code Changes:**
 
-    -   Stage all code changes related to the task.
-    -   Propose a clear, concise commit message e.g, `feat(ui): Create basic
+    - Stage all code changes related to the task.
+    - Propose a clear, concise commit message e.g, `feat(ui): Create basic
         HTML structure for calculator`.
-    -   Perform the commit.
+    - Perform the commit.
 
-9.  **Attach Task Summary with Git Notes:**
+9. **Attach Task Summary with Git Notes:**
 
-    -   **Step 9.1: Get Commit Hash:** Obtain the hash of the *just-completed
+    - **Step 9.1: Get Commit Hash:** Obtain the hash of the *just-completed
         commit* (`git log -1 --format="%H"`).
-    -   **Step 9.2: Draft Note Content:** Create a detailed summary for the
+    - **Step 9.2: Draft Note Content:** Create a detailed summary for the
         completed task. This should include the task name, a summary of changes,
         a list of all created/modified files, and the core "why" for the change.
-    -   **Step 9.3: Attach Note:** Use the `git notes` command to attach the
-        summary to the commit. `bash # The note content from the previous step
-        is passed via the -m flag. git notes add -m "<note content>"
+    - **Step 9.3: Attach Note:** Use the `git notes` command to attach the
+        summary to the commit. `bash # The note content from the previous step is passed via the -m flag. git notes add -m "<note content>"
         <commit_hash>`
 
 10. **Get and Record Task Commit SHA:**
 
-    -   **Step 10.1: Update Plan:** Read `plan.md`, find the line for the
+    - **Step 10.1: Update Plan:** Read `plan.md`, find the line for the
         completed task, update its status from `[~]` to `[x]`, and append the
         first 7 characters of the *just-completed commit's* commit hash.
-    -   **Step 10.2: Write Plan:** Write the updated content back to `plan.md`.
+    - **Step 10.2: Write Plan:** Write the updated content back to `plan.md`.
 
 11. **Commit Plan Update:**
 
-    -   **Action:** Stage the modified `plan.md` file.
-    -   **Action:** Commit this change with a descriptive message (e.g.,
+    - **Action:** Stage the modified `plan.md` file.
+    - **Action:** Commit this change with a descriptive message (e.g.,
         `conductor(plan): Mark task 'Create user model' as complete`).
 
 ### Task Correction & Plan Amendment Workflows
 
 When an implemented task or phase requires corrections, amendments, or additions, follow these standard workflows to maintain plan integrity and avoid untracked code drift:
 
-1.  **In-Flight Refinements:** If minor gaps are found while a task is actively
+1. **In-Flight Refinements:** If minor gaps are found while a task is actively
     in-progress (`[~]`), make the adjustments directly in the active
     implementation stream and ensure passing tests before committing.
-2.  **Code Review Corrections (`conductor-review`):** If issues are identified
+2. **Code Review Corrections (`conductor-review`):** If issues are identified
     during or after a code review, instruct the agent to review your changes
     (e.g., *"run a review"* or triggering the action manually in compatible
-    clients). The review agent will automatically append a `Review Fixes` phase
+    clients).
+        The review agent will automatically append a `Review Fixes` phase
     to `plan.md` so that correction tasks are formally tracked and
     checkpointed.
-3.  **Logical State Reversions (`conductor-revert`):** If a task implementation
+3. **Logical State Reversions (`conductor-revert`):** If a task implementation
     is fundamentally flawed or needs to be redone, instruct the agent to revert
     the changes (e.g., *"revert the last task"* or triggering the action
-    manually in compatible clients). This safely rolls back associated git
+    manually in compatible clients).
+        This safely rolls back associated git
     commits and resets the task state in `plan.md` back to pending `[ ]` to
     allow a clean restart.
 
@@ -115,73 +119,78 @@ When an implemented task or phase requires corrections, amendments, or additions
 **Trigger:** This protocol is executed immediately after a task is completed
 that also concludes a phase in `plan.md`.
 
-1.  **Announce Protocol Start:** Inform the user that the phase is complete and
+1. **Announce Protocol Start:** Inform the user that the phase is complete and
     the verification and checkpointing protocol has begun.
 
-2.  **Ensure Test Coverage for Phase Changes:**
+2. **Ensure Test Coverage for Phase Changes:**
 
-    -   **Step 2.1: Determine Phase Scope:** To identify the files changed in
-        this phase, you must first find the starting point. Read `plan.md` to
-        find the Git commit SHA of the *previous* phase's checkpoint. If no
+    - **Step 2.1: Determine Phase Scope:** To identify the files changed in
+        this phase, you must first find the starting point.
+        Read `plan.md` to
+        find the Git commit SHA of the *previous* phase's checkpoint.
+        If no
         previous checkpoint exists, the scope is all changes since the first
         commit.
-    -   **Step 2.2: List Changed Files:** Execute `git diff --name-only
+    - **Step 2.2: List Changed Files:** Execute `git diff --name-only
         <previous_checkpoint_sha> HEAD` to get a precise list of all files
         modified during this phase.
-    -   **Step 2.3: Verify and Create Tests:** For each file in the list:
-        -   **CRITICAL:** First, check its extension. Exclude non-code files
+    - **Step 2.3: Verify and Create Tests:** For each file in the list:
+        - **CRITICAL:** First, check its extension.
+        Exclude non-code files
             (e.g., `.json`, `.md`, `.yaml`).
-        -   For each remaining code file, verify a corresponding test file
+        - For each remaining code file, verify a corresponding test file
             exists.
-        -   If a test file is missing, you **must** create one. Before writing
+        - If a test file is missing, you **must** create one.
+        Before writing
             the test, **first, analyze other test files in the repository to
-            determine the correct naming convention and testing style.** The new
+            determine the correct naming convention and testing style.**
+        The new
             tests **must** validate the functionality described in this phase's
             tasks (`plan.md`).
 
-3.  **Execute Automated Tests with Proactive Debugging:**
+3. **Execute Automated Tests with Proactive Debugging:**
 
-    -   Before execution, announce the exact shell command used to run tests.
-    -   **Example Announcement:** "Running automated test suite: `CI=true npm test`"
-    -   Execute the announced command.
-    -   If tests fail, proactively inspect logs, root-cause the failure, and iterate to repair failures until clean per `AGENTS.md`. If genuinely blocked on an external requirement, file an issue and escalate.
+    - Before execution, announce the exact shell command used to run tests.
+    - **Example Announcement:** "Running automated test suite: `CI=true npm test`"
+    - Execute the announced command.
+    - If tests fail, proactively inspect logs, root-cause the failure, and iterate to repair failures until clean per `AGENTS.md`. If genuinely blocked on an external requirement, file an issue and escalate.
 
-4.  **Propose a Detailed, Actionable Verification Summary:**
+4. **Propose a Detailed, Actionable Verification Summary:**
 
-    -   Analyze `product.md`, `product-guidelines.md`, and `plan.md` to confirm the goals of the completed phase are met.
-    -   Generate a verification summary documenting automated test results and verification steps.
+    - Analyze `product.md`, `product-guidelines.md`, and `plan.md` to confirm the goals of the completed phase are met.
+    - Generate a verification summary documenting automated test results and verification steps.
 
-5.  **Autonomous Progress & User Feedback:**
+5. **Autonomous Progress & User Feedback:**
 
-    -   Per `AGENTS.md`, default to action without asking for non-destructive, verified steps.
-    -   Report completed verification in the past tense.
-    -   Ask the user only for destructive, ambiguous, high-impact, or genuinely blocking decisions.
+    - Per `AGENTS.md`, default to action without asking for non-destructive, verified steps.
+    - Report completed verification in the past tense.
+    - Ask the user only for destructive, ambiguous, high-impact, or genuinely blocking decisions.
 
-6.  **Identify Target Commit for Report:**
+6. **Identify Target Commit for Report:**
 
-    -   Do NOT create a new empty commit for checkpointing.
-    -   Identify the hash of the last functional commit made during this phase. This will be the target for the verification report.
+    - Do NOT create a new empty commit for checkpointing.
+    - Identify the hash of the last functional commit made during this phase. This will be the target for the verification report.
 
-7.  **Attach Auditable Verification Report using Git Notes:**
+7. **Attach Auditable Verification Report using Git Notes:**
 
-    -   **Step 7.1: Draft Note Content:** Create a detailed verification report
+    - **Step 7.1: Draft Note Content:** Create a detailed verification report
         including the automated test command, the manual verification steps, and
         the user's confirmation.
-    -   **Step 7.2: Attach Note:** Use the `git notes` command to attach the full report to the target commit identified in step 6.
+    - **Step 7.2: Attach Note:** Use the `git notes` command to attach the full report to the target commit identified in step 6.
 
-8.  **Get and Record Phase Checkpoint SHA:**
+8. **Get and Record Phase Checkpoint SHA:**
 
-    -   **Step 8.1: Get Commit Hash:** Obtain the hash of the *target commit*
+    - **Step 8.1: Get Commit Hash:** Obtain the hash of the *target commit*
         identified in step 6 (`git log -1 --format="%H"` or target commit hash).
-    -   **Step 8.2: Update Plan:** Read `plan.md`, find the heading for the
+    - **Step 8.2: Update Plan:** Read `plan.md`, find the heading for the
         completed phase, and append the first 7 characters of the commit hash in
         the format `[checkpoint: <sha>]`.
-    -   **Step 8.3: Write Plan:** Write the updated content back to `plan.md`.
+    - **Step 8.3: Write Plan:** Write the updated content back to `plan.md`.
 
-9.  **Commit Plan Update:**
+9. **Commit Plan Update:**
 
-    -   **Action:** Stage the modified `plan.md` file.
-    -   **Action:** Commit this change with a descriptive message following the
+    - **Action:** Stage the modified `plan.md` file.
+    - **Action:** Commit this change with a descriptive message following the
         format `conductor(plan): Mark phase '<PHASE NAME>' as complete`.
 
 10. **Announce Completion:** Inform the user that the phase is complete and the
@@ -192,18 +201,18 @@ that also concludes a phase in `plan.md`.
 
 Before marking any task complete, verify:
 
--   [ ] All tests pass
--   [ ] Code coverage meets requirements (>80%)
--   [ ] Code follows project's code style guidelines (as defined in
+- [ ] All tests pass
+- [ ] Code coverage meets requirements (>80%)
+- [ ] Code follows project's code style guidelines (as defined in
     `code_styleguides/`)
--   [ ] All public functions/methods are documented (e.g., docstrings, JSDoc,
+- [ ] All public functions/methods are documented (e.g., docstrings, JSDoc,
     GoDoc)
--   [ ] Type safety is enforced (e.g., type hints, TypeScript types, Go types)
--   [ ] No linting or static analysis errors (using the project's configured
+- [ ] Type safety is enforced (e.g., type hints, TypeScript types, Go types)
+- [ ] No linting or static analysis errors (using the project's configured
     tools)
--   [ ] Works correctly on mobile (if applicable)
--   [ ] Documentation updated if needed
--   [ ] No security vulnerabilities introduced
+- [ ] Works correctly on mobile (if applicable)
+- [ ] Documentation updated if needed
+- [ ] No security vulnerabilities introduced
 
 ## Development Commands
 
@@ -238,26 +247,26 @@ language, framework, and build tools.**
 
 ### Unit Testing
 
--   Every module must have corresponding tests.
--   Use appropriate test setup/teardown mechanisms (e.g., fixtures,
+- Every module must have corresponding tests.
+- Use appropriate test setup/teardown mechanisms (e.g., fixtures,
     beforeEach/afterEach).
--   Mock external dependencies.
--   Test both success and failure cases.
+- Mock external dependencies.
+- Test both success and failure cases.
 
 ### Integration Testing
 
--   Test complete user flows
--   Verify database transactions
--   Test authentication and authorization
--   Check form submissions
+- Test complete user flows
+- Verify database transactions
+- Test authentication and authorization
+- Check form submissions
 
 ### Mobile Testing
 
--   Test on actual iPhone when possible
--   Use Safari developer tools
--   Test touch interactions
--   Verify responsive layouts
--   Check performance on 3G/4G
+- Test on actual iPhone when possible
+- Use Safari developer tools
+- Test touch interactions
+- Verify responsive layouts
+- Check performance on 3G/4G
 
 ## Code Review Process
 
@@ -265,44 +274,44 @@ language, framework, and build tools.**
 
 Before requesting review:
 
-1.  **Functionality**
+1. **Functionality**
 
-    -   Feature works as specified
-    -   Edge cases handled
-    -   Error messages are user-friendly
+    - Feature works as specified
+    - Edge cases handled
+    - Error messages are user-friendly
 
-2.  **Code Quality**
+2. **Code Quality**
 
-    -   Follows style guide
-    -   DRY principle applied
-    -   Clear variable/function names
-    -   Appropriate comments
+    - Follows style guide
+    - DRY principle applied
+    - Clear variable/function names
+    - Appropriate comments
 
-3.  **Testing**
+3. **Testing**
 
-    -   Unit tests comprehensive
-    -   Integration tests pass
-    -   Coverage adequate (>80%)
+    - Unit tests comprehensive
+    - Integration tests pass
+    - Coverage adequate (>80%)
 
-4.  **Security**
+4. **Security**
 
-    -   No hardcoded secrets
-    -   Input validation present
-    -   SQL injection prevented
-    -   XSS protection in place
+    - No hardcoded secrets
+    - Input validation present
+    - SQL injection prevented
+    - XSS protection in place
 
-5.  **Performance**
+5. **Performance**
 
-    -   Database queries optimized
-    -   Images optimized
-    -   Caching implemented where needed
+    - Database queries optimized
+    - Images optimized
+    - Caching implemented where needed
 
-6.  **Mobile Experience**
+6. **Mobile Experience**
 
-    -   Touch targets adequate (44x44px)
-    -   Text readable without zooming
-    -   Performance acceptable on mobile
-    -   Interactions feel native
+    - Touch targets adequate (44x44px)
+    - Text readable without zooming
+    - Performance acceptable on mobile
+    - Interactions feel native
 
 ## Commit Guidelines
 
@@ -318,13 +327,13 @@ Before requesting review:
 
 ### Types
 
--   `feat`: New feature
--   `fix`: Bug fix
--   `docs`: Documentation only
--   `style`: Formatting, missing semicolons, etc.
--   `refactor`: Code change that neither fixes a bug nor adds a feature
--   `test`: Adding missing tests
--   `chore`: Maintenance tasks
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Formatting, missing semicolons, etc.
+- `refactor`: Code change that neither fixes a bug nor adds a feature
+- `test`: Adding missing tests
+- `chore`: Maintenance tasks
 
 ### Examples
 
@@ -339,54 +348,54 @@ git commit -m "style(mobile): Improve button touch targets"
 
 A task is complete when:
 
-1.  All code implemented to specification
-2.  Unit tests written and passing
-3.  Code coverage meets project requirements
-4.  Documentation complete (if applicable)
-5.  Code passes all configured linting and static analysis checks
-6.  Works beautifully on mobile (if applicable)
-7.  Implementation notes added to `plan.md`
-8.  Changes committed with proper message
-9.  Git note with task summary attached to the commit
+1. All code implemented to specification
+2. Unit tests written and passing
+3. Code coverage meets project requirements
+4. Documentation complete (if applicable)
+5. Code passes all configured linting and static analysis checks
+6. Works beautifully on mobile (if applicable)
+7. Implementation notes added to `plan.md`
+8. Changes committed with proper message
+9. Git note with task summary attached to the commit
 
 ## Emergency Procedures
 
 ### Critical Bug in Production
 
-1.  Create hotfix branch from main
-2.  Write failing test for bug
-3.  Implement minimal fix
-4.  Test thoroughly including mobile
-5.  Deploy immediately
-6.  Document in plan.md
+1. Create hotfix branch from main
+2. Write failing test for bug
+3. Implement minimal fix
+4. Test thoroughly including mobile
+5. Deploy immediately
+6. Document in plan.md
 
 ### Data Loss
 
-1.  Stop all write operations
-2.  Restore from latest backup
-3.  Verify data integrity
-4.  Document incident
-5.  Update backup procedures
+1. Stop all write operations
+2. Restore from latest backup
+3. Verify data integrity
+4. Document incident
+5. Update backup procedures
 
 ### Security Breach
 
-1.  Rotate all secrets immediately
-2.  Review access logs
-3.  Patch vulnerability
-4.  Notify affected users (if any)
-5.  Document and update security procedures
+1. Rotate all secrets immediately
+2. Review access logs
+3. Patch vulnerability
+4. Notify affected users (if any)
+5. Document and update security procedures
 
 ## Deployment Workflow
 
 ### Pre-Deployment Checklist
 
--   [ ] All tests passing
--   [ ] Coverage >80%
--   [ ] No linting errors
--   [ ] Mobile testing complete
--   [ ] Environment variables configured
--   [ ] Database migrations ready
--   [ ] Backup created
+- [ ] All tests passing
+- [ ] Coverage >80%
+- [ ] No linting errors
+- [ ] Mobile testing complete
+- [ ] Environment variables configured
+- [ ] Database migrations ready
+- [ ] Backup created
 
 ### Deployment & Merge Steps
 
@@ -395,23 +404,23 @@ A task is complete when:
 > NEVER merge any Pull Request or feature branch to `main` without explicit user permission (e.g. `/mwc`, `/maw`, `/merge-it`).
 > Driving CI and review to clean does NOT grant merge authority.
 
-1.  Verify PR is fully clean across CI and adversarial review.
-2.  Obtain explicit user merge permission (`/mwc` / `/maw` / `/merge-it`).
-3.  Merge feature branch to `main`.
-4.  Tag release with version if applicable.
-5.  Verify post-merge state and cleanup worktrees.
+1. Verify PR is fully clean across CI and adversarial review.
+2. Obtain explicit user merge permission (`/mwc` / `/maw` / `/merge-it`).
+3. Merge feature branch to `main`.
+4. Tag release with version if applicable.
+5. Verify post-merge state and cleanup worktrees.
 
 ### Post-Deployment
 
-1.  Monitor analytics
-2.  Check error logs
-3.  Gather user feedback
-4.  Plan next iteration
+1. Monitor analytics
+2. Check error logs
+3. Gather user feedback
+4. Plan next iteration
 
 ## Continuous Improvement
 
--   Review workflow weekly
--   Update based on pain points
--   Document lessons learned
--   Optimize for user happiness
--   Keep things simple and maintainable
+- Review workflow weekly
+- Update based on pain points
+- Document lessons learned
+- Optimize for user happiness
+- Keep things simple and maintainable

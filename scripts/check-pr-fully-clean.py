@@ -1006,7 +1006,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     dated_matching = sorted((it for it in matching_items if it[1]), key=lambda it: it[1])
     latest_by_provider = {}
     for item in dated_matching:
-        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _has_finding_patterns(item[2], item[4], finding_patterns):
+        # A comment qualifies as a verdict if it has an explicit verdict, finding patterns, or is an implicit clean review
+        # (which is any comment that survived the is_non_review_notice filter and is not explicitly a status update).
+        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _has_finding_patterns(item[2], item[4], finding_patterns) or not item[2].lower().startswith(("starting review", "reviewing")):
             provider = _detect_review_agent(item[2]) or item[5]
             latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
@@ -1052,7 +1054,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 break
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
-        unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
+        unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and (classify_verdict(item[2], item[4]) == "clean" or not _has_finding_patterns(item[2], item[4], finding_patterns)))
         if len(unique_authors) < quorum:
             issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:

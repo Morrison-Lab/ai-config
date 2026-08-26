@@ -175,10 +175,13 @@ List tables also support row/cell attributes (`[]{.highlight}`, `[]{align=r}`), 
 
 ## Computational Tables
 
+**In this repo, use div syntax instead** --- see [`shared/writing/quarto-figure-captions.md`](../../../shared/writing/quarto-figure-captions.md).
+The chunk-option form below is the general Quarto convention this repo overrides.
+
 Tables generated from code:
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics."
 
@@ -186,14 +189,14 @@ Tables generated from code:
 ```
 ````
 
-**Engine note — table rendering differs by engine:**
+**Engine note --- table rendering differs by engine:**
 
 - **knitr engine**: Recognised table objects are rendered automatically (e.g. a data frame is printed as a markdown table without extra configuration).
 - **jupyter engine**: Cells that return a display-protocol object auto-display as HTML in HTML output only.
   For portable output across all formats, print a markdown table string and set `output: asis`:
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics."
 #| output: asis
@@ -224,7 +227,7 @@ tbl-cap-location: top
 ### Per Table
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-data
 #| tbl-cap: "Data."
 #| tbl-cap-location: bottom
@@ -269,7 +272,7 @@ See @tbl-panel, including @tbl-first.
 ### From Code
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-multi
 #| tbl-cap: "Multiple tables."
 #| tbl-subcap:

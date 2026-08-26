@@ -105,6 +105,15 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`r-pkg-check`](skills/r-pkg-check/SKILL.md) | | Run `devtools::check()`/`R CMD check` and triage the results |
 | [`r-pkg-news`](skills/r-pkg-news/SKILL.md) | | Draft a new NEWS.md entry for an R package |
 | [`r-pkg-cran-checklist`](skills/r-pkg-cran-checklist/SKILL.md) | | Walk through the standard CRAN submission checklist |
+| [`cran-extrachecks`](skills/cran-extrachecks/SKILL.md) | | Check the ad-hoc CRAN requirements `devtools::check()` doesn't catch |
+| [`create-release-checklist`](skills/create-release-checklist/SKILL.md) | | File a GitHub issue with a release checklist for an R package |
+| [`r-package-development`](skills/r-package-development/SKILL.md) | | Day-to-day R package dev loop: load, test, document, format |
+| [`testing-r-packages`](skills/testing-r-packages/SKILL.md) | | Full testthat reference: fixtures, mocking, snapshots, BDD-style tests |
+| [`quarto-authoring`](skills/quarto-authoring/SKILL.md) | | Author and convert Quarto documents |
+| [`lifecycle`](skills/lifecycle/SKILL.md) | | Apply lifecycle badges and deprecation stages to R package functions |
+| [`brand-yml`](skills/brand-yml/SKILL.md) | | Configure a shared `_brand.yml` for Quarto, Shiny, and R Markdown |
+| [`cli`](skills/cli/SKILL.md) | | Format CLI output with the R `{cli}` package |
+| [`release-post`](skills/release-post/SKILL.md) | | Draft a release announcement post for an R package |
 | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.md) | | Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability |
 | [`measure-performance`](skills/measure-performance/SKILL.md) | `perf`, `benchmark` | Profile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end |
 | [`refresh-claude-token`](skills/refresh-claude-token/SKILL.md) | `rct` | Rotate `CLAUDE_CODE_OAUTH_TOKEN` across the repos that carry it, without `/install-github-app`'s workflow scaffolding, then verify the new token authenticates |
@@ -131,8 +140,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 ## Full skill list
 
-All 181+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills)
-on GitHub. Generated Codex wrappers live in
-[`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills).
+All 198+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub.
+Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills).
 Each canonical `SKILL.md` has a `description` field that lists the trigger
 phrases and a full procedure.

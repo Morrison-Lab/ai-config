@@ -108,7 +108,7 @@ This appears in the right margin.
 ### Figures in Margin
 
 ````markdown
-```{language}
+```{<language>}
 #| column: margin
 #| fig-cap: "Margin figure."
 
@@ -127,7 +127,7 @@ Or for markdown images:
 ### Tables in Margin
 
 ````markdown
-```{language}
+```{<language>}
 #| column: margin
 #| tbl-cap: "Margin table."
 
@@ -155,7 +155,7 @@ Control output placement from code cells:
 ### Column Option
 
 ````markdown
-```{language}
+```{<language>}
 #| column: page
 
 # output spans page width
@@ -169,7 +169,7 @@ Options: `body`, `body-outset`, `page`, `page-inset`, `screen`, `screen-inset`, 
 Target figure outputs specifically:
 
 ````markdown
-```{language}
+```{<language>}
 #| fig-column: margin
 
 # code that produces a figure
@@ -181,7 +181,7 @@ Target figure outputs specifically:
 Target table outputs:
 
 ````markdown
-```{language}
+```{<language>}
 #| tbl-column: page
 
 # code that produces a wide table
@@ -193,7 +193,7 @@ Target table outputs:
 ### In Margin
 
 ````markdown
-```{language}
+```{<language>}
 #| fig-cap: "Figure with margin caption."
 #| cap-location: margin
 

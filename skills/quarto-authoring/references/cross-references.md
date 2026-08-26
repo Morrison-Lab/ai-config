@@ -96,7 +96,7 @@ Tables [-@tbl-one; -@tbl-two] show...
 ### Code-Generated Figures
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-scatter
 #| fig-cap: "Scatter plot of x versus y."
 
@@ -134,7 +134,7 @@ See @fig-animals, specifically @fig-cat.
 ### Code-Generated Tables
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics."
 

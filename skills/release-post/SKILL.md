@@ -94,7 +94,7 @@ Follow the best practices in `references/content-guidelines.md`:
 
 Convert NEWS.md bullets to blog-friendly content:
 
-- **Research features thoroughly**: Don't just copy NEWS bullets—read function docs, check PRs, understand the context
+- **Research features thoroughly**: Don't just copy NEWS bullets --- read function docs, check PRs, understand the context
 - **Expand context**: Why changes matter, not just what changed
 - **Add complete code examples**: Show realistic usage with full workflows, not just function signatures
 - **Explain concepts first**: For unfamiliar features, explain what they are and how they work before showing code

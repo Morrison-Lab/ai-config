@@ -9,7 +9,7 @@ license: MIT
 
 # Quarto Authoring
 
-> This skill is based on Quarto CLI v1.9.36 (2026-03-24).
+> This skill is based on Quarto CLI v1.9.36, released 2026-03-19.
 
 ## When to Use What
 
@@ -108,7 +108,7 @@ Options use **dashes, not dots** (e.g., `fig-cap` not `fig.cap`).
 - Graphviz/DOT: `//|`
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-example
 #| echo: false
 #| fig-cap: "A scatter plot example."
@@ -125,8 +125,8 @@ execute:
   warning: false
 ```
 
-**Caching — critical engine difference:** Only suggest `#| cache: true` for R code cells (knitr engine).
-Never suggest it for other language cells — it does not work and will be silently ignored.
+**Caching --- critical engine difference:** Only suggest `#| cache: true` for R code cells (knitr engine).
+Never suggest it for other language cells --- it does not work and will be silently ignored.
 The only correct approach is `execute: cache: true` in the top-level YAML front matter when using engines other than `knitr`.
 Python/Jupyter requires `jupyter-cache` (`pip install jupyter-cache`):
 
@@ -148,7 +148,7 @@ Reference with `@`:
 - Equation: `eq-` prefix, e.g., `{#eq-model}` → `@eq-model`
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-plot
 #| fig-cap: "A caption for the plot."
 
@@ -294,6 +294,11 @@ format:
   html:
     theme: cosmo
 ```
+
+## Relationship to other skills
+
+This skill covers general Quarto authoring and documents the upstream chunk-option syntax (`#| label: fig-...`, `#| fig-cap: "..."`) that Quarto itself supports for figure and table captions.
+This repo overrides that convention for its own `.qmd` files: [`shared/writing/quarto-figure-captions.md`](../../shared/writing/quarto-figure-captions.md) requires div syntax (`::: {#fig-...}` / `::: {#tbl-...}`) instead, and that lab-specific rule takes precedence over the chunk-option examples in this skill's `references/figures.md` and `references/tables.md` whenever the document under edit belongs to this repo.
 
 ## Resources
 

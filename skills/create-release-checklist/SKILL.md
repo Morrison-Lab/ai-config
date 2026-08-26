@@ -49,7 +49,8 @@ First, check that the prerequisites are available (in this order for efficiency)
    If that fails, diagnose the error:
    - If `gh` is not installed, try running `git remote -v` to find a GitHub URL.
    - If the local repo does not have a GitHub remote, suggest the user connect the package to GitHub using `usethis::use_github()`.
-     Offer to run this command for the user; if they decline, continue without a GitHub URL.
+     Offer to run this command for the user.
+     If they decline, continue without a GitHub URL.
    - If `gh` is installed but not authenticated and the repo has a GitHub remote, suggest that the user run `gh auth login`.
 
 If any check fails, inform the user of the specific issue with clear instructions on how to fix it, then stop the workflow.
@@ -171,3 +172,10 @@ If the issue creation fails, preserve the checklist content and offer to:
 
 - Retry the command.
 - Display the checklist for manual issue creation instead.
+
+## Relationship to other skills
+
+This skill files a tracking issue with a checklist.
+It does not run any of the checklist's items.
+[`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) and [`cran-extrachecks`](../cran-extrachecks/SKILL.md) are the skills that actually perform CRAN-readiness checks.
+[`release-post`](../release-post/SKILL.md) drafts the release announcement once the release ships, and [`r-pkg-news`](../r-pkg-news/SKILL.md) drafts the `NEWS.md` entry beforehand.

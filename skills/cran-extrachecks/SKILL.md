@@ -478,3 +478,9 @@ Use this checklist to ensure nothing is missed before submission:
 ### Optional but Recommended
 - [ ] If concerns about method references, added preemptive note to `cran-comments.md`
 - [ ] Reviewed bundled file licensing if including third-party files
+
+## Relationship to other skills
+
+This is the ad-hoc / stylistic checklist (Title case, `@return` tags, `\dontrun{}` usage, URL hygiene) that `devtools::check()` doesn't catch on its own.
+[`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) covers the release mechanics this skill does not: win-builder, revdep checks, and `devtools::release()`.
+Run both for a CRAN submission --- neither subsumes the other.

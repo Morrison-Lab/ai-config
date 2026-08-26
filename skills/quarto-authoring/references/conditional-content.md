@@ -177,7 +177,7 @@ quarto render --profile development
 ````markdown
 ::: {.content-visible when-format="html"}
 
-```{language}
+```{<language>}
 # interactive output for HTML
 ```
 
@@ -185,7 +185,7 @@ quarto render --profile development
 
 ::: {.content-visible when-format="pdf"}
 
-```{language}
+```{<language>}
 # static output for PDF
 ```
 

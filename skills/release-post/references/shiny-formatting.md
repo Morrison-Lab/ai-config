@@ -471,7 +471,7 @@ Every code example should include both R and Python variants using Quarto tabset
 - Use `group="language"` to sync all language tabsets on the page
 - Provide equivalent functionality in both languages
 - Don't show R-only or Python-only examples unless the feature is language-specific
-- Keep examples parallel—if the R example shows 5 lines, the Python example should be similar
+- Keep examples parallel --- if the R example shows 5 lines, the Python example should be similar
 
 ### Installation Instructions
 

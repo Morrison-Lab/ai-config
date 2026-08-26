@@ -154,7 +154,7 @@ format:
 author: "Author Name"
 ```
 
-The same mapping applies to `config.toml` — convert TOML keys to the equivalent Quarto YAML.
+The same mapping applies to `config.toml` --- convert TOML keys to the equivalent Quarto YAML.
 
 ## Blog Setup
 

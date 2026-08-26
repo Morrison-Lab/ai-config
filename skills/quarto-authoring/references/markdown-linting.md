@@ -2,13 +2,13 @@
 # Markdown Linting
 
 Quarto documents should follow standard [markdownlint](https://github.com/markdownlint/markdownlint) rules.
-This file covers only Quarto-specific allowances and configuration — refer to the markdownlint docs for general rules.
+This file covers only Quarto-specific allowances and configuration --- refer to the markdownlint docs for general rules.
 
 ## Quarto-Specific Allowances
 
 ### Line Length (MD013)
 
-Typically disabled for Quarto — prose paragraphs may be long and YAML/code lines can exceed limits.
+Typically disabled for Quarto --- prose paragraphs may be long and YAML/code lines can exceed limits.
 
 ### Duplicate Headings (MD024)
 

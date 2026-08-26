@@ -73,7 +73,7 @@ The hashpipe comment prefix depends on the cell type:
 For portable output across all formats, print a markdown string and use `output: asis`:
 
 ````markdown
-```{language}
+```{<language>}
 #| tbl-cap: "Summary statistics."
 #| output: asis
 

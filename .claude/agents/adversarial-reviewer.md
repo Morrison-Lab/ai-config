@@ -32,12 +32,14 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Read every cited source against what it actually says, rather than checking that the link resolves.
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
 
-3. **The Slop Detector & Structural Contempt**
-   - **Guilty Until Proven Exceptional**: Assume every line is broken, inefficient, or lazy until it demonstrates otherwise.
-     Evaluate the artifact, not the intent.
-     `// TODO: handle edge case` means the edge case isn't handled.
-   - **Slop Detector**: Flag obvious comments (e.g. `// increment counter` above `counter++`), lazy naming (`data`, `temp`, `df`, `x`), copy-paste artifacts, cargo cult code, and dead code.
-   - **Structural Contempt**: Flag functions doing multiple unrelated things, "junk drawer" files, inconsistent patterns within the same PR, and import chaos.
+3. **The Slop Detector**
+   - Default to skepticism: evaluate what the artifact actually does, never what the surrounding comment or commit message claims it does.
+     A `// TODO: handle edge case` comment is not a handled edge case.
+     File it under step 1's unhandled-edge-case check rather than taking the comment's word for it.
+   - Flag obvious placeholder comments (e.g. `// increment counter` above `counter++`), copy-paste artifacts, cargo cult code, and dead code.
+   - Flag lazy naming only when the name is genuinely uninformative in its context (`data1`, `temp`, `foo`, a single unexplained letter used across an unrelated scope).
+     A name this corpus's own style guide prefers --- `df` for a data frame, per `shared/coding/tidy-code.md` --- is not a finding.
+   - Flag a function doing multiple unrelated things, a file with no coherent purpose ("everything else" catch-all), inconsistent patterns within the same diff, or an import added but never used --- each as a concrete `[Defect]` naming the file, line, and what the fix would be, never as an unfalsifiable vibe.
 
 4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.

@@ -8,7 +8,7 @@ Quarto uses a hashpipe (`#|`) syntax for code cell options, providing a clean, Y
 Code cell options are specified with `#|` at the start of lines within the code block:
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-scatter
 #| echo: false
 #| fig-cap: "A scatter plot of x versus y."
@@ -22,7 +22,8 @@ Code cell options are specified with `#|` at the start of lines within the code 
 **Important:** Options use **dashes, not dots**.
 Use `fig-cap` not `fig.cap`, `fig-width` not `fig.width`.
 
-The hashpipe prefix is `#|` for R, Python, and Julia; diagram cells use a different prefix.
+The hashpipe prefix is `#|` for R, Python, and Julia.
+Diagram cells use a different prefix.
 See [engines.md](engines.md) for the full table.
 
 ## Execution Options
@@ -43,7 +44,7 @@ Control whether and how code is executed:
 Show code but don't run it:
 
 ````markdown
-```{language}
+```{<language>}
 #| eval: false
 
 # This code is displayed but not executed
@@ -53,7 +54,7 @@ Show code but don't run it:
 Run code but hide it:
 
 ````markdown
-```{language}
+```{<language>}
 #| echo: false
 
 # This code runs but is not shown
@@ -63,7 +64,7 @@ Run code but hide it:
 Show fenced code block with attributes:
 
 ````markdown
-```{language}
+```{<language>}
 #| echo: fenced
 
 # code here
@@ -78,10 +79,11 @@ Use it when your code prints a pre-formatted markdown or raw string that Quarto 
 Requirements:
 
 - The output must already be valid markdown (pipe table, headings, prose) or a raw block (` ```{=html} `, ` ```{=latex} `).
-- `tbl-cap` on an `output: asis` cell does not behave identically to the knitr table-rendering path; prefer a div-wrapped caption for reliability.
+- `tbl-cap` on an `output: asis` cell does not behave identically to the knitr table-rendering path.
+  Prefer a div-wrapped caption for reliability.
 
 ````markdown
-```{language}
+```{<language>}
 #| output: asis
 
 # print("| Col A | Col B |\n| ----- | ----- |\n| 1     | 2     |")
@@ -107,7 +109,7 @@ Options for controlling figure output:
 ### Figure Example
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-analysis
 #| fig-cap: "Analysis results showing the relationship between variables."
 #| fig-alt: "Scatter plot with trend line showing positive correlation."
@@ -122,7 +124,7 @@ Options for controlling figure output:
 ### Multiple Figures
 
 ````markdown
-```{language}
+```{<language>}
 #| label: fig-panels
 #| fig-cap: "Multiple panel figure."
 #| fig-subcap:
@@ -148,7 +150,7 @@ Options for controlling table output:
 ### Table Example
 
 ````markdown
-```{language}
+```{<language>}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics by group."
 
@@ -156,13 +158,14 @@ Options for controlling table output:
 ```
 ````
 
-Table rendering behaviour differs between the knitr and jupyter engines; see [tables.md](tables.md) for details.
+Table rendering behaviour differs between the knitr and jupyter engines.
+See [tables.md](tables.md) for details.
 For markdown table output from code, use `output: asis` (see the [output: asis](#output-asis) section above).
 
 ## Caching and Freeze
 
 Only suggest `#| cache: true` for R code cells (knitr engine).
-It is not valid for Python or Julia cells — the jupyter engine silently ignores it.
+It is not valid for Python or Julia cells --- the jupyter engine silently ignores it.
 
 For Python and Julia, caching is document-level only.
 Install `jupyter-cache` (`pip install jupyter-cache`) and set in YAML front matter:
@@ -231,7 +234,7 @@ format:
 Per cell override:
 
 ````markdown
-```{language}
+```{<language>}
 #| code-fold: show
 
 # This code is visible by default
@@ -243,7 +246,7 @@ Per cell override:
 Add annotations to explain code:
 
 ````markdown
-```{language}
+```{<language>}
 #| code-annotations: hover
 
 step_one()   # <1>
@@ -263,7 +266,7 @@ Annotation styles: `hover`, `select`, `below`, `beside`.
 Show a filename above the code block:
 
 ````markdown
-```{language}
+```{<language>}
 #| filename: "analysis.ext"
 
 # code here

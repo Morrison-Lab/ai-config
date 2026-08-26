@@ -48,6 +48,9 @@ air format .
 
 ## Testing
 
+For the full testthat API (fixtures, mocking, snapshots, BDD-style tests), see [`testing-r-packages`](../testing-r-packages/SKILL.md).
+This section's snapshot-first preference for errors and warnings is this author's own convention, not a universal rule --- when a package's existing test suite already uses `expect_error()`/`expect_warning()` directly, match that precedent instead of converting it.
+
 - Tests for `R/{name}.R` go in `tests/testthat/test-{name}.R`.
 - All new code should have an accompanying test.
 - If there are existing tests, place new tests next to similar existing tests.
@@ -67,6 +70,9 @@ air format .
 
 ## `NEWS.md`
 
+This is the tidyverse-style default.
+When the package already has an established `NEWS.md` style, match that existing style instead --- see [`r-pkg-news`](../r-pkg-news/SKILL.md), whose whole job is reading a package's precedent before drafting a new entry.
+
 - Every user-facing change should be given a bullet in `NEWS.md`.
   Do not add bullets for small documentation changes or internal refactorings.
 - Each bullet should briefly describe the change to the end user.
@@ -74,3 +80,13 @@ air format .
 - If the bullet is related to a GitHub issue or pull request, reference it by number in parentheses before the final period: `(#123).`.
 - Order bullets alphabetically by function name.
   Put all bullets that don't mention function names at the beginning.
+
+## Relationship to other skills
+
+This skill is a day-to-day dev-loop reference (load, test, document, format) with this author's own conventions.
+It does not replace, and does not cover:
+
+- [`r-pkg-check`](../r-pkg-check/SKILL.md) --- running and triaging `devtools::check()` output.
+- [`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) --- the CRAN submission checklist (Title case, `@return` tags, `urlchecker`, win-builder, revdeps).
+- [`r-pkg-news`](../r-pkg-news/SKILL.md) --- matching a package's existing `NEWS.md` style, which overrides this skill's own default above.
+- [`testing-r-packages`](../testing-r-packages/SKILL.md) --- the full testthat API (fixtures, mocking, snapshots, BDD-style tests), which overrides this skill's own error/warning-testing preference above.

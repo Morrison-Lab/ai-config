@@ -30,8 +30,35 @@ if (!requireNamespace("usethis", quietly = TRUE)) {
 
 new_version <- args[1]
 url <- if (length(args) >= 2) args[2] else NULL
-on_cran <- !is.null(usethis:::cran_version())
 
-target_repo <- if (!is.null(url)) list(url = url) else NULL
-checklist <- usethis:::release_checklist(new_version, on_cran, target_repo)
+# `cran_version()` and `release_checklist()` are unexported usethis
+# internals --- this script generates the checklist TEXT only, so the
+# customization loop in this skill's Step 4 can run before the issue is
+# filed, which usethis's own exported `use_release_issue()` doesn't allow
+# (it creates the issue immediately, with no interactive review step).
+# An unexported signature can change between usethis releases with no
+# deprecation warning, so fail with a concrete fallback rather than a raw
+# error.
+fallback_message <- paste(
+  "Error: usethis's internal checklist API is unavailable or has changed",
+  "(this script calls unexported usethis:::cran_version() and",
+  "usethis:::release_checklist(), which carry no compatibility guarantee).",
+  "Fall back to running usethis::use_release_issue() directly --- it",
+  "creates the release issue itself, without this skill's interactive",
+  "customization step.",
+  sep = "\n"
+)
+
+checklist <- tryCatch(
+  {
+    on_cran <- !is.null(usethis:::cran_version())
+    target_repo <- if (!is.null(url)) list(url = url) else NULL
+    usethis:::release_checklist(new_version, on_cran, target_repo)
+  },
+  error = function(e) {
+    cat(fallback_message, "\n", file = stderr())
+    cat("Original error: ", conditionMessage(e), "\n", file = stderr())
+    quit(status = 1)
+  }
+)
 cat(checklist, sep = "\n")

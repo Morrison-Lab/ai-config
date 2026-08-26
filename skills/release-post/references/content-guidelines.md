@@ -176,7 +176,7 @@ Read about [the feature](#feature) below to learn why this change was needed.
 
 ### Deep Dives on Features
 
-Don't just list features from NEWS—research them and provide comprehensive explanations:
+Don't just list features from NEWS --- research them and provide comprehensive explanations:
 
 **Transform NEWS bullets into complete sections:**
 

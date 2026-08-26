@@ -430,4 +430,10 @@ When working with testthat 3 code, prefer modern patterns:
 
 **Find slow tests:** `devtools::test(reporter = "slow")`
 
-**Shuffle tests:** `devtools::test(shuffle = TRUE)` . .
+**Shuffle tests:** `devtools::test(shuffle = TRUE)`
+
+## Relationship to other skills
+
+This is the general testthat reference: fixtures, mocking, snapshots, BDD-style tests, and the full expectation API, including `expect_error()`/`expect_warning()`.
+[`r-package-development`](../r-package-development/SKILL.md) has a narrower, author-specific preference for snapshot-testing errors and warnings instead --- when the two disagree, match whichever style the package under edit already uses.
+Neither skill covers `R CMD check` output ([`r-pkg-check`](../r-pkg-check/SKILL.md)) or CRAN submission ([`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md)).

@@ -354,6 +354,27 @@ def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[st
         return None
 
 
+def _workflow_path_for_run(run_id: str, repo: str, cache: dict) -> Optional[str]:
+    """Resolve a workflow file path from an Actions run id, with per-call caching."""
+    if run_id in cache:
+        return cache[run_id]
+    try:
+        out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
+        path = json.loads(out).get("path") or ""
+    except RuntimeError:
+        path = ""
+    cache[run_id] = path
+    return path or None
+
+
+def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[str]:
+    url = cr.get("html_url") or ""
+    m = re.search(r"/actions/runs/(\d+)/", url)
+    if not m:
+        return None
+    return _workflow_path_for_run(m.group(1), repo, cache)
+
+
 def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
     data = json.loads(out)
@@ -377,11 +398,16 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
 
     # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
     # a later success with the same job name on the same SHA (ai-config#2277).
-    success_names = {
-        cr["name"]
-        for cr in check_runs
-        if cr.get("status") == "completed" and cr.get("conclusion") == "success"
-    }
+    # Scope by workflow file path, not name alone: two workflows can share a job
+    # name (#1869) without one run superseding the other.
+    workflow_cache: dict = {}
+    success_keys = set()
+    for cr in check_runs:
+        if cr.get("status") != "completed" or cr.get("conclusion") != "success":
+            continue
+        wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
+        if wp:
+            success_keys.add((cr["name"], wp))
 
     for cr in check_runs:
         name = cr["name"]
@@ -405,8 +431,10 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
-            if conclusion == "cancelled" and name in success_names:
-                continue
+            if conclusion == "cancelled":
+                wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
+                if wp and (name, wp) in success_keys:
+                    continue
             issues.append(
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")

@@ -46,6 +46,11 @@ Worked-example case records for the rules below live in
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**
+   GraphQL `statusCheckRollup` is the same kind of short surface for a
+   *progress* report --- not enough for a terminal "fully clean" /
+   "ready to merge" claim.
+   That claim needs `scripts/check-pr-fully-clean.py`
+   (ai-config#2277, 2026-08-26).
 
    **`--paginate` is load-bearing, not tidiness.**
 
@@ -166,7 +171,8 @@ Worked-example case records for the rules below live in
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)
 
-2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+   A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
 
 **Criterion 2's test is the absence of findings, not the presence of a verdict
 line saying so.**
@@ -218,6 +224,22 @@ So when Claude is reachable, its verdict is the one to report on:
   know which agent answered, and on a selector-based setup the agent is chosen
   at random.
 
+**A disagreement among reviews vetoes merge, including under `mwc`.**
+Criterion 2 is every reviewer's latest verdict, not the globally last comment.
+If one review is all-clear and another raises blocking issues, nits, minor
+items, or any other flagged heading, the findings win.
+ARD every item from every review, then request fresh reviews.
+A later all-clear from a different reviewer does not supersede a standing
+not-clean; only a later clean from the same reviewer does
+(the ordinary ARDI iterate path).
+`check-pr-fully-clean.py` encodes the per-reviewer scan
+(ai-config#2274).
+
+- **Do:** ARD the union of findings from every review, then request a fresh
+  round from the reviewers that spoke.
+- **Don't:** merge on one reviewer's all-clear while another still has a
+  standing not-clean, even with `mwc` active.
+
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a
@@ -237,6 +259,18 @@ Note that merging autonomously under `mwc` (merge-when-confident) strictly requi
 a genuine clean automated Claude review verdict evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
+
+**One more gate stacks on top (user directive, 2026-08-25):
+no merge under any grant, `mwc` included,
+without a 100% all-clear adversarial verdict at the shipping head from a
+reviewer meeting [`adversarial-self-review`](adversarial-self-review.md)'s
+independence bar.**
+It composes with the external-reviewer requirement above ---
+neither satisfies the other.
+When the external reviewer self-skips by design (workflow modification is
+the known case), autonomous merging stays blocked:
+human approval is the only path.
+Specification and mechanics live in that fragment.
 
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".
@@ -385,8 +419,19 @@ See [`fully-clean.cases.md`](fully-clean.cases.md),
 
 **A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
 
-When a review run skips (e.g. self-modification workflow guard or quota limits) and falls back to a self-review or human review per [`self-review-fallback`](self-review-fallback.md), that fallback authorizes **merging** only in the absence of prior unresolved findings.
-It does NOT wipe the slate clean, and it does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run.
+When a review run skips
+(e.g. self-modification workflow guard or quota limits)
+and falls back to a self-review or human review per
+[`self-review-fallback`](self-review-fallback.md),
+that fallback lets the ARDI iteration loop proceed
+in the absence of prior unresolved findings.
+It never satisfies an autonomous merge gate ---
+autonomous merging under `mwc` remains blocked per the merge gate above,
+and human approval is the only path.
+It does NOT wipe the slate clean,
+does NOT license merging over an unaddressed `Needs more work` verdict
+or open finding list from an earlier or concurrent review run,
+and does NOT clear the all-clear merge gate above.
 
 - **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or ready to merge.
 - **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.

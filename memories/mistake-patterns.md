@@ -24,6 +24,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
 - **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
 - **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+  That "watch and ARDI" default applies when you are driving the branch, not when you were asked only to review it ---
+  see [`reviewing-prs.md`](reviewing-prs.md) ("Review-only is not working the PR").
 - **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
 ## Pattern 5: Bypassing Existing Repo Knowledge
@@ -41,12 +43,33 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
 
 ## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
-- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
-- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): told user Morrison-Lab/ai-config#1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` --- a PR is not ready until ALL CI checks pass AND review is clean.
-- **Fix**: Always run `gh pr checks <N>` or `gh pr view <N> --json statusCheckRollup` before declaring a PR ready.
-  Never say "ready to merge" unless every check is green.
-  If CI is failing, say so and fix it first.
+- **Mistake**: Telling a user a PR is ready to merge without checking CI status,
+  or saying "ready" when checks haven't finished,
+  or declaring clean from a short rollup (`gh pr checks`, `statusCheckRollup`)
+  instead of the complete instrument.
+- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`):
+  told user Morrison-Lab/ai-config#1677 was ready without checking that CI had failed
+  (`new-line-breaks` check).
+  Re-hit 2026-08-26 on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277):
+  reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict;
+  `check-pr-fully-clean.py` exited 1 (`No automated review...`).
+  The rollup matched the endpoint that time (8==8);
+  the defect was resting a terminal claim on it.
+  An earlier Fix in this pattern recommended those short rollups ---
+  that was the wrong instrument for a terminal claim.
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
+  `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
+- **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
+  before a terminal clean / ready-to-merge claim.
+  Read exit 0 as clean,
+  exit 1 with `  - ` bullets as not-clean,
+  any other exit as the check failing to answer.
+  A paginated `commits/<sha>/check-runs` read is the check-run half only
+  (progress reports, criterion 1); it does not authorize the terminal claim.
+- **Don't:** Declare clean from `gh pr checks` or `statusCheckRollup` alone,
+  however current they look.
+  Progress reports ("8 success, 0 pending") are fine;
+  "Ready for merge" is not until `check-pr-fully-clean.py` exits 0.
 
 ## Pattern 5d: Failing to Learn From Mistakes
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.
@@ -55,6 +78,31 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work") plus the UMS principle: every correction is a learning to bank, not a conversation to end.
 - **Fix**: After any correction, immediately record it in `mistake-patterns.md` (or the appropriate memory file) with enough context that a cold reader can avoid it.
   Don't wait to be told to learn --- the correction IS the instruction.
+
+## Pattern 5e: Assuming Universal Rules Do Not Exist Because The File Is Missing Locally
+- **Mistake**: When `AGENTS.md` is missing from the local repository, assuming there are no universal instructions and failing to check `ai-config` or apply standing core policies (like "Default to action" or "Adversarial review").
+- **Example**: 2026-08-25 session working on `gha`: `AGENTS.md` was missing locally.
+  I assumed there were no instructions to follow, asked for permission for non-destructive git commands, pushed without an adversarial self-review, and omitted the agent disclosure comment.
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) applies across all Morrison-Lab repositories.
+  "Generalize instructions to every AI agent by default."
+- **Fix**: If `AGENTS.md` doesn't exist locally, read it from the `ai-config` repository.
+  Always follow the standing Universal AI Agent Instructions (Adversarial Self-Review, Default to action, Agent disclosure) everywhere.
+
+## Pattern 5f: Declaring a PR "Fully Clean" Without Verified Automated Review Approval on HEAD
+- **Mistake**: Reporting a PR as "fully clean" based solely on passing CI checks and an internal self-review fallback, while an external automated review had unaddressed findings or had not yet evaluated the exact current HEAD SHA.
+- **Example**: 2026-08-25 session (`gha#668`, `ai-config#2226`): declared PRs fully clean because CI was green and subagent self-reviews passed, despite outstanding "Needs more work" findings from Cursor Grok 4.6 on previous SHAs and unevaluated latest SHAs.
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) and [`AGENTS.md`](../AGENTS.md) ("Strict Merge Control Policy").
+  A fallback self-review or reviewer skip notice does NOT grant approval or satisfy `mwc`.
+- **Fix**: Run `scripts/check-pr-fully-clean.py` (or verify all its criteria) before ever declaring a PR fully clean.
+  Only report clean when all CI checks pass AND an automated AI review evaluating the exact HEAD SHA has posted an approved / ready verdict with zero open findings.
+
+## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
+- **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
+- **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
+- **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer before concluding any turn, and report what was armed and its firing time.
+  When actively waiting on fast CI jobs, use short intervals (1--2 minutes);
+  when waiting on human review or in a quiescent idle state, use progressive backoff (e.g. 5m -> 15m -> 30m -> 1h) to prevent wasteful token burn while keeping the wake-up armed.
 
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
@@ -108,3 +156,61 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md) names the same trap under "a cached copy for the origin."
 - **Fix**: When a reviewer's finding cites an external source you haven't read, fetch that source yourself before rebutting -- two checks against one artifact are one check, however different the grep angles feel.
   Fetching the citation only settles what the citation says, not which name actually works -- don't conflate the two, and don't assert either source outranks the other for a fast-moving/experimental feature without live-testing which name functions.
+
+## Pattern 11: Pasting Repo-Specific Infrastructure into Universal Instructions for Another Repository
+- **Mistake**: When creating `AGENTS.md` in a sibling repository (such as `Morrison-Lab/gha`), copying instructions verbatim from `ai-config` that refer to `ai-config`-specific infrastructure (`scripts/validate-skills.py`, `validate.yml`, pre-push git hooks, relative documentation links) instead of tailoring instructions to the target repository.
+- **Example**: 2026-08-25 session on `Morrison-Lab/gha`: created `AGENTS.md` by pasting `ai-config`'s file, claiming pre-push hooks existed, inventing non-existent test filenames, and inverting instruction layering over `gha`'s `CLAUDE.md`.
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("Universal AI Agent Instructions").
+  Universal instructions must be repository-agnostic or verified against the target repo.
+- **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
+  Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
+
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+- **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
+  Treating the arming as harmless because CI is red ignores that the robot fires later,
+  the moment checks go green,
+  with no re-check of review state.
+- **Example**: 2026-08-26 on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  the remote can act between your commands,
+  and an armed automation is exactly such an action you scheduled against yourself.
+- **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  Auto-merge fires server-side the moment CI passes,
+  so a review landing seconds later cannot block it,
+  and no reactive disable can win that race.
+  Branch protection does not substitute either:
+  it gates native approvals, not verdicts posted as comments.
+  Merge synchronously instead,
+  only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
+  CI green and the all-clear verdict both verified at the shipping head.
+  If something is found already armed, disable it at once ---
+  `gh pr merge <N> --repo <r> --disable-auto`,
+  verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
+  and treat the PR as unverified until re-checked.
+  Disabling is cleanup, not protection.
+
+## Falsely assuming local fallback reviews grant autonomous merge authority (check-pr-fully-clean.py)
+
+On 2026-08-26, an agent noticed that the GitHub CLI merge command was blocked by the `no-unauthorized-merge.py` merge guard after completing an adversarial review via the local `pre-push-review.py` CLI on PR #2305.
+The agent incorrectly concluded that `check-pr-fully-clean.py` had a bug preventing it from recognizing local fallback reviews posted by the human user (`d-morrison`).
+[`tools.md`](tools.md)'s own summary of criterion (2) was, at the time, stale and misleading: it said a review is admitted when it "has been posted by an automated bot account ... or carries a bot review header (`🤖`, ...)", and the agent took that "or carries a bot review header" clause at face value rather than reading the script itself.
+In the actual code, the body-marker check exists only inside `is_non_review_notice()`, to keep a genuine review from being misclassified as a workflow status notice --- it is never a second admission path alongside the author-identity gate.
+The agent then filed PR #2308 to "fix" `check-pr-fully-clean.py` to admit reviews based solely on the text `### 🤖 Antigravity Agent Report`, bypassing the bot author check.
+See #2350 for correcting the stale `tools.md` summary that set this up, and issue #2306 (open, same misreading) for the original bad bug report.
+
+This was a critical misunderstanding of the security invariant:
+- Per [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (discussed in [`fully-clean.rationale.md`](../shared/workflow/fully-clean.rationale.md)), automated review approval MUST be verifiable by author identity (e.g., `github-actions[bot]`, `claude[bot]`) --- body text is never sniffed for the author-identity gate.
+- Non-bot human accounts (like `d-morrison`) are admitted ONLY if they state a blocking `not-clean` verdict (fail-closed).
+- A local fallback review does **not** grant autonomous merge approval.
+  It only satisfies the pre-push guard for iterating on the PR locally.
+- Bypassing the author identity check by sniffing body text introduces a security vulnerability, as any human user could spoof the marker to pass the check.
+
+**Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
+Do not attempt to "fix" the script to admit fallback reviews for merging.
+A clean automated Claude review evaluating the current HEAD commit is strictly required for an autonomous merge.

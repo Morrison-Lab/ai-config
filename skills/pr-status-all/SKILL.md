@@ -56,6 +56,11 @@ calls in one message) so they run at once. The fan-out is read-only, so it
 needs **no worktrees** --- each subagent only reads PR signals, nothing mutates,
 and there is nothing to collide on.
 
+**Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out per-PR subagents.
+Unbounded concurrent subagents would exhaust the session's token quota.
+Instead, build a **condensed** table straight from Step 1's own fields (title, `headRefName`, `isDraft`, author) plus one cheap orchestrator-level `gh pr checks` pass per PR for CI state --- skip the seven-signal subagent depth (review currency, external-reviewer check, thread counts, behind-main) entirely.
+Label the table's heading "Condensed --- queue too large for full per-PR review (N open PRs)" so it reads as lower-fidelity rather than as the standard dashboard, and note that a full audit is available on a smaller subset or via `ardia`.
+
 Give each subagent its PR number, `headRefName`, and `isDraft`, and have it gather the **seven independent signals** below and return one structured row.
 Carry the disciplines into the prompt --- a subagent that doesn't follow *Read the LATEST review* will silently misreport:
 

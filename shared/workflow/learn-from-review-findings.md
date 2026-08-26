@@ -17,6 +17,13 @@ So when you Address a finding --- as opposed to Rebut or Defer it, per [`ardi`](
    A finding with a decidable condition --- a banned token, a stale cross-reference, a missing test for new logic, a doc a diff falsified --- is one a pre-push check or a hook can catch every time thereafter, so the next reviewer never has to.
    That is the mechanism half of `hooks/no-mistake-without-a-hook.py`, one class of mistake over: the reviewer's finding is the incident, and the guard built from it is what turns "the reviewer keeps catching this" into "the reviewer never sees it again".
 
+The UMS pass itself now fires earlier than Address: on *reading* the review,
+and on critical feedback or a questioned claim that was wrong, per
+[`run-ums-proactively`](run-ums-proactively.md).
+This section's two steps still attach to Address.
+The read-time pass is the bank.
+Address is the class-of-mistake write-up.
+
 The lever that actually delivers a clean first push is the pre-push self-review [`ardi`](ardi.md) already requires: the project's own review skills and checks applied to your own diff *before* pushing, so a finding you would have accepted is one you caught first.
 Dispatch that pass rather than performing it --- a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent, per [`adversarial-self-review`](adversarial-self-review.md) --- since the session that wrote the diff is the one party that reads it already knowing what it meant.
 A finding a reviewer raises that your own stated conventions already covered is a self-review that did not run, not new information --- see [`copilot-review-before-human`](../vendored/copilot-review-before-human.md) for the same point about catching issues before a human sees them.

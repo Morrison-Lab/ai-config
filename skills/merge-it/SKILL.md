@@ -36,7 +36,7 @@ standing yes (see `preferences.md`).
 - Confirm it is **fully clean** before merging (the ARDI terminal state — see
   `shared/workflow/fully-clean.md`): every CI workflow and check run — not
   just required ones — is green **and completed** (never still queued or in
-  progress) AND the latest review is clean.
+  progress) AND every reviewer's latest verdict is clean.
   Verify with a fresh query, not a cached verdict:
   `mcp__github__pull_request_read` (`get` for `mergeable_state`, `get_check_runs`
   for CI) — or `gh pr view <N>` / `gh pr checks <N>` in a local session.

@@ -883,7 +883,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login)
+        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) == "Antigravity"
         verdict = classify_verdict(body)
 
         # Automated reviews must be authored by a recognized bot author.
@@ -905,7 +905,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login)
+        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) == "Antigravity"
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 

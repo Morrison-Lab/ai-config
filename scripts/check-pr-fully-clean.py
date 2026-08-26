@@ -883,7 +883,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login)
+        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
         verdict = classify_verdict(body)
 
         # Automated reviews must be authored by a recognized bot author.
@@ -905,7 +905,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login)
+        is_bot_author = _is_bot_author(author_login) or has_review_body_marker(body)
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
@@ -972,6 +972,13 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
     ]
 
+    dated_matching = sorted((it for it in matching_items if it[1]), key=lambda it: it[1])
+    latest_by_provider = {}
+    for item in dated_matching:
+        provider = _detect_review_agent(item[2]) or item[5]
+        latest_by_provider[provider] = item
+    matching_items = list(latest_by_provider.values())
+
     has_findings = False
     for item in matching_items:
         body = item[2]
@@ -1013,7 +1020,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 break
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
-        unique_authors = set(item[5] for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
+        unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
         if len(unique_authors) < quorum:
             issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:

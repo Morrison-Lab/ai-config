@@ -115,8 +115,7 @@ sits unread.
    Re-applying fixes that are already in the tree wastes a round and muddies the diff.
    If *nothing* remains outstanding (every finding is already applied), don't push an empty commit --- skip to step 6 and re-request the review directly.
 
-   **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), do not stall the PR.
-   Instead of parallel fallback requests, you must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
+   **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), you must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 
    This loop requires you to pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent) and query them sequentially, one at a time.
    Do not request them in parallel.

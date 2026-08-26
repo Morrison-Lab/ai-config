@@ -5,9 +5,9 @@ The live memory is the known-clean control. Each finding has its own
 otherwise-valid fixture so deleting that finder turns the matching test
 red. A check that has never been watched fail is a guess.
 
-False-claim fixtures inject into the step-if bullet, not the file tail:
-required phrases also occur later in the same file, and a tail append is
-outside the section the checker scans.
+Forbidden needles are file-wide: a sibling bullet or a tail append of the
+old heading must fail. Required phrases are section-scoped: later copies
+in the Jules wrap Do must not satisfy them.
 """
 from __future__ import annotations
 

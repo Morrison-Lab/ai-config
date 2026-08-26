@@ -111,9 +111,12 @@ committed pass.
      bot, not by the author.)
    - **When the target memory file is already at the 1200-line cap**,
      recover lines (re-wrap or drop) or split the file.
-     Folding a new sentence into an existing bullet still adds a source
-     line, so `validate` reddens anyway.
-     A net-positive append fails `scripts/test_check_memory_file_size.py`
+     A fold has two shapes and neither escapes every gate: a new source
+     line trips `scripts/test_check_memory_file_size.py`, while folding
+     the sentence into an existing line leaves the count flat but makes
+     that line a changed line the new-line-breaks gate can flag.
+     A net-positive append fails
+     `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
      (3rd occurrence, 2026-08-25 on `memories/preferences.md` in
      ai-config#2262: `origin/main` was exactly 1200 lines, and a

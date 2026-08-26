@@ -759,14 +759,14 @@ Do not carry 3.5's "don't run it yourself" bullet over to this step; here
 that would leave the guard inert, which is the failure rather than the
 caution.
 
-One lookup and two calls settle it, run in the ai-config checkout after step 2
+One lookup and three calls settle it, run in the ai-config checkout after step 2
 has already put it on `main` and pulled:
 
 ```bash
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
 python3 scripts/install-hooks.py                # report: registered / missing / stale
 python3 scripts/install-hooks.py --fix          # the call that actually registers
-python3 scripts/check-hook-catalog.py           # print NOTE for allowlisted hooks; exits 0
+python3 scripts/check-hook-catalog.py           # print NOTE for allowlisted hooks; exits 0 unless it FAILs
 ```
 
 **`--fix` is the load-bearing flag.**

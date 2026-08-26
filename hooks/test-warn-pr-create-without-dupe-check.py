@@ -468,6 +468,70 @@ check("command_has_issue_dupe_check: glab --all --search",
 check("command_has_issue_dupe_check: glab gh-shaped flags",
       hook.command_has_issue_dupe_check(
           'glab issue list --state all --search "x"'), False)
+
+# ------------------------------------------ review findings, ai-config#2324
+
+check("gh search issues: bare state:open qualifier does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh search issues state:open foo"), False)
+check("gh search issues: bare is:closed qualifier does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh search issues is:closed foo"), False)
+check("gh search issues: --state=all is invalid and does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh search issues --state=all foo"), False)
+check("gh issue list: --search value carrying is:open does not discharge",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --search "is:open foo"'), False)
+check("glab issue list: --all=false does not discharge",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all=false --search "x"'), False)
+check("gh issue list: --search with no value does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh issue list --state all --search"), False)
+check("gh issue list: --search followed by another flag does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh issue list --state all --search --limit 10"), False)
+check("gh issue ls (alias) discharges like gh issue list",
+      hook.command_has_issue_dupe_check(
+          'gh issue ls --state all --search "x"'), True)
+check("glab issue ls (alias) discharges like glab issue list",
+      hook.command_has_issue_dupe_check(
+          'glab issue ls --all --search "x"'), True)
+check("escaped quote in search term does not falsely discharge open search",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --search "x \\" --state all" --state open'), False)
+check("semicolon inside a quoted search term keeps the trailing flags",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --search "foo; bar" --state all'), True)
+
+check("mcp search_issues query carrying is:open does not discharge",
+      hook._mcp_is_issue_search("mcp__github__search_issues",
+                                 {"query": "repo:o/r is:open cp1252"}),
+      False)
+check("mcp search_issues with a plain query still discharges",
+      hook._mcp_is_issue_search("mcp__github__search_issues",
+                                 {"query": "repo:o/r cp1252"}),
+      True)
+
+chained_pr_and_issue_create = write_transcript(["gh pr list --state all"])
+chained_payload = json.dumps({
+    "tool_name": "Bash",
+    "tool_input": {
+        "command": "gh pr list; gh issue create --title x "
+                   "&& gh pr create --title y",
+    },
+    "transcript_path": chained_pr_and_issue_create,
+})
+proc = subprocess.run([sys.executable, HOOK], input=chained_payload,
+                      capture_output=True, text=True, timeout=10)
+_out = json.loads(proc.stdout) if proc.stdout.strip() else {}
+_note = _out.get("hookSpecificOutput", {}).get("additionalContext", "")
+check("chained pr+issue create: PR-discharged transcript still warns issue",
+      "this issue creation" in _note, True)
+check("chained pr+issue create: PR half correctly discharged, silent",
+      "this PR creation" in _note, False)
+os.unlink(chained_pr_and_issue_create)
 check("command_has_issue_dupe_check: prose",
       hook.command_has_issue_dupe_check(
           'echo gh issue list --state all --search x'), False)

@@ -217,10 +217,11 @@ Once one provider gives a clean review, move on to the next one.
 If any provider rejects the diff with findings, you must address the feedback.
 If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider.
 If you successfully address the feedback by rebutting on the existing diff and commit without making any changes, you do not need to restart.
+A successful rebuttal discharges the need for that provider's clean verdict.
 Simply continue to the next provider.
-Repeat this until all pinned providers have signed off with a clean verdict on the exact same codebase state (the same commit and working tree).
+Repeat this until all pinned providers have either signed off with a clean verdict or accepted a rebuttal on the exact same codebase state (the same commit and working tree).
 
 The set of required providers must be pinned at the start of the review cycle.
 If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry, or explicitly request user permission to drop it from the quorum.
-If the quorum size drops to zero at any point during the cycle (e.g. all providers are offline or removed), you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle (e.g. all providers are offline or removed), you must fail closed and wait until at least one becomes reachable, or request explicit user permission to proceed.
 If any provider (or combination of providers) creates an unbounded loop --- whether through irreconcilably contradictory requirements, self-contradictory oscillation, or endless non-contradictory goalpost-moving --- halt the review process and escalate to the user for a tie-breaking decision.

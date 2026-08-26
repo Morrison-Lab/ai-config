@@ -8,7 +8,7 @@ def default_fetcher(cmd: List[str]) -> str:
 
 class Review:
     def __init__(self, data: Dict[str, Any]):
-        self.state: str = data.get("state", "").upper()
+        self.state: str = (data.get("state") or "").upper()
         self.submitted_at: str = data.get("submittedAt", "")
         self.body: str = data.get("body", "")
         self.commit_oid: str = data.get("commit", {}).get("oid", "") if data.get("commit") else ""

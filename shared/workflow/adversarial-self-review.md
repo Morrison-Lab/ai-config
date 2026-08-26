@@ -41,21 +41,13 @@ The **merge gate** (see [`fully-clean`](fully-clean.md)) requires more:
 a reviewer differing from the authoring session in **both** model and harness,
 the only configuration that also buys independence of blind spot.
 
-The user's 2026-08-25 machine inventory names **cursor**, 
-**opencode**, **claude**, and `codex` wherever installed
-([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
+The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI), **opencode**, **claude**, and `codex` wherever installed ([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Dispatch in independence-and-availability order ---
-`opencode` first, then `codex`, then `claude` ---
-where each entry qualifies only if both its model and harness
-differ from the authoring session.
-This review order serves independence and measured availability,
-overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
-delegation order for general work.
-A multi-backend harness qualifies only when both its harness
-and its configured model differ from the authoring session.
+Dispatch in independence-and-availability order --- `agy` CLI or `opencode` first, then `codex`, then `claude` --- where each entry qualifies only if both its model and harness differ from the authoring session.
+This review order serves independence and measured availability, overriding [`delegation.md`](../../memories/delegation.md)'s cost-first delegation order for general work.
+A multi-backend harness qualifies only when both its harness and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
 If no qualifying entry remains, autonomous merging waits ---
@@ -67,10 +59,10 @@ deadlock rule ends in their manual review and merge decision,
 which is the one authority above this gate.
 
 
-A second directive the same day sets the merge consequence:
-"you must not merge, even with mwc enabled,
-unless you have a 100% 'all clear' review verdict
-from an adversarial review".
+`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a separate path and remains available --- see [`delegation.md`](../../memories/delegation.md)'s delegate ladder.
+A retired API never disqualifies a CLI harness that operates on a separate path from it.
+
+A second directive the same day sets the merge consequence: "you must not merge, even with mwc enabled, unless you have a 100% 'all clear' review verdict from an adversarial review".
 
 This **adds** a gate and replaces none.
 Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
@@ -91,18 +83,12 @@ and arming an auto-merge while waiting is
 
 The merge-side rules live with the gate they serve:
 
-- **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own
-  (opencode, codex,
-  claude only for sessions authored outside Claude,
-  or cursor once its headless dispatch is measured),
-  and report which harness produced each verdict.
+- **Do:** for any merge, use a reviewer on a **different model and harness** from your own (agy, opencode, codex, claude only for sessions authored outside Claude, or cursor once its headless dispatch is measured), and report which harness produced each verdict.
 - **Don't:** merge anything --- under any grant, `mwc` included ---
   without a 100% all-clear adversarial verdict at the shipping head.
   A skip notice, a stub, an older-head verdict,
   or a same-harness convenience pass clears nothing.
-- **Don't:** reuse a passing same-harness pre-push verdict
-  to satisfy the merge gate.
+- **Don't:** reuse a passing same-harness pre-push verdict to satisfy the merge gate.
   A merge needs its own cross-model, cross-harness verdict
   evaluating the shipping head.
 
@@ -346,7 +332,7 @@ The honest answer to the question was "nothing".)
 
 ## Query all available providers sequentially
 
-When obtaining adversarial reviews, we need a clean verdict from **every** available provider.
+When obtaining adversarial reviews, you need a clean verdict from **every** available provider.
 You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, OpenCode, Codex, and Claude).
 Every provider found reachable at the start of the cycle must be included in the pinned quorum.
 Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).

@@ -124,14 +124,15 @@ with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
 [Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
-Blank fenced blocks before taking that verdict:
+Blank fenced blocks before taking the verdict and the fingerprint:
 this corpus quotes those strings constantly (ai-config#1297).
 A fence closes only on a line of the same character
 that is at least as long;
 do not pair open and close by count.
 If a fence never closes, treat the report as stating no verdict:
 do not push.
-Take the first `Reviewed-Commit` after that verdict line.
+Take the last `Verdict:` line against that blanked text,
+then the first `Reviewed-Commit` after it, still on the blanked text.
 The last `Verdict:` line must match `Ready for merge` or
 `Needs more work` the way `VERDICT_LINE` does;
 a heading such as `Approved` is not a verdict.
@@ -146,10 +147,12 @@ that follows, including the refspec
 (the guard exempts dry-run from review).
 If that command fails,
 or you cannot tell from its output which commits would ship,
-or those commits are not the compared sha,
+or those commits are not the compared sha
+(prefix-match an abbreviated sha),
 do not push.
 A new branch's dry-run line is `[new branch]` with no sha;
-compare the destination ref to the branch whose HEAD you recorded.
+compare the source ref (left of `->`) to the branch
+whose HEAD you recorded.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -208,9 +211,10 @@ is the instruction to use this route.
 - **Do:** commit first, then brief the child not to edit.
   Record `HEAD` and `git status --short` before the dispatch.
   After it returns, take the last line-start `Verdict:`
-  (fences blanked) and the first `Reviewed-Commit` after it,
-  from a harness paste of the child's report or from
-  `batch-fetch-details` with `bcIds` and `includeTranscripts: true`.
+  and the first `Reviewed-Commit` after it, both on
+  fence-blanked text, from a harness paste of the child's
+  report or from `batch-fetch-details` with `bcIds` and
+  `includeTranscripts: true`.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,

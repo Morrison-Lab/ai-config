@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline regression tests for the cross-harness install audit."""
 import importlib.util
+import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -93,6 +95,83 @@ with tempfile.TemporaryDirectory() as raw:
               leftover.get("cursor/alpha") == "stale")
     else:
         print("SKIP: leftover stacked symlink (platform cannot create it)")
+    check(
+        "Cursor plugin is detected as installed",
+        hc.cursor_plugin_installed(cursor),
+    )
+    write(repo / "cursor-rules" / "live.mdc")
+    try:
+        (cursor / "rules" / "live.mdc").symlink_to(repo / "cursor-rules" / "live.mdc")
+        rule_linked = True
+    except OSError:
+        rule_linked = False
+    if rule_linked:
+        leftover_rules = statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "cursor-rules", cursor / "rules", "cursor"),
+            detail="Cursor plugin already serves this rule",
+        ))
+        check("leftover current rule symlink is stacked, not ok",
+              leftover_rules.get("cursor/live.mdc") == "stacked")
+        check("unlinked leftover rule stays unlinked beside a stacked rule",
+              leftover_rules.get("cursor/base.mdc") == "unlinked")
+    else:
+        print("SKIP: leftover stacked rule symlink (platform cannot create it)")
+
+# Drive main() so a wiring mistake (gating rule leftovers on the skill
+# catalog skip, which is also true for a Claude-only install) cannot stay
+# green. Helper-only checks above would not catch that.
+with tempfile.TemporaryDirectory() as raw:
+    root = Path(raw)
+    repo = root / "repo"
+    cursor = root / "cursor"
+    claude = root / "claude"
+    write(repo / "skills" / "alpha" / "SKILL.md")
+    write(repo / "cursor-rules" / "live.mdc")
+    claude_skills = claude / "skills"
+    claude_skills.parent.mkdir(parents=True)
+    try:
+        claude_skills.symlink_to(repo / "skills")
+        (cursor / "rules").mkdir(parents=True)
+        (cursor / "rules" / "live.mdc").symlink_to(repo / "cursor-rules" / "live.mdc")
+        wired = True
+    except OSError:
+        wired = False
+    if wired:
+        def run_audit() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    sys.executable, str(SCRIPT),
+                    "--repo-root", str(repo),
+                    "--cursor-dir", str(cursor),
+                    "--claude-dir", str(claude),
+                    "--codex-dir", str(root / "codex-absent"),
+                    "--gemini-dir", str(root / "gemini-absent"),
+                ],
+                capture_output=True, text=True, check=False,
+                env=os.environ,
+            )
+
+        result = run_audit()
+        check(
+            "Claude catalog without a plugin does not label Cursor rules as leftovers",
+            "Cursor rules (plugin leftovers)" not in result.stdout,
+        )
+        check(
+            "Claude catalog without a plugin does not stack an ok rule link",
+            "STACKED" not in result.stdout,
+        )
+        (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+        result = run_audit()
+        check(
+            "main() labels leftover rules as plugin leftovers when the plugin is live",
+            "Cursor rules (plugin leftovers)" in result.stdout,
+        )
+        check(
+            "main() reports a leftover ok rule link as stacked",
+            "STACKED" in result.stdout and "cursor/live.mdc" in result.stdout,
+        )
+    else:
+        print("SKIP: main() rule leftover wiring (platform cannot create symlink)")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

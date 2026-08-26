@@ -19,8 +19,8 @@ allowed-tools:
 > **Do not dispatch the workflow** --- a dispatch burns a run and leaves a red
 > check for a reviewer that cannot answer.
 > For a cross-vendor second opinion use
-> [`delegate-to-codex`](../delegate-to-codex/SKILL.md), the only cross-vendor
-> reviewer this corpus can still dispatch itself.
+> [`delegate-to-codex`](../delegate-to-codex/SKILL.md), the billed
+> ChatGPT-plan CLI this corpus dispatches.
 > Copilot stays requestable on the PR where the org's licensing reaches it.
 > Tracked as ai-config#1776.
 

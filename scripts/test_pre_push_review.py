@@ -121,6 +121,28 @@ class TestPrePushReview(unittest.TestCase):
             self.assertFalse(is_valid)
             self.assertIn("Unrecognized", reason)
 
+    def test_parse_review_verdict_qualifiers(self):
+        commit = "12345678abcdef00"
+        tests = [
+            ("Verdict: Ready for merge --- no blocking issues found", True, True),
+            ("Verdict: Ready for merge --- all tests pass", True, True),
+            ("Verdict: Ready for merge --- but wait", True, False),
+            ("Verdict: Ready for merge --- not tested", True, False),
+            ("Verdict: Ready for merge --- no blocking issues found and a severe regression remains", True, False),
+            ("Verdict: Ready for merge --- all tests pass and a severe regression remains", True, False),
+        ]
+        for verdict_line, expected_valid, expected_clean in tests:
+            report = (
+                f"### Summary Verdict\n{verdict_line}\n\n"
+                "### Critical Findings\nNone.\n\n"
+                "### Observations\n\nLooks good.\n\n"
+                "### Verification Steps\n\nChecked all tests.\n"
+                f"Reviewed-Commit: {commit}"
+            )
+            is_valid, is_clean, _ = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+            self.assertEqual(is_valid, expected_valid)
+            self.assertEqual(is_clean, expected_clean)
+
     def test_validate_review_output_valid_reports(self):
         commit = "12345678abcdef00"
         report = (
@@ -676,13 +698,13 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("claude-3-5-sonnet", claude_cmd)
         self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt_diff")
 
-        # Test Antigravity runner passes prompt immediately after --print
+        # Test Antigravity runner passes prompt via stdin without positional prompt arg
         mock_which.return_value = "/opt/homebrew/bin/agy"
         out_agy = reviewer.run_antigravity_review("prompt_diff", model="claude-3-7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_agy, valid_report)
         agy_cmd = mock_subproc.call_args[0][0]
-        print_idx = agy_cmd.index("--print")
-        self.assertEqual(agy_cmd[print_idx + 1], "Please review the diff provided on standard input.")
+        self.assertNotIn("Please review the diff provided on standard input.", agy_cmd)
+        self.assertIn("Please review the following diff:\n\nprompt_diff", mock_subproc.call_args[1].get("input"))
         self.assertIn("--model", agy_cmd)
         self.assertIn("claude-3-7-sonnet", agy_cmd)
 
@@ -803,7 +825,7 @@ Tests passed.
         self.assertTrue(is_clean)
         self.assertTrue(is_valid)
         self.assertEqual(reason, "Verdict: CLEAN")
-        
+
         # Edge case: Blocker in the Summary Verdict section itself
         report_verdict_blocker = """### Summary Verdict
 Verdict: Ready for merge

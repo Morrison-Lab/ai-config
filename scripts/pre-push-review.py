@@ -262,12 +262,12 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
         has_core_negation = bool(re.search(core_negation_pattern, v_core))
         has_qual_negation = bool(re.search(qual_negation_pattern, v_qual, flags=re.IGNORECASE))
-        has_qual_negative = bool(re.search(r"(?i)\b(?:do\s+not|don't|not|never|needs?\s+work|fail|failed|blocked|breaks|bug|defect|issue|error|data\s+loss)\b", v_qual))
+        has_qual_negative = bool(re.search(r"(?i)\b(?:do\s+not|don't|not|never|needs?\s+work|fail|failed|blocked|breaks|bug|defect|issue|error|data\s+loss|regression)\b", v_qual))
 
         if v_core in clean_allowlist:
             is_pure_clean_qual = bool(re.match(r"^(?:no\s+(?:blocking\s+|critical\s+)?(?:issues|findings|defects|regressions)(?:\s+(?:found|present|identified))?|all\s+(?:checks|tests|validation)\s+pass(?:ed)?)(?:\s+and\s+[a-z0-9\s,]+)?\.?$", v_qual.strip(), flags=re.IGNORECASE))
             has_explicit_negation_in_qual = bool(re.search(r"(?i)\b(?:do\s+not\s+merge|do\s+not\s+approve|don't\s+merge|needs?\s+work|must\s+fix|requires?\s+changes)\b", v_qual))
-            if has_core_negation or has_qual_negation or has_explicit_negation_in_qual or (v_qual and not is_pure_clean_qual):
+            if has_core_negation or has_qual_negation or has_explicit_negation_in_qual or has_qual_negative or (v_qual and not is_pure_clean_qual):
                 parsed_verdicts.append((True, False, f"Negated or qualified approval: '{v_str}'"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
@@ -345,14 +345,17 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--print", "Please review the diff provided on standard input.", "--mode", "plan"]
+    cmd = [agy_path, "--print", "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
+
+    # Prepend the instruction to the diff since Antigravity >= 1.1.1 ignores stdin if a prompt arg is provided
+    full_prompt = f"Please review the following diff:\n\n{prompt}"
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=full_prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None

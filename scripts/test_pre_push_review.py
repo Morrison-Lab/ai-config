@@ -33,7 +33,7 @@ class TestPrePushReview(unittest.TestCase):
         formatted = reviewer.format_review_body(report, engine, commit_sha=commit_sha)
 
         # Check for disclosure trailer matching AGENTS.md
-        self.assertIn(f"_Posted by {engine} (AI agent) --- not written by a human._", formatted)
+        self.assertIn("_Posted by Local Pre-push Review Hook (AI agent) --- not written by a human._", formatted)
         # Check that commit SHA is bound
         self.assertIn(f"**Reviewed Commit**: `{commit_sha}`", formatted)
         # Check that no robot emoji is present (which would interfere with check-pr-fully-clean.py)
@@ -120,6 +120,20 @@ class TestPrePushReview(unittest.TestCase):
             is_valid, is_clean, _ = reviewer.parse_review_verdict(neg_report)
             self.assertTrue(is_valid)
             self.assertFalse(is_clean)
+
+        # "safe to merge" should NOT be caught as a blocker
+        safe_to_merge_report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\nThe reviewed change is safe to merge.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(safe_to_merge_report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean, msg=f"Should be clean but failed with: {reason}")
 
         # Extended heading with blockers: ### Critical Findings (blocking) is caught
         extended_heading_report = (

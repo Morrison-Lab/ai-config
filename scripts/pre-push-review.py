@@ -255,7 +255,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|(?:un|)safe\s+to\s+merge|not\s+safe\s+to\s+merge|p0(?:[:\s]|$))\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge|p0(?:[:\s]|$))\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -274,7 +274,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
 
 def validate_review_output(report: Optional[str], expected_commit_sha: str = "") -> bool:
-    is_valid, _, _ = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
+    is_valid, _, reason = parse_review_verdict(report, expected_commit_sha=expected_commit_sha)
+    if not is_valid:
+        print(f"Notice: Rejected invalid report: {reason}", file=sys.stderr)
     return is_valid
 
 
@@ -396,15 +398,27 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         return None
 
     label_suffix = f" (model: {model})" if model else ""
-    print(f"Running local adversarial review via OpenCode (plan agent, pure mode){label_suffix}...")
+    print(f"Running local adversarial review via OpenCode (sandboxed agent, pure mode){label_suffix}...")
 
     prompt_file = None
+    agent_file = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
             tf.write(prompt)
             prompt_file = tf.name
+            
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as af:
+            af.write("---\n")
+            af.write("description: Adversarial Code Reviewer\n")
+            af.write("mode: subagent\n")
+            af.write("permission:\n")
+            af.write("  edit: deny\n")
+            af.write("  bash: deny\n")
+            af.write("---\n")
+            af.write("You are an adversarial code reviewer. Do not edit files or run shell commands.\n")
+            agent_file = af.name
 
-        cmd = [opencode_path, "run", "--agent", "plan", "--pure", "--file", prompt_file, "Review the attached diff."]
+        cmd = [opencode_path, "run", "--agent", agent_file, "--pure", "--file", prompt_file, "Review the attached diff."]
         if model:
             cmd.extend(["-m", model])
 
@@ -416,10 +430,15 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         print(f"Notice: OpenCode execution failed: {e}", file=sys.stderr)
         return None
     finally:
-        if prompt_file:
+        if prompt_file and os.path.exists(prompt_file):
             try:
                 os.remove(prompt_file)
-            except OSError:
+            except Exception:
+                pass
+        if agent_file and os.path.exists(agent_file):
+            try:
+                os.remove(agent_file)
+            except Exception:
                 pass
 
     if res.returncode != 0:
@@ -571,12 +590,13 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> str:
     """Format review report for GitHub PR posting adhering to lab disclosure policy."""
     sha_line = f"\n**Reviewed Commit**: `{commit_sha}`\n" if commit_sha else ""
+    driver_name = os.environ.get("AGENT_NAME") or "Local Pre-push Review Hook"
     return (
         f"### Local Adversarial AI Review ({engine_name})\n"
         f"{sha_line}\n"
         f"{report}\n\n"
         "---\n"
-        f"_Posted by {engine_name} (AI agent) --- not written by a human._"
+        f"_Posted by {driver_name} (AI agent) --- not written by a human._"
     )
 
 

@@ -94,12 +94,11 @@ PR create --- any earlier command that could surface an existing PR:
 Issue create --- a qualifying tracker search, not a listing of open issues:
 
     gh issue list ... --state all ... --search ...
-    glab issue list ... --state all ... --search ...
-    gh search issues
+    glab issue list ... --all ... --search ...
+    gh search issues   (omit --state; --state open|closed does not qualify)
     mcp__github__search_issues
-    mcp__github__list_issues with state=all
 
-`--state all`, not `--state open`, per
+`--state all` / glab `--all`, not `--state open`, per
 [`check-open-prs-before-duplicating`](../shared/workflow/check-open-prs-before-duplicating.md).
 A bug fixed and closed last week is exactly the duplicate an open-state search
 cannot see. Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode
@@ -192,18 +191,28 @@ RX_ISSUE_CREATE = re.compile(
     re.MULTILINE,
 )
 
-# `gh issue list` / `glab issue list` at a command position. Discharge
-# separators stay NARROW (no `(` / `{`), same reason as RX_DISCHARGE.
-RX_ISSUE_LIST = re.compile(
+# `gh issue list` at a command position. Discharge separators stay NARROW
+# (no `(` / `{`), same reason as RX_DISCHARGE.
+RX_GH_ISSUE_LIST = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"(?:gh|glab)\s+issue\s+list\b",
+    r"gh\s+issue\s+list\b",
     re.MULTILINE,
 )
 
-# `gh search issues` searches all states unless the query adds is:open, so
-# it is the equivalent of `--state all --search`. The hook does not parse
-# the query (grep-is-not-coverage).
+# glab's flags are not gh's. Verified 2026-08-26 against GitLab Docs
+# `glab issue list`: all-state is `-A`/`--all`, search is `--search`, and
+# `-s` is `--sort`. Applying gh's `--state all` / `-s all` here would
+# discharge a command glab rejects and miss the one it accepts.
+RX_GLAB_ISSUE_LIST = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"glab\s+issue\s+list\b",
+    re.MULTILINE,
+)
+
+# `gh search issues` with no `--state open|closed`. Omitting --state is the
+# all-state form (`gh search issues -h`, 2026-08-26: --state {open|closed}).
 RX_GH_SEARCH_ISSUES = re.compile(
     r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
@@ -211,16 +220,24 @@ RX_GH_SEARCH_ISSUES = re.compile(
     re.MULTILINE,
 )
 
-# `--state all` or `--state=all`, and gh's short `-s all` (gh issue list
-# uses -s for --state and -S for --search; see `gh issue list -h`).
-RX_STATE_ALL = re.compile(
-    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))all\b"
+RX_GH_SEARCH_STATE_FILTER = re.compile(
+    r"--state(?:=|\s+)(?:open|closed)\b"
 )
 
-# `--search` or gh's short `-S`. Not bare `-s`: on gh that is --state.
-RX_SEARCH_FLAG = re.compile(
+# gh issue list: `--state all` or `--state=all`, and short `-s all`
+# (`gh issue list -h`: -s is --state, -S is --search).
+RX_GH_STATE_ALL = re.compile(
+    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))all\b"
+)
+RX_GH_SEARCH_FLAG = re.compile(
     r"(?:--search\b|(?<![A-Za-z0-9-])-S\b)"
 )
+
+# glab issue list: `--all` / `-A`, and `--search` (no short search flag).
+RX_GLAB_ALL = re.compile(
+    r"(?:--all\b|(?<![A-Za-z0-9-])-A\b)"
+)
+RX_GLAB_SEARCH_FLAG = re.compile(r"--search\b")
 
 # Quoted spans in a list command's flags are search terms, not flags.
 # `--state open --search "--state all"` must not discharge.
@@ -234,7 +251,6 @@ MCP_CREATE = "mcp__github__create_pull_request"
 MCP_ISSUE_CREATE = "mcp__github__create_issue"
 MCP_ISSUE_WRITE = "mcp__github__issue_write"
 MCP_ISSUE_SEARCH = "mcp__github__search_issues"
-MCP_ISSUE_LIST = "mcp__github__list_issues"
 
 # A heredoc body is prose, not commands. Strip it before position matching.
 RX_HEREDOC = re.compile(
@@ -283,6 +299,8 @@ One query settles it before you spend an issue:
 
     gh issue list --repo <owner>/<repo> --state all --search "<keywords>"
 
+On GitLab the equivalent is `glab issue list --all --search "<keywords>"`.
+
 This prompts the search; it does not judge whether the terms were good.
 If an issue already covers this, comment there instead. If you have already
 checked another way, carry on --- this is a reminder, not a refusal.
@@ -321,17 +339,25 @@ def _command_rest(text, start):
 def command_has_issue_dupe_check(command):
     """True when this command string is a qualifying issue search.
 
-    Qualifying means command-position `gh search issues`, or command-position
-    `gh`/`glab issue list` whose own flags include both `--state all` (or
-    gh's `-s all`) and `--search` (or gh's `-S`). `--state open --search`
-    does not qualify.
+    Qualifying means command-position `gh search issues` without
+    `--state open|closed`, command-position `gh issue list` whose own flags
+    include both `--state all` (or gh's `-s all`) and `--search` (or gh's
+    `-S`), or command-position `glab issue list` with both `--all`/`-A` and
+    `--search`. `--state open --search` does not qualify. `glab --state all`
+    does not qualify: that flag is not glab's.
     """
     text = strip_heredocs(command)
-    if RX_GH_SEARCH_ISSUES.search(text):
-        return True
-    for match in RX_ISSUE_LIST.finditer(text):
+    for match in RX_GH_SEARCH_ISSUES.finditer(text):
         rest = RX_QUOTED_SPAN.sub(" ", _command_rest(text, match.end()))
-        if RX_STATE_ALL.search(rest) and RX_SEARCH_FLAG.search(rest):
+        if not RX_GH_SEARCH_STATE_FILTER.search(rest):
+            return True
+    for match in RX_GH_ISSUE_LIST.finditer(text):
+        rest = RX_QUOTED_SPAN.sub(" ", _command_rest(text, match.end()))
+        if RX_GH_STATE_ALL.search(rest) and RX_GH_SEARCH_FLAG.search(rest):
+            return True
+    for match in RX_GLAB_ISSUE_LIST.finditer(text):
+        rest = RX_QUOTED_SPAN.sub(" ", _command_rest(text, match.end()))
+        if RX_GLAB_ALL.search(rest) and RX_GLAB_SEARCH_FLAG.search(rest):
             return True
     return False
 
@@ -346,14 +372,16 @@ def _mcp_creates_issue(tool_name, tool_input):
     return False
 
 
-def _mcp_is_issue_search(name, payload):
-    """True when this MCP call is a qualifying issue search."""
-    if name == MCP_ISSUE_SEARCH:
-        return True
-    if name == MCP_ISSUE_LIST:
-        state = payload.get("state") if isinstance(payload, dict) else None
-        return isinstance(state, str) and state.lower() == "all"
-    return False
+def _mcp_is_issue_search(name, _payload):
+    """True when this MCP call is a qualifying issue search.
+
+    Only `search_issues`. GitHub MCP `list_issues` (github-mcp-server
+    list_issues schema, fetched 2026-08-26) takes state OPEN|CLOSED and
+    omits both when unbound --- there is no state=all, and a listing is
+    not a keyword search. The CLI path already refuses a list without
+    --search.
+    """
+    return name == MCP_ISSUE_SEARCH
 
 
 def _tool_uses(entry):

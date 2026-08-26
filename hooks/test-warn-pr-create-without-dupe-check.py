@@ -376,11 +376,17 @@ with_issue_search_only = write_transcript(
     ['gh issue list --search "cp1252"'])
 with_gh_search_issues = write_transcript(
     ["gh search issues --owner o 'cp1252'"])
+with_gh_search_issues_open = write_transcript(
+    ["gh search issues --state open --owner o 'cp1252'"])
 with_glab_issue_all = write_transcript(
+    ['glab issue list --all --search "cp1252"'])
+with_glab_issue_all_short = write_transcript(
+    ['glab issue list -A --search "cp1252"'])
+with_glab_issue_gh_flags = write_transcript(
     ['glab issue list --state all --search "cp1252"'])
 with_mcp_issue_search = write_transcript(
     [None], "mcp__github__search_issues")
-with_mcp_issue_list_open = write_transcript(
+with_mcp_issue_list = write_transcript(
     [None], "mcp__github__list_issues")
 with_pr_list_for_issue = write_transcript(["gh pr list --repo o/r"])
 prose_issue_list = write_transcript(
@@ -415,14 +421,20 @@ check("--search without --state all does not discharge",
       hook.transcript_has_issue_dupe_check(with_issue_search_only), False)
 check("gh search issues discharges",
       hook.transcript_has_issue_dupe_check(with_gh_search_issues), True)
-check("glab issue list --state all --search discharges",
+check("gh search issues --state open does not discharge",
+      hook.transcript_has_issue_dupe_check(with_gh_search_issues_open), False)
+check("glab issue list --all --search discharges",
       hook.transcript_has_issue_dupe_check(with_glab_issue_all), True)
+check("glab issue list -A --search discharges",
+      hook.transcript_has_issue_dupe_check(with_glab_issue_all_short), True)
+check("glab issue list with gh --state all flags does not discharge",
+      hook.transcript_has_issue_dupe_check(with_glab_issue_gh_flags), False)
 check("mcp search_issues discharges",
       hook.transcript_has_issue_dupe_check(with_mcp_issue_search), True)
-check("mcp list_issues without state=all does not discharge",
-      hook.transcript_has_issue_dupe_check(with_mcp_issue_list_open), False)
-check("mcp list_issues with state=all discharges",
-      hook.transcript_has_issue_dupe_check(with_mcp_issue_list_all), True)
+check("mcp list_issues does not discharge",
+      hook.transcript_has_issue_dupe_check(with_mcp_issue_list), False)
+check("mcp list_issues with state=all still does not discharge",
+      hook.transcript_has_issue_dupe_check(with_mcp_issue_list_all), False)
 check("gh pr list does not discharge issue create",
       hook.transcript_has_issue_dupe_check(with_pr_list_for_issue), False)
 check("gh issue list does not discharge PR create",
@@ -441,6 +453,15 @@ check("command_has_issue_dupe_check: open state",
           'gh issue list --state open --search "x"'), False)
 check("command_has_issue_dupe_check: gh search issues",
       hook.command_has_issue_dupe_check("gh search issues 'x'"), True)
+check("command_has_issue_dupe_check: gh search issues --state open",
+      hook.command_has_issue_dupe_check(
+          "gh search issues --state open 'x'"), False)
+check("command_has_issue_dupe_check: glab --all --search",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all --search "x"'), True)
+check("command_has_issue_dupe_check: glab gh-shaped flags",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --state all --search "x"'), False)
 check("command_has_issue_dupe_check: prose",
       hook.command_has_issue_dupe_check(
           'echo gh issue list --state all --search x'), False)
@@ -465,6 +486,11 @@ check("end-to-end issue still warns after --state open search",
       bool(run_hook("gh issue create --title x", with_issue_open)), True)
 check("end-to-end issue silent after gh search issues",
       run_hook("gh issue create --title x", with_gh_search_issues), "")
+check("end-to-end issue still warns after gh search issues --state open",
+      bool(run_hook("gh issue create --title x", with_gh_search_issues_open)),
+      True)
+check("end-to-end issue silent after glab --all --search",
+      run_hook("glab issue create --title x", with_glab_issue_all), "")
 check("PR create still fires when only an issue search ran",
       bool(run_hook("gh pr create --fill", with_issue_all)), True)
 check("issue create still fires when only a PR list ran",
@@ -483,19 +509,31 @@ check("mcp create_issue silent when search_issues ran",
 mcp_write_ok = json.dumps({
     "tool_name": "mcp__github__issue_write",
     "tool_input": {"method": "create", "title": "x"},
-    "transcript_path": with_mcp_issue_list_all,
+    "transcript_path": with_mcp_issue_search,
 })
 proc = subprocess.run([sys.executable, HOOK], input=mcp_write_ok,
                       capture_output=True, text=True, timeout=10)
-check("mcp issue_write create silent when list_issues state=all ran",
+check("mcp issue_write create silent when search_issues ran",
       proc.stdout.strip(), "")
+
+mcp_write_list = json.dumps({
+    "tool_name": "mcp__github__issue_write",
+    "tool_input": {"method": "create", "title": "x"},
+    "transcript_path": with_mcp_issue_list_all,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_write_list,
+                      capture_output=True, text=True, timeout=10)
+check("mcp issue_write create still fires after list_issues",
+      bool(proc.stdout.strip()), True)
 
 for path in (no_check, with_list, with_view, with_search, with_mcp,
              with_mcp_read, prose_list, prose_commit, prose_heredoc,
              chained_real, unrelated_mcp, with_issue_all, with_issue_all_eq,
              with_issue_all_short, with_issue_open, with_issue_all_no_search,
-             with_issue_search_only, with_gh_search_issues, with_glab_issue_all,
-             with_mcp_issue_search, with_mcp_issue_list_open,
+             with_issue_search_only, with_gh_search_issues,
+             with_gh_search_issues_open, with_glab_issue_all,
+             with_glab_issue_all_short, with_glab_issue_gh_flags,
+             with_mcp_issue_search, with_mcp_issue_list,
              with_pr_list_for_issue, prose_issue_list, quoted_state_in_search,
              with_mcp_issue_list_all):
     os.unlink(path)

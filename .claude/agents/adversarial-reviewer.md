@@ -61,6 +61,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    In a checkout whose pushes go through that adapter
    the parent is required to call `parse_report()`
    on the recovered report
+   from the worktree's `hooks/no-push-without-self-review.py`
+   (see [`memories/cursor.md`](../../memories/cursor.md);
+   do not import `~/.claude/hooks/`)
    and does not push unless the verdict is `clean` and the
    fingerprint prefix-matches HEAD.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.

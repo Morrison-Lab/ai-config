@@ -137,11 +137,13 @@ If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, recover the report from
 cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
-That transcript is the admissible source for `parse_report()`,
-the HEAD fingerprint check, the dry-run tip check,
-and the source-ref check below.
-It is not a substitute for those checks.
-A harness paste of the child's own assistant message may corroborate it;
+That transcript is the admissible source for `parse_report()`
+and the HEAD fingerprint check.
+Gates 5 and 6 take no input from the transcript:
+the dry-run tip and the source ref come from the same-argv
+`git push --dry-run` in the checkout whose push follows.
+A harness paste of the child's own assistant message may corroborate
+the recovered body;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
 `json.load` of `transcript.json` already yields the markdown
@@ -154,21 +156,27 @@ The parser resolves that.
 Extract the last assistant `text` that carries Summary / Findings /
 Verdict / Reviewed-Commit
 (same selector as the identity-only section below).
-Two legal routes, and both must produce the report body
-(the last matching assistant `text` from `transcript.json`).
-The `parse_report()` tuple always comes from that file
-(route (a)), never from an unverified subagent return:
-(a) a decoder reads `transcript.json` whose path contains
-the `cloudAgentBcId`, writes that last matching `text`
+The role filter is load-bearing.
+The user brief also carries those headings
+(it specifies the required report shape).
+A decoder that takes the last matching `text`
+without filtering `role == assistant`
+grades the brief when the child produced no report.
+Route (a) is the instrument.
+A decoder reads `transcript.json` whose path contains
+the `cloudAgentBcId`, writes that last matching assistant `text`
 to a file, and calls `parse_report()` on the file contents
-in one process;
-(b) a subagent returns that last matching assistant `text`
-verbatim;
+in one process.
+The `parse_report()` tuple always comes from that file,
+never from an unverified subagent return.
+Route (b) is corroboration only:
+a subagent returns that last matching assistant `text` verbatim;
 the conductor writes that return to a file without editing it.
 Route (b) is legal for the posted body only when that file
 is byte-identical to route (a)'s file.
 If they differ, refuse: do not call `parse_report()` on the
 subagent return.
+Do not run route (b) alone.
 A partial return that drops a trailing `Needs more work`
 can leave an earlier quoted `Ready for merge` as the last
 verdict line `parse_report` reads.
@@ -181,16 +189,18 @@ Post with `--body-file` / `-F body=@<file>`.
 Route (a)'s file is the body to post
 (`gh pr comment --body-file` / equivalent)
 and the input to `parse_report()`.
-Route (b)'s provenance is the subagent's verbatim return
-of the same selector, written to a file that matches
-route (a)'s file.
+Route (b) is corroboration of that same selector,
+written to a file that matches route (a)'s file.
 The `parse_report()` tuple is the push gate, not the comment.
 Do not treat route (a) as returning only the tuple.
-Call `parse_report()` from
+Call `parse_report()` from the **worktree's**
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
 on the file contents
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects).
+Do not import `~/.claude/hooks/no-push-without-self-review.py`:
+that path is a copy, not a symlink
+(measured 2026-08-26 PDT on Cursor Cloud).
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -207,6 +217,10 @@ If the verdict is not `clean`, or there is no fingerprint, do not push.
 A push that carries nothing to review
 is the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
 branch, created with `--allow-empty`.
+The positive test is two commands in that checkout:
+`git rev-list --count origin/<default-branch>..HEAD` equals 1,
+and `git diff HEAD^ HEAD` is empty.
+That is the `--allow-empty` pr-on-claim commit.
 `git diff origin/<default-branch>...HEAD` empty
 in that checkout is tree equality against the merge-base,
 not "this branch carries nothing".
@@ -229,7 +243,8 @@ tracks a CLI wrapper over that Cursor Cloud `parse_report()` call.
 Provenance is the recovery route in this file:
 route (a) reads the `transcript.json` whose path contains the
 `cloudAgentBcId` and writes the body to a file;
-route (b) writes the subagent's verbatim return of the same
+route (b) is corroboration only:
+it writes the subagent's verbatim return of the same
 selector to a file that must match route (a)'s file.
 `parse_report()` always runs on route (a)'s file.
 Until that wrapper lands, the import is the instrument
@@ -248,8 +263,16 @@ Run `git push --dry-run` in that checkout
 with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
+This recipe's push is `git push -u origin <branch>`
+without `--porcelain`.
+A `--porcelain` push is not this procedure.
+Do not treat a line without `->` as a deletion under porcelain:
+porcelain writes those lines to stdout
+and emits no `->` on any line
+(git v2.43.0 `transport.c` `print_ref_status`).
 Read stdout and stderr (`2>&1`).
-The summary lines this section names write to stderr.
+Without `--porcelain`, the summary lines this section names
+write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
 or a reported new tip does not prefix-match HEAD,
@@ -276,8 +299,9 @@ The source-ref rule and the HEAD comparison remain.
 A deletion line (`- [deleted]`) has no `->`,
 so it has no source ref for gate 6.
 `--delete` / `-d` is not this procedure.
-`_argv_push` never examines it.
-Treat it as an ordinary git push,
+`_argv_push` excludes those flags,
+so the guard never sees the push.
+Treat a `--delete` / `-d` push as an ordinary git push,
 not as a reviewed feature-branch push.
 `git push origin :branch` is also not this procedure.
 On Claude Code it still needs a clean verdict
@@ -357,6 +381,9 @@ exempts item 1's first half, item 2,
 item 3's verdict/fingerprint clause, and item 4
 (no dispatch, so no report and no pre-dispatch sha).
 It does not exempt item 1's second half, item 5, or item 6.
+The positive test is two commands in that checkout:
+`git rev-list --count origin/<default-branch>..HEAD` equals 1,
+and `git diff HEAD^ HEAD` is empty.
 Say in the reply that the carve-out was used.
 
 1. Confirm `git status --short` is empty before dispatch,
@@ -374,7 +401,7 @@ Say in the reply that the carve-out was used.
 3. Confirm the verdict is `clean` and the fingerprint
    prefix-matches HEAD.
    Carve-out: skip (no fingerprint;
-   the `--allow-empty` procedure is what decides).
+   the two-command test above is what decides).
 4. Confirm HEAD is still the recorded sha.
    Carve-out: skip (no sha was recorded before a dispatch).
 5. Run the same-argv dry-run; confirm a reported new tip
@@ -384,9 +411,11 @@ Say in the reply that the carve-out was used.
    and also does not confirm the shipped tip).
 6. Confirm the source ref is `HEAD` or the recorded branch.
    A deletion line (`- [deleted]`) is a different command
-   (`--delete` / `-d` is an ordinary push;
+   (`_argv_push` excludes `--delete` / `-d`,
+   so the guard never sees that push;
    `:branch` is not this feature-branch recipe),
    not a gate-6 miss.
+   This recipe does not use `--porcelain`.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -439,7 +468,11 @@ is the instruction to use this route.
   (a harness paste of the child may corroborate; name the route).
   Write the last assistant `text` that
   carries Summary / Findings / Verdict / Reviewed-Commit
-  to a file, and call `parse_report()` on that file.
+  to a file (role filter is load-bearing;
+  the user brief also carries those headings),
+  and call `parse_report()` on that file
+  from the worktree's `hooks/no-push-without-self-review.py`
+  (not `~/.claude/hooks/`).
   If you cannot obtain a `clean` verdict and fingerprint,
   or HEAD is not still the recorded sha,
   or the fingerprint does not prefix-match HEAD,
@@ -453,6 +486,9 @@ is the instruction to use this route.
   do not push.
   The empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
   `--allow-empty` branch is the carve-out.
+  The positive test is
+  `git rev-list --count origin/<default-branch>..HEAD` equals 1
+  and `git diff HEAD^ HEAD` empty in that checkout.
   `git diff origin/<default-branch>...HEAD` empty in that checkout
   is tree equality, not "this branch carries nothing".
   A net-zero tree of other commits is not the carve-out:
@@ -510,8 +546,9 @@ pre-push guard.
   `includeTranscripts: true`, then write the last assistant `text` that
   carries those same sections to a file and quote from that file ---
   not the last assistant message (which
-  may be thinking or `tool_calls` with empty `text`), and not the whole
-  file.
+  may be thinking or `tool_calls` with empty `text`), not the user brief
+  (the brief also carries those headings; the role filter is load-bearing),
+  and not the whole file.
   `cloudAgentBcId` is a field on the Task JSON `tool_result`; `bcIds` is
   the tool parameter.
 - **Don't:** treat the parent thinking "the reviewer approved" as the

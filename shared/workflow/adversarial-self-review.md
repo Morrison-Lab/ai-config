@@ -149,6 +149,9 @@ so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
 under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` on the recovered report
+from the worktree's `hooks/no-push-without-self-review.py`
+(see [`memories/cursor.md`](../../memories/cursor.md);
+do not import `~/.claude/hooks/`),
 in the checkout whose push follows;
 do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
@@ -156,6 +159,9 @@ The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
 do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff HEAD^ HEAD` empty
+in the checkout whose push follows.
 `git diff origin/<default-branch>...HEAD` empty
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".

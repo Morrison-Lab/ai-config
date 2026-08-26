@@ -44,6 +44,10 @@ Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 ([`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` on the recovered report
+from the worktree's
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
+(see [`memories/cursor.md`](../../memories/cursor.md);
+do not import `~/.claude/hooks/`),
 in a checkout whose pushes go through that adapter.
 If the verdict is not `clean`, or the fingerprint does not
 prefix-match HEAD, do not push.
@@ -63,7 +67,8 @@ Cursor adapter, default: do not prefix.
 The prefix is inert for the adapter
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 makes the adapter run that guard
-(the skip and the `parse_report` gate are in the paragraph above).
+(the skip and the `parse_report` gate are in
+[step 0](#0-a-separate-subagent-reviewed-this-diff-and-cleared-it)).
 If a native `PreToolUse` deny from
 `no-push-without-self-review` is observed on the push,
 prefix for that native guard.
@@ -72,6 +77,8 @@ The empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)
 has no report to parse: do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff HEAD^ HEAD` empty.
 `git diff origin/<default-branch>...HEAD` empty is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.

@@ -263,16 +263,22 @@ until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`,
 call `parse_report()` on the recovered report
+from the worktree's
+[`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
+(see [`memories/cursor.md`](memories/cursor.md);
+do not import `~/.claude/hooks/`),
 in the checkout whose push follows,
 and do not push unless the verdict is `clean` and the
-fingerprint prefix-matches HEAD
-([`memories/cursor.md`](memories/cursor.md)).
+fingerprint prefix-matches HEAD.
 On that Cursor-adapter path, the empty
 [`pr-on-claim`](shared/workflow/pr-on-claim.md)
 `--allow-empty` branch has no report:
 do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff HEAD^ HEAD` empty
+in the checkout whose push follows.
 `git diff origin/<default-branch>...HEAD` empty
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".

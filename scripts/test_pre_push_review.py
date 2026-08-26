@@ -803,8 +803,6 @@ class TestPrePushReview(unittest.TestCase):
 
         called_args = mock_run.call_args[0][0]
         self.assertEqual(called_args[0], "/usr/local/bin/agy")
-        self.assertIn("--mode", called_args)
-        self.assertIn("plan", called_args)
         self.assertIn("--print", called_args)
         # Check that the prompt immediately follows --print
         print_idx = called_args.index("--print")
@@ -866,7 +864,7 @@ class TestPrePushReview(unittest.TestCase):
 
 
 
-    
+
     def test_verdict_mislabeled_blocker(self):
         commit = "12345678abcdef00"
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[MINOR] The command crashes on every invocation and is not ready for merge.\n### Verification Steps\nNone\nReviewed-Commit: " + commit

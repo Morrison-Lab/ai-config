@@ -317,7 +317,7 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
         return None
 
-    cmd = [agy_path, "--print", prompt, "--mode", "plan"]
+    cmd = [agy_path, "--print", prompt]
     if model:
         cmd.extend(["--model", model])
 

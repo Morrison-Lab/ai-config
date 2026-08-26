@@ -361,8 +361,10 @@ class TestLiveHTTPBehavior(_LiveServerCase):
     def test_real_redirect_is_refused_not_followed(self):
         # The redirect target below is a LIVE, valid endpoint on this same
         # server, serving a real cloud.disabled=true body -- following it
-        # would let the whole check SUCCEED. That makes the assertion below
-        # discriminating: it can only pass if NoRedirectHandler genuinely
+        # would let verification proceed past the status check (it then
+        # fails later, at the residency check, with a DIFFERENT message,
+        # since tags_body is an empty model list). That makes the assertion
+        # below discriminating: it can only pass if NoRedirectHandler genuinely
         # refused the redirect, never merely because some unrelated
         # connection failed. (An earlier version of this test redirected to
         # an unroutable port instead, so a refused redirect and a followed

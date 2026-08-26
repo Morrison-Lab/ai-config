@@ -167,13 +167,17 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
+So the pairing above is now Copilot and `delegate-to-codex`, and nothing else
+on the GitHub-requested / separately-billed-CLI axis.
 Those two are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the only cross-vendor reviewer this corpus can
-**dispatch** itself.
+`delegate-to-codex` is the only *CLI* this corpus can **dispatch** itself
+as a cross-vendor reviewer.
+A Cursor Cloud `Task` child is a third self-dispatchable route when the
+conductor is not Claude and a Claude model is listed: that routing is in
+[`memories/cursor.md`](../../memories/cursor.md).
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

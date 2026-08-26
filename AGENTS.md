@@ -389,8 +389,8 @@ Non-obvious caveats worth knowing:
   environments, which is slow but cached thereafter.
 - **Adversarial review:** Cursor Cloud `Task` with
   `subagent_type: adversarial-reviewer` is available in a
-  session rooted in a repo that ships that persona
+  session that can resolve that persona
   (measured 2026-08-25 on this repo).
   When the conductor is not Claude and a Claude model is listed
-  for `Task`, pass it on `model`.
+  for `Task`, pass that Claude model on `model`.
   Details are in [`memories/cursor.md`](memories/cursor.md).

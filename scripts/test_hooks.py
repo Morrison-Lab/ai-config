@@ -23,6 +23,11 @@ This runner does two things:
 explicit, reviewable debt; adding a NEW hook without a test fails this check.
 Tracked in ai-config#1080 -- write those tests, then empty the allowlist.
 
+A hung suite used to stall the whole sweep with no timeout and nothing on
+stdout (ai-config#2098, observed on Windows). Each suite now has a deadline;
+expiry prints FAIL and the runner continues. Override with
+HOOK_TEST_SUITE_TIMEOUT (seconds).
+
 Run: python3 scripts/test_hooks.py
 """
 import glob
@@ -33,10 +38,48 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
+# Per-suite deadline. Measured 2026-08-26 on a Linux cloud runner: the
+# slowest suite (test-no-clobbering-push: 28 scratch git repos plus 17
+# mutation rounds) finished in 178s. 600s is about 3x that, so a slow
+# Windows box has headroom, while the hang that never terminated across
+# 120s and 420s kills (ai-config#2098) still FAILs instead of stalling
+# the sweep. Override with HOOK_TEST_SUITE_TIMEOUT.
+DEFAULT_SUITE_TIMEOUT_S = 600
+
 # Hooks that ship without a test today. An explicit, reviewable list -- not a
 # silent gap. A new hook is expected to bring its test; this list should only
 # ever shrink. See ai-config#1080.
 KNOWN_UNTESTED = {"inject-local-time.sh"}
+
+
+def suite_timeout_s():
+    """Seconds a single hooks/test-*.py may run before the runner FAILs it."""
+    raw = os.environ.get("HOOK_TEST_SUITE_TIMEOUT")
+    if raw is None or raw == "":
+        return DEFAULT_SUITE_TIMEOUT_S
+    try:
+        value = float(raw)
+    except ValueError:
+        sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} is not a number")
+    if value <= 0:
+        sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be positive")
+    return value
+
+
+def _timeout_label(timeout):
+    """Render a timeout for the FAIL line without a trailing .0."""
+    if timeout == int(timeout):
+        return str(int(timeout))
+    return str(timeout)
+
+
+def _decode_captured(blob):
+    """TimeoutExpired.stdout/stderr may be str, bytes, or None."""
+    if blob is None:
+        return ""
+    if isinstance(blob, bytes):
+        return blob.decode("utf-8", errors="replace")
+    return blob
 
 
 def test_for(subject_basename):
@@ -57,8 +100,33 @@ def subjects():
     return out
 
 
-def run_suites():
+def run_one_suite(test_path, subject, timeout):
+    """Run one suite against its subject. Returns 0 on pass, 1 on fail."""
+    rel_test = os.path.relpath(test_path, ROOT)
+    print(f"RUN: {rel_test}", flush=True)
+    try:
+        proc = subprocess.run(
+            [sys.executable, test_path, subject],
+            capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        print(f"FAIL: {rel_test} (timed out after {_timeout_label(timeout)}s)")
+        sys.stdout.write(_decode_captured(exc.stdout))
+        sys.stderr.write(_decode_captured(exc.stderr))
+        return 1
+    tail = (proc.stdout.strip().splitlines() or ["(no output)"])[-1]
+    if proc.returncode == 0:
+        print(f"PASS: {rel_test} -- {tail}")
+        return 0
+    print(f"FAIL: {rel_test} (exit {proc.returncode})")
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    return 1
+
+
+def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
+    if timeout is None:
+        timeout = suite_timeout_s()
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     for test_path in tests:
@@ -69,16 +137,7 @@ def run_suites():
             print(f"FAIL: {rel_test} has no subject at {rel_subj}")
             failures += 1
             continue
-        proc = subprocess.run(
-            [sys.executable, test_path, subject], capture_output=True, text=True)
-        tail = (proc.stdout.strip().splitlines() or ["(no output)"])[-1]
-        if proc.returncode == 0:
-            print(f"PASS: {rel_test} -- {tail}")
-        else:
-            print(f"FAIL: {rel_test} (exit {proc.returncode})")
-            sys.stdout.write(proc.stdout)
-            sys.stderr.write(proc.stderr)
-            failures += 1
+        failures += run_one_suite(test_path, subject, timeout)
     return failures, len(tests)
 
 

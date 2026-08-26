@@ -463,8 +463,11 @@ LABEL_EXPECT = {
 
 
 def verdict(hook_path, repo, command, case_id=None):
+    # sys.executable, not a bare "python3": on Windows the App Execution
+    # Alias stub for python3.exe can block instead of erroring when no
+    # python3 exists on PATH (ai-config#2098).
     proc = subprocess.run(
-        ["python3", hook_path], input=json.dumps(bash(command)),
+        [sys.executable, hook_path], input=json.dumps(bash(command)),
         capture_output=True, text=True, cwd=repo,
     )
     if proc.returncode != 0:

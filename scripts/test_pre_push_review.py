@@ -688,6 +688,11 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
+        
+        # Verify it created the agent in the correct directory
+        import os
+        expected_dir = os.path.join(os.getcwd(), ".opencode", "agents")
+        mock_tf.assert_any_call(mode="w", suffix=".md", dir=expected_dir, delete=False)
         self.assertIn("--file", oc_cmd)
         self.assertNotIn("prompt", oc_cmd)
         self.assertIn("-m", oc_cmd)

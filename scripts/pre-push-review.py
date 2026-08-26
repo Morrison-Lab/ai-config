@@ -406,11 +406,9 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
             tf.write(prompt)
             prompt_file = tf.name
-            
-        agent_dir = os.path.join(os.getcwd(), ".agents")
+        agent_dir = os.path.join(os.getcwd(), ".opencode", "agents")
         os.makedirs(agent_dir, exist_ok=True)
-        agent_file = os.path.join(agent_dir, "opencode-pre-push-reviewer.md")
-        with open(agent_file, "w") as af:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False) as af:
             af.write("---\n")
             af.write("description: Adversarial Code Reviewer\n")
             af.write("mode: subagent\n")
@@ -419,8 +417,13 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
             af.write("  bash: deny\n")
             af.write("---\n")
             af.write("You are an adversarial code reviewer. Do not edit files or run shell commands.\n")
+            agent_file = af.name
 
-        cmd = [opencode_path, "run", "--agent", "opencode-pre-push-reviewer", "--pure", "--file", prompt_file, "Review the attached diff."]
+        agent_name = os.path.basename(agent_file)
+        if agent_name.endswith(".md"):
+            agent_name = agent_name[:-3]
+
+        cmd = [opencode_path, "run", "--agent", agent_name, "--pure", "--file", prompt_file, "Review the attached diff."]
         if model:
             cmd.extend(["-m", model])
 
@@ -597,7 +600,7 @@ def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> s
     forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
     if any(marker in driver_lower for marker in forbidden_markers):
         driver_name = "Local Pre-push Hook"
-        
+
     return (
         f"### Local Adversarial AI Review ({engine_name})\n"
         f"{sha_line}\n"

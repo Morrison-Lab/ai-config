@@ -766,10 +766,12 @@ class TestPrePushReview(unittest.TestCase):
     @patch("sys.stdout.isatty", return_value=False)
     @patch.dict(os.environ, {"AGENT_NAME": "human"}, clear=True)
     @patch.object(reviewer, "detect_available_engines", return_value=["codex", "claude"])
-    def test_alternate_fails_without_invoker(self, mock_detect, mock_isatty):
+    @patch.object(reviewer, "run_codex_review")
+    def test_alternate_proceeds_without_invoker(self, mock_codex, mock_detect, mock_isatty):
+        mock_codex.return_value = "report"
         report, label = reviewer.execute_review("alternate", "prompt")
-        self.assertIsNone(report)
-        self.assertEqual(label, "None")
+        self.assertEqual(report, "report")
+        self.assertEqual(label, "OpenAI Codex")
 
 
 

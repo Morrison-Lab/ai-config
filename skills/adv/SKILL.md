@@ -18,6 +18,8 @@ Runs a local adversarial AI code review on outgoing branch commits using an alte
 
 ## Usage
 
+**Note:** Until this skill is merged to `main`, you must set `PRE_PUSH_REVIEW_LOCAL_DEV=1` in your environment to use the local branch copy.
+
 Run the `pre-push-review.py` script with the `--engine alternate` flag to rotate through available models, or specify a specific engine.
 
 ```bash
@@ -40,8 +42,11 @@ if [ -n "$AGENT_NAME" ]; then
 else
   python3 "$REVIEW_SCRIPT" --engine alternate
 fi
+```
 
-# Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode)
+Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):
+
+```bash
 python3 "$REVIEW_SCRIPT" --engine codex
 ```
 

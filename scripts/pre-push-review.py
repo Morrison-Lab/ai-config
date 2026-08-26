@@ -267,7 +267,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
 
-    observations_match = re.search(r"(?i)#{2,3}\s*Observations(?: & Non-Blocking Suggestions)?(.*?)(?:###|$)", unfenced_report, re.DOTALL)
+    observations_match = re.search(r"(?i)#{2,3}\s*Observations(?: & Non-Blocking Suggestions)?(.*?)(?:#{2,3}|$)", unfenced_report, re.DOTALL)
     if is_clean and observations_match:
         obs_body = observations_match.group(1).strip()
         if obs_body and not re.match(r"^\s*(?:none(?:\.|\b)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
@@ -596,6 +596,8 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             "claude": "claude",
             "claude code": "claude",
             "claude-code": "claude",
+            "auto": "cursor",
+            "composer": "cursor",
 
 
             "codex": "codex",
@@ -622,8 +624,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, cursor, antigravity). Unknown exclusions: {list(invokers)}")
             return None, "None"
         elif not invokers and not sys.stdout.isatty():
-            log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
-            return None, "None"
+            print("Warning: Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME to prevent self-invocation.", file=sys.stderr)
 
         if not available:
             log_error(f"No alternate AI CLI found (invoking agents {list(invokers)} were excluded).")

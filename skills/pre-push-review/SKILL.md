@@ -28,6 +28,8 @@ drawing on desktop **Claude Pro/Team**, **ChatGPT**, **OpenCode**, or **Google A
 
 ## Usage
 
+**Note:** Until this skill is merged to `main`, you must set `PRE_PUSH_REVIEW_LOCAL_DEV=1` in your environment to use the local branch copy.
+
 ```bash
 # By default, use the trusted installed review script to prevent executing untrusted branch code.
 # To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1
@@ -52,20 +54,30 @@ if [ -n "$AGENT_NAME" ]; then
 else
   python3 "$REVIEW_SCRIPT" --engine alternate
 fi
+```
 
-# Review via Claude model through Antigravity CLI
+Review via Claude model through Antigravity CLI:
+```bash
 python3 "$REVIEW_SCRIPT" --engine agy-claude
+```
 
-# Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity')
+Explicitly choose AI engine ('claude', 'codex', 'opencode', or 'antigravity'):
+```bash
 python3 "$REVIEW_SCRIPT" --engine codex
+```
 
-# Pass custom model override
+Pass custom model override:
+```bash
 python3 "$REVIEW_SCRIPT" --engine codex --model gpt-5.6-sol
+```
 
-# Post the review report directly to the current GitHub PR
+Post the review report directly to the current GitHub PR:
+```bash
 python3 "$REVIEW_SCRIPT" --post
+```
 
-# Save output to a markdown file
+Save output to a markdown file:
+```bash
 python3 "$REVIEW_SCRIPT" -o review.md
 ```
 

@@ -20,7 +20,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "jules-review.yml"
-SHA_RE = re.compile(r"\b[0-9a-f]{40}\b")
 USES_ACTION_RE = re.compile(r"uses:\s*sanjay3290/jules-pr-reviewer@")
 CHILD_EVENT_NAME_RE = re.compile(
     r"^[ \t]*GITHUB_EVENT_NAME=pull_request[ \t]*\\?\s*$",
@@ -34,6 +33,21 @@ YAML_EVENT_NAME_RE = re.compile(
     r"^[ \t]*GITHUB_EVENT_NAME:\s*pull_request\s*$",
     re.MULTILINE,
 )
+NODE_INVOCATION_RE = re.compile(
+    r"^[ \t]*node[ \t].*dist/index\.js",
+    re.MULTILINE,
+)
+SHA_PIN_RE = re.compile(
+    r"^[ \t]*JULES_PR_REVIEWER_SHA:\s*[0-9a-f]{40}\s*$",
+    re.MULTILINE,
+)
+SETUP_NODE_RE = re.compile(r"uses:\s*actions/setup-node@")
+NODE_VERSION_RE = re.compile(r"node-version:\s*['\"]20['\"]")
+PREFLIGHT_ID_RE = re.compile(
+    r"^[ \t]*(?:-\s+)?id:\s*preflight\s*$",
+    re.MULTILINE,
+)
+PREFLIGHT_OUTCOME_RE = re.compile(r"steps\.preflight\.outcome")
 
 
 def pre_jobs(text: str) -> str:
@@ -81,9 +95,12 @@ def findings(text: str) -> list[str]:
             "(without it, eventName is pull_request but the payload is still "
             "issue_comment)"
         )
-    if "dist/index.js" not in text:
-        out.append("does not run the pinned action's dist/index.js")
-    if "JULES_PR_REVIEWER_SHA:" not in text or not SHA_RE.search(text):
+    if not NODE_INVOCATION_RE.search(text):
+        out.append(
+            "does not run the pinned action's dist/index.js "
+            "(need a `node ... dist/index.js` invocation, not a comment)"
+        )
+    if not SHA_PIN_RE.search(text):
         out.append("missing 40-character pin for sanjay3290/jules-pr-reviewer")
     if not re.search(r"INPUT_SKIP_DRAFTS:\s*'false'", text):
         out.append(
@@ -91,6 +108,19 @@ def findings(text: str) -> list[str]:
         )
     if "imperative prose" not in text:
         out.append("missing extra_instructions that this corpus's prose is content")
+    if not SETUP_NODE_RE.search(text) or not NODE_VERSION_RE.search(text):
+        out.append(
+            "Node is unpinned; the action's runs.using is node20 so the wrap "
+            "needs actions/setup-node with node-version 20"
+        )
+    if not PREFLIGHT_ID_RE.search(text):
+        out.append(
+            "missing preflight step (id: preflight) for wrap inputs before node"
+        )
+    if not PREFLIGHT_OUTCOME_RE.search(text):
+        out.append(
+            "could-not-start notifier does not gate on steps.preflight.outcome"
+        )
     return out
 
 

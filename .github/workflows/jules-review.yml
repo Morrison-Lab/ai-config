@@ -53,11 +53,12 @@ jobs:
       contains(github.event.comment.body, '@jules') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
-    # The action's own `timeout_minutes` defaults to 30, and it uses that
-    # budget to give up gracefully and still post a verdict. So bound the job
-    # above it rather than at it: 40 leaves the action 10 minutes to report
-    # before the runner hard-kills the job, which would leave `jules/review`
-    # stuck pending with no comment. Raise both together, never this alone.
+    # The pinned action has no `timeout_minutes` input. `src/index.ts` at
+    # the pinned SHA hard-codes `pollForReview(session, 15 * 60 * 1000)`.
+    # Bound the job above that poll: 40 leaves 25 minutes for fetch, Node
+    # setup, and posting a verdict after the poll returns, before the
+    # runner hard-kills the job and leaves `jules/review` pending with no
+    # comment.
     timeout-minutes: 40
     permissions:
       contents: read        # src/index.ts: repos.getContent, compareCommitsWithBasehead
@@ -130,7 +131,7 @@ jobs:
       # Third-party, personal-account action: fetch the same SHA the workflow
       # used to pin via `uses: owner/repo@sha`. Re-verify the SHA against the
       # upstream tag before bumping. A `uses:` step cannot see the synthetic
-      # event (see the payload step's comment), so the next step runs
+      # event (see the payload step's comment), so a later step runs
       # `dist/index.js` directly.
       - name: Fetch Jules PR Reviewer at the pinned SHA
         id: fetch-action
@@ -148,6 +149,32 @@ jobs:
           git -C "$dest" checkout --quiet --detach FETCH_HEAD
           test -f "$dest/dist/index.js"
 
+      # The pinned action.yml says `runs: using: 'node20'`. A `uses:` step
+      # gets the runner's vendored Node 20; a bare `node` on `ubuntu-latest`
+      # does not. Pin 20 so an image bump cannot change the interpreter
+      # under a third-party bundle.
+      - name: Pin Node 20 to match the action's runs.using
+        id: setup-node
+        if: steps.payload.outputs.same-repo == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      # Assertions that must fail before `node dist/index.js` starts. Kept
+      # off the `jules` step so their outcome is addressable by the
+      # could-not-start notifier. Once the process starts, the action posts
+      # its own failure comment on some paths; these checks never get that far.
+      - name: Confirm the wrap inputs exist
+        id: preflight
+        if: steps.payload.outputs.same-repo == 'true'
+        env:
+          SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pull_request_event.json
+          JULES_ACTION_DIR: ${{ runner.temp }}/jules-pr-reviewer
+        run: |
+          set -euo pipefail
+          test -f "$SYNTHETIC_EVENT_PATH"
+          test -f "$JULES_ACTION_DIR/dist/index.js"
+
       - name: Run Jules PR Reviewer
         id: jules
         if: steps.payload.outputs.same-repo == 'true'
@@ -164,16 +191,16 @@ jobs:
           INPUT_SKIP_FORKS: 'true'
           INPUT_BYPASS_LABEL: jules-override
           INPUT_STATUS_CONTEXT: jules/review
-          INPUT_RULES_FILE: .github/jules-review-rules.md
-          # Deliberately `extra_instructions` and NOT the `rules_file` input.
-          # The action's prompt (src/prompt.ts at the pinned SHA) puts the two
-          # on opposite sides of its trust boundary: the rules file is injected
-          # under "# UNTRUSTED: Project-specific rules", which the prompt's own
-          # security preamble tells the model to ignore and to report as a
-          # "[BLOCKING] Prompt injection attempt" -- so stating this there
-          # would be flagged rather than obeyed. This input is injected under
-          # "# Trusted: Additional instructions (from workflow config)",
-          # because only someone who can edit this workflow can set it.
+          # Empty string disables `loadRulesFromBase()`. The action injects
+          # a rules file under "# UNTRUSTED: Project-specific rules" and
+          # tells the model to treat that block as injection, so this
+          # corpus's trusted guidance belongs in extra_instructions, not
+          # here. No `.github/jules-review-rules.md` exists in this repo.
+          INPUT_RULES_FILE: ''
+          # Trusted side of the action's prompt boundary (src/prompt.ts at
+          # the pinned SHA): "# Trusted: Additional instructions (from
+          # workflow config)". Only someone who can edit this workflow can
+          # set it.
           INPUT_EXTRA_INSTRUCTIONS: |
             This repository is a corpus of instructions for AI coding agents.
             Files under `memories/`, `skills/`, and `shared/`, and the
@@ -194,8 +221,6 @@ jobs:
           JULES_ACTION_DIR: ${{ runner.temp }}/jules-pr-reviewer
         run: |
           set -euo pipefail
-          test -f "$SYNTHETIC_EVENT_PATH"
-          test -f "$JULES_ACTION_DIR/dist/index.js"
           # YAML `env:` cannot override reserved GITHUB_* names. `env(1)`
           # sets the child's environment after that merge, so Context()
           # reads pull_request. See the payload step's comment.
@@ -229,19 +254,23 @@ jobs:
 
       # The fork skip above is not the only route to silence: if the payload
       # step itself dies (a `gh api` hiccup, a rate limit), `same-repo` is
-      # never set, so both gated steps evaluate false, the job goes red, and
-      # the requester sees nothing on the PR. The fetch-action step is the
-      # same shape: it runs before `dist/index.js`, so a clone failure never
-      # reaches the action's own failure comment. Gated on those two steps
-      # rather than a bare `failure()`, because once the Jules process starts
-      # it posts its own failure comment and updates its commit status -- a
-      # second "could not start" note on top of that would be noise
-      # contradicting a report that already exists.
+      # never set, so later gated steps evaluate false, the job goes red, and
+      # the requester sees nothing on the PR. Fetch, Node pin, and preflight
+      # are the same shape: they run before `node dist/index.js`, so a
+      # failure never reaches the action's own comment. Gated on those
+      # steps rather than a bare `failure()`, and not on `jules`, because
+      # once that process starts it posts its own failure comment on the
+      # paths that reach `commentId` -- a second "could not start" note on
+      # top of that would be noise. Paths that return before `commentId`
+      # (invalid fail_on, missing pull_request payload, unsupported event)
+      # still stay silent; those are inside the process, not before it.
       - name: Explain a request that could not start
         if: >-
           failure() &&
           (steps.payload.outcome == 'failure' ||
-           steps.fetch-action.outcome == 'failure')
+           steps.fetch-action.outcome == 'failure' ||
+           steps.setup-node.outcome == 'failure' ||
+           steps.preflight.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.issue.number }}

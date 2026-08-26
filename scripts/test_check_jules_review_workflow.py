@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for check_jules_review_workflow.py.
+"""Regression tests for check-jules-review-workflow.py.
 
 The live workflow is one case. Each finding the checker claims to catch has
 its own fixture that is otherwise valid, so deleting that finder turns the
@@ -8,12 +8,13 @@ matching test red. A check that has never been watched fail is a guess.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent / "check_jules_review_workflow.py"
+SCRIPT = Path(__file__).resolve().parent / "check-jules-review-workflow.py"
 ROOT = Path(__file__).resolve().parent.parent
 LIVE = ROOT / ".github" / "workflows" / "jules-review.yml"
 
@@ -50,6 +51,11 @@ on:
 jobs:
   review:
     steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+      - id: preflight
+        run: echo preflight
       - env:
           JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
         run: echo pin
@@ -60,8 +66,11 @@ jobs:
             node "$JULES_ACTION_DIR/dist/index.js"
         env:
           INPUT_SKIP_DRAFTS: 'false'
+          INPUT_RULES_FILE: ''
           INPUT_EXTRA_INSTRUCTIONS: |
             Files are written as imperative prose addressed to an AI reader.
+      - if: steps.preflight.outcome == 'failure'
+        run: echo could-not-start
 """
 
 
@@ -106,7 +115,11 @@ MISSING_CHILD_PATH = tweak(
     "",
 )
 
-MISSING_DIST = tweak("dist/index.js", "index.js")
+# Prose still names dist/index.js; the node invocation is gone.
+COMMENTED_ONLY_DIST = tweak(
+    '            node "$JULES_ACTION_DIR/dist/index.js"\n',
+    "            # start its dist/index.js under env(1)\n",
+)
 
 MISSING_SHA = tweak(
     "          JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6\n",
@@ -116,6 +129,19 @@ MISSING_SHA = tweak(
 MISSING_SKIP_DRAFTS = tweak("          INPUT_SKIP_DRAFTS: 'false'\n", "")
 
 MISSING_PROSE = tweak("imperative prose", "review rules")
+
+MISSING_SETUP_NODE = tweak(
+    "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
+    '        with:\n          node-version: "20"\n',
+    "",
+)
+
+MISSING_PREFLIGHT_ID = tweak("      - id: preflight\n        run: echo preflight\n", "")
+
+MISSING_PREFLIGHT_GATE = tweak(
+    "      - if: steps.preflight.outcome == 'failure'\n        run: echo could-not-start\n",
+    "",
+)
 
 
 def write_fixture(tmpdir: str, body: str) -> Path:
@@ -178,32 +204,50 @@ case_exits(
     1,
     "GITHUB_EVENT_PATH=",
 )
-case_exits("missing dist/index.js", MISSING_DIST, 1, "dist/index.js")
+case_exits(
+    "dist/index.js only in comments",
+    COMMENTED_ONLY_DIST,
+    1,
+    "node ... dist/index.js",
+)
 case_exits("missing SHA pin", MISSING_SHA, 1, "40-character pin")
 case_exits("missing INPUT_SKIP_DRAFTS", MISSING_SKIP_DRAFTS, 1, "INPUT_SKIP_DRAFTS")
 case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is content")
+case_exits("unpinned Node", MISSING_SETUP_NODE, 1, "Node is unpinned")
+case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
+case_exits(
+    "could-not-start omits preflight",
+    MISSING_PREFLIGHT_GATE,
+    1,
+    "steps.preflight.outcome",
+)
 
 # Mechanism: env(1) overrides an inherited GITHUB_EVENT_NAME. This is the
 # property the workflow relies on and that YAML env: on uses: does not have.
-proc = subprocess.run(
-    [
-        "env",
-        "GITHUB_EVENT_NAME=issue_comment",
-        "env",
-        "GITHUB_EVENT_NAME=pull_request",
-        sys.executable,
-        "-c",
-        "import os; assert os.environ['GITHUB_EVENT_NAME'] == 'pull_request'",
-    ],
-    capture_output=True,
-    text=True,
-    env=os.environ | {"GITHUB_EVENT_NAME": "issue_comment"},
-)
-check(
-    "env(1) overrides inherited GITHUB_EVENT_NAME",
-    proc.returncode == 0,
-    proc.stdout + proc.stderr,
-)
+# Skip when `env` is not on PATH (Windows Python outside Git Bash).
+env_bin = shutil.which("env")
+if env_bin is None:
+    print("SKIP: env(1) overrides inherited GITHUB_EVENT_NAME (env not on PATH)")
+else:
+    proc = subprocess.run(
+        [
+            env_bin,
+            "GITHUB_EVENT_NAME=issue_comment",
+            env_bin,
+            "GITHUB_EVENT_NAME=pull_request",
+            sys.executable,
+            "-c",
+            "import os; assert os.environ['GITHUB_EVENT_NAME'] == 'pull_request'",
+        ],
+        capture_output=True,
+        text=True,
+        env=os.environ | {"GITHUB_EVENT_NAME": "issue_comment"},
+    )
+    check(
+        "env(1) overrides inherited GITHUB_EVENT_NAME",
+        proc.returncode == 0,
+        proc.stdout + proc.stderr,
+    )
 
 # Missing workflow is a usage error, not a clean pass.
 missing_code, missing_out = run_check(ROOT / "no-such-jules-review.yml")

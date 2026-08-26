@@ -688,6 +688,22 @@ secrets under `pull_request`) has to be re-established explicitly.
 - **Do:** invoke the action from a `run:` step with `env(1)` setting
   `GITHUB_EVENT_NAME` and `GITHUB_EVENT_PATH` on the node child, and set
   every `INPUT_*` the JS reads because `action.yml` defaults will not apply.
+- **Do:** pin Node to the action's `runs.using` (`node20` here via
+  `actions/setup-node`) when the wrap is a `run: node dist/index.js` rather
+  than `uses:`. The runner's vendored Node 20 is a `uses:` property.
+- **Do:** keep wrap preflight (`test -f` on the synthetic payload and the
+  bundle) in its own step so a "could not start" comment can gate on it.
+  Assertions left on the `jules` step fail before the process assigns
+  `commentId`, and the notifier that excludes that step will not fire.
+- **Do:** gate a wrap checker on the `node ... dist/index.js` invocation
+  line, not a substring comments also contain.
+- **Don't:** spawn `env` from Python without `shutil.which("env")`. Windows
+  Python outside Git Bash has no `env` on PATH, so the call raises
+  `FileNotFoundError` before the suite can print its tally, and local
+  pre-commit goes red while ubuntu CI stays green.
+- **Don't:** set `INPUT_RULES_FILE` to a path and then comment that the
+  rules-file input is deliberately unused. The empty string is the
+  documented disable value.
 - **Do:** fetch a checker at the SHA the calling workflow **pins** when
   reproducing a diff-scoped CI gate locally, not the action's default branch.
   The first Do pins when *auditing* an action; the same applies when
@@ -731,7 +747,7 @@ Measured 2026-08-26 on run 32942088643 / #2280: the step logged the override
 and the action still saw `issue_comment`.
 The working form is `env(1)` around `node dist/index.js`, recorded in
 `.github/workflows/jules-review.yml` and gated by
-`scripts/check_jules_review_workflow.py`.)
+`scripts/check-jules-review-workflow.py`.)
 
 ## A SHA pin on a reusable workflow freezes the caller, not what the caller runs
 

@@ -28,9 +28,9 @@ jobs:
         # ai-config#2280: a uses: step with GITHUB_EVENT_NAME in env looks
         # like a wrap and is a no-op. This gate fails if the mention path
         # is dropped or if the action is invoked via uses: again.
-        run: python3 scripts/check_jules_review_workflow.py
+        run: python3 scripts/check-jules-review-workflow.py
       - name: Run Jules-review workflow tests
-        run: python3 scripts/test_jules_review_workflow.py
+        run: python3 scripts/test_check_jules_review_workflow.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
       - name: Check tui-alloc README defaults

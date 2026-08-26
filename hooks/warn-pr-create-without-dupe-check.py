@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""PreToolUse reminder: creating a PR with no duplicate check earlier in the session.
+"""PreToolUse reminder: creating a PR or issue with no duplicate check earlier
+in the session.
 
-[`pr-on-claim`](../shared/workflow/pr-on-claim.md) already names the check --- the
-authoritative in-flight signal for a piece of work is the issue's
-cross-referenced **open PRs**, not the claim comment. That rule is consulted at
-read time and broken at composition time, which is the shape
-[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) says to
-mechanize rather than restate.
+[`pr-on-claim`](../shared/workflow/pr-on-claim.md) already names the PR check ---
+the authoritative in-flight signal for a piece of work is the issue's
+cross-referenced **open PRs**, not the claim comment.
+[`issue-first`](../shared/workflow/issue-first.md) and
+[`report-mistakes-proactively`](../shared/workflow/report-mistakes-proactively.md)
+name the same shape for issues: search the tracker before filing.
+Both rules are consulted at read time and broken at composition time, which is
+the shape [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
+says to mechanize rather than restate.
 
 WHAT HAPPENED
 -------------
@@ -36,11 +40,13 @@ Deliberate. README's "A hook that misfires is worse than a missing one" sets the
 bar, and the asymmetry here runs the opposite way from
 `no-handrolled-verdict-parse.py`'s:
 
-  * A duplicate PR is cheap. It is visible, it is closeable, and closing it
-    costs one comment.
-  * A blocked `gh pr create` is expensive. It interrupts the one action that
-    makes work visible to other sessions, which is the very thing this rule
-    exists to encourage.
+  * A duplicate PR or issue is cheap. It is visible, it is closeable, and
+    closing it costs one comment.
+  * A blocked `gh pr create` or `gh issue create` is expensive. It interrupts
+    the one action that makes work (or a problem) visible to other sessions,
+    which is the very thing these rules exist to encourage.
+    `report-mistakes-proactively.md`'s "filing is not gated on approval" points
+    the same way: a redundant entry is cheap and a lost one is not.
 
 So the safe direction is a reminder carrying the query to run, not a refusal.
 That also means a false positive costs a line of context and nothing else,
@@ -48,12 +54,15 @@ which is what lets the matcher stay broad enough to be useful.
 
 THE CHECK
 ---------
-Both must hold:
+Both must hold, independently for PRs and for issues:
 
-  1. the command creates a PR/MR at a COMMAND POSITION --- `gh pr create` or
-     `glab mr create` at the start of the command or after `;`, `&&`, `||`,
-     `|`, or a newline.
-  2. NO duplicate-surfacing command appears earlier in the transcript.
+  1. the command creates a PR/MR or an issue at a COMMAND POSITION ---
+     `gh pr create` / `glab mr create`, or `gh issue create` /
+     `glab issue create`, at the start of the command or after `;`, `&&`,
+     `||`, `|`, or a newline.
+  2. NO duplicate-surfacing command of the SAME object kind appears earlier
+     in the transcript. A `gh pr list` does not discharge an issue create,
+     and a `gh issue list` does not discharge a PR create.
 
 Clause 1's anchoring is load-bearing, not tidiness. This corpus quotes
 `gh pr create` constantly --- in fragments, in issue bodies, in heredocs
@@ -75,21 +84,51 @@ rather than exposing it. Caught in review on #1749.
 
 WHAT DISCHARGES IT
 ------------------
-Any earlier command that could surface an existing PR:
+PR create --- any earlier command that could surface an existing PR:
 
     gh pr list, gh pr view, gh pr status, gh search prs
     glab mr list, glab mr view
     mcp__github__list_pull_requests, mcp__github__search_pull_requests,
     mcp__github__pull_request_read
 
-The discharge is deliberately generous --- session-wide rather than per-topic.
+Issue create --- a qualifying tracker search, not a listing of open issues:
+
+    gh issue list ... --state all ... --search ...
+    glab issue list ... --state all ... --search ...
+    gh search issues
+    mcp__github__search_issues
+    mcp__github__list_issues with state=all
+
+`--state all`, not `--state open`, per
+[`check-open-prs-before-duplicating`](../shared/workflow/check-open-prs-before-duplicating.md).
+A bug fixed and closed last week is exactly the duplicate an open-state search
+cannot see. Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode
+crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed
+them; three of the four would have been caught by an `--state open` search,
+but a bug fixed and closed last week is exactly the duplicate an open-state
+search cannot see.
+
+The hook prompts that search. It does not adjudicate whether the terms were
+good --- that is [`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md).
+
+PR discharge stays generous --- session-wide rather than per-topic.
 [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) warns
 that an over-broad discharge makes a guard go silent, and that is a real cost
 here: a session that listed PRs once at the start is discharged for every PR it
 later creates. That was accepted because the target is the session that never
-looked at all, which is what the measured incident was. Tightening it to
+looked at all, which is what the measured PR incident was. Tightening it to
 per-topic would need a notion of "same topic" that nothing in the transcript
-supplies.
+supplies. Issue discharge is stricter on FLAGS (`--state all` and `--search`)
+for the same reason, not on topic.
+
+OUT OF SCOPE
+------------
+Re-deriving a documented quirk (instance 3 of #2088) is not mechanizable until
+after the fact: nothing at composition time distinguishes it from ordinary
+work. Authoring a new file under `shared/` or `memories/` without a prior
+corpus search (instance 2) is a different instrument --- a Write matcher, a
+filesystem "new file" check, and a grep discharge --- not a matcher extension
+of this hook.
 
 FAILS OPEN
 ----------
@@ -143,8 +182,59 @@ MCP_DISCHARGE = (
     "mcp__github__pull_request_read",
 )
 
+# `gh issue create` / `glab issue create` at a command position. Same
+# separator class as RX_CREATE, including `(` and `{`, for the same reason:
+# `URL=$(gh issue create ...)` is a real create.
+RX_ISSUE_CREATE = re.compile(
+    r"(?:^|[;&|\n({])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:gh\s+issue\s+create|glab\s+issue\s+create)\b",
+    re.MULTILINE,
+)
+
+# `gh issue list` / `glab issue list` at a command position. Discharge
+# separators stay NARROW (no `(` / `{`), same reason as RX_DISCHARGE.
+RX_ISSUE_LIST = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:gh|glab)\s+issue\s+list\b",
+    re.MULTILINE,
+)
+
+# `gh search issues` searches all states unless the query adds is:open, so
+# it is the equivalent of `--state all --search`. The hook does not parse
+# the query (grep-is-not-coverage).
+RX_GH_SEARCH_ISSUES = re.compile(
+    r"(?:^|[;&|\n])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"gh\s+search\s+issues\b",
+    re.MULTILINE,
+)
+
+# `--state all` or `--state=all`, and gh's short `-s all` (gh issue list
+# uses -s for --state and -S for --search; see `gh issue list -h`).
+RX_STATE_ALL = re.compile(
+    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))all\b"
+)
+
+# `--search` or gh's short `-S`. Not bare `-s`: on gh that is --state.
+RX_SEARCH_FLAG = re.compile(
+    r"(?:--search\b|(?<![A-Za-z0-9-])-S\b)"
+)
+
+# Quoted spans in a list command's flags are search terms, not flags.
+# `--state open --search "--state all"` must not discharge.
+RX_QUOTED_SPAN = re.compile(r"'[^']*'|\"[^\"]*\"")
+
 # The MCP equivalent of `gh pr create` (tool-mappings.md, CREATE_PR).
 MCP_CREATE = "mcp__github__create_pull_request"
+
+# CREATE_ISSUE: the legacy name and the current issue_write method=create
+# mapping (tool-mappings.md).
+MCP_ISSUE_CREATE = "mcp__github__create_issue"
+MCP_ISSUE_WRITE = "mcp__github__issue_write"
+MCP_ISSUE_SEARCH = "mcp__github__search_issues"
+MCP_ISSUE_LIST = "mcp__github__list_issues"
 
 # A heredoc body is prose, not commands. Strip it before position matching.
 RX_HEREDOC = re.compile(
@@ -175,6 +265,29 @@ If a PR already covers this, add to it instead. If you have already checked
 another way, carry on --- this is a reminder, not a refusal.
 """
 
+ISSUE_NOTE = """\
+No duplicate check ran before this issue creation.
+
+`issue-first` and `report-mistakes-proactively` require a tracker search
+before filing, and nothing in this session's transcript has listed or
+searched issues with `--state all --search`. Parallel sessions collide most
+often on exactly the bug that feels obviously unfiled.
+
+Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode crash had
+four open issues (#1984, #2040, #2048, #2049) before #2086 closed them.
+
+`--state all`, not `--state open`: a bug fixed and closed last week is
+exactly the duplicate an open-state search cannot see.
+
+One query settles it before you spend an issue:
+
+    gh issue list --repo <owner>/<repo> --state all --search "<keywords>"
+
+This prompts the search; it does not judge whether the terms were good.
+If an issue already covers this, comment there instead. If you have already
+checked another way, carry on --- this is a reminder, not a refusal.
+"""
+
 
 def strip_heredocs(command):
     """Remove heredoc BODIES, keeping the rest of the opener line.
@@ -193,6 +306,84 @@ def creates_pr(command):
     return bool(RX_CREATE.search(strip_heredocs(command)))
 
 
+def creates_issue(command):
+    """True when the command creates an issue at a command position."""
+    return bool(RX_ISSUE_CREATE.search(strip_heredocs(command)))
+
+
+def _command_rest(text, start):
+    """Flags of the command starting at start, up to the next separator."""
+    rest = text[start:]
+    match = re.search(r"[;&|\n]", rest)
+    return rest if match is None else rest[: match.start()]
+
+
+def command_has_issue_dupe_check(command):
+    """True when this command string is a qualifying issue search.
+
+    Qualifying means command-position `gh search issues`, or command-position
+    `gh`/`glab issue list` whose own flags include both `--state all` (or
+    gh's `-s all`) and `--search` (or gh's `-S`). `--state open --search`
+    does not qualify.
+    """
+    text = strip_heredocs(command)
+    if RX_GH_SEARCH_ISSUES.search(text):
+        return True
+    for match in RX_ISSUE_LIST.finditer(text):
+        rest = RX_QUOTED_SPAN.sub(" ", _command_rest(text, match.end()))
+        if RX_STATE_ALL.search(rest) and RX_SEARCH_FLAG.search(rest):
+            return True
+    return False
+
+
+def _mcp_creates_issue(tool_name, tool_input):
+    """True when this MCP call creates an issue."""
+    if tool_name == MCP_ISSUE_CREATE:
+        return True
+    if tool_name == MCP_ISSUE_WRITE:
+        method = tool_input.get("method") if isinstance(tool_input, dict) else None
+        return isinstance(method, str) and method.lower() == "create"
+    return False
+
+
+def _mcp_is_issue_search(name, payload):
+    """True when this MCP call is a qualifying issue search."""
+    if name == MCP_ISSUE_SEARCH:
+        return True
+    if name == MCP_ISSUE_LIST:
+        state = payload.get("state") if isinstance(payload, dict) else None
+        return isinstance(state, str) and state.lower() == "all"
+    return False
+
+
+def _tool_uses(entry):
+    """Yield (name, payload_dict) for each tool_use in a transcript entry."""
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return
+    content = message.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        name = block.get("name")
+        if not isinstance(name, str):
+            name = ""
+        payload = block.get("input")
+        if not isinstance(payload, dict):
+            payload = {}
+        yield name, payload
+
+
+def _payload_commands(payload):
+    """Yield command-ish strings from a tool_use input dict."""
+    for key in ("command", "cmd", "CommandLine"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            yield value
+
+
 def transcript_has_dupe_check(transcript_path):
     """True when some earlier transcript command could have surfaced a PR.
 
@@ -209,37 +400,64 @@ def transcript_has_dupe_check(transcript_path):
                     entry = json.loads(line)
                 except ValueError:
                     continue
-                for kind, text in _tool_inputs(entry):
-                    if kind == "name":
-                        if text in MCP_DISCHARGE:
-                            return True
-                    elif RX_DISCHARGE.search(strip_heredocs(text)):
+                for name, payload in _tool_uses(entry):
+                    if name in MCP_DISCHARGE:
                         return True
+                    for text in _payload_commands(payload):
+                        if RX_DISCHARGE.search(strip_heredocs(text)):
+                            return True
+    except OSError:
+        return True
+    return False
+
+
+def transcript_has_issue_dupe_check(transcript_path):
+    """True when some earlier transcript command was a qualifying issue search.
+
+    Returns True (i.e. discharged, silent) on any read failure --- fail open.
+    """
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return True
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                for name, payload in _tool_uses(entry):
+                    if _mcp_is_issue_search(name, payload):
+                        return True
+                    for text in _payload_commands(payload):
+                        if command_has_issue_dupe_check(text):
+                            return True
     except OSError:
         return True
     return False
 
 
 def _tool_inputs(entry):
-    """Yield command-ish strings from one transcript entry."""
-    message = entry.get("message")
-    if not isinstance(message, dict):
-        return
-    content = message.get("content")
-    if not isinstance(content, list):
-        return
-    for block in content:
-        if not isinstance(block, dict) or block.get("type") != "tool_use":
-            continue
-        name = block.get("name")
-        if isinstance(name, str):
+    """Yield command-ish strings from one transcript entry.
+
+    Kept as a thin wrapper over `_tool_uses` so older tests that poke at
+    this helper still see the same (kind, text) pairs.
+    """
+    for name, payload in _tool_uses(entry):
+        if name:
             yield ("name", name)
-        payload = block.get("input")
-        if isinstance(payload, dict):
-            for key in ("command", "cmd", "CommandLine"):
-                value = payload.get(key)
-                if isinstance(value, str):
-                    yield ("command", value)
+        for text in _payload_commands(payload):
+            yield ("command", text)
+
+
+def _emit(note):
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": note,
+        }
+    }))
 
 
 def main():
@@ -254,47 +472,48 @@ def main():
         return 0  # fail open: the harness always sends an object
 
     tool_name = payload.get("tool_name")
-    if tool_name == MCP_CREATE:
-        # No command string to inspect; the tool itself is the creation.
-        if transcript_has_dupe_check(payload.get("transcript_path") or ""):
-            return 0
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "additionalContext": NOTE,
-            }
-        }))
-        return 0
-
-    if tool_name not in ("Bash", "bash", "run_command"):
-        return 0
-
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         tool_input = {}
-    command = (tool_input.get("command")
-               or tool_input.get("cmd")
-               or tool_input.get("CommandLine")
-               or "")
-    if not isinstance(command, str) or not command.strip():
-        return 0
+    transcript = payload.get("transcript_path") or ""
 
     try:
-        if not creates_pr(command):
+        if tool_name == MCP_CREATE:
+            if transcript_has_dupe_check(transcript):
+                return 0
+            _emit(NOTE)
             return 0
-        if transcript_has_dupe_check(payload.get("transcript_path") or ""):
+
+        if _mcp_creates_issue(tool_name, tool_input):
+            if transcript_has_issue_dupe_check(transcript):
+                return 0
+            _emit(ISSUE_NOTE)
+            return 0
+
+        if tool_name not in ("Bash", "bash", "run_command"):
+            return 0
+
+        command = (tool_input.get("command")
+                   or tool_input.get("cmd")
+                   or tool_input.get("CommandLine")
+                   or "")
+        if not isinstance(command, str) or not command.strip():
+            return 0
+
+        if creates_pr(command):
+            if transcript_has_dupe_check(transcript):
+                return 0
+            _emit(NOTE)
+            return 0
+        if creates_issue(command):
+            if transcript_has_issue_dupe_check(transcript):
+                return 0
+            _emit(ISSUE_NOTE)
             return 0
     except Exception as exc:  # fail open on any parse trouble
         print("warn-pr-create-without-dupe-check: could not evaluate "
               f"({exc})", file=sys.stderr)
         return 0
-
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "additionalContext": NOTE,
-        }
-    }))
     return 0
 
 

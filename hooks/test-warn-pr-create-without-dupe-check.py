@@ -284,9 +284,220 @@ proc = subprocess.run([sys.executable, HOOK], input=mcp_payload_ok,
                       capture_output=True, text=True, timeout=10)
 check("mcp create silent when discharged", proc.stdout.strip(), "")
 
+# MCP create-issue tools must trip the issue half, not the PR half.
+mcp_issue_payload = json.dumps({
+    "tool_name": "mcp__github__create_issue",
+    "tool_input": {"title": "x"},
+    "transcript_path": no_check,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_issue_payload,
+                      capture_output=True, text=True, timeout=10)
+check("mcp create_issue fires without a dupe check",
+      bool(proc.stdout.strip()), True)
+if proc.stdout.strip():
+    try:
+        ctx = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        check("mcp create_issue warning names the issue query",
+              "gh issue list" in ctx, True)
+        check("mcp create_issue warning requires --state all",
+              "--state all" in ctx, True)
+    except (ValueError, KeyError) as exc:
+        failures.append(f"mcp create_issue output not well-formed: {exc}")
+
+mcp_write_create = json.dumps({
+    "tool_name": "mcp__github__issue_write",
+    "tool_input": {"method": "create", "title": "x"},
+    "transcript_path": no_check,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_write_create,
+                      capture_output=True, text=True, timeout=10)
+check("mcp issue_write method=create fires", bool(proc.stdout.strip()), True)
+
+mcp_write_update = json.dumps({
+    "tool_name": "mcp__github__issue_write",
+    "tool_input": {"method": "update", "issue_number": 1},
+    "transcript_path": no_check,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_write_update,
+                      capture_output=True, text=True, timeout=10)
+check("mcp issue_write method=update is silent", proc.stdout.strip(), "")
+
+# ---------------------------------------------------------------- issue create
+
+check("plain gh issue create",
+      hook.creates_issue("gh issue create --title x"), True)
+check("glab issue create", hook.creates_issue("glab issue create"), True)
+check("issue create after &&",
+      hook.creates_issue("true && gh issue create --title x"), True)
+check("issue create after newline",
+      hook.creates_issue("true\ngh issue create --title x"), True)
+check("issue create with env prefix",
+      hook.creates_issue("GH_TOKEN=x gh issue create --title x"), True)
+check("issue create inside command substitution",
+      hook.creates_issue("URL=$(gh issue create --title x)"), True)
+check("issue create inside a brace group",
+      hook.creates_issue("{ gh issue create --title x; }"), True)
+check("pr create is not issue create",
+      hook.creates_issue("gh pr create --fill"), False)
+check("issue create is not pr create",
+      hook.creates_pr("gh issue create --title x"), False)
+check("prose mentioning issue create mid-sentence",
+      hook.creates_issue("echo 'run gh issue create when ready'"), False)
+check("heredoc body quoting issue create at line start",
+      hook.creates_issue(
+          "cat > /tmp/body.md <<'EOF'\n"
+          "gh issue create --title x\n"
+          "EOF"),
+      False)
+check("issue create chained after the opener with &&",
+      hook.creates_issue(
+          "cat <<'EOF' > /tmp/b.md && gh issue create --body-file /tmp/b.md\n"
+          "body\n"
+          "EOF"),
+      True)
+check("unrelated gh issue command",
+      hook.creates_issue("gh issue list"), False)
+check("issue create as a substring of another word",
+      hook.creates_issue("gh issue createfoo"), False)
+
+# ------------------------------------------------------- issue discharge
+
+with_issue_all = write_transcript(
+    ['gh issue list --state all --search "cp1252"'])
+with_issue_all_eq = write_transcript(
+    ['gh issue list --search=cp1252 --state=all'])
+with_issue_all_short = write_transcript(
+    ["gh issue list -s all -S cp1252"])
+with_issue_open = write_transcript(
+    ['gh issue list --state open --search "cp1252"'])
+with_issue_all_no_search = write_transcript(
+    ["gh issue list --state all"])
+with_issue_search_only = write_transcript(
+    ['gh issue list --search "cp1252"'])
+with_gh_search_issues = write_transcript(
+    ["gh search issues --owner o 'cp1252'"])
+with_glab_issue_all = write_transcript(
+    ['glab issue list --state all --search "cp1252"'])
+with_mcp_issue_search = write_transcript(
+    [None], "mcp__github__search_issues")
+with_mcp_issue_list_open = write_transcript(
+    [None], "mcp__github__list_issues")
+with_pr_list_for_issue = write_transcript(["gh pr list --repo o/r"])
+prose_issue_list = write_transcript(
+    ['echo \'run gh issue list --state all --search "x" first\''])
+quoted_state_in_search = write_transcript(
+    ['gh issue list --state open --search "--state all"'])
+
+
+def write_mcp_input(tool_name, payload):
+    fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                     encoding="utf-8")
+    block = {"type": "tool_use", "name": tool_name, "input": payload}
+    fh.write(json.dumps({"message": {"content": [block]}}) + "\n")
+    fh.close()
+    return fh.name
+
+
+with_mcp_issue_list_all = write_mcp_input(
+    "mcp__github__list_issues", {"state": "all"})
+
+check("gh issue list --state all --search discharges",
+      hook.transcript_has_issue_dupe_check(with_issue_all), True)
+check("flag order --search then --state=all discharges",
+      hook.transcript_has_issue_dupe_check(with_issue_all_eq), True)
+check("gh short flags -s all -S discharge",
+      hook.transcript_has_issue_dupe_check(with_issue_all_short), True)
+check("--state open --search does not discharge",
+      hook.transcript_has_issue_dupe_check(with_issue_open), False)
+check("--state all without --search does not discharge",
+      hook.transcript_has_issue_dupe_check(with_issue_all_no_search), False)
+check("--search without --state all does not discharge",
+      hook.transcript_has_issue_dupe_check(with_issue_search_only), False)
+check("gh search issues discharges",
+      hook.transcript_has_issue_dupe_check(with_gh_search_issues), True)
+check("glab issue list --state all --search discharges",
+      hook.transcript_has_issue_dupe_check(with_glab_issue_all), True)
+check("mcp search_issues discharges",
+      hook.transcript_has_issue_dupe_check(with_mcp_issue_search), True)
+check("mcp list_issues without state=all does not discharge",
+      hook.transcript_has_issue_dupe_check(with_mcp_issue_list_open), False)
+check("mcp list_issues with state=all discharges",
+      hook.transcript_has_issue_dupe_check(with_mcp_issue_list_all), True)
+check("gh pr list does not discharge issue create",
+      hook.transcript_has_issue_dupe_check(with_pr_list_for_issue), False)
+check("gh issue list does not discharge PR create",
+      hook.transcript_has_dupe_check(with_issue_all), False)
+check("prose quoting the qualifying issue list does not discharge",
+      hook.transcript_has_issue_dupe_check(prose_issue_list), False)
+check("quoted --state all inside --search does not discharge",
+      hook.transcript_has_issue_dupe_check(quoted_state_in_search), False)
+
+# Direct matcher for the command-has helper.
+check("command_has_issue_dupe_check: qualifying list",
+      hook.command_has_issue_dupe_check(
+          'gh issue list -R o/r --state all --search "x"'), True)
+check("command_has_issue_dupe_check: open state",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state open --search "x"'), False)
+check("command_has_issue_dupe_check: gh search issues",
+      hook.command_has_issue_dupe_check("gh search issues 'x'"), True)
+check("command_has_issue_dupe_check: prose",
+      hook.command_has_issue_dupe_check(
+          'echo gh issue list --state all --search x'), False)
+
+issue_fires = run_hook("gh issue create --title x", no_check)
+check("end-to-end issue create fires without a dupe check",
+      bool(issue_fires), True)
+if issue_fires:
+    try:
+        payload = json.loads(issue_fires)
+        ctx = payload["hookSpecificOutput"]["additionalContext"]
+        check("issue warning names --state all", "--state all" in ctx, True)
+        check("issue warning names gh issue list", "gh issue list" in ctx, True)
+        check("issue warning is not the PR warning",
+              "open PRs" in ctx, False)
+    except (ValueError, KeyError) as exc:
+        failures.append(f"issue end-to-end output not well-formed: {exc}")
+
+check("end-to-end issue silent when discharged with --state all",
+      run_hook("gh issue create --title x", with_issue_all), "")
+check("end-to-end issue still warns after --state open search",
+      bool(run_hook("gh issue create --title x", with_issue_open)), True)
+check("end-to-end issue silent after gh search issues",
+      run_hook("gh issue create --title x", with_gh_search_issues), "")
+check("PR create still fires when only an issue search ran",
+      bool(run_hook("gh pr create --fill", with_issue_all)), True)
+check("issue create still fires when only a PR list ran",
+      bool(run_hook("gh issue create --title x", with_list)), True)
+
+mcp_issue_ok = json.dumps({
+    "tool_name": "mcp__github__create_issue",
+    "tool_input": {"title": "x"},
+    "transcript_path": with_mcp_issue_search,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_issue_ok,
+                      capture_output=True, text=True, timeout=10)
+check("mcp create_issue silent when search_issues ran",
+      proc.stdout.strip(), "")
+
+mcp_write_ok = json.dumps({
+    "tool_name": "mcp__github__issue_write",
+    "tool_input": {"method": "create", "title": "x"},
+    "transcript_path": with_mcp_issue_list_all,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_write_ok,
+                      capture_output=True, text=True, timeout=10)
+check("mcp issue_write create silent when list_issues state=all ran",
+      proc.stdout.strip(), "")
+
 for path in (no_check, with_list, with_view, with_search, with_mcp,
              with_mcp_read, prose_list, prose_commit, prose_heredoc,
-             chained_real, unrelated_mcp):
+             chained_real, unrelated_mcp, with_issue_all, with_issue_all_eq,
+             with_issue_all_short, with_issue_open, with_issue_all_no_search,
+             with_issue_search_only, with_gh_search_issues, with_glab_issue_all,
+             with_mcp_issue_search, with_mcp_issue_list_open,
+             with_pr_list_for_issue, prose_issue_list, quoted_state_in_search,
+             with_mcp_issue_list_all):
     os.unlink(path)
 
 if failures:

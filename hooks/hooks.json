@@ -281,7 +281,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
+            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal; issue-first.md and report-mistakes-proactively.md require the same search before gh issue create. Both rules are consulted at read time while the omission happens at composition time. PR half measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Issue half measured on Morrison-Lab/ai-config 2026-08: one cp1252 decode crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed them. Issue discharge requires --state all --search (or gh search issues / MCP search_issues), not --state open, per check-open-prs-before-duplicating.md. Warns rather than blocks -- a duplicate is cheap to close and a blocked creation is expensive, since creating the PR or filing the issue is the act that makes work visible. Anchored on a command position with heredoc bodies stripped. Fails open. Tracked as #1748 (PR) and #2088 (issue)."
           },
           {
             "type": "command",
@@ -487,7 +487,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request and CREATE_ISSUE to mcp__github__issue_write (method=create) (legacy mcp__github__create_issue still matched), and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           },
           {
             "type": "command",

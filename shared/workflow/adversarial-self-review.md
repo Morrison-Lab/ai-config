@@ -300,6 +300,9 @@ The other cases have no guard and are prose rules here.
   gate defined under "Cross-model and cross-harness reviews are required
   for merging, and the harness list is concrete" above.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
+  Do not report a HEAD as reviewed until a dispatched review of **that** SHA has returned.
+  If a fix already moved HEAD, re-dispatch on the current SHA before the next status report.
+  (ai-config#2277, 2026-08-26: addressed two wording nits on `92c65d5c` and reported without a review of that SHA until asked.)
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.

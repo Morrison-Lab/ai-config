@@ -6,6 +6,15 @@ Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
 
+Posting a review as comments, with no request to edit the branch, is not
+working the PR.
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+"Watch and ARDI every PR you touch" applies when you are driving the
+branch, not when you were asked only to read it.
+(UCD-SERG/shigella#31, 2026-08-25.)
+
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in
 [`ardi.rationale.md`](ardi.rationale.md),

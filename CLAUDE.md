@@ -774,18 +774,29 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
-## Watch and ARDI every PR you touch — don't ask first
+## Watch and ARDI every PR you touch --- don't ask first
 
-When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs and all repos.
+"Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
+A request to post a review and leave findings, with no request to edit, is not that kind of touch.
+
+**Driving.**
+When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
+That answer is a standing yes across all PRs you are driving.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
+This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
+
+**Review-only.**
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 

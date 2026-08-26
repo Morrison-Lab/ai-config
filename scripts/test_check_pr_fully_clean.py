@@ -1798,6 +1798,67 @@ def main() -> int:
         ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
 
+    mock_ci_cancel_superseded = json.dumps({
+        "check_runs": [
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "cancelled",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]
+    })
+
+    def cancel_superseded_router(cmd):
+        joined = " ".join(cmd)
+        if "check-runs" in joined:
+            return mock_ci_cancel_superseded
+        if "/actions/runs/" in joined:
+            run_id = cmd[-1].rsplit("/", 1)[-1]
+            return json.dumps({
+                "path": ".github/workflows/claude-review.yml",
+            })
+        return "{}"
+
+    with patch.object(checker, "run_cmd", side_effect=cancel_superseded_router):
+        cancel_ok, cancel_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check(
+            "cancelled check run is ignored when same workflow later succeeded",
+            cancel_ok and cancel_issues == [],
+        )
+
+    mock_ci_cancel_collision = json.dumps({
+        "check_runs": [
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "cancelled",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]
+    })
+
+    def cancel_collision_router(cmd):
+        joined = " ".join(cmd)
+        if "check-runs" in joined:
+            return mock_ci_cancel_collision
+        if "/actions/runs/" in joined:
+            run_id = cmd[-1].rsplit("/", 1)[-1]
+            paths = {
+                "1": ".github/workflows/R-CMD-check.yaml",
+                "2": ".github/workflows/check-readme.yaml",
+            }
+            return json.dumps({"path": paths.get(run_id, "")})
+        return "{}"
+
+    with patch.object(checker, "run_cmd", side_effect=cancel_collision_router):
+        collision_ok, collision_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check(
+            "cancelled run is not ignored when success is from a different workflow",
+            (not collision_ok)
+            and any("cancelled" in i for i in collision_issues),
+        )
+
     # A job name is not unique across workflows (#1869). The live case:
     # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
     # check-readme, and a passing check-readme job was nearly read as the

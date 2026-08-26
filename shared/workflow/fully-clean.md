@@ -46,6 +46,11 @@ Worked-example case records for the rules below live in
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**
+   GraphQL `statusCheckRollup` is the same kind of short surface for a
+   *progress* report --- not enough for a terminal "fully clean" /
+   "ready to merge" claim.
+   That claim needs `scripts/check-pr-fully-clean.py`
+   (ai-config#2277, 2026-08-26).
 
    **`--paginate` is load-bearing, not tidiness.**
 

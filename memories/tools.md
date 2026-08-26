@@ -9,7 +9,7 @@ than duplicating the table here.
 That includes the OpenRouter activation mechanics
 (the `~/.config/opencode/opencode.jsonc` provider entry
 and the `OPENROUTER_API_KEY` variable) ---
-see delegation.md's "A fourth destination" section, not a copy here.
+see delegation.md's bolded "A fourth destination" passage, not a copy here.
 One fact specific to this machine's configuration, not covered there:
 - Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
 

@@ -198,7 +198,7 @@ Cursor Cloud does not load Claude `PreToolUse` hooks, so Bash in that
 session did not die; the settings.json was still the
 registered-but-absent state the 2026-08-05 incident produced.
 The order in the Do bullet above is the recovery as well as the
-prevention.)
+prevention.
 
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
 

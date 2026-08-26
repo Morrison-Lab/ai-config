@@ -57,13 +57,11 @@ Every hook actually shipped in this repo's catalog (`hooks/*.py`) signals a deny
 
 ### Silent failure prevention
 Harness bridge adapters must be gated by isolated unit tests in CI (`validate.yml`, e.g. `scripts/test_agy_hook_adapter.py`).
-Because an incomplete adapter simply returns `{"decision": "allow"}` when it misses an event,
-adapter gaps fail silently in production unless tested against synthetic payloads.
+Because an incomplete adapter simply returns `{"decision": "allow"}` when it misses an event, adapter gaps fail silently in production unless tested against synthetic payloads.
 
 ## `agy` CLI model execution & print mode
 
-- Model names in `agy --model` must match the registered string format,
-  e.g. `agy --model "Claude Sonnet 4.6 (Thinking)" -p "<prompt>"`.
+- Model names in `agy --model` must match the registered string format, e.g. `agy --model "Claude Sonnet 4.6 (Thinking)" -p "<prompt>"`.
 - Print mode (`-p` / `--print`) runs a single turn.
   When prompting reasoning/thinking models (such as Claude Thinking models or reasoning Gemini models) non-interactively without tool access, enforce immediate output in the prompt (e.g., "Provide your full review immediately in this response.
   Do not use tools or acknowledge with a conversational promise.").

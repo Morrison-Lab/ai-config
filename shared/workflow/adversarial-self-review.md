@@ -214,7 +214,7 @@ When obtaining adversarial reviews, we need a clean verdict from **every** pinne
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.
-If any provider rejects the diff with findings, you must address the feedback (either by making changes and creating a new commit, or by successfully rebutting on the existing commit) and restart the sequential query process from the very first provider.
+If any provider rejects the diff with findings, you must address the feedback. If you make changes and create a new commit, you must restart the sequential query process from the very first provider. If you successfully address the feedback by rebutting on the existing commit, you do not need to restart; simply continue to the next provider.
 Repeat this until all pinned providers have signed off with a clean verdict on the exact same commit.
 
 The set of required providers must be pinned at the start of the review cycle.

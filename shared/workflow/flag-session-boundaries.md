@@ -5,7 +5,7 @@ Don't interrupt mid-task to say it.
 
 **Always state whether or not the session is at a clean stopping point.**
 The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session
-(though for non-clean stopping points, it need not be the absolute final line of the message)
+(though for non-clean stopping points, the declaration need not be the absolute final line of the message)
 (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
 Whenever ending a session, completing a turn, or wrapping up work
 (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`),

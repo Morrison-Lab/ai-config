@@ -464,7 +464,7 @@ class TestPrePushReview(unittest.TestCase):
     @patch("shutil.which", return_value=True)
     def test_detect_available_engines(self, mock_which, mock_isfile):
         engines = reviewer.detect_available_engines()
-        self.assertEqual(engines, ["claude", "cursor", "codex", "opencode", "antigravity"])
+        self.assertEqual(engines, ["claude", "codex", "opencode", "antigravity"])
 
 
     @patch.object(reviewer, "run_claude_review")
@@ -690,7 +690,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
     def test_get_next_alternate_engine_rotation(self):
-        engines = ["claude", "cursor", "codex", "opencode", "antigravity"]
+        engines = ["claude", "codex", "opencode", "antigravity"]
         # When no prior state exists, starts with first available engine
         with patch("os.path.isfile", return_value=False):
             e1 = reviewer.get_next_alternate_engine(engines)
@@ -699,12 +699,7 @@ class TestPrePushReview(unittest.TestCase):
         # When last engine was claude, next is cursor
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "claude"}')):
             e2 = reviewer.get_next_alternate_engine(engines)
-            self.assertEqual(e2, "cursor")
-
-        # When last engine was cursor, next is codex
-        with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "cursor"}')):
-            e3 = reviewer.get_next_alternate_engine(engines)
-            self.assertEqual(e3, "codex")
+            self.assertEqual(e2, "codex")
 
         # When last engine was antigravity, wraps around to claude
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "antigravity"}')):

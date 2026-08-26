@@ -187,7 +187,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         for found_sha_raw in all_shas:
             if found_sha_raw.lower() != exp_sha:
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
-        
+
         # Also ensure the final fingerprint is anchored at the end of the report
         if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+\s*\Z", unfenced_report):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
@@ -469,8 +469,6 @@ def detect_available_engines() -> List[str]:
     engines = []
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
         engines.append("claude")
-    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
-        engines.append("cursor")
     if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
         engines.append("codex")
     if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
@@ -480,7 +478,7 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
-ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = ["claude", "codex", "opencode", "antigravity"]
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:
@@ -567,13 +565,13 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             "claude": "claude",
             "claude code": "claude",
             "claude-code": "claude",
-            
-            
+
+
             "codex": "codex",
             "opencode": "opencode",
             "open code": "opencode",
         }
-        
+
         recognized = False
         for inv in list(invokers):
             # Also try to normalize by substring if exact match fails
@@ -651,10 +649,10 @@ def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> s
         spec = importlib.util.spec_from_file_location("check_pr", checker_path)
         check_pr = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(check_pr)
-        forbidden_markers = list(check_pr.REVIEW_BODY_MARKERS) + list(check_pr.REVIEW_AGENT_MARKERS.keys())
+        forbidden_markers = [m.lower() for m in list(check_pr.REVIEW_BODY_MARKERS) + list(check_pr.REVIEW_AGENT_MARKERS.keys())]
     except Exception:
         forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
-    
+
     if any(marker in driver_lower for marker in forbidden_markers):
         driver_name = "Local Pre-push Hook"
 
@@ -807,6 +805,8 @@ def main():
             subprocess.run(["git", "clone", "--shared", repo_root, temp_dir], check=True, capture_output=True)
             os.chdir(temp_dir)
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
+            # Remove branch-controlled agent configs to enforce sandbox isolation
+            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github", ".vscode", "cursor.json", ".aider.conf.yml"], check=False)
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)

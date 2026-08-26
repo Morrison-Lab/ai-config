@@ -505,6 +505,27 @@ check("semicolon inside a quoted search term keeps the trailing flags",
       hook.command_has_issue_dupe_check(
           'gh issue list --search "foo; bar" --state all'), True)
 
+# ---------------------- last-flag-wins (repeated --state/--all), ai-config#2324
+
+check("gh issue list: repeated --state, LAST one open, does not discharge",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --search "x" --state open'), False)
+check("gh issue list: repeated --state, LAST one all, discharges",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state open --search "x" --state all'), True)
+check("gh issue list: repeated -s (short), LAST one open, does not discharge",
+      hook.command_has_issue_dupe_check(
+          'gh issue list -s all --search "x" -s open'), False)
+check("gh issue list: repeated -s (short), LAST one all, discharges",
+      hook.command_has_issue_dupe_check(
+          'gh issue list -s open --search "x" -s all'), True)
+check("glab issue list: --all then --all=false, LAST wins, does not discharge",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all --search "x" --all=false'), False)
+check("glab issue list: --all=false then --all, LAST wins, discharges",
+      hook.command_has_issue_dupe_check(
+          'glab issue list --all=false --search "x" --all'), True)
+
 check("mcp search_issues query carrying is:open does not discharge",
       hook._mcp_is_issue_search("mcp__github__search_issues",
                                  {"query": "repo:o/r is:open cp1252"}),

@@ -246,10 +246,20 @@ RX_OPEN_CLOSED_QUALIFIER = re.compile(
     re.IGNORECASE,
 )
 
-# gh issue list: `--state all` or `--state=all`, and short `-s all`
-# (`gh issue list -h`: -s is --state, -S is --search).
-RX_GH_STATE_ALL = re.compile(
-    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))all\b"
+# gh issue list: `--state VALUE` / `--state=VALUE`, and short `-s VALUE`
+# (`gh issue list -h`: -s is --state, -S is --search). Captures the value
+# rather than matching `all` directly, because gh's Cobra/pflag parsing is
+# LAST-FLAG-WINS: a repeated `--state`/`-s` does not error, each occurrence
+# silently overrides the ones before it. `--state all --search "x" --state
+# open` therefore searches OPEN ISSUES ONLY --- gh itself never sees the
+# `all`, it is discarded the instant the second `--state` is parsed. A
+# `.search()` for the literal `all` finds that discarded flag anyway and
+# discharges the reminder in exactly the direction the hook must stay
+# conservative about: an issue closed last week is invisible to the
+# open-only search gh actually ran (caught in review on #2324, verified by
+# direct execution of the reproducer above).
+RX_GH_STATE_FLAG = re.compile(
+    r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))(\S+)"
 )
 RX_GH_SEARCH_FLAG = re.compile(
     r"(?:--search\b|(?<![A-Za-z0-9-])-S\b)"
@@ -266,10 +276,14 @@ RX_SEARCH_VALUE = re.compile(
 )
 
 # glab issue list: `--all` / `-A`, and `--search` (no short search flag).
-# `--all=false` is excluded --- Cobra boolean flags accept an explicit
-# `=false`, and that is not the all-state search this hook prompts for.
-RX_GLAB_ALL = re.compile(
-    r"(?:--all\b(?!=false)|(?<![A-Za-z0-9-])-A\b)"
+# Captures an explicit `=VALUE` when present (a bare flag has none and
+# defaults true, per Cobra/pflag boolean-flag parsing) rather than matching
+# the flag alone, for the same last-flag-wins reason as RX_GH_STATE_FLAG
+# above: `--all --all=false` parses to false, not true, and a plain
+# containment check for `--all\b(?!=false)` matches the FIRST occurrence
+# and never sees the second one override it.
+RX_GLAB_ALL_FLAG = re.compile(
+    r"(?:--all|(?<![A-Za-z0-9-])-A)\b(?:=(\S+))?"
 )
 RX_GLAB_SEARCH_FLAG = re.compile(r"--search\b")
 
@@ -430,17 +444,63 @@ def _search_value_ok(rest_raw):
     return not RX_OPEN_CLOSED_QUALIFIER.search(val)
 
 
+def _gh_state_is_all(rest):
+    """True when the LAST `--state`/`-s` occurrence in `rest` is `all`.
+
+    gh's Cobra/pflag parsing is last-flag-wins: `--state all --search "x"
+    --state open` is parsed as `--state open` alone, the earlier `all` simply
+    discarded. `RX_GH_STATE_FLAG.finditer` in source order and taking the
+    LAST match mirrors that parse; a plain containment test for the literal
+    `all` would instead report whichever occurrence happens to exist,
+    independent of which one gh actually applied (caught in review on
+    #2324, verified by direct execution of the reproducer above).
+
+    `rest` must have quoted spans stripped (as `command_has_issue_dupe_check`
+    already does before calling this), so a `--search "--state all"` value
+    is never mistaken for a real flag.
+    """
+    matches = list(RX_GH_STATE_FLAG.finditer(rest))
+    if not matches:
+        return False
+    return matches[-1].group(1).strip("'\"").lower() == "all"
+
+
+def _glab_all_is_true(rest):
+    """True when the LAST `--all`/`-A` occurrence in `rest` resolves true.
+
+    Same last-flag-wins reasoning as `_gh_state_is_all`: Cobra/pflag boolean
+    flags accept a trailing `=VALUE`, and a later occurrence overrides every
+    earlier one. `--all --all=false` therefore parses to false, not true,
+    and a plain containment check for `--all\\b(?!=false)` matches the FIRST
+    occurrence and never sees the second one override it. A bare flag (no
+    `=VALUE`) means true, per Cobra/pflag boolean-flag defaults.
+
+    `rest` must have quoted spans stripped, for the same reason as above.
+    """
+    matches = list(RX_GLAB_ALL_FLAG.finditer(rest))
+    if not matches:
+        return False
+    value = matches[-1].group(1)
+    if value is None:
+        return True
+    return value.strip("'\"").lower() != "false"
+
+
 def command_has_issue_dupe_check(command):
     """True when this command string is a qualifying issue search.
 
     Qualifying means command-position `gh search issues` with no explicit
     `--state` value and no bare `is:`/`state:` qualifier in the query,
     command-position `gh issue list`/`ls` whose own flags include
-    `--state all` (or gh's `-s all`), `--search` (or gh's `-S`) carrying a
-    non-empty value, and no `is:`/`state:` qualifier inside that value, or
-    command-position `glab issue list`/`ls` with the same shape using
-    `--all`/`-A` and `--search`. `--state open --search` does not qualify.
-    `glab --state all` does not qualify: that flag is not glab's.
+    `--state all` (or gh's `-s all`) as the LAST `--state`/`-s` occurrence
+    (gh's Cobra/pflag parsing is last-flag-wins), `--search` (or gh's `-S`)
+    carrying a non-empty value, and no `is:`/`state:` qualifier inside that
+    value, or command-position `glab issue list`/`ls` with the same shape
+    using `--all`/`-A` (again the LAST occurrence, since a trailing
+    `=false` overrides an earlier bare flag) and `--search`. `--state open
+    --search` does not qualify, and neither does `--state all --search "x"
+    --state open` --- the trailing `--state open` is what gh actually
+    parses. `glab --state all` does not qualify: that flag is not glab's.
     """
     text = strip_heredocs(command)
     for match in RX_GH_SEARCH_ISSUES.finditer(text):
@@ -454,13 +514,13 @@ def command_has_issue_dupe_check(command):
     for match in RX_GH_ISSUE_LIST.finditer(text):
         rest_raw = _command_rest(text, match.end())
         rest = RX_QUOTED_SPAN.sub(" ", rest_raw)
-        if (RX_GH_STATE_ALL.search(rest) and RX_GH_SEARCH_FLAG.search(rest)
+        if (_gh_state_is_all(rest) and RX_GH_SEARCH_FLAG.search(rest)
                 and _search_value_ok(rest_raw)):
             return True
     for match in RX_GLAB_ISSUE_LIST.finditer(text):
         rest_raw = _command_rest(text, match.end())
         rest = RX_QUOTED_SPAN.sub(" ", rest_raw)
-        if (RX_GLAB_ALL.search(rest) and RX_GLAB_SEARCH_FLAG.search(rest)
+        if (_glab_all_is_true(rest) and RX_GLAB_SEARCH_FLAG.search(rest)
                 and _search_value_ok(rest_raw)):
             return True
     return False

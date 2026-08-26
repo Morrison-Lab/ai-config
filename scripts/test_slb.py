@@ -590,6 +590,81 @@ with tempfile.TemporaryDirectory() as pin_dir:
         )
     expect("content-hash mismatch raises NLBPinError", raised_hash)
 
+# ---------------------------------------------------------------------------
+# Config agreement (PR #2322 review finding): the gate module used to derive
+# *which script* CI runs from validate.yml, but not *how it is configured*.
+# `classify_line`/`split_sentences` were called at each call site's
+# compiled-in default (clause_breaks=True, clause_min_length=80), so a
+# future `with: clause-min-length: '10'` in validate.yml would change what
+# CI flags without changing what this module accepts. These tests pin the
+# fix: the resolved config matches today's defaults, and a synthetic
+# validate.yml with a non-default `clause-min-length` changes both
+# classify_line's verdict and emit_gate_clean's output for the same line.
+# ---------------------------------------------------------------------------
+
+resolved_config = nlb_gate.resolve_nlb_config()
+expect(
+    "resolved config from the live validate.yml equals today's defaults",
+    resolved_config == (checker._DEFAULT_CLAUSE_BREAKS, checker._DEFAULT_CLAUSE_MIN_LENGTH),
+    repr(resolved_config),
+)
+expect(
+    "load_nlb_config caches the same resolution",
+    nlb_gate.load_nlb_config() == resolved_config,
+    repr(nlb_gate.load_nlb_config()),
+)
+
+# The reviewer's example: 30 visible characters and an interior semicolon,
+# so it is a clause violation once the length gate drops to 10 but not at
+# the default of 80.
+CONFIG_DEMO_LINE = "Short clause here; second bit."
+with tempfile.TemporaryDirectory() as config_dir:
+    config_yml = Path(config_dir) / "validate.yml"
+    config_yml.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - name: Check new markdown lines for missing semantic breaks\n"
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        with:\n"
+        "          clause-min-length: '10'\n",
+        encoding="utf-8",
+    )
+    config_10 = nlb_gate.resolve_nlb_config(config_yml, checker)
+    expect(
+        "synthetic `with: clause-min-length: '10'` resolves to 10",
+        config_10 == (True, 10),
+        repr(config_10),
+    )
+    expect(
+        "at CI's live defaults the demo line is not a clause violation",
+        checker.classify_line(CONFIG_DEMO_LINE, *resolved_config) is None,
+        repr(checker.classify_line(CONFIG_DEMO_LINE, *resolved_config)),
+    )
+    expect(
+        "at clause-min-length: '10' the same line becomes a clause violation",
+        checker.classify_line(CONFIG_DEMO_LINE, *config_10) == "clause",
+        repr(checker.classify_line(CONFIG_DEMO_LINE, *config_10)),
+    )
+    emit_default = nlb_gate.emit_gate_clean(
+        CONFIG_DEMO_LINE, checker,
+        clause_breaks=resolved_config[0], clause_min_length=resolved_config[1],
+    )
+    emit_10 = nlb_gate.emit_gate_clean(
+        CONFIG_DEMO_LINE, checker,
+        clause_breaks=config_10[0], clause_min_length=config_10[1],
+    )
+    expect(
+        "emit_gate_clean leaves the demo line whole at the live default",
+        emit_default == [CONFIG_DEMO_LINE],
+        repr(emit_default),
+    )
+    expect(
+        "emit_gate_clean splits the demo line at min-length 10",
+        emit_10 == ["Short clause here;", "second bit."],
+        repr(emit_10),
+    )
+
 # Issue #2085: a line the old reformatter left whole, which CI rejected.
 ISSUE_2085 = (
     "The **file-set** half of the pair-collision section does flag the shared "

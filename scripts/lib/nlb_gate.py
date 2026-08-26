@@ -5,7 +5,9 @@ The local reformatter (`scripts/semantic-line-breaks.py`) and CI's
 They drifted: a semicolon is not a sentence boundary, so the reformatter
 joined a clause pair onto one line and CI rejected it (ai-config#2085).
 
-Agreement here is by construction, not by matching predicates by hand:
+Agreement here is by construction, not by matching predicates by hand ---
+for *which script* runs, and, as of the `clause-breaks`/`clause-min-length`
+config below, for *how it is configured* too:
 
 - `.github/workflows/validate.yml` pins
   `Morrison-Lab/gha/check-new-line-breaks@<sha>`.
@@ -14,6 +16,16 @@ Agreement here is by construction, not by matching predicates by hand:
   the sha256 of the vendored bytes.
 - Loading refuses to proceed if either disagrees with `validate.yml` or
   with the file on disk.
+- The same step's `with:` block can set `clause-breaks` and
+  `clause-min-length` (or omit them, falling back to the composite
+  action's own defaults). `resolve_nlb_config` parses that block and
+  resolves both values through the checker's own `_env_flag`/`_env_int`,
+  and `emit_gate_clean` defaults to that resolution --- so a future
+  `with: clause-min-length: '10'` in `validate.yml` changes what this
+  module accepts without an edit here. Before this, only the checker
+  *script* was derived from `validate.yml`; its config was compiled-in at
+  each call site's default, so a `with:`-set knob CI honored and this
+  module ignored would silently disagree.
 
 Bump the action pin, then run `python3 scripts/sync-nlb-checker.py`.
 """
@@ -26,6 +38,8 @@ import re
 import sys
 from pathlib import Path
 from types import ModuleType
+
+import yaml
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +54,11 @@ VALIDATE_YML = REPO_ROOT / ".github" / "workflows" / "validate.yml"
 _USES_RE = re.compile(
     r"(?m)^\s+uses:\s+Morrison-Lab/gha/check-new-line-breaks@([0-9a-f]{40})\b"
 )
+
+# Same action reference, anchored to the bare `uses:` *value* a YAML parse
+# hands back (no leading whitespace or `uses:` key to match past), for
+# `parse_ci_nlb_with`'s step lookup below.
+_USES_VALUE_RE = re.compile(r"^Morrison-Lab/gha/check-new-line-breaks@[0-9a-f]{40}\b")
 
 _CHECKER: ModuleType | None = None
 
@@ -67,6 +86,142 @@ def parse_ci_nlb_sha(validate_yml: Path | None = None) -> str:
             f"{path}: multiple NLB action SHAs pinned: {sorted(unique)}"
         )
     return matches[0]
+
+
+def parse_ci_nlb_with(validate_yml: Path | None = None) -> dict[str, object]:
+    """Return the NLB action step's `with:` mapping from `validate.yml`.
+
+    Empty dict when the step carries no `with:` block at all (every knob
+    then falls back to the composite action's own default). Raises
+    `NLBPinError` under the same conditions as `parse_ci_nlb_sha` -- no
+    matching step, or more than one -- since both walk the same file for
+    the same step, one by regex and one by parsing the YAML structure.
+    """
+    path = VALIDATE_YML if validate_yml is None else validate_yml
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    matches: list[dict[str, object]] = []
+    for job in (doc.get("jobs") or {}).values():
+        if not isinstance(job, dict):
+            continue
+        for step in job.get("steps") or []:
+            uses = step.get("uses") if isinstance(step, dict) else None
+            if isinstance(uses, str) and _USES_VALUE_RE.match(uses):
+                matches.append(step.get("with") or {})
+    if not matches:
+        raise NLBPinError(
+            f"{path}: no step `uses: Morrison-Lab/gha/check-new-line-breaks@<40-char-sha>` found"
+        )
+    if len(matches) > 1:
+        raise NLBPinError(
+            f"{path}: multiple NLB action steps found; expected exactly one"
+        )
+    return matches[0]
+
+
+def _to_env_string(value: object) -> str:
+    """Stringify a YAML `with:` value the way the composite action's `env:`
+    block passes it (`NLB_CLAUSE_BREAKS: ${{ inputs.clause-breaks }}`, etc).
+
+    A composite action's inputs are always strings by the time the checker
+    reads them as environment variables, whatever quoting `validate.yml`
+    used. YAML parses an unquoted `true`/`false`/`10` as a native
+    bool/int, so this normalizes back to the string form before handing it
+    to the checker's own `_env_flag`/`_env_int`, which expect exactly what
+    `env:` would set -- an empty string for "unset", "true"/"false" for a
+    flag, and a base-10 integer literal for a length.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _read_checker_env(
+    checker: ModuleType,
+    env_name: str,
+    raw: str,
+    parse_fn: str,
+    default: bool | int,
+) -> bool | int:
+    """Resolve one config value via the checker's own env parser.
+
+    Round-trips through `os.environ` around a single call to the checker's
+    `_env_flag`/`_env_int` (named by `parse_fn`), then restores whatever
+    was there before -- rather than re-implementing that parsing here,
+    which would drift the moment the vendored file's own fallback or
+    warning behavior changes. This mirrors how `classify_line` and
+    `split_sentences` are already called on the loaded `checker` module
+    instead of re-derived locally.
+    """
+    previous = os.environ.get(env_name)
+    try:
+        if raw:
+            os.environ[env_name] = raw
+        else:
+            os.environ.pop(env_name, None)
+        return getattr(checker, parse_fn)(env_name, default)
+    finally:
+        if previous is None:
+            os.environ.pop(env_name, None)
+        else:
+            os.environ[env_name] = previous
+
+
+def resolve_nlb_config(
+    validate_yml: Path | None = None,
+    checker: ModuleType | None = None,
+) -> tuple[bool, int]:
+    """Return `(clause_breaks, clause_min_length)` as CI would apply them.
+
+    Reads the NLB action step's `with:` block in `validate_yml` (default:
+    `validate.yml`) and resolves `clause-breaks`/`clause-min-length`
+    through `checker`'s own `_env_flag`/`_env_int` -- so a value
+    `validate.yml` sets, or a value it omits (falling back to the
+    composite action's documented default, which equals the checker's
+    compiled-in `_DEFAULT_CLAUSE_BREAKS`/`_DEFAULT_CLAUSE_MIN_LENGTH`),
+    tracks CI's `NLB_CLAUSE_BREAKS`/`NLB_CLAUSE_MIN_LENGTH` exactly.
+    """
+    if checker is None:
+        checker = load_nlb_checker()
+    with_block = parse_ci_nlb_with(validate_yml)
+    clause_breaks = _read_checker_env(
+        checker,
+        "NLB_CLAUSE_BREAKS",
+        _to_env_string(with_block.get("clause-breaks")),
+        "_env_flag",
+        checker._DEFAULT_CLAUSE_BREAKS,
+    )
+    clause_min_length = _read_checker_env(
+        checker,
+        "NLB_CLAUSE_MIN_LENGTH",
+        _to_env_string(with_block.get("clause-min-length")),
+        "_env_int",
+        checker._DEFAULT_CLAUSE_MIN_LENGTH,
+    )
+    return clause_breaks, clause_min_length
+
+
+_NLB_CONFIG: tuple[bool, int] | None = None
+
+
+def load_nlb_config(
+    validate_yml: Path | None = None,
+    checker: ModuleType | None = None,
+) -> tuple[bool, int]:
+    """Cached `resolve_nlb_config`, for the default (no-override) case.
+
+    Mirrors `load_nlb_checker`'s own `_CHECKER` cache: an explicit
+    `validate_yml` or `checker` (as tests pass) always resolves fresh and
+    is never cached, since it is by construction not "the real config".
+    """
+    global _NLB_CONFIG
+    if validate_yml is None and checker is None and _NLB_CONFIG is not None:
+        return _NLB_CONFIG
+    result = resolve_nlb_config(validate_yml, checker)
+    if validate_yml is None and checker is None:
+        _NLB_CONFIG = result
+    return result
 
 
 def read_vendor_pin(pin_path: Path | None = None) -> str:
@@ -223,20 +378,39 @@ def split_clauses(text: str, checker: ModuleType | None = None) -> list[str]:
     return pieces or [text]
 
 
-def emit_gate_clean(content: str, checker: ModuleType | None = None) -> list[str]:
+def emit_gate_clean(
+    content: str,
+    checker: ModuleType | None = None,
+    *,
+    clause_breaks: bool | None = None,
+    clause_min_length: int | None = None,
+) -> list[str]:
     """Return one or more lines `classify_line` accepts.
 
     Sentence splits come from the gate's `split_sentences`. Clause splits
     come from `split_clauses` after the gate's `classify_line` returns
     `clause`. Recurses until every piece is clean, or raises if a flag
     remains with no split.
+
+    `clause_breaks`/`clause_min_length` default to `load_nlb_config()`'s
+    resolution of `validate.yml`'s NLB step `with:` block, and are threaded
+    through every recursive call so a nested `classify_line` sees the same
+    resolved config as the top-level one -- a caller only needs to pass
+    them explicitly to test a config other than the live one (as
+    `test_slb.py` does for the synthetic `clause-min-length` case).
     """
     if checker is None:
         checker = load_nlb_checker()
+    if clause_breaks is None or clause_min_length is None:
+        default_breaks, default_min_length = load_nlb_config(checker=checker)
+        if clause_breaks is None:
+            clause_breaks = default_breaks
+        if clause_min_length is None:
+            clause_min_length = default_min_length
     content = content.strip()
     if not content:
         return []
-    reason = checker.classify_line(content)
+    reason = checker.classify_line(content, clause_breaks, clause_min_length)
     if reason is None:
         return [content]
     if reason == "sentence":
@@ -248,7 +422,14 @@ def emit_gate_clean(content: str, checker: ModuleType | None = None) -> list[str
             )
         out: list[str] = []
         for piece in pieces:
-            out.extend(emit_gate_clean(piece, checker))
+            out.extend(
+                emit_gate_clean(
+                    piece,
+                    checker,
+                    clause_breaks=clause_breaks,
+                    clause_min_length=clause_min_length,
+                )
+            )
         return out
     if reason == "clause":
         pieces = split_clauses(content, checker)
@@ -259,6 +440,13 @@ def emit_gate_clean(content: str, checker: ModuleType | None = None) -> list[str
             )
         out = []
         for piece in pieces:
-            out.extend(emit_gate_clean(piece, checker))
+            out.extend(
+                emit_gate_clean(
+                    piece,
+                    checker,
+                    clause_breaks=clause_breaks,
+                    clause_min_length=clause_min_length,
+                )
+            )
         return out
     raise NLBSplitError(f"unknown classify_line reason {reason!r} for {content!r}")

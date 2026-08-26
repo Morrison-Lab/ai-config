@@ -921,14 +921,14 @@ to touch beyond a one-word swap.
 calls itself advisory, but `test_check_memory_file_size.py`'s own
 regression test asserts the *live corpus* stays under it, which is a
 different, non-advisory guarantee --- so a file already sitting exactly at
-1200 lines has zero headroom.
+1250 lines has zero headroom.
 Repointing one citation inside it to a longer replacement name rewraps the
 sentence carrying it, and in this semantic-line-break corpus that rewrap can
-add a whole line, pushing the file to 1201 and failing CI though not one
+add a whole line, pushing the file to 1251 and failing CI though not one
 word of content changed.
 
 - **Do:** after repointing a citation, `wc -l` any touched `memories/` file
-  that was near 1200 lines, and re-wrap the sentence to recover the line if
+  that was near 1250 lines, and re-wrap the sentence to recover the line if
   it crossed.
 - **Do:** read `test_check_memory_file_size.py` itself, not just the
   checker script's docstring --- the docstring calls the check advisory,

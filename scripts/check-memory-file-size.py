@@ -15,7 +15,7 @@ than in anyone's periodic judgment.
 
 Threshold rationale (`--max-lines`, default below):
 
-  1,200 lines of memory prose is roughly 12k tokens -- a defensible ceiling
+  1,250 lines of memory prose is roughly 12.5k tokens -- a defensible ceiling
   for a file an agent may read whole. It also sits just above the largest
   file ai-config#694's split produced (`github-actions.md`, ~1,066 lines),
   so the corpus starts green with real but finite headroom. The value is a

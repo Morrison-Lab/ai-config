@@ -89,19 +89,22 @@ so.
   check that comment or the repo's own CLAUDE.md for the exact convention
   rather than assuming a layout.
 - **Displayed equations vs the implementation they cite.**
-  When the document says the Stan, R, or JAGS code implements `@eq-...`,
-  read that code.
-  A derivation that is algebraically fine but is not what the runner does
-  is still a finding: the filter, the mixture, the defaults that produced
-  the tables, and similar implementation choices, not only the algebra on
-  the page.
+  When the document says an equation is what the Stan, R, or JAGS
+  code, the R runner, or the simulator implements,
+  read that implementation.
+  A derivation that is algebraically fine but is not what those
+  programs do is still a finding: the filter, the mixture,
+  the defaults that produced the tables, and similar choices,
+  not only the algebra on the page.
   (UCD-SERG/shigella#31, 2026-08-25:
-  `@eq-lpfilter` used max `lp__`, every R runner used the median.
-  `@eq-brt` was a truncated exponential,
-  the likelihood mixed in a uniform.
-  The never-infected branch used `y_f = 0` rather than bank `y_0`.
-  The simulator evaluated a decay-only curve
-  while the design said evaluate `@eq-curve`.)
+  `@eq-lpfilter` used the per-chain max of `lp__`.
+  Every R runner used the median.
+  `@eq-brt` wrote a truncated exponential.
+  The R likelihood mixed a uniform into that density.
+  The never-infected branch in the R likelihood used `y_f = 0`
+  rather than the bank's `y_0`.
+  The R simulator evaluated a decay-only curve
+  while the design said to evaluate `@eq-curve`.)
 
 ## What to report
 

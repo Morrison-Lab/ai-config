@@ -6,18 +6,23 @@ so new review-scope lessons land here rather than as appends there.
 
 Source: [UCD-SERG/shigella#31](https://github.com/UCD-SERG/shigella/pull/31), 2026-08-25.
 
-## Exhaustive posting
+## Do not withhold findings in notes
 
-[`preferences.md`](preferences.md)'s
-"Demand a single, exhaustive review pass" bullet
-governs prompts for automated reviewers (gha#412).
-The same rule applies when *you* are the reviewer posting on a PR:
-post every finding already in hand,
-in that review or an immediate follow-up.
-Do not leave a remainder in session notes
+When *you* are the reviewer posting on a PR,
+post every finding already in hand.
+If a remainder surfaces after the first comment,
+post it immediately.
+Do not leave it in session notes
 and wait to be asked whether it landed.
 
-2nd occurrence, 2026-08-25, shigella#31:
+This is not the automated-reviewer prompt rule in
+[`preferences.md`](preferences.md)
+("Demand a single, exhaustive review pass", gha#412),
+which forbids staggering *prompted* feedback across rounds.
+A follow-up here is a completeness correction,
+not a planned second round.
+
+shigella#31, 2026-08-25:
 mechanical and math/content reviews went up.
 Leftover nits stayed in notes until the user asked
 "did you post all that?" then "yes".
@@ -52,8 +57,9 @@ The owner then asked to check math, Stan/R runners, and content.
 Posting a review as comments is not working the PR.
 A request to review and leave findings, with no request to edit, is
 review-only:
-do not start the ARDI loop on that branch,
-do not push fixes, and do not merge.
+do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
 "Watch and ARDI every PR you touch" applies when you are driving the
 branch, not when you were asked only to read it.
 See also [`shared/workflow/ardi.md`](../shared/workflow/ardi.md).

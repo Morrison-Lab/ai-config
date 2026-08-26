@@ -763,10 +763,18 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 
 ## Watch and ARDI every PR you touch — don't ask first
 
-When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs and all repos **you are driving**.
-A request to post a review and leave findings, with no request to edit, is review-only: do not start ARDI on that branch.
+"Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
+A request to post a review and leave findings, with no request to edit, is not that kind of touch.
+
+**Driving.** When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
+That answer is a standing yes across all PRs you are driving.
 Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
+
+**Review-only.** Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.

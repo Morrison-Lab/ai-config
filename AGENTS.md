@@ -320,7 +320,9 @@ This grants no merge authority: the strict merge policy below still applies.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
 - **Never describe a PR as mergeable without a clean review verdict on the latest commit.**
-  GitHub's `mergeable` / `mergeStateStatus: CLEAN` means only that git can merge without conflicts.
+  GitHub's `mergeable` field is conflict existence (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`).
+  `mergeStateStatus: CLEAN` is no-conflicts plus passing commit status, not a review verdict.
+  Only `DIRTY` / `CONFLICTING` means conflicts.
   A PR whose latest commit has no authentic clean review is not mergeable.
   Report it as blocked on review, not as mergeable.
 - **Revert premature or defective merges immediately.**

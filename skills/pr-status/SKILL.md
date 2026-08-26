@@ -17,9 +17,10 @@ re-trigger), and it may carry findings the old one missed.
 
 - "what's the status of PR #N", "is #N ready to merge", "is the review clean".
 - Before you would state, anywhere, that a PR is mergeable / clean / ready.
-  GitHub `mergeable` / `mergeStateStatus: CLEAN` is conflict-freedom, not mergeable.
+  GitHub `mergeable` is conflict existence, not a merge license.
+  `mergeStateStatus: CLEAN` is no-conflicts plus passing commit status, not a review verdict.
   Do not describe a PR as mergeable, ready to merge, or "green and mergeable"
-  unless the latest commit has an authentic clean review verdict.
+  unless it is fully clean, including an authentic clean review verdict on HEAD.
 - Any other question about a live PR this session is driving, even when
   the user never said "status": "why didn't you wait", "did you fix it",
   "why haven't you responded to that comment".

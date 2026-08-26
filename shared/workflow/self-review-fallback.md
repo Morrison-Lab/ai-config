@@ -266,14 +266,31 @@ and a one-line header naming what produced it.
 This is the same requirement as the Cursor Cloud route above;
 this section adds that it holds wherever a dispatched review is published,
 not only in that harness.
+
+Publication is **one comment per review**.
+When review rounds follow, each round gets its own comment ---
+several rounds are never bundled into one combined post.
+"As received" governs the content, not the container:
+convert the reviewer's raw output into clean markdown
+--- findings as a numbered list, the verdict stated as its own line ---
+while preserving the wording of every finding and the verdict.
+Publishing a JSON dump or other structured output inside code fences
+is not conversion; it substitutes the reviewer's formatting for readability
+without adding anything the reviewer said.
+The publishing session adds nothing else:
+no status framing, no assessment of the findings,
+no commentary inside the review comment.
 The session's own dispositions of the findings (addressed / rebutted / deferred)
 go in separate follow-up comments or commit messages ---
 never interleaved into the published review body.
 
-- **Do:** publish the reviewer's findings and verdict verbatim, attributed, with the reviewed commit SHA.
-- **Do:** post your dispositions as separate follow-ups, after the review is on the record.
+- **Do:** publish each review round as its own comment,
+  converted to clean markdown with every finding's wording and the verdict preserved.
+- **Do:** post your dispositions as separate follow-ups, after the reviews are on the record.
 - **Don't:** paraphrase, filter, reorder, summarize, or re-frame a review before publishing it.
-- **Don't:** fold your own status framing or "ready" assessment into the published review body.
+- **Don't:** bundle several rounds into one comment,
+  publish raw structured output (a JSON dump) as the review's form,
+  or add your own commentary to a review comment.
 
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.

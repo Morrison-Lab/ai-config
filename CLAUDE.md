@@ -1654,6 +1654,9 @@ recurred immediately in a `jq` filter reading a PR review body.)
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
+  A disagreement among reviews is not fully clean: any standing not-clean
+  --- nits included --- vetoes merge even with `mwc` active
+  (ai-config#2274).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

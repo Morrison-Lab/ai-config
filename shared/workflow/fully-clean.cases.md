@@ -763,6 +763,15 @@ Only reading the bodies separates them.
 The fix landed in `8cf34dce` and Claude's next round at that head returned
 `Ready for merge`, having re-verified both cited source facts itself.)
 
+Merging on Antigravity's LGTM while Claude's `Needs more work` still stood
+is forbidden either way: the standing not-clean vetoes merge, `mwc` included.
+On this PR the not-clean was last, so the old global-latest scan already
+failed it.
+The #2274 hole is the reverse order --- an earlier not-clean, then a later
+all-clear from a different reviewer --- which that scan missed.
+ARD the union, then request fresh reviews.
+`check-pr-fully-clean.py` now fails that per-reviewer split too.
+
 ## Three PRs reported clean by grepping the checker's own output
 
 (`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16.

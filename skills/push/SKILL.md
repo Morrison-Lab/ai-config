@@ -40,7 +40,7 @@ Never brief it with your rationale for the change, per [`adversarial-self-review
 Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
 `hooks/no-push-without-self-review.py` gates this on Claude Code.
-This repo's Cursor adapter skips that script when it is the
+This repo's Cursor adapter skips that script when that adapter is the
 active hook path (measured 2026-08-25 PDT;
 [`memories/cursor.md`](../../memories/cursor.md));
 compare `Reviewed-Commit` by hand there.

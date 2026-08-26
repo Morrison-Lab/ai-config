@@ -126,6 +126,9 @@ How to retrieve that paste or transcript is
 [Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
 Blank fenced blocks before taking that verdict:
 this corpus quotes those strings constantly (ai-config#1297).
+A fence closes only on a line of the same character
+that is at least as long;
+do not pair open and close by count.
 If a fence never closes, treat the report as stating no verdict:
 do not push.
 Take the first `Reviewed-Commit` after that verdict line.
@@ -140,11 +143,10 @@ Compare that sha to the recorded sha and to `git rev-parse HEAD`.
 If they differ, do not push.
 If the push refspec is not `HEAD`, compare against that named ref.
 This check covers one named ref.
-If the push is not a single named ref
-(`--all`, `--tags`, `--mirror`, `push.default=matching`,
-a configured `remote.<name>.push`,
-`--recurse-submodules=on-demand|only`),
-do not treat a matching HEAD sha as covering it.
+If the push is not a single named ref, do not treat a matching
+HEAD sha as covering it.
+The examples `--all` and `--tags` are illustrative;
+`--follow-tags` on a named ref is also out of coverage.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -217,7 +219,7 @@ is the instruction to use this route.
   If the dispatch errored or produced no report,
   that is the CLI-fallback case.
 - **Don't:** treat a matching HEAD sha as covering a push
-  that is not a single named ref.
+  that is not a single named ref, including `--follow-tags`.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 
@@ -233,10 +235,10 @@ Quote that paste only when it already carries Summary / Findings / Verdict.
 Otherwise fetch the child transcript.
 Do not treat a thinking paraphrase or an empty paste as the report.
 
-The Cursor adapter skips `no-push-without-self-review.py` because JSONL
-omits `tool_result` (see `SKIP_WITHOUT_TOOL_RESULT` in
-[`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
-so this lesson is about the posted PR comment, not about satisfying the
+The adapter skip of `no-push-without-self-review.py` until
+[#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+is in the dispatch section of this file;
+this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
 - **Do:** quote a harness paste of the child's report when that paste

@@ -390,7 +390,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
-| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs (not registered -- see ai-config#1717) |
+| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |

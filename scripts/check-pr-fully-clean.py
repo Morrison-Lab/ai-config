@@ -641,8 +641,20 @@ VERDICT_NOT_CLEAN_PATTERNS = [
 NOT_CLEAN_NEGATION_PREFIX = re.compile(
     r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
 )
+# Two alternation groups on purpose. Emphasis markers are tolerated ONLY
+# before the alternatives that are unambiguous negations when they open the
+# emphasized text (`**None.**`, `**N/A**`): a bold `**Nothing major, but X is
+# broken**`, `**0-day exploit...**`, or `**No issues, however...**` opens with
+# a negator and carries a real finding, so extending emphasis tolerance to
+# those branches would swallow it. Missing a not-clean signal is the dangerous
+# direction here (see the prefix comment above), so the risky branches keep
+# the plain-punctuation prefix they always had.
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
-    r"^\s*[*_:.\-]*\s*(?:none\b(?!\s+of\b)|nothing\b|0\b|n/a\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|\bnone\s+identified\b|\bnone\s+remaining\b|\bno\s+new\b)",
+    r"^\s*(?:"
+    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    r"|"
+    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r")",
     re.IGNORECASE,
 )
 

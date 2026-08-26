@@ -1558,6 +1558,42 @@ def main() -> int:
                 bn_ok and bn_issues == [],
             )
 
+    # Negative controls for the emphasis tolerance above: a bold span that
+    # merely OPENS with a negator while carrying a real finding must still be
+    # flagged. Only the whole-negation alternatives (none/n-slash-a) tolerate
+    # emphasis; nothing/0/no-... deliberately do not (review finding on #2298).
+    for label, section in (
+        ("bold 'Nothing major, but...' real finding",
+         "## Nits\n\n**Nothing major, but the retry loop leaks a file handle on timeout.**\n\n"),
+        ("bold '0-day exploit...' real finding",
+         "## Nits\n\n**0-day exploit possible in the auth handler.**\n\n"),
+        ("bold 'No issues, however...' real finding",
+         "## Nits\n\n**No issues, however the login flow is broken.**\n\n"),
+        ("bold 'None of the tests...' real finding",
+         "## Nits\n\n**None of the tests cover this path.**\n\n"),
+    ):
+        bold_finding_at_head = {
+            "createdAt": "2026-08-26T01:00:00Z",
+            "author": {"login": "github-actions"},
+            "body": (
+                "**Claude finished** review\n\n"
+                + section
+                + "### Verdict\n\n**Ready for merge**\n\n"
+                "(reviewed at `sha123`)"
+            ),
+        }
+        mock_bold_finding = json.dumps(
+            {"comments": [bold_finding_at_head], "reviews": []}
+        )
+        with patch.object(checker, "run_cmd", return_value=mock_bold_finding):
+            bf_ok, bf_issues = checker.check_review_comments(
+                "2298", "sha123", TEST_REPO
+            )
+            check(
+                f"check_review_comments: {label} IS a finding (#2298)",
+                (not bf_ok) and any("Nits" in i for i in bf_issues),
+            )
+
     nits_bold_at_head = {
         "createdAt": "2026-08-26T01:00:00Z",
         "author": {"login": "github-actions"},

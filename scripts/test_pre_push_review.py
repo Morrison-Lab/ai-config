@@ -33,7 +33,7 @@ class TestPrePushReview(unittest.TestCase):
         formatted = reviewer.format_review_body(report, engine, commit_sha=commit_sha)
 
         # Check for disclosure trailer matching AGENTS.md
-        self.assertIn("_Posted by Local Pre-push Review Hook (AI agent) --- not written by a human._", formatted)
+        self.assertIn("_Posted by Local Pre-push Hook (AI agent) --- not written by a human._", formatted)
         # Check that commit SHA is bound
         self.assertIn(f"**Reviewed Commit**: `{commit_sha}`", formatted)
         # Check that no robot emoji is present (which would interfere with check-pr-fully-clean.py)
@@ -736,5 +736,16 @@ class TestPrePushReview(unittest.TestCase):
         mock_subproc.assert_called_once()
 
 
+
+    def test_integration_opencode_cli_contract(self):
+        import shutil, subprocess
+        if not shutil.which("opencode"):
+            self.skipTest("opencode CLI not installed")
+        res = subprocess.run(["opencode", "run", "--help"], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0)
+        output = res.stdout + res.stderr
+        self.assertIn("--agent", output, "opencode run missing --agent flag")
+        self.assertIn("--pure", output, "opencode run missing --pure flag")
+        self.assertIn("--file", output, "opencode run missing --file flag")
 if __name__ == "__main__":
     unittest.main()

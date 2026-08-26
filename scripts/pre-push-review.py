@@ -255,7 +255,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge|p0(?:[:\s]|$))\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?:[:\s]|$)|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -407,7 +407,10 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
             tf.write(prompt)
             prompt_file = tf.name
             
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as af:
+        agent_dir = os.path.join(os.getcwd(), ".agents")
+        os.makedirs(agent_dir, exist_ok=True)
+        agent_file = os.path.join(agent_dir, "opencode-pre-push-reviewer.md")
+        with open(agent_file, "w") as af:
             af.write("---\n")
             af.write("description: Adversarial Code Reviewer\n")
             af.write("mode: subagent\n")
@@ -416,9 +419,8 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
             af.write("  bash: deny\n")
             af.write("---\n")
             af.write("You are an adversarial code reviewer. Do not edit files or run shell commands.\n")
-            agent_file = af.name
 
-        cmd = [opencode_path, "run", "--agent", agent_file, "--pure", "--file", prompt_file, "Review the attached diff."]
+        cmd = [opencode_path, "run", "--agent", "opencode-pre-push-reviewer", "--pure", "--file", prompt_file, "Review the attached diff."]
         if model:
             cmd.extend(["-m", model])
 
@@ -590,7 +592,12 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> str:
     """Format review report for GitHub PR posting adhering to lab disclosure policy."""
     sha_line = f"\n**Reviewed Commit**: `{commit_sha}`\n" if commit_sha else ""
-    driver_name = os.environ.get("AGENT_NAME") or "Local Pre-push Review Hook"
+    driver_name = os.environ.get("AGENT_NAME") or "Local Pre-push Hook"
+    driver_lower = driver_name.lower()
+    forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
+    if any(marker in driver_lower for marker in forbidden_markers):
+        driver_name = "Local Pre-push Hook"
+        
     return (
         f"### Local Adversarial AI Review ({engine_name})\n"
         f"{sha_line}\n"

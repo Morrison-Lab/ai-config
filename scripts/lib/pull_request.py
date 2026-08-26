@@ -3,7 +3,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple, Any, Callable
 
 def default_fetcher(cmd: List[str]) -> str:
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = subprocess.run(cmd, capture_output=True, encoding="utf-8", check=True)
     return result.stdout
 
 class Review:

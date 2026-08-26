@@ -62,6 +62,33 @@ def check(name: str, condition: bool):
         failures += 1
 
 
+
+# Compatibility wrappers for refactored check_ci_runs and check_review_comments
+from scripts.lib.pull_request import PullRequest
+
+original_check_ci_runs = checker.check_ci_runs
+def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = "123"
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    pr._data = {"headRefOid": sha}
+    pr._check_runs = None
+    return original_check_ci_runs(pr)
+
+original_check_review_comments = checker.check_review_comments
+def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch=""):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = pr_num
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    pr._data = {"headRefOid": sha, "reviewDecision": review_decision, "headRefName": branch}
+    pr._check_runs = None
+    return original_check_review_comments(pr)
+
+checker.check_ci_runs = wrapped_check_ci_runs
+checker.check_review_comments = wrapped_check_review_comments
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 

@@ -23,11 +23,13 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Where a cross-vendor reviewer is reachable ---
-[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
-or the repo's own configured reviewer ---
-chasing it is advisory at the push gate
-and required by the merge gate below.
+Chasing an additional reviewer is advisory at the push gate.
+At the merge gate it becomes required --- with a distinction the two roles
+must not blur:
+the repo's configured PR reviewer (often `@claude`) satisfies criterion 2 of
+[`fully-clean`](fully-clean.md),
+while this gate needs an author-dispatched reviewer on a different model and
+harness than the authoring session.
 The next section raises the bar for merges above what a push gate needs.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
@@ -57,7 +59,9 @@ when one is temporarily out of quota, move to the next.
 Known-good headless entry points are the `agy` CLI and `opencode`,
 followed by `codex` and `claude` where installed,
 with `cursor` last --- named in the inventory but not yet probed headless here.
-A multi-backend harness counts only when configured to run a non-author model.
+A qualifying harness must itself differ from the authoring session's harness,
+and a multi-backend one must additionally be configured
+to run a non-author model.
 If no qualifying entry remains, the merge waits;
 it never falls through to a same-model or same-harness reviewer.
 A quota outage reroutes the dispatch --- it does not license skipping it.
@@ -73,9 +77,8 @@ merge, even with mwc enabled, unless you have a 100% 'all clear' review
 verdict from an adversarial review".
 
 This **adds** a gate and replaces none.
-Every requirement [`fully-clean`](fully-clean.md) already sets stands
-unchanged ---
-including the external automated PR reviewer's clean verdict at head,
+Every requirement [`fully-clean`](fully-clean.md) already sets stands unchanged
+--- including the external automated PR reviewer's clean verdict at head,
 wherever a repo has one ---
 and an author-dispatched subagent verdict never satisfies that external gate.
 What is added: a merge additionally requires
@@ -84,16 +87,18 @@ delivered by that cross-model, cross-harness reviewer.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
-If no qualifying reviewer is reachable, the merge waits --- "blocked on
-reviewer availability" is the honest status, and arming an auto-merge while
-waiting is [Pattern 12](../../memories/mistake-patterns.md).
+If no qualifying reviewer is reachable, the merge waits ---
+"blocked on reviewer availability" is the honest status ---
+and arming an auto-merge while waiting is
+[Pattern 12](../../memories/mistake-patterns.md).
 
 
 The merge-side rules live with the gate they serve:
 
 - **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own (agy CLI, opencode, codex, or claude;
-  `cursor` once its headless dispatch is measured),
+  from your own
+  (agy CLI, opencode, codex, claude,
+  or cursor once its headless dispatch is measured),
   and report which harness produced each verdict.
 - **Don't:** merge anything --- under any grant, `mwc` included ---
   without a 100% all-clear adversarial verdict at the shipping head.

@@ -617,6 +617,28 @@ expect(
 # The reviewer's example: 30 visible characters and an interior semicolon,
 # so it is a clause violation once the length gate drops to 10 but not at
 # the default of 80.
+# The config cache must engage on the ordinary path: a whole-file reformat
+# calls emit_gate_clean once per sentence, and an uncached resolution
+# re-parses validate.yml every time (measured ~170x slowdown on CLAUDE.md
+# before the fix reviewed on #2322).
+_resolve_calls = {"n": 0}
+_orig_resolve = nlb_gate.resolve_nlb_config
+def _counting_resolve(*a, **k):
+    _resolve_calls["n"] += 1
+    return _orig_resolve(*a, **k)
+nlb_gate.resolve_nlb_config = _counting_resolve
+nlb_gate._NLB_CONFIG = None
+try:
+    for _ in range(3):
+        nlb_gate.emit_gate_clean("A plain short sentence.")
+finally:
+    nlb_gate.resolve_nlb_config = _orig_resolve
+expect(
+    "config resolution is cached across emit_gate_clean calls",
+    _resolve_calls["n"] <= 1,
+    f"resolve_nlb_config ran {_resolve_calls['n']} times for 3 calls",
+)
+
 CONFIG_DEMO_LINE = "Short clause here; second bit."
 with tempfile.TemporaryDirectory() as config_dir:
     config_yml = Path(config_dir) / "validate.yml"
@@ -645,6 +667,38 @@ with tempfile.TemporaryDirectory() as config_dir:
         "at clause-min-length: '10' the same line becomes a clause violation",
         checker.classify_line(CONFIG_DEMO_LINE, *config_10) == "clause",
         repr(checker.classify_line(CONFIG_DEMO_LINE, *config_10)),
+    )
+    breaks_off_yml = Path(config_dir) / "validate-breaks-off.yml"
+    breaks_off_yml.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - name: Check new markdown lines for missing semantic breaks\n"
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        with:\n"
+        "          clause-breaks: 'false'\n",
+        encoding="utf-8",
+    )
+    config_off = nlb_gate.resolve_nlb_config(breaks_off_yml, checker)
+    expect(
+        "synthetic `with: clause-breaks: 'false'` resolves clause_breaks off",
+        config_off == (False, checker._DEFAULT_CLAUSE_MIN_LENGTH),
+        repr(config_off),
+    )
+    LONG_SEMI_LINE = (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters; then the second clause "
+        "follows on from there."
+    )
+    expect(
+        "with clause-breaks off, a long semicolon line is not a violation",
+        checker.classify_line(LONG_SEMI_LINE, *config_off) is None,
+        repr(checker.classify_line(LONG_SEMI_LINE, *config_off)),
+    )
+    expect(
+        "at CI's live defaults the same long semicolon line IS a violation",
+        checker.classify_line(LONG_SEMI_LINE, *resolved_config) == "clause",
+        repr(checker.classify_line(LONG_SEMI_LINE, *resolved_config)),
     )
     emit_default = nlb_gate.emit_gate_clean(
         CONFIG_DEMO_LINE, checker,

@@ -407,10 +407,16 @@ def emit_gate_clean(
     them explicitly to test a config other than the live one (as
     `test_slb.py` does for the synthetic `clause-min-length` case).
     """
+    caller_checker = checker
     if checker is None:
         checker = load_nlb_checker()
     if clause_breaks is None or clause_min_length is None:
-        default_breaks, default_min_length = load_nlb_config(checker=checker)
+        # Pass the CALLER's checker (None on the ordinary path), not the
+        # singleton resolved above: load_nlb_config only caches the
+        # no-override case, and handing it the singleton made every
+        # top-level call re-parse validate.yml (a measured ~170x
+        # regression on a whole-file reformat).
+        default_breaks, default_min_length = load_nlb_config(checker=caller_checker)
         if clause_breaks is None:
             clause_breaks = default_breaks
         if clause_min_length is None:

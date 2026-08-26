@@ -379,7 +379,7 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--print", prompt, "--mode", "plan"]
+    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
 

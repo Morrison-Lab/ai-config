@@ -663,7 +663,7 @@ class TestPrePushReview(unittest.TestCase):
         out_cursor = reviewer.run_cursor_review("prompt", model="claude-3.7-sonnet", expected_commit_sha="abc12345")
         self.assertEqual(out_cursor, valid_report)
         cursor_cmd = mock_subproc.call_args[0][0]
-        self.assertNotIn("--trust", cursor_cmd)
+        self.assertIn("--trust", cursor_cmd)
         self.assertIn("--print", cursor_cmd)
         print_idx = cursor_cmd.index("--print"); self.assertEqual(cursor_cmd[print_idx + 1], "prompt")
 

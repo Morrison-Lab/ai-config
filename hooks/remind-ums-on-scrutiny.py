@@ -80,6 +80,7 @@ _ums = _sibling("remind-ums-after-error.py")
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
 ADMISSION = getattr(_ums, "ADMISSION", None)
 UMS_WORD = getattr(_ums, "UMS_WORD", None)
+TICKED = getattr(_ums, "TICKED", re.compile(r"`[^`\n]*`"))
 
 # Fetching a PR review or review comments. Deliberately NOT the bare word
 # "review", which appears in almost every ARDI turn and would nag constantly.
@@ -202,10 +203,11 @@ def scan(path):
         if rec_type == "user":
             raw = _text_of(blocks)
             prose = visible_prose(raw)
-            # Paste markers on RAW text minus inline ticks: a pasted review
-            # is often a blockquote or fence (visible_prose strips those),
-            # and naming `### Verdict` in inline code is not a review-read.
-            paste_src = re.sub(r"`[^`]*`", " ", raw)
+            # Paste markers on RAW text minus same-line ticks: a pasted
+            # review is often a blockquote or fence (visible_prose strips
+            # those). `TICKED` is same-line only so a ``` fence body stays.
+            # Naming `### Verdict` in inline code is not a review-read.
+            paste_src = TICKED.sub(" ", raw)
             if REVIEW_FETCH.search(prose) or REVIEW_PASTE.search(paste_src):
                 last_review_at = i
             if _is_tool_result(blocks):

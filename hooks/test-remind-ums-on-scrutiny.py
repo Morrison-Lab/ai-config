@@ -116,6 +116,8 @@ REMIND = [
      "user-pasted review body"),
     ([user("> **Claude finished** reviewing HEAD.\n> ### Verdict")],
      "user-pasted review as a blockquote"),
+    ([user("```\n**Claude finished** reviewing HEAD.\n### Verdict\n```")],
+     "user-pasted review as a fence"),
     ([REVIEW, FIX_SHARED], "editing shared/ after a review-read is the fix"),
     ([Q, WRONG, FIX_SHARED], "a corpus edit is not an explicit UMS pass"),
     ([UMS, Q, WRONG], "UMS before the correction does not count"),

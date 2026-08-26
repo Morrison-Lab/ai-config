@@ -81,6 +81,7 @@ done
 # The remaining consumers do not share check-install.py's Claude manifest.
 # A collision there needs a scoped manual repair; pointing --consumer-dir at
 # one of these directories would install unrelated Claude entries into it.
+# shellcheck disable=SC2034  # consumed by the sourced link-one.sh
 LINK_ONE_FIX_HINT="back it up or merge it manually, then rerun bootstrap.sh"
 
 # --- Codex skill wrappers: plugin and symlink installs are alternatives ---

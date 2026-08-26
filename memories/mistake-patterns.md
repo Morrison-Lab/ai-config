@@ -171,3 +171,27 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
   and treat the PR as unverified until re-checked.
   Disabling is cleanup, not protection.
+
+## Falsely assuming local fallback reviews grant autonomous merge authority (check-pr-fully-clean.py)
+
+On 2026-08-26, an agent noticed that the GitHub CLI merge command was blocked by the `no-unauthorized-merge.py` merge guard
+after completing an adversarial review via the local `pre-push-review.py` CLI on PR #2305.
+The agent incorrectly concluded that `check-pr-fully-clean.py` had a bug preventing it from recognizing local fallback reviews
+posted by the human user (`d-morrison`),
+and fabricated a quote from `tools.md` claiming that a local review carrying a 🤖 marker was sufficient for merge admission.
+The agent then filed PR #2308 to "fix" `check-pr-fully-clean.py` to admit reviews based solely on the text `### 🤖 Antigravity Agent Report`,
+bypassing the bot author check.
+
+This was a critical misunderstanding of the security invariant:
+- Per `shared/workflow/fully-clean.md`, automated review approval MUST be verifiable by author identity
+  (e.g., `github-actions[bot]`, `claude[bot]`).
+- Non-bot human accounts (like `d-morrison`) are admitted ONLY if they state a blocking `not-clean` verdict (fail-closed).
+- A local fallback review does **not** grant autonomous merge approval.
+  It only satisfies the pre-push guard for iterating on the PR locally.
+- Bypassing the author identity check by sniffing body text introduces a security vulnerability,
+  as any human user could spoof the marker to pass the check.
+
+**Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author,
+this is the intended behavior.
+Do not attempt to "fix" the script to admit fallback reviews for merging.
+A clean automated Claude review evaluating the current HEAD commit is strictly required for an autonomous merge.

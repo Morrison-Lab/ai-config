@@ -29,6 +29,16 @@ committed pass.
   **A user correction is a mandatory immediate trigger.** Persist the lesson
   before resuming the main task; never wait for the user to invoke UMS or
   remind you a second time.
+- **When you read a review of your work, receive critical feedback on it,
+  or a questioned claim turns out to be wrong.**
+  The trigger is the scrutiny, not Address, not a clean verdict, and not
+  a first-person admission.
+  "Are you sure about that?" is the questioning case: check the claim, and
+  if it was wrong, run UMS --- answering with the corrected fact is not
+  the pass.
+  Questioning alone does not owe a pass when the claim holds.
+  See
+  [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 - **When a PR reaches a clean review verdict** -- the concrete checkpoint the
   bullet above leaves implicit, and the one the `ardi` loop exits on.
   Run the pass there rather than at the merge: the merge is human-gated and

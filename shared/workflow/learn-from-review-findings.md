@@ -10,6 +10,12 @@ The learning is exactly as real; only the surface that carried it is a review th
 
 So when you Address a finding --- as opposed to Rebut or Defer it, per [`ardi`](ardi.md)'s ARD dispositions --- do two things beyond the fix:
 
+The UMS pass itself now fires earlier than Address: on *reading* the review,
+and on critical feedback or a questioned claim that was wrong, per
+[`run-ums-proactively`](run-ums-proactively.md).
+This section's two steps still attach to Address.
+The read-time pass is the bank; Address is the class-of-mistake write-up.
+
 1. **Record the class of mistake** --- what you overlooked or believed, and what the reviewer saw.
    This is `CLAUDE.md`'s "Run UMS proactively" rule reaching the review loop: record the lesson as the finding is accepted rather than deferring it, with [`ardi`](ardi.md)'s clean-verdict pass as the backstop that catches whatever slipped through, not the trigger to wait for.
    Delegate it to a subagent, per `CLAUDE.md`'s pre-authorized sidecar work, so it does not compete with the round.

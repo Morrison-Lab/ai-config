@@ -138,13 +138,19 @@ JSON-decode the assistant `text` field
 (`transcript.json` stores the body as a JSON string,
 so newlines arrive as escaped `\n`).
 `batch-fetch-details` can write a large `transcript.json`.
-Extract the child's assistant `text` with a subagent that returns
-that text verbatim, or with a deterministic decoder.
+Extract the last assistant `text` that carries Summary / Findings /
+Verdict / Reviewed-Commit
+(same selector as the identity-only section below).
+Two legal routes:
+(a) a decoder reads `transcript.json` and calls `parse_report()`
+in one process, on the file whose path contains the `cloudAgentBcId`;
+(b) a subagent returns that last matching assistant `text`
+verbatim and the conductor calls `parse_report()` on that return
+without editing it.
+Do not require the same invocation for route (b).
 Call `parse_report()` from
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
-on that printed text
-in the same invocation that read the transcript file
-whose path contains the `cloudAgentBcId`
+on that recovered text
 (`importlib.util.spec_from_file_location`;
 the module loads with no side effects).
 Do not paste a report body the conductor composed.
@@ -218,9 +224,11 @@ the adapter skip makes `ALLOW_UNREVIEWED_PUSH=1` inert
 for the adapter
 (measured 2026-08-25 PDT on Cursor Cloud).
 Do not prefix it for the adapter's sake.
-Home Claude settings can exist on Cloud after `bootstrap.sh`
+Home Claude settings can exist on Cloud
 (measured 2026-08-26 PDT: `/home/ubuntu/.claude/settings.json`
 binds `no-push-without-self-review` under `PreToolUse`).
+The writer of that file in this tree is `scripts/install-hooks.py`,
+not `bootstrap.sh`.
 Those settings do not make the Cursor adapter run Claude's hook runner.
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
@@ -279,7 +287,8 @@ is the instruction to use this route.
   After it returns, recover the report from `batch-fetch-details`
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
-  Call `parse_report()` on the decoded assistant text.
+  Call `parse_report()` on the last assistant `text` that
+  carries Summary / Findings / Verdict / Reviewed-Commit.
   If you cannot obtain a `clean` verdict and fingerprint,
   or HEAD is not still the recorded sha,
   or the fingerprint does not prefix-match HEAD,
@@ -332,7 +341,8 @@ this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
 - **Do:** quote a harness paste of the child's report when that paste
-  already carries Summary / Findings / Verdict; otherwise call
+  already carries Summary / Findings / Verdict / Reviewed-Commit;
+  otherwise call
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
   `includeTranscripts: true`, then quote the last assistant `text` that
   carries those same sections --- not the last assistant message (which

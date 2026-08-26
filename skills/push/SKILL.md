@@ -58,20 +58,17 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - an emergency.
 
 On a session whose pushes go through Morrison-Lab/ai-config's
-Cursor adapter, that adapter skips the
-guard until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
-so the prefix is inert under every reviewer,
-including a CLI-delivered one.
-Do not use it on that adapter path while that skip holds.
-When a recovered report exists, call `parse_report()` on it instead.
-If the verdict is not `clean`, or the fingerprint does not
-prefix-match HEAD, do not push.
+Cursor adapter, the prefix is inert for the adapter
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
+makes the adapter run that guard
+(the skip and the `parse_report` gate are in the paragraph above).
+Do not use it for the adapter's sake while that skip holds.
 A push that carries nothing to review
 (the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
 has no report to parse: do not invent one.
 After [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
-restores the adapter's running of that guard,
-the prefix is again the documented escape
+makes the adapter run that guard,
+the prefix is the documented escape
 when the guard cannot see a verdict.
 The adapter skip makes the prefix inert for the adapter only.
 If Claude Code's native guard is also running

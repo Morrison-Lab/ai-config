@@ -39,8 +39,8 @@ The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 **opencode**, and **claude**;
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)'s `codex`
 belongs in the same ladder wherever installed.
-Dispatch through whichever differs from you first; when one is temporarily out
-of quota, move to the next.
+Dispatch through whichever differs from you first;
+when one is temporarily out of quota, move to the next.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 
 Same-harness scope, stated precisely because two gates meet here.
@@ -54,7 +54,8 @@ waits rather than degrading to a same-harness pass.
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
 [`memories/preferences.md`](../../memories/preferences.md)'s delegate ladder.
-A retired API never disqualifies the CLI harness built on top of it.
+A retired API never disqualifies the CLI harness operating on a separate
+path from it.
 
 ## No merge without a 100% all-clear adversarial verdict
 
@@ -69,7 +70,10 @@ has one --- stands unchanged, and an author-dispatched subagent verdict never
 satisfies that external gate.
 What is added: a merge additionally requires a 100% all-clear verdict at the
 shipping head from an adversarial review meeting this fragment's independence
-bar, preferably a different model and harness than the authoring session.
+bar, delivered by a reviewer on a different model and harness than the
+authoring session.
+The same-harness floor covers the push gate only;
+at the merge gate it does not clear anything.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
@@ -215,8 +219,10 @@ The other cases have no guard and are prose rules here.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
-- **Don't:** merge anything --- under any grant, `mwc` included --- without a 100% all-clear adversarial verdict at the shipping head.
-  A skip notice, a stub, an older-head verdict, or a same-harness convenience pass clears nothing.
+- **Don't:** merge anything --- under any grant, `mwc` included ---
+  without a 100% all-clear adversarial verdict at the shipping head.
+  A skip notice, a stub, an older-head verdict,
+  or a same-harness convenience pass clears nothing.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

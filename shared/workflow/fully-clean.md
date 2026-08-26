@@ -244,11 +244,7 @@ from an adversarial review meeting
 [`adversarial-self-review`](adversarial-self-review.md)'s independence bar.**
 It composes with the external-reviewer requirement above --- neither satisfies
 the other.
-A Needs-more-work verdict blocks until a compliant re-dispatch returns
-all-clear at the shipping head.
-A skip notice, a stub, or a stale-head verdict clears nothing.
-Where no qualifying reviewer is reachable, the PR waits, and that waiting
-state is the honest status to report.
+Blocking, retry, and unavailability mechanics live in that fragment.
 
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".

@@ -145,8 +145,8 @@ that is the CLI-fallback case above.
 Morrison-Lab/ai-config's Cursor adapter skips
 `no-push-without-self-review.py` until
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
-so `ALLOW_UNREVIEWED_PUSH=1` is inert for the adapter only
-under any reviewer
+so `ALLOW_UNREVIEWED_PUSH=1` is inert for the adapter
+under any reviewer, and is not inert for a native guard
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
 on the report recovered from the child's transcript

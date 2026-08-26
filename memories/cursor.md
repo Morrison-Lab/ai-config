@@ -180,9 +180,12 @@ A last assistant message that restates the brief's required shape
 (a plan or an apology that reproduces those four headings)
 passes the heading check.
 The role filter does not exclude it.
-`parse_report`'s fingerprint regex is what closes that case:
-`REVIEWED_COMMIT` requires 7-40 hex characters,
-so a literal placeholder yields no fingerprint and gate 3 refuses.
+`parse_report`'s fingerprint regex refuses a placeholder
+(`REVIEWED_COMMIT` requires 7-40 hex characters,
+so a literal placeholder yields no fingerprint and gate 3 refuses).
+A restatement that already carries a real HEAD-matching sha
+is not closed by that regex
+([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).
 The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last non-empty assistant `text`
@@ -397,12 +400,11 @@ Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
 On a desktop session, do not pair the project adapter
 with native Claude hooks (leave one path enabled).
-On Cursor Cloud that instruction is unfollowable:
-this VM's copy of `~/.claude/settings.json`
-predates this session and its origin is unmeasured
-(see the measurement above).
-Until the origin and the native-runner question
-are both measured, do not treat
+On Cursor Cloud, that file can already exist
+(see the measurement above),
+and whether the native runner also fires is unmeasured
+as of 2026-08-26 PDT.
+Until both are measured, do not treat
 both-present as a Cloud defect to clear by deleting settings.
 The adapter skip is still the Cursor path,
 and a native deny of the unprefixed push is still the
@@ -478,7 +480,10 @@ Say in the reply that the carve-out was used.
    to reach an earlier matching one also fails this gate.
    A last assistant message that restates the brief's
    required shape still passes this heading check;
-   gate 3's fingerprint regex is what refuses a placeholder.
+   gate 3's fingerprint regex refuses a placeholder
+   and does not refuse a restatement that already
+   carries a real HEAD-matching sha
+   ([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -594,7 +599,8 @@ is the instruction to use this route.
   `no-push-without-self-review` deny of the unprefixed push.
   On a desktop session, do not pair the project adapter
   with native Claude hooks.
-  On Cursor Cloud that pairing rule is unfollowable
+  On Cursor Cloud, do not treat both-present as a
+  Cloud defect to clear by deleting settings
   (see the pairing rule in the procedure above).
   If the dispatch errored, produced no report,
   or produced a report whose fingerprint cannot be recovered

@@ -1,5 +1,7 @@
 Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
-Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap --- don't interrupt mid-task to say it.
+Use the `⚠️ **FLAG** ---` tag from `CLAUDE.md`'s chat-output-tagging convention.
+Place it on one line, at the natural end of that turn's recap (or immediately before a `wrap-up` report).
+Don't interrupt mid-task to say it.
 
 **Always state whether or not the session is at a clean stopping point.** The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
 
@@ -142,10 +144,31 @@ Run UMS first if it is owed, per [`run-ums-proactively`](run-ums-proactively.md)
 - **Don't:** barrel into a new PR carrying a long, unrelated session by reflex, just because opening a PR feels like forward motion rather than a stopping point.
 - **Don't:** `/clear` or abandon a session while a PR it opened is still unmerged -- that drops the monitoring loop the bright line protects.
 
+**Check for a stopping point instead of asking for more tasks.**
+Never ask for more tasks.
+Never say "what would you like me to do next?"
+When a session has grown long and hits a natural stopping point,
+run the `wrap-up` skill to sweep for pending work.
+After executing `wrap-up`,
+use the live state you observed and the criteria in this file to determine if a session-management recommendation applies.
+Since this file's criteria supersede `wrap-up`'s default assessment (e.g., allowing a `/clear` when open work belongs to another session),
+adjust `wrap-up`'s stopping point declaration to clean if the criteria here permit it.
+If a recommendation applies,
+prefix your recommendation with the `⚠️ **FLAG** ---` tag and present it.
+Regardless of whether a recommendation applies,
+output `wrap-up`'s full report.
+Ensure the (possibly adjusted) stopping point declaration remains the final thing in your response (subject to the CI exception above).
+
+- **Do:** run `wrap-up` when a session hits a natural stopping point.
+- **Do:** prefix any recommendation with the flag, instead of offering to take on more tasks.
+- **Don't:** ask "what next?" when you just finished a task.
+
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.
-Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large --- many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
+Proactively flag (using the same `⚠️ **FLAG** ---` tag) when a session is still mid-task but has grown large.
+This applies when there are many tool calls, or long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured.
+It also applies to a session that's already been through one automatic compaction and is heading for another.
 Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
 
 Use this instead of the `/clear` flag above when there's still live state worth carrying forward: an unfinished task, an unmerged PR this session opened or pushed to, or an open question.

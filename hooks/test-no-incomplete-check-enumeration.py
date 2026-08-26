@@ -18,7 +18,7 @@ HOOK = sys.argv[1]
 
 PARTIAL = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 651 -R ucdavis/bcs"}}]}}
-# GraphQL rollup is the same incomplete class as `gh pr checks`
+# GraphQL rollup is also a short surface, not the complete instrument
 # (ai-config#2277, 2026-08-26).
 PARTIAL_ROLLUP = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {

@@ -111,15 +111,19 @@ Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
 Commit first.
 A review of uncommitted work names a commit that does not exist yet
 (`hooks/no-push-without-self-review.py`).
-Record `git rev-parse HEAD` before the dispatch,
+Record `git rev-parse HEAD` and `git rev-parse --abbrev-ref HEAD`
+before the dispatch,
 and run `git status --short`.
 If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, take the last `Verdict:` line
 anchored at line start
 (optionally as a heading, as the guard's `VERDICT_LINE` does)
-from a harness paste that already carries Summary / Findings / Verdict,
+from a harness paste of the child's own assistant message
+that already carries Summary / Findings / Verdict,
 or from cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
+An author-composed block with those headings is not a paste.
+If the paste is not clearly the child's, use the transcript route.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
@@ -134,7 +138,7 @@ do not push.
 Take the last `Verdict:` line against that blanked text,
 then the first `Reviewed-Commit` after it, still on the blanked text.
 The last `Verdict:` line must match `Ready for merge` or
-`Needs more work` the way `VERDICT_LINE` does;
+`Needs more work` or `Needs work` the way `VERDICT_LINE` does;
 a heading such as `Approved` is not a verdict.
 The `Task` JSON `tool_result` has no review body.
 If you cannot obtain `Reviewed-Commit`, do not push.
@@ -150,9 +154,9 @@ or you cannot tell from its output which commits would ship,
 or those commits are not the compared sha
 (prefix-match an abbreviated sha),
 do not push.
-A new branch's dry-run line is `[new branch]` with no sha;
-compare the source ref (left of `->`) to the branch
-whose HEAD you recorded.
+A new branch's dry-run line is `[new branch]` with no sha.
+If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
+If it is a branch name, that name must match the recorded branch.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -209,7 +213,8 @@ is the instruction to use this route.
 - **Do:** when the conductor is not Claude and a Claude model is
   listed for `Task`, pass that Claude model on `model`.
 - **Do:** commit first, then brief the child not to edit.
-  Record `HEAD` and `git status --short` before the dispatch.
+  Record `HEAD`, the branch name, and `git status --short`
+  before the dispatch.
   After it returns, take the last line-start `Verdict:`
   and the first `Reviewed-Commit` after it, both on
   fence-blanked text, from a harness paste of the child's

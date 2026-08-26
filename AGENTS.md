@@ -258,7 +258,7 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
-Cursor's project adapter skips `no-push-without-self-review.py`
+This repo's Cursor adapter skips `no-push-without-self-review.py`
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](memories/cursor.md)).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,

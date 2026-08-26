@@ -399,7 +399,7 @@ def command_views_issue(command, issue, view_cli):
             return True
     rest_issue = re.compile(
         CMD_PREFIX
-        + rf"gh\s+api\b[^\n]*/issues/{number}(?!/comments)",
+        + rf"gh\s+api\b[^\n]*/issues/{number}(?!\d)(?!/)",
         re.MULTILINE,
     )
     return bool(rest_issue.search(text))

@@ -263,6 +263,51 @@ check(
     False,
 )
 check(
+    "gh api REST issue read at command position views",
+    subject.command_views_issue(
+        'gh api "repos/Morrison-Lab/ai-config/issues/2282"',
+        issue,
+        stems["view_cli"],
+    ),
+    True,
+)
+check(
+    "gh api REST read of a longer issue number does not view",
+    subject.command_views_issue(
+        'gh api "repos/Morrison-Lab/ai-config/issues/22820"',
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "gh api REST comments sub-resource does not view",
+    subject.command_views_issue(
+        'gh api "repos/Morrison-Lab/ai-config/issues/2282/comments"',
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "gh api REST timeline sub-resource does not view",
+    subject.command_views_issue(
+        'gh api "repos/Morrison-Lab/ai-config/issues/2282/timeline"',
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
+    "gh api REST labels sub-resource does not view",
+    subject.command_views_issue(
+        'gh api "repos/Morrison-Lab/ai-config/issues/2282/labels"',
+        issue,
+        stems["view_cli"],
+    ),
+    False,
+)
+check(
     "git fetch at command position",
     subject.command_fetches_remote("git fetch origin main", stems["fetch_cli"]),
     True,

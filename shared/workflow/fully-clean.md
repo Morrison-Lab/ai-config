@@ -721,7 +721,7 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
-GitHub's `mergeable` / `mergeStateStatus: CLEAN` means conflict-free (GitHub `mergeable`), not merge-ready.
+`mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
 A PR without a clean review verdict on the latest commit is not merge-ready.
 
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.

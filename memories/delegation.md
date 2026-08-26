@@ -53,6 +53,26 @@ The `--print` flag consumes the next token as its prompt argument,
 so keep the prompt immediately after `--print` (via space or `=`)
 and keep other flags outside it.
 
+Dispatching large prompts (a full diff plus context files) hits the Windows
+command-line length limit around 32k characters ---
+`--print=$big` fails with "filename or extension is too long",
+and passing multiline content as a PowerShell argument mangles quoting.
+Pipe the brief through stdin instead:
+`cmd /c "type brief.txt | agy.exe"`.
+Stage the brief file itself as UTF-8 ---
+PowerShell's `Out-File` defaults to UTF-16LE,
+which Python then cannot read as UTF-8.
+
+A headless reviewer has no tool permissions:
+it cannot run `git diff`, so embed the diff **and** the full text of every
+file the diff touches directly in the brief.
+Missing context produces phantom-reference findings
+(the reviewer cannot verify that a cited section exists)
+and missed ones (it cannot check claims against their referent).
+Regenerate the embedded diff before **every** re-dispatch round ---
+a stale brief once produced an entire review round
+against content the fix had already changed.
+
 `cursor` was named for the machine inventory by the user
 (2026-08-25, CLI installed)
 but has no measured headless dispatch mechanics here yet ---

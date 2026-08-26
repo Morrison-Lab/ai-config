@@ -5,6 +5,11 @@ Reformat Markdown prose to use semantic line breaks.
 Semantic line breaks = each sentence or independent clause on its own
 source line. Never break a phrase mid-way at a column boundary.
 
+Sentence and clause predicates come from the same
+`check-new-line-breaks.py` CI pins in `.github/workflows/validate.yml`
+(see `scripts/lib/nlb_gate.py`). This script is a reformatter, not a
+second implementation of the gate.
+
 Preserves: YAML frontmatter, fenced code blocks (including nested fences),
 tables, headings, horizontal rules, HTML comments, @-import directives, and
 list items inside blockquotes.
@@ -19,63 +24,28 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import importlib.util
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 
-# Sentence splitting
-
-# Abbreviations whose trailing period should NOT trigger a sentence split.
-# Matched as whole words (word-boundary on the left, literal period on right).
-_ABBREVS = [
-    'e.g', 'i.e', 'vs', 'etc', 'Dr', 'Mr', 'Mrs', 'Ms', 'Jr', 'Sr',
-    'Fig', 'Eq', 'Ref', 'Sec', 'Ch', 'Vol', 'pp', 'No', 'approx',
-    'incl', 'excl', 'ca', 'cf', 'ibid', 'op', 'pt', 'Dept',
-    'al',   # et al.
-]
-_ABBREV_RE = re.compile(
-    r'(?<!\w)(' + '|'.join(re.escape(a) for a in _ABBREVS) + r')\.'
-)
-
-# Sentence boundary: [.!?] + optional closing chars + whitespace + uppercase/quote.
-# The closing-char class includes `*` and `_` so a sentence ending in Markdown
-# emphasis (`**Some claim.** Explanation...`, the corpus's most common paragraph
-# opener, or the `__claim.__` / `_claim._` underscore forms) splits: the emphasis
-# close sits between the period and the whitespace and would otherwise defeat the
-# boundary. A lowercase word after the close still blocks the split via the
-# uppercase-or-markup lookahead, so mid-sentence emphasis is left intact.
-_SENT_BREAK_RE = re.compile(r'([.!?][`"\')\]*_]*)\s+(?=[A-Z"\'`\*\[])')
+def _load_nlb_gate():
+    """Import `scripts/lib/nlb_gate.py` without requiring `scripts.lib`."""
+    path = Path(__file__).resolve().parent / "lib" / "nlb_gate.py"
+    spec = importlib.util.spec_from_file_location("nlb_gate", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-_PLACEHOLDER = '\x00'
-
-
-def _protect_inline_code(m: re.Match) -> str:
-    """Replace sentence-ending punctuation inside backtick spans with placeholders."""
-    return m.group(0).replace('.', _PLACEHOLDER).replace('!', '\x01').replace('?', '\x02')
+_nlb_gate = _load_nlb_gate()
 
 
 def split_sentences(text: str) -> list[str]:
-    """Split text at sentence boundaries; return list of sentences."""
-    text = re.sub(r'\s+', ' ', text).strip()
-    if not text:
-        return []
-
-    # Protect abbreviations by replacing their dot with a placeholder.
-    protected = _ABBREV_RE.sub(lambda m: m.group(1) + _PLACEHOLDER, text)
-
-    # Also protect periods inside backtick spans (inline code).
-    protected = re.sub(r'`[^`]+`', _protect_inline_code, protected)
-
-    # Insert newline at sentence boundaries.
-    protected = _SENT_BREAK_RE.sub(lambda m: m.group(1) + '\n', protected)
-
-    # Split and restore.
-    parts = [p.replace(_PLACEHOLDER, '.').replace('\x01', '!').replace('\x02', '?').strip()
-             for p in protected.split('\n')]
-    return [p for p in parts if p]
+    """Split text at sentence boundaries using CI's checker."""
+    return _nlb_gate.load_nlb_checker().split_sentences(text)
 
 
 # Paragraph / bullet helpers
@@ -156,10 +126,16 @@ def _emit_prose_sentences(
         output.extend(raw_lines)
         return
 
+    def emit_clean(s: str, prefix: str) -> None:
+        pieces = _nlb_gate.emit_gate_clean(s)
+        for j, piece in enumerate(pieces):
+            line_prefix = prefix if j == 0 else indent_str
+            output.append(line_prefix + piece)
+
     if changed is None:
         for k, s in enumerate(sentences):
             prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
-            output.append(prefix + s)
+            emit_clean(s, prefix)
         return
 
     curr_pos = 0
@@ -167,7 +143,10 @@ def _emit_prose_sentences(
         prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
         s_idx = para_text.find(s, curr_pos)
         if s_idx == -1:
-            output.append(prefix + s)
+            # split_sentences returned a piece that is not a substring of
+            # para_text. Still emit through the gate so a scoped run cannot
+            # write a line classify_line would flag.
+            emit_clean(s, prefix)
             continue
         s_start = s_idx
         s_end = s_idx + len(s)
@@ -192,7 +171,7 @@ def _emit_prose_sentences(
             for line_idx in overlapping:
                 output.append(raw_lines[line_idx - orig_start_idx])
         else:
-            output.append(prefix + s)
+            emit_clean(s, prefix)
 
 
 def _flush_bq_prose(
@@ -617,11 +596,6 @@ def main(argv: list[str] | None = None) -> int:
     if not args.write and changed_files:
         print('Preview only -- nothing was written. Re-run with --write to apply.')
 
-    print(
-        '\nNote: This tool does not implement the CI clause-break rule '
-        '(NLB_CLAUSE_BREAKS). A clean run here may still fail in CI if '
-        'a line >=80 chars contains a mid-line semicolon.'
-    )
     return 1 if errors else 0
 
 

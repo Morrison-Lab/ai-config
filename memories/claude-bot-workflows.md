@@ -976,4 +976,3 @@ the review from the agent's final message instead.
 See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
-

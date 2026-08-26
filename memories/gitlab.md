@@ -1,8 +1,7 @@
 # GitLab CLI and Discussions API
 
 `glab` and the GitLab Discussions API for inline MR comments.
-Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
-1200-line gate.
+Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line gate.
 
 ## GitLab Discussions API (inline diff comments)
 - Endpoint: `POST /projects/:id/merge_requests/:iid/discussions`
@@ -16,23 +15,21 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
 - Use for MR comments, pipeline checks, CI job logs, etc.
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
   Just use `glab issue list` (no flag needed).
-- No `GITLAB_TOKEN` env var --- glab uses its own config at `~/Library/Application Support/glab-cli/config.yml`
-- **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with
-  `Unknown flag: --jq`.
-  Pipe the raw JSON to `jq` separately instead:
-  `glab api "projects/<id>" | jq '.default_branch'`.
-- **A self-hosted GitLab instance on an institutional internal network may
-  only resolve while on that network's VPN.**
-  A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with
-  ordinary internet DNS resolving fine otherwise, points at needing the VPN
-  rather than a broader outage or sandbox restriction: `nslookup <host>`
-  before and after connecting confirms it.
+- `GITLAB_TOKEN` **is** read and takes precedence over the stored config (per the official `glab` README, 2026-08-26) --- an unset or wrong value in the environment silently overrides a working `glab auth login` session.
+  Absent that env var, `glab` falls back to its own config at `~/Library/Application Support/glab-cli/config.yml` (macOS path);
+  other platforms use their own config-dir convention.
+- **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with `Unknown flag: --jq`.
+  Pipe the raw JSON to `jq` separately instead: `glab api "projects/<id>" | jq '.default_branch'`.
+- **A self-hosted GitLab instance on an institutional internal network may only resolve while on that network's VPN.**
+  A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with ordinary internet DNS resolving fine otherwise, points at needing the VPN rather than a broader outage or sandbox restriction: `nslookup <host>` before and after connecting confirms it.
 - Key commands:
   - `glab ci list` --- list pipelines
   - `glab ci get --pipeline-id <ID>` --- view pipeline details (non-interactive)
   - `glab ci create --branch <branch>` --- trigger a NEW pipeline (picks up upstream template changes)
-  - `glab ci retry --branch <branch>` --- retries the EXISTING pipeline (does NOT pick up template changes)
-  - `glab ci view <id>` --- requires TTY; use `glab ci get` or `glab api .../trace` instead
+  - `glab ci retry --branch <branch>` --- retries a JOB from the existing pipeline (per the official `glab ci retry` docs, 2026-08-26: its positional argument is a job, not a pipeline, and `--branch` only narrows which pipeline to search) --- with no job given it opens interactive job selection, and either way it does NOT pick up template changes.
+  - `glab ci view <id>` --- `<id>` there is a BRANCH or tag, not a pipeline ID (per the official `glab ci view` docs, 2026-08-26);
+    pass a pipeline with `--pipelineid`/`-p` instead.
+    Also requires TTY; use `glab ci get` or `glab api .../trace` for a non-interactive pipeline view.
   - `glab api "/projects/<ID>/jobs/<JOB_ID>/trace"` --- get job log non-interactively
   - `glab mr note create <MR_IID> --message "..."` --- post MR comment
   - `glab mr list` --- list merge requests
@@ -42,4 +39,3 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
   - `include:` (for CI templates) works independently of the API allowlist
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
-

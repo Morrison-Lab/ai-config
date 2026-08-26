@@ -14,6 +14,7 @@ synthetics still fail.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,8 +29,9 @@ FORBIDDEN_ABSOLUTES = (
 REQUIRED_HEDGE = "still grant write schemas"
 REQUIRED_DISCIPLINE = "instruction-level discipline"
 
-# Origin/main wording as of 2026-08-26 (afaf6b66), truncated to the
-# two sentences this issue names. Must keep failing the predicate.
+# Origin/main wording as of 2026-08-26 (afaf6b66). Carries the two
+# sentences this issue names, plus the discipline sentence so the
+# control does not fail REQUIRED_DISCIPLINE for a second reason.
 OLD_ABSOLUTE = (
     "with no Edit or Write access, so it can never alter code "
     "and the calling session is the one that dispositions its findings.\n"
@@ -109,6 +111,11 @@ def persona_hedges_write_schemas(text: str) -> bool:
     return True
 
 
+def frontmatter(text: str) -> str:
+    match = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    return match.group(1) if match else ""
+
+
 check(
     "old absolute claim fails the predicate (negative control)",
     persona_hedges_write_schemas(OLD_ABSOLUTE) is False,
@@ -170,8 +177,25 @@ for path in persona_paths:
     )
     check(
         f"{rel} bans any write tool by category, not by name list",
-        "Do not use any tool that writes, edits, moves, or deletes a file" in text,
+        "Do not use any tool that writes, edits, moves, or deletes a file" in text
+        and "or that posts or pushes, whatever it is named" in text,
     )
+    fm = frontmatter(text)
+    tools_line = next(
+        (line.split(":", 1)[1] for line in fm.splitlines() if line.startswith("tools:")),
+        None,
+    )
+    if tools_line is not None:
+        tools = [t.strip() for t in tools_line.split(",")]
+        check(
+            f"{rel} tools: omits Edit and Write",
+            "Edit" not in tools and "Write" not in tools,
+        )
+    if re.search(r"^\s*edit:\s*", fm, re.M):
+        check(
+            f"{rel} permission block denies edit",
+            re.search(r"^\s*edit:\s*deny\s*$", fm, re.M) is not None,
+        )
 
 doc_text = (ROOT / "agents.qmd").read_text(encoding="utf-8")
 check(

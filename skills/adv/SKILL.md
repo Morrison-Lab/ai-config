@@ -23,7 +23,7 @@ Run the `pre-push-review.py` script with the `--engine alternate` flag to rotate
 ```bash
 # By default, use the trusted installed review script to prevent executing untrusted branch code.
 # To override with a local checkout during development, set PRE_PUSH_REVIEW_LOCAL_DEV=1
-REVIEW_SCRIPT=$(python3 -c "import os; p=next((os.path.realpath(os.path.expanduser(f)) for f in ['~/.claude/skills', '~/.gemini/skills', '~/.cursor/skills', '~/.codex/skills'] if os.path.exists(os.path.expanduser(f))), 'skills'); print(os.path.abspath(os.path.join(p, '..', 'scripts', 'pre-push-review.py')))")
+REVIEW_SCRIPT=$(python3 -c "import os, sys; candidates = ['~/.claude/skills/pre-push-review', '~/.gemini/skills/pre-push-review', '~/.cursor/skills/pre-push-review', '~/.codex/skills/pre-push-review', '~/.gemini/config/plugins/ai-config/skills/pre-push-review']; p = next((os.path.realpath(os.path.expanduser(f)) for f in candidates if os.path.exists(os.path.expanduser(f))), 'skills/pre-push-review'); print(os.path.abspath(os.path.join(p, '..', '..', 'scripts', 'pre-push-review.py')))")
 
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -n "$PRE_PUSH_REVIEW_LOCAL_DEV" ] && [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/scripts/pre-push-review.py" ]; then

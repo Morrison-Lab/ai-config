@@ -172,9 +172,8 @@ class TestPrePushReview(unittest.TestCase):
             "### Verification Steps\nNone.\n"
             f"Reviewed-Commit: {commit}"
         )
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(rationale_report, expected_commit_sha=commit)
-        self.assertTrue(is_valid)
-        self.assertTrue(is_clean)
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(rationale_report, expected_commit_sha=commit)
+        self.assertFalse(is_clean)
 
         # None. followed by numbered blocker is NOT clean
         sneaky_findings = (
@@ -243,7 +242,7 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, _ = reviewer.parse_review_verdict(multiple_findings_report, expected_commit_sha=commit)
         self.assertFalse(is_clean)
 
-        # Clean verdict with rationale without negative words is accepted as clean
+        # Clean verdict with ANY rationale is rejected as strict grammar
         clean_with_rationale = (
             "### Summary Verdict\n"
             "Verdict: Ready for merge \u2014 CI passed cleanly.\n\n"
@@ -254,8 +253,7 @@ class TestPrePushReview(unittest.TestCase):
             f"Reviewed-Commit: {commit}"
         )
         is_valid, is_clean, _ = reviewer.parse_review_verdict(clean_with_rationale, expected_commit_sha=commit)
-        self.assertTrue(is_valid)
-        self.assertTrue(is_clean)
+        self.assertFalse(is_clean)
 
         # Contradictory rationale fails the review
         contradictory_rationale = (

@@ -75,7 +75,7 @@ def get_pr_base_branch(pr_number: int) -> Optional[str]:
     return None
 
 
-def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str]:
+def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str, str]:
     """Compute local git diff against the PR base branch or default main.
 
     Always diffs the provided head_sha to include unpushed commits.
@@ -225,6 +225,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if v_core in clean_allowlist:
             if has_core_negation:
                 parsed_verdicts.append((True, False, "Negated approval"))
+            elif len(v_split) > 1 and v_split[1].strip():
+                # Any trailing qualification invalidates a clean verdict (e.g., 'Ready for merge - fix XYZ')
+                parsed_verdicts.append((True, False, f"Invalid clean verdict with trailing qualification: {v_str}"))
             else:
                 parsed_verdicts.append((True, True, "Clean"))
         elif v_core in needs_work_allowlist or any(v_core.startswith(nw) for nw in needs_work_allowlist) or has_core_negation:
@@ -610,7 +613,16 @@ def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> s
     sha_line = f"\n**Reviewed Commit**: `{commit_sha}`\n" if commit_sha else ""
     driver_name = os.environ.get("AGENT_NAME") or "Local Pre-push Hook"
     driver_lower = driver_name.lower()
-    forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
+    try:
+        import importlib.util
+        checker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check-pr-fully-clean.py")
+        spec = importlib.util.spec_from_file_location("check_pr", checker_path)
+        check_pr = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(check_pr)
+        forbidden_markers = list(check_pr.REVIEW_BODY_MARKERS) + list(check_pr.REVIEW_AGENT_MARKERS.keys())
+    except Exception:
+        forbidden_markers = ["\U0001f916", "code review", "**claude finished", "verdict"]
+    
     if any(marker in driver_lower for marker in forbidden_markers):
         driver_name = "Local Pre-push Hook"
 

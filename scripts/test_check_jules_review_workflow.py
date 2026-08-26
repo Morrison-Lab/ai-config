@@ -60,7 +60,8 @@ jobs:
       - env:
           JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
         run: echo pin
-      - run: |
+      - if: success()
+        run: |
           env \\
             GITHUB_EVENT_NAME=pull_request \\
             GITHUB_EVENT_PATH="$SYNTHETIC_EVENT_PATH" \\
@@ -183,6 +184,13 @@ COMMENTED_SETUP_NODE = tweak(
 )
 
 MISSING_PREFLIGHT_ID = tweak("      - id: preflight\n        run: echo preflight\n", "")
+
+MISSING_SUCCESS = tweak("      - if: success()\n        run: |\n", "      - run: |\n")
+
+COMMENTED_SUCCESS = tweak(
+    "      - if: success()\n        run: |\n",
+    "      - run: |\n      # if: success()\n",
+)
 
 MISSING_PREFLIGHT_GATE = tweak(
     "      - if: steps.preflight.outcome == 'failure'\n        run: echo could-not-start\n",
@@ -314,6 +322,8 @@ case_exits(
 case_exits("unpinned Node", MISSING_SETUP_NODE, 1, "Node is unpinned")
 case_exits("Node pin only in comments", COMMENTED_SETUP_NODE, 1, "Node is unpinned")
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
+case_exits("missing success() gate", MISSING_SUCCESS, 1, "success()")
+case_exits("success() only in a comment", COMMENTED_SUCCESS, 1, "success()")
 case_exits(
     "could-not-start omits preflight",
     MISSING_PREFLIGHT_GATE,

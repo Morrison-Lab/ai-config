@@ -53,6 +53,10 @@ PREFLIGHT_ID_RE = re.compile(
     r"^[ \t]*(?:-\s+)?id:\s*preflight\s*$",
     re.MULTILINE,
 )
+SUCCESS_GATE_RE = re.compile(
+    r"^[ \t]*(?:-\s+)?(?:if:\s+)?success\(\)",
+    re.MULTILINE,
+)
 PREFLIGHT_OUTCOME_RE = re.compile(
     r"^[ \t]*(?:-\s+)?(?:if:\s+)?steps\.preflight\.outcome",
     re.MULTILINE,
@@ -150,6 +154,11 @@ def findings(text: str) -> list[str]:
     if not PREFLIGHT_ID_RE.search(text):
         out.append(
             "missing preflight step (id: preflight) for wrap inputs before node"
+        )
+    if not SUCCESS_GATE_RE.search(text):
+        out.append(
+            "wrap steps do not require success(); an explicit if: replaces "
+            "the default and a failed pin would still spawn node"
         )
     if not PREFLIGHT_OUTCOME_RE.search(text):
         out.append(

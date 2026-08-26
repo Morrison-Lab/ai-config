@@ -31,9 +31,10 @@ exits 1 on any finding -- so a `validate` run goes red at "Run
 memory-file-size check tests", never at the step that runs this file. A PR
 that appends past 1200 lines cannot merge; it has to split first.
 A file already AT the cap cannot take a net-positive append either.
-Fold new content into existing bullets, or split, rather than adding lines.
-Measured 2026-08-25 on memories/preferences.md in #2262: origin/main was
-exactly 1200 lines. A +5-line append failed
+Recover lines (re-wrap or drop) or split, rather than adding lines.
+Folding a sentence into an existing bullet still adds a source line.
+Measured 2026-08-25 on memories/preferences.md in ai-config#2262:
+origin/main was exactly 1200 lines. A +5-line append failed
 scripts/test_check_memory_file_size.py.
 
 The two statements are consistent and read as contradictory, which is why

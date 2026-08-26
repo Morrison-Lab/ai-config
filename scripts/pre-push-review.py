@@ -332,7 +332,7 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
@@ -388,7 +388,7 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
         cmd.extend(["-m", model])
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None

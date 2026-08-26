@@ -63,8 +63,13 @@ def suite_timeout_s():
     except ValueError:
         sys.exit(f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} is not a number")
     # nan and inf both pass `value <= 0` (nan comparisons are false;
-    # inf is positive). subprocess.run(timeout=nan) does not expire, so
-    # they would restore the unbounded wait this runner exists to bound.
+    # inf is positive). On Python 3.12.3 (measured 2026-08-26),
+    # subprocess.run(timeout=nan) raises ValueError immediately and
+    # timeout=inf raises OverflowError; either would abort the whole
+    # sweep with no per-suite FAIL. timeout=-inf expires immediately
+    # as TimeoutExpired. Rejecting all three names the bad env var
+    # instead of crashing, and does not treat -inf as a zero-second
+    # deadline.
     if not math.isfinite(value) or value <= 0:
         sys.exit(
             f"FATAL: HOOK_TEST_SUITE_TIMEOUT={raw!r} must be a positive "

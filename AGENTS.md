@@ -387,3 +387,9 @@ Non-obvious caveats worth knowing:
   default; run it as `~/.local/bin/pre-commit run --all-files`.
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
+- **Adversarial review:** Cursor Cloud `Task` with
+  `subagent_type: adversarial-reviewer` is available in this
+  session.
+  When the conductor is not Claude and a Claude model is listed,
+  pass that Claude model.
+  Details are in [`memories/cursor.md`](memories/cursor.md).

@@ -85,6 +85,46 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 (both sources run; measured against Cursor's third-party hook docs on
 2026-08-25).
 
+## Cursor Cloud `Task` dispatches `adversarial-reviewer`
+
+A Cursor session already has the reviewer the corpus requires:
+`Task` with `subagent_type: adversarial-reviewer`
+(foreground, read-only).
+That is the dispatch.
+GitHub `claude-review` skipping for a missing
+`CLAUDE_CODE_OAUTH_TOKEN` or quota is a different channel from
+Cursor's listed Claude models on `Task`.
+
+When the conductor is not Claude and a Claude model is listed
+for `Task`, pass that Claude model.
+A Grok conductor inheriting its own model for the reviewer
+buys independence of intent only.
+A Claude child on a Grok diff also buys independence of
+vendor blind spot, which is the cross-vendor half of
+[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md).
+
+Measured 2026-08-25 on
+[#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
+[#2266](https://github.com/Morrison-Lab/ai-config/pull/2266):
+a Cursor Grok session posted author-assembled fallback comments
+while `Task` plus Claude was listed.
+The correction was: run the review in this session using a
+subagent; consider using the Claude model
+([#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)).
+
+- **Do:** dispatch `Task` `adversarial-reviewer` (foreground,
+  read-only) for every self-review in a Cursor session,
+  including when GitHub `claude-review` skipped.
+- **Do:** when the conductor is not Claude and a Claude model
+  is listed for `Task`, pass that Claude model.
+- **Don't:** treat a skipped GitHub `claude-review` as "no
+  Claude reviewer is reachable in this session".
+- **Don't:** inherit the conductor's model for the reviewer
+  when Claude is listed.
+- **Don't:** compose the fallback PR comment in the authoring
+  session --- post the child's structured report, per the
+  section below.
+
 ## Cursor Cloud Task `tool_result` is identity-only
 
 A Cursor Cloud `Task` JSON `tool_result` (harness logs may show `task_v2`)

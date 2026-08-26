@@ -42,6 +42,11 @@ A reviewer that can edit turns a finding into a silent fix, which loses the find
 **No Agent tool, or no reviewer registered here?**
 A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+Cursor Cloud's `Task` tool *is* that dispatch
+(`subagent_type: adversarial-reviewer`).
+When the conductor is not Claude, pass a listed Claude model;
+the Cursor-specific routing is in
+[`memories/cursor.md`](../../memories/cursor.md).
 
 Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.

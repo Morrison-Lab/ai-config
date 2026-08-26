@@ -401,7 +401,8 @@ Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links acros
 The same shape was still present on `scripts/check-hook-output-shape.py` as of 2026-08-26 (ai-config#2038): an all-green run under `PYTHONIOENCODING=cp1252` exited 1 on the success line.
 
 The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
-`sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169); it still depends on the stream supporting `reconfigure`.
+`sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169);
+it still depends on the stream supporting `reconfigure`.
 ASCII cannot fail the encoding.
 #2080 tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
 
@@ -416,7 +417,8 @@ Different layer, different fix; do not reach for one when you have the other.
 - **Don't:** leave a Unicode check mark on a success `print` and rely on the caller to set `PYTHONIOENCODING` --- that is a workaround, not a fix.
 
 (2026-08-06, verified both ways while running the pre-push checks for `Morrison-Lab/ai-config#1224`.
-ASCII-on-the-success-line adopted 2026-08-26 for #2038; the 2026-08-06 wording had treated deleting the glyph as the wrong fix.)
+ASCII-on-the-success-line adopted 2026-08-26 for #2038;
+the 2026-08-06 wording had treated deleting the glyph as the wrong fix.)
 
 opencode's Bash tool on this box has its own failure mode and workaround;
 see [`opencode-bash-windows.md`](opencode-bash-windows.md).

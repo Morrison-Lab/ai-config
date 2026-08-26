@@ -18,7 +18,7 @@ The local tier also keeps payloads strictly on the machine when loopback routing
 Claude stays the orchestrator.
 It writes the prompt, runs the delegate, validates what comes back, and does the synthesis.
 This skill is the mechanism.
-The budget preference it plugs into lives in `memories/preferences.md` ("Delegate heavy work to another CLI first").
+The budget preference it plugs into lives in `memories/delegation.md`.
 
 ## Why this is a shell-out and not a subagent
 
@@ -143,7 +143,7 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `opencode`, and `openrouter` (`agy` API dispatch is out of service).
+`memories/delegation.md`'s "Delegate heavy work to another CLI first" holds the order across `codex`, `agy`, `opencode`, and `openrouter` (`agy` API dispatch is out of service; its CLI dispatch is not).
 Read it there rather than re-deriving it here.
 
 OpenCode spans multiple cost structures:

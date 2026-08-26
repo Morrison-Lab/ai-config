@@ -23,7 +23,7 @@ passes. See README.md, "Shared content".
 @shared/workflow/run-ums-proactively.md
 
 Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
-The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, and a corrected belief or a corrected false state-claim that never gets banked because nothing merged --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
+The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, a corrected belief or a corrected false state-claim that never gets banked because nothing merged, reading a review and treating ARD work as the pass, and answering a questioned claim ("are you sure about that?") with the corrected fact so nothing looks like an admission --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 
@@ -177,9 +177,17 @@ So the lever there is to **recommend** a change rather than make one.
 When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-Active delegation budgets include `codex` (ChatGPT plan, operationalized by `delegate-to-codex`), `opencode` (OpenCode Go subscription, free models via Zen, local Ollama, operationalized by `delegate-to-opencode`), and OpenRouter (prepaid credit balance for frontier/stealth previews).
-`agy` (Google Antigravity)'s API route was permanently retired for dispatched work (user directive, 2026-08-20, ai-config#1776), though interactive desktop extension and plan mode remain active.
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule, the usage-window semantics, and prepaid balance details.
+Active delegation budgets include `codex` (ChatGPT plan, operationalized by
+`delegate-to-codex`), `opencode` (OpenCode Go subscription, free models via
+Zen, local Ollama, operationalized by `delegate-to-opencode`), `agy` CLI
+(headless dispatch available since the 2026-08-25 clarification), and
+OpenRouter (prepaid credit balance for frontier/stealth previews).
+`agy` (Google Antigravity)'s **API** route was permanently retired for
+dispatched work (user directive, 2026-08-20, ai-config#1776); only that
+route is out --- the `agy --print` CLI and the interactive
+desktop extension/plan mode are unaffected and not at quota.
+`memories/delegation.md` carries the rule, the usage-window semantics
+across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**
@@ -645,7 +653,7 @@ The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
 The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
 Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
-`hooks/no-push-without-self-review.py` gates the pre-push case.
+`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
 The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch

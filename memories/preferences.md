@@ -98,9 +98,9 @@
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
 - **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
   When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
-- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
-  The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
-  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
+- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, missed item, or scrutiny of the work.**
+  The moment the user corrects your behavior, you realize you made an incorrect claim or missed something, you read a review of your work, you receive critical feedback, or a questioned claim ("are you sure about that?") turns out to be wrong, run UMS right then --- do not wait for the task to finish, Address, a clean verdict, a first-person admission, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
+  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section --- a corrected understanding, a false claim about state, and a questioned claim that was wrong all fire immediately, and that section holds the rationale and case records (User directive / CAI, 2026-08-05 and 2026-08-25, [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261)).
 - **Proactive Immediate Fixes for Self-Acknowledged / Realized Mistakes (In-Flight Work & Directives)**: Whenever realizing, discovering, or acknowledging a mistake, bug, gap, missed instruction, or oversight in your own in-flight work or directive-following (whether self-discovered or pointed out by the user), take immediate, proactive corrective action to fix it permanently (implement the fix/skill/memory update, commit on a dedicated branch, open a PR, request review, and drive to clean) in the exact same turn without waiting for a user prompt or follow-up instruction. (For out-of-scope codebase bugs discovered incidentally, file a tracking issue per `report-mistakes-proactively` instead). (User directive / correction, 2026-08-17.)
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
 - When opening a GitHub PR, trigger AI review (`@claude review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
@@ -226,8 +226,18 @@
   A blank subagent re-reading what's already known is waste, not thoroughness.
 - Delegating implementation does NOT mean trusting an agent's "CLEAN, ready to merge" report blind.
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
-  ESPECIALLY when the bot review self-skipped (a PR that edits the review workflow itself --- the reusable `claude-code-review` workflow in `d-morrison/gha`, or the repo's own caller that invokes it, whatever it's named in that repo --- makes the `@claude` bot self-skip: it 401s from a PR ref and only runs after merge) or was quota-skipped --- then my own diff read is the ONLY review.
-  The merge gate is MY independent check, not the agent's word.
+  ESPECIALLY when the bot review self-skipped:
+  a PR editing the review workflow itself --- the reusable `claude-code-review`
+  workflow in `d-morrison/gha`, or the repo's own caller that invokes it,
+  whatever it's named in that repo --- makes the `@claude` bot self-skip
+  (it 401s from a PR ref and only runs after merge),
+  and a quota skip has the same effect.
+  Then my own diff read is a necessary check --- and never the merge gate;
+  since 2026-08-25 the author's inline diff read clears no merge grant.
+  Autonomous merging under `mwc` stays blocked,
+  and human approval is the only path to landing such a PR,
+  with any available cross-model, cross-harness adversarial review
+  recorded alongside, never substituted for, that sign-off.
 - A verification artifact (state transcript, frame/state dump) is worthless unless something actually READS it.
   Put it where the reviewer looks: the `@claude` review bot reviews only the checked-out PR tree plus the diff, so a JSON linked by raw URL on a side/media branch is invisible to it --- inline a compact state summary in the PR conversation/diff (and add a line telling the reviewer to use it); a bare link is decoration.
   And the coordinator must actually read the dumps too --- don't build a verification tool and then keep trusting agents' written "I verified tick-by-tick" reports without ever reading a dump.
@@ -961,88 +971,10 @@ On `shared/coding/tidy-code.md` (ai-config#476), a "Preferred" R example labeled
 The paired "Avoid" example was also contrived (a nested `eval_tidy()`/`quo()` call nobody writes, and not even equivalent inside `summarise()`'s NSE) rather than the realistic verbose form.
 Both were caught by the `@claude` review bot, not by me --- mentally (or actually) running the example against its stated claim before publishing would have caught it first.
 
-## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
+## Delegate heavy work to another CLI first
 
-> [!IMPORTANT]
-> **`agy` (Google Antigravity)'s API-dispatch route is permanently out of service** (user directive, 2026-08-20, ai-config#1776).
-> Route no dispatched subagent work to it.
-> Interactive subscription/extension is unaffected.
-> Read the ladder as OpenCode free/local tiers, then Codex / OpenCode Go subscription windows, then OpenRouter prepaid models, then Claude.
-
-For heavy, parallelizable **read / draft / verify** work (deep reading, backlog scoping, file audits, drafting artifacts, adversarial verification), route to another agent CLI before spending Claude/Workflow tokens.
-CLIs drawing on subscriptions and keys (ChatGPT via `codex`, Claude Pro/Team via `claude`, Google AI Ultra via `agy`, OpenCode, OpenRouter) provide high capacity.
-Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and fallback.
-Standing default across all sessions.
-
-**Available subscriptions, balances, and delegation destinations (measured 2026-08-25):**
-
-| CLI / Provider | Plan / Billing Tier | Entrypoint |
-|---|---|---|
-| `codex` | ChatGPT (Plus / Team / Enterprise) | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `opencode` | OpenCode Go (`opencode-go/*`, $10/mo) + Zen free (`opencode/*-free`) + local (`ollama/*`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
-| OpenRouter | Prepaid credit balance / API key (frontier & stealth models) | `~/.config/opencode/opencode.json` / API |
-| `agy` (Google Antigravity) | Antigravity desktop subscription (API dispatch out of service) | Interactive desktop / Gemini CLI |
-| `claude` | Claude Pro / Team subscription | Conductor orchestrator & subagents |
-
-Exhaust the *current usage window* of each metered subscription CLI (roughly 5-hour windows for Codex and OpenCode Go) before falling back.
-Prepaid credit balances (OpenRouter) do not have a recurring time window.
-They are drawn per token for workloads benefiting from frontier/stealth models, or when subscription windows deplete.
-"Delegate first" spends available subscription windows and free tiers before drawing on Claude tokens or prepaid API credits.
-
-**`opencode` and `openrouter` expand non-metered, prepaid, and alternative routes:**
-- **OpenCode**: Reaches OpenCode Go (`opencode-go/*`, $10/mo windowed subscription), free models hosted via Zen gateway (e.g. `opencode/*-free`), and a local tier (`ollama/*`).
-  Free and local tiers cost no metered budget, executing without spending Claude or Codex quota (other Zen models incur per-request charges).
-- **OpenRouter**: Prepaid credit balance / key (`OPENROUTER_API_KEY`), reaching frontier/stealth previews (`openrouter/*`) via OpenCode (configured in user `~/.config/opencode/opencode.json`, measured 2026-08-23 on OpenCode 1.18.21).
-- **Local tier**: The local (`ollama/*`) tier keeps payloads on-device **only when** the endpoint resolves strictly to loopback (`127.0.0.1` / `::1`), local-only mode is verified (`OLLAMA_NO_CLOUD=1`), and the model is locally resident.
-Initial OpenCode tiers measured 2026-08-19 on OpenCode 1.18.15.
-Active Go subscription and OpenRouter credit balance verified 2026-08-25.
-`delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
-
-**`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**
-This is the whole of what makes `agy` usable headlessly, and getting it wrong looks exactly like a broken tool:
-
-```bash
-agy --print "Reply with only the word BANANA."                 # -> BANANA
-agy --print "Reply with only the word BANANA." --effort low    # -> BANANA
-agy --print="Reply with only the word BANANA." --effort low    # -> BANANA
-agy --print --effort low "Reply with only the word BANANA."    # -> explains what --effort does
-```
-
-That last line is the failure, and its output is the proof: the CLI answers the
-prompt `--effort`, because `--print` took `--effort` as its value and the real
-prompt fell out as an unconsumed positional.
-So the rule is about **position**, not syntax --- either keep the prompt
-immediately after `--print`, or bind it with `=` and put other flags after.
-
-**Both forms exit 0**, so the drop is invisible to any caller keying on exit status, which is what a delegation wrapper keys on.
-
-Measured 2026-08-15 and re-measured 2026-08-16, `agy` 1.1.13 at `~/.local/bin/agy`.
-Three space-form and three equals-form runs of the same prompt, with nothing between the flag and the prompt, all returned `BANANA`.
-
-**An earlier version of this entry said the equals sign was REQUIRED and blamed Go's `flag` package.**
-Both halves were wrong, and the error is worth keeping because it is a confound rather than a slip.
-Four failing probes all carried another flag between `--print` and the prompt.
-Two working ones did not, and also happened to use `=`.
-Two variables moved together and the visible one got the credit.
-Go's stdlib `flag` in fact treats `-flag value` and `-flag=value` identically for a string flag, which is what a reviewer pointed out (`Morrison-Lab/ai-config#1487`).
-
-**Its figures still need checking, whichever form you use.**
-Asked to read `scripts/added_lines.py` in `ucdavis/bcs`, it returned the right function name and its exact line number (`added_lines`, line 30), so it really read the file.
-It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73 --- same run, 2026-08-15, same 1.1.13 binary.
-So a delegate having genuinely done the work does not make the figures it reports true, and any count one returns is re-derived rather than quoted --- the same standing treatment codex's output gets.
-
-**Two upstream bugs are real and are NOT this.**
-`google-antigravity/antigravity-cli` #76 (closed, 1.0.0) reports `--print` silently emitting nothing on a non-TTY, and #318 (open, 1.0.6) reports it hanging there.
-Neither matches the symptom above --- ours returns prompt content promptly on 1.1.13 --- but both are worth knowing before trusting a headless run, since each fails silently in its own way.
-
-- **Do:** route heavy read/draft/verify work to `codex` before Claude, and, where an old `agy` invocation still has to be read, keep the prompt immediately after `--print` or bind it with `=`.
-- **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
-- **Don't:** put another flag between `--print` and the prompt --- that flag becomes the prompt, and the exit status is still 0.
-- **Don't:** read "we have agy quota" as "agy is usable".
-  Quota and a working invocation are separate facts, and the second took five
-  probes plus a review round to establish.
-
-Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
+Moved to [delegation.md](delegation.md) --- the cost-first order,
+usage-window rules, and headless dispatch mechanics live there.
 
 ## Ephemeral-session commit tension
 

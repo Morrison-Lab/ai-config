@@ -150,14 +150,15 @@ under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` on the recovered report
 from the worktree's `hooks/no-push-without-self-review.py`
-(see [`memories/cursor.md`](../../memories/cursor.md);
-do not import `~/.claude/hooks/`, which resolves into the
-primary checkout),
-in the checkout whose push follows;
-do not push unless the verdict is `clean` and the
+when that file exists
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Do not import `~/.claude/hooks/` from an ai-config worktree
+(there it resolves into the primary checkout).
+If the script is missing and the checkout is not ai-config,
+import from `~/.claude/hooks/` (the ai-config clone);
+otherwise obtain a CLI review.
+Do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
-If that checkout has no `hooks/` directory,
-obtain a CLI review.
 The empty `pr-on-claim` `--allow-empty` branch has no report to parse:
 do not invent one,
 do not refuse that push for lack of a verdict,
@@ -165,6 +166,7 @@ and say in the reply that the carve-out was used.
 The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
 equal to 1 and `git diff HEAD^ HEAD` empty
 in the checkout whose push follows.
+Both commands must succeed; a failed `git diff` is not the carve-out.
 `git diff origin/<default-branch>...HEAD` empty
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".

@@ -139,13 +139,13 @@ cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
 That transcript is the admissible source for `parse_report()`
 and the HEAD fingerprint check.
-Gates 5 and 6 take no input from the transcript:
-the dry-run tip and the source ref come from the same-argv
+The dry-run tip check and the source-ref check take no input
+from the transcript:
+they come from the same-argv
 `git push --dry-run` in the checkout whose push follows.
 A harness paste of the child's own assistant message may corroborate
 the recovered body;
 an author-composed block with those headings does not.
-Name which route produced the verdict.
 Measured 2026-08-26 PDT on Cursor Cloud:
 `json.load` of `transcript.json` already yields the markdown
 string in the assistant `text` field.
@@ -156,15 +156,14 @@ The parser resolves that.
 Records carry a `role` the decoder must filter on.
 `batch-fetch-details` can write a large `transcript.json`.
 Extract the last assistant `text` that carries Summary / Findings /
-Verdict / Reviewed-Commit
-(same selector as the identity-only section below).
+Verdict / Reviewed-Commit.
 The role filter is load-bearing.
 The user brief also carries those headings
 (it specifies the required report shape).
 A decoder that takes the last matching `text`
 without filtering `role == assistant`
 grades the brief when the child produced no report.
-Route (a) is the instrument.
+The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last matching assistant `text`
 to a file outside the checkout (under `/tmp`),
@@ -175,39 +174,35 @@ never from an unverified subagent return.
 Fetch only the `cloudAgentBcId` from a `Task` dispatch whose
 `subagent_type` was `adversarial-reviewer`.
 Do not fetch a sibling child's transcript.
-The posted body is route (a)'s file.
+The posted body is that recovered file.
 Do not re-emit the markdown through a shell command string.
 A backtick span inside a double-quoted body runs as
 command substitution and vanishes.
 A doubled backslash can collapse even inside a quoted heredoc.
 Post with `--body-file` / `-F body=@<file>`.
 The `parse_report()` tuple is the push gate, not the comment.
-Do not treat route (a) as returning only the tuple.
+Do not treat the recovered file as returning only the tuple.
 Call `parse_report()` from the **worktree's**
 [`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
 on the file contents
 (`importlib.util.spec_from_file_location`;
-the module loads with no side effects).
-Do not import `~/.claude/hooks/no-push-without-self-review.py`.
-On Cursor Cloud that path is a directory symlink into the
-primary checkout
+the module loads with no side effects)
+when that file exists in the pushing checkout.
+On Cursor Cloud, `~/.claude/hooks` is a directory symlink into the
+primary checkout only when that checkout is ai-config
 (`~/.claude/hooks -> /workspace/hooks`,
 measured 2026-08-26 PDT: same inode as
 `/workspace/hooks/no-push-without-self-review.py`,
 and `/workspace` was `main` at `21a2e2aa`).
-It is a different revision from the worktree under review,
-not a stale duplicate of the worktree file.
-On a branch that edits `parse_report` itself,
-the worktree copy is unreviewed code grading its own review;
-the `~/.claude` path would have been `main`'s.
-This import is for an ai-config worktree.
-If the pushing checkout has no `hooks/` directory,
-that is the CLI-fallback case in
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md);
-obtain a CLI review.
-`~/.claude/hooks` resolves into the primary checkout
-only when that checkout is ai-config.
-In another repo's session that path is the ai-config clone.
+Do not import that path from an ai-config worktree:
+it is a different revision from the branch under review.
+If `hooks/no-push-without-self-review.py` is missing
+from the pushing checkout and that checkout is not ai-config,
+import from `~/.claude/hooks/no-push-without-self-review.py`
+(the ai-config clone).
+If the script is missing in an ai-config checkout,
+obtain a CLI review
+([`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)).
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -227,6 +222,9 @@ branch, created with `--allow-empty`.
 The positive test is two commands in that checkout:
 `git rev-list --count origin/<default-branch>..HEAD` equals 1,
 and `git diff HEAD^ HEAD` is empty.
+Both must succeed (exit 0).
+A failed `git diff HEAD^ HEAD` prints nothing on stdout,
+so empty stdout is not the carve-out.
 That is the `--allow-empty` pr-on-claim commit.
 `git diff origin/<default-branch>...HEAD` empty
 in that checkout is tree equality against the merge-base,
@@ -298,7 +296,7 @@ the first push of a `cursor/<name>` branch is this case,
 so the dry-run only confirms the command would create that ref.
 The source-ref rule and the HEAD comparison remain.
 A deletion line (`- [deleted]`) has no `->`,
-so it has no source ref for gate 6.
+so it has no source ref for the source-ref check.
 `--delete` / `-d` is not this procedure.
 `_argv_push` excludes those flags,
 so the guard never sees the push.
@@ -308,7 +306,7 @@ not as a reviewed feature-branch push.
 On Claude Code it still needs a clean verdict
 to reach `verify_review`'s `if not commits` exit
 (the guard's own docstring).
-On this Cursor-adapter path it is not a gate-6 miss
+On this Cursor-adapter path it is not a source-ref miss
 of the feature-branch recipe;
 it is a different command.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
@@ -378,7 +376,8 @@ Pause points:
 before the `Task` dispatch (item 1's first half),
 and before `git push` of the reviewed branch
 (item 1's second half through item 6).
-All six run in the checkout whose push follows.
+The git commands among the six run in the checkout whose push follows.
+Gate 2 writes the report under `/tmp`.
 The empty `pr-on-claim` `--allow-empty` carve-out
 exempts item 1's first half, item 2,
 item 3's verdict/fingerprint clause, and item 4
@@ -393,11 +392,14 @@ Say in the reply that the carve-out was used.
    excludes the uncommitted work.
    Carve-out: skip the before-dispatch half
    (there is no dispatch); still confirm empty after.
-2. Write the last heading-bearing assistant `text`
+2. Confirm the `cloudAgentBcId` came from a `Task` whose
+   `subagent_type` was `adversarial-reviewer`.
+   Write the last heading-bearing assistant `text`
    to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
    **Killer item:** an author-assembled body is not a report,
    and `parse_report` then grades the wrong text.
+   A real report from the wrong dispatch also fails this gate.
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -418,7 +420,7 @@ Say in the reply that the carve-out was used.
    (`_argv_push` excludes `--delete` / `-d`,
    so the guard never sees that push;
    `:branch` is not this feature-branch recipe),
-   not a gate-6 miss.
+   not a source-ref miss.
    This recipe does not use `--porcelain`.
 
 When the conductor is not Claude, pass a listed Claude slug on `model`

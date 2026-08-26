@@ -46,12 +46,13 @@ until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 Call `parse_report()` on the recovered report
 from the worktree's
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
-(see [`memories/cursor.md`](../../memories/cursor.md);
-do not import `~/.claude/hooks/`, which resolves into the
-primary checkout),
-in a checkout whose pushes go through that adapter.
-If that checkout has no `hooks/` directory,
-obtain a CLI review
+when that file exists
+(see [`memories/cursor.md`](../../memories/cursor.md)).
+Do not import `~/.claude/hooks/` from an ai-config worktree
+(there it resolves into the primary checkout).
+If the script is missing and the checkout is not ai-config,
+import from `~/.claude/hooks/` (the ai-config clone);
+otherwise obtain a CLI review
 (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 If the verdict is not `clean`, or there is no fingerprint,
 or the fingerprint does not prefix-match HEAD, do not push.
@@ -83,6 +84,7 @@ do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
 The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
 equal to 1 and `git diff HEAD^ HEAD` empty.
+Both commands must succeed; a failed `git diff` is not the carve-out.
 `git diff origin/<default-branch>...HEAD` empty is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.

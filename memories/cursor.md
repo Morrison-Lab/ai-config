@@ -176,6 +176,13 @@ without filtering `role == assistant`
 grades the brief when the child produced no report.
 A decoder that skips a later non-empty assistant text
 grades a draft when the child errored after quoting the shape.
+A last assistant message that restates the brief's required shape
+(a plan or an apology that reproduces those four headings)
+passes the heading check.
+The role filter does not exclude it.
+`parse_report`'s fingerprint regex is what closes that case:
+`REVIEWED_COMMIT` requires 7-40 hex characters,
+so a literal placeholder yields no fingerprint and gate 3 refuses.
 The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last non-empty assistant `text`
@@ -390,9 +397,15 @@ Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
 On a desktop session, do not pair the project adapter
 with native Claude hooks (leave one path enabled).
-On Cursor Cloud both can be present:
-the adapter skip is the Cursor path,
-and a native deny of the unprefixed push is the
+On Cursor Cloud that instruction is unfollowable:
+the VM image already writes `~/.claude/settings.json`
+(measured 2026-08-26 PDT on this VM),
+and this session cannot disable that image-level file
+without writing outside the checkout.
+Until the native runner is measured, do not treat
+both-present as a Cloud defect to clear by deleting settings.
+The adapter skip is still the Cursor path,
+and a native deny of the unprefixed push is still the
 observable that the native runner fired.
 
 If Claude Code's native guard is also running ---
@@ -424,7 +437,7 @@ This is a Read-Do checklist.
 Item 1's pre-dispatch recording must precede the dispatch,
 or item 4 has nothing to compare against.
 Gate 3 consumes the tuple gate 2 produces.
-Reordering 5 with 6 does not change the answer.
+Item 6 consumes the dry-run output item 5 produces.
 Details in the procedure above.
 Pause points:
 before the `Task` dispatch (item 1's first half),
@@ -463,6 +476,9 @@ Say in the reply that the carve-out was used.
    A real report from the wrong dispatch also fails this gate.
    Skipping a later non-empty assistant text
    to reach an earlier matching one also fails this gate.
+   A last assistant message that restates the brief's
+   required shape still passes this heading check;
+   gate 3's fingerprint regex is what refuses a placeholder.
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -578,7 +594,7 @@ is the instruction to use this route.
   `no-push-without-self-review` deny of the unprefixed push.
   On a desktop session, do not pair the project adapter
   with native Claude hooks.
-  On Cursor Cloud both can be present
+  On Cursor Cloud that pairing rule is unfollowable
   (see the pairing rule in the procedure above).
   If the dispatch errored, produced no report,
   or produced a report whose fingerprint cannot be recovered

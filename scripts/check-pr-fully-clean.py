@@ -791,9 +791,10 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-def _has_finding_patterns(body: str, state: str, finding_patterns: List[str]) -> bool:
+def _has_finding_patterns(body: str, state: str, finding_patterns: List[str]) -> str:
+    """Returns the pattern that matched, or 'STATE' if the state blocked, or empty string if none."""
     if state in ("CHANGES_REQUESTED", "REJECTED"):
-        return True
+        return "STATE"
     scan_body = strip_cited_finding_vocab(body)
     for pat in finding_patterns:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
@@ -819,8 +820,8 @@ def _has_finding_patterns(body: str, state: str, finding_patterns: List[str]) ->
                 pfx = scan_body[max(0, start - 25):start].lower()
                 if re.search(r"\bno\s+(\w+\s+)?$", pfx):
                     continue
-            return True
-    return False
+            return pat
+    return ""
 
 def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     """Fail when the latest verdict-bearing statement is not clean.
@@ -918,7 +919,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
+        author_assoc = c.get("authorAssociation", "").upper()
+        is_bot_author = _is_bot_author(author_login) or (
+            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _detect_review_agent(body) is not None
+        )
         verdict = classify_verdict(body)
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
@@ -935,12 +939,15 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
         author_login = (r.get("author") or {}).get("login", "")
+        author_assoc = r.get("authorAssociation", "").upper()
         # A formal review carries a real commit.oid, so admitting one attributes
         # it to HEAD with no body-content check. Scope admission to automated bot
         # authors, including CLI agents posting under human accounts
         # detected via strict body text markers, OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
+        is_bot_author = _is_bot_author(author_login) or (
+            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _detect_review_agent(body) is not None
+        )
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
@@ -1020,41 +1027,13 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     for item in matching_items:
         body = item[2]
         state = item[4]
-        if state in ("CHANGES_REQUESTED", "REJECTED"):
+        matched = _has_finding_patterns(body, state, finding_patterns)
+        if matched == "STATE":
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
-
-        # Scan a copy with cited finding vocabulary (code spans, fenced blocks,
-        # double-quoted spans) blanked out, so a clean verdict that merely quotes
-        # finding vocabulary is not read as raising a finding (#1202).
-        scan_body = strip_cited_finding_vocab(body)
-        for pat in finding_patterns:
-            for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
-                if pat in BARE_NOT_CLEAN_PATTERNS:
-                    if not _is_marked_or_in_verdict_section(scan_body, match.start()):
-                        continue
-                prefix = scan_body[max(0, match.start() - 25):match.start()]
-                if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
-                    continue
-                if pat in (
-                    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-                    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
-                    r"\*\*Actionable Findings\*\*",
-                    r"\*\*Detailed Findings\*\*",
-                    r"#+\s*Issues",
-                    r"#+\s*Remaining",
-                ):
-                    suffix = scan_body[match.end():match.end() + 60]
-                    if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
-                        continue
-                if pat == r"changes\s+requested\b":
-                    start = match.start()
-                    pfx = scan_body[max(0, start - 25):start].lower()
-                    if re.search(r"\bno\s+(\w+\s+)?$", pfx):
-                        continue
-                has_findings = True
-                issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
-                break
+        elif matched:
+            has_findings = True
+            issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{matched}')")
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
         unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")

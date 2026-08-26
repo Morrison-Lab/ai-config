@@ -252,18 +252,34 @@ def main() -> int:
         )
 
     # Regression (PR #2180 round 5): non-bot comment containing review marker
-    # and HEAD SHA DOES satisfy review admission, because CLI agents post under human accounts!
+    # and HEAD SHA DOES NOT satisfy review admission if the author is not authorized!
     spoofed_passerby_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
         "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": "random-passerby"},
+        "authorAssociation": "NONE"
     }
     mock_spoofed = json.dumps({"comments": [spoofed_passerby_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_spoofed):
         sp_ok, sp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
-            "non-bot comment with marker and HEAD SHA DOES satisfy review admission (CLI agents)",
-            sp_ok and len(sp_issues) == 0,
+            "non-bot comment with marker and HEAD SHA does not satisfy review admission if unauthorized",
+            (not sp_ok) and any("No automated review" in i for i in sp_issues),
+        )
+
+    # CLI agents post under human accounts, but MUST have an authorized association.
+    authorized_cli_agent_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "author": {"login": "the-repo-owner"},
+        "authorAssociation": "OWNER"
+    }
+    mock_authorized = json.dumps({"comments": [authorized_cli_agent_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_authorized):
+        auth_ok, auth_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "authorized human comment with agent marker DOES satisfy review admission (CLI agents)",
+            auth_ok and len(auth_issues) == 0,
         )
 
     # Regression (PR #2180 round 6): comment with author: None (deleted account) cannot spoof review

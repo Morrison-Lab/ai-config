@@ -41,14 +41,14 @@ The **merge gate** (see [`fully-clean`](fully-clean.md)) requires more:
 a reviewer differing from the authoring session in **both** model and harness,
 the only configuration that also buys independence of blind spot.
 
-The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
+The user's 2026-08-25 machine inventory names **cursor**, 
 **opencode**, **claude**, and `codex` wherever installed
 ([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
 Dispatch in independence-and-availability order ---
-`agy` CLI or `opencode` first, then `codex`, then `claude` ---
+`opencode` first, then `codex`, then `claude` ---
 where each entry qualifies only if both its model and harness
 differ from the authoring session.
 This review order serves independence and measured availability,
@@ -66,11 +66,6 @@ escalation to the repository owner per [`fully-clean`](fully-clean.md)'s
 deadlock rule ends in their manual review and merge decision,
 which is the one authority above this gate.
 
-`agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
-separate path and remains available --- see
-[`delegation.md`](../../memories/delegation.md)'s delegate ladder.
-A retired API never disqualifies a CLI harness
-that operates on a separate path from it.
 
 A second directive the same day sets the merge consequence:
 "you must not merge, even with mwc enabled,
@@ -98,7 +93,7 @@ The merge-side rules live with the gate they serve:
 
 - **Do:** for any merge, use a reviewer on a **different model and harness**
   from your own
-  (agy CLI, opencode, codex,
+  (opencode, codex,
   claude only for sessions authored outside Claude,
   or cursor once its headless dispatch is measured),
   and report which harness produced each verdict.
@@ -352,20 +347,21 @@ The honest answer to the question was "nothing".)
 ## Query all available providers sequentially
 
 When obtaining adversarial reviews, we need a clean verdict from **every** available provider.
-You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, Antigravity (`agy`), OpenCode, Codex, and Claude).
+You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, OpenCode, Codex, and Claude).
 Every provider found reachable at the start of the cycle must be included in the pinned quorum.
 Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review, move on to the next one.
 If any provider rejects the diff with findings, you must address the feedback.
-If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider.
-When restarting the cycle due to code changes, you must proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
+When you make fixes, **do not hold the branch**: push the verified fixes immediately.
+Pushing the new commit naturally restarts the sequential query process against the new HEAD from the first provider.
+When requesting review on the new push, proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
 This ensures providers do not redundantly re-raise settled non-code issues on the new diff.
 You must submit your rebuttal to the provider and request a new review.
 This allows them to post a clean verdict at HEAD that supersedes their previous findings.
-Only after the provider posts a new clean verdict may you continue to the next provider.
-Repeat this until all pinned providers have explicitly confirmed that zero findings remain open on the exact same codebase state (the same commit and working tree).
+Only after the provider posts a new clean verdict may you continue to the next provider in the quorum.
+Continue this iterative loop of review, fix, and push until the current HEAD receives clean verdicts from the entire pinned quorum.
 
 The set of required providers must be pinned at the start of the review cycle.
 If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry.

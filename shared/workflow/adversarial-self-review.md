@@ -50,13 +50,14 @@ The same applies to a session whose reviewer is registered from a stale definiti
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
 **Cursor Cloud has a subagent dispatch.**
-When the session's `Task` tool lists `adversarial-reviewer`,
-that is the dispatch (measured 2026-08-25 PDT on a Grok conductor).
-On that surface the pre-push guard never runs;
+On Cursor Cloud, when the session's `Task` tool lists
+`adversarial-reviewer`, that is the dispatch
+(measured 2026-08-25 PDT on a Grok conductor).
+On Cursor Cloud the pre-push guard never runs;
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a `Task` dispatch
-just ran: the subagent route was available.
+Do not prefix `ALLOW_UNREVIEWED_PUSH=1` after a Cursor `Task`
+dispatch just ran: the subagent route was available.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is the CLI-fallback case above.
 

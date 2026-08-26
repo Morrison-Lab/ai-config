@@ -261,18 +261,15 @@ guards on Claude Code.
 Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
-dispatch that persona through `Task`,
-call `parse_report()` on the recovered report
+dispatch that persona through `Task`.
+Call `parse_report()` on the report recovered from the child's transcript
 from the worktree's
 [`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
 when that file exists
 (see [`memories/cursor.md`](memories/cursor.md)).
-Do not import `~/.claude/hooks/` from an ai-config worktree
-(there it resolves into the primary checkout).
-If the worktree script is missing and the checkout is not ai-config
-and `~/.claude/hooks/no-push-without-self-review.py` exists,
-import from that path;
-otherwise obtain a CLI review.
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+If the worktree script is missing, obtain a CLI review.
 Do not push unless the verdict is `clean` and the
 fingerprint prefix-matches HEAD.
 On that Cursor-adapter path, the empty
@@ -282,9 +279,9 @@ do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
 The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
-equal to 1 and `git diff HEAD^ HEAD` empty
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
 in the checkout whose push follows.
-Both commands must succeed; a failed `git diff` is not the carve-out.
+Exit 1 means a diff; exit 128 means the command failed.
 `git diff origin/<default-branch>...HEAD` empty
 in the checkout whose push follows is tree equality,
 not "this branch carries nothing".

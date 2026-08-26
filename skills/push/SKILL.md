@@ -43,17 +43,14 @@ Address, rebut, or defer every finding it returns, then re-dispatch it, so the c
 Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 ([`memories/cursor.md`](../../memories/cursor.md)).
-Call `parse_report()` on the recovered report
+Call `parse_report()` on the report recovered from the child's transcript
 from the worktree's
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)
 when that file exists
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Do not import `~/.claude/hooks/` from an ai-config worktree
-(there it resolves into the primary checkout).
-If the worktree script is missing and the checkout is not ai-config
-and `~/.claude/hooks/no-push-without-self-review.py` exists,
-import from that path;
-otherwise obtain a CLI review
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+If the worktree script is missing, obtain a CLI review
 (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 If the verdict is not `clean`, or there is no fingerprint,
 or the fingerprint does not prefix-match HEAD, do not push.
@@ -83,8 +80,8 @@ has no report to parse: do not invent one,
 do not refuse that push for lack of a verdict,
 and say in the reply that the carve-out was used.
 The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
-equal to 1 and `git diff HEAD^ HEAD` empty.
-Both commands must succeed; a failed `git diff` is not the carve-out.
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0.
+Exit 1 means a diff; exit 128 means the command failed.
 `git diff origin/<default-branch>...HEAD` empty is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.

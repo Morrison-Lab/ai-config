@@ -196,7 +196,6 @@ A doubled backslash can collapse even inside a quoted heredoc.
 Write the recovered file plus the marker to a comment file
 under `/tmp`, and post that file
 with `--body-file` / `-F body=@<file>`.
-The `parse_report()` tuple is the push gate, not the comment.
 The recovered file is both the `parse_report()` input
 and the posted comment body (then the disclosure marker).
 The tuple is only the push gate.
@@ -215,15 +214,12 @@ shares an inode with
 (`/workspace` was `main` at `21a2e2aa`).
 That measurement does not say what the path is
 when the primary checkout is not ai-config.
-Do not import `~/.claude/hooks/` from an ai-config worktree:
-it is a different revision from the branch under review.
 If `hooks/no-push-without-self-review.py` is missing
-from the pushing checkout,
-and that checkout is not ai-config,
-and `~/.claude/hooks/no-push-without-self-review.py` exists,
-import from that path.
-Otherwise obtain a CLI review
+from the pushing checkout, obtain a CLI review
 ([`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review,
+and in some install shapes a real copy a `git pull` does not refresh.
 Do not paste a report body the conductor composed.
 Do not read the transcript file into the conductor's context.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
@@ -242,10 +238,9 @@ is the empty [`pr-on-claim`](../shared/workflow/pr-on-claim.md)
 branch, created with `--allow-empty`.
 The positive test is two commands in that checkout:
 `git rev-list --count origin/<default-branch>..HEAD` equals 1,
-and `git diff HEAD^ HEAD` is empty.
-Both must succeed (exit 0).
-A failed `git diff HEAD^ HEAD` prints nothing on stdout,
-so empty stdout is not the carve-out.
+and `git diff --quiet HEAD^ HEAD` exits 0.
+Exit 1 means a diff; exit 128 means the command failed.
+Neither is the carve-out.
 That is the `--allow-empty` pr-on-claim commit.
 `git diff origin/<default-branch>...HEAD` empty
 in that checkout is tree equality against the merge-base,
@@ -567,8 +562,9 @@ even when the child ran in the foreground.
 That JSON is not the report to post as a fallback comment.
 The harness may still paste a child assistant message into the parent
 transcript.
-Quote that paste only when it already carries Summary / Findings / Verdict.
-Otherwise fetch the child transcript.
+A paste may corroborate the recovered body;
+do not post the paste.
+Fetch the child transcript and post the recovered file.
 Do not treat a thinking paraphrase or an empty paste as the report.
 
 The adapter skip of `no-push-without-self-review.py` until
@@ -577,15 +573,15 @@ is in the dispatch section of this file;
 this lesson is about the posted PR comment, not about satisfying the
 pre-push guard.
 
-- **Do:** quote a harness paste of the child's report when that paste
-  already carries Summary / Findings / Verdict / Reviewed-Commit;
-  otherwise call
+- **Do:** recover the report from
   cursor-cloud `batch-fetch-details` with `bcIds: [<cloudAgentBcId>]` and
   `includeTranscripts: true`, then write the last non-empty assistant `text`
   (thinking and `tool_calls` with empty `text` are not candidates).
-  That text must itself carry those same sections.
+  That text must itself carry
+  Summary / Findings / Verdict / Reviewed-Commit.
   Write it to a file outside the checkout
-  (under `/tmp`) and quote from that file ---
+  (under `/tmp`) and post from that file ---
+  not a harness paste (a paste may corroborate; do not post it),
   not an earlier matching assistant text reached by skipping
   a later non-empty one, not the user brief
   (the brief also carries those headings; the role filter is load-bearing),

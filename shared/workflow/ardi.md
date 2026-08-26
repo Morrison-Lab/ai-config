@@ -156,9 +156,12 @@ as a self-authored merge). Drive to fully clean, report ready, and leave the
 merge --- and any other destructive one-off, e.g. a `gh workflow run` that
 force-pushes --- for explicit human authorization.
 
-Because the loop ends there, **the clean verdict is also where `ums` runs** ---
-don't hold the pass for the merge, which is on the human's clock rather than
+Because the loop ends there, **the clean verdict remains a UMS checkpoint** ---
+don't hold that pass for the merge, which is on the human's clock rather than
 this session's and may land after a `/clear` or not at all.
+**Reading the review is an earlier checkpoint than the verdict.**
+Run UMS when the review arrives (Rebut and Defer included), not only once
+every finding is Addressed or the round comes back clean.
 See `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate";
 the merge-time pass in `post-merge` then only has to cover what the merge
 itself taught.
@@ -404,7 +407,7 @@ pull requests share one number space.**
   harmless; check whether the target was open.
 
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
-message".
+message" and "A negated closing-keyword sentence still closes the issue".
 
 **A SHA's provenance is the question its source command answers, not merely
 that a command produced it.**

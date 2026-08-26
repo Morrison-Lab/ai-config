@@ -39,7 +39,9 @@ the exact token spelling as certain. -->
   - In Antigravity's `hooks.json`, `Stop` handlers are **flat** (a direct list of `{ "type": "command", "command": "..." }` objects without `matcher`/`hooks` wrappers), per Antigravity hook specifications.
   - To prevent termination (e.g. when unfulfilled obligations or unreviewed commits exist), Antigravity expects `{"decision": "continue", "reason": "..."}`.
     Any other value (or `{"decision": "allow"}`) allows termination.
-  - `systemMessage` is a **top-level** field accepted on every Claude Code hook event (confirmed in Claude Code's own hooks docs), independent of `decision`, and Antigravity's own Stop event surfaces it as a warning in the interface.
+  - `systemMessage` is a **top-level** field accepted on every Claude Code hook event (confirmed in Claude Code's own hooks docs), independent of `decision`.
+    Antigravity's own Stop event is reported to surface it as a warning in the interface, per the same secondary-source synthesis checked 2026-08-26.
+    That surfacing behavior is unconfirmed against a live install, since the primary docs were egress-blocked from this session --- re-verify before relying on it.
     A warn-only Stop hook (no block/deny decision) still allows the stop, but its message rides along as `{"systemMessage": "..."}` rather than reaching only stderr.
   - Claude hooks in `hooks/hooks.json` are grouped and output `{"decision": "block", "reason": "..."}`.
     An adapter must translate `block` to `continue`.

@@ -1014,6 +1014,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
 
     if not has_findings and not issues:
         print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")
+        print("  NOTE: This script verifies that AT LEAST ONE clean review exists at HEAD.")
+        print("        If your workflow requires a multi-provider quorum, you must separately verify")
+        print("        that ALL required providers have returned a clean verdict.")
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.

@@ -190,7 +190,7 @@ They are not three rules.
 
 `hooks/remind-ums-on-scrutiny.py` is the decidable slice: a review-read, or a questioned claim followed by a correction, with no explicit UMS after it.
 It injects on the next prompt and never blocks.
-It stays unregistered until its authoring PR merges, per README.
+Activation follows the README model: the plugin loads it from `hooks/hooks.json`, and `install-hooks.py --fix` binds the non-plugin path.
 
 - **Do:** run UMS when you read a review of your work, before or as you start ARD, not after the verdict.
 - **Do:** run UMS when critical feedback arrives, including feedback that is not a formal review round.

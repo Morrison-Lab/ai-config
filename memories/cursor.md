@@ -398,11 +398,11 @@ The prefix stays inert for the adapter either way.
 On a desktop session, do not pair the project adapter
 with native Claude hooks (leave one path enabled).
 On Cursor Cloud that instruction is unfollowable:
-the VM image already writes `~/.claude/settings.json`
-(measured 2026-08-26 PDT on this VM),
-and this session cannot disable that image-level file
-without writing outside the checkout.
-Until the native runner is measured, do not treat
+this VM's copy of `~/.claude/settings.json`
+predates this session and its origin is unmeasured
+(see the measurement above).
+Until the origin and the native-runner question
+are both measured, do not treat
 both-present as a Cloud defect to clear by deleting settings.
 The adapter skip is still the Cursor path,
 and a native deny of the unprefixed push is still the

@@ -17,7 +17,9 @@ fact-check — and want each target checked in parallel without risking a stray
 worker writing a file, filing an issue, or running a destructive command.
 Every agent in this repo omits `Edit` and `Write` from its Claude Code
 `tools` list.
-Claude Code honors that allowlist.
+Claude Code honors that allowlist (the `tools:` field, documented in
+this repo since [ai-config#341](https://github.com/Morrison-Lab/ai-config/pull/341)
+and still the Claude Code path as of 2026-08-26).
 Some other harnesses still grant Write schemas to the same persona
 (Cursor Cloud Task, measured 2026-08-25 PDT on
 [ai-config#2265](https://github.com/Morrison-Lab/ai-config/pull/2265),
@@ -54,10 +56,15 @@ Every agent except `community-demand-scout` keeps `Bash` for read-only checks
 (`grep`, `gh api`, `git submodule status`, `test -e`) --- avoiding a
 write-capable shell command (`renv::update()` without `check = TRUE`,
 `pre-commit autoupdate`) is instruction-level discipline for those.
-On Claude Code the missing `Edit`/`Write` tools are harness-enforced;
-on harnesses that still grant Write schemas, staying read-only on that
+Each such agent's file under `.claude/agents/` says so in as many words,
+so the Bash discipline is instructed where it is relied on rather than
+only asserted here.
+On Claude Code the missing `Edit`/`Write` tools are harness-enforced
+(the `tools:` field; still the Claude Code path as of 2026-08-26).
+On harnesses that still grant Write schemas, staying read-only on that
 surface is instruction-level too.
-`adversarial-reviewer` says so in as many words.
+`adversarial-reviewer` is the persona that currently carries that
+Write-schema hedge.
 The `.opencode/` mirrors are not all the same: opencode's own permission block
 can deny `edit` or `bash` outright, in which case that surface is
 harness-enforced there.

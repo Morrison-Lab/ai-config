@@ -66,6 +66,18 @@ HEDGE_NO_DISCIPLINE = (
     "Do not apply a correction.\n"
 )
 
+# agents.qmd's removed wording. Exercises the fourth forbidden
+# needle; OLD_ABSOLUTE does not contain it.
+OLD_QMD_ABSOLUTE = (
+    "Every agent in this repo omits Edit and Write from its tools list, "
+    "so it can never call those tools to change a file.\n"
+    "Staying read-only is instruction-level discipline.\n"
+)
+
+HEDGE_PLUS_QMD_ABSOLUTE = (
+    HEDGED + "so it can never call those tools to change a file.\n"
+)
+
 passes = failures = 0
 
 
@@ -105,6 +117,14 @@ check(
     persona_hedges_write_schemas(HEDGE_NO_DISCIPLINE) is False,
 )
 check(
+    "removed agents.qmd absolute fails (can never call those tools)",
+    persona_hedges_write_schemas(OLD_QMD_ABSOLUTE) is False,
+)
+check(
+    "hedge plus leftover agents.qmd absolute still fails",
+    persona_hedges_write_schemas(HEDGE_PLUS_QMD_ABSOLUTE) is False,
+)
+check(
     "hedged wording passes the predicate",
     persona_hedges_write_schemas(HEDGED) is True,
 )
@@ -117,7 +137,6 @@ check(
 )
 
 for path in persona_paths:
-    check(f"{path.relative_to(ROOT)} exists", path.is_file())
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(ROOT)
     check(
@@ -129,14 +148,11 @@ for path in persona_paths:
         "Do not apply a correction" in text,
     )
 
-doc = ROOT / "agents.qmd"
-check("agents.qmd exists", doc.is_file())
-if doc.is_file():
-    doc_text = doc.read_text(encoding="utf-8")
-    check(
-        "agents.qmd hedges Write schemas and drops the absolute claim",
-        persona_hedges_write_schemas(doc_text),
-    )
+doc_text = (ROOT / "agents.qmd").read_text(encoding="utf-8")
+check(
+    "agents.qmd hedges Write schemas and drops the absolute claim",
+    persona_hedges_write_schemas(doc_text),
+)
 
 print(f"\n{passes} passed, {failures} failed; examined {examined} persona files")
 raise SystemExit(1 if failures else 0)

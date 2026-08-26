@@ -254,11 +254,11 @@ is the instruction to use this route.
   If you cannot obtain it, or a fence never closes,
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
-   or the same-argv dry-run fails,
-   or it lists commits other than that sha
-   (`Everything up-to-date` and a new-branch line with no sha
-   are not a mismatch),
-   do not push.
+  or the same-argv dry-run fails,
+  or it lists commits other than that sha
+  (`Everything up-to-date` and a new-branch line with no sha
+  are not a mismatch),
+  do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is

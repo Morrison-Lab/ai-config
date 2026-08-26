@@ -56,14 +56,14 @@ README = os.path.join(ROOT, "README.md")
 # should only ever shrink: registering a hook, or dropping its README row,
 # means removing it from here.
 #
-# Keyed per entry rather than sharing one issue number, so a
-# reader of the printed NOTE is sent to the tracker for that hook.
-KNOWN_UNREGISTERED = {
-    # Inert BY THE GATE: README's activation rule makes the hooks.json entry
-    # itself the plugin-path activation, so this is registered by the
-    # follow-up after its authoring PR merges.
-    "no-incomplete-check-enumeration.py": 1717,
-}
+# Keyed per entry rather than sharing one issue number, because the entries
+# are unregistered for different reasons and a reader of the printed NOTE
+# would otherwise be sent to the wrong tracker. #1505 covers two hooks that
+# were registered nowhere by oversight; #1527's hook is inert BY THE GATE,
+# since README's activation rule makes the hooks.json entry itself the
+# plugin-path activation, so it is registered by the follow-up after its
+# authoring PR merges.
+KNOWN_UNREGISTERED = {}
 
 # The README row of an allowlisted hook must contain this, so the table states
 # the hook is inert rather than describing it as an active guard.

@@ -16,7 +16,8 @@ a product one.
 
 ## The procedure
 
-1. **Say something in chat.** Surface the mistake as a one-line `⚠️ **FLAG** ---`
+1. **Say something in chat.**
+   Surface the mistake as a one-line `⚠️ **FLAG** ---`
    (per `CLAUDE.md`'s chat-output-tagging convention) so the user sees it
    now — but don't stop there; chat is not durable.
    The flag is a heads-up, not a request.

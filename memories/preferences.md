@@ -392,10 +392,13 @@
 - Avoid nested function calls and nested function definitions where feasible --- prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over `f(g(h(x)))`, and prefer top-level function definitions over functions defined inside other functions.
   Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
-- When mentioning GitLab/GitHub pipelines, jobs, or commits in prose, always hyperlink them:
+- Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
+  Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
+  Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
   - Jobs: `[job 11056](https://host/project/-/jobs/11056)`
   - Commits: `[320d7ad](https://host/project/-/commit/320d7ad)`
+  - PRs/reviews: `[PR 668](https://github.com/owner/repo/pull/668)`, `[review 5025211582](https://github.com/owner/repo/pull/668#pullrequestreview-5025211582)`
 - When linking to MRs/PRs, link to the bottom of the page so the user doesn't have to scroll:
   - GitLab: use a specific note anchor (e.g., `#note_11437`); there is no symbolic "latest" anchor
   - GitHub: use a specific comment anchor (e.g., `#issuecomment-4739921085`); there is no symbolic "latest" anchor
@@ -748,6 +751,8 @@
   Wrong ordering misleads the reader about the correct flow.
 - When a user explicitly says to contribute to an existing PR (for example "this should go on #280"), keep the work on that PR's head branch and push there.
   Do not open a new sibling PR to `main` unless the user asks to supersede the original; if the documented push-scope exception applies (e.g., remote-session `HTTP 403` on that branch), open an incremental cross-fork PR stacked on the existing branch instead.
+  A fork PR opened this way still needs an actual review afterward.
+  See "A skipped fork-PR review check is not a completed review" below --- the target repo's review workflow may skip a fork-originated PR outright, and that skip is not equivalent to a passing review.
 - After pushing to any non-default branch for maintenance work (including ai-config memory/skill branches), explicitly verify whether that branch already has an open PR in the intended base repo before ending the task.
   Check with `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open"` --- not `gh pr list --repo ... --head <owner>:<branch>`, which silently returns empty for an owner-qualified head even when a matching PR exists (verified directly: it returned `[]` against a real open PR that the bare branch-only form found).
   If none exists and upstream is accessible, prepare explicit title and body, show the draft for approval (per the "always show the draft before posting" rule below), then create non-interactively with `--repo`/`--base`/`--head`/`--title`/`--body-file`/`--reviewer`; otherwise hand off that upstream PR creation is still required.
@@ -1128,3 +1133,16 @@ safer/preferred choice merely because the repo has external consumers.
   - **Do:** If you revert a PR or merge commit that previously closed one or more tracked issues,
     you must immediately reopen the corresponding issue(s).
   - **Don't:** Leave closed issues pointing at reverted work.
+
+## A skipped fork-PR review check is not a completed review
+
+- **Never treat a review check that came back green or skipped, only because a PR is fork-originated, as equivalent to a completed review.**
+  Many repos' review workflows decline fork-originated PRs outright, so a green or skipped check there reflects the decline, not an approval.
+  - **Do:** When the push-scope exception above applies and you open an incremental cross-fork PR, still get an actual review afterward on the original in-repo PR --- try a review-trigger comment there, and escalate to a maintainer when trigger comments produce nothing (in the incident below, only a maintainer close/reopen cycle finally produced the review) --- rather than treating the fork's skip as sufficient.
+  - **Don't:** Stop pursuing review once a fork-originated PR shows a green or skipped check, and don't open a wholesale replacement PR to route around a stalled review when the underlying problem is the review stalling, not a push-permission wall.
+  (Learned on ucd-serg.github.io, 2026-08-25: PR #107 is an in-repo PR whose review stalled, with no fork involved.
+  Several review-trigger comments on it produced no review, and its substantive review only posted after the maintainer closed and reopened the PR.
+  The fork PRs were #116, opened stacked on #107's branch per the push-scope exception above, and #117, opened as a wholesale replacement of #107 --- the exact move the second Don't above rules out.
+  The repo's review workflow declines fork-originated PRs by construction (its dispatch job tests the PR head repo against the target repo), so #116's review checks never produced a verdict.
+  The exact check conclusions could not be re-verified from the public page when this record was corrected on 2026-08-26, so "declined, no verdict" is the claim, not a specific conclusion string.
+  Treating that fork-side non-review as sufficient --- rather than continuing to pursue #107's own review --- was the mistake.)

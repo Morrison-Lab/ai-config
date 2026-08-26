@@ -729,7 +729,11 @@ Name the specific practice and gap, cite the rule or label the opinion as an opi
 
 The external-correction counterpart to the UMS triggers at the top of this file: those fire on a first-person admission ("I was wrong"), which is why `hooks/remind-ums-after-error.py` deliberately excludes correcting someone else.
 Agreeing with a reviewer is the commoner case and the one that machinery misses --- you admit nothing, you accept a finding --- so an accepted finding is a first-push miss to record and, where a decidable condition exists, to algorithmatize, per the goal that every PR gets a clean review on the first push.
-`hooks/remind-learn-from-review.py` is that trigger; like its sibling it only ever adds context and never blocks, and it stays unregistered until its PR merges, per README's activation gate.
+`hooks/remind-learn-from-review.py` is that trigger;
+like its sibling it only ever adds context and never blocks.
+It is registered in `hooks/hooks.json`,
+which binds it on the plugin path
+and is what `install-hooks.py --fix` binds on the non-plugin path.
 
 ## Tracking issues in upstream repos
 

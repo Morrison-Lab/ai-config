@@ -68,6 +68,7 @@ KNOWN_UNREGISTERED = {
     # itself the plugin-path activation, so this is registered by the
     # follow-up after its authoring PR merges.
     "remind-ums-on-scrutiny.py": 2261,
+    "warn-stale-issue-edit.py": 2282,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

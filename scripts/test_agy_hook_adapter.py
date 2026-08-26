@@ -1002,10 +1002,10 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_script_key_executes_in_stop_and_pre_invocation(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+    def test_script_key_executes_in_stop(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
         # extract_hook_list's "script" key support (test_extract_hook_list_
-        # supports_script_key) must also be honored by the execution loops,
-        # not just by the list-flattening step.
+        # supports_script_key) must also be honored by the Stop execution
+        # loop, not just by the list-flattening step.
         script_hooks_def = {
             "hooks": {
                 "Stop": [{"script": "python3 /path/to/stop-hook.py"}]
@@ -1024,14 +1024,16 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 1)
         self.assertIn("stop-hook.py", mock_run.call_args_list[0].args[0])
 
-        # Now the PreInvocation half: a UserPromptSubmit hook keyed by
-        # "script" (rather than "command") must also execute on the
-        # PreInvocation dispatch path (adapter's UserPromptSubmit handling),
-        # not just on Stop.
-        mock_run.reset_mock()
-        mock_stdout.seek(0)
-        mock_stdout.truncate(0)
-
+    @patch('os.path.exists', return_value=True)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_script_key_executes_in_pre_invocation(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_exists):
+        # extract_hook_list's "script" key support (test_extract_hook_list_
+        # supports_script_key) must also be honored by the PreInvocation
+        # (UserPromptSubmit) execution loop, not just by the Stop loop
+        # covered in test_script_key_executes_in_stop.
         ups_script_hooks_def = {
             "hooks": {
                 "UserPromptSubmit": [{"script": "python3 /path/to/prompt-hook.py"}]
@@ -1042,8 +1044,6 @@ class TestAgyHookAdapter(unittest.TestCase):
             mock_run.return_value = mock_result
 
             payload = {"invocationNum": 1, "prompt": "hello"}
-            mock_stdin.seek(0)
-            mock_stdin.truncate(0)
             mock_stdin.write(json.dumps(payload))
             mock_stdin.seek(0)
 

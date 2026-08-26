@@ -967,7 +967,7 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 > **`agy` (Google Antigravity)'s API-dispatch route is permanently out of
 > service** (user directive, 2026-08-20; scope corrected 2026-08-23),
 > confirmed via a dispatched run's `429: prepayment credits depleted`.
-> Route no dispatched subagent work to it.
+> Route no API-dispatched subagent work to it.
 > **The API and the CLI are two separate paths: the API is out of commission,
 > but the agy CLI is available** (user clarification, 2026-08-25) --- so
 > headless `agy --print` invocations, including adversarial review dispatch,

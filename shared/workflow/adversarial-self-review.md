@@ -25,16 +25,21 @@ Those are different independences, and this rule buys the second one only.
 **So the subagent is the floor, not the ceiling.**
 Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing, and its clean verdict is still not the one a PR is reported ready on while Claude is reachable (see [`fully-clean`](fully-clean.md)).
 
-## Cross-model and cross-harness are preferred, and the harness list is concrete
+## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
 (Directive from the user, 2026-08-25: "all reviews, even self-reviews, must be
 adversarial; don't do them yourself, use a subagent, preferably using a
 different model and harness".)
 
-Prefer a reviewer that differs from the authoring session in **both** model
-and harness --- that is the only configuration that buys independence of blind
-spot as well as of intent, which the same-vendor case above explicitly does
-not.
+Two gates meet here, and they have different independence bars.
+
+The **self-review duty** (gating a push) takes an adversarial subagent on any
+harness, same-harness included --- that floor buys independence of intent,
+which is what a push gate needs.
+The **merge gate** ([`fully-clean`](fully-clean.md), below) requires more:
+a reviewer differing from the authoring session in **both** model and harness,
+the only configuration that also buys independence of blind spot.
+
 The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 **opencode**, and **claude**;
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)'s `codex`
@@ -42,14 +47,6 @@ belongs in the same ladder wherever installed.
 Dispatch through whichever differs from you first;
 when one is temporarily out of quota, move to the next.
 A quota outage reroutes the dispatch --- it does not license skipping it.
-
-Same-harness scope, stated precisely because two gates meet here.
-The **self-review duty** keeps its same-harness floor: the
-[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
-subagent dispatch remains valid and hook-checked for gating a push.
-The **merge gate** below is stricter: its all-clear verdict prefers a
-cross-model, cross-harness reviewer, and when none is reachable the merge
-waits rather than degrading to a same-harness pass.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
 separate path and remains available --- see
@@ -209,9 +206,11 @@ That is also why the review comes **after** committing, which is where [`ardi`](
 
 The other cases have no guard and are prose rules here.
 
-- **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.
-- **Do:** prefer a reviewer on a **different model and harness** from your own
-  (cursor, codex, agy CLI, opencode, or claude).
+- **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
+  (foreground, read-only) for the pre-push self-review gate,
+  and report which agent produced the verdict.
+- **Do:** for any merge, use a reviewer on a **different model and harness**
+  from your own (cursor, codex, agy CLI, opencode, or claude).
 - **Do:** move down that list when one is out of quota,
   and report which harness produced each verdict.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.

@@ -9,16 +9,19 @@ therefore still skips after a failed prior step.
 The older heading "Writing any explicit step-level if: REPLACES the default
 success()" is false (ai-config#2307).
 
-Scan only that step-if bullet. Required phrases also occur later in the
-same file (the Jules wrap Do), so a whole-file search would stay green
-after the #2307 writeup was deleted.
+Forbidden needles are scanned on the whole file: a sibling bullet can
+restore the old heading while the #2307 writeup stays in place.
+Required phrases are scanned only on that step-if bullet: the same
+phrases occur later in the Jules wrap Do, so a whole-file search would
+stay green after the writeup was deleted.
 
 This check pins three unique needles from the false heading/body/Don't,
 and three required phrases from the corrected writeup, so deleting a
 finder turns its unique-negative red.
 
 Exit codes (per ``shared/principles/fail-fast.md``):
-0 = the six needles hold on the step-if bullet;
+0 = the six needles hold (forbidden absent file-wide; required present
+in the step-if bullet);
 1 = the bullet is missing, a false claim returned, or a required phrase
 vanished;
 2 = the file is missing, so the check could not run.
@@ -55,20 +58,21 @@ FALSE_CLAIMS = (
     ),
 )
 
-# Unique to the corrected writeup inside this bullet. Dropping any of them
-# is a regression even when the false heading stays gone.
+# Unique to the corrected writeup inside this bullet. ``Keep writing``
+# distinguishes the recommendation from the gha#350 sibling's
+# ``Restore an explicit success() &&``.
 REQUIRED = (
     (
         "older claim that *any* explicit step",
         "missing retraction: older claim that *any* explicit step",
     ),
     (
-        "success() &&",
-        "missing recommended success() && (visibility / later failure() copy)",
+        "Keep writing `success() &&`",
+        "missing recommended Keep writing `success() &&`",
     ),
     (
-        "auto-applies",
-        "missing GitHub auto-applies success() unless a status-check function",
+        "GitHub auto-applies `success()` when the condition has no such function",
+        "missing GitHub auto-applies `success()` when the condition has no such function",
     ),
 )
 
@@ -89,16 +93,14 @@ def extract_section(text: str) -> str | None:
     return "".join(out)
 
 
-def findings(section: str) -> list[str]:
-    """Return one message per violated invariant on the step-if bullet."""
-    out: list[str] = []
-    for needle, message in FALSE_CLAIMS:
-        if needle in section:
-            out.append(message)
-    for needle, message in REQUIRED:
-        if needle not in section:
-            out.append(message)
-    return out
+def false_claim_findings(text: str) -> list[str]:
+    return [message for needle, message in FALSE_CLAIMS if needle in text]
+
+
+def required_findings(section: str) -> list[str]:
+    return [
+        message for needle, message in REQUIRED if needle not in section
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,15 +120,18 @@ def main(argv: list[str] | None = None) -> int:
     text = path.read_text(encoding="utf-8")
     n_invariants = len(FALSE_CLAIMS) + len(REQUIRED)
     section = extract_section(text)
-    print(
-        f"Examined {n_invariants} invariants on {path} step-if bullet: "
-        f"{len(FALSE_CLAIMS)} forbidden, {len(REQUIRED)} required"
-    )
+    hits: list[str] = []
     if section is None:
-        print(MISSING_SECTION)
-        return 1
-    hits = findings(section)
-    print(f"{len(hits)} finding(s)")
+        hits.append(MISSING_SECTION)
+    else:
+        hits.extend(required_findings(section))
+    hits.extend(false_claim_findings(text))
+    print(
+        f"Examined {n_invariants} invariants on {path}: "
+        f"{len(FALSE_CLAIMS)} forbidden file-wide, "
+        f"{len(REQUIRED)} required in the step-if bullet; "
+        f"{len(hits)} finding(s)"
+    )
     if hits:
         for hit in hits:
             print(hit)

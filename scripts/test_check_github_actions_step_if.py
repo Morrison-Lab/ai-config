@@ -94,13 +94,21 @@ check(
     "Writing any explicit step-level" not in live_text,
 )
 
-# Unique negatives: restore one false claim INSIDE the bullet.
+# Unique negatives: restore one false claim. Forbidden needles are
+# file-wide, so a sibling bullet must fail the same way as an in-bullet
+# restore.
 case_exits(
     "old heading restored in the bullet",
     insert_in_section(
         live_text,
         "Writing any explicit step-level `if:` REPLACES success().\n",
     ),
+    1,
+    "Writing any explicit step-level",
+)
+case_exits(
+    "old heading restored as a sibling bullet",
+    live_text + "\nWriting any explicit step-level `if:` REPLACES success().\n",
     1,
     "Writing any explicit step-level",
 )
@@ -123,36 +131,41 @@ case_exits(
     "steps that carry their own",
 )
 
-# Section-scoping control: the same false heading after the file must not
-# trip the checker. Whole-file search is the defect this replaces.
-case_exits(
-    "false heading outside the step-if bullet is ignored",
-    live_text + "\nWriting any explicit step-level `if:` REPLACES success().\n",
-    0,
-)
-
-# Unique negatives: drop one required phrase, keep the rest.
+# Unique negatives: drop one required phrase from the bullet, keep the
+# rest. Replacements are scoped to the recommendation / retraction, not
+# every success() && in the file (gha#350's sibling copy must not satisfy
+# the Keep writing needle).
 case_exits(
     "retraction sentence removed",
     live_text.replace("older claim that *any* explicit step", "older claim that a step"),
     1,
     "older claim that *any* explicit step",
 )
-case_exits(
-    "recommended success() && removed",
-    live_text.replace("success() &&", "success() and"),
-    1,
-    "success() &&",
-)
+keep = "Keep writing `success() &&`"
+keep_gone = live_text.replace(keep, "Keep writing success() and")
+check("Keep writing success() && removal actually applied", keep not in keep_gone)
 check(
-    "success() && removal actually applied",
-    "success() &&" not in live_text.replace("success() &&", "success() and"),
+    "gha#350 sibling success() && still present after Keep writing removal",
+    "success() &&" in keep_gone,
 )
 case_exits(
-    "auto-applies claim removed",
-    live_text.replace("auto-applies", "applies"),
+    "recommended Keep writing success() && removed",
+    keep_gone,
     1,
-    "auto-applies",
+    "Keep writing `success() &&`",
+)
+docs = "GitHub auto-applies `success()` when the condition has no such function"
+docs_gone = live_text.replace(docs, "GitHub applies success() when prior steps passed")
+check("docs auto-applies sentence removal actually applied", docs not in docs_gone)
+check(
+    "Jules wrap auto-applies still present after docs sentence removal",
+    "GitHub auto-applies" in docs_gone,
+)
+case_exits(
+    "docs auto-applies sentence removed",
+    docs_gone,
+    1,
+    "GitHub auto-applies `success()` when the condition has no such function",
 )
 
 # Deleting the #2307 writeup heading is not a clean pass: later copies of

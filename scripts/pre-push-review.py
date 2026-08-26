@@ -379,7 +379,7 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
         print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
         return None
 
-    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--print", prompt, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
@@ -608,10 +608,10 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 
         recognized = False
         for inv in list(invokers):
-            # Also try to normalize by substring if exact match fails
+            # Try to match word boundaries if exact match fails
             if inv not in alias_map:
                 for k, v in alias_map.items():
-                    if k in inv:
+                    if re.search(r'\b' + re.escape(k) + r'\b', inv):
                         alias_map[inv] = v
                         break
 
@@ -622,8 +622,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
                 recognized = True
 
         if exclude_engine and not recognized:
-            log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, cursor, antigravity). Unknown exclusions: {list(invokers)}")
-            return None, "None"
+            print(f"Warning: Unknown --exclude-engine '{exclude_engine}'. Ignoring exclusion.", file=sys.stderr)
         elif not invokers and not sys.stdout.isatty():
             print("Warning: Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME to prevent self-invocation.", file=sys.stderr)
 
@@ -658,7 +657,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 
     available = detect_available_engines()
     if not available:
-        log_error("No supported AI CLI found (`claude`, `codex`, `opencode`, `agy`).")
+        log_error("No supported AI CLI found (`claude`, `cursor`, `codex`, `opencode`, `agy`).")
         return None, "None"
 
     for cand in available:

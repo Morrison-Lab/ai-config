@@ -35,7 +35,11 @@ else
 fi
 
 
-python3 "$REVIEW_SCRIPT" --engine alternate ${AGENT_NAME:+--exclude-engine "$AGENT_NAME"}
+if [ -n "$AGENT_NAME" ]; then
+  python3 "$REVIEW_SCRIPT" --engine alternate --exclude-engine "$AGENT_NAME"
+else
+  python3 "$REVIEW_SCRIPT" --engine alternate
+fi
 
 # Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode)
 python3 "$REVIEW_SCRIPT" --engine codex

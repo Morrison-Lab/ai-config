@@ -267,7 +267,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|(?<!\bno )(?<!\bzero )(?<!non-)\bcritical\s+(?:bug|flaw|regression|vulnerability)|(?<!\bno )(?<!\bzero )(?<!non-)\bsevere\s+bug|(?<!\bprevents\s)(?<!\bprevent\s)(?<!\bpreventing\s)(?<!\bno\s)(?<!\bzero\s)(?<!non-)\b(?:causes\s+data\s+loss|data\s+loss)|(?<!\bno )(?<!\bzero )(?<!non-)\bmerge\s+should\s+be\s+withheld|(?<!\bno )(?<!\bzero )(?<!non-)\bmust\s+not\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bshould\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s*(?::|\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?)))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -297,6 +297,11 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
+    
+    if len(prompt) > 800000:
+        print("Notice: Prompt size exceeds ARG_MAX safe limit for Antigravity, skipping...", file=sys.stderr)
+        return None
+        
     cmd = [agy_path, "--print", prompt, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
@@ -353,6 +358,11 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(cursor_path) and not shutil.which("agent"):
         return None
 
+    
+    if len(prompt) > 800000:
+        print("Notice: Prompt size exceeds ARG_MAX safe limit for Cursor, skipping...", file=sys.stderr)
+        return None
+        
     cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])

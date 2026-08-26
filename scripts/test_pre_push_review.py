@@ -800,7 +800,7 @@ class TestPrePushReview(unittest.TestCase):
         mock_isfile.return_value = True
         mock_run.return_value.stdout = "valid output"
         reviewer.run_antigravity_review("my_prompt", expected_commit_sha="abc")
-        
+
         called_args = mock_run.call_args[0][0]
         self.assertEqual(called_args[0], "/usr/local/bin/agy")
         self.assertIn("--mode", called_args)
@@ -844,6 +844,25 @@ class TestPrePushReview(unittest.TestCase):
         report, label = reviewer.execute_review("cursor", "prompt")
         self.assertEqual(report, "report")
         self.assertEqual(label, "Cursor Agent")
+
+
+    def test_verdict_negated_blockers_accepted(self):
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\nObservation: prevents data loss.\nNo critical vulnerability was introduced.\n### Verification Steps\nNone"
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(report)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
+    def test_verdict_p1_crash_rejected(self):
+        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\nP1: the command crashes.\n### Verification Steps\nNone"
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report)
+        self.assertFalse(is_clean)
+        self.assertIn("Contradictory output", reason)
+
+
+    def test_oversized_prompt_skips_antigravity_and_cursor(self):
+        huge_prompt = "A" * 800001
+        self.assertIsNone(reviewer.run_antigravity_review(huge_prompt))
+        self.assertIsNone(reviewer.run_cursor_review(huge_prompt))
 
 if __name__ == "__main__":
     unittest.main()

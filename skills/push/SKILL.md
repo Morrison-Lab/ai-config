@@ -55,7 +55,8 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
 
-On Cursor Cloud the prefix is inert; do not use it, and compare `Reviewed-Commit` by hand instead.
+On Cursor Cloud the prefix is inert;
+do not use it, and compare `Reviewed-Commit` by hand instead.
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 

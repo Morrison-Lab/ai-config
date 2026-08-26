@@ -768,5 +768,22 @@ class TestPrePushReview(unittest.TestCase):
         finally:
             reviewer.get_pr_head_sha = old_get_pr_head
 
+    def test_parse_review_contradictory_blocker(self):
+        report = """### Summary Verdict
+Verdict: Ready for merge
+
+### Critical Findings
+None.
+
+### Observations
+This implementation has a blocking data-loss bug and requires changes before merge.
+
+### Verification Steps
+Tests failed.
+"""
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report)
+        self.assertFalse(is_clean)
+        self.assertFalse(is_valid)
+
 if __name__ == "__main__":
     unittest.main()

@@ -312,13 +312,18 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             r"(?i)\bdo not merge\b",
             r"(?i)\bmust be fixed\b",
             r"(?i)\bfail(?:ed)? verification\b",
+            r"(?i)\btests? failed\b",
             r"(?i)\bcannot merge\b",
             r"(?i)\bnot ready\b",
-            r"(?i)\bneeds work\b"
+            r"(?i)\bneeds work\b",
+            r"(?i)\b(?:blocking|critical) (?:bug|issue|finding)\b",
+            r"(?i)\brequires changes\b",
+            r"(?i)(?<!no )\bdata[- ]loss\b",
+            r"(?i)\bchanges requested\b"
         ]
 
         # Strip out the Summary Verdict header so we don't accidentally match it if it's there
-        body_without_verdict = re.sub(r"(?is)^#{2,3}\s+Summary Verdict.*?(?=^#{2,3}|\Z)", "", clean_report)
+        body_without_verdict = re.sub(r"(?ism)^#{2,3}\s+Summary Verdict.*?(?=^#{2,3}|\Z)", "", clean_report)
 
         for pat in contradictory_patterns:
             if re.search(pat, body_without_verdict):

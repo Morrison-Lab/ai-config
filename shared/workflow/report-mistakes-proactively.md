@@ -22,12 +22,13 @@ a product one.
    The flag is a heads-up, not a request.
    Ending it with an offer ("worth an issue --- say the word and I'll file
    it") is the failure this rule exists to prevent, dressed as courtesy.
-2. **Dupe-check the tracker.** Search the target repo's issues first with
-   a qualifying all-state search (the same search step
-   [`issue-first`](issue-first.md) runs: `gh issue list --state all --search`
-   or `glab issue list --all --search`); when an existing issue already
-   covers the mistake, comment there with the new evidence instead of
-   filing a duplicate.
+2. **Dupe-check the tracker.**
+   Search the target repo's issues first with a qualifying all-state search
+   (the same search step [`issue-first`](issue-first.md) runs:
+   `gh issue list --state all --search` or
+   `glab issue list --all --search`);
+   when an existing issue already covers the mistake,
+   comment there with the new evidence instead of filing a duplicate.
    Not an open-only listing: a closed issue for the same bug is the
    duplicate an open-state search cannot see.
 3. **File the issue immediately, without waiting for approval.**

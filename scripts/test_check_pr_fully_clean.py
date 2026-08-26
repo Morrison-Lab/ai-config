@@ -87,7 +87,7 @@ def main() -> int:
     no_major_changes_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
         "author": {"login": "github-actions"},
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\nNo major changes requested. Everything looks clean and ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\n### Verdict\n\n**Ready for merge**\n\nNo major changes requested."
     }
 
     none_author_review = {
@@ -252,18 +252,18 @@ def main() -> int:
         )
 
     # Regression (PR #2180 round 5): non-bot comment containing review marker
-    # and HEAD SHA cannot spoof an automated review approval.
+    # and HEAD SHA DOES satisfy review admission, because CLI agents post under human accounts!
     spoofed_passerby_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
-        "body": "code review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": "random-passerby"},
     }
     mock_spoofed = json.dumps({"comments": [spoofed_passerby_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_spoofed):
         sp_ok, sp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
-            "non-bot comment with marker and HEAD SHA does not satisfy review admission",
-            (not sp_ok) and any("No automated review" in i for i in sp_issues),
+            "non-bot comment with marker and HEAD SHA DOES satisfy review admission (CLI agents)",
+            sp_ok and len(sp_issues) == 0,
         )
 
     # Regression (PR #2180 round 6): comment with author: None (deleted account) cannot spoof review
@@ -321,7 +321,7 @@ def main() -> int:
             "**Claude finished** review\n\n"
             "All prior findings addressed. The earlier round was blocked on a missing test fixture, "
             "which is now resolved.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_blk = json.dumps({"comments": [resolved_blocker_comment], "reviews": []})
@@ -339,7 +339,7 @@ def main() -> int:
         "body": (
             "**Claude finished** review\n\n"
             "No deadlock or impasse here -- the prior rebuttal convinced the reviewer.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_imp = json.dumps({"comments": [resolved_impasse_comment], "reviews": []})
@@ -1490,8 +1490,8 @@ def main() -> int:
     with patch.object(checker, "run_cmd",
                       return_value=json.dumps({"comments": [control], "reviews": []})):
         ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
-    check("negative control: the same body without the marker DOES read clean",
-          ctrl_ok)
+    check("negative control: the same body without the marker NO LONGER reads clean (quorum requires explicit verdict)",
+          not ctrl_ok)
 
     # --- review findings on #1862 ------------------------------------------
     #

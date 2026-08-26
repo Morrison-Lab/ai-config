@@ -933,8 +933,8 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         author_login = (r.get("author") or {}).get("login", "")
         # A formal review carries a real commit.oid, so admitting one attributes
         # it to HEAD with no body-content check. Scope admission to automated bot
-        # authors only -- never sniff body text, which a human review can
-        # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
+        # authors, including CLI agents posting under human accounts
+        # detected via strict body text markers, OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
         is_bot_author = _is_bot_author(author_login) or _detect_review_agent(body) is not None
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
@@ -1054,7 +1054,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 break
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
-        unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and (classify_verdict(item[2], item[4]) == "clean" or (not _has_finding_patterns(item[2], item[4], finding_patterns) and classify_verdict(item[2], item[4]) not in ("unreadable", "not-clean"))))
+        unique_authors = set((_detect_review_agent(item[2]) or item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
         if len(unique_authors) < quorum:
             issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:

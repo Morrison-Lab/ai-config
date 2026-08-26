@@ -251,14 +251,13 @@ See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-
 **Publish a dispatched review verbatim --- the posting session transports it, it does not edit it.**
 When the reviewing subagent returns,
 its structured report --- summary, findings, and verdict --- *is* the review.
-Rewriting that report before posting
---- summarizing it, regrouping it,
+The report's entire value is its independence from the authoring session.
+Rewriting it before posting --- summarizing it, regrouping it,
 translating it into the session's own status prose,
 or softening the verdict ---
-filters the artifact whose entire value
-is independence from the authoring session.
-A rewrite is authored by exactly
-the party the separate reviewer exists to check.
+discards exactly that value,
+and the rewrite is authored by the party
+the separate reviewer exists to check.
 A reader cannot tell filtered-out findings from absent ones,
 so a softened publication reads as a cleaner review than occurred.
 

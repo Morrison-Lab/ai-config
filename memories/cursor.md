@@ -155,11 +155,13 @@ Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
 `needs_work` is Needs more work or Needs work,
 and `(None, None)` is no verdict, including an unclosed fence.
 If the verdict is not `clean`, or there is no fingerprint, do not push.
-Compare the fingerprint to the recorded sha and to
-`git rev-parse HEAD` by prefix-match after lowercasing both sides
-(`c.startswith(reviewed_commit)`), as `_rev_parse` does.
-If the fingerprint does not prefix-match the recorded sha or HEAD,
-do not push.
+Re-read `git rev-parse HEAD` after the child returns.
+If HEAD is not the recorded sha, the child wrote or HEAD moved:
+do not push; re-dispatch on the new HEAD.
+The fingerprint must prefix-match HEAD
+(`c.startswith(reviewed_commit)` in `verify_review`).
+`parse_report` already lowercases the fingerprint.
+If the fingerprint does not prefix-match HEAD, do not push.
 [#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
 tracks a CLI wrapper over that call.
 Until that wrapper lands, the import is the instrument.
@@ -170,8 +172,7 @@ Read stdout and stderr (`2>&1`).
 The summary lines this section names write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
-or the new tip is not the compared sha
-(prefix-match an abbreviated sha),
+or a reported new tip does not prefix-match HEAD,
 do not push.
 Git's dry-run summary is `old..new` for a fast-forward,
 and `old...new` for a forced non-fast-forward
@@ -270,11 +271,11 @@ is the instruction to use this route.
   (a harness paste of the child may corroborate; name the route).
   Call `parse_report()` on the decoded assistant text.
   If you cannot obtain a `clean` verdict and fingerprint,
-  or the fingerprint does not prefix-match the recorded sha or HEAD,
+  or HEAD is not still the recorded sha,
+  or the fingerprint does not prefix-match HEAD,
   or `git status --short` is not empty,
   or the same-argv dry-run fails,
-  or the new tip (hex to the right of `..` or `...`)
-  is not that sha
+  or a reported new tip does not prefix-match HEAD
   (`Everything up-to-date` is not a mismatch;
   a new-branch line with no sha is not a mismatch
   and also does not confirm the shipped tip),
@@ -292,6 +293,8 @@ is the instruction to use this route.
   obtain a CLI review and still call `parse_report()`.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
   that used different arguments, failed, or listed other refs.
+- **Don't:** treat a fingerprint that matches only the
+  pre-dispatch recorded sha as covering a new HEAD.
 - **Don't:** treat a clean `git status` as proof the child did
   not commit.
 - **Don't:** compose the fallback PR comment in the authoring

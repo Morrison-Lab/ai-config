@@ -61,8 +61,11 @@ Cursor adapter, that adapter skips the
 guard until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so the prefix is inert under every reviewer,
 including a CLI-delivered one.
-Do not use it on that adapter path while that skip holds,
-and call `parse_report()` on the recovered report instead.
+Do not use it on that adapter path while that skip holds.
+When a recovered report exists, call `parse_report()` on it instead.
+A push that carries nothing to review
+(the empty [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) branch)
+has no report to parse: do not invent one.
 After that restore, the prefix is again the documented escape
 when the guard cannot see a verdict.
 If Claude Code's native guard is the one running

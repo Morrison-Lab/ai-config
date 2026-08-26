@@ -791,6 +791,19 @@ the printed `examined N` against the current `hooks/hooks.json` before
 believing a clean report, and say that hooks connect at session start so a
 mid-session `--fix` arms nothing until a restart.
 
+**`--fix` binds the manifest, not every hook file on disk.**
+A hook whose authoring PR left it in the catalog allowlist of
+documented-but-inert hooks is absent from `hooks/hooks.json`, so this
+step cannot arm it.
+File the registration follow-up (manifest entry, drop from the allowlist,
+drop **not registered** from the README row) as its own issue and PR.
+That PR's merge is when this step can bind it.
+
+- **Do:** treat a documented-but-inert catalog row as a deferred
+  registration, not as a `--fix` miss on this merge.
+- **Don't:** report the merged hook as live after this step when it is still
+  allowlisted.
+
 **A hook cannot be the instrument that BOOTSTRAPS this**, which is worth
 stating so nobody reaches for one first.
 A guard that detects unregistered hooks is itself a hook, so on a machine where

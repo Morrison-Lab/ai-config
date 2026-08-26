@@ -109,6 +109,13 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
+     **When the target memory file is already at the 1200-line cap**, fold
+     the new content into existing bullets, or split the file.
+     A net-positive append fails `scripts/test_check_memory_file_size.py`
+     even when every new sentence is a real lesson
+     (measured 2026-08-25 on `memories/preferences.md` in #2262:
+     `origin/main` was exactly 1200 lines, and a +5-line append reddened
+     `validate`).
    - **When step 2 routed the item to a repo other than ai-config, grep the
      ai-config corpus too** -- "the whole `memories/` directory" above means
      the *destination's*, so a repo-local entry can duplicate or contradict a

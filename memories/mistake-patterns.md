@@ -141,3 +141,33 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   Universal instructions must be repository-agnostic or verified against the target repo.
 - **Fix**: Verify every path, test suite name, and CI workflow against the target repository's tree before committing.
   Use absolute GitHub URLs for any cross-repository references to `ai-config` files.
+
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open
+- **Mistake**: Running `gh pr merge --auto` (or any deferred/auto merge) on a PR that still has open review findings or no verdict at head.
+  Treating the arming as harmless because CI is red ignores that the robot fires later,
+  the moment checks go green,
+  with no re-check of review state.
+- **Example**: 2026-08-26 on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
+  See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md):
+  the remote can act between your commands,
+  and an armed automation is exactly such an action you scheduled against yourself.
+- **Fix**: Never arm `gh pr merge --auto` on a PR whose merge gate includes a posted review verdict, which is every PR here.
+  Auto-merge fires server-side the moment CI passes,
+  so a review landing seconds later cannot block it,
+  and no reactive disable can win that race.
+  Branch protection does not substitute either:
+  it gates native approvals, not verdicts posted as comments.
+  Merge synchronously instead,
+  only after `scripts/check-pr-fully-clean.py <N>` exits clean ---
+  CI green and the all-clear verdict both verified at the shipping head.
+  If something is found already armed, disable it at once ---
+  `gh pr merge <N> --repo <r> --disable-auto`,
+  verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
+  and treat the PR as unverified until re-checked.
+  Disabling is cleanup, not protection.

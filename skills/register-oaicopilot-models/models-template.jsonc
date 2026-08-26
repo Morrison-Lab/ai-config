@@ -59,8 +59,8 @@
   },
 
   // --- GPT-5 family: reasoning models. Databricks uses max_tokens with the
-  //     OpenAI-compatible endpoint. Codex variants use apiMode
-  //     "openai-responses"; the rest use "openai". ---
+  //     OpenAI-compatible endpoint. API mode is model-specific; the current
+  //     catalog requires "openai-responses" for GPT-5.5 and GPT-5.3 Codex. ---
   {
     "id": "databricks-gpt-5-6-sol",
     "owned_by": "databricks",
@@ -82,7 +82,7 @@
     "reasoning_effort": "medium",
     "vision": true,
     "baseUrl": "<workspace-url>/serving-endpoints",
-    "apiMode": "openai"
+    "apiMode": "openai-responses"
   },
   {
     "id": "databricks-gpt-5-3-codex",

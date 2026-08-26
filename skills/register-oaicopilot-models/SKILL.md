@@ -87,6 +87,10 @@ For Databricks entries, its operational limits follow WAI's
 [`tbl-databricks-oaicopilot-defaults`](https://github.com/Morrison-Lab/wai/blob/main/chapters/ai-tools/byok-vscode-databricks.qmd#tbl-databricks-oaicopilot-defaults),
 verified against Databricks' pay-per-token limits on 2026-08-26. These values
 are deliberately smaller than some models' provider maximum context windows.
+Check the current Databricks
+[`supported-models` catalog](https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models)
+separately for model-specific API requirements; on 2026-08-26 it required the
+Responses API for GPT-5.5 and GPT-5.3 Codex.
 
 ## Step 1: Diff requested models against what's already registered
 
@@ -129,23 +133,30 @@ version within that line, then copy its schema verbatim except for `id` (and
 `gpt-5.4` vs `gpt-5.4-mini`). Carry over unchanged when the sibling has the
 same provider and quota tier:
 
-- `baseUrl` / `apiMode` (per-provider, essentially never changes)
+- `baseUrl` (per-provider, essentially never changes)
 - `context_length`, `max_tokens` or `max_completion_tokens`
+- `delay` from the quota tier (omit it only when that tier's delay is 0 ms)
 - `vision`
 - `reasoning_effort` (GPT-family reasoning models only)
 - `owned_by`
+
+Derive `apiMode` from the provider's current catalog for the exact model; it
+is not provider-wide. For Databricks, use `openai-responses` whenever the
+catalog says the model requires the Responses API, and `openai` otherwise.
 
 For Databricks pay-per-token endpoints, use the current WAI table linked in
 Step 0 rather than copying a provider-maximum window from a model card or a
 sibling in another tier. As verified on 2026-08-26, the operational groups
 are:
 
-- GPT-5.6 Sol/Terra/Luna: 400,000 context, 16,000 output, no delay.
+- GPT-5.6 Sol/Terra/Luna: 400,000 context, 16,000 output, no delay (omit the
+  `delay` field).
 - Claude, GPT-5.5 through GPT-5, and Gemini: 64,000 context, 16,000 output,
   and 15,000 ms delay.
 - Inkling: 64,000 context, 8,192 output, and 15,000 ms delay.
-- GPT OSS: 131,072 context, 25,000 output, no delay.
-- Llama 4, Llama 3, and Gemma 3: 128,000 context, 8,192 output, no delay.
+- GPT OSS: 131,072 context, 25,000 output, no delay (omit `delay`).
+- Llama 4, Llama 3, and Gemma 3: 128,000 context, 8,192 output, no delay
+  (omit `delay`).
 
 OAICopilot advertises input capacity as `context_length - max_tokens`.
 Therefore, the 64,000/16,000 default exposes about 48,000 input tokens and can

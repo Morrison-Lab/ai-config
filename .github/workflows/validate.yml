@@ -32,6 +32,8 @@ jobs:
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
+      - name: Validate OAICopilot model-template policy
+        run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
       - name: Run check-pr-body-figures tests

@@ -1007,6 +1007,18 @@ def windows_path_cases() -> tuple[int, int]:
     check("iter_pushes recovers a Windows path on `cd`, not only on `-C`",
           len(pushes) == 1 and pushes[0][2] == posix)
 
+    crlf = "git -C " + win + "\\\r\npush origin main"
+    pushes = list(mod.iter_pushes(crlf))
+    check("a Windows CRLF line-continuation after -C is still a push",
+          len(pushes) == 1 and pushes[0][2] == posix
+          and pushes[0][1][-2:] == ["origin", "main"])
+
+    lf = "git -C " + win + "\\\npush origin main"
+    pushes = list(mod.iter_pushes(lf))
+    check("a Windows LF line-continuation after -C is still a push",
+          len(pushes) == 1 and pushes[0][2] == posix
+          and pushes[0][1][-2:] == ["origin", "main"])
+
     posix_cmd = f"git -C {REPO} push origin main"
     pushes = list(mod.iter_pushes(posix_cmd))
     check("a POSIX -C path is unchanged",

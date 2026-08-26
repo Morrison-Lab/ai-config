@@ -455,7 +455,7 @@ REDIRECTED = object()
 # possible. Git accepts forward slashes on Windows, so rewriting the drive
 # path before the parse is the recovery. A POSIX path has no drive-letter
 # backslash run and is unchanged.
-_WIN_DRIVE_PATH = re.compile(r"[A-Za-z]:(?:\\[^\\/;\n|&<>]+)+")
+_WIN_DRIVE_PATH = re.compile(r"[A-Za-z]:(?:\\[^\\/;\n\r|&<>]+)+")
 
 
 def _posixize_windows_paths(command: str) -> str:
@@ -500,6 +500,16 @@ def iter_pushes(command: str):
     """
     if _SIBLING is None:
         return
+    # Join line-continuations BEFORE posixize. Otherwise a Windows CRLF
+    # continuation (`\` + `\r\n`) is swallowed into the drive path (`/` + CR),
+    # the leftover newline becomes `;`, and a real `git push` is no longer
+    # detected --- fail-open. Measured on this change: `git -C C:\Users\...\`
+    # plus CRLF plus `push origin main` yielded zero pushes after posixize
+    # and one push (mangled directory, fail-closed) without it. The sibling's
+    # `_simple_commands` already does this join, but only after we would have
+    # rewritten the backslash. `\r` is also excluded from the path class so
+    # a stray CR cannot extend the match even if this join is skipped.
+    command = re.sub(r"\\\r?\n", " ", command)
     command = _posixize_windows_paths(command)
     cmds = _SIBLING._simple_commands(command)
     if not cmds:

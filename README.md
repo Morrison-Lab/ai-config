@@ -512,11 +512,12 @@ fires.
 A hook that is deliberately documented-but-inert says **not registered** in its
 own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
 asserted rather than merely true.
-A mapped tracker that has closed fails the check, so a closed activation
-issue cannot keep a hook silently inert
+A mapped tracker that has closed, or that does not exist, fails the check,
+so a closed activation issue cannot keep a hook silently inert
 ([#2302](https://github.com/Morrison-Lab/ai-config/issues/2302)).
-When the issue cannot be fetched, the check prints `SKIP` and does not
-fail --- that skip is the documented offline path, not a silent pass.
+When the issue cannot be fetched (offline, timeout, or rate limit), the
+check prints `SKIP` and does not fail --- that skip is the documented
+offline path, not a silent pass.
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

@@ -38,11 +38,12 @@ This checks four things:
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
 
-When a tracker cannot be fetched (offline, timeout, HTTP error), this check
+When a tracker cannot be fetched (offline, timeout, or rate limit), this check
 prints `SKIP` and does not fail. That skip is the documented offline path, not
-a silent pass: the line is visible, and tests assert it. Inject states via
-`HOOK_CATALOG_ISSUE_STATES` (a JSON object of `{issue: state}`, or the token
-`unfetchable`) so tests never hit the network.
+a silent pass: the line is visible, and tests assert it. A 404/410 is not a
+skip -- a missing tracker is the same class of defect as a closed one. Inject
+states via `HOOK_CATALOG_ISSUE_STATES` (a JSON object of `{issue: state}`, or
+the token `unfetchable`) so tests never hit the network.
 
 Hard-gating rather than advisory. Unlike a file-length threshold, nothing here
 is a judgment call -- the two sets either match or they do not.
@@ -88,6 +89,8 @@ KNOWN_UNREGISTERED = {
 DEFAULT_REPO = "Morrison-Lab/ai-config"
 ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
 UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
+VALID_ISSUE_STATES = frozenset({"open", "closed", "missing"})
+GONE_HTTP = frozenset({404, 410})
 API_TIMEOUT_SEC = 10
 
 # The README row of an allowlisted hook must contain this, so the table states
@@ -165,7 +168,7 @@ def documented():
 def _injected_states():
     """Parse HOOK_CATALOG_ISSUE_STATES, or None to fetch live.
 
-    A JSON object maps issue number -> `open`/`closed`. The tokens
+    A JSON object maps issue number -> `open`/`closed`/`missing`. The tokens
     `unfetchable` / `skip` / empty string mean every tracker is unfetchable
     (the documented offline path, and the fixture-test default). Invalid JSON
     fails the check rather than skipping: a malformed injection is a test bug,
@@ -187,7 +190,7 @@ def _injected_states():
     out = {}
     for key, value in data.items():
         state = str(value).lower()
-        if state not in ("open", "closed"):
+        if state not in VALID_ISSUE_STATES:
             sys.exit(f"FAIL: {ISSUE_STATES_ENV} has invalid state {value!r} "
                      f"for #{key}")
         out[str(key)] = state
@@ -195,7 +198,12 @@ def _injected_states():
 
 
 def fetch_issue_state(number):
-    """Return `open` or `closed`, or None when the issue cannot be fetched."""
+    """Return `open`, `closed`, or `missing`, or None when unfetchable.
+
+    `missing` is HTTP 404/410: the tracker does not exist, which is the
+    same class of defect as a closed issue. Network failures, timeouts, and
+    rate limits return None so the caller can SKIP.
+    """
     injected = _injected_states()
     if injected is not None:
         return injected.get(str(number))
@@ -213,6 +221,15 @@ def fetch_issue_state(number):
     try:
         with urllib.request.urlopen(request, timeout=API_TIMEOUT_SEC) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        code = getattr(exc, "code", None)
+        try:
+            exc.close()
+        except OSError:
+            pass
+        if code in GONE_HTTP:
+            return "missing"
+        return None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
         return None
     if not isinstance(payload, dict):
@@ -224,10 +241,11 @@ def fetch_issue_state(number):
 
 
 def check_tracker_states():
-    """Fail when an allowlisted hook's mapped issue is closed.
+    """Fail when an allowlisted hook's mapped issue is closed or missing.
 
     Returns the extra failure count. A fetch failure prints SKIP and does
     not count as a failure -- that skip is the documented offline path.
+    HTTP 404/410 is not a fetch failure; it is a vanished tracker.
     """
     failures = 0
     for script, number in sorted(KNOWN_UNREGISTERED.items()):
@@ -237,12 +255,25 @@ def check_tracker_states():
                   "not failing the closed-tracker check (offline path; set "
                   f"{ISSUE_STATES_ENV} to inject a state)")
             continue
+        if state == "open":
+            continue
         if state == "closed":
             print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
                   f"ai-config#{number}, which is closed, so a closed tracker "
                   "is keeping the hook silently inert; register the hook, "
                   "or retarget the allowlist at an open issue")
             failures += 1
+            continue
+        if state == "missing":
+            print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+                  f"ai-config#{number}, which does not exist, so a vanished "
+                  "tracker is keeping the hook silently inert; register the "
+                  "hook, or retarget the allowlist at an open issue")
+            failures += 1
+            continue
+        print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+              f"ai-config#{number} with unexpected state {state!r}")
+        failures += 1
     return failures
 
 

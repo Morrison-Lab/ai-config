@@ -220,11 +220,51 @@ case("closed tracker fails",
      want_fail=True, needle="which is closed",
      allowlisted=test_allow, issue_states={"9999": "closed"})
 
+case("missing tracker fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="which does not exist",
+     allowlisted=test_allow, issue_states={"9999": "missing"})
+
 case("unfetchable tracker skips rather than failing",
      [("a.py", "Stop", "")],
      [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
      want_fail=False, needle="SKIP: could not fetch",
      allowlisted=test_allow, issue_states="unfetchable")
+
+case("invalid HOOK_CATALOG_ISSUE_STATES JSON fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="not valid JSON",
+     allowlisted=test_allow, issue_states="{nope")
+
+case("invalid injected tracker state fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="invalid state",
+     allowlisted=test_allow, issue_states={"9999": "wobbly"})
+
+case("injected tracker states must be an object",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="must be a JSON object",
+     allowlisted=test_allow, issue_states="[]")
+
+# Live HTTP 404 (issue 9999 does not exist). Tests the urllib path, not the
+# injected `missing` token. An offline miss is a visible skip, not a PASS.
+with tempfile.TemporaryDirectory() as td:
+    root = make_repo(
+        td, [("a.py", "Stop", "")],
+        [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+        allowlisted=test_allow)
+    rc, out = run(root, issue_states=None)
+    if "SKIP: could not fetch" in out:
+        skip("HTTP 404 is a missing tracker", "issue 9999 could not be fetched")
+    else:
+        check("HTTP 404 is a missing tracker",
+              rc != 0 and "which does not exist" in out)
+        if rc == 0 or "which does not exist" not in out:
+            print(f"      rc={rc}\n{out}")
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",
@@ -245,17 +285,38 @@ with tempfile.TemporaryDirectory() as td:
           rc != 0 and "parsed 0 hook rows" in out)
 
 # --- the live corpus: a holding-constant regression guard -----------------
-# Fetch live so a closed production tracker fails this suite, not only the
-# injected closed-tracker case. Drop a leaked HOOK_CATALOG_ISSUE_STATES so
-# the parent environment cannot skip the live fetch.
-live_env = os.environ.copy()
-live_env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+# Catalog shape is checked offline so a network SKIP cannot masquerade as a
+# consistent catalog. Tracker freshness is a separate live fetch: a closed or
+# missing production tracker fails; an offline miss is a visible skip(), not
+# a PASS. Drop a leaked HOOK_CATALOG_ISSUE_STATES so the parent environment
+# cannot skip the live fetch.
+offline_env = os.environ.copy()
+offline_env["HOOK_CATALOG_ISSUE_STATES"] = "unfetchable"
 proc = subprocess.run([sys.executable, str(SCRIPT)],
                       capture_output=True, text=True, cwd=str(ROOT),
-                      env=live_env)
+                      env=offline_env)
 check("the real repo's catalog is consistent", proc.returncode == 0)
 if proc.returncode != 0:
     print(proc.stdout + proc.stderr)
+
+if ALLOWLISTED:
+    live_env = os.environ.copy()
+    live_env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    proc = subprocess.run([sys.executable, str(SCRIPT)],
+                          capture_output=True, text=True, cwd=str(ROOT),
+                          env=live_env)
+    out = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        check("the real repo's trackers are open", False)
+        print(out)
+    elif "SKIP: could not fetch" in out:
+        skip("the real repo's trackers are open",
+             "issue state could not be fetched")
+    else:
+        check("the real repo's trackers are open", True)
+else:
+    skip("the real repo's trackers are open",
+         "KNOWN_UNREGISTERED is empty")
 
 print(f"\n{passes} passed, {failures} failed, {skipped} skipped "
       f"({len(ALLOWLISTED)} hook(s) in KNOWN_UNREGISTERED)")

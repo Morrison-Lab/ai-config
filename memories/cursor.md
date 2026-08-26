@@ -132,17 +132,20 @@ The identity-only JSON is the parent `Task` `tool_result` for child
 `bc-61fbadd0-7970-5b2d-8775-4924a28e09a1`.
 That comment does not contain the JSON.)
 
-## Jules allowlist skips `cursor[bot]` / `author_association: NONE`
+## Jules allowlist skips `cursor[bot]` outside OWNER/MEMBER/COLLABORATOR
 
 [`.github/workflows/jules-review.yml`](../.github/workflows/jules-review.yml)
 requires `author_association` in OWNER/MEMBER/COLLABORATOR.
 Comments from a Cursor Cloud run post as `cursor[bot]`.
-Association has been measured as `NONE`
-(2026-08-25, [#2234](https://github.com/Morrison-Lab/ai-config/pull/2234))
-and as `CONTRIBUTOR`
-(2026-08-26, [#2290](https://github.com/Morrison-Lab/ai-config/pull/2290)).
-Both sit outside OWNER/MEMBER/COLLABORATOR, so an `@jules review`
+A 2026-08-25 memory recorded that identity as `NONE` on
+[#2234](https://github.com/Morrison-Lab/ai-config/pull/2234).
+A live REST re-read on 2026-08-26 of the same `@jules review` comment
+([5415839558](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839558))
+returns `CONTRIBUTOR`, as do `cursor[bot]` comments on
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).
+`CONTRIBUTOR` is still outside the allowlist, so an `@jules review`
 comment from that identity is skipped either way.
+Prefer the live association over the stored `NONE`.
 
 This is the same class as
 [`self-review-fallback.cases.md`](../shared/workflow/self-review-fallback.cases.md)
@@ -150,7 +153,8 @@ This is the same class as
 ([#1417](https://github.com/Morrison-Lab/ai-config/pull/1417) /
 [#1433](https://github.com/Morrison-Lab/ai-config/issues/1433), 2026-08-12:
 `claude[bot]` / `CONTRIBUTOR`).
-2nd occurrence, 2026-08-25, #2234; the association that time is `NONE`.
+2nd occurrence, 2026-08-25, #2234 (the skip is real; the stored
+`NONE` is not what that comment shows on 2026-08-26).
 
 `jules-review.yml` also starts a skipped run on every PR comment, because
 `on: issue_comment` fires before the job `if:`.
@@ -160,19 +164,18 @@ That skip is the `@jules` substring pre-filter, not this allowlist.
 
 - **Do:** have a human OWNER/MEMBER/COLLABORATOR post `@jules review`
   (the workflow trigger is a trusted comment containing that mention).
-- **Do:** re-read `author_association` on the comment you care about;
-  Cursor Cloud has posted both `NONE` and `CONTRIBUTOR`.
+- **Do:** re-read `author_association` on the comment you care about
+  rather than inheriting a stored Cursor Cloud value.
 - **Don't:** re-post the same request from a session whose comments post
   as `cursor[bot]` outside OWNER/MEMBER/COLLABORATOR --- the gate that
   skipped it skips the retry.
 - **Don't:** count a skipped `jules-review.yml` run as this allowlist
   miss unless the triggering comment actually contained `@jules`.
 
-(Measured 2026-08-25 on
+(Allowlist skip measured 2026-08-25 on
 [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234);
-association re-measured 2026-08-26 on
-[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290)
-as `CONTRIBUTOR`, with no `@jules` mention on that PR.)
+association on that `@jules` comment re-read 2026-08-26 as
+`CONTRIBUTOR`. #2290 had no `@jules` mention.)
 
 ## Cursor Cloud `gh` writes can 403 while the PR-comment tool still posts
 

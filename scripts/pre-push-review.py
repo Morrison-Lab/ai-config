@@ -255,7 +255,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|blocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?:[:\s]|$)|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|critical\s+(?:bug|flaw|regression|vulnerability)|severe\s+bug|causes\s+data\s+loss|data\s+loss|merge\s+should\s+be\s+withheld|must\s+not\s+merge|should\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|\bp[0-2](?:[:\s]|$)|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -406,7 +406,7 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tf:
             tf.write(prompt)
             prompt_file = tf.name
-        agent_dir = os.path.join(os.getcwd(), ".opencode", "agents")
+        agent_dir = os.path.expanduser("~/.config/opencode/agents")
         os.makedirs(agent_dir, exist_ok=True)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", dir=agent_dir, delete=False) as af:
             af.write("---\n")

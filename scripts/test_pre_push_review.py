@@ -691,7 +691,7 @@ class TestPrePushReview(unittest.TestCase):
         
         # Verify it created the agent in the correct directory
         import os
-        expected_dir = os.path.join(os.getcwd(), ".opencode", "agents")
+        expected_dir = os.path.expanduser("~/.config/opencode/agents")
         mock_tf.assert_any_call(mode="w", suffix=".md", dir=expected_dir, delete=False)
         self.assertIn("--file", oc_cmd)
         self.assertNotIn("prompt", oc_cmd)
@@ -752,5 +752,23 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("--agent", output, "opencode run missing --agent flag")
         self.assertIn("--pure", output, "opencode run missing --pure flag")
         self.assertIn("--file", output, "opencode run missing --file flag")
+
+    def test_non_blocking_observations(self):
+        commit = "12345678abcdef0012345678abcdef0012345678"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge.\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations\n"
+            "Non-blocking issue found in documentation.\n"
+            "This is a non-blocking bug.\n\n"
+            "### Verification Steps\nNone.\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean, f"Should be clean but got: {reason}")
+
 if __name__ == "__main__":
     unittest.main()

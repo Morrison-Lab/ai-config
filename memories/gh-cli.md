@@ -1,5 +1,5 @@
 # GitHub CLI (gh)
-## gh (GitHub CLI)
+
 - `gh` opens a pager (alternate buffer) that hangs the agent terminal.
 - Always disable it: pipe `| cat` or set `GH_PAGER=cat` (e.g. `gh pr view 116 | cat`).
 - `gh --no-pager` is not a supported flag and will error; use `GH_PAGER=cat` or `| cat` instead.

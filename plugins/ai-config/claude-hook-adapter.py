@@ -166,7 +166,7 @@ def main():
                 reason = f"invoke_subagent Subagents argument must be a list (received {type(raw_subagents).__name__})"
                 print(json.dumps({"decision": "deny", "reason": reason}))
                 return
-            subagents = raw_subagents if isinstance(raw_subagents, list) else []
+            subagents = raw_subagents or []
             if len(subagents) > 50:
                 reason = f"invoke_subagent exceeded maximum supported fanout limit of 50 subagents (received {len(subagents)})"
                 print(json.dumps({"decision": "deny", "reason": reason}))

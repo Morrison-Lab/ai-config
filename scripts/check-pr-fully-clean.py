@@ -1006,8 +1006,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     dated_matching = sorted((it for it in matching_items if it[1]), key=lambda it: it[1])
     latest_by_provider = {}
     for item in dated_matching:
-        # A comment qualifies as a verdict if it has an explicit verdict, finding patterns, or is an implicit clean review
-        # (which is any comment that survived the is_non_review_notice filter and is not explicitly a status update).
+        # A comment qualifies as a verdict if it has an explicit verdict or explicit finding patterns.
         if classify_verdict(item[2], item[4]) in ("clean", "not-clean", "unreadable") or _has_finding_patterns(item[2], item[4], finding_patterns):
             provider = _detect_review_agent(item[2]) or item[5]
             latest_by_provider[provider] = item

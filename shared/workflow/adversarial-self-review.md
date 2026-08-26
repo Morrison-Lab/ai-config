@@ -221,7 +221,8 @@ If any provider rejects the diff with findings, you must address the feedback.
 If you make changes to the working tree diff or create a new commit, you must restart the sequential query process from the very first provider.
 When restarting the cycle due to code changes, you must proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
 This ensures providers do not redundantly re-raise settled non-code issues on the new diff.
-You must submit your rebuttal to the provider and request a new review so they can post a clean verdict at HEAD that supersedes their previous findings.
+You must submit your rebuttal to the provider and request a new review.
+This allows them to post a clean verdict at HEAD that supersedes their previous findings.
 Only after the provider posts a new clean verdict may you continue to the next provider.
 Repeat this until all pinned providers have explicitly confirmed that zero findings remain open on the exact same codebase state (the same commit and working tree).
 

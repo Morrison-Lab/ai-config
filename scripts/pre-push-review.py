@@ -282,7 +282,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                     return False, False, f"Contradictory output: unclassified free-text observation '{line[:50]}...'"
 
     if is_clean:
-        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|(?<!\bno )(?<!\bzero )(?<!non-)\bcritical\s+(?:bug|flaw|regression|vulnerability)|(?<!\bno )(?<!\bzero )(?<!non-)\bsevere\s+bug|(?<!\bprevents\s)(?<!\bprevent\s)(?<!\bpreventing\s)(?<!\bno\s)(?<!\bzero\s)(?<!non-)\b(?:causes\s+data\s+loss|data\s+loss|data\s+corruption|crashes|crash|not\s+ready\s+for\s+merge|not\s+ready\s+to\s+merge|fails\s+to\s+compile|compilation\s+failure)|(?<!\bno )(?<!\bzero )(?<!non-)\bmerge\s+should\s+be\s+withheld|(?<!\bno )(?<!\bzero )(?<!non-)\bmust\s+not\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bshould\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s*(?::|\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?)))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
+        blocker_pattern = r"(?im)(?:\b(?:must\s+fix|must\s+be\s+(?:fixed|addressed)\s+before\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bblocking\s+(?:bug|issue|finding|flaw|regression)|(?<!\bno )(?<!\bzero )(?<!non-)\bcritical\s+(?:bug|flaw|regression|vulnerability)|(?<!\bno )(?<!\bzero )(?<!non-)\bsevere\s+bug|(?<!\bprevents\s)(?<!\bprevent\s)(?<!\bpreventing\s)(?<!\bno\s)(?<!\bzero\s)(?<!non-)\b(?:causes\s+data\s+loss|data\s+loss|data\s+corruption|crashes|crash|not\s+ready\s+for\s+merge|not\s+ready\s+to\s+merge|fails\s+to\s+compile|compilation\s+failure|authentication\s+is\s+bypassed|bypasses\s+authentication|security\s+flaw|security\s+issue)|(?<!\bno )(?<!\bzero )(?<!non-)\bmerge\s+should\s+be\s+withheld|(?<!\bno )(?<!\bzero )(?<!non-)\bmust\s+not\s+merge|(?<!\bno )(?<!\bzero )(?<!non-)\bshould\s+not\s+(?:merge|be\s+merged)|unsafe\s+to\s+merge|not\s+safe\s+to\s+merge)\b|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:severity\s*:?\s*p[0-2]|p[0-2]\s*(?::|\s+(?:bugs?|issues?|flaws?|vulnerabilit(?:y|ies)|regressions?|blockers?)))(?![0-9a-zA-Z])|(?<!\bno )(?<!\bzero )(?<!non-)\b(?:blocker|blocking)(?:\s*:|\b)|this\s+is\s+a\s+blocker\b)"
         blocker_match = re.search(blocker_pattern, unfenced_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
@@ -345,7 +345,7 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(claude_path) and not shutil.which("claude"):
         return None
 
-    cmd = [claude_path, "--permission-mode", "plan", "-p", "-"]
+    cmd = [claude_path, "--permission-mode", "plan", "--safe-mode", "--strict-mcp-config", "-p", "-"]
     if model:
         cmd.extend(["--model", model])
 
@@ -408,7 +408,7 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
 
     label_suffix = f" (model: {model})" if model else " (ChatGPT quota)"
     print(f"Running local adversarial review via OpenAI Codex{label_suffix}...")
-    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "-"]
+    cmd = [codex_path, "exec", "-s", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral", "-"]
     if model:
         cmd.extend(["-m", model])
 

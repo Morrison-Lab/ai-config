@@ -6,8 +6,9 @@ otherwise-valid fixture so deleting that finder turns the matching test
 red. A check that has never been watched fail is a guess.
 
 Forbidden needles are file-wide: a sibling bullet or a tail append of the
-old heading must fail. Required phrases are section-scoped: later copies
-in the Jules wrap Do must not satisfy them.
+old heading must fail. Required phrases are unique to the #2307 bullet
+and scanned only there. The Jules wrap Do uses similar shorter wording,
+not these needles; heading deletion is ``missing step-if bullet``.
 """
 from __future__ import annotations
 
@@ -168,8 +169,9 @@ case_exits(
     "GitHub auto-applies `success()` when the condition has no such function",
 )
 
-# Deleting the #2307 writeup heading is not a clean pass: later copies of
-# auto-applies / success() && in the Jules wrap Do must not satisfy the gate.
+# Deleting the #2307 writeup heading is not a clean pass: that is
+# MISSING_SECTION, even though the Jules wrap Do still says auto-applies
+# / success().
 gutted = live_text.replace(SECTION_START, "- **A step if: that names a status function")
 check("writeup heading removal actually applied", SECTION_START not in gutted)
 case_exits(

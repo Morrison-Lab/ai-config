@@ -11,9 +11,12 @@ success()" is false (ai-config#2307).
 
 Forbidden needles are scanned on the whole file: a sibling bullet can
 restore the old heading while the #2307 writeup stays in place.
-Required phrases are scanned only on that step-if bullet: the same
-phrases occur later in the Jules wrap Do, so a whole-file search would
-stay green after the writeup was deleted.
+Required phrases are unique to this bullet --- the Jules wrap Do later
+says "GitHub auto-applies it" / "write success()", not these needles ---
+and are scanned only here so a later exact copy cannot keep the gate
+green after this writeup's sentences are deleted. Deleting the heading
+is a separate miss (MISSING_SECTION); Jules wrap does not contain the
+required phrases and would not satisfy them even on a whole-file search.
 
 This check pins three unique needles from the false heading/body/Don't,
 and three required phrases from the corrected writeup, so deleting a

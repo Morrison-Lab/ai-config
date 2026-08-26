@@ -44,7 +44,7 @@ Morrison-Lab/ai-config's Cursor adapter skips that script
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](../../memories/cursor.md));
-compare `Reviewed-Commit` by hand in that checkout.
+call `parse_report()` on the recovered report in that checkout.
 On Claude Code the guard admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
@@ -56,16 +56,18 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
 
-On Cursor Cloud, Morrison-Lab/ai-config's Cursor adapter skips the
+On a session whose pushes go through Morrison-Lab/ai-config's
+Cursor adapter, that adapter skips the
 guard until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so the prefix is inert under every reviewer,
 including a CLI-delivered one.
-Do not use it there while that skip holds,
-and compare `Reviewed-Commit` by hand instead.
+Do not use it on that adapter path while that skip holds,
+and call `parse_report()` on the recovered report instead.
 After that restore, the prefix is again the documented escape
 when the guard cannot see a verdict.
-On desktop with third-party Claude hooks enabled, the native guard
-still runs; the prefix is the escape
+If Claude Code's native guard is the one running
+(desktop third-party Claude hooks, or a Claude Code process),
+the prefix is the escape
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.

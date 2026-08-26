@@ -58,7 +58,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    Morrison-Lab/ai-config's Cursor adapter skips that guard
    until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
    (measured 2026-08-25 PDT).
-   The parent still compares `Reviewed-Commit` by hand.
+   The parent still calls `parse_report()` on the recovered report.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
    Write the label plainly on its own line: emphasis around it is tolerated, but the guard reads the first fingerprint AFTER your verdict, so put it last.
 

@@ -132,7 +132,7 @@ this section specifies, not a substitute for it.
 A harness paste of the child's own assistant message may corroborate it;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
-Decode the assistant `text` before blanking fences.
+Decode the assistant `text` before calling `parse_report()`.
 `batch-fetch-details` can write a large `transcript.json`.
 Extract the child's assistant `text` with a subagent that returns
 that text verbatim, or with a deterministic decoder.
@@ -143,41 +143,26 @@ Do not read the transcript file into the conductor's context.
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
 [Cursor Cloud Task `tool_result` is identity-only](#cursor-cloud-task-tool_result-is-identity-only).
-Blank fenced blocks before taking the verdict and the fingerprint:
-this corpus quotes those strings constantly (ai-config#1297).
-A fence closes only on a line of the same character
-that is at least as long;
-do not pair open and close by count.
-If a fence never closes, treat the report as stating no verdict:
-do not push.
-Take the last matching `Verdict:` line against that blanked text.
-An optional ATX heading prefix (`### Verdict:`) is allowed.
-Optional `**` emphasis is allowed only between the colon and the
-value (`Verdict: **Ready for merge**`), as `VERDICT_LINE` in
-`hooks/no-push-without-self-review.py` allows.
-Wrapping `Verdict:` itself in `**` is not a match.
-Values are `Ready for merge`, `Needs more work`, or `Needs work`.
-If no line matches `VERDICT_LINE`, the report states no verdict:
-do not push.
-An unrecognized trailing `Verdict:` line is skipped, not a verdict,
-as the guard does.
-Then take the first `Reviewed-Commit` after that match,
-still on the blanked text.
 The `Task` JSON `tool_result` has no review body.
-If you cannot obtain `Reviewed-Commit`, do not push.
-The verdict must be Ready for merge; do not push a Needs more work
-report even when the fingerprint matches.
-Compare that sha to the recorded sha and to `git rev-parse HEAD`
-by prefix-match (`c.startswith(reviewed_commit)`), as the guard does.
-Lowercase both sides first:
-`parse_report` lowercases the fingerprint,
-and `_rev_parse` lowercases the resolved sha,
-before that check runs.
-An uppercase fingerprint is still a fingerprint.
-The fingerprint is 7 to 40 hex digits, as `REVIEWED_COMMIT` requires.
-Optional `**` around the label and a backticked sha are allowed.
-A shorter string is not a fingerprint: do not push.
-If they differ, do not push.
+Call `parse_report()` from
+[`hooks/no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)
+on the decoded text
+(`importlib.util.spec_from_file_location`;
+the module loads with no side effects).
+Do not re-derive `VERDICT_LINE` or fence-blanking by hand.
+`parse_report` returns `(verdict, reviewed_commit)`:
+`clean` is Ready for merge,
+`needs_work` is Needs more work or Needs work,
+and `(None, None)` is no verdict, including an unclosed fence.
+If the verdict is not `clean`, or there is no fingerprint, do not push.
+Compare the fingerprint to the recorded sha and to
+`git rev-parse HEAD` by prefix-match after lowercasing both sides
+(`c.startswith(reviewed_commit)`), as `_rev_parse` does.
+If the fingerprint does not prefix-match the recorded sha or HEAD,
+do not push.
+[#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
+tracks a CLI wrapper over that call.
+Until that wrapper lands, the import is the instrument.
 Run `git push --dry-run` with the same arguments as the push
 that follows, including the refspec
 (the guard exempts dry-run from review).
@@ -206,6 +191,8 @@ so the dry-run only confirms the command would create that ref.
 The source-ref rule and the HEAD comparison remain.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
 If it is a branch name, that name must match the recorded branch.
+Any other source ref (a tag, `FETCH_HEAD`, a raw sha) is not covered:
+do not push.
 Re-run `git status --short`.
 If it is not empty, do not push:
 uncommitted child edits (or leftover dirty files) are not in the
@@ -214,23 +201,26 @@ This repo's Cursor adapter skips `no-push-without-self-review.py`
 (`SKIP_WITHOUT_TOOL_RESULT`) until
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so a failed or skipped dispatch is not caught before the push.
-[#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
-tracks a CLI wrapper over `parse_report()` for this comparison
-until that restore.
 The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
 obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
-and still compare `Reviewed-Commit` by hand.
-On Cursor Cloud the adapter skip makes
-`ALLOW_UNREVIEWED_PUSH=1` inert
-(measured 2026-08-25 PDT; Cloud has no home Claude settings).
-Do not prefix it there.
-On desktop, third-party Claude hooks still load
-`~/.claude/settings.json` and run the guard
-(measured against Cursor's third-party hook docs on 2026-08-25).
-The prefix is the escape on that path, because Cursor JSONL omits
-`tool_result` and the native guard otherwise denies every push.
+and still call `parse_report()` on the recovered report.
+On a session whose pushes go through this repo's Cursor adapter,
+the adapter skip makes `ALLOW_UNREVIEWED_PUSH=1` inert
+(measured 2026-08-25 PDT on Cursor Cloud).
+Do not prefix it on that path.
+Home Claude settings can exist on Cloud after `bootstrap.sh`
+(measured 2026-08-26 PDT: `/home/ubuntu/.claude/settings.json`
+binds `no-push-without-self-review` under `PreToolUse`).
+Those settings do not make the Cursor adapter run Claude's hook runner.
+If Claude Code's native guard is the one running ---
+desktop third-party Claude hooks, or a Claude Code process on the
+same VM --- the prefix is the escape,
+because Cursor JSONL omits `tool_result` and the native guard
+otherwise denies every push
+(desktop path measured against Cursor's third-party hook docs on
+2026-08-25).
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -278,31 +268,28 @@ is the instruction to use this route.
   After it returns, recover the report from `batch-fetch-details`
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
-  Take the last matching `Verdict:` line
-  (optional `### ` prefix, as the guard's `VERDICT_LINE`,
-  and optional `**` only between the colon and the value)
-  and the first `Reviewed-Commit` after it, both on
-  fence-blanked decoded text.
-  If you cannot obtain it, or a fence never closes,
-  or the verdict is not Ready for merge,
-  or HEAD differs, or `git status --short` is not empty,
+  Call `parse_report()` on the decoded assistant text.
+  If you cannot obtain a `clean` verdict and fingerprint,
+  or the fingerprint does not prefix-match the recorded sha or HEAD,
+  or `git status --short` is not empty,
   or the same-argv dry-run fails,
   or the new tip (hex to the right of `..` or `...`)
   is not that sha
   (`Everything up-to-date` is not a mismatch;
   a new-branch line with no sha is not a mismatch
   and also does not confirm the shipped tip),
+  or the source ref is not `HEAD` and is not the recorded branch,
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud,
-  where the adapter skip makes it inert.
-  On desktop with third-party Claude hooks enabled, that prefix
-  is the native-guard escape, not an inert flag.
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on a Cursor-adapter
+  push, where the skip makes it inert.
+  If Claude Code's native guard is the one running, that prefix
+  is the escape, not an inert flag.
   If the dispatch errored or produced no report,
-  obtain a CLI review and still compare by hand.
+  obtain a CLI review and still call `parse_report()`.
 - **Don't:** treat a matching HEAD sha as covering a dry-run
   that used different arguments, failed, or listed other refs.
 - **Don't:** treat a clean `git status` as proof the child did

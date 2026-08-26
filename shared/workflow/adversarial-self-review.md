@@ -143,20 +143,20 @@ On Cursor Cloud, when the session's `Task` tool lists
 Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT);
-compare `Reviewed-Commit` by hand
+compare `Reviewed-Commit` by calling `parse_report()`
 (see [`memories/cursor.md`](../../memories/cursor.md)).
-Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud:
+Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on a Cursor-adapter push:
 Morrison-Lab/ai-config's Cursor adapter skips the guard there,
 so the prefix is inert and
 misreports the session, including after a Task dispatch that errored
 (see [`memories/cursor.md`](../../memories/cursor.md)
-for the desktop path, where native Claude hooks still run the guard).
+for the path where Claude Code's native guard is the one running).
 If that dispatch errored or produced no report,
 obtain a review via the CLI fallback above
-and still compare `Reviewed-Commit` by hand.
+and still call `parse_report()` on the recovered report.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is also the CLI-fallback case above ---
-on Cursor Cloud still with no override prefix, because
+on a Cursor-adapter session still with no override prefix, because
 Morrison-Lab/ai-config's Cursor adapter skips the guard there
 under any reviewer.
 

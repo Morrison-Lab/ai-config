@@ -263,7 +263,7 @@ until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`
-and compare `Reviewed-Commit` by hand
+and call `parse_report()` on the recovered report
 ([`memories/cursor.md`](memories/cursor.md)).
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 

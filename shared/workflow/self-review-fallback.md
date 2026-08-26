@@ -104,7 +104,11 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
-On Cursor Cloud, dispatch through `Task`.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch through `Task`.
+If `Task` is absent or does not list that persona, that is the
+CLI-fallback case in
+[`adversarial-self-review`](adversarial-self-review.md).
 The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**

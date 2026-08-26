@@ -110,15 +110,19 @@ QUESTIONING = re.compile(
 )
 
 # Assistant correction of a prior claim. The first-person admission sibling
-# already covers "I was wrong". Extra alternatives here must also name that
-# the claim was WRONG: "the correct figure is 12" and "actually, it is 12"
-# are how a confirmed claim is restated, and the written rule says
-# confirming does not owe a pass (ai-config#2261 review).
+# already covers "I was wrong". Extra alternatives here must name that the
+# prior value was displaced, not merely restate the current one.
+#
+# Discriminator (ai-config#2261 review): a contrast against a number
+# ("Actually, it's 12, not 9." / "The figure is 12, not 9 as I said.")
+# is the closed-Q&A path the issue names. "The correct figure is 12" and
+# "Actually, it is 12" restate a confirmed claim and must stay silent.
 CORRECTION_EXTRA = re.compile(
     r"""(
       i\s+misspoke\b
     | that\s+(?:count|figure|number|claim)\s+was\s+
         (?:wrong|incorrect|off)\b
+    | \bnot\s+\d+\b
     )""",
     re.I | re.X,
 )

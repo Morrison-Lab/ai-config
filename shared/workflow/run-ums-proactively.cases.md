@@ -34,7 +34,8 @@ the near-miss is answering the question.
 A user (or reviewer) asks "are you sure about that?" about a figure,
 a state claim, or a count you just reported.
 You re-query, the claim was wrong, and you reply with the corrected
-value.
+value --- often a contrast with no admission language
+("Actually, it's 12, not 9" / "The figure is 12, not 9 as I said").
 From the inside that is a closed Q&A: they asked, you checked, you
 answered.
 Nothing merged, no finding was Addressed, and you never said "I was

@@ -174,7 +174,8 @@ They are not three rules.
    The trigger is the read, not Address and not a clean verdict.
    Rebut and Defer still get a pass: the review taught something even if you disagree.
    A review with no findings still gets a short pass.
-   [`learn-from-review-findings`](learn-from-review-findings.md) still attaches the record-the-class and algorithmatize steps to Address; this is the earlier bank, not a replacement for those steps.
+   [`learn-from-review-findings`](learn-from-review-findings.md) still attaches the record-the-class and algorithmatize steps to Address.
+   This is the earlier bank, not a replacement for those steps.
 
 2. **You receive critical feedback on the work.**
    Chat, a human PR comment, another agent's review, an adversarial-reviewer finding.
@@ -196,11 +197,16 @@ It stays unregistered until its authoring PR merges, per README.
 - **Do:** when a claim is questioned and the check shows it was wrong, run UMS as you correct the answer --- the discovery is the trigger, not a first-person admission.
 - **Don't:** wait for Address, a clean verdict, or an admission phrasing before the pass is owed.
 - **Don't:** treat answering "are you sure about that?" with the corrected fact as having banked the lesson.
-- **Don't:** run UMS merely because someone asked; the questioning case fires if the claim was wrong.
+- **Don't:** run UMS merely because someone asked.
+  The questioning case fires if the claim was wrong.
 
 See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Are you sure about that?".
 
-(Directive from the user, 2026-08-25: "cai: run ums every time you read a review of your work"; then "any critical feedback"; then "every time your work or your claims are questioned"; then the worked example that questioning triggers UMS if the claim was wrong.
+(Directive from the user, 2026-08-25, in four successive expansions:
+run ums every time you read a review of your work,
+then any critical feedback,
+then every time your work or your claims are questioned,
+then the worked example that questioning triggers UMS if the claim was wrong.
 Tracked as [ai-config#2261](https://github.com/Morrison-Lab/ai-config/issues/2261).)
 
 **Folding or pruning a finished record is a step of the pass, and which records are outstanding is a link-graph fact rather than something you remember.**

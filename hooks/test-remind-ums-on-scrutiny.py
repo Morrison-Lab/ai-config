@@ -53,9 +53,12 @@ def user(s):
 Q = user("are you sure about that?")
 WRONG = txt("You're right to ask -- I was wrong, the count is 12 not 9.")
 SILENT_UPDATE = txt("That count was wrong -- it is 12.")
+CONTRAST = txt("Actually, it's 12, not 9.")
+CONTRAST_AS_SAID = txt("The figure is 12, not 9 as I said.")
 CONFIRM = txt("On re-checking, the figure holds.")
 CONFIRM_CORRECT = txt("The correct figure is 12.")
 CONFIRM_ACTUALLY = txt("Actually, it is 12.")
+CONFIRM_NOT_IN_DOUBT = txt("The figure is not in doubt.")
 REVIEW = tool("Bash", {
     "command": 'gh api repos/Morrison-Lab/ai-config/pulls/2262/comments',
 })
@@ -74,6 +77,8 @@ WRITE_HOOK = tool("Write", {
 REMIND = [
     ([Q, WRONG], "given example: are you sure, then I was wrong"),
     ([Q, SILENT_UPDATE], "questioned then 'that count was wrong' without I-was-wrong"),
+    ([Q, CONTRAST], "closed Q&A contrast without admission: it's 12, not 9"),
+    ([Q, CONTRAST_AS_SAID], "figure is 12, not 9 as I said"),
     ([REVIEW], "review comments fetched, no UMS"),
     ([user("**Claude finished** reviewing HEAD. ### Verdict")],
      "user-pasted review body"),
@@ -88,6 +93,7 @@ SILENT = [
     ([Q, CONFIRM], "questioning then confirming the claim"),
     ([Q, CONFIRM_CORRECT], "restating 'the correct figure is N' is confirmation"),
     ([Q, CONFIRM_ACTUALLY], "'actually, it is N' restates a confirmed claim"),
+    ([Q, CONFIRM_NOT_IN_DOUBT], "'not' without a digit is not a contrast correction"),
     ([WRONG], "correction with no prior question"),
     ([Q, WRONG, UMS], "explicit ums after the correction"),
     ([REVIEW, UMS], "explicit ums after the review-read"),

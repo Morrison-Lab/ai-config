@@ -400,15 +400,9 @@ Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
 On a desktop session, do not pair the project adapter
 with native Claude hooks (leave one path enabled).
-On Cursor Cloud, that file can already exist
-(see the measurement above),
-and whether the native runner also fires is unmeasured
-as of 2026-08-26 PDT.
-Until both are measured, do not treat
-both-present as a Cloud defect to clear by deleting settings.
-The adapter skip is still the Cursor path,
-and a native deny of the unprefixed push is still the
-observable that the native runner fired.
+On Cursor Cloud, do not treat
+both-present as a Cloud defect to clear by deleting settings
+until the native runner's firing is measured.
 
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
@@ -480,7 +474,7 @@ Say in the reply that the carve-out was used.
    to reach an earlier matching one also fails this gate.
    A last assistant message that restates the brief's
    required shape still passes this heading check;
-   gate 3's fingerprint regex refuses a placeholder
+   `parse_report`'s fingerprint regex refuses a placeholder
    and does not refuse a restatement that already
    carries a real HEAD-matching sha
    ([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).

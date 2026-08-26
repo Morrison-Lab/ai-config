@@ -85,11 +85,8 @@ and runs every source ([third-party hooks](https://cursor.com/docs/reference/thi
 the adapter's tick sentinel does not collapse adapter-plus-native.
 On a desktop session, leave one path enabled:
 this project file, or Claude settings, not both.
-On Cursor Cloud, that file can already exist
-(see the measurement above),
-and whether the native runner also fires is unmeasured
-as of 2026-08-26 PDT.
-Until both are measured, do not treat
-both-present as a Cloud defect to clear by deleting settings.
+On Cursor Cloud, do not treat
+both-present as a Cloud defect to clear by deleting settings
+until the native runner's firing is measured.
 A native deny of the unprefixed push is still the
 observable that the native runner fired.

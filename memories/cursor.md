@@ -164,9 +164,10 @@ Read it with `.get("text")`.
 A missing, null, or empty value is not a candidate.
 That last non-empty assistant `text` must itself carry
 Summary / Findings / Verdict / Reviewed-Commit.
-Do not skip a later non-empty assistant text
-to reach an earlier matching one.
+The decoder decides that; `parse_report()` does not
+(`parse_report` matches only the verdict line and the fingerprint).
 If that last non-empty text lacks those headings, there is no report.
+Do not call `parse_report()` on a body that failed the heading check.
 The role filter is load-bearing.
 The user brief also carries those headings
 (it specifies the required report shape).
@@ -257,7 +258,7 @@ The positive test is two commands in that checkout:
 and `git diff --quiet HEAD^ HEAD` exits 0.
 Exit 1 means a diff; exit 128 means the command failed.
 Neither is the carve-out.
-That is the `--allow-empty` pr-on-claim commit.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
 `git diff origin/<default-branch>...HEAD` empty
 in that checkout is tree equality against the merge-base,
 not "this branch carries nothing".
@@ -328,6 +329,12 @@ That line is not a mismatch.
 It also does not confirm the shipped tip:
 the first push of a `cursor/<name>` branch is this case,
 so the dry-run only confirms the command would create that ref.
+A `-u` dry-run also prints
+`Would set upstream of '<branch>' to '<branch>' of 'origin'`
+on stdout, including when the upstream is already set
+(git 2.43.0 `set_upstreams()` pretend branch).
+That line is not a mismatch and is not "other refs".
+It does not confirm the shipped tip.
 The source-ref rule and the HEAD comparison remain.
 A deletion line (`- [deleted]`) has no `->`,
 so it has no source ref for the source-ref check.
@@ -381,7 +388,12 @@ Whether Claude Code's native hook runner also fires on Cloud
 is unmeasured as of 2026-08-26 PDT.
 Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
-Do not pair the project adapter with native Claude hooks.
+On a desktop session, do not pair the project adapter
+with native Claude hooks (leave one path enabled).
+On Cursor Cloud both can be present:
+the adapter skip is the Cursor path,
+and a native deny of the unprefixed push is the
+observable that the native runner fired.
 
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
@@ -439,7 +451,11 @@ Say in the reply that the carve-out was used.
    Take the last assistant record whose `text` is a non-empty string
    (thinking and `tool_calls` usually omit `text`; use `.get`;
    they are not candidates);
-   that text must itself carry the headings.
+   that text must itself carry the headings
+   (the decoder refuses here; `parse_report` does not check
+   Summary or Findings).
+   If the headings are missing, there is no report;
+   do not call `parse_report`.
    Write that text to a file outside the checkout (under `/tmp`)
    and call `parse_report()` on that file.
    **Killer item:** an author-assembled body is not a report,
@@ -459,7 +475,9 @@ Say in the reply that the carve-out was used.
    prefix-matches HEAD
    (`Everything up-to-date` is not a mismatch;
    a new-branch line with no sha is not a mismatch
-   and also does not confirm the shipped tip).
+   and also does not confirm the shipped tip;
+   `Would set upstream of ...` on stdout is not a mismatch
+   and is not "other refs").
    If the dry-run listed other refs (`[new tag]`,
    `push.followTags`), do not push.
 6. Confirm every source ref is `HEAD` or the recorded branch.
@@ -558,7 +576,10 @@ is the instruction to use this route.
   push by default: the skip makes it inert for the adapter.
   Prefix only after a native `PreToolUse`
   `no-push-without-self-review` deny of the unprefixed push.
-  Do not pair the project adapter with native Claude hooks.
+  On a desktop session, do not pair the project adapter
+  with native Claude hooks.
+  On Cursor Cloud both can be present
+  (see the pairing rule in the procedure above).
   If the dispatch errored, produced no report,
   or produced a report whose fingerprint cannot be recovered
   (including a stale-registered persona),

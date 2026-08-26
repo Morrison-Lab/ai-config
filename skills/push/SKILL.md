@@ -91,6 +91,7 @@ The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
 equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
 in the checkout whose push follows.
 Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
 `git diff origin/<default-branch>...HEAD` empty is tree equality,
 not "this branch carries nothing".
 A net-zero tree of other commits is not the carve-out.

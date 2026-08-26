@@ -83,4 +83,8 @@ Those settings do not make the Cursor adapter run Claude's hook runner.
 Desktop Cursor with third-party Claude hooks enabled loads that file natively
 and runs every source ([third-party hooks](https://cursor.com/docs/reference/third-party-hooks.md), fetched 2026-08-25);
 the adapter's tick sentinel does not collapse adapter-plus-native.
-Leave one path enabled: this project file, or Claude settings, not both.
+On a desktop session, leave one path enabled:
+this project file, or Claude settings, not both.
+On Cursor Cloud both can be present;
+a native deny of the unprefixed push is the
+observable that the native runner fired.

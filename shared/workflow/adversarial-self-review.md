@@ -154,8 +154,8 @@ obtain a review via the CLI fallback above
 and still compare `Reviewed-Commit` by hand.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is also the CLI-fallback case above ---
-but on Cursor Cloud still with no override prefix: the guard does
-not run there under any reviewer, so compare `Reviewed-Commit`
+still with no override prefix on Cursor, Cloud or desktop: the guard
+does not run there under any reviewer, so compare `Reviewed-Commit`
 by hand instead.
 
 ## Brief it with the diff and the standards, never with your rationale

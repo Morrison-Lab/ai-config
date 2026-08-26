@@ -146,7 +146,8 @@ until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud:
-the adapter skips the guard there, so the prefix is inert and
+Morrison-Lab/ai-config's Cursor adapter skips the guard there,
+so the prefix is inert and
 misreports the session, including after a Task dispatch that errored
 (see [`memories/cursor.md`](../../memories/cursor.md)
 for the desktop path, where native Claude hooks still run the guard).
@@ -155,8 +156,9 @@ obtain a review via the CLI fallback above
 and still compare `Reviewed-Commit` by hand.
 If `Task` is not in the schema, or it does not list
 `adversarial-reviewer`, that is also the CLI-fallback case above ---
-on Cursor Cloud still with no override prefix, because the adapter
-skips the guard there under any reviewer.
+on Cursor Cloud still with no override prefix, because
+Morrison-Lab/ai-config's Cursor adapter skips the guard there
+under any reviewer.
 
 ## Brief it with the diff and the standards, never with your rationale
 

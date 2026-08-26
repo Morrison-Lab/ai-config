@@ -157,8 +157,10 @@ value (`Verdict: **Ready for merge**`), as `VERDICT_LINE` in
 `hooks/no-push-without-self-review.py` allows.
 Wrapping `Verdict:` itself in `**` is not a match.
 Values are `Ready for merge`, `Needs more work`, or `Needs work`.
-If the last `Verdict:` line is none of those, the report states
-no verdict: do not push.
+If no line matches `VERDICT_LINE`, the report states no verdict:
+do not push.
+An unrecognized trailing `Verdict:` line is skipped, not a verdict,
+as the guard does.
 Then take the first `Reviewed-Commit` after that match,
 still on the blanked text.
 The `Task` JSON `tool_result` has no review body.
@@ -167,6 +169,11 @@ The verdict must be Ready for merge; do not push a Needs more work
 report even when the fingerprint matches.
 Compare that sha to the recorded sha and to `git rev-parse HEAD`
 by prefix-match (`c.startswith(reviewed_commit)`), as the guard does.
+Lowercase both sides first:
+`parse_report` lowercases the fingerprint,
+and `_rev_parse` lowercases the resolved sha,
+before that check runs.
+An uppercase fingerprint is still a fingerprint.
 The fingerprint is 7 to 40 hex digits, as `REVIEWED_COMMIT` requires.
 Optional `**` around the label and a backticked sha are allowed.
 A shorter string is not a fingerprint: do not push.
@@ -178,15 +185,25 @@ Read stdout and stderr (`2>&1`).
 The summary lines this section names write to stderr.
 If that command fails,
 or you cannot tell from its output which commits would ship,
-or the new tip (right of `..`) is not the compared sha
+or the new tip is not the compared sha
 (prefix-match an abbreviated sha),
 do not push.
-Git's dry-run summary is `old..new`.
+Git's dry-run summary is `old..new` for a fast-forward,
+and `old...new` for a forced non-fast-forward
+(git-push OUTPUT; this worktree's git is 2.43.0).
+Compare only the new tip:
+the hex to the right of the two-or-three-dot range.
+A split on the two-dot string is not that extraction,
+because `...` contains `..`.
 The left sha is the remote's current tip, not a commit this push adds.
-Compare only the new tip.
 `Everything up-to-date` means the push would ship nothing;
 that is not a fingerprint mismatch.
 A new branch's dry-run line is `[new branch]` with no sha.
+That line is not a mismatch.
+It also does not confirm the shipped tip:
+the first push of a `cursor/<name>` branch is this case,
+so the dry-run only confirms the command would create that ref.
+The source-ref rule and the HEAD comparison remain.
 If the source ref (left of `->`) is `HEAD`, the recorded sha covers it.
 If it is a branch name, that name must match the recorded branch.
 Re-run `git status --short`.
@@ -270,9 +287,11 @@ is the instruction to use this route.
   or the verdict is not Ready for merge,
   or HEAD differs, or `git status --short` is not empty,
   or the same-argv dry-run fails,
-  or the new tip (right of `..`) is not that sha
-  (`Everything up-to-date` and a new-branch line with no sha
-  are not a mismatch),
+  or the new tip (hex to the right of `..` or `...`)
+  is not that sha
+  (`Everything up-to-date` is not a mismatch;
+  a new-branch line with no sha is not a mismatch
+  and also does not confirm the shipped tip),
   do not push.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".

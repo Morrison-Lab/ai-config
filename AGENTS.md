@@ -259,6 +259,7 @@ Brief the reviewer with the diff and the standards, never with the rationale for
 Pushing without a clean self-review is mechanistically blocked by pre-push
 guards on Claude Code.
 This repo's Cursor adapter skips `no-push-without-self-review.py`
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT).
 On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
 dispatch that persona through `Task`

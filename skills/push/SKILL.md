@@ -41,6 +41,7 @@ Address, rebut, or defer every finding it returns, then re-dispatch it, so the c
 
 `hooks/no-push-without-self-review.py` gates this on Claude Code.
 Morrison-Lab/ai-config's Cursor adapter skips that script
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](../../memories/cursor.md));
 compare `Reviewed-Commit` by hand in that checkout.
@@ -56,9 +57,13 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - an emergency.
 
 On Cursor Cloud, Morrison-Lab/ai-config's Cursor adapter skips the
-guard, so the prefix is inert under every reviewer,
+guard until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
+so the prefix is inert under every reviewer,
 including a CLI-delivered one.
-Do not use it there, and compare `Reviewed-Commit` by hand instead.
+Do not use it there while that skip holds,
+and compare `Reviewed-Commit` by hand instead.
+After that restore, the prefix is again the documented escape
+when the guard cannot see a verdict.
 On desktop with third-party Claude hooks enabled, the native guard
 still runs; the prefix is the escape
 (see [`memories/cursor.md`](../../memories/cursor.md)).

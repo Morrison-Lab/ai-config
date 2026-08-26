@@ -1225,6 +1225,23 @@ def main() -> int:
         ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
 
+    mock_ci_cancel_superseded = json.dumps({
+        "check_runs": [
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "cancelled",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_ci_cancel_superseded):
+        cancel_ok, cancel_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check(
+            "cancelled check run is ignored when same name succeeded on the SHA",
+            cancel_ok and cancel_issues == [],
+        )
+
     # A job name is not unique across workflows (#1869). The live case:
     # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
     # check-readme, and a passing check-readme job was nearly read as the

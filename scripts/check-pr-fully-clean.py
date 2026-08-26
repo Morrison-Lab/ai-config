@@ -375,6 +375,14 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
         seen[cr["name"]] = seen.get(cr["name"], 0) + 1
     duplicated = {n for n, count in seen.items() if count > 1}
 
+    # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
+    # a later success with the same job name on the same SHA (ai-config#2277).
+    success_names = {
+        cr["name"]
+        for cr in check_runs
+        if cr.get("status") == "completed" and cr.get("conclusion") == "success"
+    }
+
     for cr in check_runs:
         name = cr["name"]
         status = cr["status"]
@@ -397,6 +405,8 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
+            if conclusion == "cancelled" and name in success_names:
+                continue
             issues.append(
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")

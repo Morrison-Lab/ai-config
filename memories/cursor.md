@@ -87,43 +87,52 @@ Desktop Cursor with third-party Claude hooks enabled also loads
 
 ## Cursor Cloud `Task` dispatches `adversarial-reviewer`
 
-A Cursor session already has the reviewer the corpus requires:
-`Task` with `subagent_type: adversarial-reviewer`
-(foreground, read-only).
+A Cursor Cloud session rooted in a repo that ships
+`.claude/agents/adversarial-reviewer.md` already has the reviewer
+the corpus requires: `Task` with
+`subagent_type: adversarial-reviewer`.
+Pass `model` from the listed Claude slugs when the conductor
+is not Claude (example: `claude-opus-5-thinking-high`).
 That is the dispatch.
+The persona's `tools:` frontmatter is instruction-level on
+Cursor Cloud, not a harness filter: this session's dispatch
+still received Write schemas.
 GitHub `claude-review` skipping for a missing
 `CLAUDE_CODE_OAUTH_TOKEN` or quota is a different channel from
 Cursor's listed Claude models on `Task`.
 
 When the conductor is not Claude and a Claude model is listed
-for `Task`, pass that Claude model.
+for `Task`, pass that Claude model via `model`.
 A Grok conductor inheriting its own model for the reviewer
 buys independence of intent only.
 A Claude child on a Grok diff also buys independence of
 vendor blind spot, which is the cross-vendor half of
-[`adversarial-self-review`](../shared/workflow/adversarial-self-review.md).
+[`self-review-fallback`](../shared/workflow/self-review-fallback.md).
 
 Measured 2026-08-25 on
 [#2265](https://github.com/Morrison-Lab/ai-config/pull/2265) and
 [#2266](https://github.com/Morrison-Lab/ai-config/pull/2266):
 a Cursor Grok session posted author-assembled fallback comments
 while `Task` plus Claude was listed.
-The correction was: run the review in this session using a
-subagent; consider using the Claude model
+The correction was to run the review in this session using a
+subagent, and to consider using the Claude model
 ([#2270](https://github.com/Morrison-Lab/ai-config/issues/2270)).
+Cursor Cloud `Task` listed Claude slugs on that date;
+the dispatch default when `model` is omitted was not separately
+measured.
 
-- **Do:** dispatch `Task` `adversarial-reviewer` (foreground,
-  read-only) for every self-review in a Cursor session,
+- **Do:** dispatch `Task` `adversarial-reviewer` for every
+  self-review in a Cursor session that can resolve the persona,
   including when GitHub `claude-review` skipped.
 - **Do:** when the conductor is not Claude and a Claude model
-  is listed for `Task`, pass that Claude model.
+  is listed for `Task`, pass it on `model`.
 - **Don't:** treat a skipped GitHub `claude-review` as "no
   Claude reviewer is reachable in this session".
-- **Don't:** inherit the conductor's model for the reviewer
-  when Claude is listed.
+- **Don't:** omit `model` on that dispatch when Claude is
+  listed and the conductor is not Claude.
 - **Don't:** compose the fallback PR comment in the authoring
-  session --- post the child's structured report, per the
-  section below.
+  session --- post the child's structured report, per
+  "Cursor Cloud Task `tool_result` is identity-only".
 
 ## Cursor Cloud Task `tool_result` is identity-only
 

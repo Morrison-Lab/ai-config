@@ -42,17 +42,20 @@ A reviewer that can edit turns a finding into a silent fix, which loses the find
 **No Agent tool, or no reviewer registered here?**
 A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
-Cursor Cloud's `Task` tool *is* that dispatch
-(`subagent_type: adversarial-reviewer`).
-When the conductor is not Claude, pass a listed Claude model;
-the Cursor-specific routing is in
-[`memories/cursor.md`](../../memories/cursor.md).
 
-Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
+Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
 Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
 The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
+
+Cursor Cloud's `Task` tool is the subagent dispatch when the session
+is rooted in a repo that ships the persona
+(`subagent_type: adversarial-reviewer`, and `model` set to a listed
+Claude slug when the conductor is not Claude).
+The Cursor-specific routing, including that Cursor's adapter skips
+the pre-push guard, is in
+[`memories/cursor.md`](../../memories/cursor.md).
 
 ## Brief it with the diff and the standards, never with your rationale
 

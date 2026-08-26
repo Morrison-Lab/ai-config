@@ -388,8 +388,9 @@ Non-obvious caveats worth knowing:
   Its first run builds the gitleaks (Go) and markdownlint (Node) hook
   environments, which is slow but cached thereafter.
 - **Adversarial review:** Cursor Cloud `Task` with
-  `subagent_type: adversarial-reviewer` is available in this
-  session.
-  When the conductor is not Claude and a Claude model is listed,
-  pass that Claude model.
+  `subagent_type: adversarial-reviewer` is available in a
+  session rooted in a repo that ships that persona
+  (measured 2026-08-25 on this repo).
+  When the conductor is not Claude and a Claude model is listed
+  for `Task`, pass it on `model`.
   Details are in [`memories/cursor.md`](memories/cursor.md).

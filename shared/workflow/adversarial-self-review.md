@@ -23,12 +23,11 @@ What it does not share is the account of what the change was for.
 Those are different independences, and this rule buys the second one only.
 
 **So the subagent is the floor, not the ceiling.**
-Where a cross-vendor reviewer is reachable --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), or the repo's own configured reviewer --- it is still worth chasing.
-Readiness reporting and merging are different gates,
-and the next section gives the merge one a harder bar.
-Since 2026-08-25 a cross-model and cross-harness adversarial review is
-required outright for any merge,
-not an optional enhancement.
+Where a cross-vendor reviewer is reachable ---
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
+or the repo's own configured reviewer ---
+it is still worth chasing.
+The next section raises the bar for merges above what a push gate needs.
 
 ## Cross-model and cross-harness reviews are required for merging, and the harness list is concrete
 
@@ -49,11 +48,16 @@ The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 **opencode**, and **claude**;
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)'s `codex`
 belongs in the same ladder wherever installed.
-Dispatch through whichever differs from you first;
+From the authoring session's perspective the ladder filters itself:
+any entry sharing your model or your harness does not qualify for this gate,
+whatever the list says.
+Among qualifying entries, dispatch through whichever differs from you first;
 when one is temporarily out of quota, move to the next.
 Order by measured headless readiness ---
-`agy` CLI, `opencode`, then `codex` and `claude` --- with `cursor` last:
+`agy` CLI, `opencode`, then `codex`, with `cursor` last:
 it is named in the inventory but not yet probed headless here.
+If no qualifying entry remains, the merge waits;
+it never falls through to a same-model or same-harness reviewer.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 
 `agy` specifically: its API-dispatch route is retired, but the **agy CLI** is a
@@ -67,10 +71,11 @@ merge, even with mwc enabled, unless you have a 100% 'all clear' review
 verdict from an adversarial review".
 
 This **adds** a gate and replaces none.
-Every requirement [`fully-clean`](fully-clean.md) already sets --- including
-the external automated PR reviewer's clean verdict at head, wherever a repo
-has one --- stands unchanged, and an author-dispatched subagent verdict never
-satisfies that external gate.
+Every requirement [`fully-clean`](fully-clean.md) already sets stands
+unchanged ---
+including the external automated PR reviewer's clean verdict at head,
+wherever a repo has one ---
+and an author-dispatched subagent verdict never satisfies that external gate.
 What is added: a merge additionally requires a 100% all-clear adversarial
 verdict at the shipping head from that cross-model, cross-harness reviewer.
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
@@ -225,6 +230,10 @@ The other cases have no guard and are prose rules here.
   without a 100% all-clear adversarial verdict at the shipping head.
   A skip notice, a stub, an older-head verdict,
   or a same-harness convenience pass clears nothing.
+- **Don't:** reuse a passing same-harness pre-push verdict
+  to satisfy the merge gate.
+  A merge needs its own cross-model, cross-harness verdict
+  evaluating the shipping head.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

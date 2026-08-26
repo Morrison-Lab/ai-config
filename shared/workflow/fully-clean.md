@@ -238,9 +238,10 @@ a genuine clean automated Claude review verdict evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 
-**One more gate stacks on top (user directive, 2026-08-25): no merge under any
-grant, `mwc` included, without a 100% all-clear verdict at the shipping head
-from an adversarial review meeting
+**One more gate stacks on top (user directive, 2026-08-25):
+no merge under any grant, `mwc` included,
+without a 100% all-clear adversarial verdict at the shipping head
+from a reviewer meeting
 [`adversarial-self-review`](adversarial-self-review.md)'s independence bar.**
 It composes with the external-reviewer requirement above --- neither satisfies
 the other.

@@ -31,6 +31,18 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-jules-review-workflow
+        name: check Jules mention-dispatch wrap
+        entry: python scripts/check-jules-review-workflow.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-jules-review-workflow
+        name: Jules-review workflow tests
+        entry: python scripts/test_check_jules_review_workflow.py
+        language: python
+        pass_filenames: false
+        always_run: true
       - id: markdownlint
         name: markdownlint (markdown style)
         entry: markdownlint-cli2

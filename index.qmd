@@ -13,7 +13,7 @@ and any agent that reads markdown instruction files.
 |-----------|---------|
 | `skills/` | Reusable workflow skills for Claude Code (`~/.claude/skills/`), Gemini CLI (`~/.gemini/skills/`), and Cursor |
 | `codex-skills/` | Generated Codex wrappers (`~/.codex/skills/`) |
-| `cursor-rules/` | User-global Cursor rules (`~/.cursor/rules/`) |
+| `cursor-rules/` | User-global Cursor rules (plugin or `~/.cursor/rules/`) |
 | `.cursor/rules/` | Project Cursor rules when this repo is the workspace |
 | `.cursor-plugin/` | Cursor Plugin manifest (skills, rules, commands) |
 | `AGENTS.md` | Universal vendor-neutral instruction file for all coding agents |
@@ -26,14 +26,16 @@ and any agent that reads markdown instruction files.
 
 **Local CLI** --- clone the repo and run `bootstrap.sh` once.
 It symlinks each directory into `~/.claude/`, `~/.gemini/`,
-`~/.codex/`, and `~/.cursor/rules/`
+`~/.codex/`, and --- when no Cursor plugin is already serving them ---
+`~/.cursor/rules/`
 (and, when no Cursor plugin or Claude skill catalog is already
 serving this repo, `~/.cursor/skills/`).
 Skills appear in Claude Code, Gemini CLI, and Cursor as `/skill-name`.
 
 **Codex & Cursor** --- the same bootstrap links generated wrappers
 from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills`
-and user-global Cursor rules from `cursor-rules/`
+and, when no Cursor plugin is already serving them, user-global
+Cursor rules from `cursor-rules/`
 into `${CURSOR_HOME:-$HOME/.cursor}/rules`.
 This repo is also a Cursor plugin (`.cursor-plugin/plugin.json`).
 `AGENTS.md` acts as a universal entrypoint.

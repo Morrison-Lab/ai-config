@@ -127,7 +127,6 @@ Consumer-side CI, App installs, and moving-tag pins:
   [`fully-clean`](../shared/workflow/fully-clean.md)'s own criteria ---
   select verdict candidates on the `**Claude finished` body marker rather
   than an author login, anchor on the **last** `### Verdict` heading, read
-
   Copilot's posted review body rather than its check colour, and paginate the
   check-runs endpoint.
 
@@ -176,7 +175,6 @@ Consumer-side CI, App installs, and moving-tag pins:
   `select(.user.login | test("claude"))` both came up empty; the actual review
   comments were under `github-actions[bot]`.)
 - **Polling for the bot's verdict: match `Claude finished`, don't exclude a placeholder.** While a run is underway, the bot's comment holds an in-progress placeholder whose wording *varies between runs* ("### Review in progress …", "Claude Code is working…"), so a watcher that exits when comments exist, or when one known placeholder phrase disappears, fires early on the next differently-worded placeholder. Completed runs (review and agent alike) start the body with `**Claude finished`. **Filter on that body marker, not on an author login** --- the login itself varies by repo (see the `github-actions[bot]` variant in the bullet above), so a login-only filter can come up empty even once a review has posted.
-
   - **When re-triggering a run on a thread that already has a completed `**Claude finished` comment from an earlier run, also scope the filter to comments newer than a baseline ID captured before the trigger** --- otherwise the poll matches the *prior* run's already-finished comment immediately and never actually waits for the new one.
     **`gh api`'s own `--jq` flag has no way to inject a variable (neither `--arg` nor `--argjson`), and reaching for one fails in the shape of an empty result**: `gh` parses the unknown flag and its value as extra positionals, so `gh api <endpoint> --jq --arg h "$SHA" '<expr>'` exits 1 with an empty **stdout** and `accepts 1 arg(s), received 4` on **stderr** (measured on `gh` 2.92.0, 2026-08-13).
     Inside a `$(...)` whose stderr is not being watched --- a "reviews at the current head" query, say --- that reads as "no reviews exist" rather than as a broken command, which is why the remedy below is worth taking rather than retrying the flag.
@@ -354,7 +352,6 @@ Consumer-side CI, App installs, and moving-tag pins:
   Treat "this worked last time" as no evidence at all here.
   Prefer `gh pr view <N> --json comments`, which cannot be mis-scoped.
   (`ucdavis/bcs`, 2026-07-30: an agent driving #473 was handed #468's "Needs more work" verdict, with two HIGH findings about restricted-data handling, and was three sentences into treating them as #473's before the body's own `## Code Review: ucdavis/bcs#468` header caught it.
-
   The same query had been used for two earlier rounds and was right both times, by luck.)
 - **Finding the PR(s) linked to an issue from the CLI: use the REST timeline endpoint, not `gh issue view --json`.** `gh issue view --json` has no `timelineItems` field (that exists only on `gh pr view --json`), so `gh issue view <N> --json timelineItems` errors — and a `2>/dev/null` swallows the error so the check silently returns nothing and *looks* like it passed. Query the timeline instead, with three gotchas: (1) in a `cross-referenced` event, `source.type` is always `"issue"`, so a PR is one whose `source.issue.pull_request` is non-null (`source.type == "pull_request"` never matches); (2) `--paginate` is required, or `gh api` returns only the first 30 events and silently misses a later cross-reference; (3) filter `source.issue.state` if you only want open PRs. Full call: `gh api --paginate repos/<o>/<r>/issues/<N>/timeline --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'`. (Learned over three review rounds on #287.)
 - **Whether `#N` is an issue or a PR is decided by the `pull_request` key, and `gh issue view` cannot decide it.**
@@ -425,7 +422,6 @@ Consumer-side CI, App installs, and moving-tag pins:
   (Morrison-Lab/gha#412, 2026-08-05).
 - **Anchor a location match to its heading, not just the `Location:` line.**
   When intro text sits between a section heading (`#### 1. Critical Bug`) and its `Location:` tag, a regex keyed only on the immediate prefix of `Location:` misses the heading, and finding bodies then absorb the adjacent heading.
-
   Precompute each heading's start position preceding its location match and slice bodies from there.
   (Morrison-Lab/gha#412, 2026-08-05).
 - **Strip backticks and leading slashes from location file paths.**
@@ -439,7 +435,6 @@ Consumer-side CI, App installs, and moving-tag pins:
   (Morrison-Lab/gha#412, 2026-08-05).
 - **Require double newlines `\n\s*\n` (or a compound section phrase) when truncating summary headers.**
   Trimming a summary on single newlines (`\n+#{1,6}`) or a bare keyword (`Recommendation`) can cut an inline comment body short when a finding contains a sub-heading like `### Recommendation`.
-
   Requiring `\n\s*\n`, or matching a compound phrase (`Overall Summary`, `General Recommendations`) with a negative lookahead, keeps such sub-headings intact.
   (Morrison-Lab/gha#413, 2026-08-05).
 

@@ -49,7 +49,8 @@ air format .
 ## Testing
 
 For the full testthat API (fixtures, mocking, snapshots, BDD-style tests), see [`testing-r-packages`](../testing-r-packages/SKILL.md).
-This section's snapshot-first preference for errors and warnings is this author's own convention, not a universal rule --- when a package's existing test suite already uses `expect_error()`/`expect_warning()` directly, match that precedent instead of converting it.
+Match the package's existing `expect_error()`/`expect_warning()` or snapshot-testing style where precedent exists.
+On a fresh package with no precedent, follow testing-r-packages' preference for snapshot-based error/warning tests, per the section below.
 
 - Tests for `R/{name}.R` go in `tests/testthat/test-{name}.R`.
 - All new code should have an accompanying test.
@@ -89,4 +90,6 @@ It does not replace, and does not cover:
 - [`r-pkg-check`](../r-pkg-check/SKILL.md) --- running and triaging `devtools::check()` output.
 - [`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) --- the CRAN submission checklist (Title case, `@return` tags, `urlchecker`, win-builder, revdeps).
 - [`r-pkg-news`](../r-pkg-news/SKILL.md) --- matching a package's existing `NEWS.md` style, which overrides this skill's own default above.
-- [`testing-r-packages`](../testing-r-packages/SKILL.md) --- the full testthat API (fixtures, mocking, snapshots, BDD-style tests), which overrides this skill's own error/warning-testing preference above.
+- [`testing-r-packages`](../testing-r-packages/SKILL.md) --- the full testthat API (fixtures, mocking, snapshots, BDD-style tests).
+  Match the package's existing `expect_error()`/`expect_warning()` or snapshot-testing style where precedent exists.
+  On a fresh package with no precedent, follow testing-r-packages' preference for snapshot-based error/warning tests, which agrees with this skill's own default above.

@@ -181,7 +181,7 @@ The chunk-option form below is the general Quarto convention this repo overrides
 Tables generated from code:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics."
 
@@ -196,7 +196,7 @@ Tables generated from code:
   For portable output across all formats, print a markdown table string and set `output: asis`:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics."
 #| output: asis
@@ -227,7 +227,7 @@ tbl-cap-location: top
 ### Per Table
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: tbl-data
 #| tbl-cap: "Data."
 #| tbl-cap-location: bottom
@@ -272,7 +272,7 @@ See @tbl-panel, including @tbl-first.
 ### From Code
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: tbl-multi
 #| tbl-cap: "Multiple tables."
 #| tbl-subcap:

@@ -126,7 +126,8 @@ See @fig-process for the workflow.
 ## Sizing
 
 Use `%%| fig-width` and `%%| fig-height` cell options.
-Diagrams are responsive by default in HTML; disable with `%%| fig-responsive: false`.
+Diagrams are responsive by default in HTML.
+Disable this with `%%| fig-responsive: false`.
 
 ## Theming
 

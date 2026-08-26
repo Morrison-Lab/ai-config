@@ -374,7 +374,7 @@ params:
 Use in document:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: read-data
 
 # access params$data_file (knitr) or params["data_file"] (jupyter) etc.

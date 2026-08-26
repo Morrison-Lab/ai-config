@@ -108,7 +108,7 @@ Options use **dashes, not dots** (e.g., `fig-cap` not `fig.cap`).
 - Graphviz/DOT: `//|`
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-example
 #| echo: false
 #| fig-cap: "A scatter plot example."
@@ -148,7 +148,7 @@ Reference with `@`:
 - Equation: `eq-` prefix, e.g., `{#eq-model}` → `@eq-model`
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-plot
 #| fig-cap: "A caption for the plot."
 

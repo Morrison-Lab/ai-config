@@ -71,7 +71,7 @@ The chunk-option form below is the general Quarto convention this repo overrides
 Figures generated from code use hashpipe options:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-scatter
 #| fig-cap: "Scatter plot showing the relationship."
 #| fig-alt: "Scatter plot with positive trend."
@@ -117,7 +117,7 @@ See @fig-comparison, particularly @fig-first.
 ### From Code
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-panels
 #| fig-cap: "Panel figure."
 #| fig-subcap:
@@ -178,7 +178,7 @@ fig-cap-location: top
 ### Per Figure
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-example
 #| fig-cap: "Caption on top."
 #| fig-cap-location: top

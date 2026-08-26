@@ -435,5 +435,7 @@ When working with testthat 3 code, prefer modern patterns:
 ## Relationship to other skills
 
 This is the general testthat reference: fixtures, mocking, snapshots, BDD-style tests, and the full expectation API, including `expect_error()`/`expect_warning()`.
-[`r-package-development`](../r-package-development/SKILL.md) has a narrower, author-specific preference for snapshot-testing errors and warnings instead --- when the two disagree, match whichever style the package under edit already uses.
+[`r-package-development`](../r-package-development/SKILL.md) has a narrower, author-specific preference for snapshot-testing errors and warnings instead.
+Match the package's existing `expect_error()`/`expect_warning()` or snapshot-testing style where precedent exists.
+On a fresh package with no precedent, follow this skill's preference for snapshot-based error/warning tests.
 Neither skill covers `R CMD check` output ([`r-pkg-check`](../r-pkg-check/SKILL.md)) or CRAN submission ([`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md)).

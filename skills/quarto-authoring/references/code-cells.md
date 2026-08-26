@@ -8,7 +8,7 @@ Quarto uses a hashpipe (`#|`) syntax for code cell options, providing a clean, Y
 Code cell options are specified with `#|` at the start of lines within the code block:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-scatter
 #| echo: false
 #| fig-cap: "A scatter plot of x versus y."
@@ -44,7 +44,7 @@ Control whether and how code is executed:
 Show code but don't run it:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| eval: false
 
 # This code is displayed but not executed
@@ -54,7 +54,7 @@ Show code but don't run it:
 Run code but hide it:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| echo: false
 
 # This code runs but is not shown
@@ -64,7 +64,7 @@ Run code but hide it:
 Show fenced code block with attributes:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| echo: fenced
 
 # code here
@@ -83,7 +83,7 @@ Requirements:
   Prefer a div-wrapped caption for reliability.
 
 ````markdown
-```{<language>}
+```{{language}}
 #| output: asis
 
 # print("| Col A | Col B |\n| ----- | ----- |\n| 1     | 2     |")
@@ -109,7 +109,7 @@ Options for controlling figure output:
 ### Figure Example
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-analysis
 #| fig-cap: "Analysis results showing the relationship between variables."
 #| fig-alt: "Scatter plot with trend line showing positive correlation."
@@ -124,7 +124,7 @@ Options for controlling figure output:
 ### Multiple Figures
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: fig-panels
 #| fig-cap: "Multiple panel figure."
 #| fig-subcap:
@@ -150,7 +150,7 @@ Options for controlling table output:
 ### Table Example
 
 ````markdown
-```{<language>}
+```{{language}}
 #| label: tbl-summary
 #| tbl-cap: "Summary statistics by group."
 
@@ -234,7 +234,7 @@ format:
 Per cell override:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| code-fold: show
 
 # This code is visible by default
@@ -246,7 +246,7 @@ Per cell override:
 Add annotations to explain code:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| code-annotations: hover
 
 step_one()   # <1>
@@ -266,7 +266,7 @@ Annotation styles: `hover`, `select`, `below`, `beside`.
 Show a filename above the code block:
 
 ````markdown
-```{<language>}
+```{{language}}
 #| filename: "analysis.ext"
 
 # code here

@@ -126,12 +126,18 @@ If that status is not empty, do not dispatch: commit or stash first.
 After the child returns, recover the report from
 cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
-That transcript route discharges the hand comparison this section
-specifies.
+That transcript is the admissible source for the hand comparison
+this section specifies, not a substitute for it.
 A harness paste of the child's own assistant message may corroborate it;
 an author-composed block with those headings does not.
 Name which route produced the verdict.
 Decode the assistant `text` before blanking fences.
+`batch-fetch-details` can write a large `transcript.json`.
+If the conductor cannot read it in-window, extract the child's
+assistant `text` with a deterministic decoder, or a subagent
+that returns that text verbatim.
+A paraphrase of the headings is an author-composed block
+and does not count.
 `cloudAgentBcId` is a field on the Task JSON `tool_result`;
 `bcIds` is the tool parameter.
 How to retrieve that paste or transcript is
@@ -143,9 +149,12 @@ that is at least as long;
 do not pair open and close by count.
 If a fence never closes, treat the report as stating no verdict:
 do not push.
-Take the last matching `Verdict:` line against that blanked text
-(`Ready for merge`, `Needs more work`, or `Needs work`);
-a trailing `Approved` is not a match, so skip it.
+Take the last matching `Verdict:` line against that blanked text.
+An optional ATX heading prefix (`### Verdict:`) and optional
+`**` emphasis are allowed, as `VERDICT_LINE` in
+`hooks/no-push-without-self-review.py` allows.
+Values are `Ready for merge`, `Needs more work`, or `Needs work`.
+A trailing `Approved` is not a match, so skip it.
 Then take the first `Reviewed-Commit` after that match,
 still on the blanked text.
 The `Task` JSON `tool_result` has no review body.
@@ -176,12 +185,16 @@ This repo's Cursor adapter skips `no-push-without-self-review.py`
 (`SKIP_WITHOUT_TOOL_RESULT`) until
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
 so a failed or skipped dispatch is not caught before the push.
+[#2299](https://github.com/Morrison-Lab/ai-config/issues/2299)
+tracks a CLI wrapper over `parse_report()` for this comparison
+until that restore.
 The posted PR comment is the record, not a gate.
 If the dispatch errored or produced no report,
 obtain a review via the CLI fallback in
 [`adversarial-self-review`](../shared/workflow/adversarial-self-review.md)
 and still compare `Reviewed-Commit` by hand;
-do not prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud.
+do not prefix `ALLOW_UNREVIEWED_PUSH=1` where this repo's Cursor
+adapter skips the guard (Cloud and desktop with this project open).
 
 When the conductor is not Claude, pass a listed Claude slug on `model`
 (that 2026-08-25 PDT conductor listed `claude-opus-5-thinking-high`
@@ -229,7 +242,8 @@ is the instruction to use this route.
   After it returns, recover the report from `batch-fetch-details`
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
-  Take the last matching line-start `Verdict:`
+  Take the last matching `Verdict:` line
+  (optional `### ` prefix, as the guard's `VERDICT_LINE`)
   and the first `Reviewed-Commit` after it, both on
   fence-blanked decoded text.
   If you cannot obtain it, or a fence never closes,
@@ -244,7 +258,9 @@ is the instruction to use this route.
   Claude reviewer is reachable in this session".
 - **Don't:** omit `model` on that dispatch when Claude is
   listed and the conductor is not Claude.
-- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` on Cursor Cloud.
+- **Don't:** prefix `ALLOW_UNREVIEWED_PUSH=1` where this repo's
+  Cursor adapter skips the guard (Cloud and desktop with this
+  project open).
   If the dispatch errored or produced no report,
   obtain a CLI review and still compare by hand.
 - **Don't:** treat a matching HEAD sha as covering a dry-run

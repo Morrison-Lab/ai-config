@@ -40,10 +40,10 @@ Never brief it with your rationale for the change, per [`adversarial-self-review
 Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
 `hooks/no-push-without-self-review.py` gates this on Claude Code.
-This repo's Cursor adapter skips that script
+Morrison-Lab/ai-config's Cursor adapter skips that script
 (measured 2026-08-25 PDT;
 [`memories/cursor.md`](../../memories/cursor.md));
-compare `Reviewed-Commit` by hand there.
+compare `Reviewed-Commit` by hand in that checkout.
 On Claude Code it admits a verdict only from that subagent's own call result, only when the verdict is a verdict *line* rather than a sentence quoting one, and only when the report names the commit it read (`Reviewed-Commit: <sha>`, after the verdict) and that commit is what the push would actually ship --- refspec resolved, so `push origin some-other-branch` is not covered by a verdict for `HEAD`.
 So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
 Review after committing, therefore, not before.
@@ -55,8 +55,10 @@ Override by prefixing the push itself with `ALLOW_UNREVIEWED_PUSH=1` when no ver
 - a session where the reviewer agent is unregistered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921)) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;
 - an emergency.
 
-On Cursor Cloud the prefix is inert;
-do not use it, and compare `Reviewed-Commit` by hand instead.
+Where Morrison-Lab/ai-config's Cursor adapter skips the guard
+(Cloud and desktop with that project open),
+the prefix is inert.
+Do not use it, and compare `Reviewed-Commit` by hand instead.
 
 The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.
 

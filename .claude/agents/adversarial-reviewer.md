@@ -54,11 +54,13 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    ```
 
    Read that sha yourself rather than taking it from the brief.
-   The pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
+   On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
+   Morrison-Lab/ai-config's Cursor adapter skips that guard;
+   the parent still compares `Reviewed-Commit` by hand.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
    Write the label plainly on its own line: emphasis around it is tolerated, but the guard reads the first fingerprint AFTER your verdict, so put it last.
 
-State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
+State the verdict on its own line in that exact form --- on Claude Code the pre-push guard reads your call's result for it, and treats anything else as no verdict.
 
 You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).

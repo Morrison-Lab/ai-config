@@ -50,15 +50,16 @@ air format .
 
 For the full testthat API (fixtures, mocking, snapshots, BDD-style tests), see [`testing-r-packages`](../testing-r-packages/SKILL.md).
 Match the package's existing `expect_error()`/`expect_warning()` or snapshot-testing style where precedent exists.
-On a fresh package with no precedent, follow testing-r-packages' preference for snapshot-based error/warning tests, per the section below.
+On a fresh package with no precedent, follow testing-r-packages' preference for snapshot-based error/warning tests.
 
 - Tests for `R/{name}.R` go in `tests/testthat/test-{name}.R`.
 - All new code should have an accompanying test.
 - If there are existing tests, place new tests next to similar existing tests.
 - Strive to keep tests minimal with few comments.
 - Avoid `expect_true()` and `expect_false()` in favour of a specific expectation which will give a better failure message.
-- When testing errors and warnings, don't use `expect_error()` or `expect_warning()`.
-  Instead, use `expect_snapshot(error = TRUE)` for errors and `expect_snapshot()` for warnings because these allow the user to review the full text of the output.
+- When testing errors and warnings, match the package's existing precedent where one exists (see above).
+  On a fresh package with no precedent, use `expect_snapshot(error = TRUE)` for errors and `expect_snapshot()` for warnings, not `expect_error()` or `expect_warning()`.
+  A snapshot lets the user review the full text of the output.
 
 ## Documentation
 

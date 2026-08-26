@@ -140,13 +140,13 @@ Where no second context is reachable at all, say so in the review itself rather 
 On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
 (measured 2026-08-25 PDT on a Grok conductor).
-This repo's Cursor adapter skips `no-push-without-self-review.py`
+Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
 until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241)
 (measured 2026-08-25 PDT);
 compare `Reviewed-Commit` by hand
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Do not prefix `ALLOW_UNREVIEWED_PUSH=1` where that adapter skips
-the guard (Cloud and desktop with this project open):
+the guard (Cloud and desktop with that project open):
 the guard does not run, so the prefix is inert and misreports
 the session, including after a Task dispatch that errored.
 If that dispatch errored or produced no report,

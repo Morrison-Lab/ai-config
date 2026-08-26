@@ -18,8 +18,7 @@ allowed-tools:
 > check for a reviewer that cannot answer.
 > For a cross-vendor second opinion use
 > [`delegate-to-codex`](../delegate-to-codex/SKILL.md), the billed
-> ChatGPT-plan CLI this corpus dispatches as a cross-vendor second
-> reviewer.
+> ChatGPT-plan CLI this corpus dispatches.
 > Copilot stays requestable on the PR where the org's licensing reaches it.
 > Tracked as ai-config#1776.
 

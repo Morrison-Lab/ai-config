@@ -150,11 +150,14 @@ do not pair open and close by count.
 If a fence never closes, treat the report as stating no verdict:
 do not push.
 Take the last matching `Verdict:` line against that blanked text.
-An optional ATX heading prefix (`### Verdict:`) and optional
-`**` emphasis are allowed, as `VERDICT_LINE` in
+An optional ATX heading prefix (`### Verdict:`) is allowed.
+Optional `**` emphasis is allowed only between the colon and the
+value (`Verdict: **Ready for merge**`), as `VERDICT_LINE` in
 `hooks/no-push-without-self-review.py` allows.
+Wrapping `Verdict:` itself in `**` is not a match.
 Values are `Ready for merge`, `Needs more work`, or `Needs work`.
-A trailing `Approved` is not a match, so skip it.
+If the last `Verdict:` line is none of those, the report states
+no verdict: do not push.
 Then take the first `Reviewed-Commit` after that match,
 still on the blanked text.
 The `Task` JSON `tool_result` has no review body.
@@ -243,7 +246,8 @@ is the instruction to use this route.
   with `bcIds` and `includeTranscripts: true`
   (a harness paste of the child may corroborate; name the route).
   Take the last matching `Verdict:` line
-  (optional `### ` prefix, as the guard's `VERDICT_LINE`)
+  (optional `### ` prefix, as the guard's `VERDICT_LINE`,
+  and optional `**` only between the colon and the value)
   and the first `Reviewed-Commit` after it, both on
   fence-blanked decoded text.
   If you cannot obtain it, or a fence never closes,

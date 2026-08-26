@@ -174,8 +174,8 @@ Copilot and that CLI reviewer are not interchangeable, which is why the preferen
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
-**dispatches** as a cross-vendor second reviewer.
+`delegate-to-codex` is what this corpus
+**dispatches**.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

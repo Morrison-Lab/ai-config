@@ -297,14 +297,14 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--mode", "plan"]
+    cmd = [agy_path, "--print", prompt, "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Google Antigravity (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Antigravity review timed out after 360s.", file=sys.stderr)
         return None
@@ -332,7 +332,7 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Claude review timed out after 360s.", file=sys.stderr)
         return None
@@ -353,14 +353,14 @@ def run_cursor_review(prompt: str, model: str = "", expected_commit_sha: str = "
     if not os.path.isfile(cursor_path) and not shutil.which("agent"):
         return None
 
-    cmd = [cursor_path, "--print", "--mode", "plan", "--trust"]
+    cmd = [cursor_path, "--print", prompt, "--mode", "plan", "--trust"]
     if model:
         cmd.extend(["--model", model])
 
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Cursor Agent (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Cursor review timed out after 360s.", file=sys.stderr)
         return None
@@ -388,7 +388,7 @@ def run_codex_review(prompt: str, model: str = "", expected_commit_sha: str = ""
         cmd.extend(["-m", model])
 
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=360)
     except subprocess.TimeoutExpired:
         print("Notice: Codex review timed out after 360s.", file=sys.stderr)
         return None
@@ -467,10 +467,12 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 
 def detect_available_engines() -> List[str]:
-    """Return available local engines in preferred fallback priority: claude -> codex -> opencode -> agy."""
+    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
     engines = []
     if shutil.which("claude") or os.path.isfile(os.path.expanduser("~/.local/bin/claude")):
         engines.append("claude")
+    if shutil.which("agent") or os.path.isfile(os.path.expanduser("~/.local/bin/agent")):
+        engines.append("cursor")
     if shutil.which("codex") or os.path.isfile(os.path.expanduser("~/.local/bin/codex")):
         engines.append("codex")
     if shutil.which("opencode") or os.path.isfile(os.path.expanduser("~/.local/bin/opencode")):
@@ -480,7 +482,7 @@ def detect_available_engines() -> List[str]:
     return engines
 
 
-ENGINE_ROTATION_ORDER = ["claude", "codex", "opencode", "antigravity"]
+ENGINE_ROTATION_ORDER = ["claude", "cursor", "codex", "opencode", "antigravity"]
 
 
 def get_next_alternate_engine(available_engines: List[str]) -> str:
@@ -526,6 +528,7 @@ def record_successful_engine(engine_name: str):
 def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "", exclude_engine: str = "") -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
+        "cursor": (run_cursor_review, "Cursor Agent"),
         "claude": (run_claude_review, "Claude Code (Local)"),
         "codex": (run_codex_review, "OpenAI Codex"),
         "dtc": (run_codex_review, "OpenAI Codex"),
@@ -548,6 +551,8 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             invokers.add("claude")
         if os.environ.get("GEMINI_SESSION_ID") or os.environ.get("ANTIGRAVITY_AGENT") or "antigravity" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("antigravity")
+        if "CURSOR" in os.environ.get("AGENT_NAME", "").upper():
+            invokers.add("cursor")
         if os.environ.get("CODEX_THREAD_ID") or "codex" in os.environ.get("AGENT_NAME", "").lower():
             invokers.add("codex")
         if os.environ.get("OPENCODE_SESSION_ID") or "opencode" in os.environ.get("AGENT_NAME", "").lower():
@@ -561,6 +566,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             "dto": "opencode",
             "agy": "antigravity",
             "antigravity": "antigravity",
+            "cursor": "cursor",
             "claude": "claude",
             "claude code": "claude",
             "claude-code": "claude",
@@ -587,7 +593,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
                 recognized = True
 
         if exclude_engine and not recognized:
-            log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, antigravity). Unknown exclusions: {list(invokers)}")
+            log_error(f"Failed to identify a valid invoking engine. Provide a known --exclude-engine (e.g. claude, codex, opencode, cursor, antigravity). Unknown exclusions: {list(invokers)}")
             return None, "None"
         elif not invokers and not sys.stdout.isatty():
             log_error("Failed to identify invoking engine for alternate selection. Provide --exclude-engine or set AGENT_NAME.")
@@ -640,7 +646,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 def format_review_body(report: str, engine_name: str, commit_sha: str = "") -> str:
     """Format review report for GitHub PR posting adhering to lab disclosure policy."""
     sha_line = f"\n**Reviewed Commit**: `{commit_sha}`\n" if commit_sha else ""
-    driver_name = os.environ.get("AGENT_NAME") or "Local Pre-push Hook"
+    driver_name = os.environ.get("AGENT_NAME") or engine_name
     driver_lower = driver_name.lower()
     try:
         import importlib.util
@@ -743,12 +749,12 @@ def main():
     parser.add_argument(
         "--engine",
         choices=[
-            "auto", "alternate", "round-robin", "claude", "codex", "dtc",
+            "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
             "opencode", "dto", "opencode-claude", "opencode-zen", "ollama",
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",
@@ -800,12 +806,12 @@ def main():
     with tempfile.TemporaryDirectory() as temp_dir:
         original_cwd = os.getcwd()
         try:
-            # Provide a read-only snapshot of the repository at the feature branch tip
+            # Provide a writable snapshot of the repository at the feature branch tip
             subprocess.run(["git", "clone", "--shared", repo_root, temp_dir], check=True, capture_output=True)
             os.chdir(temp_dir)
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             # Remove branch-controlled agent configs to enforce sandbox isolation
-            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".vscode", "cursor.json", ".aider.conf.yml"], check=False)
+            subprocess.run(["rm", "-rf", ".claude", ".claude.json", ".cursor", ".gemini", ".codex", "AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".vscode", "cursor.json", ".aider.conf.yml", ".agents", "opencode.json", ".mcp.json"], check=False)
             report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
         finally:
             os.chdir(original_cwd)

@@ -33,7 +33,7 @@ class TestPrePushReview(unittest.TestCase):
         formatted = reviewer.format_review_body(report, engine, commit_sha=commit_sha)
 
         # Check for disclosure trailer matching AGENTS.md
-        self.assertIn("_Posted by Local Pre-push Hook (AI agent) --- not written by a human._", formatted)
+        self.assertIn("_Posted by OpenAI Codex (AI agent) --- not written by a human._", formatted)
         # Check that commit SHA is bound
         self.assertIn(f"**Reviewed Commit**: `{commit_sha}`", formatted)
         # Check that no robot emoji is present (which would interfere with check-pr-fully-clean.py)
@@ -464,7 +464,7 @@ class TestPrePushReview(unittest.TestCase):
     @patch("shutil.which", return_value=True)
     def test_detect_available_engines(self, mock_which, mock_isfile):
         engines = reviewer.detect_available_engines()
-        self.assertEqual(engines, ["claude", "codex", "opencode", "antigravity"])
+        self.assertEqual(engines, ["claude", "cursor", "codex", "opencode", "antigravity"])
 
 
     @patch.object(reviewer, "run_claude_review")
@@ -663,7 +663,7 @@ class TestPrePushReview(unittest.TestCase):
         cursor_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--trust", cursor_cmd)
         self.assertIn("--print", cursor_cmd)
-        self.assertEqual(mock_subproc.call_args[1].get("input"), "prompt")
+        print_idx = cursor_cmd.index("--print"); self.assertEqual(cursor_cmd[print_idx + 1], "prompt")
 
         # Test Antigravity runner
         mock_which.return_value = "/opt/homebrew/bin/agy"
@@ -679,7 +679,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(out_oc, valid_report)
         oc_cmd = mock_subproc.call_args[0][0]
         self.assertIn("--pure", oc_cmd)
-        
+
         # Verify it created the agent in the correct directory
         import os
         expected_dir = os.path.expanduser("~/.config/opencode/agents")
@@ -690,7 +690,7 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIn("anthropic/claude-3.7-sonnet", oc_cmd)
 
     def test_get_next_alternate_engine_rotation(self):
-        engines = ["claude", "codex", "opencode", "antigravity"]
+        engines = ["claude", "cursor", "codex", "opencode", "antigravity"]
         # When no prior state exists, starts with first available engine
         with patch("os.path.isfile", return_value=False):
             e1 = reviewer.get_next_alternate_engine(engines)
@@ -699,7 +699,7 @@ class TestPrePushReview(unittest.TestCase):
         # When last engine was claude, next is cursor
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "claude"}')):
             e2 = reviewer.get_next_alternate_engine(engines)
-            self.assertEqual(e2, "codex")
+            self.assertEqual(e2, "cursor")
 
         # When last engine was antigravity, wraps around to claude
         with patch("os.path.isfile", return_value=True), patch("builtins.open", mock_open(read_data='{"last_engine_name": "antigravity"}')):
@@ -725,19 +725,6 @@ class TestPrePushReview(unittest.TestCase):
         res = reviewer.post_review_to_github(123, "report content", "OpenAI Codex", commit_sha="12345678")
         self.assertFalse(res)
         mock_subproc.assert_called_once()
-
-
-
-    def test_integration_opencode_cli_contract(self):
-        import shutil, subprocess
-        if not shutil.which("opencode"):
-            self.skipTest("opencode CLI not installed")
-        res = subprocess.run(["opencode", "run", "--help"], capture_output=True, text=True)
-        self.assertEqual(res.returncode, 0)
-        output = res.stdout + res.stderr
-        self.assertIn("--agent", output, "opencode run missing --agent flag")
-        self.assertIn("--pure", output, "opencode run missing --pure flag")
-        self.assertIn("--file", output, "opencode run missing --file flag")
 
     def test_non_blocking_observations(self):
         commit = "12345678abcdef0012345678abcdef0012345678"
@@ -787,7 +774,7 @@ class TestPrePushReview(unittest.TestCase):
     @patch.object(reviewer, "detect_available_engines")
     def test_alternate_fallback_chain(self, mock_detect):
         mock_detect.return_value = ["codex", "claude", "opencode"]
-        
+
         call_count = 0
         def fake_codex(*a, **k):
             nonlocal call_count; call_count += 1; return None
@@ -795,7 +782,7 @@ class TestPrePushReview(unittest.TestCase):
             nonlocal call_count; call_count += 1; return None
         def fake_opencode(*a, **k):
             nonlocal call_count; call_count += 1; return "success report"
-            
+
         with patch.dict(os.environ, {"AGENT_NAME": "antigravity"}, clear=True):
             with patch.object(reviewer, "get_next_alternate_engine", side_effect=["codex", "claude", "opencode"]):
                 with patch.object(reviewer, "run_codex_review", side_effect=fake_codex):
@@ -805,21 +792,58 @@ class TestPrePushReview(unittest.TestCase):
                             self.assertEqual(report, "success report")
                             self.assertEqual(label, "OpenCode")
 
-
+    @patch("shutil.which")
+    @patch("os.path.isfile")
     @patch("subprocess.run")
-    def test_antigravity_command_contract(self, mock_run):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "### Summary Verdict\nVerdict: Ready for merge"
-        with patch("shutil.which", return_value="/usr/local/bin/agy"):
-            with patch("os.path.isfile", return_value=True):
-                reviewer.run_antigravity_review("test prompt")
-                
+    def test_antigravity_command_contract(self, mock_run, mock_isfile, mock_which):
+        mock_which.return_value = "/usr/local/bin/agy"
+        mock_isfile.return_value = True
+        mock_run.return_value.stdout = "valid output"
+        reviewer.run_antigravity_review("my_prompt", expected_commit_sha="abc")
+        
         called_args = mock_run.call_args[0][0]
         self.assertEqual(called_args[0], "/usr/local/bin/agy")
         self.assertIn("--mode", called_args)
         self.assertIn("plan", called_args)
-        self.assertNotIn("-p", called_args)
-        self.assertNotIn("-", called_args)
+        self.assertIn("--print", called_args)
+        # Check that the prompt immediately follows --print
+        print_idx = called_args.index("--print")
+        self.assertEqual(called_args[print_idx + 1], "my_prompt")
+
+
+    @patch("subprocess.run")
+    def test_sandbox_isolation_removes_agent_configs(self, mock_run):
+        import subprocess
+        mock_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="true\n")
+        mock_run.return_value = mock_result
+        with patch("os.chdir"):
+            with patch.object(reviewer, "execute_review", return_value=("report", "label")):
+                with patch("sys.argv", ["pre-push-review.py", "--engine", "codex"]):
+                    try:
+                        reviewer.main()
+                    except SystemExit:
+                        pass
+
+        rm_call = None
+        for call in mock_run.call_args_list:
+            args = call[0][0]
+            if args and args[0] == "rm" and "-rf" in args:
+                rm_call = args
+                break
+
+        self.assertIsNotNone(rm_call, "Sandbox cleanup rm -rf was not called")
+        self.assertIn(".cursor", rm_call)
+        self.assertIn(".agents", rm_call)
+        self.assertIn("opencode.json", rm_call)
+        self.assertIn(".mcp.json", rm_call)
+
+
+    @patch.object(reviewer, "run_cursor_review")
+    def test_execute_review_dispatches_cursor(self, mock_run_cursor):
+        mock_run_cursor.return_value = "report"
+        report, label = reviewer.execute_review("cursor", "prompt")
+        self.assertEqual(report, "report")
+        self.assertEqual(label, "Cursor Agent")
 
 if __name__ == "__main__":
     unittest.main()

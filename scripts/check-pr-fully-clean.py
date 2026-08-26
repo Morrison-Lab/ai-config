@@ -961,14 +961,16 @@ def check_latest_verdict(
         verdict = classify_verdict(body, state)
         identity = _reviewer_identity(body, author)
         finding_pat = _unresolved_finding_pattern(body)
-        if verdict == "unreadable":
-            agent = _detect_review_agent(body) or "unknown"
-            unreadable_items.append((when, agent))
-        elif verdict == "not-clean" or finding_pat:
+        # Findings win over unreadable: a known-agent body with ## Nits and no
+        # classifiable verdict line is a standing not-clean, not a NOTE.
+        if verdict == "not-clean" or finding_pat:
             n_with_verdict += 1
             latest_verdict, latest_when = "not-clean", when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = ("not-clean", when, author)
+        elif verdict == "unreadable":
+            agent = _detect_review_agent(body) or "unknown"
+            unreadable_items.append((when, agent))
         elif verdict:
             n_with_verdict += 1
             latest_verdict, latest_when = verdict, when

@@ -1576,6 +1576,27 @@ def main() -> int:
             (not nc_ok) and any("Claude" in i for i in nc_issues),
         )
 
+    claude_nits_no_verdict = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Nits\n\n1. Rename the helper.\n\n"
+            "(reviewed at `oldsha00`)"
+        ),
+    }
+    mock_unread_nits = json.dumps({
+        "comments": [claude_nits_no_verdict, agy_clean_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_unread_nits):
+        un_ok, un_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: earlier Claude ## Nits without a verdict "
+            "line is not cleared by a later Antigravity all-clear (#2274)",
+            (not un_ok) and any("Claude" in i for i in un_issues),
+        )
+
     # Ordering, not payload order: the chronology must come from the timestamps,
     # so a clean verdict listed first but dated EARLIER still loses to a later
     # not-clean one.

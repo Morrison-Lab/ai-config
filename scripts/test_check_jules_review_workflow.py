@@ -157,6 +157,17 @@ COMMENTED_PROSE = tweak(
     COMMENTED_PROSE,
 )
 
+# Phrase after the extra_instructions block must not count.
+TRAILING_PROSE = tweak(
+    "imperative prose addressed",
+    "review rules addressed",
+)
+TRAILING_PROSE = tweak(
+    "        run: echo could-not-start\n",
+    "        run: echo could-not-start\n      # corpus imperative prose is content\n",
+    TRAILING_PROSE,
+)
+
 MISSING_SETUP_NODE = tweak(
     "      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n"
     '        with:\n          node-version: "24"\n',
@@ -291,6 +302,12 @@ case_exits("missing extra_instructions prose", MISSING_PROSE, 1, "prose is conte
 case_exits(
     "imperative prose only in a header comment",
     COMMENTED_PROSE,
+    1,
+    "prose is content",
+)
+case_exits(
+    "imperative prose only after extra_instructions",
+    TRAILING_PROSE,
     1,
     "prose is content",
 )

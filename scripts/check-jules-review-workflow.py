@@ -60,9 +60,25 @@ PREFLIGHT_OUTCOME_RE = re.compile(
 
 
 def extra_instructions_block(text: str) -> str:
-    """Trusted extra_instructions body, not header comments that mention the phrase."""
-    match = re.search(r"INPUT_EXTRA_INSTRUCTIONS:\s*\|(.*)", text, re.DOTALL)
-    return match.group(1) if match else ""
+    """The YAML block scalar under INPUT_EXTRA_INSTRUCTIONS, not the rest of the file."""
+    match = re.search(
+        r"^([ \t]*)INPUT_EXTRA_INSTRUCTIONS:\s*\|\n",
+        text,
+        re.MULTILINE,
+    )
+    if not match:
+        return ""
+    indent = match.group(1)
+    lines: list[str] = []
+    for line in text[match.end() :].splitlines(keepends=True):
+        if line.strip() == "":
+            lines.append(line)
+            continue
+        if line.startswith(indent) and line[len(indent) : len(indent) + 1] in " \t":
+            lines.append(line)
+            continue
+        break
+    return "".join(lines)
 
 
 def pre_jobs(text: str) -> str:

@@ -135,7 +135,9 @@ jobs:
       # `dist/index.js` directly.
       - name: Fetch Jules PR Reviewer at the pinned SHA
         id: fetch-action
-        if: steps.payload.outputs.same-repo == 'true'
+        if: >-
+          success() &&
+          steps.payload.outputs.same-repo == 'true'
         env:
           JULES_PR_REVIEWER_SHA: fc66a7c78b499bfa2e16235b55574e458c6551d6
         run: |
@@ -156,18 +158,22 @@ jobs:
       # interpreter. Pin 24 so the wrap matches what `uses:` actually ran.
       - name: Pin Node 24 to match what GitHub runs for this action
         id: setup-node
-        if: steps.payload.outputs.same-repo == 'true'
+        if: >-
+          success() &&
+          steps.payload.outputs.same-repo == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
 
       # Assertions that must fail before `node dist/index.js` starts. Kept
       # off the `jules` step so their outcome is addressable by the
-      # could-not-start notifier. Once the process starts, the action posts
-      # its own failure comment on some paths; these checks never get that far.
+      # could-not-start notifier. `jules` and this step require `success()`,
+      # so a failed pin or preflight does not still spawn `node`.
       - name: Confirm the wrap inputs exist
         id: preflight
-        if: steps.payload.outputs.same-repo == 'true'
+        if: >-
+          success() &&
+          steps.payload.outputs.same-repo == 'true'
         env:
           SYNTHETIC_EVENT_PATH: ${{ runner.temp }}/pull_request_event.json
           JULES_ACTION_DIR: ${{ runner.temp }}/jules-pr-reviewer
@@ -178,7 +184,9 @@ jobs:
 
       - name: Run Jules PR Reviewer
         id: jules
-        if: steps.payload.outputs.same-repo == 'true'
+        if: >-
+          success() &&
+          steps.payload.outputs.same-repo == 'true'
         env:
           # action.yml defaults are applied only by a `uses:` step. Set every
           # input the JS reads, including the ones we would otherwise inherit.

@@ -156,23 +156,40 @@ Run UMS first if it is owed, per [`run-ums-proactively`](run-ums-proactively.md)
 Never ask for more tasks.
 Never say "what would you like me to do next?"
 When a session has grown long and hits a natural stopping point,
-run the `wrap-up` skill to sweep for pending work.
-After executing `wrap-up`,
-use the live state you observed and the criteria in this file to determine if a session-management recommendation applies.
-Since this file's criteria supersede `wrap-up`'s default assessment (e.g., allowing a `/clear` when open work belongs to another session),
-adjust `wrap-up`'s stopping point declaration to clean if the criteria here permit it.
+run `wrap-up`'s state sweep to gather the live state,
+per this file's own "Run `wrap-up`'s state sweep" instruction above,
+rather than invoking the full `wrap-up` skill.
+The full skill's own UMS step is not owed at every task boundary:
+per [`run-ums-proactively`](run-ums-proactively.md),
+a learning gets recorded the moment it surfaces,
+so the pass should already be current by the time one task ends.
+Use the live state the sweep surfaced,
+together with the criteria in this file,
+to decide whether a session-management recommendation applies.
+This file's criteria decide the declaration,
+not `wrap-up`'s own default assessment
+--- e.g. this file permits a `/clear` recommendation
+when the only open work belongs to another session,
+a case `wrap-up`'s closing checklist does not carve out on its own.
 If a recommendation applies,
-prefix your recommendation with the `⚠️ **FLAG** ---` tag and present it.
+prefix it with the `⚠️ **FLAG** ---` tag and present it.
 Regardless of whether a recommendation applies,
-output `wrap-up`'s full report.
-For a clean stopping point, ensure the (possibly adjusted) stopping point declaration remains the final thing in your response (subject to the CI exception above).
-For a non-clean stopping point, ensure the open questions and pending tasks are placed after the stopping point declaration,
-so they remain the final and most visible element in your response,
-per `wrap-up`'s visibility rule.
+report what the sweep found:
+every open PR and issue, linked,
+any uncommitted changes,
+and any leftover branches or worktrees.
+For a clean stopping point,
+end the reply with the stopping-point declaration (subject to the CI exception above).
+For a non-clean stopping point,
+place the open questions and pending tasks after the declaration,
+so they remain the final and most visible element of the reply,
+per `wrap-up`'s instruction to end the reply with the open questions,
+last and clearly visible.
 
-- **Do:** run `wrap-up` when a session hits a natural stopping point.
+- **Do:** run `wrap-up`'s state sweep when a session hits a natural stopping point.
 - **Do:** prefix any recommendation with the flag, instead of offering to take on more tasks.
 - **Don't:** ask "what next?" when you just finished a task.
+- **Don't:** trust `wrap-up`'s raw stopping-point declaration when the only open item belongs to another session --- this file's criteria decide the declaration.
 
 ## Flag good moments to run `compress-session`, too
 

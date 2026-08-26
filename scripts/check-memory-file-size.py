@@ -30,6 +30,17 @@ calls `oversized_files("memories", DEFAULT_MAX_LINES)` on the live tree and
 exits 1 on any finding -- so a `validate` run goes red at "Run
 memory-file-size check tests", never at the step that runs this file. A PR
 that appends past 1200 lines cannot merge; it has to split first.
+A file already AT the cap cannot take a net-positive append either.
+Recover lines (re-wrap or drop) or split, rather than adding lines.
+A fold has two shapes and neither escapes every gate: putting the new
+sentence on its own source line trips this size test, while densifying
+an existing line leaves the line count flat but makes that line a
+changed line the new-line-breaks gate can flag.
+Measured 2026-08-25 on memories/preferences.md in ai-config#2262:
+origin/main was exactly 1200 lines. A +5-line append failed
+scripts/test_check_memory_file_size.py; a same-day rewrite that folded
+the additions into three existing lines passed this test and had to
+satisfy new-line-breaks instead.
 
 The two statements are consistent and read as contradictory, which is why
 they are stated together: the advisory exit keeps THIS check from blocking an

@@ -494,7 +494,7 @@ direction --- it enumerates the hooks and flags any that lack a test --- so a
 Each suite has a 600-second deadline
 (override with `HOOK_TEST_SUITE_TIMEOUT`);
 a hung suite reports FAIL rather than stalling the sweep.
-It gates `validate` and pre-commit.
+The runner gates `validate` and pre-commit.
 One hook is untested today
 (`inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in

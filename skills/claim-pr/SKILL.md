@@ -35,8 +35,9 @@ Those don't risk a parallel session.
 A persistent watch after a review has landed is not a standing claim;
 re-claim only when a new review round starts.
 Do not claim every open PR at the start of a sweep --- claim the one
-whose review is starting, unclaim when that review lands, then claim the
-next.
+whose review is starting, unclaim a **review-only** pass when that
+review lands, then claim the next.
+A write/ARDI sweep keeps its write claim until that work ends.
 
 ## Claim (start of session)
 
@@ -56,8 +57,6 @@ gh issue comment <N> --body "Claude Code CLI (local session) is working on this 
 
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
-
-### Posted-review claim
 
 A review-only session uses the same `hold off` invariant so existing
 detectors still match, and names the review so authors know when they
@@ -170,6 +169,10 @@ glab api --method PUT \
   -f "resolved=true"
 ```
 
+A review-only unclaim on GitLab is this same resolve step.
+Do not post a second note.
+An unresolved `hold off` discussion stays a live claim.
+
 ### GitHub — post a closing comment
 
 ```bash
@@ -181,13 +184,11 @@ gh issue comment <N> --body "Done with my local session — unclaiming.
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
 
-After a **review-only** posted review, unclaim that pass as soon as the
-SHA-stamped review comment lands (the author needs the thread free to
-address findings).
-On GitHub, post a closing comment whose body includes `unclaiming` so
-claim detectors treat it as a release.
-On GitLab, **resolve** the review-claim discussion --- do not post a
-second note, which would leave the unresolved `hold off` discussion live.
+After a **review-only** posted review on GitHub, unclaim that pass as soon
+as the SHA-stamped review comment lands (the author needs the thread
+free to address findings).
+The closing comment's body must include `unclaiming` so claim detectors
+treat it as a release.
 
 ```bash
 gh pr comment <N> --body "Review posted --- unclaiming.

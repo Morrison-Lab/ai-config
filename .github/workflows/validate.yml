@@ -5,7 +5,6 @@ on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
   issues: read
-  pull-requests: read
 
 jobs:
   validate:
@@ -148,10 +147,12 @@ jobs:
         # README row for an unregistered hook: an inert guard and a guard with
         # nothing to block look identical, since neither ever produces output.
         # GITHUB_TOKEN is mapped so the closed-tracker fetch (ai-config#2302)
-        # is authenticated; contents:read alone 403s on /issues, which would
-        # force the documented SKIP path on every CI run and make the new
-        # gate vacuous. issues: read / pull-requests: read cover both an
-        # issue tracker and a registration PR (KNOWN_UNREGISTERED values).
+        # is authenticated on this repo. contents:read alone is not Issues
+        # read, so /issues can 403 and force the documented SKIP path on
+        # every CI run. issues: read covers GET /repos/.../issues/{n},
+        # including a registration PR number (every pull request is an
+        # issue). Do not send a fork GITHUB_TOKEN to that host --- the
+        # script drops the token when GITHUB_REPOSITORY is not this repo.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/check-hook-catalog.py

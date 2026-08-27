@@ -5,6 +5,29 @@ import os
 import re
 import traceback
 
+def _int_env(name, default):
+    """Read an integer config value from the environment, falling back to
+    `default` (with a stderr diagnostic) on a missing or malformed value ---
+    never crashing on a bad override."""
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        print(f"claude-hook-adapter: invalid {name}={val!r}, using default {default}", file=sys.stderr)
+        return default
+
+# invoke_subagent fanout cap: the maximum number of subagents accepted in a
+# single Subagents list before the tool call is denied outright.
+SUBAGENT_FANOUT_CAP = _int_env("AGY_ADAPTER_FANOUT_CAP", 50)
+# PreInvocation context-injection caps: per-message byte cap, cumulative
+# byte cap across all injected messages, and the maximum number of
+# injectSteps entries emitted.
+PRE_INVOCATION_MSG_BYTE_CAP = _int_env("AGY_ADAPTER_MSG_BYTE_CAP", 10000)
+PRE_INVOCATION_TOTAL_BYTE_CAP = _int_env("AGY_ADAPTER_TOTAL_BYTE_CAP", 30000)
+PRE_INVOCATION_MSG_CAP = _int_env("AGY_ADAPTER_MSG_CAP", 20)
+
 def run_hook_command(cmd, claude_payload, cwd, timeout_val):
     # A timeout or a launch exception returns None, and every caller below
     # treats that the same way native Claude Code treats a PreToolUse hook
@@ -38,15 +61,19 @@ def run_hook_command(cmd, claude_payload, cwd, timeout_val):
         return None
 
 def matches_tool(matcher_pattern, tool_name):
+    # An absent or empty matcher means "match every tool call", per Claude
+    # Code's documented PreToolUse matcher semantics: a hook group with no
+    # matcher applies to all tools, the same as an explicit "*".
     if not matcher_pattern:
-        return False
+        return True
     if matcher_pattern == "*":
         return True
     if matcher_pattern == tool_name:
         return True
     try:
         return bool(re.fullmatch(matcher_pattern, tool_name))
-    except re.error:
+    except re.error as exc:
+        print(f"claude-hook-adapter: invalid matcher pattern {matcher_pattern!r}: {exc}", file=sys.stderr)
         return False
 
 def parse_timeout(val):
@@ -130,7 +157,14 @@ def main():
         tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args") or {}
-        tool_cwd = args.get("Cwd") or repo_root
+        # The hook subprocess's cwd must be the caller's real working
+        # directory (falling back to this process's own cwd), never
+        # repo_root: repo_root here is ai-config's own checkout location,
+        # used below only to locate hooks.json/scripts. A guard hook (e.g.
+        # hooks/no-clobbering-push.py) inherits this cwd to evaluate the
+        # user's project's own git state, so pointing it at ai-config's
+        # checkout instead makes it evaluate the wrong repository.
+        tool_cwd = args.get("Cwd") or os.getcwd()
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         tasks_to_run = []
@@ -147,7 +181,13 @@ def main():
                     tasks_to_run.append((extract_hook_list(group), bash_payload, tool_cwd, "run_command"))
 
         elif tool_name == "invoke_subagent":
+            # Dual-case lookup, like every other args.get(...) or
+            # args.get(...) fallback in this file -- an explicit None check
+            # rather than `or`, since a present-but-falsy value (e.g. an
+            # empty list) must not be treated as absent.
             raw_subagents = args.get("Subagents")
+            if raw_subagents is None:
+                raw_subagents = args.get("subagents")
             if raw_subagents is None:
                 reason = "invoke_subagent missing required 'Subagents' argument"
                 print(json.dumps({"decision": "deny", "reason": reason}))
@@ -167,8 +207,8 @@ def main():
                 print(json.dumps({"decision": "deny", "reason": reason}))
                 return
             subagents = raw_subagents or []
-            if len(subagents) > 50:
-                reason = f"invoke_subagent exceeded maximum supported fanout limit of 50 subagents (received {len(subagents)})"
+            if len(subagents) > SUBAGENT_FANOUT_CAP:
+                reason = f"invoke_subagent exceeded maximum supported fanout limit of {SUBAGENT_FANOUT_CAP} subagents (received {len(subagents)})"
                 print(json.dumps({"decision": "deny", "reason": reason}))
                 return
             for idx, sub in enumerate(subagents):
@@ -189,7 +229,7 @@ def main():
                     agent_payload["transcript_path"] = transcript_path
                 for group in pre_tool_groups:
                     if matches_tool(group.get("matcher", ""), "Agent"):
-                        tasks_to_run.append((extract_hook_list(group), agent_payload, repo_root, f"invoke_subagent ({agent_name})"))
+                        tasks_to_run.append((extract_hook_list(group), agent_payload, tool_cwd, f"invoke_subagent ({agent_name})"))
 
         elif tool_name == "send_message":
             send_payload = {
@@ -203,7 +243,7 @@ def main():
                 send_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "SendMessage"):
-                    tasks_to_run.append((extract_hook_list(group), send_payload, repo_root, "send_message"))
+                    tasks_to_run.append((extract_hook_list(group), send_payload, tool_cwd, "send_message"))
 
         elif tool_name == "define_subagent":
             task_payload = {
@@ -218,7 +258,7 @@ def main():
                 task_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Task"):
-                    tasks_to_run.append((extract_hook_list(group), task_payload, repo_root, "define_subagent"))
+                    tasks_to_run.append((extract_hook_list(group), task_payload, tool_cwd, "define_subagent"))
 
         else:
             generic_payload = {
@@ -229,7 +269,7 @@ def main():
                 generic_payload["transcript_path"] = transcript_path
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), tool_name):
-                    tasks_to_run.append((extract_hook_list(group), generic_payload, repo_root, tool_name))
+                    tasks_to_run.append((extract_hook_list(group), generic_payload, tool_cwd, tool_name))
 
         # Execute PreToolUse hooks; if ANY hook denies, block tool execution immediately
         system_messages = []
@@ -294,7 +334,7 @@ def main():
             if timeout_val is None:
                 timeout_val = 30.0
 
-            result = run_hook_command(cmd, stop_payload, repo_root, timeout_val)
+            result = run_hook_command(cmd, stop_payload, os.getcwd(), timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 try:
                     hook_out = json.loads(result.stdout)
@@ -303,7 +343,14 @@ def main():
                         reason = hook_out.get("reason", "Blocked by Stop hook")
                         print(json.dumps({"decision": "continue", "reason": reason}))
                         return
-                    msg = hook_out.get("systemMessage") or hook_out.get("additionalContext")
+                    # Claude Code's documented hook-output shape nests
+                    # additionalContext under hookSpecificOutput (as the
+                    # PreToolUse branch above reads it); accept both the
+                    # top-level and nested forms, preferring whichever is
+                    # present.
+                    hso = hook_out.get("hookSpecificOutput") or {}
+                    nested_context = hso.get("additionalContext") if isinstance(hso, dict) else None
+                    msg = hook_out.get("systemMessage") or hook_out.get("additionalContext") or nested_context
                     if msg:
                         warn_messages.append(str(msg))
                 except Exception as exc:
@@ -356,7 +403,7 @@ def main():
         total_injected_bytes = 0
         hooks_to_run = extract_hook_list(ups_groups)
         for hook in hooks_to_run:
-            if len(injected_messages) >= 20:
+            if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
                 break
             cmd = hook.get("command") or hook.get("script")
             if not cmd:
@@ -366,33 +413,41 @@ def main():
             if timeout_val is None:
                 timeout_val = 30.0
             
-            result = run_hook_command(cmd, ups_payload, repo_root, timeout_val)
+            result = run_hook_command(cmd, ups_payload, os.getcwd(), timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
                 if text_out:
                     try:
                         parsed = json.loads(text_out)
                         if isinstance(parsed, dict):
-                            text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or ""
+                            # Also read the nested hookSpecificOutput form
+                            # (Claude Code's documented shape, per the
+                            # PreToolUse branch above), preferring whichever
+                            # is present.
+                            hso = parsed.get("hookSpecificOutput") or {}
+                            nested_context = hso.get("additionalContext") if isinstance(hso, dict) else None
+                            text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or nested_context or ""
                     except Exception:
                         pass
                     if text_out:
-                        # Cap single injected message at 10KB (in UTF-8 bytes) and total cumulative bytes at 30KB
-                        raw_bytes = text_out.encode("utf-8")[:10000]
+                        # Cap single injected message at PRE_INVOCATION_MSG_BYTE_CAP
+                        # (UTF-8 bytes) and cumulative bytes at
+                        # PRE_INVOCATION_TOTAL_BYTE_CAP.
+                        raw_bytes = text_out.encode("utf-8")[:PRE_INVOCATION_MSG_BYTE_CAP]
                         chunk = raw_bytes.decode("utf-8", errors="ignore")
                         chunk_bytes = len(chunk.encode("utf-8"))
-                        if total_injected_bytes + chunk_bytes <= 30000:
+                        if total_injected_bytes + chunk_bytes <= PRE_INVOCATION_TOTAL_BYTE_CAP:
                             injected_messages.append(chunk)
                             total_injected_bytes += chunk_bytes
-                        elif total_injected_bytes < 30000:
-                            remaining_bytes = 30000 - total_injected_bytes
+                        elif total_injected_bytes < PRE_INVOCATION_TOTAL_BYTE_CAP:
+                            remaining_bytes = PRE_INVOCATION_TOTAL_BYTE_CAP - total_injected_bytes
                             encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
                             trimmed_chunk = encoded_trimmed.decode("utf-8", errors="ignore")
                             injected_messages.append(trimmed_chunk)
                             total_injected_bytes += len(trimmed_chunk.encode("utf-8"))
 
         if injected_messages:
-            steps = [{"ephemeralMessage": msg} for msg in injected_messages[:20]]
+            steps = [{"ephemeralMessage": msg} for msg in injected_messages[:PRE_INVOCATION_MSG_CAP]]
             print(json.dumps({"injectSteps": steps}))
         else:
             print(json.dumps({"injectSteps": []}))

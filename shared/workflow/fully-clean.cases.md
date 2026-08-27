@@ -1128,59 +1128,73 @@ zero pending **and** an unchanged total across two consecutive polls.
 Printing the total each tick is what made the growth visible; a loop that
 reports only its exit condition cannot show it.
 
-
 ## Required-checks arithmetic reported three PRs ready over a red review check
 
 (`ucdavis/bcs` #745/#746/#748, 2026-08-27.)
 
-The repository's review job was failing on every PR at once, on a credential
-fault rather than on anything in any diff.
-Every other check passed, and the failing one was **not** in the branch
-ruleset's `required_status_checks` list --- which was read off the API rather
-than assumed:
+The repository's review job was failing on every open PR at once, on a
+credential fault rather than on anything in any diff.
+Every other check passed, and the failing one was absent from the branch
+ruleset's `required_status_checks`, read off the API rather than assumed:
 
 ```
 ["docs-check","version-check / version-check","docs",
  "ubuntu-latest (release)","macos-latest (release)","windows-latest (release)"]
 ```
 
-From that list plus a green `statusCheckRollup` for each required entry, three
-PRs were reported "ready to merge".
-Rule 1 of [`fully-clean.md`](fully-clean.md) already says otherwise in as many
-words --- "not just the required checks" --- so nothing new had to be learned
-for this to have been avoided.
+From that list plus a green rollup for each required entry, three PRs were
+reported ready to merge.
+Rule 1 of [`fully-clean.md`](fully-clean.md) already says "not just the
+required checks", so nothing new had to be learned for this to have been
+avoided.
 
-What the arithmetic actually establishes is that **branch protection would let
-the merge through**, which is a claim about the forge's gate rather than about
-the PR.
-The two questions differ, and the requiredness list is a live, quotable
-artifact, so deriving the wrong answer from it feels like measurement.
-That is what makes this failure mode distinct from a lazy "looks green to me":
-it comes with evidence attached.
+What the arithmetic establishes is that **branch protection would permit the
+merge**, which is a fact about the forge's gate rather than about the PR.
+The requiredness list is a live, quotable API artifact, so deriving the wrong
+answer from it arrives with evidence attached --- which is what separates this
+from an eyeballed "looks green".
+[`memories/gh-cli.md`](../../memories/gh-cli.md) records the inverse error on
+the same repository, a red check wrongly *dismissed* as non-required; the two
+are the same conflation run in opposite directions.
 
-`scripts/check-pr-fully-clean.py` settles it, and did, exiting 1 on all three
-with two findings each:
+`scripts/check-pr-fully-clean.py` settles it, exiting 1 on all three.
+
+**The second finding then changed wording as the PR state changed, and the
+change is the instructive part.**
+Before any fallback review existed the script reported:
 
 ```
-- Check run 'ai-review / select-and-review' completed with conclusion 'failure'
-- No review comment has been posted evaluating HEAD SHA <sha> yet
+- No review comment has been posted evaluating HEAD SHA a72741ec yet
 ```
 
-Note the second finding, which no amount of check-state reading reaches.
-A self-review fallback had been posted on each PR, carrying
-`**Claude finished`, `Reviewed commit: <sha>`, and a `### Verdict` heading ---
-and it did not satisfy the scan, because it was posted under the **user's own
-login** while the verdict scan examines automated review items.
-That is correct behaviour rather than a gap in the checker: a fallback the
-author writes cannot stand in for the independent review the bar names.
-It does mean a reviewer outage leaves the second finding open until the
-reviewer itself runs again, and no amount of local work closes it.
+After a self-review was posted on each PR it became a different branch:
 
-- **Do:** run the instrument before any terminal clean claim, and report
-  progress counts ("required checks green, instrument still reports 2
-  findings") while it exits non-zero.
-- **Don't:** derive readiness from the ruleset's required-check list --- that
-  answers whether the forge would permit the merge, not whether the PR is
-  clean.
-- **Don't:** expect a self-review posted under your own login to close the
-  verdict half; it is not an automated review item and is not meant to be.
+```
+  verdict scan: examined 2 dated automated review item(s), 0 bore a verdict
+  - NOTE: Review from Claude (2026-08-27T09:15:56Z) has a format the verdict
+    classifier cannot read -- not treated as 'no review'
+- No valid clean review found for HEAD SHA a72741ec.
+```
+
+The tempting reading of that second state is that a self-review posted under
+the author's **own login** was filtered out as not an automated review.
+That is wrong, and checking rather than assuming is what shows it: the
+comment was admitted as a Claude item and was quorum-eligible, because the
+admission test resolves a reviewer identity for an `OWNER` comment carrying
+the agent's own marker.
+
+It failed on **format**.
+`classify_verdict()` reads `### Verdict: Clean` on one line, and returns
+nothing for a `### Verdict` heading followed by `Clean.` on the next --- the
+form all six of that sweep's fallback reviews used.
+So the reviewer outage was real, and on top of it every fallback verdict
+written to stand in for the bot was unreadable to the instrument that checks
+for one, with the note above as the only sign.
+
+Two things follow.
+A fallback self-review has to be written in the form the classifier parses,
+or it silently does not count.
+And a `NOTE:` line about an unreadable review is a finding about *your own*
+review, not a remark about somebody else's --- it names the one artifact a
+fallback cannot afford to get wrong.
+

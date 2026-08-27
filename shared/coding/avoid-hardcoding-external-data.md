@@ -46,35 +46,42 @@ Refreshing the parenthetical to 17 entries would have been wrong again
 within weeks, so it became "every fragment under `shared/coding/`, indexed
 by the principle it serves in the catalog above".)
 
-**A softened count is still a pinned count, and hedging one reads as
-compliance.**
-The rule above says to replace a drifted list with a pointer.
-The near-miss is to replace it with a vaguer version of itself --- "roughly
-90K tokens across the ~60 files in it" in place of an exact figure --- which
-acknowledges the imprecision and changes nothing about the mechanism.
-Any number written down is a pinned number: the tree can shrink past
-"90K+" as easily as it grew past an exact one, and the hedged form is
-harder to notice afterwards precisely because it looks careful.
+**A softened count is still a pinned count.**
+The paragraph above says a refreshed list only resets the clock.
+The move it does not rule out is replacing the figure with a vaguer version
+of itself --- "on the order of 90K+ tokens across the ~60 files in it" in
+place of an exact count.
+Hedging acknowledges the imprecision and changes nothing about the mechanism,
+so the substitution reads as careful while drifting on the same schedule:
+a tree can shrink past "90K+" as easily as it grew past an exact figure.
 
-The tell is that the sentence has to describe its own restraint.
-A form that needs a clause like "a count this sentence deliberately does not
-pin" is one that pinned a count, or it would have nothing to disclaim.
-The pointer form needs no such clause, because it names the query instead of
-an answer.
+The tell is that such a sentence has to describe its own restraint.
+A form needing a clause like "a count this sentence deliberately does not
+pin" pinned one, or it would have nothing to disclaim.
+The pointer form needs no such clause, because it names the query rather
+than an answer.
 
-- **Do:** replace the figure with the command or query that derives it, so
-  the reader gets today's answer rather than the day-of-writing answer.
-- **Don't:** hedge the figure and keep it --- an approximation drifts on the
-  same schedule the exact value did.
+This is the *sourced* case, and only that case: it applies to a figure some
+command enumerates, which is what makes a pointer possible.
+A count of the items in the block directly beneath it has no source to point
+at, and the section below on a count in the prose above a block prescribes
+dropping or re-deriving it instead.
 
-(Measured on `ucdavis/bcs`#750, 2026-08-27: a fix for a drifted
-"~74-92K tokens across 59 files" was first drafted as
-"on the order of 90K+ tokens across the ~60 files in it, a count the
-filesystem enumerates and this sentence deliberately does not pin", in a
-commit that cited this fragment as its justification.
-An adversarial review rejected it on the grounds above, and it shipped as
-"count it with `find .ai-config/shared -name '*.md' | wc -l` rather than
-trusting a number written here".)
+- **Do:** replace a figure the filesystem or an API enumerates with the
+  command that derives it.
+- **Don't:** hedge such a figure and keep it --- an approximation drifts on
+  the same schedule the exact value did.
+
+(Measured on `ucdavis/bcs`, 2026-08-27.
+A fix for a drifted "~74-92K tokens across 59 files" was first drafted as a
+hedge, in a commit citing this fragment as its justification, and an
+adversarial review rejected it before it was pushed.
+Note what the shipped text does and does not do: the *file* count became
+`find .ai-config/shared -name '*.md' | wc -l`, and the *token* figure was
+dropped rather than derived, no command being available for it.
+Dropping is the honest outcome when nothing enumerates the quantity ---
+the failure is keeping a number, hedged, that neither a command nor the
+argument needs.)
 
 This is conditioned on the external source being **reliably available** ---
 don't add a network fetch or a fragile dependency where a static value would

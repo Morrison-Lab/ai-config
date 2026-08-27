@@ -28,9 +28,9 @@ without asking confirmation before every merge.
   "merge when confident", "merge at will", or "maw",
   that baseline prohibition is suspended for the current session only.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
-  (all CI checks passing, automated Claude review verdict clean, no unresolved comments, no open block labels).
-  It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped Claude review.
-  A clean automated Claude review evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
+  (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
+  It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.
+  A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
   **A disagreement among reviews is unresolved findings.**
   If one review is all-clear and another raises blocking issues, nits, or any

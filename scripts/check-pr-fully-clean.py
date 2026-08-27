@@ -195,17 +195,12 @@ def resolve_repo(explicit: str = "") -> str:
     return repo
 
 
-def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json",
-                   "headRefOid,headRefName,state,commits,reviewDecision"])
-    data = json.loads(out)
-    head_sha = data["headRefOid"]
-    commits = data.get("commits", [])
-    commit_date = ""
-    if commits:
-        commit_date = commits[-1].get("committedDate", "")
-    review_decision = data.get("reviewDecision") or ""
-    return head_sha, data["headRefName"], data["state"], commit_date, review_decision
+def get_pr_info(pr_num: str, repo: str):
+    if str(Path(__file__).resolve().parent.parent) not in sys.path:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from scripts.lib.pull_request import PullRequest
+    pr = PullRequest(pr_num, repo, fetcher=run_cmd)
+    return pr
 
 
 def _is_bot_author(login: Optional[str]) -> bool:
@@ -214,7 +209,7 @@ def _is_bot_author(login: Optional[str]) -> bool:
     if not login_str:
         return False
     return (
-        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude", "cursor")
         or login_str.endswith("[bot]")
     )
 
@@ -226,6 +221,8 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "**claude finished": "Claude",
     "### \U0001f916 antigravity agent report": "Antigravity",
     "verdict: block": "Jules",
+    "_posted by codex (ai agent)": "Codex",
+    "_posted by opencode (ai agent)": "OpenCode",
 }
 
 # Logins that are one reviewer, never shared. Claude and Antigravity both post
@@ -234,6 +231,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
 EXCLUSIVE_BOT_IDENTITY: Dict[str, str] = {
     "jules": "Jules",
     "jules[bot]": "Jules",
+    "cursor": "Cursor",
 }
 
 
@@ -282,6 +280,8 @@ REVIEW_BODY_MARKERS = (
     "code review",
     "**claude finished",
     "### verdict",
+    "_posted by codex (ai agent)",
+    "_posted by opencode (ai agent)",
     "verdict:",
 )
 
@@ -307,20 +307,23 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     Cited finding vocabulary is blanked first so a code span still does not
     match.
 
-    Residual: a shared-login review whose first non-empty line has no known
+    Residual: a shared-login review whose first or last non-empty line has no known
     agent marker falls back to the login, so two unmarked ``github-actions``
     bodies share one identity.
     Real Claude and Antigravity reviews carry the marker on that first line.
+    CLI agents like Codex and OpenCode append the marker on the last line.
     Scanning the whole body would re-open the quote-inheritance hole this
-    first-line rule exists to close.
+    first-and-last-line rule exists to minimize.
     """
     login = str(author or "").strip()
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
     scan = strip_cited_finding_vocab(body or "")
-    first_line = next((ln.strip() for ln in scan.splitlines() if ln.strip()), "")
-    agent = _detect_review_agent(first_line)
+    lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
+    first_line = lines[0] if lines else ""
+    last_line = lines[-1] if lines else ""
+    agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
     if login:
@@ -449,10 +452,10 @@ def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[
     return _workflow_path_for_run(m.group(1), repo, cache)
 
 
-def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
-    data = json.loads(out)
-    check_runs = data.get("check_runs", [])
+def check_ci_runs(pr) -> Tuple[bool, List[str]]:
+    sha = pr.head_sha
+    repo = pr.repo
+    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url} for cr in pr.get_check_runs()]
 
     issues = []
     if not check_runs:
@@ -1094,12 +1097,10 @@ def check_latest_verdict(
     return len(blocking) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
-    data = json.loads(out)
-
-    comments = data.get("comments", [])
-    reviews = data.get("reviews", [])
+def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
+    pr_num, sha, repo, review_decision, branch = pr.pr_num, pr.head_sha, pr.repo, pr.review_decision, pr.branch
+    comments = [{"author": {"login": c.author_login}, "createdAt": c.created_at, "body": c.body, "authorAssociation": c.author_association} for c in pr.get_comments()]
+    reviews = [{"state": r.state, "author": {"login": r.author_login}, "submittedAt": r.submitted_at, "body": r.body, "commit": {"oid": r.commit_oid}, "authorAssociation": r.author_association} for r in pr.get_reviews()]
 
     issues = []
 
@@ -1133,11 +1134,14 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_non_review_notice(body):
             continue
 
-        is_bot_author = _is_bot_author(author_login)
+        author_assoc = (c.get("authorAssociation") or "").upper()
+        is_bot_author = _is_bot_author(author_login) or (
+            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+        )
         verdict = classify_verdict(body)
 
-        # Automated reviews must be authored by a recognized bot author.
-        # A comment whose author is missing, null, or a non-bot account is admitted
+        # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
+        # A comment that is neither from a bot account nor carrying a review agent marker is admitted
         # ONLY if it states a blocking (not-clean) verdict -- fail closed.
         if is_bot_author:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
@@ -1150,12 +1154,15 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
         author_login = (r.get("author") or {}).get("login", "")
+        author_assoc = (r.get("authorAssociation") or "").upper()
         # A formal review carries a real commit.oid, so admitting one attributes
         # it to HEAD with no body-content check. Scope admission to automated bot
-        # authors only -- never sniff body text, which a human review can
-        # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
+        # authors, including CLI agents posting under human accounts
+        # detected via strict body text markers, OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = _is_bot_author(author_login)
+        is_bot_author = _is_bot_author(author_login) or (
+            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+        )
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
@@ -1210,9 +1217,21 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if is_match:
             matching_items.append(item)
 
+    if quorum <= 0:
+        issues.append(f"Quorum size is {quorum}, but it must be at least 1. Failing closed.")
+        return False, issues
+
     if not matching_items:
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
+
+    dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
+    latest_by_provider = {}
+    for item in dated_matching:
+        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
+            provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
+            latest_by_provider[provider] = item
+    matching_items = list(latest_by_provider.values())
 
     has_findings = False
     for item in matching_items:
@@ -1229,9 +1248,31 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
                 f"Review comment for SHA {sha[:8]} contains findings "
                 f"(matched pattern '{matched}')"
             )
+        elif classify_verdict(body, state) == "not-clean":
+            has_findings = True
+            issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
-    if not has_findings and not issues:
-        print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")
+    if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
+        unique_authors = set()
+        logins_with_markers = set()
+        for item in matching_items:
+            if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
+                login = item[5]
+                identity = _reviewer_identity(item[2], login)
+                unique_authors.add(identity)
+                if identity != login and identity != "unknown":
+                    logins_with_markers.add(login)
+        for login in logins_with_markers:
+            if login in unique_authors:
+                unique_authors.remove(login)
+
+        if len(unique_authors) < quorum:
+            if len(unique_authors) == 0 and quorum > 0:
+                issues.append(f"No valid clean review found for HEAD SHA {sha[:8]}.")
+            elif quorum > 0:
+                issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
+        else:
+            print(f"\u2713 Found {len(unique_authors)} clean review(s) evaluating HEAD SHA {sha[:8]}, meeting quorum of {quorum}.")
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.
@@ -1244,6 +1285,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         prog="check-pr-fully-clean.py",
         description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
     )
+
+    def non_negative_int(value):
+        ivalue = int(value)
+        if ivalue < 0:
+            raise argparse.ArgumentTypeError(f"quorum must be >= 0, got {value}")
+        return ivalue
+
+    parser.add_argument("--quorum", type=non_negative_int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
     parser.add_argument("pr_number", help="Pull request number to check")
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",
@@ -1264,11 +1313,12 @@ def main():
     # name in the next line.
     print(f"Checking ARDI / fully-clean status for {repo}#{pr_num}...")
 
-    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num, repo)
+    pr = get_pr_info(pr_num, repo)
+    sha, branch, state, commit_date, review_decision = pr.head_sha, pr.branch, pr.state, pr.commit_date, pr.review_decision
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
-    ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch)
+    ci_ok, ci_issues = check_ci_runs(pr)
+    review_ok, review_issues = check_review_comments(pr, args.quorum)
 
     all_issues = ci_issues + review_issues
 

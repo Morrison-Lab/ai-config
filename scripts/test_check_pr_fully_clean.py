@@ -62,6 +62,45 @@ def check(name: str, condition: bool):
         failures += 1
 
 
+
+# Compatibility wrappers for refactored check_ci_runs and check_review_comments
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.pull_request import PullRequest
+
+original_check_ci_runs = checker.check_ci_runs
+def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = "123"
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    pr._data = {"headRefOid": sha}
+    pr._check_runs = None
+    return original_check_ci_runs(pr)
+
+original_check_review_comments = checker.check_review_comments
+def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch="", quorum=1):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = pr_num
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    import json
+    out = checker.run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
+    if isinstance(out, str):
+        data = json.loads(out)
+    else:
+        data = {}
+    data["headRefOid"] = sha
+    data["reviewDecision"] = review_decision
+    data["headRefName"] = branch
+    pr._data = data
+    pr._check_runs = None
+    return original_check_review_comments(pr, quorum)
+
+checker.check_ci_runs = wrapped_check_ci_runs
+checker.check_review_comments = wrapped_check_review_comments
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 
@@ -87,7 +126,7 @@ def main() -> int:
     no_major_changes_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
         "author": {"login": "github-actions"},
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\nNo major changes requested. Everything looks clean and ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\n### Verdict\n\n**Ready for merge**\n\nNo major changes requested."
     }
 
     none_author_review = {
@@ -252,24 +291,40 @@ def main() -> int:
         )
 
     # Regression (PR #2180 round 5): non-bot comment containing review marker
-    # and HEAD SHA cannot spoof an automated review approval.
+    # and HEAD SHA DOES NOT satisfy review admission if the author is not authorized!
     spoofed_passerby_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
         "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": "random-passerby"},
+        "authorAssociation": "NONE"
     }
     mock_spoofed = json.dumps({"comments": [spoofed_passerby_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_spoofed):
         sp_ok, sp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
-            "non-bot comment with marker and HEAD SHA does not satisfy review admission",
+            "non-bot comment with marker and HEAD SHA does not satisfy review admission if unauthorized",
             (not sp_ok) and any("No automated review" in i for i in sp_issues),
+        )
+
+    # CLI agents post under human accounts, but MUST have an authorized association.
+    authorized_cli_agent_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "author": {"login": "the-repo-owner"},
+        "authorAssociation": "OWNER"
+    }
+    mock_authorized = json.dumps({"comments": [authorized_cli_agent_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_authorized):
+        auth_ok, auth_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "authorized human comment with agent marker DOES satisfy review admission (CLI agents)",
+            auth_ok and len(auth_issues) == 0,
         )
 
     # Regression (PR #2180 round 6): comment with author: None (deleted account) cannot spoof review
     spoofed_null_author_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
-        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "body": "code review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": None,
     }
     mock_null_author = json.dumps({"comments": [spoofed_null_author_comment], "reviews": []})
@@ -283,7 +338,7 @@ def main() -> int:
     # Regression (PR #2180 round 6): author with null login {"author": {"login": None}} does not crash _is_bot_author
     spoofed_null_login_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
-        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "body": "code review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": None},
     }
     mock_null_login = json.dumps({"comments": [spoofed_null_login_comment], "reviews": []})
@@ -321,7 +376,7 @@ def main() -> int:
             "**Claude finished** review\n\n"
             "All prior findings addressed. The earlier round was blocked on a missing test fixture, "
             "which is now resolved.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_blk = json.dumps({"comments": [resolved_blocker_comment], "reviews": []})
@@ -339,7 +394,7 @@ def main() -> int:
         "body": (
             "**Claude finished** review\n\n"
             "No deadlock or impasse here -- the prior rebuttal convinced the reviewer.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_imp = json.dumps({"comments": [resolved_impasse_comment], "reviews": []})
@@ -1434,7 +1489,7 @@ def main() -> int:
         )
         check(
             "POSITIVE CONTROL is non-vacuous: criterion 4 is the ONLY thing that fires",
-            len(v_issues) == 1,
+            len(v_issues) == 1
         )
 
     # NEGATIVE CONTROL -- the ordinary ARDI flow the check must not break:
@@ -2107,8 +2162,9 @@ def main() -> int:
               for i in skip_issues))
 
     # Negative control, MINIMAL: the identical body with only the marker phrase
-    # deleted. It must read clean, which is what proves the assertion above is
-    # about the marker rather than about some other property of the fixture.
+    # deleted. It will still not read clean (because it lacks an explicit
+    # verdict), but it proves the marker's effect because it is now treated as
+    # a review rather than being skipped, producing a different failure reason.
     #
     # The earlier version of this control substituted a whole different body (an
     # Antigravity report with an explicit `Verdict: Clean`), so it routed through
@@ -2123,9 +2179,12 @@ def main() -> int:
           and len(control["body"]) > 0.8 * len(skip_at_head["body"]))
     with patch.object(checker, "run_cmd",
                       return_value=json.dumps({"comments": [control], "reviews": []})):
-        ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
-    check("negative control: the same body without the marker DOES read clean",
-          ctrl_ok)
+        ctrl_ok, ctrl_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("negative control: the same body without the marker NO LONGER reads clean (quorum requires explicit verdict)",
+          not ctrl_ok)
+    check("negative control: is NOT skipped as a notice (different failure reason)",
+          not any("No automated review" in i or "No review comment" in i
+                  for i in ctrl_issues))
 
     # --- review findings on #1862 ------------------------------------------
     #
@@ -2303,9 +2362,53 @@ def main() -> int:
     check("negative control: a readable-stderr failure still raises RuntimeError",
           outcome2.startswith("RuntimeError:") and "404" in outcome2)
 
+    # Test multi-provider quorum logic.
+    round_a = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T11:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-1"
+    }
+    round_b = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T12:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-2"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_b], "reviews": []})):
+        q1_ok, q1_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from the same shared-login provider (one marked, one unmarked) do NOT masquerade as two distinct providers",
+          not q1_ok and len(q1_issues) > 0)
+
+    round_c = {
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "MEMBER",
+        "createdAt": "2026-08-25T13:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)\n\n_Posted by Codex (AI agent) --- not written by a human._",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-3"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_c], "reviews": []})):
+        q2_ok, q2_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from different providers DO satisfy a quorum of 2",
+          q2_ok and len(q2_issues) == 0)
+
+
+    round_cursor = {
+        "author": {"login": "cursor"},
+        "authorAssociation": "CONTRIBUTOR",
+        "createdAt": "2026-08-25T14:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-4"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_cursor], "reviews": []})):
+        q3_ok, q3_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("a cursor-authored clean review counts toward quorum",
+          q3_ok and len(q3_issues) == 0)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

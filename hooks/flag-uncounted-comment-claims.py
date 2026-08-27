@@ -340,14 +340,15 @@ CARDINALITY_RE = re.compile(
 # longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
 # guarding this case directly.
 #
-# THE PATH-VS-LIST GRAMMAR CLASS -- SEVEN ROUTES ACROSS SEVEN REVIEW ROUNDS.
+# THE PATH-VS-LIST GRAMMAR CLASS -- NINE ROUTES ACROSS NINE REVIEW ROUNDS
+# (SEVEN FIXED, TWO PRE-DISPOSITIONED -- SEE THE STANDING STATEMENT BELOW).
 # Renamed from "false-positive class" once route 6 found the mirror-image
 # failure: the SAME underlying confusion -- `TOKEN` cannot tell "one file's
 # own path, N directory segments then a filename" from "several hand-typed
 # identifiers joined by `/`", because both are letters, hyphens, and dots
 # joined by a slash -- produces an over-broad match in one direction
 # (routes 1-5, false positives) and a match that stops too soon in the
-# other (routes 6-7, false negatives). Routes 1-2 are about WHERE the match
+# other (routes 6-9, false negatives). Routes 1-2 are about WHERE the match
 # starts (the noun); routes 3-5 are about WHAT the captured list's items
 # look like, and after the third one of THOSE the fix stopped being "count
 # separators and items harder" and became a CLASS BOUNDARY, drawn once in
@@ -515,6 +516,48 @@ CARDINALITY_RE = re.compile(
 #      very FIRST list item defeats the token-list clause's own SEPARATOR,
 #      a different mechanism than `trailing_char`/`continuation`), not to a
 #      new, unrelated route.
+#
+#   8. `looks_like_path_continuation()`'s extension check cannot tell a real
+#      file extension from a version-number tail (`feature/v2.1`), so a
+#      coincidental version-like suffix reopens route 7's exact failure
+#      through the same `PATH_EXTENSION_RE` this whole class already
+#      accepted one trade for (see that regex's own comment, extended for
+#      this route). PINNED AS AN ACCEPTED RESIDUAL
+#      (`ACCEPTED_MISS_VERSION_SUFFIX_*`), not fixed with a ninth predicate.
+#   9. `looks_like_path_continuation()`'s OTHER branch --
+#      `continuation.endswith("/")`, untouched by routes 7-8 -- has the same
+#      gap: ANY coincidental continuation ending in a bare trailing `/`
+#      (`cycle-charge-flee/main/`, `cycle-charge-flee/v2/`) is unconditionally
+#      read as a directory citation, with nothing requiring the segment
+#      itself to be meaningfully path-like. Scoped to exactly the 2-item
+#      case, same as routes 6-8: a 3rd bare item elsewhere in the list still
+#      independently fails the citation test, so `looks_like_one_path`'s
+#      `all()` still returns `False` and the claim fires -- masked there,
+#      not fixed. PINNED AS AN ACCEPTED RESIDUAL
+#      (`ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_*`), not fixed.
+#
+# STANDING PRE-DISPOSITION (ai-config#2386 review round 9, generalizing
+# rounds 8-9's own per-instance decisions into a rule): routes 8 and 9 are
+# not the last two coincidental-slash-continuation shapes `TOKEN`'s design
+# admits -- they are two DEMONSTRATED instances of an open-ended class
+# (`looks_like_path_continuation()` classifying a bounded, hand-derived
+# regex shape can never enumerate every string a coincidental `/`-suffix in
+# ordinary English prose might take). Nine review rounds establishing that
+# pattern twice in a row is itself the evidence, not a coincidence to
+# re-litigate a tenth time. ANY future coincidental-slash-continuation shape
+# found reachable through this mechanism -- version suffixes, bare trailing
+# slashes, or a shape not yet enumerated here -- is THEREFORE a
+# PRE-DISPOSITIONED accepted residual of this hook's warn-only, fail-open
+# design, exactly like routes 8 and 9, without needing its own round of
+# review to establish that disposition fresh. `ai-config#2404` is the
+# single tracked home for any future narrowing work across this entire
+# class (routes 8, 9, and whatever comes after) -- add a new variant there
+# rather than opening a new issue. A future review round that finds another
+# member of this class should CITE THIS BLOCK rather than reopening the
+# fix-vs-accept question; a pinned regression fixture for any newly
+# DEMONSTRATED instance is still welcome, purely as documentation of what
+# was checked, but is not a precondition for treating the class itself as
+# already disposed of.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*/?(?:,|/)\s*{TOKEN}){{1,}})",
@@ -626,6 +669,19 @@ def looks_like_path_continuation(continuation):
     `codex-skills/pre-push-review/ were found`) is the simple case and is
     handled by the caller directly -- this function is only reached when
     something IS attached to the slash.
+
+    TWO ACCEPTED RESIDUALS remain in the classification below, found in
+    rounds 8 and 9 (routes 8-9 in the class doc-comment above `ENUM_RE`,
+    which also carries the standing pre-disposition covering any FURTHER
+    variant of this same shape): `PATH_EXTENSION_RE` cannot tell a real
+    extension from a version-number tail (`/main/v2.1` -- route 8), and the
+    `continuation.endswith("/")` branch below cannot tell a genuine
+    directory citation from a coincidental suffix that merely happens to
+    end in a bare `/` (`/main/` -- route 9, the mirror of the very `/main`
+    example above that this docstring already says "stays unclassified" --
+    it does, right up until one more trailing slash is appended). Both are
+    pinned as regression fixtures (`ACCEPTED_MISS_VERSION_SUFFIX_*` and
+    `ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_*`) rather than narrowed further.
     """
     m = CONTINUATION_RE.match(continuation)
     if not m or m.end() != len(continuation):

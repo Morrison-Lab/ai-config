@@ -400,6 +400,34 @@ ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM = (
     "feature/v2.1, interval-labels."
 )
 
+# ai-config#2386 review round 9 (claude-review, comment 5436345773): the
+# THIRD variant of the same continuation-classification gap, this time in
+# `looks_like_path_continuation()`'s OTHER branch --
+# `continuation.endswith("/")` -- which routes 7-8 never exercised. Appending
+# one bare `/` to round 7's own already-fixed `cycle-charge-flee/main`
+# fixture reopens the identical silencing. Scoped to exactly the 2-item
+# case, same as routes 6-8: with a third bare item elsewhere in the list,
+# the claim still fires (pinned below as a positive confirmation, not an
+# accepted miss), since that third item independently fails the citation
+# test regardless of what happens to the coincidental one.
+ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_TWO_ITEM = (
+    "No hits in local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/main/ was checked."
+)
+ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_VERSION = (
+    "No hits in local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/v2/ was tested."
+)
+# The 3-item case is NOT an accepted miss -- a third bare identifier in the
+# list still makes the claim fire, since `looks_like_one_path`'s `all()`
+# fails on that item regardless of the coincidental one's own
+# misclassification. Pinned as a positive regression, matching the
+# reviewer's own verification.
+TRAILING_SLASH_SUFFIX_THREE_ITEM_STILL_FIRES = (
+    "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
+    "interval-labels, cycle-charge-flee/v2/ was checked."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -688,6 +716,20 @@ def unit_checks(mod):
           mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_TWO_ITEM), [])
     check("find_claims ACCEPTS missing a 3-item list with a version-suffix citation",
           mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM), [])
+
+    # Regression: review round 9 (comment 5436345773) -- the third variant,
+    # in looks_like_path_continuation()'s bare-trailing-slash branch. Both
+    # of the reviewer's own repro sentences, pinned as deliberate, tested
+    # accepted misses; the 3-item case is pinned as a POSITIVE regression
+    # (it still fires), matching the reviewer's own verification.
+    check("find_claims ACCEPTS missing a 2-item list with a trailing-slash-suffix citation",
+          mod.find_claims(ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_TWO_ITEM), [])
+    check("find_claims ACCEPTS missing a 2-item list with a version+trailing-slash citation",
+          mod.find_claims(ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_VERSION), [])
+    claims = mod.find_claims(TRAILING_SLASH_SUFFIX_THREE_ITEM_STILL_FIRES)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims still catches the 3-item trailing-slash-suffix case (masked, not fixed)",
+          bool(enum_claims), True)
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

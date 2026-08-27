@@ -249,17 +249,20 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-27, ai-config#2419: six review rounds on one
   exemption.
   Each round's fix looked safe on paper; execution against `origin/main`'s
-  classifier found a wider acceptance set four times (untagged prose
-  findings swallowed, `+`/`1)` list forms escaping a veto, a bullet strip
-  feeding vocabulary the base's char class never resolved).
+  classifier found a wider acceptance set four times (examples: untagged
+  prose findings swallowed, `+`/`1)` list forms escaping a veto, a
+  lookbehind swallowing a still-open "previously-blocking" statement, a
+  bullet strip feeding vocabulary the base's char class never resolved).
   The round that finally stuck REUSED the base's own regex on the
   unstripped line --- parity by reuse, not by re-derivation --- and the
-  reviewer verified "0 mismatches" over 30 vocabulary shapes by running
-  both versions.
+  local pre-push review round verified acceptance-set parity by running
+  both versions over a vocabulary corpus (that verification lives in the
+  unposted local round, not on the PR record).
 - **Canonical Rule**: `shared/principles/fail-fast.md` (a guard's pass path
   must not be reachable by its failure path) and
-  `shared/workflow/check-purpose-before-reusing.md` (re-deriving a
-  vocabulary is where the purpose silently changes).
+  `shared/workflow/check-purpose-before-reusing.md` (structural fit is
+  necessary and never sufficient; the checks you naturally run confirm
+  the mechanism, never the purpose).
 - **Fix**: Before shipping an exemption change, run the old and new
   versions over the same adversarial case set and diff the acceptance
   sets; any body the new version exempts and the old flagged needs its own

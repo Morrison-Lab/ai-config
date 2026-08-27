@@ -236,3 +236,36 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
 - **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
+
+## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
+- **Mistake**: Adding or widening an exemption in a fail-closed checker (a
+  verdict scan, a findings gate, a guard) and reasoning about its safety
+  from the diff, instead of proving the new acceptance set is no wider than
+  the old one by executing BOTH versions over an adversarial corpus.
+  A convenience strip, a broadened vocabulary, or a tolerant anchor each
+  reads as a small ergonomic fix while quietly admitting shapes the base
+  version rejected --- and the admitted shapes are exactly where a real
+  finding hides.
+- **Example**: 2026-08-27, ai-config#2419: six review rounds on one
+  exemption.
+  Each round's fix looked safe on paper; execution against `origin/main`'s
+  classifier found a wider acceptance set four times (examples: untagged
+  prose findings swallowed, `+`/`1)` list forms escaping a veto, a
+  lookbehind swallowing a still-open "previously-blocking" statement, a
+  bullet strip feeding vocabulary the base's char class never resolved).
+  The round that finally stuck REUSED the base's own regex on the
+  unstripped line --- parity by reuse, not by re-derivation --- and the
+  local pre-push review round verified acceptance-set parity by running
+  both versions over a vocabulary corpus (that verification lives in the
+  unposted local round, not on the PR record).
+- **Canonical Rule**: `shared/principles/fail-fast.md` (a guard's pass path
+  must not be reachable by its failure path) and
+  `shared/workflow/check-purpose-before-reusing.md` (structural fit is
+  necessary and never sufficient; the checks you naturally run confirm
+  the mechanism, never the purpose).
+- **Fix**: Before shipping an exemption change, run the old and new
+  versions over the same adversarial case set and diff the acceptance
+  sets; any body the new version exempts and the old flagged needs its own
+  justification.
+  Prefer reusing the instrument's existing vocabulary regex over writing a
+  near-copy, so parity holds by construction.

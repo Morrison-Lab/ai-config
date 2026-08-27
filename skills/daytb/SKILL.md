@@ -51,17 +51,40 @@ That is what keeps countermanding cheap.
   one.
 
   **Local git housekeeping is the exception, and it is inside the grant.**
-  Removing a stale worktree, deleting a merged local branch, and resetting a
-  diverged local branch ref to its remote are all covered -- do them rather
-  than filing them back as a question.
+  Removing a stale worktree, deleting a merged local branch, and
+  fast-forwarding a *behind* local branch ref to its remote are all covered
+  -- do them rather than filing them back as a question.
   What makes them safe is that they are local and recoverable: the commits
   stay in the object store and the reflog, and nothing outward-facing
   changes.
-  Verify before each one -- a worktree's tree is clean and its HEAD is
-  reachable from a remote, or its content is demonstrably superseded; a
-  branch's content is already on the default branch -- and keep anything
-  carrying commits reachable from no remote, which is triage rather than
-  cleanup.
+
+  Each covered action has its own precondition, and none of them is
+  satisfied by a clean tree alone:
+
+  - **Removing a worktree** needs the *liveness* check, not just a content
+    check.
+    A clean `git status` and an unlisted agent each describe one instant, so
+    neither says whether the session working that directory has stopped ---
+    ask the agent directly first, per `CLAUDE.md`'s "Subagent worktrees are
+    assigned, and an incident never silently repeals a decision" and
+    [`memories/git-worktrees.md`](../../memories/git-worktrees.md), which
+    records a quiet worktree misread as dead while it was live.
+    A long quiet stretch is a reason to ask sooner, not evidence of
+    abandonment.
+    Then check the content: HEAD reachable from a remote, or demonstrably
+    superseded.
+  - **Deleting a local branch** needs its content already on the default
+    branch --- established by `git merge-base --is-ancestor` or an empty
+    `git diff <default> <branch>`, never by a commit-range count, which
+    reports merged work as unmerged in a squash-merging repo.
+  - **Fast-forwarding a branch ref** needs the local ref to be strictly
+    *behind* its remote.
+    A ref carrying commits reachable from no remote is not behind, it has
+    diverged, and `git branch -f` would drop those commits from the pointer
+    --- that is triage, not cleanup, and it is outside the grant.
+
+  Keep anything carrying commits reachable from no remote, in all three
+  cases.
   A push, a remote-branch deletion, or a `git reset --hard` over unpushed
   work stays outside the grant.
 - **Not the safety rules.**

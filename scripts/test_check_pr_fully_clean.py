@@ -1725,6 +1725,47 @@ def main() -> int:
             il_ok and il_issues == [],
         )
 
+    # ai-config#2369: hyphen compounds must not read as the Blocking signal.
+    check("classify_verdict: 'non-blocking' inside a clean verdict stays clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge** (one nit -- non-blocking prose polish).\n", "")
+          == "clean")
+    check("classify_verdict: 'previously-blocking ... fixed' stays clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously-blocking error was fixed.\n", "")
+          == "clean")
+    check("classify_verdict: 'No blocking or non-blocking findings' stays clean",
+          checker.classify_verdict(
+              "No blocking or non-blocking findings.\n### Verdict\nReady for merge.\n", "")
+          == "clean")
+    import re as _re
+    check("_BARE_REJECTION still matches a bare 'merge-blocking' compound",
+          bool(_re.search(checker._BARE_REJECTION, "Two merge-blocking issues remain.", _re.I)))
+    check("_BARE_REJECTION still matches plain 'Blocking:'",
+          bool(_re.search(checker._BARE_REJECTION, "Blocking: the API change.", _re.I)))
+
+    # ai-config#2370: a findings section that resolves to a whole-line
+    # no-findings statement is not an open finding, even when verification
+    # prose precedes the closing line.
+    check("findings section closing 'No actionable findings identified.' is not a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nVerification performed: traced all call sites.\n\n"
+              "No actionable findings identified.\n\n### Verdict: Ready for merge\n")
+          is None)
+    check("findings section with a [Defect] item stays a finding despite a 'no other issues' line",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. **[Defect]** scripts/x.py:1 broken.\n\n"
+              "No other issues found.\n\n### Verdict: Needs more work\n")
+          is not None)
+    check("findings section with a **Location:** item stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified elsewhere.\n")
+          is not None)
+    check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
+          is not None)
+
     claude_nits_earlier = {
         "createdAt": "2026-08-07T21:56:00Z",
         "author": {"login": "github-actions"},

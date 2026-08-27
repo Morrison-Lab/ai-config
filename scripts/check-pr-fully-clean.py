@@ -643,6 +643,23 @@ def strip_cited_finding_vocab(text: str) -> str:
     return text
 
 
+# The bare rejection alternation appears in three lists that must stay
+# byte-identical, because BARE_NOT_CLEAN_PATTERNS membership is tested by
+# string equality against the list entries -- so it is built once here.
+#
+# `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
+# boundary: "non-blocking" is how a reviewer marks a nit as NOT blocking, and
+# "previously-blocking" is how one narrates a fixed finding -- both measured
+# reading a Ready-for-merge review as not-clean (ai-config#2369, four times on
+# 2026-08-27 alone). The lookbehinds enumerate those two compounds rather
+# than exempting every `-blocking` compound, because "merge-blocking" is a
+# real signal and missing a not-clean is the dangerous direction here.
+_BARE_REJECTION = (
+    r"\b(?:Rejected|Unapproved|"
+    r"(?<!non-)(?<!non\s)(?<!previously-)Block(?:ed|ing)?"
+    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
+)
+
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
     # ones a reviewer writes. Found by running this classifier over the real
@@ -661,7 +678,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
@@ -728,7 +745,7 @@ BARE_CLEAN_PATTERNS = {
     r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 BARE_NOT_CLEAN_PATTERNS = {
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
@@ -751,7 +768,7 @@ FINDING_PATTERNS = [
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 FINDING_HEADING_PATTERNS = {
@@ -949,6 +966,47 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
+# Whole-line clean statements a findings SECTION can resolve to. Anchored to
+# a full line on purpose (ai-config#2359: an unguarded negation branch can
+# swallow real findings), and deliberately a short allowlist rather than a
+# free-prose heuristic -- "found no remaining bugs" buried in a paragraph
+# stays a safe-direction re-flag.
+_SECTION_RESOLVED_EMPTY = re.compile(
+    r"(?im)^\s*(?:\*\*)?(?:"
+    r"no\s+(?:actionable|new|blocking)?\s*(?:findings|issues)"
+    r"(?:\s+(?:identified|found))?"
+    r"|none(?:\s+identified)?"
+    r")\.?(?:\*\*)?\s*$"
+)
+
+# A line that IS a finding item: a severity/class tag or a Location marker.
+# Any one of these in the section vetoes the resolved-empty exemption.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)^\s*(?:\d+\.|[-*])?\s*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|\*\*Location:\*\*"
+)
+
+_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
+
+
+def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
+    """True when the findings section starting at *match_end* holds a
+    whole-line no-findings statement and no severity-tagged item.
+
+    Covers the review shape where verification prose precedes the closing
+    "No actionable findings identified." line, which the 60-char suffix
+    window cannot reach (ai-config#2370). The section runs to the next
+    heading or end of body.
+    """
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
+    section = scan_body[match_end:match_end + next_heading.start()] \
+        if next_heading else scan_body[match_end:]
+    if _SECTION_FINDING_ITEM.search(section):
+        return False
+    return bool(_SECTION_RESOLVED_EMPTY.search(section))
+
+
 def _unresolved_finding_pattern(body: str) -> Optional[str]:
     """Return the first unmatched finding pattern in *body*, or None.
 
@@ -969,6 +1027,9 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
+            if pat == _FINDINGS_HEADING_PATTERN and \
+                    _findings_section_resolves_empty(scan_body, match.end()):
+                continue
             if pat == r"changes\s+requested\b":
                 start = match.start()
                 pfx = scan_body[max(0, start - 25):start].lower()

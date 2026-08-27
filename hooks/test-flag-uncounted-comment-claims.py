@@ -220,6 +220,59 @@ ACCEPTED_MISS_SLASH_ONLY_MULTI_FILE_LIST = (
     "See files foo.py / bar.py / baz.py in this update."
 )
 
+# ai-config#2386 review round 5 (claude-review, comment 5435642539): a
+# FIFTH route -- TWO SEPARATE path citations joined by a comma, each
+# independently hyphen/dot-shaped and each containing its own `/`. Every
+# fix for routes 3-4 keyed on "every separator in the whole span is `/`",
+# which is correct for one path split into segments and wrong the moment
+# two citations are cited together with an ordinary comma. Both paths are
+# the exact citations already used in `PATH_BOTH_SEGMENTS_HYPHENATED_1`/`_2`
+# above, cited together instead of singly.
+PATH_PAIR_COMMA_JOINED = (
+    "See files ai-config/claude-hook-adapter.py, "
+    "local-bin/encrypt-gh-token.sh for the mapping."
+)
+PATH_PAIR_COMMA_JOINED_2 = (
+    "No hits in ai-config/claude-hook-adapter.py, "
+    "local-bin/encrypt-gh-token.sh after the sweep."
+)
+# A distinct comma-pair, deliberately not identical to either literal
+# review repro above, so this pins the MECHANISM (any two path citations
+# joined by a comma) rather than only the two specific strings a reviewer
+# happened to type.
+PATH_PAIR_COMMA_JOINED_3 = (
+    "See references in codex-skills/pre-push-review/SKILL.md, "
+    "shared/workflow/ardi.md for the routing logic."
+)
+
+# ai-config#2386 review round 5's design decision (see the "PATH-CITATION
+# FALSE-POSITIVE CLASS" doc comment above ENUM_RE): rather than patch route
+# 5 the same narrow way as routes 3-4, `looks_like_one_path` was rewritten
+# to classify the captured list per ITEM -- split on `,` first, then ask
+# whether every resulting piece independently looks like one path citation
+# (an internal `/`, extension-terminated or trailing-`/`). That closes
+# routes 3-5 in one rule, but ALSO means a genuine hand-typed enumeration
+# of several FULL paths (directory and extension both present) is no
+# longer detected as an enumeration claim at all, comma-joined or not. This
+# is accepted, not incidental: the guard's actual purpose is a
+# RECALLED-NOT-DERIVED population claim, and such a claim about files
+# essentially always carries an explicit count nearby ("the 3 affected
+# files ..."), which CARDINALITY_RE still catches unaffected by any of
+# this. The incident this hook exists for was never this shape either --
+# its wrong claim named bare script IDENTIFIERS, not full paths with
+# directories and extensions.
+ACCEPTED_MISS_GENUINE_ALL_PATHS_COMMA_LIST = (
+    "The affected files: scripts/alpha.py, scripts/beta.py, "
+    "scripts/gamma.py."
+)
+# The mirror true positive the class boundary is drawn to PRESERVE: a
+# comma-joined list of BARE filenames with no directory component (no
+# internal `/` in any item) is never a citation under the item-level test,
+# so it still fires -- unlike a `/`-joined bare-file list, which stays an
+# accepted miss (see ACCEPTED_MISS_SLASH_ONLY_MULTI_FILE_LIST above; that
+# fixture's own separator, not its extensions, is what keeps it silent).
+BARE_FILENAMES_COMMA_JOINED = "See files foo.py, bar.py in this update."
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -373,6 +426,23 @@ def unit_checks(mod):
           mod.looks_like_one_path("a-b/c-d/e-f.py"), True)
     check("looks_like_one_path keeps a 3+-item slash list with no extension",
           mod.looks_like_one_path("a-b/c-d/e-f"), False)
+    # Review round 5 (comment 5435642539) design decision: comma-joined
+    # PATH citations (each piece independently `/`-shaped and extension-
+    # terminated) are now rejected regardless of how many there are.
+    check("looks_like_one_path rejects a comma-joined pair of path citations",
+          mod.looks_like_one_path(
+              "ai-config/claude-hook-adapter.py, local-bin/encrypt-gh-token.sh"),
+          True)
+    check("looks_like_one_path rejects a comma-joined TRIPLE of path citations",
+          mod.looks_like_one_path(
+              "scripts/alpha.py, scripts/beta.py, scripts/gamma.py"),
+          True)
+    # The mirror: a comma-joined pair where only ONE piece is path-shaped
+    # must still fire -- `all()` over the pieces is load-bearing, not `any()`.
+    check("looks_like_one_path keeps a mixed pair (one path, one bare identifier)",
+          mod.looks_like_one_path(
+              "ai-config/claude-hook-adapter.py, interval-labels"),
+          False)
 
     # Regression: PR #2386 review round 4 -- the length-generalized fix.
     check("find_claims silent on a 3-segment hyphenated path",
@@ -393,6 +463,29 @@ def unit_checks(mod):
     # rather than silently regaining (and losing) coverage either way.
     check("find_claims ACCEPTS missing a slash-only multi-file list (documented)",
           mod.find_claims(ACCEPTED_MISS_SLASH_ONLY_MULTI_FILE_LIST), [])
+
+    # Regression: review round 5 (comment 5435642539) -- the design-decision
+    # fix. A comma-joined pair (or triple) of independent path citations
+    # must stay silent, whichever literal strings are used.
+    check("find_claims silent on a comma-joined path pair (repro 1)",
+          mod.find_claims(PATH_PAIR_COMMA_JOINED), [])
+    check("find_claims silent on a comma-joined path pair (repro 2)",
+          mod.find_claims(PATH_PAIR_COMMA_JOINED_2), [])
+    check("find_claims silent on a comma-joined path pair (distinct mechanism check)",
+          mod.find_claims(PATH_PAIR_COMMA_JOINED_3), [])
+    # The pinned NEW accepted miss the design decision trades away: a
+    # genuine comma-joined enumeration of several FULL paths (directory and
+    # extension both present, no count attached) is no longer flagged as an
+    # enumeration claim. See the fixture's own comment for the rationale.
+    check("find_claims ACCEPTS missing a genuine all-paths comma list (documented)",
+          mod.find_claims(ACCEPTED_MISS_GENUINE_ALL_PATHS_COMMA_LIST), [])
+    # The mirror true positive the boundary is drawn to preserve: bare
+    # filenames (no directory, so no internal `/`) joined by a comma are
+    # never citations under the item-level test, so this still fires.
+    claims = mod.find_claims(BARE_FILENAMES_COMMA_JOINED)
+    check("find_claims still catches a comma-joined list of bare filenames",
+          any(k == "enumeration" and "foo.py" in q for k, q in claims),
+          True)
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

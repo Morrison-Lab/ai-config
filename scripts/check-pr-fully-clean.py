@@ -373,6 +373,38 @@ def _detect_review_agent(body: str) -> Optional[str]:
     return best_name
 
 
+# A DRIVING session's ledger on the PR thread: a claim/hold comment (the
+# claim-pr invariants) or an ARD disposition table, optionally ending in a
+# self-imposed hold ("Do not merge. Blocked on review of <sha>."). Such a
+# comment QUOTES the round it addressed ("Addressed ... (Needs more work)"),
+# so the verdict scan read it as a standing reviewer not-clean -- and since
+# a driver never posts a superseding clean verdict, the #2274 per-reviewer
+# rule froze the PR forever (ai-config#2409, measured on #2340/#2341 where
+# cursor[bot] is both a driver and a reviewer login).
+_DRIVER_LEDGER_MARKERS = re.compile(
+    r"(?im)"
+    r"\b(?:hold\s+off|paws\s+off|back\s+off)\b"
+    r"|^\|[^\n]*\bDisposition\b[^\n]*\|\s*$"
+)
+
+
+def _is_driver_ledger(body: str) -> bool:
+    """True when *body* is a driving session's claim or disposition ledger.
+
+    Fail-safe direction: mis-skipping a REAL review would swallow a
+    not-clean, so anything carrying a review's own structure -- a Verdict
+    heading, a completed-review marker, or the structured-report shape --
+    is never classified as a ledger, whatever else it contains.
+    """
+    if re.search(r"(?im)^#{1,6}\s*Verdict\b", body):
+        return False
+    if "claude finished" in body.lower():
+        return False
+    if _is_structured_review_body(body):
+        return False
+    return bool(_DRIVER_LEDGER_MARKERS.search(body))
+
+
 def is_non_review_notice(body: str) -> bool:
     """True when *body* is a workflow status notice rather than a review.
 
@@ -1250,6 +1282,11 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
         # A workflow status notice is not a review, whoever posted it.
         if is_non_review_notice(body):
+            continue
+
+        # Neither is a driving session's claim or disposition ledger, even
+        # from a bot login that also posts real reviews (ai-config#2409).
+        if _is_driver_ledger(body):
             continue
 
         author_assoc = (c.get("authorAssociation") or "").upper()

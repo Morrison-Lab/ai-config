@@ -1973,6 +1973,58 @@ def main() -> int:
             (not fq_ok) and any("NOT clean" in i for i in fq_issues),
         )
 
+    # --- ai-config#2409: a driving session's ledger is not a verdict. ----
+    driver_ledger = {
+        "createdAt": "2026-08-26T20:52:56Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "Addressed GitHub Claude of `9508454e` (Needs more work). "
+            "Pushed `8af4edc9`.\n\n"
+            "| # | Tag | Disposition |\n|---|---|---|\n"
+            "| 1 conflated | **Address** | Recreate rule is MERGED only. |\n\n"
+            "Do not merge. Blocked on review of `8af4edc9`.\n"
+        ),
+    }
+    later_bot_clean = {
+        "createdAt": "2026-08-26T21:15:09Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed commit: sha123\n"
+        ),
+    }
+    mock_ledger = json.dumps({"comments": [driver_ledger, later_bot_clean],
+                              "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_ledger):
+        dl_ok, dl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a driver disposition ledger quoting a not-clean does not stand "
+            "as a reviewer verdict (#2409)",
+            dl_ok and dl_issues == [],
+        )
+
+    # A REAL review from the same login (structured, own Verdict heading)
+    # must still be admitted -- the ledger discriminator keys on structure,
+    # not on the login.
+    cursor_real_notclean = {
+        "createdAt": "2026-08-26T20:37:29Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "### Summary of Changes\nProse edits.\n\n"
+            "### Findings\n1. [Defect] scripts/x.py:1 broken.\n\n"
+            "### Verdict: Needs more work\n\nReviewed-Commit: sha123\n"
+        ),
+    }
+    mock_realnc = json.dumps({"comments": [cursor_real_notclean,
+                                           later_bot_clean], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_realnc):
+        rn_ok, rn_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a real structured review from the same login is still admitted "
+            "and its not-clean still vetoes",
+            (not rn_ok) and any("NOT clean" in i for i in rn_issues),
+        )
+
     # A casual human comment saying Ready for merge, with no report
     # structure, is still not admitted at all (#1798's guard).
     human_casual = {

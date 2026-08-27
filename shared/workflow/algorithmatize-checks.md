@@ -891,6 +891,45 @@ framing). Prefer shrinking the judgment surface over automating a judgment
 badly: an instrument with a mushy threshold that misfires trains everyone to
 ignore it.
 
+**Name the slice you examined before answering "not mechanizable".**
+The verdict is legitimate --- the paragraph above says so, and a guard with a
+mushy threshold is worse than none.
+What makes it unsafe is that it is also the cheapest sentence available at
+the moment a mechanism is owed, and it is unfalsifiable as written: a
+well-examined verdict and a reflexive one read identically.
+
+The asymmetry decides how to write it.
+Claiming a decidable slice that turns out not to exist is caught by the first
+person who looks for it.
+Claiming none exists closes the question, so nobody looks again.
+
+So state what you checked and where it ran out: which artifact would carry
+the signal, and why a predicate over it cannot decide the case.
+A verdict that names its slice can be refuted; one that names nothing cannot,
+and an unfalsifiable claim is not an answer.
+When the slice exists but building the guard is out of scope, the honest
+discharge is a filed issue carrying the slice and its limits, not a verdict
+of unmechanizable.
+
+- **Do:** name the artifact a check would read, and the property it cannot
+  decide, in the same sentence as the verdict.
+- **Do:** file the guard with its decidable slice and known coverage gaps
+  when a slice exists but the work does not fit the current change.
+- **Don't:** answer "not mechanizable" without having asked where the content
+  the check needs actually lives --- content composed inline in a tool call is
+  visible to a transcript check, while the same content written to a file
+  first is not, and the two look alike in the reply.
+
+(Measured 2026-08-27 on a `ucdavis/bcs` sweep.
+A fallback review's verdict had been written in a form the fully-clean
+checker cannot parse, six times across six pull requests.
+Asked for a mechanism, the first answer was that no transcript predicate
+could read the comment bodies, since they were posted with `--body-file`.
+That was wrong about its own case: the bodies were built by a heredoc inside
+the same tool call, so the text was in the transcript before it was posted.
+The verdict was reached without asking where the content came from, which is
+the one question that decides it.)
+
 ## Apply this to writing a memory bullet, not just to runtime checks
 
 The rule targets checks a system performs, but a UMS/memory bullet that

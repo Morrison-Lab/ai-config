@@ -1041,9 +1041,9 @@ With it active, the comment is dropped and the checker exits 0.
 The general shape is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently inside this one checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had, and they inherit it silently, because nobody tests a guard the way they eyeball a matcher's positive output.
 Inverting the gate was the obvious next move, and it was tried and refuted within hours.
 The candidate positive signature was the agent-disclosure marker, on the premise that every driver comment carries it per [`disclose-agent-authorship`](disclose-agent-authorship.md) and no reviewer report emits it.
-Neither half survives: that fragment exempts a comment posted under a genuine bot identity, so even the first half is a convention rather than a guarantee.
-Only the first half holds.
-[`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH the marker appended, so a genuine not-clean review carries it as well, and a marker gate dropped that review exactly as the negative guards dropped Copilot's.
+Neither half survives.
+The second fails outright: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH the marker appended, so a genuine not-clean review carries it as well, and a marker gate dropped that review exactly as the negative guards dropped Copilot's.
+The first is weaker than it reads, too: [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so "every driver comment carries it" is a convention this corpus asks for rather than a property a gate can rely on.
 Both designs failed for one reason: every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item.
 
 A third design was then built and refuted in turn, which is what settles the shape of the answer.

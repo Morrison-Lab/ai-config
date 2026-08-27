@@ -677,7 +677,9 @@ This is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern
 
 **Inverting the gate to a POSITIVE signature was tried next, and refuted the same day, which is the more useful half of the lesson.**
 The candidate signature was the agent-disclosure marker, on the premise that every driver comment carries it and no reviewer report emits it.
-The first half is true and the second is false: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH that marker, so a genuine not-clean review carries it too, and gating on it dropped that review instead.
+Neither half holds.
+[`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH that marker, so a genuine not-clean review carries it too, and gating on it dropped that review instead.
+And [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so even the first half is a convention this corpus asks for rather than a property a gate can rely on.
 Both attempts failed the same way.
 Every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item -- and a positive signature is not safer than a negative one merely for being positive.
 A third design stopped dropping anything and blanked that one citation shape inside `strip_cited_finding_vocab` instead.

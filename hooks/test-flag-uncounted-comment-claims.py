@@ -380,6 +380,26 @@ ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
     "local-bin/encrypt-gh-token.sh, interval-labels."
 )
 
+# ai-config#2386 review round 8 (claude-review, comment 5436238489): round
+# 7's `continuation` classifier fixed the digit-only and bare-word
+# coincidental-slash cases, but a version-shaped suffix (`v2.1`) still
+# reopens the exact same failure -- `_BARE_SEGMENT` parses `v2` as an
+# ordinary segment and `.1` satisfies `PATH_EXTENSION_RE` exactly as a real
+# extension would, so `feature/v2.1` reads as "resolves to an extension"
+# and the whole mixed list goes silent. Explicitly accepted per round 8's
+# own verdict rather than patched with a ninth predicate -- see the
+# extended comment above `PATH_EXTENSION_RE`'s definition for the full
+# reasoning and the letter-required-extension idea tracked as a future
+# narrowing under ai-config#2404. Both of the reviewer's own repro
+# sentences are pinned here as deliberate, tested residuals.
+ACCEPTED_MISS_VERSION_SUFFIX_TWO_ITEM = (
+    "No hits in local-bin/encrypt-gh-token.sh, feature/v2.1 was tested."
+)
+ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM = (
+    "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
+    "feature/v2.1, interval-labels."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -660,6 +680,14 @@ def unit_checks(mod):
               bool(enum_claims), True)
     check("find_claims ACCEPTS missing a list starting with the coincidental-slash item",
           mod.find_claims(ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST), [])
+
+    # Regression: review round 8 (comment 5436238489) -- both of the
+    # reviewer's own repro sentences, pinned as deliberate, tested
+    # accepted misses per that round's own explicit exit.
+    check("find_claims ACCEPTS missing a 2-item list with a version-suffix citation",
+          mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_TWO_ITEM), [])
+    check("find_claims ACCEPTS missing a 3-item list with a version-suffix citation",
+          mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

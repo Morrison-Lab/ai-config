@@ -548,6 +548,32 @@ COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 # number after a dot ("v1.2") also matches this shape -- accepted since no
 # case in this corpus's own comment history takes that form and the cost is
 # a missed reminder, never a wrong one.
+#
+# THAT TRADE DOES NOT TRANSFER CLEANLY to `looks_like_path_continuation()`'s
+# use of this same regex (added in round 7, ai-config#2386), and round 8's
+# review said so explicitly. Here the version-shaped span is not the FLAGGED
+# item's own text -- it is dangling content after a DIFFERENT, unrelated
+# bare identifier (`cycle-charge-flee/feature/v2.1`-style: a coincidental
+# branch/version suffix, not a citation at all). `_BARE_SEGMENT` parses
+# `v2`/`v3` as an ordinary segment, and `.1` then satisfies this regex
+# exactly as `.md` would, so `feature/v2.1` reads as "resolves to an
+# extension" and the WHOLE mixed list -- founding-incident shape, real
+# citation plus recalled identifiers -- goes silent. That is a materially
+# worse cost than the original trade: not "one version-named item
+# misclassified" but "the entire enumeration undetected," the same severity
+# routes 6 and 7 were both fixed for.
+#
+# ACCEPTED ANYWAY, explicitly rather than left implicit, per round 8's own
+# framing -- this hook is warn-only and fail-open, and eight rounds on one
+# grammar is reason enough to stop adding narrower predicates rather than
+# start a ninth. Pinned as `ACCEPTED_MISS_VERSION_SUFFIX_*` in the test
+# suite (both of round 8's own repro sentences), the same way every other
+# accepted miss in this file is pinned rather than left to a comment alone.
+# The known next step, if this residual ever bites in a real comment: require
+# the extension to contain at least one LETTER (ruling out purely-numeric
+# tails like `.1`/`.3` while still accepting `.md`/`.py`/`.io`) -- tracked as
+# part of ai-config#2404, the same issue already tracking this file's other
+# `TOKEN`/extension-parsing residuals, rather than opened as a new one.
 PATH_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
 
 # A path SEGMENT that may itself be bare (no internal hyphen/underscore/dot

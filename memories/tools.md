@@ -809,6 +809,15 @@ Reaching for a hand-rolled substitute when a real one is one path away is the
 error underneath whatever the regex got wrong, per
 [`deterministic-tools`](../shared/principles/deterministic-tools.md).
 
+**Run it only against committed state --- it is diff-scoped against `<base>...HEAD`.**
+The false-clean-on-an-uncommitted-tree trap and its commit-first remedy are already recorded twice:
+in [`memories/git.md`](git.md)'s `check-new-line-breaks` entry,
+and in [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s dirty-tree section,
+which carries the precise mechanism (line numbers from `<base>...HEAD`, line content from the working tree),
+the occurrence record,
+and the tracked guard (ai-config#2382).
+This pointer is deliberately not a third statement of the rule.
+
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**
 That is right for the stdin-contention entry below.

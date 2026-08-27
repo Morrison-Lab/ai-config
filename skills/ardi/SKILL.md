@@ -157,8 +157,7 @@ sits unread.
    A skipped review is never a clean external verdict on its own
    and does not authorize marking the PR as approved.
    See [*The bar: "fully clean"*](#the-bar-fully-clean).
-   It requires clean external verdicts at the current head
-   from all reachable providers in your pinned quorum,
+   It requires clean verdicts at the current head from all reachable providers in your pinned quorum,
    not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
@@ -359,7 +358,7 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0`
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>` returned exit code `0`
       (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.

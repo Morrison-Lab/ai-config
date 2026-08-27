@@ -379,8 +379,7 @@ push the verified fixes immediately.
 Pushing the new commit naturally restarts the sequential query process
 against the new HEAD from the first provider.
 When requesting review on the new push,
-proactively carry forward any previously accepted rebuttals
-from earlier providers into your initial review request.
+proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
 This ensures providers do not redundantly re-raise settled non-code issues
 on the new diff.
 You must submit your rebuttal to the provider

@@ -140,7 +140,8 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 ## Full skill list
 
-All 198+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub.
+All 198+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills)
+on GitHub.
 Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills).
 Each canonical `SKILL.md` has a `description` field that lists the trigger
 phrases and a full procedure.

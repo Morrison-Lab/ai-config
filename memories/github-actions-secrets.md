@@ -128,8 +128,9 @@ available --- no surviving repo-level copy, and no sibling credential (an
 `ANTHROPIC_API_KEY`, say) the workflow could fall back to.
 The canary satisfied both clauses, each verified separately:
 `Morrison-Lab/qmt` had zero repository secrets,
-and no `ANTHROPIC_API_KEY` (or other Anthropic credential) existed at the
-org level or was referenced by any of that repo's workflows.
+and no Anthropic credential other than the org token under test existed at
+the org level or was referenced by any of that repo's workflows,
+so the workflow had nothing to fall back to.
 
 This is the shape
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)

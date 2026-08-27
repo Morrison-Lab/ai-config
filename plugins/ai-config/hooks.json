@@ -2,12 +2,21 @@
   "enforce-merge-control": {
     "PreToolUse": [
       {
-        "matcher": "run_command|invoke_subagent|send_message|define_subagent|mcp__github__.*",
+        "matcher": "run_command",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${extensionPath}/enforce-mwc-review-gate.py\""
           },
+          {
+            "type": "command",
+            "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "invoke_subagent|send_message|define_subagent|mcp__github__.*",
+        "hooks": [
           {
             "type": "command",
             "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""

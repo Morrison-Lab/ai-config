@@ -25,7 +25,9 @@ the exact token spelling as certain. -->
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
   Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
   - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
-  - The plugin matcher's `mcp__github__.*` alternative assumes Antigravity names MCP tool calls with Claude Code's `mcp__<server>__<tool>` convention.
+  - The plugin's `PreToolUse` list carries **two** groups rather than one, deliberately: a `"run_command"` group (literal matcher, unchanged since before this split) carrying `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`, and a second group matched on the regex alternation `"invoke_subagent|send_message|define_subagent|mcp__github__.*"` carrying only `claude-hook-adapter.py`.
+    Whether Antigravity treats `matcher` as a regex at all is unverified (2026-08-26), so the split is a de-risking measure: if that assumption is wrong, only the second group's coverage (the newer tool names) fails to fire, and the pre-existing `run_command` merge-control gate --- matched literally, so it does not depend on regex support --- is unaffected.
+  - The second group's `mcp__github__.*` alternative assumes Antigravity names MCP tool calls with Claude Code's `mcp__<server>__<tool>` convention.
     That is unverified (2026-08-26): the confirmed Antigravity `toolCall.name` values are only `run_command`, `invoke_subagent`, `send_message`, and `define_subagent`, so if the real MCP names differ, the `mcp__github__.*` branch silently never fires --- re-verify against a live install before relying on it as a gate.
   - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.

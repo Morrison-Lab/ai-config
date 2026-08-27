@@ -647,14 +647,26 @@ inability to measure is being reported as a measurement.
 
 (Measured 2026-08-27 on
 [ai-config#2442](https://github.com/Morrison-Lab/ai-config/pull/2442).
-Three rounds found one hyperlink nit, one citation-order nit, then nothing ---
-and all three returned `Needs more work`, each naming
-`review / claude-review` (itself) among the pending checks.
+Three rounds found one hyperlink nit, one citation-order nit, then nothing.
+The instrument reported not-clean in all three, naming
+`review / claude-review` (itself) among the pending checks --- and the verdict
+field carried that into a block in **two** of them.
 The third round said so explicitly: "not due to any content defect", "no
 further content changes are needed on my end".
 CI was 10/10 green and `require-review` passed.
 The three rounds cost $4.60 between them, and the PR merged only on an explicit
 user decision to treat the verdict as non-blocking.
+
+The round that did **not** block is the most useful of the three.
+It is the same reviewer, on the same PR, reaching the same instrument result
+and keeping it out of the verdict field: it returned `Ready for merge` and put
+the caveat in a note beneath it.
+So the discrimination this entry asks for is achievable rather than merely
+desirable, and the two rounds that blocked were not forced to by anything about
+the instrument.
+That round is also the reason to state the split precisely: the first draft of
+this record said all three blocked, and review caught it --- an unverified count
+in prose, inside an entry about an unverified count.
 Tracked as [ai-config#2441](https://github.com/Morrison-Lab/ai-config/issues/2441).)
 
 (Measured 2026-08-19 on a remote session driving

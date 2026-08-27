@@ -300,9 +300,9 @@ A clean automated review from every available provider evaluating the current HE
   fallback --- `delegate-to-opencode` --- was available the whole time and
   simply never tried.
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md)
-  ("No Agent tool, or no reviewer registered here? A separate CLI is the
-  same move and a stronger one --- `delegate-to-codex` or
-  `delegate-to-opencode`.").
+  ("No Agent tool, or no reviewer registered here?
+  A separate CLI is the same move and a stronger one ---
+  `delegate-to-codex` or `delegate-to-opencode`.").
 - **Fix**: Before falling back to a same-vendor subagent, run
   `which codex; which opencode; which agy` (or the OS equivalent) and
   route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.

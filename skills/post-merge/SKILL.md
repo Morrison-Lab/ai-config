@@ -100,7 +100,7 @@ Page at `first:100` and select `totalCount`: a `totalCount` above the node
 count means the cap was hit, so the thread list is itself truncated --- treat
 that as not-yet-clean, the guard `skills/pr-status/SKILL.md` and
 `skills/pr-status-all/SKILL.md` already use.
-`memories/github.md` carries the full statement and the case record.
+`memories/gh-cli.md` carries the full statement and the case record.
 
 **A finding can also arrive as a plain top-level PR comment rather than a
 formal review** --- a bot posting a summary via `gh pr comment` (or the

@@ -212,7 +212,7 @@ accepts at most 1 arg(s), received 4
 
 This corpus already records that, in
 [`skills/ardi/SKILL.md`](../ardi/SKILL.md) and
-[`memories/github.md`](../../memories/github.md).
+[`memories/gh-cli.md`](../../memories/gh-cli.md).
 
 Once the run completes, evaluate it in **one** filter that names every
 outcome:

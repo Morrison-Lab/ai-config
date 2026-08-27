@@ -1143,7 +1143,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
 
         author_assoc = (c.get("authorAssociation") or "").upper()
         is_bot_author = _is_bot_author(author_login) or (
-            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
         verdict = classify_verdict(body)
 
@@ -1168,7 +1168,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # detected via strict body text markers, OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
         is_bot_author = _is_bot_author(author_login) or (
-            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))

@@ -355,6 +355,7 @@ waiting for?".
 Five commits were sitting unpushed behind a self-imposed review queue while
 the branch's conflict with `main` had to be re-resolved twice.
 The honest answer to the question was "nothing".)
+
 ## Query all available providers sequentially
 
 When obtaining adversarial reviews,
@@ -384,11 +385,9 @@ Continue this iterative loop of review, fix, and push
 until the current HEAD receives clean verdicts from the entire pinned quorum.
 
 The set of required providers must be pinned at the start of the review cycle.
-If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits),
-you must wait and retry.
+If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry.
 Alternatively, request explicit user permission to drop it from the quorum.
-If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle,
-you must fail closed and wait until at least one becomes reachable.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle, you must fail closed and wait until at least one becomes reachable.
 This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
 Alternatively, request explicit user permission to proceed.
 Do not bypass the review gate.

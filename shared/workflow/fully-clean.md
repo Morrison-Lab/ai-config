@@ -210,11 +210,17 @@ Two failure modes make the preference concrete, and both have recurred:
 
 So when the pinned quorum is reachable, their verdicts are the ones to report on:
 
-- **Do:** dispatch reviews to the quorum and wait for all verdicts before reporting a PR ready, whatever one agent has already said.
-- **Do:** name which agents produced the verdicts you are reporting, so "clean" is attributable rather than anonymous.
-- **Do:** treat any agent's findings as real findings --- every provider's objections count.
-- **Don't:** report a PR ready on a single clean verdict while the quorum is still reachable and pending, however thorough that report reads.
-- **Don't:** read a green review-gate check as settling this; the gate does not know how many agents answered, only that one did.
+- **Do:** dispatch reviews to the quorum and wait for all verdicts before reporting a PR ready,
+  whatever one agent has already said.
+- **Do:** name which agents produced the verdicts you are reporting,
+  so "clean" is attributable rather than anonymous.
+- **Do:** treat any agent's findings as real findings ---
+  every provider's objections count.
+- **Don't:** report a PR ready on a single clean verdict while the quorum is still reachable and pending,
+  however thorough that report reads.
+- **Don't:** read a green review-gate check as settling this;
+  the gate does not know how many agents answered,
+  only that one did.
 
 **A disagreement among reviews vetoes merge, including under `mwc`.**
 Criterion 2 is every reviewer's latest verdict, not the globally last comment.

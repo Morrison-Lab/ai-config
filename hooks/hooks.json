@@ -314,6 +314,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
+            "timeout": 25,
+            "script": "no-delete-branch-under-stacked-pr.py",
+            "why": "Measured on ucdavis/bcs 2026-08-27. Merging #749 with --delete-branch removed the branch that was #750's base, and GitHub CLOSES a pull request whose base branch is deleted -- so the stacked child was closed rather than retargeted to main, while gh reported the merge as successful and said nothing about it. The retarget everyone expects does happen on an ordinary stacked merge; it does not when the deletion lands in the same operation. Recovery deadlocks: a closed PR cannot be retargeted, and cannot be reopened while its base branch is gone, so the only way out is to push the deleted branch back, reopen, retarget, then delete again -- possible only while a copy survives. WARNS, never blocks: the condition needs a network query, so blocking would fail closed whenever gh is unavailable, and the flag is the tidy habit on every unstacked merge. Silent when nothing is stacked, when the query fails, when gh is absent, and when no -R or PR number is parseable."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clobbering-push.py\"",
             "timeout": 20,
             "script": "no-clobbering-push.py",

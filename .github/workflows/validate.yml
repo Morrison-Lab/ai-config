@@ -46,6 +46,8 @@ jobs:
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
+      - name: Validate OAICopilot model-template policy
+        run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
       - name: Run check-pr-body-figures tests
@@ -72,6 +74,8 @@ jobs:
           python3 scripts/test_check_install.py
           python3 scripts/test_check_harness_installs.py
           python3 scripts/test_check_harness_ignores.py
+      - name: Run Ollama locality verification tests
+        run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run plugin-overlap detector tests
@@ -143,6 +147,9 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run Antigravity hook adapter tests
+        # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
+        run: python3 scripts/test_agy_hook_adapter.py
       - name: Run hook-runner tests
         # Per-suite timeout and interpreter spawn (ai-config#2098). The
         # runner itself had no test, so a missing timeout would only show

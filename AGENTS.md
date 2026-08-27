@@ -136,7 +136,7 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 |---|---|---|
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
-| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| upstream Morrison-Lab/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
 | `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
@@ -348,6 +348,8 @@ below).
   - *Model Decision*: Injected dynamically based on task context.
   - *Manual*: Triggered via `@mention` or explicit command.
 - **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
+- **Hooks integration**: Configured via `plugins/ai-config/hooks.json` mapping Antigravity lifecycle events (`PreToolUse`, `Stop`, `PreInvocation`) to shared enforcement hooks via `plugins/ai-config/claude-hook-adapter.py`.
+  See [`memories/antigravity.md`](memories/antigravity.md).
 
 ## Default to action without asking
 
@@ -374,10 +376,37 @@ This grants no merge authority: the strict merge policy below still applies.
   not-clean --- nits included --- vetoes merge even with `mwc` active.
   ARD every item from every review, then request fresh reviews
   (ai-config#2274).
+- **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
+  GitHub's `mergeable` field is conflict existence (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`).
+  `mergeStateStatus: CLEAN` is conflict-free (GitHub `mergeable`) plus passing commit status, not a review verdict.
+  Only `DIRTY` / `CONFLICTING` means conflicts.
+  A PR whose latest commit has no authentic clean review is not merge-ready.
+  Report it as blocked on review, not as merge-ready.
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+
+## Always arm a persistent PR loop
+
+This applies in any repo, not only Morrison-Lab ones.
+When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running.
+Keep it running until the PR merges, closes, or the user says stop.
+A one-shot status poll is not babysitting.
+A PR-activity subscription is not a loop.
+PR-activity webhooks (`subscribe_pr_activity`) do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Subscribe when that tool exists, and re-arm a periodic check-in using whatever wake mechanism this session has.
+Claude Code: `/loop`, `send_later`, `CronCreate`, or a `schedule` timer.
+Another harness: its own scheduler or timer.
+A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
+Start the loop if it is not already running, then answer.
+
+Baking a self-merge directive into the loop/wakeup prompt is allowed only under a standing merge-when-confident (`mwc`) session grant.
+A one-off "merge this PR" instruction authorizes merging the current head once.
+It never licenses a later wake to self-merge a different head.
+
+- **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
+- **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
 
 ## Request review and drive every started PR to clean
 

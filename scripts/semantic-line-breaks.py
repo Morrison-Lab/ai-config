@@ -251,6 +251,7 @@ def changed_lines_for(path: Path, base: str) -> set[int]:
         try:
             return subprocess.run(
                 ['git', '-C', anchor, *args], capture_output=True, text=True,
+                encoding='utf-8', errors='replace',
             )
         except OSError as e:
             raise ScopeError(f'could not run git: {e}') from e

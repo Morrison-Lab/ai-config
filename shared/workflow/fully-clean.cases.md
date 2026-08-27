@@ -360,7 +360,8 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25;
+filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 
@@ -463,7 +464,7 @@ agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
 Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
 and then failed
 `Command failed: git fetch origin --depth=20 pull/77/head:main`.
-`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`Morrison-Lab/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
 

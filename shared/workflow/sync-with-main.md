@@ -310,6 +310,67 @@ successful conflict resolution rather than as lost work.
 - **Don't:** rely on the deleted-lines sweep for this case; content that left
   the diff has no deletion hunk for that sweep to show.
 
+**The same silent reversion happens one line at a time, and there the file
+never vanishes from the diff at all.**
+The bidirectional check above triggers on a *file* disappearing from the PR's
+diff.
+A merge can revert a single sentence inside a file that stays in the diff for
+other reasons, and then nothing about the diff's shape changes to prompt a
+look.
+`main` resolves the conflicting region toward its own side, the branch's fix
+is gone, and the restored text is byte-identical to `main`'s copy --- so
+`git diff origin/main...HEAD` for that region shows **zero lines**, the same
+as if the branch had never touched it.
+
+This is the near-miss worth naming: reviewing the PR's diff against `main`
+feels like reviewing what the merge did, and it is not.
+The PR diff answers "how does the branch currently differ from `main`", and a
+reverted line that now matches `main` again answers that question with
+nothing, by construction.
+The only comparison that can see the revert is the branch's own pre-merge tip
+against the merge result --- a different diff than any ordinary review runs.
+
+```bash
+git diff <pre-merge-branch-tip> <merge-commit> -- <file>
+```
+
+A line that appears there as a **deletion**, with no corresponding line
+re-added elsewhere in that hunk, is a fix the merge discarded.
+"No conflict marker" says nothing about this case either: the region may
+never have raised a `<<<<<<<` at all, since a merge is free to resolve a
+three-way diff silently in favor of one side when git's own heuristics call it
+unambiguous.
+
+The general form is [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s
+survival check, generalized past whole files: for every line the branch added
+between the merge-base and its pre-merge tip, confirm that line --- not just
+the file it lived in --- survives unchanged in the merge result.
+A whole-file diff-stat delta cannot substitute, since the file's total line
+count can be unchanged or even larger while one specific sentence inside it
+was swapped back to `main`'s wording.
+
+- **Do:** diff the branch's pre-merge tip against the merge commit, per file,
+  and treat any line that appears only as a deletion there as a discarded fix.
+- **Do:** run this check even when the file in question is still present and
+  still shows other changes in the PR's diff against `main`.
+- **Don't:** treat `git diff origin/main...HEAD` as evidence about what a
+  merge did --- a reverted line that now matches `main` produces no diff
+  there, which is exactly what makes the revert invisible.
+- **Don't:** read "no conflict marker in this region" as evidence nothing was
+  discarded; a silent three-way resolution needs no marker to still pick the
+  wrong side.
+
+(Morrison-Lab/ai-config#2243, 2026-08-25/26: commit `6a537734` fixed a
+sentence in `CLAUDE.md` ("This webhook-driven loop never formally invokes..."
+to "This subscription never formally invokes...").
+The later merge of `main`, commit `061bffcc`, resolved that region toward
+`main`'s side and restored the pre-fix wording verbatim, byte-identical to
+`main`'s copy.
+An adversarial re-review caught it only via
+`git diff b42b344d 061bffcc -- CLAUDE.md`, the pre-merge-tip-to-merge-result
+comparison above, and fixed it in `c0c658d2`.
+Tracked as [ai-config#2374](https://github.com/Morrison-Lab/ai-config/issues/2374).)
+
 **When the whole PR is superseded, not just one file, the conflict is telling
 you to close it rather than resolve it.**
 The two cases above keep `main`'s version of a file a sibling PR already

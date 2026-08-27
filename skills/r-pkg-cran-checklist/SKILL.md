@@ -86,3 +86,5 @@ Work through each item; don't submit until every one is checked.
 - [`r-pkg-news`](../r-pkg-news/SKILL.md) — the NEWS.md entry sub-step (item 3).
 - [`r-pkg-spellcheck`](../r-pkg-spellcheck/SKILL.md) — run before this
   checklist so documentation and NEWS.md text are clean going in.
+- [`cran-extrachecks`](../cran-extrachecks/SKILL.md) --- the ad-hoc/stylistic checks (Title case, `@return` tags, URL hygiene) this checklist does not cover.
+  Run both for a CRAN submission.

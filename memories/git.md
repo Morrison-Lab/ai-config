@@ -56,7 +56,10 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
 
 ## Git branch create/reset (`git switch -C`)
 - `git switch -C "$BRANCH"` is already safe against flag-shaped branch names: `$BRANCH` is the argument *to* `-C`, so a value like `--weird` fails cleanly as `fatal: '--weird' is not a valid branch name` rather than being parsed as an option.
-- Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**: the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch. (Verified on git 2.x; a review bot suggested the broken form on d-morrison/gha#58.)
+- Do NOT "harden" it to `git switch -C -- "$BRANCH"` — that form is **broken**:
+  the `--` is consumed as the branch name (the required argument to `-C`), so `$BRANCH` is parsed as the start-point instead and the command fails without creating the branch.
+  (Verified on git 2.x;
+a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
 ## Git — `gh pr merge --delete-branch` can orphan a stacked PR instead of retargeting it
 - GitHub's docs promise automatic retargeting: "If you delete a head branch
@@ -189,7 +192,7 @@ a CI workflow invokes *directly* (not via `bash script.sh`) fails at runtime
 with `Permission denied` / exit 126 — a failure mode invisible to a normal
 content-diff code review, since reviewing a diff shows added/changed lines,
 not file-mode metadata. This let a broken script merge to `main` via a
-reviewed, "Ready for merge" PR (`d-morrison/gha`-reviewed
+reviewed, "Ready for merge" PR (`Morrison-Lab/gha`-reviewed
 `Lacaedemon/sparta` PR #634, 2026-07-03) and then break the `demo` CI job on
 every *other* open PR that subsequently merged `main` in. When a PR adds a new
 executable script (a `tools/ci/*.sh` invoked directly, not sourced), verify
@@ -765,7 +768,7 @@ One command decides it, which is the
 applied to a question that otherwise invites a confident wrong answer.
 
 This is not specific to one repo.
-`d-morrison/gha`'s `lint-markdown` and `lint-yaml` both resolve their `globs`
+`Morrison-Lab/gha`'s `lint-markdown` and `lint-yaml` both resolve their `globs`
 input this way (`_pathspec.mjs` / `_pathspec.py`, `trackedFiles()`) and
 document it as "git pathspecs ... recursive by default", so every consuming
 repo inherits the same trap.

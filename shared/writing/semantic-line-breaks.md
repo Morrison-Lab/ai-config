@@ -38,7 +38,7 @@ weight to give the finding when you are the reviewer in the first place.
 count -- don't reflow to 80 columns thinking the check demands it.**
 The 60-to-80 range above is guidance for a human writing prose.
 The automated check backing it (`check-new-line-breaks`, a reusable
-workflow in [`d-morrison/gha`](https://github.com/d-morrison/gha); formerly
+workflow in [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha); formerly
 ai-config's own `scripts/check-new-line-breaks.py`, retired in ai-config#703)
 tests something narrower, against each **newly added** prose line in the diff.
 Its primary rule flags a line holding more than one sentence.
@@ -255,7 +255,7 @@ Before #2085 the two tools carried different sentence-boundary rules.
 lookahead demanded an uppercase letter or markup after the period, so a sentence
 ending in `.` before a lowercase word was no boundary to it.
 The gate carries that same branch plus a second one,
-`_SENT_BREAK_LOWER_RE` (reported in `d-morrison/gha` #389, added by gha#425), matching
+`_SENT_BREAK_LOWER_RE` (reported in `Morrison-Lab/gha` #389, added by gha#425), matching
 `(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
 then a space, then a lowercase word.
 So `...rules, or agents. opencode instead reads...` was one line to the
@@ -285,7 +285,7 @@ because re-running it after a correct hand-break restored the violation.
 (Both mechanisms verified by source, read on 2026-08-21:
 the reformatter's then-single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
 and the gate's `_SENT_BREAK_LOWER_RE` at `check-new-line-breaks.py:140` in a
-fresh clone of `d-morrison/gha`, whose own `CLAUDE.md` records that gha#425
+fresh clone of `Morrison-Lab/gha`, whose own `CLAUDE.md` records that gha#425
 closed gha#389 by adding that branch.
 The rejoin was reproduced directly rather than inferred: calling `reformat()`
 on `"...or agents.\nopencode instead reads..."` returned the two lines joined
@@ -345,7 +345,7 @@ rather than against the current tree.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
-`d-morrison/gha@e91b8bf` ("fail by default when violations are found",
+`Morrison-Lab/gha@e91b8bf` ("fail by default when violations are found",
 gha#508/#509) flipped `_DEFAULT_FAIL` to `True`, and this repo's `validate.yml`
 passes `NLB_FAIL: true` besides, so a violation now reddens the check rather
 than annotating a green one.
@@ -472,7 +472,7 @@ they are machine-written and nobody is going to line-break them.
 Everything else the workflow passes is already the script's own default, so
 setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
 `NLB_CLAUSE_BREAKS` to true, and `NLB_CLAUSE_MIN_LENGTH` to 80 (read off
-`check-new-line-breaks.py` at `d-morrison/gha` `430393d`, and confirmed
+`check-new-line-breaks.py` at `Morrison-Lab/gha` `430393d`, and confirmed
 against a passing job's own log, which prints every `NLB_*` value it used).
 The practical consequence is worth stating in the safe direction: the clause
 check that catches a long line with a mid-line semicolon **is** on by default
@@ -507,6 +507,22 @@ output.
 (ai-config#752, 2026-07-27: the pre-commit run reported clean and that claim
 went into the PR body; the same content flagged 7 lines the moment it was
 run again after committing.)
+
+(A fourth pre-commit false clean, counting `memories/git.md`'s two:
+ai-config#2381, 2026-08-27.
+A pre-commit run passed over new uncommitted lines,
+and the identical post-commit invocation flagged one of them.
+The session then nearly recorded this rule a third time, in
+`memories/tools.md`, because its dupe grep was phrase-keyed ---
+`nlb|NLB_BASE_REF|gha-check-new-line-breaks` over `memories/` ---
+a population that never included this fragment at all,
+and `memories/git.md`'s entry contained none of those strings;
+a mechanism-keyed grep (`unified=0`) found both at once, per
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md).
+That recurrence count meets
+[`deterministic-tools`](../principles/deterministic-tools.md)'s bar for an
+instrument rather than more prose:
+a dirty-tree warning in the checker itself is tracked as ai-config#2382.)
 
 **A third dirty-tree symptom, and the only one that flags a line you never
 touched: the line NUMBERS come from the commit and the line CONTENT comes
@@ -921,14 +937,14 @@ to touch beyond a one-word swap.
 calls itself advisory, but `test_check_memory_file_size.py`'s own
 regression test asserts the *live corpus* stays under it, which is a
 different, non-advisory guarantee --- so a file already sitting exactly at
-1200 lines has zero headroom.
+1250 lines has zero headroom.
 Repointing one citation inside it to a longer replacement name rewraps the
 sentence carrying it, and in this semantic-line-break corpus that rewrap can
-add a whole line, pushing the file to 1201 and failing CI though not one
+add a whole line, pushing the file to 1251 and failing CI though not one
 word of content changed.
 
 - **Do:** after repointing a citation, `wc -l` any touched `memories/` file
-  that was near 1200 lines, and re-wrap the sentence to recover the line if
+  that was near 1250 lines, and re-wrap the sentence to recover the line if
   it crossed.
 - **Do:** read `test_check_memory_file_size.py` itself, not just the
   checker script's docstring --- the docstring calls the check advisory,

@@ -144,6 +144,40 @@ PATH_CITATION_BEFORE_BULLETS = (
 NEGATION_WITH_LISTABLE_NOUN = "There are no dead branches."
 ZERO_IS_KEPT = "There are zero files remaining."
 
+# ai-config#2386 review round 2 (claude-review, comment 5435218793): a THIRD
+# route to the same path-citation false-positive class, needing neither of
+# the first two tricks. A two-segment path whose directory AND filename are
+# BOTH independently hyphen/dot-shaped satisfies ENUM_RE's own two-token
+# list clause directly -- no gap-crossing needed, fires with the noun
+# immediately adjacent. Both paths are real citations in this corpus
+# (`ai-config/claude-hook-adapter.py` is cited in AGENTS.md).
+PATH_BOTH_SEGMENTS_HYPHENATED_1 = (
+    "No hits found in local-bin/encrypt-gh-token.sh after the sweep."
+)
+PATH_BOTH_SEGMENTS_HYPHENATED_2 = (
+    "See files ai-config/claude-hook-adapter.py for the mapping."
+)
+PATH_BOTH_SEGMENTS_HYPHENATED_3 = (
+    "Several references still point to ai-config/claude-hook-adapter.py "
+    "directly."
+)
+
+# The true-positive counter-case the fix must NOT break: a genuine two-item
+# `/`-joined enumeration whose second item does not end in a file
+# extension. `looks_like_one_path` only rejects the (exactly-two-items,
+# `/`-only, extension-terminated) shape, so this must still fire.
+TWO_ITEM_SLASH_LIST_NOT_A_PATH = (
+    "The fingerprinted scripts: brace-vs-unbraced-charge / "
+    "defensive-doctrine-plan, and 18 files on main."
+)
+# A comma-joined two-item list is never rejected regardless of extension,
+# since `,` is a list signal at any length -- confirms the rejection is
+# keyed on the separator, not merely the item count.
+TWO_ITEM_COMMA_LIST = (
+    "The fingerprinted scripts: cycle-charge-flee, interval-labels, "
+    "and 18 files on main."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -253,6 +287,43 @@ def unit_checks(mod):
           mod.find_claims(NEGATION_WITH_LISTABLE_NOUN), [])
     check("find_claims still catches an explicit 'zero' cardinality claim",
           mod.find_claims(ZERO_IS_KEPT), [("cardinality", "zero files")])
+
+    # Regression: PR #2386 review round 2 -- a THIRD route to the path-
+    # citation class. A two-segment path whose directory AND filename are
+    # both independently hyphen/dot-shaped satisfies ENUM_RE's own two-token
+    # clause directly, with no gap-crossing trick and the noun adjacent.
+    check("find_claims silent on a hyphenated-directory/hyphenated-file path (1)",
+          mod.find_claims(PATH_BOTH_SEGMENTS_HYPHENATED_1), [])
+    check("find_claims silent on a hyphenated-directory/hyphenated-file path (2)",
+          mod.find_claims(PATH_BOTH_SEGMENTS_HYPHENATED_2), [])
+    check("find_claims silent on a hyphenated-directory/hyphenated-file path (3)",
+          mod.find_claims(PATH_BOTH_SEGMENTS_HYPHENATED_3), [])
+
+    # True-positive counter-cases the round-2 fix must NOT break: a genuine
+    # two-item enumeration, slash- or comma-joined, whose second item is not
+    # itself filename-shaped.
+    claims = mod.find_claims(TWO_ITEM_SLASH_LIST_NOT_A_PATH)
+    check("find_claims still catches a genuine 2-item slash list (not a path)",
+          any(k == "enumeration" and "brace-vs-unbraced-charge" in q
+              for k, q in claims),
+          True)
+    claims = mod.find_claims(TWO_ITEM_COMMA_LIST)
+    check("find_claims still catches a genuine 2-item comma list",
+          any(k == "enumeration" and "cycle-charge-flee" in q
+              for k, q in claims),
+          True)
+
+    # looks_like_one_path unit checks: the classifier itself, isolated from
+    # the surrounding regex.
+    check("looks_like_one_path rejects a 2-item slash pair ending in an extension",
+          mod.looks_like_one_path("local-bin/encrypt-gh-token.sh"), True)
+    check("looks_like_one_path keeps a 2-item slash pair with no extension",
+          mod.looks_like_one_path("brace-vs-unbraced-charge/defensive-doctrine-plan"),
+          False)
+    check("looks_like_one_path keeps a comma-joined pair even with an extension",
+          mod.looks_like_one_path("foo.py, bar.py"), False)
+    check("looks_like_one_path keeps a 3+-item slash list even extension-terminated",
+          mod.looks_like_one_path("a-b/c-d/e-f.py"), False)
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

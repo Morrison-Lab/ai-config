@@ -339,11 +339,75 @@ CARDINALITY_RE = re.compile(
 # -- and `skills`, tried as its own noun candidate once the gap can no
 # longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
 # guarding this case directly.
+#
+# THE PATH-CITATION FALSE-POSITIVE CLASS -- THREE ROUTES, THREE CLOSED.
+# All three rounds of review on this hook (ai-config#2377/#2386) found the
+# SAME underlying confusion by a different route: `TOKEN` cannot tell "one
+# file's own path, directory then filename" from "two hand-typed identifiers
+# joined by `/`", because both are letters-and-hyphens-and-dots joined by a
+# slash. A future editor touching this regex should know all three were
+# needed, not assume the fix on file is complete:
+#   1. The NOUN itself sits directly against the path with no separator
+#      (`skills/select-model/SKILL.md` reading "skills" as the noun). Closed
+#      by the `(?![-_./])` lookahead right after the noun, above.
+#   2. A DIFFERENT, earlier noun's gap swallows a bare (non-hyphenated)
+#      directory segment plus its slash, resuming the match mid-path
+#      ("No occurrences found in skills/..."). Closed by excluding `/` from
+#      the gap's own character class, above.
+#   3. The path's OWN two segments are independently hyphen/dot-shaped
+#      (`ai-config/claude-hook-adapter.py`, `local-bin/encrypt-gh-token.sh`)
+#      and satisfy `TOKEN` on BOTH sides with no gap involved at all --
+#      "No hits found in local-bin/encrypt-gh-token.sh" matches the noun
+#      immediately adjacent, using neither of the tricks routes 1 and 2
+#      closed. Closed below, by `looks_like_one_path()`, since no regex
+#      lookahead placed near the noun can see far enough into the token list
+#      itself to tell these apart -- the noun is not even adjacent to the
+#      part that is wrong.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*(?:,|/)\s*{TOKEN}){{1,}})",
     re.I,
 )
+
+# Splits a captured token-list group back into its items and separators, so
+# `looks_like_one_path` can inspect the SHAPE of the list -- how many items,
+# and whether they were joined by `,` or `/` -- rather than only its text.
+LIST_ITEM_SPLIT_RE = re.compile(r"\s*(,|/)\s*")
+
+# Extensions common enough, in this corpus and in software repos generally,
+# to be the "this is a FILENAME" signal when they terminate the second item
+# of an otherwise-ambiguous two-item list.
+PATH_EXTENSION_RE = re.compile(
+    r"\.(?:py|gd|sh|js|ts|jsx|tsx|json|ya?ml|md|qmd|txt|rb|go|rs|c|cc|cpp"
+    r"|h|hpp|java|sql|r|toml|ini|cfg|conf|xml|html|css|scss|env|lock)$",
+    re.I,
+)
+
+
+def looks_like_one_path(group_text):
+    """True when a captured ENUM_RE list is really ONE file's own path.
+
+    Route 3 of the path-citation class documented above. The ambiguity is
+    irreducible in general -- `a-b/c-d` really could be either a path or a
+    two-item list -- so this narrows to the shape a real enumeration this
+    short essentially never takes: EXACTLY two items, joined by a `/` alone
+    (never a `,`, which stays a list signal at any length), where the
+    SECOND item ends in a common file extension. A hand-typed list this
+    narrow overwhelmingly either uses a comma or has a third item (the
+    incident's own claim had four); a bare two-segment, extension-terminated
+    `/`-pair is the shape a path's own directory/filename split takes.
+    Reject only that shape, so a genuine two-item slash-joined list whose
+    second item is NOT filename-shaped (`brace-vs-unbraced-charge /
+    defensive-doctrine-plan`) still fires, per the test suite's
+    `TWO_ITEM_SLASH_LIST_NOT_A_PATH` fixture.
+    """
+    parts = LIST_ITEM_SPLIT_RE.split(group_text)
+    items, seps = parts[0::2], parts[1::2]
+    return (
+        len(items) == 2
+        and seps == ["/"]
+        and bool(PATH_EXTENSION_RE.search(items[1]))
+    )
 
 # ENUMERATION, bulleted-list form: a listable noun introducing a markdown
 # bullet list, each line an identifier-shaped token. `ENUM_RE` only sees
@@ -391,6 +455,8 @@ def find_claims(body_text):
         found.append(("cardinality", quote))
 
     for m in ENUM_RE.finditer(prose):
+        if looks_like_one_path(m.group(1)):
+            continue
         quote = " ".join(m.group(0).split())
         key = ("enumeration", quote.lower())
         if key in seen:

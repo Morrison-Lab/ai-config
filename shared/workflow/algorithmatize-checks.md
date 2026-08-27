@@ -346,7 +346,11 @@ quantities and labelling the total as one of them.**
 **The remedy is already corpus doctrine and was simply not applied.**
 
 **This is not mechanizable as a general hook, and saying so is the honest
-answer** (per "Limits" below).
+answer.**
+The artifact a check would read is the published figure, and the property it
+cannot decide is whether that figure's population is the one the surrounding
+claim is about --- which is semantic, per "Limits" below and
+"Name the slice you examined" after it.
 
 - **Do:** re-derive every figure a detector produced when you widen it, in the
   same pass, before publishing any of them.
@@ -887,9 +891,83 @@ The rule targets *decidable* checks. Judgments of legibility, intent,
 aesthetics, and prose accuracy stay with a human or model reviewer --- but even
 these often decompose into a decidable core plus a smaller judgment (declare
 the intended outcome as data, assert it mechanically, and review only the
-framing). Prefer shrinking the judgment surface over automating a judgment
-badly: an instrument with a mushy threshold that misfires trains everyone to
+framing).
+Prefer shrinking the judgment surface over automating a judgment badly:
+an instrument with a mushy threshold that misfires trains everyone to
 ignore it.
+
+## Name the slice you examined before answering "not mechanizable"
+
+The "Limits" section above licenses leaving a judgment to a reviewer, and
+[`memories/preferences.md`](../../memories/preferences.md) together with
+[`hooks/no-mistake-without-a-hook.py`](../../hooks/no-mistake-without-a-hook.py)
+license "not mechanizable, **and why**" as a discharge when a mechanism is
+owed.
+This tightens the *why* into two named things, because the verdict as usually
+written cannot be checked.
+
+Claiming a decidable slice that turns out not to exist is caught by the first
+person who looks for it.
+Claiming none exists closes the question, so nobody looks again.
+The second is therefore the one that needs evidence attached, even though it
+is the one that sounds more cautious.
+
+So name the artifact a check would read, and the property a predicate over it
+cannot decide.
+[`check-purpose-before-reusing`](check-purpose-before-reusing.md) and
+[`metacognitive-monitoring.rationale`](metacognitive-monitoring.rationale.md)
+both carry compliant examples worth copying.
+
+**Three answers are legitimate, and only the first is "not mechanizable".**
+
+- **No slice exists.**
+  Name the artifact and the property, so the claim can be refuted.
+- **A slice exists and the guard belongs elsewhere.**
+  File it, carrying the slice and its coverage gaps,
+  rather than reporting the case closed.
+- **A slice exists and building it would misfire.**
+  Say that, and say what would make it misfire.
+  `metacognitive-monitoring.rationale.md`'s "The one decidable sub-case, and
+  why it still is not a hook" is the worked example: decidable, deliberately
+  not built, and no issue filed.
+  A slice existing does not oblige a guard, which is the same trade "Limits"
+  draws between a decidable check and one worth having.
+
+**Ask where the content a check would read is composed, not which flag
+carries it.**
+This is the tell that decides most transcript-hook questions, and it is easy
+to get backwards.
+A body written by a heredoc *in the same tool call* is in the transcript
+whatever flag posts it, including `--body-file`; a body composed by a separate
+file-writing tool and then posted is not visible to a Bash-only check, whatever
+flag posts it.
+[`hooks/require-agent-disclosure.py`](../../hooks/require-agent-disclosure.py)
+is the worked precedent, and it resolves this with a three-way verdict rather
+than a binary, distinguishing a body it read from one it could not.
+
+- **Do:** name the artifact and the undecidable property in the same sentence
+  as the verdict.
+- **Do:** file the guard with its slice and known gaps when one exists but the
+  work does not fit the current change.
+- **Don't:** infer visibility from the flag --- ask which step composed the
+  content, and whether that step is in the transcript.
+
+(Measured 2026-08-27 on a `ucdavis/bcs` sweep.
+Six fallback reviews wrote their verdict as a `### Verdict` heading with the
+word on the next line, which `classify_verdict()` in
+`scripts/check-pr-fully-clean.py` returns `unreadable` for, so none of them
+counted as a verdict.
+Asked for a mechanism, the first answer was that no transcript predicate could
+read the comment bodies, since they were posted with `--body-file` --- wrong
+about its own case, because each body was built by a heredoc in the same tool
+call.
+Filed as
+[ai-config#2435](https://github.com/Morrison-Lab/ai-config/issues/2435).
+Note also what the measurement showed about the defect itself: the split
+heading is not uniformly unreadable, since `Ready for merge` parses from it
+while `Clean` does not.
+A guard keyed on the shape would therefore be wrong; the artifact to check is
+the phrase.)
 
 ## Apply this to writing a memory bullet, not just to runtime checks
 

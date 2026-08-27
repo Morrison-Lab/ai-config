@@ -169,6 +169,22 @@ matching and supplied a verified double-backtick fix, applied as `4b30781`.
 The irony that the example *about* a backtick pitfall hit a different backtick
 pitfall is the reason it is worth its own entry.)
 
+**The consumption-side mirror: a regex that blanks "code spans" to strip cited text needs to match a run of N backticks closed by a run of exactly N, not just a single pair.**
+Everything above is the authoring rule --- widen the delimiter when the quoted text contains a backtick.
+A classifier reading that same span back has the opposite failure mode: a naive single-backtick-pair pattern matches the *inner* pair inside a correctly-authored double-backtick span and leaves the *outer* content exposed, rather than failing to parse it.
+A double-backticked citation of a phrase that itself contains a backtick --- the CommonMark-correct form once the quoted text needs one --- blanks only the inner pair under that pattern, so the cited phrase's own vocabulary stays live in the stripped output.
+This is the general form: "wrap it in backticks" is under-specified guidance for a tool author unless it also says which delimiter run the consuming regex actually handles, because the multi-backtick form is not an edge case --- CommonMark makes it mandatory the moment the quoted text contains a backtick, which is routine when quoting code, SHAs, or another code span.
+
+- **Do:** state which backtick-run length a code-span-matching regex accepts when documenting a "wrap it in backticks" convention for something a tool will parse.
+- **Do:** match a pattern like ``(`+)(?:(?!\1).)*?\1`` (longest run first) rather than a fixed single-backtick pattern, when the regex must handle CommonMark's full code span grammar.
+- **Don't:** assume a single-backtick-pair regex handles every code span a human author might write --- CommonMark requires the wider form whenever the quoted text contains a backtick.
+
+(ai-config#2449, 2026-08-27: `strip_cited_finding_vocab` in `scripts/check-pr-fully-clean.py` blanked only single-backtick spans;
+a reviewer's correctly double-backticked citation of a SHA left a not-clean-looking phrase live in the stripped text, and a clean `Ready for merge` verdict read as NOT clean.
+Fail-safe direction --- it under-blanks rather than over-blanks --- but it still cost a full round to diagnose.
+Fix tracked in that issue rather than applied here;
+this entry is the transferable authoring lesson, not the checker patch.)
+
 ## Office Open XML (.docx / .xlsx) — editing committed content
 - `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive
   link from a committed Word doc): `unzip` the file, edit `word/document.xml` for body

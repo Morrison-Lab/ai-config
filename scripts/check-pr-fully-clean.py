@@ -373,103 +373,6 @@ def _detect_review_agent(body: str) -> Optional[str]:
     return best_name
 
 
-# A DRIVING session's ledger on the PR thread: a claim/hold comment (the
-# claim-pr invariants) or an ARD disposition table, optionally ending in a
-# self-imposed hold ("Do not merge. Blocked on review of <sha>."). Such a
-# comment QUOTES the round it addressed ("Addressed ... (Needs more work)"),
-# so the verdict scan read it as a standing reviewer not-clean -- and since
-# a driver never posts a superseding clean verdict, the #2274 per-reviewer
-# rule froze the PR forever (ai-config#2409, measured on #2340/#2341 where
-# cursor[bot] is both a driver and a reviewer login).
-_DRIVER_LEDGER_MARKERS = re.compile(
-    r"(?im)"
-    r"\b(?:hold\s+off|paws\s+off|back\s+off)\b"
-    r"|^\|[^\n]*\bDisposition\b[^\n]*\|\s*$"
-)
-
-# The agent-disclosure marker every agent-posted forge comment carries
-# (CLAUDE.md, "Every comment you post to a forge says an agent posted it").
-# Kept byte-identical to hooks/require-agent-disclosure.py's MARKER_RE, which
-# is the canonical definition; test_disclosure_marker_parity locks the two
-# together so a change there cannot silently widen or narrow this one.
-_DISCLOSURE_MARKER_RE = re.compile(
-    r"posted by .{0,40}\(ai agent\)[^\n]{0,12}not written by a human",
-    re.IGNORECASE)
-
-
-def _is_driver_ledger(body: str) -> bool:
-    """True when *body* is a driving session's claim or disposition ledger.
-
-    Classification is gated on a POSITIVE driver signature -- the
-    agent-disclosure marker -- before any ledger marker is consulted, and
-    that ordering is the whole safety argument. The ledger markers are bare
-    English (`hold off`, a `Disposition` table row) that ordinary review
-    prose reaches: a Copilot report saying "hold off on merging until the
-    null check is added" carries a real finding and matches every one of
-    them. Guarding that by NEGATION alone cannot work, because every
-    negative guard below keys on Claude's and Cursor's own report format,
-    which a Copilot, Codex, or human reviewer simply does not emit -- so the
-    guards abstain exactly where the marker over-matches, and a genuine
-    not-clean is swallowed into a FULLY CLEAN report. The disclosure marker
-    inverts that: agent-posted driver comments always carry it (CLAUDE.md
-    mandates it on every claim, release, status, and disposition comment),
-    and no reviewer report does. A body without it is never a ledger,
-    whatever else it says.
-
-    The gate errs toward admitting: a driver comment predating the
-    disclosure convention, or one posted without the marker, stays admitted
-    and can still freeze the scan the way #2409 describes. That is the
-    recoverable direction -- a false not-clean is visible and one comment
-    away from being cleared, while a false clean authorizes a merge.
-
-    Fail-safe direction, secondarily: anything carrying a review's own
-    structure is never classified as a ledger, whatever else it contains --
-    a Verdict heading, a plain `Verdict:` label line (parse_report's
-    contract makes the heading optional), a Reviewed-Commit fingerprint, or
-    a completed-review marker. The ledger markers are matched over the
-    cited-vocab-STRIPPED body, so a review merely QUOTING the claim
-    invariants in backticks or a fence stays a review (#1202's convention,
-    same as classify_verdict).
-    """
-    # Every guard and the marker match run over the SAME cited-vocab
-    # stripped text: a real review's own heading and fingerprint are
-    # unfenced and survive the strip, while a ledger QUOTING a report
-    # inside a fence loses the quoted structure and stays a ledger --
-    # the same one-dialect rule parse_report applies to its own searches.
-    # The disclosure marker is read from the same stripped text for the same
-    # reason: a review QUOTING the marker in a fence has not disclosed
-    # anything, and must not inherit a driver's exemption by citing one.
-    scan = strip_cited_finding_vocab(body)
-    if not _DISCLOSURE_MARKER_RE.search(scan):
-        return False
-    # One unified verdict-line guard instead of separate heading and label
-    # forms: a line opening with any mix of heading/emphasis glyphs and the
-    # word Verdict -- `### Verdict`, `Verdict:`, `**Verdict**`,
-    # `## __Verdict__`, `***Verdict***:` -- refuses ledger classification.
-    # The lookahead (colon, whitespace, or EOL directly after the word,
-    # emphasis consumed first) is what keeps "Verdicts were mixed" prose
-    # from matching; `\b` alone cannot, because `_` is a word character,
-    # which is how the balanced-underscore heading slipped an earlier
-    # asterisk-only guard.
-    #
-    # `>` sits in both leading classes so a blockquoted verdict or
-    # fingerprint still fires the guard. GitHub's own Reply control prefixes
-    # every quoted line with `> `, so that shape arrives unprompted. Firing
-    # on it keeps the item ADMITTED, which is the conservative outcome even
-    # when the quoting body really is a driver's.
-    if re.search(r"(?im)^[\s#*_>]{0,8}Verdict[*_]{0,3}(?=\s*:|\s|$)", scan):
-        return False
-    if re.search(r"(?im)^[>\s]{0,4}[*_]{0,3}Reviewed[- ]Commit[*_]{0,3}\s*:", scan):
-        return False
-    if "claude finished" in scan.lower():
-        return False
-    # No _is_structured_review_body guard here: its own fingerprint regex
-    # (`^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:`) is a strict subset of the
-    # fingerprint guard directly above, so it could never be reached with a
-    # True value. It was dead code, and no test failed when it was neutered.
-    return bool(_DRIVER_LEDGER_MARKERS.search(scan))
-
-
 def is_non_review_notice(body: str) -> bool:
     """True when *body* is a workflow status notice rather than a review.
 
@@ -727,6 +630,46 @@ def strip_cited_finding_vocab(text: str) -> str:
         r"\)?[^.!?\n]{0,40}\b" + RESOLUTION_WORDING + r"\b)"
         r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
         " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # A FOURTH citation shape, measured on ai-config#2341 (tracked as #2409):
+    # an ARD ledger's own header line cites the round it is disposing of, as a
+    # bare parenthetical after the reviewed SHA --
+    #
+    #     Addressed GitHub Claude of `9508454e` (Needs more work). Pushed `8af4edc9`.
+    #
+    # Nothing above touches it: there are no quotes and no bold. Measured by
+    # execution, this line ALONE is what made that comment classify not-clean;
+    # neither its `Disposition` table nor its "Do not merge. Blocked on review
+    # of `8af4edc9`." hold produces a verdict at all. Because a driver never
+    # posts a superseding clean, the #2274 per-reviewer rule then froze the PR
+    # permanently on a citation of a round that had already been addressed.
+    #
+    # Gated on BOTH signals, the same discipline the #1752 rule above arrived
+    # at after two over-broad versions were refuted:
+    #
+    #   1. the sentence OPENS with an ARD disposition verb reporting a
+    #      completed action, which a live finding never does; and
+    #   2. the parenthetical follows a backticked SHA immediately and holds
+    #      NOTHING BUT the verdict phrase.
+    #
+    # The second is what keeps a reviewer REJECTING a claimed fix -- "Addressed
+    # in `abc1234` (still Needs more work)" -- out of the match: "still" is
+    # extra content, so the paren does not close after the phrase. Requiring an
+    # exact paren body rather than merely containing the phrase is the narrow
+    # choice, and it is the one that keeps the dangerous direction closed.
+    #
+    # Only the parenthetical is blanked, never the disposition verb or the rest
+    # of the line, so any real finding elsewhere in the comment survives. Runs
+    # before the code-span strip below, since the SHA is itself backticked.
+    _DISPOSITION_VERB = r"(?:Addressed|Rebutted|Deferred|Acknowledged)"
+    text = re.sub(
+        r"(?m)^[\s>*_-]{0,8}" + _DISPOSITION_VERB + r"\b[^.!?\n]{0,120}?"
+        r"`[0-9a-f]{7,40}`[ \t]*\(\s*\*{0,2}(?:"
+        r"Needs\s+more\s+work|Changes\s+requested|Not\s+clean|Blocked"
+        r")\*{0,2}\s*\)",
+        lambda m: re.sub(r"\([^)]*\)$", " ", m.group(0)),
         text,
         flags=re.IGNORECASE,
     )
@@ -1349,11 +1292,6 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         if is_non_review_notice(body):
             continue
 
-        # Neither is a driving session's claim or disposition ledger, even
-        # from a bot login that also posts real reviews (ai-config#2409).
-        if _is_driver_ledger(body):
-            continue
-
         author_assoc = (c.get("authorAssociation") or "").upper()
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
@@ -1413,13 +1351,6 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
-        # A driver ledger posted through the formal-review surface (state
-        # COMMENTED) is skipped the same way as its issue-comment twin
-        # (ai-config#2409). A blocking CHANGES_REQUESTED/REJECTED state
-        # still vetoes whatever the body looks like -- the state is the
-        # forge's own signal, not body text.
-        if state == "COMMENTED" and _is_driver_ledger(body):
-            continue
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 

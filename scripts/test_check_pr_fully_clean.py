@@ -1973,14 +1973,19 @@ def main() -> int:
             (not fq_ok) and any("NOT clean" in i for i in fq_issues),
         )
 
-    # --- ai-config#2409: a driving session's ledger is not a verdict. ----
-    # Every ledger fixture below carries the agent-disclosure marker, because
-    # every real one does: both measured #2341 driver comments end with it
-    # (5430672892 and 5430978306), and CLAUDE.md mandates it on every
-    # agent-posted forge comment. Omitting it made these fixtures imitate an
-    # artifact that does not exist, and let the per-guard tests below pass
-    # through the marker gate instead of through the guard each was named
-    # for (shared/workflow/fixtures-are-not-evidence.md).
+    # --- ai-config#2409: an ARD ledger's citation of the round it disposes
+    # of is not that ledger's own verdict. ---------------------------------
+    #
+    # Measured on #2341 (comment 5430978306). Every fixture below is the real
+    # artifact or a minimal variation on it, disclosure marker included,
+    # because both measured driver comments carry one.
+    #
+    # Nothing is DROPPED from the verdict scan. Two earlier designs classified
+    # such a comment as a "driver ledger" and skipped it; both were proven
+    # fail-open by execution -- a Copilot report containing "hold off", and a
+    # marker-carrying cross-vendor review published per self-review-fallback
+    # -- because every discriminator available in the body is one some real
+    # reviewer also emits. The regression controls for both live below.
     DISCLOSURE = (
         "\n_Posted by Cursor Grok 4.6 (AI agent) --- not written by a human._\n"
     )
@@ -2008,18 +2013,49 @@ def main() -> int:
     with patch.object(checker, "run_cmd", return_value=mock_ledger):
         dl_ok, dl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
         check(
-            "a driver disposition ledger quoting a not-clean does not stand "
-            "as a reviewer verdict (#2409)",
+            "a driver ledger citing the round it addressed does not stand as "
+            "a reviewer verdict (#2409)",
             dl_ok and dl_issues == [],
         )
 
-    # A REAL review from the same login (structured, own Verdict heading)
-    # must still be admitted -- the ledger discriminator keys on structure,
-    # not on the login.
-    # This body deliberately CARRIES a ledger marker (a disposition-recap
-    # table) beside its own Verdict heading, so it exercises the guards:
-    # deleting the heading/fingerprint/structure guards flips this to a
-    # skipped ledger and fails the test below.
+    # Which line does the work: measured, the header citation ALONE is what
+    # made that comment classify not-clean. Neither the Disposition table nor
+    # the self-imposed hold produces a verdict, so neither needs handling --
+    # and asserting that here is what stops a future round from "fixing" them.
+    check("the ledger's citation header is the only not-clean signal in it",
+          checker.classify_verdict(
+              "Addressed GitHub Claude of `9508454e` (Needs more work). "
+              "Pushed `8af4edc9`.\n") == "")
+    check("a Disposition table alone bears no verdict",
+          checker.classify_verdict(
+              "| # | Tag | Disposition |\n|---|---|---|\n"
+              "| 1 c | **Address** | done |\n") == "")
+    check("a self-imposed hold naming its release condition bears no verdict",
+          checker.classify_verdict(
+              "Do not merge. Blocked on review of `8af4edc9`.\n") == "")
+
+    # The strip is gated on BOTH the opening disposition verb and a
+    # parenthetical holding NOTHING BUT the verdict phrase. Each of these
+    # drops one signal and must stay not-clean; the first is the dangerous
+    # one -- a reviewer REJECTING a claimed fix.
+    for body, name in (
+        ("Addressed in `abc1234` (still Needs more work).\n",
+         "a reviewer rejecting a claimed fix ('still' inside the paren)"),
+        ("Addressed the prior round (Needs more work).\n",
+         "a paren verdict with no cited SHA before it"),
+        ("The review of `9508454e` (Needs more work) is still open.\n",
+         "a paren verdict on a line with no disposition verb"),
+        ("Addressed Claude of `9508454e` (Needs more work).\n\n"
+         "### Verdict\nNeeds more work\n",
+         "a ledger whose own Verdict section is not clean"),
+        ("Needs more work: foo.py:1 is broken.\n",
+         "a bare not-clean carrying no citation shape"),
+    ):
+        check(f"{name} still classifies not-clean",
+              checker.classify_verdict(body) == "not-clean")
+
+    # A REAL review from the same login must still be admitted and veto --
+    # the ledger's citation shape is what is neutralized, not the login.
     cursor_real_notclean = {
         "createdAt": "2026-08-26T20:37:29Z",
         "author": {"login": "cursor"},
@@ -2041,183 +2077,40 @@ def main() -> int:
             (not rn_ok) and any("NOT clean" in i for i in rn_issues),
         )
 
-    # A headingless review whose verdict is a plain `Verdict:` label line,
-    # containing "back off" as ordinary technical prose -- spec-compliant
-    # per parse_report's optional-heading contract; must stay admitted.
-    plain_label_review = {
-        "createdAt": "2026-08-26T20:40:00Z",
-        "author": {"login": "cursor"},
-        "body": (
-            "1. The polling loop should back off exponentially when "
-            "rate-limited.\n\nVerdict: Needs more work\n"
-            "Reviewed-Commit: sha123\n"
-        ),
-    }
-    mock_plain = json.dumps({"comments": [plain_label_review,
-                                          later_bot_clean], "reviews": []})
-    with patch.object(checker, "run_cmd", return_value=mock_plain):
-        pl_ok, pl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
-        check(
-            "a plain Verdict-label review containing 'back off' prose is "
-            "still admitted and vetoes",
-            (not pl_ok) and any("NOT clean" in i for i in pl_issues),
-        )
-
-    # A review QUOTING the claim invariants in backticks stays a review:
-    # the marker match runs on the stripped body.
-    quoting_review = {
-        "createdAt": "2026-08-26T20:45:00Z",
-        "author": {"login": "cursor"},
-        "body": (
-            "### Findings\n1. The doc should cite `hold off|paws off|back "
-            "off` as the claim alternation.\n\n"
-            "### Verdict: Needs more work\n\nReviewed-Commit: sha123\n"
-        ),
-    }
-    mock_quote = json.dumps({"comments": [quoting_review, later_bot_clean],
-                             "reviews": []})
-    with patch.object(checker, "run_cmd", return_value=mock_quote):
-        qr_ok, qr_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
-        check(
-            "a review quoting the claim invariants stays admitted and vetoes",
-            (not qr_ok) and any("NOT clean" in i for i in qr_issues),
-        )
-
-    # Per-guard discriminating fixtures: each is protected by exactly ONE
-    # refusal guard, so deleting that guard alone fails its test.
-    # (a) heading guard sole protector: heading + marker, no fingerprint,
-    # no label line, no structure (structure needs the fingerprint).
-    heading_only_review = {
-        "createdAt": "2026-08-26T20:47:00Z",
-        "author": {"login": "cursor"},
-        "body": (
-            "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
-            "### Verdict\n**Needs more work** -- see items above.\n"
-            + DISCLOSURE
-        ),
-    }
-    # (b) fingerprint guard sole protector: bold label line would be caught
-    # by the label guard, so use marker + fingerprint ONLY (no verdict
-    # heading or label): stays admitted purely on the fingerprint.
-    fingerprint_only_review = {
-        "createdAt": "2026-08-26T20:48:00Z",
-        "author": {"login": "cursor"},
-        "body": (
-            "Please hold off on merging; item 1 is open.\n\n"
-            "Reviewed-Commit: sha123\n" + DISCLOSURE
-        ),
-    }
-    # (c) label-line guard sole protector: plain `Verdict:` label + marker,
-    # no heading, no fingerprint.
-    label_only_review = {
-        "body": "Verdict: Needs more work\n\nPlease hold off on merging.\n"
-                + DISCLOSURE,
-    }
-    # (d) claude-finished guard sole protector: marker phrase + hold-off,
-    # nothing else review-shaped (a truncated/stub review).
-    stub_only_review = {
-        "body": "**Claude finished review**\n\nPlease hold off on merging.\n"
-                + DISCLOSURE,
-    }
-    # (e) underscore-emphasis forms of the label and fingerprint guards, and
-    # (f) the blockquoted forms GitHub's own Reply control produces.
-    for body, name in ((label_only_review["body"], "label-line"),
-                       (stub_only_review["body"], "claude-finished"),
-                       ("__Verdict__: Needs more work\n\nPlease hold off on merging.\n"
-                        + DISCLOSURE,
-                        "underscore label"),
-                       ("Please hold off on merging; item 1 open.\n\n"
-                        "__Reviewed-Commit__: sha123\n" + DISCLOSURE,
-                        "underscore fingerprint"),
-                       ("## __Verdict__\nNeeds more work\n\n"
-                        "Please hold off on merging.\n" + DISCLOSURE,
-                        "underscore-emphasized heading"),
-                       ("**Verdict**\nNeeds more work\n\n"
-                        "Please hold off on merging.\n" + DISCLOSURE,
-                        "bare emphasized verdict line"),
-                       ("***Verdict***: Needs more work\n\n"
-                        "Please hold off on merging.\n" + DISCLOSURE,
-                        "triple-emphasis label"),
-                       ("> Please hold off on merging.\n> ### Verdict\n"
-                        "> Needs more work\n" + DISCLOSURE,
-                        "blockquoted verdict heading"),
-                       ("> Please hold off on merging.\n"
-                        "> Reviewed-Commit: sha123\n" + DISCLOSURE,
-                        "blockquoted fingerprint")):
-        check(f"the {name} guard alone keeps a marker-carrying review "
-              "out of the ledger class",
-              not checker._is_driver_ledger(body))
-    check("'Verdicts were mixed' prose does not refuse ledger classification",
-          checker._is_driver_ledger(
-              "Verdicts were mixed last round. Addressed all.\n\n"
-              "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
-              "Do not merge.\n" + DISCLOSURE))
-
-    # The disclosure-marker gate is the sole protector here: a Copilot
-    # report saying "hold off" carries a real finding and NO agent-disclosure
-    # marker, and emits none of Claude's report structure -- so every
-    # negative guard abstains and only the marker gate keeps it admitted.
-    # Neutering that gate alone reports this PR FULLY CLEAN over an open
-    # finding, which is the failure this fixture exists to catch.
-    copilot_holdoff_review = (
-        "Needs more work. This PR should hold off on merging until the null "
-        "check is added.\n\n"
-        "- `foo.py:12`: possible NoneType dereference if `x` is unset.\n"
+    # Regression controls for the two designs this replaced. Each was
+    # reported FULLY CLEAN over an open finding by a drop-based classifier;
+    # each must veto here. They are kept as end-to-end checks rather than
+    # classify_verdict probes because the failure was an admission-level
+    # drop, which a verdict probe cannot see.
+    fail_open_controls = (
+        ("copilot-pull-request-reviewer[bot]",
+         "Needs more work. This PR should hold off on merging until the null "
+         "check is added.\n\n"
+         "- `foo.py:12`: possible NoneType dereference if `x` is unset.\n",
+         "a Copilot not-clean containing 'hold off'"),
+        ("cursor",
+         "> Please hold off on merging.\n> ### Verdict\n> Needs more work\n"
+         "> Reviewed-Commit: sha123\n\n"
+         "### Findings\n1. [Defect] scripts/x.py:1 broken.\n",
+         "a blockquoted Cursor not-clean"),
+        ("d-morrison",
+         "Codex review.\n\n1. [Defect] foo.py:12 null deref. Please hold "
+         "off.\n\nNeeds more work\n\nReviewed at commit sha123\n"
+         "\n_Posted by Codex (AI agent) --- not written by a human._\n",
+         "a marker-carrying cross-vendor review published verbatim"),
     )
-    check("a markerless Copilot review saying 'hold off' is never a ledger",
-          not checker._is_driver_ledger(copilot_holdoff_review))
-    check("nor is a markerless review carrying a Disposition table row",
-          not checker._is_driver_ledger(
-              "Needs more work.\n\n| # | Disposition |\n|---|---|\n"
-              "| 1 | the ard skill's own column |\n"))
-    mock_copilot = json.dumps({
-        "comments": [
+    for login, body, name in fail_open_controls:
+        mock_fo = json.dumps({"comments": [
             {"createdAt": "2026-08-26T20:30:00Z",
-             "author": {"login": "copilot-pull-request-reviewer[bot]"},
-             "body": copilot_holdoff_review},
-            later_bot_clean,
-        ],
-        "reviews": [],
-    })
-    with patch.object(checker, "run_cmd", return_value=mock_copilot):
-        cp_ok, cp_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
-        check(
-            "a Copilot not-clean containing 'hold off' still vetoes (#2409 "
-            "fail-open regression)",
-            (not cp_ok) and any("NOT clean" in i for i in cp_issues),
-        )
+             "author": {"login": login}, "body": body},
+            later_bot_clean], "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_fo):
+            fo_ok, fo_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+            check(f"{name} still vetoes (#2409 fail-open control)",
+                  (not fo_ok) and any("NOT clean" in i for i in fo_issues))
 
-    # A review QUOTING the disclosure marker inside a fence has disclosed
-    # nothing, so it must not inherit a driver's exemption by citing one.
-    check("a review quoting the disclosure marker in a fence is not a ledger",
-          not checker._is_driver_ledger(
-              "### Findings\n1. Every comment must end with\n"
-              "```\n_Posted by Claude Code (AI agent) --- not written by a "
-              "human._\n```\nand this one does not. Please hold off.\n"))
-
-    # The marker regex is duplicated from hooks/require-agent-disclosure.py
-    # rather than imported (the checker runs in CI and must not depend on a
-    # hook module). This locks the copy to the canonical definition.
-    _hook_src = (Path(__file__).resolve().parent.parent
-                 / "hooks" / "require-agent-disclosure.py")
-    _hook_spec = importlib.util.spec_from_file_location(
-        "require_agent_disclosure", _hook_src)
-    _hook_mod = importlib.util.module_from_spec(_hook_spec)
-    _hook_spec.loader.exec_module(_hook_mod)
-    check("the checker's disclosure-marker regex matches the canonical one "
-          "in hooks/require-agent-disclosure.py",
-          checker._DISCLOSURE_MARKER_RE.pattern == _hook_mod.MARKER_RE.pattern
-          and checker._DISCLOSURE_MARKER_RE.flags == _hook_mod.MARKER_RE.flags)
-
-    for fixture, name in ((heading_only_review, "heading"),
-                          (fingerprint_only_review, "fingerprint")):
-        check(f"the {name} guard alone keeps a marker-carrying review "
-              "out of the ledger class",
-              not checker._is_driver_ledger(fixture["body"]))
-
-    # A driver ledger delivered through the FORMAL-REVIEW surface
-    # (state COMMENTED) is skipped like its issue-comment twin; a formal
-    # CHANGES_REQUESTED still vetoes on state alone.
+    # The ledger delivered through the FORMAL-REVIEW surface behaves the same
+    # way, and a CHANGES_REQUESTED state still vetoes whatever the body says.
     ledger_as_formal_review = {
         "state": "COMMENTED",
         "submittedAt": "2026-08-26T20:52:56Z",
@@ -2230,8 +2123,8 @@ def main() -> int:
     with patch.object(checker, "run_cmd", return_value=mock_formal):
         fl_ok, fl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
         check(
-            "a driver ledger posted as a COMMENTED formal review is skipped "
-            "(#2409 formal twin)",
+            "a driver ledger posted as a COMMENTED formal review does not "
+            "veto either (#2409 formal twin)",
             fl_ok and fl_issues == [],
         )
     cr_formal = dict(ledger_as_formal_review, state="CHANGES_REQUESTED")

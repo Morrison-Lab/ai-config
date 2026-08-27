@@ -1198,3 +1198,11 @@ And a `NOTE:` line about an unreadable review is a finding about *your own*
 review, not a remark about somebody else's --- it names the one artifact a
 fallback cannot afford to get wrong.
 
+Reposting the same verdicts in the inline form settled it: the scan went from
+`0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean; per-reviewer: Claude=clean`, and the
+`No valid clean review found` finding cleared on every PR, leaving only the
+red review check the outage itself causes.
+Nothing about any review changed --- only its punctuation --- which is the
+measure of how quietly this fails.
+

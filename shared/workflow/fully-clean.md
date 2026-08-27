@@ -186,13 +186,16 @@ than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
 **Final approval requires a clean verdict from every available provider in the pinned quorum.**
-A single agent's clean verdict does not clear criterion 2 on its own; it must be joined by a clean verdict from the rest of the quorum.
+A single agent's clean verdict does not clear criterion 2 on its own;
+it must be joined by a clean verdict from the rest of the quorum.
 
 This is a directive rather than a derivation, so treat it as a standing preference.
 What it settles is when a PR is reported **ready** for merge.
 
 The reason it needs stating is that multiple verdicts are indistinguishable from a single one to the CI review gate.
-Every agent posts the same shape --- a summary, some analysis, a positive closing line --- so a findings-free report from just one agent turns the review-gate check green, even while other providers' reviews are pending or blocked.
+Every agent posts the same shape --- a summary, some analysis, a positive closing line.
+So a findings-free report from just one agent turns the review-gate check green,
+even while other providers' reviews are pending or blocked.
 
 Two failure modes make the preference concrete, and both have recurred:
 

@@ -252,15 +252,20 @@ I don't care if they run on this computer or in the cloud."
   and treat "local" as "reachable through this computer's CLI,"
   not as "running on this computer's own hardware."
 - **Do (inferred):** apply that preference as this file's own ladder:
-  free CLI-reachable budgets first ---
-  `codex` (ChatGPT plan),
-  `opencode` (its free hosted tier, Zen, and local Ollama),
-  and the `agy --print` CLI ---
+  CLI-reachable budgets first ---
+  `codex`'s ChatGPT-plan window,
+  `opencode`'s free hosted tier plus Zen plus local Ollama,
+  and the `agy --print` window ---
   then OpenRouter's prepaid credit balance,
   then a cheap Claude tier (haiku, then sonnet) ---
   reserving the conductor's own tier for judgment-heavy work.
-  No new priority is implied within that free/CLI group beyond what
-  the rest of this file already sets:
+  Only `opencode`'s hosted-free and local tiers are actually free;
+  `codex` and `agy` stay the metered subscription windows this file
+  already calls them,
+  prioritized because their cost is sunk, not because they cost
+  nothing.
+  No new priority is implied within that group beyond what the rest
+  of this file already sets:
   `opencode`'s free and local tiers have no window to exhaust,
   so they go ahead of the metered `codex` and `agy` windows,
   per the "no window to exhaust" paragraph above.
@@ -286,8 +291,8 @@ I don't care if they run on this computer or in the cloud."
   predictably fails for a small model ---
   adversarial review, long-list triage, or any of the judgment-heavy
   work [`select-model`](../skills/select-model/SKILL.md)'s decision
-  tree already carves out (architecture, a subtle-bug hunt, security
-  review, synthesis) ---
+  tree already carves out (architectural decisions, subtle bugs,
+  a security audit) ---
   and count the resulting retry as cheap delegation.
   Escalate that work to a capable tier up front;
   a failed cheap attempt plus a retry costs more than starting at the

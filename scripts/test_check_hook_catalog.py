@@ -332,7 +332,7 @@ def _capture_open(request, timeout=None):
 _fetch_with_urlopen(_capture_open,
                     extra_env={"GITHUB_REPOSITORY": "some-fork/ai-config",
                                "GITHUB_TOKEN": "fork-token"})
-check("fork GITHUB_REPOSITORY is not the issues host",
+check("fork GITHUB_REPOSITORY does not redirect the issues repo",
       seen_urls == [
           "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1"
       ])
@@ -353,6 +353,16 @@ _fetch_with_urlopen(_capture_open,
                     extra_env={"GITHUB_TOKEN": "local-token"})
 check("local token is sent when GITHUB_REPOSITORY is unset",
       seen_auth == ["Bearer local-token"])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"HOOK_CATALOG_REPO": "other/repo",
+                               "GITHUB_TOKEN": "local-token"})
+check("HOOK_CATALOG_REPO override drops the token",
+      seen_auth == [None])
+check("HOOK_CATALOG_REPO override redirects the issues repo",
+      seen_urls == ["https://api.github.com/repos/other/repo/issues/1"])
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",

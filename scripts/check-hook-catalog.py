@@ -221,7 +221,7 @@ def _token_for_default_repo():
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if not token:
         return None
-    override = os.environ.get("HOOK_CATALOG_REPO", "")
+    override = os.environ.get("HOOK_CATALOG_REPO", "").strip()
     if override and override.lower() != DEFAULT_REPO.lower():
         return None
     here = os.environ.get("GITHUB_REPOSITORY", "")
@@ -241,7 +241,7 @@ def fetch_issue_state(number):
     if injected is not None:
         return injected.get(str(number))
 
-    repo = os.environ.get("HOOK_CATALOG_REPO", DEFAULT_REPO)
+    repo = os.environ.get("HOOK_CATALOG_REPO", "").strip() or DEFAULT_REPO
     url = f"https://api.github.com/repos/{repo}/issues/{int(number)}"
     headers = {
         "User-Agent": "ai-config-check-hook-catalog",

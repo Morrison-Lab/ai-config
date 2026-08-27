@@ -142,7 +142,7 @@ The right response is to do nothing --- the cancellation is benign, since the ne
 
 See [`ardi.cases.md`](ardi.cases.md), "A third-party push cancels an idle-dispatched review".
 
-Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn to evaluate clean verdicts.
+Always execute `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr>` synchronously in the foreground turn to evaluate clean verdicts.
 Whenever ending a turn while waiting for an AI review or CI completion on an active PR after pushing code, launch a `schedule` timer (e.g. 120s) to check back.
 When the timer fires:
 - Check if a review for the HEAD SHA has arrived.

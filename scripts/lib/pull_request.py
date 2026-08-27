@@ -13,12 +13,14 @@ class Review:
         self.body: str = (data.get("body") or "")
         self.commit_oid: str = (data.get("commit") or {}).get("oid") or ""
         self.author_login: str = (data.get("author") or {}).get("login") or ""
+        self.author_association: str = (data.get("authorAssociation") or "")
 
 class IssueComment:
     def __init__(self, data: Dict[str, Any]):
         self.body: str = (data.get("body") or "")
         self.author_login: str = (data.get("author") or {}).get("login") or ""
         self.created_at: str = (data.get("createdAt") or "")
+        self.author_association: str = (data.get("authorAssociation") or "")
 
 class CheckRun:
     def __init__(self, data: Dict[str, Any]):

@@ -545,6 +545,102 @@ BULLETED_ALL_CITATIONS_BARE_MIDDLE_SEGMENT = (
     "- local-bin/encrypt-gh-token.sh\n"
 )
 
+# ai-config#2386 round 12 (comment 5436859164): ENUM_BULLET_RE/BULLET_TOKEN_RE
+# only recognized `-`/`*` as a bullet marker, so a numbered (ordered) list or
+# a `+`-marker list -- both standard GFM syntax -- were entirely invisible:
+# no match at all, not a misclassification. Fixed by widening both regexes'
+# marker class to the shared `BULLET_MARKER` (`[-*+]|\d+\.`). Must-fire
+# fixtures for both new marker types, using the same founding-incident
+# identifiers (`cycle-charge-flee`, `interval-labels`, `group-attack`) the
+# reviewer's own repro used.
+NUMBERED_LIST_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "1. cycle-charge-flee\n"
+    "2. interval-labels\n"
+    "3. group-attack\n"
+)
+PLUS_MARKER_LIST_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "+ cycle-charge-flee\n"
+    "+ interval-labels\n"
+)
+# Must-not-fire pair: the round-10/11 citation filtering must apply
+# IDENTICALLY to the two new marker types, not just to `-`/`*`. Same
+# citation strings as `BULLETED_ALL_CITATIONS_MUST_NOT_FIRE` above, just
+# reformatted with the new markers.
+NUMBERED_LIST_ALL_CITATIONS_MUST_NOT_FIRE = (
+    "The fingerprinted scripts:\n"
+    "1. ai-config/claude-hook-adapter.py\n"
+    "2. local-bin/encrypt-gh-token.sh\n"
+)
+PLUS_MARKER_LIST_ALL_CITATIONS_MUST_NOT_FIRE = (
+    "The fingerprinted scripts:\n"
+    "+ ai-config/claude-hook-adapter.py\n"
+    "+ local-bin/encrypt-gh-token.sh\n"
+)
+# A single list mixing marker TYPES (`-` then `1.`) -- confirms the shared
+# `BULLET_MARKER` constant does not require uniform markers within one
+# block, matching how a real forge comment's markdown might render even if
+# a poster would not typically hand-type this way.
+MIXED_MARKER_TYPES_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- cycle-charge-flee\n"
+    "1. interval-labels\n"
+)
+# Trailing lazy-continuation line after the last marker line: covered
+# without any code change (see the BULLET-LIST FORMAT COVERAGE note above
+# BULLET_TOKEN_RE) -- pinned as a positive regression fixture so a future
+# change to the block regex's `{2,}` boundary cannot silently break it.
+TRAILING_LAZY_CONTINUATION_STILL_FIRES = (
+    "The fingerprinted scripts:\n"
+    "- cycle-charge-flee\n"
+    "- interval-labels\n"
+    "  continuing text here\n"
+)
+# A lazy continuation line BETWEEN two marker lines: explicitly out of
+# scope (see the same note) -- pinned as a deliberate, documented accepted
+# miss rather than left to comment alone, matching this file's own
+# established practice for every other accepted gap.
+ACCEPTED_MISS_LAZY_CONTINUATION_BETWEEN_MARKER_LINES = (
+    "The fingerprinted scripts:\n"
+    "- cycle-charge-flee\n"
+    "  wraps here\n"
+    "- interval-labels\n"
+)
+# Nested/indented sublist: covered via flattening, not deliberate nesting
+# modeling (see the same note) -- pinned as a positive regression fixture
+# for the recalled-identifier case and a must-not-fire fixture for the
+# all-citations case, confirming the flattened item still passes through
+# the existing citation filter correctly either way.
+NESTED_SUBLIST_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- cycle-charge-flee\n"
+    "  - interval-labels\n"
+    "  - group-attack\n"
+)
+NESTED_SUBLIST_ALL_CITATIONS_MUST_NOT_FIRE = (
+    "The fingerprinted scripts:\n"
+    "- ai-config/claude-hook-adapter.py\n"
+    "  - local-bin/encrypt-gh-token.sh\n"
+)
+# Ordered list with a `)` delimiter: explicitly out of scope (see the same
+# note) -- pinned as a deliberate accepted miss, not a regression, since
+# `BULLET_MARKER` never claimed to cover it.
+ACCEPTED_MISS_ORDERED_LIST_PAREN_DELIMITER = (
+    "The fingerprinted scripts:\n"
+    "1) cycle-charge-flee\n"
+    "2) interval-labels\n"
+)
+# List items inside a blockquote: explicitly out of scope, a pre-existing
+# `visible_prose()` design decision rather than a round-12 gap -- pinned so
+# a future change to blockquote stripping cannot silently change this
+# without a test noticing.
+ACCEPTED_MISS_BLOCKQUOTED_LIST = (
+    "The fingerprinted scripts:\n"
+    "> - cycle-charge-flee\n"
+    "> - interval-labels\n"
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -883,6 +979,47 @@ def unit_checks(mod):
           bool(enum_claims), True)
     check("find_claims silent on a bulleted citation with a bare middle segment",
           mod.find_claims(BULLETED_ALL_CITATIONS_BARE_MIDDLE_SEGMENT), [])
+
+    # Regression: review round 12 (comment 5436859164) -- numbered and
+    # `+`-marker lists were entirely invisible (no match, not a
+    # misclassification). Fixed via the shared BULLET_MARKER constant.
+    claims = mod.find_claims(NUMBERED_LIST_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a numbered list of recalled identifiers",
+          bool(enum_claims), True)
+    claims = mod.find_claims(PLUS_MARKER_LIST_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a plus-marker list of recalled identifiers",
+          bool(enum_claims), True)
+    check("find_claims silent on a numbered list of genuine path citations",
+          mod.find_claims(NUMBERED_LIST_ALL_CITATIONS_MUST_NOT_FIRE), [])
+    check("find_claims silent on a plus-marker list of genuine path citations",
+          mod.find_claims(PLUS_MARKER_LIST_ALL_CITATIONS_MUST_NOT_FIRE), [])
+    claims = mod.find_claims(MIXED_MARKER_TYPES_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a list mixing hyphen and numbered markers",
+          bool(enum_claims), True)
+
+    # BULLET-LIST FORMAT COVERAGE sweep (round 12): each shape enumerated
+    # in the class doc-comment above BULLET_TOKEN_RE, pinned as either a
+    # positive regression fixture (covered) or a deliberate accepted miss
+    # (explicitly out of scope), matching what was actually verified.
+    claims = mod.find_claims(TRAILING_LAZY_CONTINUATION_STILL_FIRES)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims still fires with a trailing lazy-continuation line",
+          bool(enum_claims), True)
+    check("find_claims ACCEPTS missing a list split by a mid-list lazy-continuation line",
+          mod.find_claims(ACCEPTED_MISS_LAZY_CONTINUATION_BETWEEN_MARKER_LINES), [])
+    claims = mod.find_claims(NESTED_SUBLIST_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a nested/indented sublist of recalled identifiers",
+          bool(enum_claims), True)
+    check("find_claims silent on a nested/indented sublist of genuine path citations",
+          mod.find_claims(NESTED_SUBLIST_ALL_CITATIONS_MUST_NOT_FIRE), [])
+    check("find_claims ACCEPTS missing an ordered list using a ')' delimiter",
+          mod.find_claims(ACCEPTED_MISS_ORDERED_LIST_PAREN_DELIMITER), [])
+    check("find_claims ACCEPTS missing a blockquoted list",
+          mod.find_claims(ACCEPTED_MISS_BLOCKQUOTED_LIST), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

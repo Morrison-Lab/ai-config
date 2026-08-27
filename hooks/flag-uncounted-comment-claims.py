@@ -853,6 +853,20 @@ def looks_like_one_path(group_text, continuation=""):
         for i, piece in enumerate(pieces)
     )
 
+# The marker character(s) that start a markdown list line -- shared between
+# `ENUM_BULLET_RE` (the intro-line + block scan) and `BULLET_TOKEN_RE` (the
+# per-item scan), so the two can never drift apart on what counts as a list
+# marker. Originally `[-*]` only; widened to also accept `+` and a numbered
+# (`\d+\.`) marker in round 12 (ai-config#2386 comment 5436859164) -- both
+# are standard GFM list syntaxes, and a numbered list in particular is an
+# ordinary, arguably MORE common way to present an enumerated claim ("the
+# following N files") than a hyphen bullet, so its total invisibility (no
+# match at all, not a misclassification) was a real gap, not a contrived
+# one. See the "BULLET-LIST FORMAT COVERAGE" note below `BULLET_TOKEN_RE`
+# for the full inventory of markdown list shapes considered this round and
+# what remains explicitly out of scope.
+BULLET_MARKER = r"(?:[-*+]|\d+\.)"
+
 # ENUMERATION, bulleted-list form: a listable noun introducing a markdown
 # bullet list, each line an identifier-shaped token. `ENUM_RE` only sees
 # items joined inline on one line ("a / b / c"); a poster listing the same
@@ -866,7 +880,7 @@ def looks_like_one_path(group_text, continuation=""):
 # slash, on the way to that colon.
 ENUM_BULLET_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n/]{{0,40}}?:\s*\n"
-    r"((?:[ \t]*[-*]\s+[^\n]*\n?){2,})",
+    rf"((?:[ \t]*{BULLET_MARKER}\s+[^\n]*\n?){{2,}})",
     re.I,
 )
 # Captures a bullet line's FULL item, not just its leading segment: TOKEN,
@@ -895,7 +909,97 @@ ENUM_BULLET_RE = re.compile(
 # handling is deferred to `_bullet_dangling_extends` below, called once
 # per token in `find_claims`'s bullet loop, on the SAME dangling text
 # `dangling_continuation` already computes for the inline route.
-BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN}(?:/{TOKEN})*)`?", re.M)
+#
+# Marker class widened from a hard-coded `[-*]` to the shared `BULLET_MARKER`
+# (round 12, ai-config#2386 comment 5436859164) -- see that constant's own
+# comment above `ENUM_BULLET_RE` for why, and the "BULLET-LIST FORMAT
+# COVERAGE" note below for the fuller inventory this round also produced.
+BULLET_TOKEN_RE = re.compile(rf"^[ \t]*{BULLET_MARKER}\s+`?({TOKEN}(?:/{TOKEN})*)`?", re.M)
+
+# BULLET-LIST FORMAT COVERAGE (ai-config#2386 round 12, comment 5436859164):
+# an inventory of markdown list/format shapes considered this round, each
+# tested directly against `find_claims`, so a future round can cite this
+# note instead of re-discovering one format gap per round the way rounds
+# 10/11/12 each found one (the bulleted-list detection path itself predates
+# this round's own review-round numbering, so no specific round is cited
+# for its original introduction -- verified via `git log -S` that it landed
+# in a self-review commit before round 4's own review ran, so "round 4" is
+# NOT the right attribution and is deliberately not claimed here):
+#
+#   COVERED (fires correctly, verified by fixture in the test suite):
+#   * Hyphen bullets (`- item`), the original marker this detection path
+#     started with.
+#   * Asterisk bullets (`* item`).
+#   * Plus bullets (`+ item`) -- round 12.
+#   * Numbered/ordered lists (`1. item`) -- round 12. Any digit count and
+#     any starting number (GFM does not require lists to start at 1).
+#   * A single leading space/tab of indentation before the marker (`[ \t]*`
+#     in both regexes above) -- an ordinary, unindented-looking list that
+#     happens to sit one space in still matches.
+#
+#   TESTED, FOUND ALREADY COVERED (no code change needed):
+#   * A lazy continuation line AFTER the last marker line in a block (a
+#     final item's text wrapping onto a trailing unmarked line) does not
+#     defeat detection: the `{2,}` marker-line minimum is already satisfied
+#     by the preceding consecutive marker lines before the wrap is ever
+#     reached, so the trailing line simply does not extend the match
+#     further -- verified directly (`- cycle-charge-flee\n- interval-labels\n
+#     continuing text here\n` still fires).
+#   * Nested/indented sublists (a list item itself containing a further
+#     indented list) still fire correctly, though NOT via any deliberate
+#     nesting model -- `BULLET_TOKEN_RE`'s `^[ \t]*` matches any amount of
+#     LEADING whitespace, with no concept of nesting depth, so an inner
+#     marker line is captured as if it were just another top-level item:
+#     nesting is flattened rather than recognized. Verified directly for
+#     three shapes: an all-recalled-identifiers nested list (fires), an
+#     all-citations nested list (correctly does not fire, the existing
+#     citation filter applies identically to a flattened item), and a
+#     nested NUMBERED sublist (fires). Flattening happens to produce the
+#     right answer in every case tested, so left as-is rather than adding
+#     deliberate nesting-depth modeling nothing has yet demonstrated a need
+#     for.
+#
+#   EXPLICITLY OUT OF SCOPE (tested, does NOT fire, not fixed -- reasons
+#   below; not pinned as accepted-miss fixtures the way routes 8-9-etc are,
+#   since these are missing SYNTAX RECOGNITION rather than a classification
+#   residual on already-recognized content):
+#   * A lazy continuation line BETWEEN two marker lines breaks detection --
+#     tested and found NOT covered (a plausible first guess, given the
+#     trailing-continuation case above IS covered, is that any lazy
+#     continuation is fine; verifying rather than assuming is what caught
+#     the difference). The block regex's
+#     `(?:[ \t]*{BULLET_MARKER}\s+[^\n]*\n?){2,}` requires CONSECUTIVE
+#     marker-prefixed lines; an unmarked wrapped line in between ends the
+#     repetition there, so a 2-item list split by one continuation line
+#     (`- cycle-charge-flee\n  wraps here\n- interval-labels\n`) never
+#     reaches the `{2,}` floor and produces no match at all -- confirmed via
+#     direct `ENUM_BULLET_RE.search()` returning `None`. Distinguishing a
+#     lazy-continuation line from an unrelated intervening line of prose
+#     purely by indentation is exactly the kind of ambiguous, hand-derived
+#     shape this file's own history (routes 6-9) shows is expensive to get
+#     right without introducing a new false-positive surface, so left
+#     out-of-scope rather than attempted this round; a poster whose list
+#     item wraps mid-item is also a materially less common shape in a short
+#     forge comment than the ordinary unwrapped case this hook is aimed at.
+#   * Ordered lists with a `)` delimiter (`1) item` rather than `1. item`)
+#     are NOT covered by `BULLET_MARKER`'s `\d+\.` -- CommonMark permits
+#     both, but `)` is materially rarer in forge-comment prose (GitHub's
+#     own list-rendering UI and most posters' habitual style use `.`), and
+#     widening `\d+\.` to `\d+[.)]` risks colliding with an unrelated
+#     parenthesized aside that happens to start with a digit
+#     (`"see part 2) below"` -- untested against this file's own citation
+#     apparatus, and not worth the risk for a syntax this rare without a
+#     concrete repro motivating it, per this hook's established practice
+#     of fixing demonstrated gaps rather than speculative ones.
+#   * List items inside a blockquote (`> - item`) are invisible because
+#     `visible_prose()` strips blockquote lines entirely before either
+#     regex ever runs (see that function) -- a deliberate, EARLIER design
+#     decision (predates this round), not a gap in the bullet-list regexes
+#     themselves. A quoted list is someone else's prior text being quoted
+#     back, not the poster's own claim, so stripping it is the same
+#     reasoning `visible_prose` already applies to a blockquoted SENTENCE
+#     claim (`> There are 3 files` does not fire either, by design) --
+#     consistent rather than a new gap, so not revisited here.
 
 
 def _bullet_dangling_extends(continuation):

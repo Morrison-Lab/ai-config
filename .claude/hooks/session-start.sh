@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 #
-# SessionStart hook: install this repo's user-level config into ~/.claude/, and
-# install language toolchains the base web image lacks (Julia).
+# SessionStart hook: register this repo's Gemini CLI / Antigravity config and
+# per-machine dotfiles, and install language toolchains the base web image
+# lacks (Julia).
 #
 # Runs after the repo is checked out (unlike the environment "Setup script",
 # which runs at build time before any repo is on disk), so it can call the
-# checked-out bootstrap.sh directly. Symlinks skills/ and commands/ into
-# ~/.claude/ so they're available in Claude Code on the web sessions.
+# checked-out bootstrap.sh directly. Skills and commands need no step here:
+# this repo is a native Claude Code plugin (.claude-plugin/plugin.json), so a
+# web session working in ai-config itself discovers skills/ and commands/
+# directly, with no symlink into ~/.claude/. bootstrap.sh no longer performs
+# any such symlinking either -- see its own header comment.
 #
-# Config symlinking is fast; bootstrap.sh is idempotent, so re-running on
-# resume/clear/compact is a no-op. The Julia install is likewise guarded — it
-# only does real work on a fresh container's first startup, and is a no-op once
-# juliaup is present.
+# bootstrap.sh is idempotent, so re-running on resume/clear/compact is a
+# no-op. The Julia install is likewise guarded -- it only does real work on a
+# fresh container's first startup, and is a no-op once juliaup is present.
 
 set -euo pipefail
 

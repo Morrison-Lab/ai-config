@@ -517,5 +517,486 @@ expect(
 )
 
 
+# ---------------------------------------------------------------------------
+# Gate agreement (ai-config#2085).
+#
+# The reformatter must consume CI's checker, not a second copy of its
+# predicates. These tests pin the construction (the pin matches validate.yml,
+# the loaded module is the vendored file) and the two predicates that used
+# to disagree: the mid-line semicolon, and the lowercase-follower sentence.
+# ---------------------------------------------------------------------------
+
+nlb_gate = slb._nlb_gate
+checker = nlb_gate.load_nlb_checker()
+
+ci_sha = nlb_gate.parse_ci_nlb_sha()
+pin_sha = nlb_gate.read_vendor_pin()
+expect(
+    "vendor pin matches the SHA validate.yml pins",
+    ci_sha == pin_sha,
+    f"ci={ci_sha} pin={pin_sha}",
+)
+expect(
+    "assert_pin_matches_ci accepts the committed vendor copy",
+    nlb_gate.assert_pin_matches_ci() == ci_sha,
+)
+expect(
+    "parse_ci_nlb_sha returns a 40-char object id, not the short SHA in a comment",
+    len(ci_sha) == 40 and ci_sha != "209bfb76",
+    ci_sha,
+)
+expect(
+    "loaded checker is the vendored file CI pins",
+    Path(checker.__file__).resolve() == nlb_gate.VENDOR_PY.resolve(),
+    f"loaded {checker.__file__}",
+)
+
+# A pin mismatch is a loud error, not a silent import of the wrong script.
+with tempfile.TemporaryDirectory() as pin_dir:
+    yml = Path(pin_dir) / "validate.yml"
+    pin = Path(pin_dir) / "gha-check-new-line-breaks.pin"
+    yml.write_text(
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@"
+        + ("a" * 40)
+        + " # v2\n",
+        encoding="utf-8",
+    )
+    vendor = Path(pin_dir) / "checker.py"
+    vendor.write_text("classify_line = None\n", encoding="utf-8")
+    nlb_gate.write_vendor_pin("b" * 40, nlb_gate.file_sha256(vendor), pin)
+    raised = False
+    try:
+        nlb_gate.assert_pin_matches_ci(yml, pin, vendor)
+    except nlb_gate.NLBPinError as exc:
+        raised = True
+        expect(
+            "pin mismatch names both SHAs",
+            ("a" * 40) in str(exc) and ("b" * 40) in str(exc),
+            str(exc),
+        )
+    expect("pin mismatch raises NLBPinError", raised)
+
+    # Content-hash mismatch: git SHA matches, bytes were edited.
+    nlb_gate.write_vendor_pin("a" * 40, "c" * 64, pin)
+    raised_hash = False
+    try:
+        nlb_gate.assert_pin_matches_ci(yml, pin, vendor)
+    except nlb_gate.NLBPinError as exc:
+        raised_hash = True
+        expect(
+            "content-hash mismatch names sha256",
+            "sha256" in str(exc),
+            str(exc),
+        )
+    expect("content-hash mismatch raises NLBPinError", raised_hash)
+
+# ---------------------------------------------------------------------------
+# Config agreement (PR #2322 review finding): the gate module used to derive
+# *which script* CI runs from validate.yml, but not *how it is configured*.
+# `classify_line`/`split_sentences` were called at each call site's
+# compiled-in default (clause_breaks=True, clause_min_length=80), so a
+# future `with: clause-min-length: '10'` in validate.yml would change what
+# CI flags without changing what this module accepts. These tests pin the
+# fix: the resolved config matches today's defaults, and a synthetic
+# validate.yml with a non-default `clause-min-length` changes both
+# classify_line's verdict and emit_gate_clean's output for the same line.
+# ---------------------------------------------------------------------------
+
+resolved_config = nlb_gate.resolve_nlb_config()
+expect(
+    "resolved config from the live validate.yml equals today's defaults",
+    resolved_config == (checker._DEFAULT_CLAUSE_BREAKS, checker._DEFAULT_CLAUSE_MIN_LENGTH),
+    repr(resolved_config),
+)
+expect(
+    "load_nlb_config caches the same resolution",
+    nlb_gate.load_nlb_config() == resolved_config,
+    repr(nlb_gate.load_nlb_config()),
+)
+
+# The reviewer's example: 30 visible characters and an interior semicolon,
+# so it is a clause violation once the length gate drops to 10 but not at
+# the default of 80.
+# The config cache must engage on the ordinary path: a whole-file reformat
+# calls emit_gate_clean once per sentence, and an uncached resolution
+# re-parses validate.yml every time (measured ~170x slowdown on CLAUDE.md
+# before the fix reviewed on #2322).
+_resolve_calls = {"n": 0}
+_orig_resolve = nlb_gate.resolve_nlb_config
+def _counting_resolve(*a, **k):
+    _resolve_calls["n"] += 1
+    return _orig_resolve(*a, **k)
+nlb_gate.resolve_nlb_config = _counting_resolve
+nlb_gate._NLB_CONFIG = None
+try:
+    for _ in range(3):
+        nlb_gate.emit_gate_clean("A plain short sentence.")
+finally:
+    nlb_gate.resolve_nlb_config = _orig_resolve
+expect(
+    "config resolution is cached across emit_gate_clean calls",
+    _resolve_calls["n"] <= 1,
+    f"resolve_nlb_config ran {_resolve_calls['n']} times for 3 calls",
+)
+
+CONFIG_DEMO_LINE = "Short clause here; second bit."
+with tempfile.TemporaryDirectory() as config_dir:
+    config_yml = Path(config_dir) / "validate.yml"
+    config_yml.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - name: Check new markdown lines for missing semantic breaks\n"
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        with:\n"
+        "          clause-min-length: '10'\n",
+        encoding="utf-8",
+    )
+    config_10 = nlb_gate.resolve_nlb_config(config_yml, checker)
+    expect(
+        "synthetic `with: clause-min-length: '10'` resolves to 10",
+        config_10 == (True, 10),
+        repr(config_10),
+    )
+    expect(
+        "at CI's live defaults the demo line is not a clause violation",
+        checker.classify_line(CONFIG_DEMO_LINE, *resolved_config) is None,
+        repr(checker.classify_line(CONFIG_DEMO_LINE, *resolved_config)),
+    )
+    expect(
+        "at clause-min-length: '10' the same line becomes a clause violation",
+        checker.classify_line(CONFIG_DEMO_LINE, *config_10) == "clause",
+        repr(checker.classify_line(CONFIG_DEMO_LINE, *config_10)),
+    )
+    breaks_off_yml = Path(config_dir) / "validate-breaks-off.yml"
+    breaks_off_yml.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - name: Check new markdown lines for missing semantic breaks\n"
+        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        with:\n"
+        "          clause-breaks: 'false'\n",
+        encoding="utf-8",
+    )
+    config_off = nlb_gate.resolve_nlb_config(breaks_off_yml, checker)
+    expect(
+        "synthetic `with: clause-breaks: 'false'` resolves clause_breaks off",
+        config_off == (False, checker._DEFAULT_CLAUSE_MIN_LENGTH),
+        repr(config_off),
+    )
+    LONG_SEMI_LINE = (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters; then the second clause "
+        "follows on from there."
+    )
+    expect(
+        "with clause-breaks off, a long semicolon line is not a violation",
+        checker.classify_line(LONG_SEMI_LINE, *config_off) is None,
+        repr(checker.classify_line(LONG_SEMI_LINE, *config_off)),
+    )
+    expect(
+        "at CI's live defaults the same long semicolon line IS a violation",
+        checker.classify_line(LONG_SEMI_LINE, *resolved_config) == "clause",
+        repr(checker.classify_line(LONG_SEMI_LINE, *resolved_config)),
+    )
+    emit_default = nlb_gate.emit_gate_clean(
+        CONFIG_DEMO_LINE, checker,
+        clause_breaks=resolved_config[0], clause_min_length=resolved_config[1],
+    )
+    emit_10 = nlb_gate.emit_gate_clean(
+        CONFIG_DEMO_LINE, checker,
+        clause_breaks=config_10[0], clause_min_length=config_10[1],
+    )
+    expect(
+        "emit_gate_clean leaves the demo line whole at the live default",
+        emit_default == [CONFIG_DEMO_LINE],
+        repr(emit_default),
+    )
+    expect(
+        "emit_gate_clean splits the demo line at min-length 10",
+        emit_10 == ["Short clause here;", "second bit."],
+        repr(emit_10),
+    )
+
+# Issue #2085: a line the old reformatter left whole, which CI rejected.
+ISSUE_2085 = (
+    "The **file-set** half of the pair-collision section does flag the shared "
+    "path, which is the cue to run the arithmetic below on it; what no conflict "
+    "scan above will report is the breach itself.\n"
+)
+expect(
+    "the #2085 line is a clause violation to the gate before reflow",
+    checker.classify_line(ISSUE_2085.strip()) == "clause",
+    repr(checker.classify_line(ISSUE_2085.strip())),
+)
+got_2085 = slb.reformat(ISSUE_2085)
+expect(
+    "reformat splits the #2085 semicolon line",
+    got_2085 == (
+        "The **file-set** half of the pair-collision section does flag the "
+        "shared path, which is the cue to run the arithmetic below on it;\n"
+        "what no conflict scan above will report is the breach itself.\n"
+    ),
+    repr(got_2085),
+)
+flagged_2085 = [
+    checker.classify_line(line)
+    for line in got_2085.splitlines()
+    if line.strip()
+]
+expect(
+    "every line of the #2085 reflow is gate-clean",
+    flagged_2085 == [None, None],
+    repr(flagged_2085),
+)
+
+# Lowercase-follower sentence (gate _SENT_BREAK_LOWER_RE; the old local
+# splitter left this whole and would rejoin a hand-break).
+LOWER = "The rules, or agents. opencode instead reads the mailbox.\n"
+expect(
+    "lowercase-follower is a sentence violation to the gate before reflow",
+    checker.classify_line(LOWER.strip()) == "sentence",
+    repr(checker.classify_line(LOWER.strip())),
+)
+got_lower = slb.reformat(LOWER)
+expect(
+    "reformat splits a lowercase-follower sentence boundary",
+    got_lower == (
+        "The rules, or agents.\n"
+        "opencode instead reads the mailbox.\n"
+    ),
+    repr(got_lower),
+)
+expect(
+    "reformat does not rejoin a hand-broken lowercase-follower boundary",
+    slb.reformat(
+        "The rules, or agents.\nopencode instead reads the mailbox.\n"
+    ) == got_lower,
+    repr(slb.reformat(
+        "The rules, or agents.\nopencode instead reads the mailbox.\n"
+    )),
+)
+
+# A short semicolon line is below NLB_CLAUSE_MIN_LENGTH; the gate leaves it,
+# so the reformatter must too.
+SHORT_SEMI = "Keep this; it is short.\n"
+expect(
+    "a short semicolon line is not a gate clause violation",
+    checker.classify_line(SHORT_SEMI.strip()) is None,
+)
+expect(
+    "reformat leaves a short semicolon line joined",
+    slb.reformat(SHORT_SEMI) == SHORT_SEMI,
+    repr(slb.reformat(SHORT_SEMI)),
+)
+
+# A semicolon inside a code span is not a clause boundary (the gate strips
+# markup first). This line is short enough that classify_line returns None.
+CODE_SEMI = (
+    "Run `python3 -m pytest; true` on the suite "
+    "and wait for every worker to finish the remaining cases.\n"
+)
+expect(
+    "a code-span semicolon is not a gate clause violation",
+    checker.classify_line(CODE_SEMI.strip()) is None,
+    f"len={len(checker.strip_inline_markup(CODE_SEMI.strip()))} "
+    f"reason={checker.classify_line(CODE_SEMI.strip())!r}",
+)
+expect(
+    "reformat does not split on a code-span semicolon",
+    slb.reformat(CODE_SEMI) == CODE_SEMI,
+    repr(slb.reformat(CODE_SEMI)),
+)
+
+# Same masking, but classify_line returns "clause" so emit_gate_clean
+# actually calls split_clauses. A naive text.split(";") would emit three
+# pieces; the mask must keep the code-span semicolon unsplit.
+CLAUSE_AND_CODE_SEMI = (
+    "The first independent clause is padded with enough words to push "
+    "the stripped length past eighty characters; then run `pytest; true` "
+    "and wait for every remaining worker to finish those cases.\n"
+)
+expect(
+    "a long line with a prose semicolon is a clause violation",
+    checker.classify_line(CLAUSE_AND_CODE_SEMI.strip()) == "clause",
+    f"len={len(checker.strip_inline_markup(CLAUSE_AND_CODE_SEMI.strip()))} "
+    f"reason={checker.classify_line(CLAUSE_AND_CODE_SEMI.strip())!r}",
+)
+got_clause_code = slb.reformat(CLAUSE_AND_CODE_SEMI)
+expect(
+    "reformat splits the prose semicolon and keeps the code-span one",
+    got_clause_code == (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;\n"
+        "then run `pytest; true` "
+        "and wait for every remaining worker to finish those cases.\n"
+    ),
+    repr(got_clause_code),
+)
+naive_pieces = [
+    p.strip()
+    for p in CLAUSE_AND_CODE_SEMI.strip().split(";")
+    if p.strip()
+]
+expect(
+    "naive semicolon split of that fixture yields three pieces",
+    len(naive_pieces) == 3,
+    repr(naive_pieces),
+)
+expect(
+    "split_clauses keeps the code-span semicolon (two pieces)",
+    nlb_gate.split_clauses(CLAUSE_AND_CODE_SEMI.strip(), checker)
+    == [
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;",
+        "then run `pytest; true` "
+        "and wait for every remaining worker to finish those cases.",
+    ],
+)
+expect(
+    "every line of the clause-and-code-span reflow is gate-clean",
+    [checker.classify_line(ln.strip()) for ln in got_clause_code.splitlines()]
+    == [None, None],
+)
+
+# #2081 is the comma-clause join. The gate does not flag commas, so this
+# change must not start splitting them --- that would be a different issue.
+LONG_COMMA = (
+    "They are explicit that it disables the check outright rather than "
+    "allowlisting one host, so they advise pairing it with WebFetch permission "
+    "rules to bound which domains stay reachable, and they present this as one "
+    "of two remedies for a network that blocks the Anthropic API host.\n"
+)
+expect(
+    "a long comma-clause sentence is not a gate violation",
+    checker.classify_line(LONG_COMMA.strip()) is None,
+)
+expect(
+    "#2081 comma joins are unchanged (still one line)",
+    slb.reformat(LONG_COMMA) == LONG_COMMA,
+    f"len={len(slb.reformat(LONG_COMMA).strip())} "
+    f"lines={slb.reformat(LONG_COMMA).count(chr(10))}",
+)
+
+# Bullet continuation: first piece keeps the marker, later pieces indent.
+BULLET_SEMI = (
+    "- The **Don't:** count an explicit `raise` as louder than the incidental "
+    "error it replaces; an adversarial self-review caught it before merge.\n"
+)
+got_bullet = slb.reformat(BULLET_SEMI)
+expect(
+    "bullet semicolon split keeps the marker on the first piece only",
+    got_bullet.startswith("- ") and "\n  " in got_bullet,
+    repr(got_bullet),
+)
+bullet_reasons = [
+    checker.classify_line(checker.line_content(line))
+    for line in got_bullet.splitlines()
+    if line.strip()
+]
+expect(
+    "split bullet lines are gate-clean",
+    all(r is None for r in bullet_reasons) and len(bullet_reasons) >= 2,
+    f"{got_bullet!r} reasons={bullet_reasons!r}",
+)
+
+# Ellipsis-before-capital is a sentence boundary to the shared regex
+# (ai-config#2085: --write proposes the same split the gate flags).
+ELLIPSIS = "[...] Everything else follows on.\n"
+expect(
+    "an ellipsis before a capital is a sentence violation to the gate",
+    checker.classify_line(ELLIPSIS.strip()) == "sentence",
+)
+expect(
+    "reformat splits an ellipsis before a capital",
+    slb.reformat(ELLIPSIS) == "[...]\nEverything else follows on.\n",
+    repr(slb.reformat(ELLIPSIS)),
+)
+
+# Scoped path: if split_sentences returns a piece that is not a substring
+# of the paragraph, emit_gate_clean still has to run.
+FIND_MISS_CLAUSE = (
+    "The first independent clause is padded with enough words to push "
+    "the stripped length past eighty characters; then the second clause "
+    "follows on from there with more words."
+)
+orig_split = slb.split_sentences
+try:
+    slb.split_sentences = lambda text: [FIND_MISS_CLAUSE]
+    got_miss = slb.reformat("Unrelated short prose.\n", {1})
+finally:
+    slb.split_sentences = orig_split
+expect(
+    "scoped find-miss still emits through the gate (splits the clause)",
+    got_miss == (
+        "The first independent clause is padded with enough words to push "
+        "the stripped length past eighty characters;\n"
+        "then the second clause follows on from there with more words.\n"
+    ),
+    repr(got_miss),
+)
+
+
+# PyYAML must stay optional for everything except CI-config resolution: the
+# reformatter's --help (and any pre-parse path) must work on a machine with no
+# PyYAML, and a run that genuinely needs the config must exit with the
+# friendly install message, never a raw ModuleNotFoundError traceback
+# (review finding on #2322: an unguarded module-scope import broke both).
+import subprocess
+import tempfile
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+
+with tempfile.TemporaryDirectory() as _shim_dir:
+    (Path(_shim_dir) / "yaml.py").write_text(
+        'raise ImportError("yaml blocked for test")\n', encoding="utf-8"
+    )
+    _env = dict(os.environ, PYTHONPATH=_shim_dir)
+    _help = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"), "--help"],
+        capture_output=True, text=True, env=_env,
+    )
+    expect(
+        "--help works without PyYAML",
+        _help.returncode == 0,
+        _help.stderr[-200:],
+    )
+    # --all on a temp file outside the repo: deterministic (no base-ref git
+    # scoping, which CI's checkout cannot resolve), and still reaches the
+    # gate's config resolution, which is what needs PyYAML.
+    _probe = Path(_shim_dir) / "probe.md"
+    _probe.write_text("A short test sentence.\n", encoding="utf-8")
+    _run = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"),
+         "--all", str(_probe)],
+        capture_output=True, text=True, env=_env,
+    )
+    expect(
+        "yaml-needing run without PyYAML exits with the friendly message",
+        _run.returncode != 0
+        and "pip install pyyaml" in (_run.stderr + _run.stdout)
+        and "Traceback" not in (_run.stderr + _run.stdout),
+        (_run.stderr + _run.stdout)[-300:],
+    )
+    # Multi-path contract: the missing dependency is reported per path and
+    # the run still reaches its summary line, instead of the first path
+    # killing the whole batch (finding on #2322's delta review).
+    _probe2 = Path(_shim_dir) / "probe2.md"
+    _probe2.write_text("Another short sentence.\n", encoding="utf-8")
+    _multi = subprocess.run(
+        [sys.executable, str(SCRIPTS_DIR / "semantic-line-breaks.py"),
+         "--all", str(_probe), str(_probe2)],
+        capture_output=True, text=True, env=_env,
+    )
+    _multi_out = _multi.stderr + _multi.stdout
+    expect(
+        "multi-path run without PyYAML reports each path and summarizes",
+        _multi_out.count("pip install pyyaml") >= 2
+        and "Done (" in _multi_out
+        and "Traceback" not in _multi_out,
+        _multi_out[-400:],
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

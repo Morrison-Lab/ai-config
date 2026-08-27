@@ -700,7 +700,7 @@ repo root.
 
 ### Vendored from wai (`shared/vendored/`)
 
-A few fragments are authored in **[d-morrison/wai](https://github.com/d-morrison/wai)**
+A few fragments are authored in **[Morrison-Lab/wai](https://github.com/Morrison-Lab/wai)**
 instead (prompt formats, the Copilot-review workflow) — that repo hosts the
 UCD-SERG lab's "Working with AI" notes, migrated out of the lab manual once
 they outgrew a single chapter. This repo can't add wai as a submodule — wai

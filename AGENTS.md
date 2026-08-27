@@ -136,7 +136,7 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 |---|---|---|
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
-| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| upstream Morrison-Lab/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
 | `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.

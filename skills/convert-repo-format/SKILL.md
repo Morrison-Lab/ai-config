@@ -21,7 +21,7 @@ for what that format's files, config, and CI look like:
 | R package | [`rpt`](https://github.com/UCD-SERG/rpt) | — (no `_quarto.yml`) | altdoc site | Yes — full package |
 | Quarto website | [`qwt`](https://github.com/UCD-SERG/qwt) | `website` | `_site` | Yes — light package |
 | Quarto book | [`qbt`](https://github.com/UCD-SERG/qbt) | `book` | `docs` | No (`Type: Book`) |
-| Quarto manuscript | [`qmt`](https://github.com/d-morrison/qmt) | `manuscript` | `_manuscript` | Yes — light package |
+| Quarto manuscript | [`qmt`](https://github.com/Morrison-Lab/qmt) | `manuscript` | `_manuscript` | Yes — light package |
 
 The core move is **diff against the target template, not rewrite from scratch.**
 The four formats share most of their scaffolding (R tooling, spell/lint/link
@@ -89,7 +89,7 @@ strings only):
   `CODE_OF_CONDUCT.md`.
 - Shared CI: `.github/workflows/` `claude.yml`, `claude-code-review.yml`,
   `copilot-setup-steps.yml`, `check-spelling.yaml`. Most workflows are thin
-  callers of the reusable workflows in [`d-morrison/gha`](https://github.com/d-morrison/gha)
+  callers of the reusable workflows in [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)
   pinned `@v1`, so "convert the CI" mostly means copying the target template's
   `.github/workflows/` and updating repo-specific inputs — not rewriting logic.
 

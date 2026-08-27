@@ -643,7 +643,7 @@ entry + index link + index text), a sidebar-missing one only **2**.
 ported into `reference.qmd` only; caught before merge, fixed, and confirmed
 2 -> 3 occurrences each in the deployed preview.
 `UCD-SERG/serocalculator#610` proposes the cross-check as CI, possibly
-belonging in `d-morrison/gha` since every altdoc repo shares the structure.)
+belonging in `Morrison-Lab/gha` since every altdoc repo shares the structure.)
 
 ## renv — each git worktree gets its own (empty) project library
 

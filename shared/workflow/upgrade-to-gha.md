@@ -19,7 +19,7 @@ Three rules already name a condition for reaching toward gha, and each waits for
 
 - [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s "A stale, un-migrated local copy is the least reliable place to fix a bug" fires when you are **about to patch a bug** in a workflow file.
 - The same fragment's "Close the loop once the port lands" fires when **gha has just gained** a capability a consumer already had locally.
-- [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) opens with "Check `d-morrison/gha` before writing bespoke CI", which fires when you are **about to write new CI**.
+- [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) opens with "Check `Morrison-Lab/gha` before writing bespoke CI", which fires when you are **about to write new CI**.
 
 Those three are the migration-condition rules, not every mention of gha in the corpus.
 Many more files mention gha without naming one --- `git grep -l gha <ref> -- '*.md' | wc -l` counts them at whatever ref you hand it --- and some route work toward gha for reasons that are not migration at all: [`config-ai`](../../skills/config-ai/SKILL.md)'s routing table picks gha as the home for a new shared capability, and [`convert-repo-format`](../../skills/convert-repo-format/SKILL.md) assumes a target template already calls it.

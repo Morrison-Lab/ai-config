@@ -24,6 +24,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
 - **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
 - **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+  That "watch and ARDI" default applies when you are driving the branch, not when you were asked only to review it ---
+  see [`reviewing-prs.md`](reviewing-prs.md) ("Review-only is not working the PR").
 - **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
 ## Pattern 5: Bypassing Existing Repo Knowledge
@@ -41,12 +43,33 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
 
 ## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
-- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
-- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): told user Morrison-Lab/ai-config#1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` --- a PR is not ready until ALL CI checks pass AND review is clean.
-- **Fix**: Always run `gh pr checks <N>` or `gh pr view <N> --json statusCheckRollup` before declaring a PR ready.
-  Never say "ready to merge" unless every check is green.
-  If CI is failing, say so and fix it first.
+- **Mistake**: Telling a user a PR is ready to merge without checking CI status,
+  or saying "ready" when checks haven't finished,
+  or declaring clean from a short rollup (`gh pr checks`, `statusCheckRollup`)
+  instead of the complete instrument.
+- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`):
+  told user Morrison-Lab/ai-config#1677 was ready without checking that CI had failed
+  (`new-line-breaks` check).
+  Re-hit 2026-08-26 on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277):
+  reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict;
+  `check-pr-fully-clean.py` exited 1 (`No automated review...`).
+  The rollup matched the endpoint that time (8==8);
+  the defect was resting a terminal claim on it.
+  An earlier Fix in this pattern recommended those short rollups ---
+  that was the wrong instrument for a terminal claim.
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
+  `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
+- **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
+  before a terminal clean / ready-to-merge claim.
+  Read exit 0 as clean,
+  exit 1 with `  - ` bullets as not-clean,
+  any other exit as the check failing to answer.
+  A paginated `commits/<sha>/check-runs` read is the check-run half only
+  (progress reports, criterion 1); it does not authorize the terminal claim.
+- **Don't:** Declare clean from `gh pr checks` or `statusCheckRollup` alone,
+  however current they look.
+  Progress reports ("8 success, 0 pending") are fine;
+  "Ready for merge" is not until `check-pr-fully-clean.py` exits 0.
 
 ## Pattern 5d: Failing to Learn From Mistakes
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.
@@ -190,16 +213,21 @@ This was a critical misunderstanding of the security invariant:
 
 **Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
 Do not attempt to "fix" the script to admit fallback reviews for merging.
-A clean automated Claude review evaluating the current HEAD commit is strictly required for an autonomous merge.
+A clean automated review from every available provider evaluating the current HEAD commit is strictly required for an autonomous merge.
 
 ## Pattern 13: Forgetting to Undraft a Review-Ready PR
-- **Mistake**: Pushing a fully completed feature or bugfix but leaving the PR in draft mode. This silently stalls progress because reviewers and automations treat drafts as WIP.
-- **Example**: 2026-08-26 session (ai-config#2295): completed fixes, ran local verification, requested Claude review, but left the PR in draft mode. The user had to manually ask "why is 2295 still in draft mode".
+- **Mistake**: Pushing a fully completed feature or bugfix but leaving the PR in draft mode.
+  This silently stalls progress because reviewers and automations treat drafts as WIP.
+- **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
+  The user had to manually ask "why is 2295 still in draft mode".
+  (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
 - **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft... Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
-- **Fix**: Right after a final push to a PR that completes its implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`). Do this before dispatching review workflows or yielding to the user.
+- **Fix**: Right after a final push to a PR that completes its implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
+  Do this before dispatching review workflows or yielding to the user.
 
 ## Pattern 14: Pausing Without Setting a Timer
 - **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.
-- **Example**: 2026-08-26 session: After reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
+  Pattern 5g above is the PR-monitoring special case of this; this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
+- **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
 - **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.

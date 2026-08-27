@@ -34,7 +34,7 @@ Each is a fragment this corpus already has, read for its **cost** rather than fo
 - **A brief that hands over an enumerated set rather than the query deriving it.**
   Per [`derive-dont-enumerate`](derive-dont-enumerate.md): a stale list costs a re-dispatch, and the items that appear between the lists are covered by nobody.
 - **Work sitting at the conductor's tier that a cheaper or unbilled one could do.**
-  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) is unbilled and [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) is separately billed, so both come ahead of this session's own quota for bounded mechanical work.
+  [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) offers unbilled (Zen free, local Ollama) and subscription (Go) tiers, while [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) is separately billed, so both come ahead of this session's own quota for bounded mechanical work.
 - **A large tool output re-read rather than summarized once.**
   Record the conclusion and stop re-fetching the evidence, per [`efficient-pr-babysitting`](efficient-pr-babysitting.md).
 

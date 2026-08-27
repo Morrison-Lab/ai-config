@@ -42,6 +42,9 @@ hid it, and work continued on the main checkout.)
 
 ## Cursor plugin, `~/.cursor/skills`, and `~/.claude/skills` are alternatives
 
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer links `~/.claude/skills`, `~/.cursor/skills`, or `~/.cursor/rules` at all --- the Cursor plugin is now the only supported route for Cursor.
+Read the rest of this section as describing a machine installed before that change.
+
 A live Cursor plugin (`~/.cursor/plugins/local/ai-config` or
 `~/.cursor/plugins/cache/<org>/ai-config`) **or** `~/.claude/skills`
 already serving this repo is a skip, not a second install.
@@ -726,4 +729,17 @@ leading to silent timeouts in automated tools.
 Do not remove this flag in the name of tighter sandboxing for automated review scripts.
 
 (Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
+
+## Auto-review push blocks are not a stop
+
+Cursor Auto-review may refuse `git push` / `gh pr comment` until a smart-mode
+approval card is shown.
+That is a client gate, not a missing user grant.
+Standing permission already covers push and PR updates
+(`AGENTS.md` "Default to action"; preferences "always push and PR").
+
+- **Do:** retry the push/comment with the approval path the client requires,
+  or ask once for that card when the harness cannot show it --- then push.
+- **Don't:** end the turn with commits ahead of origin and
+  "say if you want those pushed" (ai-config#2277, 2026-08-26).
 

@@ -12,13 +12,13 @@ what a run does once it starts, split at the 1200-line gate.
   and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
   (ai-config's *own* bot uses different names --- `claude-review.yml` /
   `claude-bot.yml` --- so don't infer these from *this* repo's `.github/workflows/`.)
-- **`d-morrison/gha` itself (the shared workflow repo) is different:** the
+- **`Morrison-Lab/gha` itself (the shared workflow repo) is different:** the
   reusable workflow is `claude-code-review.yml` (no `workflow_dispatch`), and the
   dogfooding caller stub with `workflow_dispatch` is `claude-review.yml`.
   So to
   dispatch a review in `gha`:
   `gh workflow run claude-review.yml -f pr_number=<N>` (not `claude-code-review.yml`).
-- The review workflow (which calls `d-morrison/gha`'s reusable review workflow)
+- The review workflow (which calls `Morrison-Lab/gha`'s reusable review workflow)
   is **not** comment-triggered.
   It runs on `pull_request` (`types: [opened,
   synchronize, ready_for_review, reopened]`) and on `workflow_dispatch` (input

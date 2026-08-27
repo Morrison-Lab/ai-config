@@ -1,13 +1,18 @@
-When starting a **new** piece of work, go **issue-first**: before branching,
-editing, or opening a PR, make sure a tracking issue exists. Search the tracker
-first; if no open issue covers the task, **file one** (`gh issue create` /
-`glab issue create`), then proceed. Never jump straight into a PR without a
-tracking issue behind it.
+When starting a **new** piece of work, go **issue-first**: before branching, editing, or opening a PR, make sure a tracking issue exists.
+Search the tracker first with a qualifying all-state search, not an open-only listing;
+if no existing issue covers the task, **file one** (`gh issue create` / `glab issue create`), then proceed.
+Never jump straight into a PR without a tracking issue behind it.
 
-The issue is the durable record of intent, scope, and "done" criteria --- it
-gives reviewers context, lets the PR auto-close it via `Closes #N`, and keeps
-the work discoverable even if the PR stalls. Skip only when the task is already
-tracked by an open issue.
+On GitHub that search is `gh issue list --state all --search`;
+on GitLab it is `glab issue list --all --search` (glab has no `--state`).
+Not `--state open`: a closed issue for the same bug is the duplicate an open-only search cannot see, per [`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md).
+`hooks/warn-pr-create-without-dupe-check.py` warns (never blocks) when a `gh issue create` / `glab issue create` runs with no such query earlier in the session.
+It prompts the search;
+it does not judge the terms ([`grep-is-not-coverage`](grep-is-not-coverage.md)).
+
+The issue is the durable record of intent, scope, and "done" criteria --- it gives reviewers context, lets the PR auto-close it via `Closes #N`, and keeps the work discoverable even if the PR stalls.
+Skip only when the task is already tracked by an open issue.
+A closed match is not a skip: surface it and confirm before re-doing the work.
 
 This rule settles *whether* something is tracked, not *where* it goes.
 An item whose deliverable is a decision rather than a diff belongs on the

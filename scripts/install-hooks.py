@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Check that this repo's hooks are registered with the harness, and repair it.
 
-`bootstrap.sh` symlinks every top-level directory into `~/.claude`, so
-`hooks/` lands there with no bootstrap change at all. That gets the *scripts*
-onto the machine and stops there: a hook only runs once it is named in
-`~/.claude/settings.json`, and bootstrap is a pure symlinker that deliberately
-never edits that file. Editing a user's harness config as a side effect of
-installing skills is the same objection that kept `git config --global
-fetch.prune` out of bootstrap (ai-config#901).
+The Claude Code plugin (`.claude-plugin/plugin.json`) is the supported path
+on a fresh machine: its loader auto-discovers `hooks/hooks.json` at the
+plugin root and registers every hook it names, no separate step needed.
 
-So registration is explicit and opt-in, and lives here rather than in
-bootstrap. `scripts/check-install.py` is the sibling for the other half: it
-decides whether the installed *files* match the repo, and knows nothing about
-`settings.json`.
+This script covers the non-plugin path instead, and its `--fix` only ever
+edits `settings.json` -- it does not place the hook *scripts* onto disk.
+`bootstrap.sh` used to symlink `hooks/` into `~/.claude` for that, but no
+longer does (see its header comment), so this path currently only helps on a
+machine whose `~/.claude/hooks` already holds the scripts some other way
+(see [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).
+Editing a user's harness config as a side effect of installing skills is a
+separate concern from placing files, which is the same objection that kept
+`git config --global fetch.prune` out of bootstrap (ai-config#901) -- so
+registration stays explicit and opt-in here rather than automatic anywhere.
 
 Why hooks at all, given the rules are already written down: each one here
 mechanizes a rule that was violated in a session where it was loaded and
@@ -139,9 +141,8 @@ def enabled_ai_config_plugin(settings: dict) -> str | None:
     Best-effort by design: this inspects only the settings.json this script
     reads, so it catches the common case (plugin enabled in the same file) and
     can miss a project-level enablement. It has no false positives. The
-    matching itself lives in `scripts/lib/plugin_overlap.py`, shared with
-    `check-plugin-overlap.py`, so the two warnings cannot drift apart; the
-    README caveat covers what this cannot see.
+    matching itself lives in `scripts/lib/plugin_overlap.py`; the README
+    caveat covers what this cannot see.
     """
     enabled = enabled_ai_config_plugins(settings)
     return enabled[0] if enabled else None
@@ -222,9 +223,11 @@ def main() -> int:
 
     if not args.fix:
         print("\nRe-run with --fix to register the missing hooks.")
-        print("Note --fix only edits settings.json. The scripts themselves are "
-              "placed by bootstrap.sh; run scripts/check-install.py --fix if "
-              "~/.claude/hooks holds real copies instead of symlinks.")
+        print("Note --fix only edits settings.json and never places the "
+              "scripts themselves. On a fresh machine, install the Claude "
+              "Code plugin instead (it registers the full catalog with no "
+              "separate step); this path only helps if ~/.claude/hooks "
+              "already holds the scripts some other way.")
         return 1
 
     backup = settings_path.with_suffix(f".json.bak-{int(time.time())}")

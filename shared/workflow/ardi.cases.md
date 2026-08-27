@@ -570,7 +570,7 @@ to say you are not using it.)
 
 ## A review round surfacing five findings your own conventions already covered
 
-([gha#219](https://github.com/d-morrison/gha/issues/219)/[#220](https://github.com/d-morrison/gha/pull/220): one review round surfaced five findings --- a DRY
+([gha#219](https://github.com/Morrison-Lab/gha/issues/219)/[#220](https://github.com/Morrison-Lab/gha/pull/220): one review round surfaced five findings --- a DRY
 duplication, an incomplete-coverage doc overclaim, a wrong changelog
 category, an uncited claim, and missing test coverage for new logic --- all
 catchable this way, since each was a direct match against gha's own
@@ -652,7 +652,7 @@ rather than by either review, and the merged body records that catch in a
 ## Validating against a real consumer repo covers what fixtures cannot
 
 (d-morrison/altdoc#34: running the new reference-index generator
-against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
+against `Morrison-Lab/rpt` covered a `\docType{package}` topic, the singular
 form of a missing-topic warning, and the documented "existing settings files
 do not pick this up automatically" caveat --- confirmed by the page
 generating while `grep -c reference.html docs/index.html` returned `0`.

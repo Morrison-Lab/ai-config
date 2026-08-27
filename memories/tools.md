@@ -825,7 +825,7 @@ error underneath whatever the regex got wrong, per
 
 **Run it only against committed state --- it is diff-scoped against `<base>...HEAD`.**
 The false-clean-on-an-uncommitted-tree trap and its commit-first remedy are already recorded twice:
-in [`memories/git.md`](git.md)'s `check-new-line-breaks` entry,
+in [`memories/git-diffing.md`](git-diffing.md)'s `check-new-line-breaks` entry,
 and in [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s dirty-tree section,
 which carries the precise mechanism (line numbers from `<base>...HEAD`, line content from the working tree),
 the occurrence record,

@@ -253,7 +253,7 @@ Fold a finished session's notebook into durable memory (or prune it) during UMS 
 
 [`shared/workflow/keep-checkouts-fresh.md`](shared/workflow/keep-checkouts-fresh.md)
 
-Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the `~/.claude` consumer copies (symlinks versus Windows real-copies versus a shadowed-container split, verified with `check-install.py` and `install-hooks.py`), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
+Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the consumer install (Claude Code and Cursor load this repo as a native plugin that auto-updates, so confirm the plugin is enabled and not doubled --- any leftover `~/.claude` copies of `shared/`, `hooks/`, or `memories/` predate the symlink-install removal and want a content diff, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
 The fragment above carries the mechanics, the failure modes each check catches, and the case records.
 
 ## Timestamp recaps in local time

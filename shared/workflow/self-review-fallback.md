@@ -131,27 +131,32 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 
 **A fallback review has to be *admitted* before its verdict is even read, and
 the admission turns on where the agent marker sits.**
-`scripts/check-pr-fully-clean.py` decides three things in order, and a
-fallback that satisfies the last two while failing the first counts for
+`scripts/check-pr-fully-clean.py` applies three filters, in this order, and a
+fallback that satisfies the later two while failing admission counts for
 nothing.
 
-1. **Admission.**
+1. **Admission**, which decides whether the comment enters the pool at all.
    `_reviewer_identity()` reads only the **first and last non-blank line** of
    the body.
    A marker anywhere between them resolves to the poster's own login, the
    comment is not admitted as an agent's review, and nothing later in it is
    consulted.
-2. **Verdict form.**
+2. **Head match**, which narrows the admitted pool to comments evaluating the
+   commit under test.
+   The body must quote it.
+   Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
+   substring, so a 7-character `--short` SHA matches, as does the full 40.
+3. **Verdict form**, read last, over whatever survived the first two.
    `classify_verdict()` reads the phrase `Verdict: Clean` on one line.
    A `### Verdict` heading whose word sits on the next line returns
    `unreadable`, and that state only exists at all when the body carried a
    marker --- without one it returns nothing and prints no note.
-3. **Head match.**
-   The body must quote the commit.
-   Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
-   substring, so a 7-character `--short` SHA matches, as does the full 40.
 
-Neither of the first two announces itself.
+The order is worth keeping straight, because it decides which diagnostic you
+get: a comment failing admission or head match never reaches the classifier,
+so no verdict complaint is printed about it at all.
+
+Neither admission nor verdict form announces itself.
 An unadmitted comment produces `No review comment has been posted evaluating
 HEAD SHA <sha> yet`, which reads as *nothing was posted* rather than as *what
 you posted did not count*.

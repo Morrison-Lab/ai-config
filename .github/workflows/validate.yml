@@ -50,6 +50,8 @@ jobs:
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run test_pull_request tests
+        run: python3 scripts/test_pull_request.py
       - name: Run check-pr-body-figures tests
         run: python3 scripts/test_check_pr_body_figures.py
       - name: Run semantic-line-break tool tests

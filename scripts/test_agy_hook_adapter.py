@@ -407,6 +407,67 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out.get("injectSteps", [])), 3)
 
     @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open)
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_multibyte_boundary_no_empty_ephemeral_messages(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: when the total byte cap lands mid a multi-byte
+        # UTF-8 character, `errors="ignore"` yields an empty
+        # trimmed_chunk. That must NOT be appended as another empty
+        # ephemeralMessage step for every remaining hook (up to the
+        # message cap) -- it must be dropped, and accumulation must stop
+        # since no further hook output can fit either.
+        #
+        # Reproduces the reviewer's scenario: hooks consuming 29999 of
+        # 30000 bytes, then hooks returning 2-byte UTF-8 characters
+        # ("e" with an acute accent, U+00E9) that cannot fit in the
+        # single remaining byte.
+        five_hooks = {
+            "hooks": {
+                "UserPromptSubmit": [
+                    {"hooks": [{"command": f"cmd_{i}"} for i in range(5)]}
+                ]
+            }
+        }
+        mock_file.return_value.read.return_value = json.dumps(five_hooks)
+
+        multibyte_chunk = "é" * 10  # 10 chars, 20 bytes in UTF-8
+        results = [
+            MagicMock(returncode=0, stdout="A" * 9999, stderr=""),   # 9999 bytes
+            MagicMock(returncode=0, stdout="B" * 10000, stderr=""),  # 10000 bytes (total 19999)
+            MagicMock(returncode=0, stdout="C" * 10000, stderr=""),  # 10000 bytes (total 29999)
+            MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # overflows by 1 byte mid-char
+            MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # must never be reached
+        ]
+        mock_run.side_effect = results
+
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        steps = out.get("injectSteps", [])
+        messages = [step["ephemeralMessage"] for step in steps]
+
+        # No empty ephemeralMessage entries, however many hooks the
+        # boundary overflow would otherwise have visited.
+        self.assertNotIn("", messages)
+        # Only the three hooks whose content actually fit contributed --
+        # the fourth hook's content could not fit even one code point
+        # (a boundary mid multi-byte UTF-8 character) and the adapter
+        # must stop accumulating rather than keep padding with empties.
+        self.assertEqual(len(steps), 3)
+        total_len = sum(len(m.encode("utf-8")) for m in messages)
+        self.assertEqual(total_len, 29999)
+        # The 5th hook's command must never have run: the adapter should
+        # have already determined nothing more could fit and stopped.
+        self.assertEqual(mock_run.call_count, 4)
+
+    @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -1255,6 +1316,40 @@ class TestAgyHookAdapter(unittest.TestCase):
             out.get("injectSteps"),
             [{"ephemeralMessage": "Nested context message"}] * 2,
         )
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_non_string_additional_context_does_not_crash(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: a hook returning a non-string
+        # additionalContext (a dict here, but a list or a number is the
+        # same shape of bug) must not crash the adapter with an uncaught
+        # AttributeError from `.encode("utf-8")` on a non-str value.
+        # PreInvocation must coerce it to a string, mirroring the
+        # str(...) coercion the PreToolUse and Stop branches already
+        # apply to their own systemMessage/additionalContext reads, and
+        # must still emit valid JSON either way.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "additionalContext": {"nested": "object"}
+        }), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertIn("injectSteps", out)
+        # MOCK_HOOKS_DEF's UserPromptSubmit group runs two hooks, and both
+        # are mocked to return the same non-string additionalContext.
+        self.assertEqual(len(out["injectSteps"]), 2)
+        for step in out["injectSteps"]:
+            self.assertEqual(step["ephemeralMessage"], str({"nested": "object"}))
 
     # -- Configurable caps (env-var overrides) ---------------------------
 

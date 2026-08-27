@@ -352,11 +352,8 @@ Brief the new subagent with the diff and the standards only --- never with the
 prior rounds' findings or dispositions.
 A verifier handed the old finding list confirms the fixes and stops;
 fresh eyes re-derive the whole diff and find what every earlier round missed.
-Measured on ucdavis/bcs#736, 2026-08-26: two verification passes returned
-Clean at their heads, and then two successive fresh rounds each found real
-defects all prior rounds had passed over --- the checking machinery
-self-declared in its own input set, and an undeclared runtime CSV input in
-the silent stale-verifies-current direction.
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"Verification passes returned Clean while fresh rounds kept finding defects".
 A verification pass still has its narrow place --- confirming a specific
 fix landed before reporting a round addressed --- but it never substitutes
 for the next fresh round.

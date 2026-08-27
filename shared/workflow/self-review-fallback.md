@@ -131,30 +131,42 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 
 **A fallback review has to be *admitted* before its verdict is even read, and
 the admission turns on where the agent marker sits.**
-`scripts/check-pr-fully-clean.py` applies three filters, in this order, and a
-fallback that satisfies the later two while failing admission counts for
-nothing.
+`scripts/check-pr-fully-clean.py` does **not** apply these as a pipeline, and
+describing them as one is what makes the mechanics hard to predict.
+Admission comes first and gates everything.
+What follows it is two *independent* readings of the admitted pool, neither
+feeding the other.
 
-1. **Admission**, which decides whether the comment enters the pool at all.
-   `_reviewer_identity()` reads only the **first and last non-blank line** of
-   the body.
-   A marker anywhere between them resolves to the poster's own login, the
-   comment is not admitted as an agent's review, and nothing later in it is
-   consulted.
-2. **Head match**, which narrows the admitted pool to comments evaluating the
-   commit under test.
-   The body must quote it.
-   Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
-   substring, so a 7-character `--short` SHA matches, as does the full 40.
-3. **Verdict form**, read last, over whatever survived the first two.
-   `classify_verdict()` reads the phrase `Verdict: Clean` on one line.
-   A `### Verdict` heading whose word sits on the next line returns
-   `unreadable`, and that state only exists at all when the body carried a
-   marker --- without one it returns nothing and prints no note.
+**Admission** decides whether a comment enters the pool at all
+(`check-pr-fully-clean.py:1316`).
+`_reviewer_identity()` reads only the **first and last non-blank line** of the
+body.
+A marker anywhere between them resolves to the poster's own login, the comment
+is not admitted as an agent's review, and nothing else about it is ever
+consulted.
 
-The order is worth keeping straight, because it decides which diagnostic you
-get: a comment failing admission or head match never reaches the classifier,
-so no verdict complaint is printed about it at all.
+Then, over everything admitted:
+
+- **The verdict check reads the whole history, not the current commit**
+  (`check_latest_verdict(all_items, ...)`, `:1325`).
+  `classify_verdict()` reads the phrase `Verdict: Clean` on one line; a
+  `### Verdict` heading whose word sits on the next line returns `unreadable`.
+  This runs over *every* admitted item regardless of which commit it
+  evaluated, and the code says why: a not-clean verdict at an earlier commit
+  stands until a later clean from the **same** reviewer supersedes it.
+- **The head match narrows to comments evaluating the commit under test**
+  (`:1334`), answering the separate question of whether anything has reviewed
+  this head at all.
+  The body must quote the commit.
+  Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
+  substring, so a 7-character `--short` SHA matches, as does the full 40.
+
+The independence is the part with consequences, and it is the opposite of what
+a pipeline model predicts.
+A stale not-clean verdict from an *earlier* commit still blocks, because the
+verdict check never sees the head filter.
+So pushing a fix does not clear a previous round's verdict; only a later clean
+from that same reviewer does.
 
 Neither admission nor verdict form announces itself.
 An unadmitted comment produces `No review comment has been posted evaluating

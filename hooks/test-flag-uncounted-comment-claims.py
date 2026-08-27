@@ -178,6 +178,48 @@ TWO_ITEM_COMMA_LIST = (
     "and 18 files on main."
 )
 
+# ai-config#2386 review round 4 (claude-review, comment 5435303313): a
+# FOURTH route into the path-citation class. `looks_like_one_path`'s round-3
+# fix only recognized EXACTLY two items; `ENUM_RE`'s own token-list clause
+# places no cap on item count, so a real three-or-more-segment hyphenated
+# path sailed past a `len(items) == 2` check untouched.
+PATH_THREE_SEGMENTS_HYPHENATED = (
+    "No matches in codex-skills/pre-push-review/SKILL.md were found."
+)
+PATH_MANY_SEGMENTS_HYPHENATED = (
+    "See references in tracking-your-work-with-issues/using-issues/"
+    "linking-a-pull-request-to-an-issue.md for details."
+)
+
+# ai-config#2386 review round 5: an adversarial sweep -- deriving 780+ real
+# path-like strings from this repo's own shared/**/*.md + skills/**/*.md,
+# embedded in review-comment-style sentences -- found 140 residual
+# enumeration false positives across five categories the round-4 fix did
+# not reach: a curated extension whitelist missing real extensions
+# (`.io`, `.jpg`, `.gz`, `.paper`), bare trailing-slash directory
+# references, and (the largest single cause, once the first two were
+# fixed) a domain-plus-path citation whose FIRST segment ends in a
+# TLD-shaped suffix that satisfied the "no earlier item may be
+# extension-shaped" refinement's OWN extension check, defeating it.
+PATH_UNCOMMON_EXTENSION = (
+    "No matches in d-morrison/methods.paper were found."
+)
+PATH_TRAILING_SLASH_DIRECTORY = (
+    "No matches in codex-skills/pre-push-review/ were found."
+)
+PATH_DOMAIN_SHAPED = (
+    "No matches in adv-r.hadley.nz/conditions.html were found."
+)
+# The DELIBERATELY ACCEPTED cost of closing the domain-shaped case: dropping
+# the "no earlier item may be extension-shaped" refinement means a genuine
+# multi-file list joined by `/` with no comma is now ALSO silenced. This is
+# no longer a true-positive fixture -- it PINS the accepted miss, so a
+# future edit that reintroduces the refinement (and reopens the domain-
+# citation false positive) has to consciously change this assertion too.
+ACCEPTED_MISS_SLASH_ONLY_MULTI_FILE_LIST = (
+    "See files foo.py / bar.py / baz.py in this update."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -322,8 +364,35 @@ def unit_checks(mod):
           False)
     check("looks_like_one_path keeps a comma-joined pair even with an extension",
           mod.looks_like_one_path("foo.py, bar.py"), False)
-    check("looks_like_one_path keeps a 3+-item slash list even extension-terminated",
-          mod.looks_like_one_path("a-b/c-d/e-f.py"), False)
+    # Round 4 generalized past exactly-two-items: a 3+-item slash list
+    # extension-terminated at the end IS now rejected as one path -- this
+    # assertion is the inverse of round 3's own (now superseded) fixture,
+    # which pinned the pre-generalization "3+ items always keeps firing"
+    # behaviour the review found too narrow.
+    check("looks_like_one_path rejects a 3+-item slash list, extension-terminated",
+          mod.looks_like_one_path("a-b/c-d/e-f.py"), True)
+    check("looks_like_one_path keeps a 3+-item slash list with no extension",
+          mod.looks_like_one_path("a-b/c-d/e-f"), False)
+
+    # Regression: PR #2386 review round 4 -- the length-generalized fix.
+    check("find_claims silent on a 3-segment hyphenated path",
+          mod.find_claims(PATH_THREE_SEGMENTS_HYPHENATED), [])
+    check("find_claims silent on a many-segment hyphenated path",
+          mod.find_claims(PATH_MANY_SEGMENTS_HYPHENATED), [])
+
+    # Regression: PR #2386 review round 5 -- the adversarial-sweep fixes.
+    check("find_claims silent on an uncommon-extension path citation",
+          mod.find_claims(PATH_UNCOMMON_EXTENSION), [])
+    check("find_claims silent on a bare trailing-slash directory reference",
+          mod.find_claims(PATH_TRAILING_SLASH_DIRECTORY), [])
+    check("find_claims silent on a domain-plus-path citation",
+          mod.find_claims(PATH_DOMAIN_SHAPED), [])
+    # The pinned accepted miss (see the fixture's own comment): dropping the
+    # "no earlier item extension-shaped" refinement silences this too. A
+    # future change that touches looks_like_one_path should see this flip
+    # rather than silently regaining (and losing) coverage either way.
+    check("find_claims ACCEPTS missing a slash-only multi-file list (documented)",
+          mod.find_claims(ACCEPTED_MISS_SLASH_ONLY_MULTI_FILE_LIST), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

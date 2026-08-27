@@ -340,13 +340,16 @@ CARDINALITY_RE = re.compile(
 # longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
 # guarding this case directly.
 #
-# THE PATH-CITATION FALSE-POSITIVE CLASS -- THREE ROUTES, THREE CLOSED.
-# All three rounds of review on this hook (ai-config#2377/#2386) found the
-# SAME underlying confusion by a different route: `TOKEN` cannot tell "one
-# file's own path, directory then filename" from "two hand-typed identifiers
-# joined by `/`", because both are letters-and-hyphens-and-dots joined by a
-# slash. A future editor touching this regex should know all three were
-# needed, not assume the fix on file is complete:
+# THE PATH-CITATION FALSE-POSITIVE CLASS -- FOUR ROUTES, FOUR CLOSED.
+# Four rounds of review on this hook (ai-config#2377/#2386) found the SAME
+# underlying confusion by a different route each time: `TOKEN` cannot tell
+# "one file's own path, N directory segments then a filename" from "several
+# hand-typed identifiers joined by `/`", because both are letters, hyphens,
+# and dots joined by a slash. This is a CLASS, not a single bug -- a future
+# editor touching this regex should assume another route may exist rather
+# than treating the fix on file as complete, and should extend
+# `looks_like_one_path()` (route 4's own fix, general over item count)
+# before reaching for a fifth special case:
 #   1. The NOUN itself sits directly against the path with no separator
 #      (`skills/select-model/SKILL.md` reading "skills" as the noun). Closed
 #      by the `(?![-_./])` lookahead right after the noun, above.
@@ -359,10 +362,22 @@ CARDINALITY_RE = re.compile(
 #      and satisfy `TOKEN` on BOTH sides with no gap involved at all --
 #      "No hits found in local-bin/encrypt-gh-token.sh" matches the noun
 #      immediately adjacent, using neither of the tricks routes 1 and 2
-#      closed. Closed below, by `looks_like_one_path()`, since no regex
-#      lookahead placed near the noun can see far enough into the token list
-#      itself to tell these apart -- the noun is not even adjacent to the
-#      part that is wrong.
+#      closed.
+#   4. Route 3's first fix only recognized this at EXACTLY two segments,
+#      and `ENUM_RE`'s own token-list clause places no cap on item count --
+#      a three-or-more-segment hyphenated path
+#      (`codex-skills/pre-push-review/SKILL.md`) sailed past a
+#      `len(items) == 2` check untouched. Closed by generalizing
+#      `looks_like_one_path()` to any length: every separator in the span
+#      must be `/` (a `,` anywhere is an unambiguous list signal regardless
+#      of length) and ONLY THE LAST item may be extension-terminated -- a
+#      real path's non-final segments are directory names, which do not
+#      themselves carry a dot-extension, unlike a genuine multi-file list
+#      where every item does.
+# No regex lookahead placed near the noun can close routes 3 or 4 -- the
+# noun is not even adjacent to the part that is wrong -- which is why both
+# are closed downstream, by inspecting the captured list's own SHAPE in
+# `looks_like_one_path()`, rather than by tightening the match itself.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*(?:,|/)\s*{TOKEN}){{1,}})",
@@ -374,40 +389,91 @@ ENUM_RE = re.compile(
 # and whether they were joined by `,` or `/` -- rather than only its text.
 LIST_ITEM_SPLIT_RE = re.compile(r"\s*(,|/)\s*")
 
-# Extensions common enough, in this corpus and in software repos generally,
-# to be the "this is a FILENAME" signal when they terminate the second item
-# of an otherwise-ambiguous two-item list.
-PATH_EXTENSION_RE = re.compile(
-    r"\.(?:py|gd|sh|js|ts|jsx|tsx|json|ya?ml|md|qmd|txt|rb|go|rs|c|cc|cpp"
-    r"|h|hpp|java|sql|r|toml|ini|cfg|conf|xml|html|css|scss|env|lock)$",
-    re.I,
-)
+# The "this is a FILENAME" signal when the LAST item terminates an
+# otherwise-ambiguous slash-joined list, per `looks_like_one_path`.
+#
+# GENERIC, not a curated extension list. An earlier version enumerated
+# specific extensions (`.py`, `.md`, `.sh`, ...), and an adversarial sweep
+# for ai-config#2386 round 5 -- deriving 600+ real path-like strings from
+# this repo's own `*.md`/`*.qmd` files and stress-testing `find_claims`
+# against each -- found dozens of real citations the curated list simply
+# didn't know about (`.io`, `.jpg`, `.gz`, `.paper`, `.sbatch`, a GitHub
+# repo styled `owner/name.git`): every one is a real extension SOMEWHERE,
+# and a whitelist can only ever be a photograph of the ones already seen.
+# A short alphanumeric suffix after a final dot is the general shape a file
+# extension takes; nothing in a genuine hand-typed identifier list needs
+# its LAST item to look like that, so treating the shape itself as the
+# signal is both simpler and closes the gap a whitelist cannot close by
+# construction. The trade (documented, not hidden): a version-style item
+# ending in a bare number after a dot ("v1.2") also matches this shape, so
+# a two-item list genuinely ending in one would be misclassified as a path
+# and go unflagged -- accepted per the round-5 sweep's own residual-hit
+# accounting below, since no case in this corpus's own comment history
+# takes that form and the cost is a missed reminder, never a wrong one.
+PATH_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
 
 
-def looks_like_one_path(group_text):
+def looks_like_one_path(group_text, trailing_char=""):
     """True when a captured ENUM_RE list is really ONE file's own path.
 
-    Route 3 of the path-citation class documented above. The ambiguity is
-    irreducible in general -- `a-b/c-d` really could be either a path or a
-    two-item list -- so this narrows to the shape a real enumeration this
-    short essentially never takes: EXACTLY two items, joined by a `/` alone
-    (never a `,`, which stays a list signal at any length), where the
-    SECOND item ends in a common file extension. A hand-typed list this
-    narrow overwhelmingly either uses a comma or has a third item (the
-    incident's own claim had four); a bare two-segment, extension-terminated
-    `/`-pair is the shape a path's own directory/filename split takes.
-    Reject only that shape, so a genuine two-item slash-joined list whose
-    second item is NOT filename-shaped (`brace-vs-unbraced-charge /
-    defensive-doctrine-plan`) still fires, per the test suite's
-    `TWO_ITEM_SLASH_LIST_NOT_A_PATH` fixture.
+    Route 3 of the path-citation class documented above -- and, as of
+    ai-config#2386 review round 4, generalized past the route-3 fix's own
+    EXACTLY-two-item scope. That scope was too narrow: `ENUM_RE`'s token-list
+    clause places no cap on item count, so a real three-or-more-segment path
+    where every segment is independently hyphen/dot-shaped
+    (`codex-skills/pre-push-review/SKILL.md`) sailed past a `len(items) == 2`
+    check untouched, with the noun adjacent and no gap involved -- a fourth
+    route into the same class, found the moment the fix generalized item
+    count from "exactly two" to nothing at all reachable by this function.
+
+    The ambiguity is irreducible in general -- `a-b/c-d` really could be
+    either a path or a two-item list -- so this narrows to the shape a real
+    hand-typed enumeration essentially never takes, at ANY length: every
+    separator in the matched span is `/` (a `,` anywhere is an unambiguous
+    list signal regardless of length, so its mere presence keeps the claim),
+    and EITHER the last item ends in an extension-shaped suffix, OR the
+    character immediately following the whole match in the source is
+    ANOTHER `/` (a trailing-slash directory reference, `codex-skills/
+    pre-push-review/` -- the round-5 sweep's single largest residual bucket,
+    104 of 140 hits: a bare N-segment directory path has no extension
+    anywhere to key on, but essentially no hand-typed list, once it ends,
+    is immediately followed by a dangling slash in the surrounding prose).
+
+    An earlier version of this check ALSO required that no item before the
+    last be extension-shaped, on the theory that a real path's non-final
+    segments are directory names (no dot-extension of their own) while a
+    hand-typed list of several files (`foo.py / bar.py / baz.py`) has every
+    item extension-terminated -- a strictly tighter rejection than checking
+    the last item alone. That refinement is GONE, deliberately, after the
+    same round-5 sweep: a domain-plus-path citation without a URL scheme
+    (`adv-r.hadley.nz/conditions.html`, a real citation found in this
+    corpus's own prose) has its FIRST segment end in a TLD-shaped suffix
+    (`.nz`) that satisfies the generic extension pattern exactly as readily
+    as a genuine file extension does, so the "no earlier item may match"
+    refinement wrongly kept firing on every domain citation it swept up --
+    more than half the round-5 residual, 48 of 92 hits at that point.
+    Checking the last item alone accepts a narrower, documented cost in
+    exchange: a genuine multi-file list joined by `/` with no comma (`foo.py
+    /bar.py/baz.py`) is now ALSO classified as one path and silenced. That
+    trade is deliberate -- this corpus's own comment history supplies real
+    domain-plus-path citations and supplies no real slash-only multi-file
+    list, and for a warn-only guard a missed reminder costs nothing while a
+    wrong one erodes trust in exactly the way four rounds of review already
+    measured.
+
+    Reject only those two shapes, so a genuine slash-joined list whose last
+    item does not look like a filename, and is not immediately followed by
+    another slash -- a 2-item list with no extension at all
+    (`brace-vs-unbraced-charge / defensive-doctrine-plan`) -- still fires,
+    per the test suite's `TWO_ITEM_SLASH_LIST_NOT_A_PATH` fixture.
     """
     parts = LIST_ITEM_SPLIT_RE.split(group_text)
     items, seps = parts[0::2], parts[1::2]
-    return (
-        len(items) == 2
-        and seps == ["/"]
-        and bool(PATH_EXTENSION_RE.search(items[1]))
-    )
+    if len(items) < 2 or any(sep != "/" for sep in seps):
+        return False
+    if trailing_char == "/":
+        return True
+    return bool(PATH_EXTENSION_RE.search(items[-1]))
 
 # ENUMERATION, bulleted-list form: a listable noun introducing a markdown
 # bullet list, each line an identifier-shaped token. `ENUM_RE` only sees
@@ -455,7 +521,7 @@ def find_claims(body_text):
         found.append(("cardinality", quote))
 
     for m in ENUM_RE.finditer(prose):
-        if looks_like_one_path(m.group(1)):
+        if looks_like_one_path(m.group(1), prose[m.end():m.end() + 1]):
             continue
         quote = " ".join(m.group(0).split())
         key = ("enumeration", quote.lower())

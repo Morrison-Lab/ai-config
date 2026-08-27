@@ -12,7 +12,8 @@ Source: [skills/do-as-you-think-best/SKILL.md](../../skills/do-as-you-think-best
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
 The source lives at `skills/do-as-you-think-best/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/do-as-you-think-best`, resolve the symlink target for this wrapper directory first, then read `../../skills/do-as-you-think-best/SKILL.md` relative to that real directory.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/do-as-you-think-best`, resolve the symlink target for this wrapper directory first,
+then read `../../skills/do-as-you-think-best/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

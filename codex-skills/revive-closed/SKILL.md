@@ -12,7 +12,8 @@ Source: [skills/revive-closed/SKILL.md](../../skills/revive-closed/SKILL.md)
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
 The source lives at `skills/revive-closed/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/revive-closed`, resolve the symlink target for this wrapper directory first, then read `../../skills/revive-closed/SKILL.md` relative to that real directory.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/revive-closed`, resolve the symlink target for this wrapper directory first,
+then read `../../skills/revive-closed/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

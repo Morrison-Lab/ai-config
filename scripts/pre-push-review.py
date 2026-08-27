@@ -160,14 +160,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     # Strip fenced code blocks using CommonMark rules (handles nested same-character fences correctly)
     unfenced_report = strip_fences(report)
 
-    # Check for unbalanced or unterminated HTML comments in remaining prose
-    count_open_html = len(re.findall(r"<!--", unfenced_report))
-    count_close_html = len(re.findall(r"-->", unfenced_report))
-    if count_open_html != count_close_html:
-        return False, False, "Unbalanced or unterminated HTML comment detected."
-
     # Strip HTML comments from prose before parsing top-level structure
     clean_report = re.sub(r"(?s)<!--.*?-->", "", unfenced_report)
+
+    # Check for unbalanced or unterminated HTML comments in remaining prose
+    if "<!--" in clean_report or "-->" in clean_report:
+        return False, False, "Unbalanced or unterminated HTML comment detected."
+
 
     required_sections = [
         ("Summary Verdict", [r"(?im)^#{2,3}\s+Summary Verdict", r"(?im)^#{2,3}\s+Verdict"]),

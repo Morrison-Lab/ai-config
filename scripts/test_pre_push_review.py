@@ -598,22 +598,24 @@ class TestPrePushReview(unittest.TestCase):
     def test_post_review_posts_issue_comment(self, mock_which, mock_subproc):
         old_get_pr = reviewer.get_pr_head_sha
         reviewer.get_pr_head_sha = lambda x: "local_sha_1111"
-        mock_res = MagicMock()
-        mock_res.returncode = 0
-        mock_subproc.return_value = mock_res
-
-        res = reviewer.post_review_to_github(
-            pr_number=123,
-            report="### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nPassed.",
-            engine_name="OpenAI Codex",
-            commit_sha="local_sha_1111",
-        )
-        self.assertTrue(res)
-        cmd_called = mock_subproc.call_args[0][0]
-        self.assertIn("comment", cmd_called)
-        self.assertIn("123", cmd_called)
-        self.assertIn("--body-file", cmd_called)
-        reviewer.get_pr_head_sha = old_get_pr
+        try:
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_subproc.return_value = mock_res
+    
+            res = reviewer.post_review_to_github(
+                pr_number=123,
+                report="### Summary Verdict\nVerdict: Ready for merge\n\n### Critical Findings\nNone.\n\n### Observations\nNone.\n\n### Verification Steps\nPassed.",
+                engine_name="OpenAI Codex",
+                commit_sha="local_sha_1111",
+            )
+            self.assertTrue(res)
+            cmd_called = mock_subproc.call_args[0][0]
+            self.assertIn("comment", cmd_called)
+            self.assertIn("123", cmd_called)
+            self.assertIn("--body-file", cmd_called)
+        finally:
+            reviewer.get_pr_head_sha = old_get_pr
 
     @patch("shutil.which", return_value=None)
     def test_post_review_missing_gh_returns_false(self, mock_which):

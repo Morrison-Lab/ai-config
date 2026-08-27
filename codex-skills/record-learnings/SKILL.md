@@ -12,7 +12,8 @@ Source: [skills/record-learnings/SKILL.md](../../skills/record-learnings/SKILL.m
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
 The source lives at `skills/record-learnings/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/record-learnings`, resolve the symlink target for this wrapper directory first, then read `../../skills/record-learnings/SKILL.md` relative to that real directory.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/record-learnings`, resolve the symlink target for this wrapper directory first,
+then read `../../skills/record-learnings/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

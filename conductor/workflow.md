@@ -92,7 +92,8 @@ All tasks follow a strict lifecycle:
 
 ### Task Correction & Plan Amendment Workflows
 
-When an implemented task or phase requires corrections, amendments, or additions, follow these standard workflows to maintain plan integrity and avoid untracked code drift:
+When an implemented task or phase requires corrections, amendments, or additions,
+follow these standard workflows to maintain plan integrity and avoid untracked code drift:
 
 1.  **In-Flight Refinements:** If minor gaps are found while a task is actively
     in-progress (`[~]`), make the adjustments directly in the active

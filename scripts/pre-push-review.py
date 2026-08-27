@@ -160,21 +160,28 @@ def _refusal_reason(report: str) -> Optional[str]:
     return None
 
 
-_HOOK_PARSE_REPORT = None
+_HOOK_MODULE = None
 
 
-def _load_hook_parse_report():
-    """Load parse_report() from hooks/no-push-without-self-review.py.
+def _load_hook_module():
+    """Load hooks/no-push-without-self-review.py as a module.
 
     The hook's filename is not an importable module name, so load it by
     path, once per process (the hook itself loads a sibling at module top
     level, so repeated exec is wasteful). Import errors propagate: a missing
     or broken hook must fail the parse loudly rather than silently falling
     back to nothing.
+
+    The whole module is returned rather than just parse_report, because the
+    persona path must blank fences in the HOOK'S dialect (its `_blank_fences`)
+    before comment-stripping and qualification-scanning -- mixing this
+    script's CommonMark `strip_fences` with the hook's laxer fence regex left
+    a gap where a pseudo-closed fence hid a qualified verdict line from the
+    guard while parse_report still read it.
     """
-    global _HOOK_PARSE_REPORT
-    if _HOOK_PARSE_REPORT is not None:
-        return _HOOK_PARSE_REPORT
+    global _HOOK_MODULE
+    if _HOOK_MODULE is not None:
+        return _HOOK_MODULE
     import importlib.util
 
     hook_path = (
@@ -187,8 +194,8 @@ def _load_hook_parse_report():
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    _HOOK_PARSE_REPORT = module.parse_report
-    return _HOOK_PARSE_REPORT
+    _HOOK_MODULE = module
+    return _HOOK_MODULE
 
 
 def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
@@ -202,15 +209,23 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
     if refusal:
         return False, False, refusal
 
-    # Strip HTML comments before parsing, exactly as the local path does: a
-    # commented-out `Verdict:` line sits at line start and would otherwise be
-    # taken as the report's last verdict.
-    stripped = re.sub(r"<!--.*?-->", "", report, flags=re.DOTALL)
+    hook = _load_hook_module()
+
+    # One fence dialect end to end: blank fences with the HOOK's own
+    # _blank_fences first, then strip HTML comments, then parse and guard
+    # over that same text. Blanking first also keeps a comment opener quoted
+    # inside a fence from reading as an unterminated comment.
+    blanked, unclosed = hook._blank_fences(report)
+    if unclosed:
+        return False, False, "Unbalanced or unterminated markdown code fence detected."
+
+    # A commented-out `Verdict:` line sits at line start and would otherwise
+    # be taken as the report's last verdict.
+    stripped = re.sub(r"<!--.*?-->", "", blanked, flags=re.DOTALL)
     if "<!--" in stripped:
         return False, False, "Unterminated HTML comment detected."
 
-    parse_report = _load_hook_parse_report()
-    verdict, reviewed_commit = parse_report(stripped)
+    verdict, reviewed_commit = hook.parse_report(stripped)
     if verdict is None:
         return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
 
@@ -219,11 +234,13 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         # qualification ("Ready for merge -- after fixing X") would pass it.
         # Mirror the local contract's rule: any content after the clean
         # phrase beyond closing emphasis/punctuation invalidates the clean.
+        # `stripped` is already fence-blanked in the hook's dialect, so this
+        # scan sees exactly the lines parse_report saw.
         last_clean = None
         for m in re.finditer(
             r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
             r"(?:Ready for merge)\b(?P<rest>.*)$",
-            strip_fences(stripped),
+            stripped,
         ):
             last_clean = m
         if last_clean is not None:

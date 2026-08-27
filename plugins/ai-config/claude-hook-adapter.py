@@ -157,13 +157,16 @@ def main():
         tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args") or {}
-        # The hook subprocess's cwd must be the caller's real working
-        # directory (falling back to this process's own cwd), never
-        # repo_root: repo_root here is ai-config's own checkout location,
-        # used below only to locate hooks.json/scripts. A guard hook (e.g.
-        # hooks/no-clobbering-push.py) inherits this cwd to evaluate the
-        # user's project's own git state, so pointing it at ai-config's
-        # checkout instead makes it evaluate the wrong repository.
+        # The hook subprocess's cwd should be the caller's working
+        # directory, never repo_root: repo_root here is ai-config's own
+        # checkout location, used below only to locate hooks.json/scripts.
+        # A guard hook (e.g. hooks/no-clobbering-push.py) inherits this cwd
+        # to evaluate the user's project's own git state, so pointing it at
+        # ai-config's checkout instead makes it evaluate the wrong
+        # repository. The os.getcwd() fallback is best-effort: per
+        # memories/antigravity.md, Antigravity can launch the adapter with
+        # cwd defaulting to $HOME regardless of the open project, so the
+        # fallback is only as good as the launcher's own cwd.
         tool_cwd = args.get("Cwd") or os.getcwd()
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])

@@ -54,7 +54,8 @@ the exact token spelling as certain. -->
   - In Antigravity's `hooks.json`, `PreInvocation` handlers are also **flat**.
   - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
   - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
-    The adapter parses JSON when present (falling back to the raw text otherwise) and emits one `ephemeralMessage` `injectSteps` entry per hook (capped at 10KB per message, 30KB and 20 messages total) --- it does not join multiple hooks' output into a single joined string.
+    The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50).
 
 ### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
 

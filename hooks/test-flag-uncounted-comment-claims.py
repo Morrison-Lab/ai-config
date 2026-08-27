@@ -273,6 +273,70 @@ ACCEPTED_MISS_GENUINE_ALL_PATHS_COMMA_LIST = (
 # fixture's own separator, not its extensions, is what keeps it silent).
 BARE_FILENAMES_COMMA_JOINED = "See files foo.py, bar.py in this update."
 
+# ai-config#2386 review round 6 (claude-review, comment 5435782017): the
+# FIRST false negative in this class -- every route above is an over-broad
+# match; this is a match that stops too soon. TOKEN cannot end on a bare
+# trailing `/`, so a directory citation BEFORE a comma mid-enumeration
+# truncated the match before the comma, dropping every recalled identifier
+# after it. This is the founding incident's own composite shape: one
+# genuine citation prefixed to a recalled list. All three orderings
+# (citation first/middle/last) are pinned, for both citation flavors
+# (trailing-slash directory and extension-terminated file).
+MIXED_LIST_CITATION_FIRST_TRAILING_SLASH = (
+    "The fingerprinted scripts: codex-skills/pre-push-review/, "
+    "cycle-charge-flee, interval-labels."
+)
+MIXED_LIST_CITATION_MIDDLE_TRAILING_SLASH = (
+    "The fingerprinted scripts: cycle-charge-flee, "
+    "codex-skills/pre-push-review/, interval-labels."
+)
+MIXED_LIST_CITATION_LAST_TRAILING_SLASH = (
+    "The fingerprinted scripts: cycle-charge-flee, interval-labels, "
+    "codex-skills/pre-push-review/."
+)
+MIXED_LIST_CITATION_FIRST_EXTENSION = (
+    "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee, group-attack."
+)
+MIXED_LIST_CITATION_MIDDLE_EXTENSION = (
+    "The fingerprinted scripts: cycle-charge-flee, "
+    "local-bin/encrypt-gh-token.sh, group-attack."
+)
+MIXED_LIST_CITATION_LAST_EXTENSION = (
+    "The fingerprinted scripts: cycle-charge-flee, group-attack, "
+    "local-bin/encrypt-gh-token.sh."
+)
+# All-citations lists in the same orderings must stay silent -- the
+# mixed-list fix must not reopen route 5 (a list of ONLY citations).
+ALL_CITATIONS_ORDER_TRAILING_SLASH_FIRST = (
+    "No hits in codex-skills/pre-push-review/, "
+    "ai-config/claude-hook-adapter.py, "
+    "local-bin/encrypt-gh-token.sh after the sweep."
+)
+ALL_CITATIONS_ORDER_TRAILING_SLASH_MIDDLE = (
+    "No hits in ai-config/claude-hook-adapter.py, "
+    "codex-skills/pre-push-review/, "
+    "local-bin/encrypt-gh-token.sh after the sweep."
+)
+ALL_CITATIONS_ORDER_TRAILING_SLASH_LAST = (
+    "No hits in ai-config/claude-hook-adapter.py, "
+    "local-bin/encrypt-gh-token.sh, "
+    "codex-skills/pre-push-review/ after the sweep."
+)
+
+# The adjacent false positive found while verifying route 6 with an
+# adversarial derivation: a real citation whose own middle segment is a
+# bare (non-hyphenated) word ("memories") truncates the match early, the
+# same shape as route 6 but for a DIFFERENT, pre-existing reason (TOKEN
+# requires every path segment to itself be hyphen/underscore/dot-shaped --
+# tracked separately as ai-config#2404). The truncated fragment
+# ("ai-config") was being read as a bare identifier rather than as the cut-
+# short start of a second citation.
+TRUNCATED_CITATION_FRAGMENT = (
+    "No matches in UCD-SERG/ucd-serg.github.io, "
+    "ai-config/memories/tools.md were found."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -486,6 +550,45 @@ def unit_checks(mod):
     check("find_claims still catches a comma-joined list of bare filenames",
           any(k == "enumeration" and "foo.py" in q for k, q in claims),
           True)
+
+    # Regression: review round 6 (comment 5435782017) -- the false-negative
+    # fix. A mixed list (one citation, several recalled identifiers) must
+    # fire in EVERY ordering, for both citation flavors.
+    for label, fixture in [
+        ("trailing-slash, citation FIRST", MIXED_LIST_CITATION_FIRST_TRAILING_SLASH),
+        ("trailing-slash, citation MIDDLE", MIXED_LIST_CITATION_MIDDLE_TRAILING_SLASH),
+        ("trailing-slash, citation LAST", MIXED_LIST_CITATION_LAST_TRAILING_SLASH),
+        ("extension-terminated, citation FIRST", MIXED_LIST_CITATION_FIRST_EXTENSION),
+        ("extension-terminated, citation MIDDLE", MIXED_LIST_CITATION_MIDDLE_EXTENSION),
+        ("extension-terminated, citation LAST", MIXED_LIST_CITATION_LAST_EXTENSION),
+    ]:
+        claims = mod.find_claims(fixture)
+        enum_claims = [c for c in claims if c[0] == "enumeration"]
+        check(f"find_claims catches a mixed list ({label})",
+              bool(enum_claims), True)
+
+    # All-citations lists in the same orderings must stay silent -- the
+    # false-negative fix must not reopen route 5.
+    for label, fixture in [
+        ("trailing-slash FIRST", ALL_CITATIONS_ORDER_TRAILING_SLASH_FIRST),
+        ("trailing-slash MIDDLE", ALL_CITATIONS_ORDER_TRAILING_SLASH_MIDDLE),
+        ("trailing-slash LAST", ALL_CITATIONS_ORDER_TRAILING_SLASH_LAST),
+    ]:
+        claims = mod.find_claims(fixture)
+        enum_claims = [c for c in claims if c[0] == "enumeration"]
+        check(f"find_claims stays silent on an all-citations list ({label})",
+              enum_claims, [])
+
+    # Regression: the adjacent false positive found while verifying round 6
+    # -- a truncated citation fragment (from the separate, pre-existing
+    # bare-segment limitation, ai-config#2404) must not be misread as a
+    # bare identifier.
+    check("find_claims silent on a truncated-citation-fragment pair",
+          mod.find_claims(TRUNCATED_CITATION_FRAGMENT), [])
+    check("looks_like_citation recognizes a bare fragment via trailing_char alone",
+          mod.looks_like_citation("ai-config", trailing_char="/"), True)
+    check("looks_like_citation still requires internal '/' with no trailing_char",
+          mod.looks_like_citation("ai-config", trailing_char=""), False)
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

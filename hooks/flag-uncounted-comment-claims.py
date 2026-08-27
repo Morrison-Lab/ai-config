@@ -412,9 +412,55 @@ CARDINALITY_RE = re.compile(
 # is not even adjacent to the part that is wrong -- which is why all three
 # are closed downstream, by inspecting the captured list's own items in
 # `looks_like_one_path()`, rather than by tightening the match itself.
+#
+#   6. A FALSE NEGATIVE, the first one in this class -- every route above is
+#      an over-broad match; this one is a match that stops too SOON. `TOKEN`
+#      cannot end on a bare trailing `/`, so when a directory citation
+#      (`codex-skills/pre-push-review/`) sits BEFORE a comma in the middle
+#      of a real enumeration, the token-list clause has no way to consume
+#      that trailing slash and simply stops there -- the comma, and every
+#      recalled identifier after it, fall completely outside the match.
+#      "The fingerprinted scripts: codex-skills/pre-push-review/,
+#      cycle-charge-flee, interval-labels." -- the exact composite shape
+#      (one genuine citation, prefixed to a recalled list) the founding
+#      incident itself used -- went entirely undetected: `find_claims`
+#      returned `[]`, not a suppressed enumeration claim but no match at
+#      all. `looks_like_citation`'s own per-item design was never the
+#      problem here (a mixed list correctly fires once it reaches the
+#      classifier, since not every piece is citation-shaped) -- the bug is
+#      UPSTREAM, in the matcher, which never handed the classifier the full
+#      span to classify. Closed by letting the token-list clause's own
+#      separator optionally absorb a dangling `/` immediately before the
+#      real `,`-or-`/` separator (`\s*/?(?:,|/)\s*` in place of
+#      `\s*(?:,|/)\s*`), so a trailing-slash directory mid-list no longer
+#      terminates the match -- it terminates the SAME way an ordinary
+#      2-segment path already does when nothing valid follows it (via the
+#      existing `trailing_char` fallback), but now the parser can also walk
+#      past it when there IS something valid after, exactly as it already
+#      does past an ordinary `,` or `/` between any other two items.
+#
+#      Verifying route 6 with an adversarial derivation swept up an ADJACENT
+#      false positive, from a DIFFERENT, PRE-EXISTING cause: `TOKEN` has
+#      always required every path SEGMENT to itself carry an internal
+#      hyphen/underscore/dot, so a real citation whose own middle segment is
+#      a bare word (`ai-config/memories/tools.md` -- "memories" has none)
+#      truncates the match early, the same shape as route 6 but for a
+#      different reason `TOKEN` itself cannot fix without giving up the
+#      precision that keeps ordinary prose off this list entirely. The
+#      truncated fragment left behind (bare `"ai-config"`, immediately
+#      followed by the unconsumed `/memories/tools.md`) was being read as a
+#      plain identifier rather than as the start of a cut-short citation.
+#      Closed in `looks_like_citation()` by checking `trailing_char` BEFORE
+#      requiring an internal `/` in the piece itself -- see that function's
+#      own docstring. The underlying limitation (a bare-segment path is
+#      never detected as an enumeration ITEM at all, so a real citation
+#      shaped that way still goes unflagged when mixed with recalled
+#      identifiers) is tracked separately as ai-config#2404: fixing it means
+#      widening `TOKEN`, a materially larger and riskier change than
+#      anything routes 1-6 needed, and belongs in its own design pass.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
-    rf"({TOKEN}(?:\s*(?:,|/)\s*{TOKEN}){{1,}})",
+    rf"({TOKEN}(?:\s*/?(?:,|/)\s*{TOKEN}){{1,}})",
     re.I,
 )
 
@@ -454,21 +500,38 @@ def looks_like_citation(text, trailing_char=""):
     test the round-5 design decision (documented above `ENUM_RE`) is built
     on.
 
-    Requires an internal `/` (a bare identifier, however extension-shaped,
-    is never a citation on its own -- see `looks_like_one_path`'s handling
-    of a comma-joined list of BARE files) and EITHER an extension-shaped
-    ending, or a bare trailing `/` (a directory reference: `codex-skills/
-    pre-push-review/` -- the round-5 sweep's single largest false-positive
-    bucket before this fix, 104 of 140 hits, since a bare N-segment
-    directory path has no extension anywhere to key on). `trailing_char` is
-    the character immediately following the WHOLE match in the source,
-    supplied only for the piece that actually abuts it (`looks_like_one_path`
-    scopes this to the last piece).
+    A piece is a citation when it has an internal `/` with either an
+    extension-shaped ending or a bare trailing `/` (a directory reference:
+    `codex-skills/pre-push-review/` -- the round-5 sweep's single largest
+    false-positive bucket before that round's fix, 104 of 140 hits, since a
+    bare N-segment directory path has no extension anywhere to key on), OR
+    -- checked FIRST, independent of any internal `/` -- when
+    `trailing_char` is `/`: the character immediately following the WHOLE
+    match in the source, supplied only for the piece that actually abuts it
+    (`looks_like_one_path` scopes this to the last piece).
+
+    The `trailing_char` check has to come before the internal-`/`
+    requirement, not after it, because of a separate, PRE-EXISTING
+    limitation `TOKEN` has always had: it requires every path SEGMENT to
+    itself carry an internal hyphen/underscore/dot, so a real citation whose
+    own middle segment is a bare word (`ai-config/memories/tools.md` --
+    "memories" has no separator) truncates the whole `ENUM_RE` match right
+    after the segment before it, leaving a piece like bare `"ai-config"` --
+    no internal `/` of its own -- immediately followed by the unconsumed
+    `/memories/tools.md` in the source. Checking the internal `/` first
+    means that truncated fragment is judged as a bare identifier rather
+    than as what it actually is: the START of a second, real citation cut
+    short by the SAME segment limitation that keeps this hook from ever
+    matching such a path in full. Ordering `trailing_char` first closes
+    that false positive without touching `TOKEN` itself -- widening `TOKEN`
+    to accept a bare segment is a separate, much larger design question
+    (it is the precision mechanism that keeps ordinary English prose off
+    this list in the first place) and out of scope here.
     """
-    if "/" not in text:
-        return False
     if text.endswith("/") or trailing_char == "/":
         return True
+    if "/" not in text:
+        return False
     return bool(PATH_EXTENSION_RE.search(text))
 
 

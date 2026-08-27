@@ -249,6 +249,14 @@
   and human approval is the only path to landing such a PR,
   with any available cross-model, cross-harness adversarial review
   recorded alongside, never substituted for, that sign-off.
+  In status recaps, name the venue as well as the verdict.
+  A subagent transcript is a "private/local pre-push adversarial check",
+  never a statement that the PR "has a clean review";
+  reserve that wording for a genuine verdict posted in the forge review record,
+  and link the posted verdict when citing it.
+  If the private artifact has no user-visible URL, say that plainly rather than
+  letting "independent review" imply an externally visible review.
+  (User correction, 2026-08-27, ucdavis/rampp#153.)
 - A verification artifact (state transcript, frame/state dump) is worthless unless something actually READS it.
   Put it where the reviewer looks: the `@claude` review bot reviews only the checked-out PR tree plus the diff, so a JSON linked by raw URL on a side/media branch is invisible to it --- inline a compact state summary in the PR conversation/diff (and add a line telling the reviewer to use it); a bare link is decoration.
   And the coordinator must actually read the dumps too --- don't build a verification tool and then keep trusting agents' written "I verified tick-by-tick" reports without ever reading a dump.

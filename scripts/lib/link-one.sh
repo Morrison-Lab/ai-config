@@ -2,24 +2,25 @@
 # link_one -- symlink a repo path into a consumer location, never clobbering
 # whatever is already there.
 #
-# Sourced by bootstrap.sh (which installs into ~/.claude, ~/.codex, ~/.gemini)
-# and by the per-machine installers under dotfiles/ (which install into ~/bin,
-# ~/.local/bin, ~/.config/...). It lives here so those two callers share one
-# implementation rather than each carrying a copy that can drift.
+# Sourced by the per-machine installers under dotfiles/ (which install into
+# ~/bin, ~/.local/bin, ~/.config/...). bootstrap.sh itself no longer sources
+# this -- it stopped placing anything under ~/.claude, ~/.codex, or
+# ~/.cursor in favor of native plugin installs (see its header comment).
+# This helper lives in its own file so multiple dotfiles installers can share
+# one implementation rather than each carrying a copy that can drift.
 #
 # Usage:
 #   LINK_ONE_FIX_HINT="how to resolve a collision in this context"   # optional
 #   . "<repo>/scripts/lib/link-one.sh"
 #   link_one /abs/path/in/repo /abs/path/at/destination [hint]
 #
-# An optional third argument overrides LINK_ONE_FIX_HINT for that call.
-# The hint is a parameter because callers resolve a collision differently:
-# bootstrap.sh passes scripts/check-install.py --fix only for ~/.claude
-# links. That script's --consumer-dir retargets a whole Claude-style
-# manifest, so the same hint is wrong for Codex, Gemini, Copilot, and
-# Cursor (ai-config#2286). Those callers inherit this file's default
-# (remove it or replace it with a link manually). Dotfiles installers
-# set their own LINK_ONE_FIX_HINT; shiva's is the --adopt path.
+# An optional third argument overrides LINK_ONE_FIX_HINT for that call, so
+# one sourced copy can serve several destinations with different collision
+# advice without a global variable leaking the wrong hint between them
+# (ai-config#2286, from when bootstrap.sh set one hint globally before
+# calling link_one for every consumer). Dotfiles installers set their own
+# LINK_ONE_FIX_HINT; shiva's is the --adopt path. Callers that set neither
+# get this file's own default below.
 
 # Advice printed when a real (non-symlink) path blocks the link. Overridable by
 # the caller or by a per-call third argument; the default says nothing

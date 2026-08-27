@@ -104,6 +104,12 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch through `Task`.
+If `Task` is absent or does not list that persona, that is the
+CLI-fallback case in
+[`adversarial-self-review`](adversarial-self-review.md).
+The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**
 Dispatching and then composing a different comment is the same failure as
@@ -167,13 +173,15 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
-Those two are not interchangeable, which is why the preference still needs
+So the pairing above is now Copilot and `delegate-to-codex`.
+Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the only cross-vendor reviewer this corpus can
-**dispatch** itself.
+`delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
+**dispatches** for that pairing.
+The Cursor `Task` route above is the same-session self-review
+dispatch, not this second-reviewer pairing.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.
@@ -324,6 +332,39 @@ The tell is a diff that *quotes no source* for a behavioural claim.
 
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
 
+
+**While the workflow reviewer is down, the fallback is a full iterate loop of FRESH clean-slate subagent rounds -- run automatically, one per round, until a clean verdict at the current head.**
+The sections above establish that a single dispatched self-review unblocks the round.
+They leave two gaps this section closes, both from a user directive
+(2026-08-26: "do that automatically when the GHA reviews aren't working",
+issued after twice having to ask by hand for another round on ucdavis/bcs#736).
+
+**One review is not the loop.**
+A working workflow reviewer re-reviews every push until it is satisfied;
+a fallback that reviews once and then only verifies its own fixes has quietly
+downgraded ARDI to a single round.
+So after addressing a fallback round's findings and pushing, dispatch the
+next round at the new head without being asked, and keep going until a round
+returns a clean verdict at the head being shipped.
+
+**Each round is a fresh clean-slate reviewer, not a verification pass.**
+Brief the new subagent with the diff and the standards only --- never with the
+prior rounds' findings or dispositions.
+A verifier handed the old finding list confirms the fixes and stops;
+fresh eyes re-derive the whole diff and find what every earlier round missed.
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"Verification passes returned Clean while fresh rounds kept finding defects".
+A verification pass still has its narrow place --- confirming a specific
+fix landed before reporting a round addressed --- but it never substitutes
+for the next fresh round.
+
+- **Do:** dispatch the next fresh round automatically after each
+  address-and-push, while the workflow reviewer cannot produce a verdict.
+- **Do:** brief each round with diff and standards only, so it re-derives
+  rather than confirms.
+- **Don't:** stop after one fallback review plus verification passes ---
+  that is one round wearing the loop's name.
+- **Don't:** hand a new round the previous rounds' findings.
 
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**

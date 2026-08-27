@@ -65,7 +65,7 @@ the half about the **stash stack**, which is global state a scratch path does
 not protect either.
 
 (Measured 2026-08-12 in the `ai-config` clone at
-`/home/demorrison/Projects/ai-config`.
+`/home/<user>/Projects/ai-config`.
 A "stash, measure, pop" idiom was run twice while the tree's own work was
 committed in between, so the second `stash` saved nothing and the `pop` drew
 `stash@{0}` --- `On 2026-07-29-branch-sweep-learnings: leftover uncommitted

@@ -1,7 +1,7 @@
 Before starting a work session on a GitHub PR or issue --- i.e. before fetching
-the branch, making edits, or invoking an automated review cycle --- post a brief
-comment on the PR/issue so other people and any automated review bots know not
-to start a conflicting parallel session.
+the branch, making edits, posting a review, or invoking an automated review
+cycle --- post a brief comment on the PR/issue so other people and any
+automated review bots know not to start a conflicting parallel session.
 
 Use:
 
@@ -24,9 +24,32 @@ After the session ends (PR merged, issue closed, or work otherwise paused), foll
 
 Skip the claim step if the most recent comment already says you are working on
 it **and that claim is still live under the expiration rule below**.
-This applies to any task that will push commits to a PR branch or run
-iterative review loops. It does **not** apply to read-only inspection (showing a
-PR, checking status, explaining a diff) --- those don't risk a parallel session.
+This applies to any task that will push commits to a PR branch, run
+iterative review loops, or post a review.
+A posted review races HEAD the same way a write session does: other sessions
+push while the reviewer is still reading, and the posted comment then stamps
+a SHA that is already stale.
+Post the claim **before** the review starts.
+When the session is **review-only** (it will not push), unclaim when the
+SHA-stamped review comment lands so the author can address findings.
+When the session is also driving the branch (implementing, ARDI), keep
+the write claim until that work ends --- posting a review mid-loop does
+not release it.
+A persistent watch is not a standing claim --- re-claim only when a new
+review round starts.
+A review-only claim still expires under the 2-hour rule below; reassert
+it if the pass is still running and the thread has been idle that long.
+It does **not** apply to read-only inspection that will not post (showing a
+PR, checking status, explaining a diff).
+
+- **Do:** post a `hold off` claim before starting a posted review of a PR.
+- **Do:** unclaim a review-only pass when that review comment is posted.
+- **Do:** keep a still-driving write claim after posting a review in the
+  same session.
+- **Don't:** skip the claim because the session is "only reviewing" and not
+  pushing --- the collision is on HEAD, not on the working tree.
+- **Don't:** leave a review-only claim standing after the verdict lands, or
+  claim every open PR at the start of a sweep.
 
 This includes a PR **you opened yourself**: in repos with an active `@claude`
 agent (`claude.yml`), the agent can push commits to your branch on PR activity
@@ -150,7 +173,7 @@ Don't assume it's fabricated or injected, and don't reflexively redo the same fi
 If a commit with that SHA genuinely exists, authored close to when the event arrived, treat it as confirmation a live parallel session owns this PR right now --- stop pushing further speculative fixes yourself, and, if genuinely in doubt, ask whether to keep driving or step back, rather than racing the other session's pushes.
 This gap is distinct from the initial claim check above: it's not about claiming a PR before starting, but about **re-verifying you're still the sole active driver** once work has been under way for a while --- especially when you picked up the PR mid-session (e.g. by answering a diagnostic question about it) rather than through the normal claim-then-branch flow, so no fresh claim check ever ran right before you started pushing.
 
-(`d-morrison/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `the repository owner`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
+(`Morrison-Lab/gha#286`, 2026-07-24: a webhook event delivered a review-comment reply attributed to `the repository owner`, reading exactly like a Claude-authored reply and claiming a fix this session hadn't made, worded "Addressed, pushed in 3fb8c5b".
 It was verified real via `get_commits` before proceeding --- a second live session, not injection.)
 
 **The git-level variant of that check: a rejected push whose remote commit is byte-for-byte what you were about to push.**

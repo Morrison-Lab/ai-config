@@ -2323,6 +2323,37 @@ def main() -> int:
     check("negative control: a readable-stderr failure still raises RuntimeError",
           outcome2.startswith("RuntimeError:") and "404" in outcome2)
 
+    # Test multi-provider quorum logic.
+    round_a = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T11:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-1"
+    }
+    round_b = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T12:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-2"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_b], "reviews": []})):
+        q1_ok, q1_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from the same shared-login provider (one marked, one unmarked) are seen as TWO providers",
+          q1_ok and len(q1_issues) == 0)
+
+    round_c = {
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "MEMBER",
+        "createdAt": "2026-08-25T13:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)\n\n_Posted by Codex (AI agent) --- not written by a human._",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-3"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_c], "reviews": []})):
+        q2_ok, q2_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from different providers DO satisfy a quorum of 2",
+          q2_ok and len(q2_issues) == 0)
+
+    
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

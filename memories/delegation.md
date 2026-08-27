@@ -260,12 +260,12 @@ I don't care if they run on this computer or in the cloud."
   then a cheap Claude tier (haiku, then sonnet) ---
   reserving the conductor's own tier for judgment-heavy work.
   Only `opencode`'s hosted-free and local tiers are actually free;
-  `codex` and `agy` stay the metered subscription windows this file
-  already calls them,
-  prioritized because their cost is sunk, not because they cost
-  nothing.
-  No new priority is implied within that group beyond what the rest
-  of this file already sets:
+  `codex` and `agy` stay the metered plans this file already calls
+  them,
+  placed ahead of Claude because their cost is sunk within the
+  current window, not because they cost nothing.
+  Within the CLI-reachable group itself, no new ordering is implied
+  beyond what the rest of this file already sets:
   `opencode`'s free and local tiers have no window to exhaust,
   so they go ahead of the metered `codex` and `agy` windows,
   per the "no window to exhaust" paragraph above.
@@ -292,7 +292,7 @@ I don't care if they run on this computer or in the cloud."
   adversarial review, long-list triage, or any of the judgment-heavy
   work [`select-model`](../skills/select-model/SKILL.md)'s decision
   tree already carves out (architectural decisions, subtle bugs,
-  a security audit) ---
+  security audit, orchestrator loop) ---
   and count the resulting retry as cheap delegation.
   Escalate that work to a capable tier up front;
   a failed cheap attempt plus a retry costs more than starting at the

@@ -51,7 +51,7 @@ if not os.path.isfile(HOOK):
 
 def verdict(cmd):
     p = subprocess.run(
-        ["python3", HOOK],
+        [sys.executable, HOOK],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
         capture_output=True, text=True,
     )

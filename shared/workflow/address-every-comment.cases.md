@@ -422,7 +422,7 @@ claim a hallucination.)
 
 (`UCD-SERG/serodynamics#274`, 2026-07-28: a review flagged possible
 duplicate review dispatch at moderate confidence, explicitly because the
-reusable workflow in `d-morrison/gha` was not visible to it.
+reusable workflow in `Morrison-Lab/gha` was not visible to it.
 That repo was cloned locally.
 Reading both matchers showed the reusable fires on `@claude[[:space:]]+review`
 and the local job on a punctuation-tolerant superset, so the plainest

@@ -231,10 +231,13 @@ so it discriminates nothing.
 Where the two artifacts are files, the deciding query is a direct comparison,
 and it is cheap: `cmp` in a loop, or `diff -r`.
 Where an instrument already owns the comparison, run the instrument instead ---
-`scripts/check-install.py` compares `~/.claude` against the checkout
-and reports `stale` by name,
-so a hand-rolled diagnosis of install staleness is re-deriving
-a verdict the repo already computes.
+a hand-rolled diagnosis of a property an instrument already computes
+is re-deriving a verdict the repo already owns.
+(The worked example here was `scripts/check-install.py`,
+which compared `~/.claude` against the checkout and reported `stale` by name;
+it was removed along with the symlink install it verified,
+so read it as a historical illustration ---
+see [ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229).)
 
 **A diagnosis that resolves an irritation deserves the deriving query
 before it deserves an issue.**

@@ -90,31 +90,17 @@ class TestDoctor(unittest.TestCase):
         self.assertFalse(res_fail["ok"])
         self.assertEqual(res_fail["status"], "FAIL")
 
-    @patch("doctor.run_cmd")
-    def test_check_consumer_installs(self, mock_run_cmd):
-        mock_run_cmd.return_value = (0, "ok", "")
-        res = doctor.check_consumer_installs()
-        self.assertTrue(res["ok"])
-        self.assertEqual(res["status"], "OK")
-
-        mock_run_cmd.return_value = (1, "stale entries found", "")
-        res_warn = doctor.check_consumer_installs()
-        self.assertFalse(res_warn["ok"])
-        self.assertEqual(res_warn["status"], "WARN")
-
     @patch("doctor.check_git_status")
     @patch("doctor.check_submodules")
     @patch("doctor.check_codex_wrappers")
     @patch("doctor.check_hook_catalog")
     @patch("doctor.check_context_closure")
-    @patch("doctor.check_consumer_installs")
-    def test_run_doctor_healthy(self, m_installs, m_closure, m_hooks, m_wrappers, m_subm, m_git):
+    def test_run_doctor_healthy(self, m_closure, m_hooks, m_wrappers, m_subm, m_git):
         m_git.return_value = {"name": "git_status", "ok": True, "status": "OK", "details": "ok"}
         m_subm.return_value = {"name": "submodules", "ok": True, "status": "OK", "details": "ok"}
         m_wrappers.return_value = {"name": "codex_wrappers", "ok": True, "status": "OK", "details": "ok"}
         m_hooks.return_value = {"name": "hook_catalog", "ok": True, "status": "OK", "details": "ok"}
         m_closure.return_value = {"name": "context_budget", "ok": True, "status": "OK", "details": "ok"}
-        m_installs.return_value = {"name": "consumer_install", "ok": True, "status": "OK", "details": "ok"}
 
         report = doctor.run_doctor()
         self.assertTrue(report["all_ok"])

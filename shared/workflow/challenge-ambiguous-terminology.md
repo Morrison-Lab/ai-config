@@ -54,7 +54,7 @@ prompted a check of this guideline while writing a brand-new citation, only
 once a review flagged it after the fact.)
 
 **Fifth occurrence, 2026-08-24, and the first one SAME-repo.**
-`CLAUDE.md` already says this section applies to a same-repo sibling PR unchanged, and this is that case: ai-config prose citing a construct in ai-config's own `hooks/`, where the four above are all `gha`'s `CLAUDE.md` citing `d-morrison/ai-config`.
+`CLAUDE.md` already says this section applies to a same-repo sibling PR unchanged, and this is that case: ai-config prose citing a construct in ai-config's own `hooks/`, where the four above are all `gha`'s `CLAUDE.md` citing `Morrison-Lab/ai-config`.
 Note what does **not** distinguish them, since the obvious contrast is wrong: none of the five had a link checker behind it.
 The four cross-repo cases cite a backticked bare path and a repo-root link, and each escapes a checker for its own reason: a backticked path is not a link, so nothing crawls it, while the repo-root link resolves fine.
 So the 404 warning never fired on any measured case, and it would not have fired on this one either.

@@ -195,17 +195,12 @@ def resolve_repo(explicit: str = "") -> str:
     return repo
 
 
-def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json",
-                   "headRefOid,headRefName,state,commits,reviewDecision"])
-    data = json.loads(out)
-    head_sha = data["headRefOid"]
-    commits = data.get("commits", [])
-    commit_date = ""
-    if commits:
-        commit_date = commits[-1].get("committedDate", "")
-    review_decision = data.get("reviewDecision") or ""
-    return head_sha, data["headRefName"], data["state"], commit_date, review_decision
+def get_pr_info(pr_num: str, repo: str):
+    if str(Path(__file__).resolve().parent.parent) not in sys.path:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from scripts.lib.pull_request import PullRequest
+    pr = PullRequest(pr_num, repo, fetcher=run_cmd)
+    return pr
 
 
 def _is_bot_author(login: Optional[str]) -> bool:
@@ -457,10 +452,10 @@ def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[
     return _workflow_path_for_run(m.group(1), repo, cache)
 
 
-def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
-    data = json.loads(out)
-    check_runs = data.get("check_runs", [])
+def check_ci_runs(pr) -> Tuple[bool, List[str]]:
+    sha = pr.head_sha
+    repo = pr.repo
+    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url} for cr in pr.get_check_runs()]
 
     issues = []
     if not check_runs:
@@ -1102,12 +1097,10 @@ def check_latest_verdict(
     return len(blocking) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "", quorum: int = 1) -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
-    data = json.loads(out)
-
-    comments = data.get("comments", [])
-    reviews = data.get("reviews", [])
+def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
+    pr_num, sha, repo, review_decision, branch = pr.pr_num, pr.head_sha, pr.repo, pr.review_decision, pr.branch
+    comments = [{"author": {"login": c.author_login}, "createdAt": c.created_at, "body": c.body, "authorAssociation": c.author_association} for c in pr.get_comments()]
+    reviews = [{"state": r.state, "author": {"login": r.author_login}, "submittedAt": r.submitted_at, "body": r.body, "commit": {"oid": r.commit_oid}, "authorAssociation": r.author_association} for r in pr.get_reviews()]
 
     issues = []
 
@@ -1320,11 +1313,12 @@ def main():
     # name in the next line.
     print(f"Checking ARDI / fully-clean status for {repo}#{pr_num}...")
 
-    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num, repo)
+    pr = get_pr_info(pr_num, repo)
+    sha, branch, state, commit_date, review_decision = pr.head_sha, pr.branch, pr.state, pr.commit_date, pr.review_decision
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
-    ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch, args.quorum)
+    ci_ok, ci_issues = check_ci_runs(pr)
+    review_ok, review_issues = check_review_comments(pr, args.quorum)
 
     all_issues = ci_issues + review_issues
 

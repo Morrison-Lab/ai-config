@@ -648,22 +648,18 @@ def strip_cited_finding_vocab(text: str) -> str:
 # string equality against the list entries -- so it is built once here.
 #
 # `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
-# boundary: "non-blocking" is how a reviewer marks a nit as NOT blocking, and
-# "previously-blocking" is how one narrates a fixed finding -- both measured
-# reading a Ready-for-merge review as not-clean (ai-config#2369, four times on
-# 2026-08-27 alone). The lookbehinds enumerate those two compounds rather
-# than exempting every `-blocking` compound, because "merge-blocking" is a
-# real signal and missing a not-clean is the dangerous direction here.
-# Only the `non-`/`non ` compounds are exempted: "non-blocking" is how a
-# reviewer marks a nit as NOT blocking (ai-config#2369, measured on #2288).
-# "previously-blocking" is deliberately NOT exempted, although it produced a
-# measured safe-direction false positive too -- "the previously-blocking
-# finding remains open; do not merge" is a real not-clean statement, and a
-# lexical lookbehind cannot tell it from "the previously-blocking error was
-# fixed". Missing a not-clean is the dangerous direction, so the narration
-# form stays an over-flag. Same for emphasis ("non-**blocking**"): the char
-# before `blocking` is `*`, the lookbehind cannot see through it, and the
-# over-flag is the accepted direction.
+# boundary, so "non-blocking" -- how a reviewer marks a nit as NOT blocking
+# -- read a Ready-for-merge review as not-clean (ai-config#2369, measured
+# 2026-08-26 on #2288). Only the `non-`/`non ` compounds are exempted.
+# "previously-blocking" is deliberately NOT exempted, although it produces a
+# safe-direction false positive when narrating a fixed finding: "the
+# previously-blocking finding remains open; do not merge" is a real
+# not-clean statement, and a lexical lookbehind cannot tell it from "the
+# previously-blocking error was fixed". Missing a not-clean is the dangerous
+# direction, so the narration form stays an over-flag -- as does any other
+# `-blocking` compound ("merge-blocking" is a real signal) and the
+# emphasized form ("non-**blocking**": the char before `blocking` is `*`,
+# which the lookbehind cannot see through).
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
     r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
@@ -995,20 +991,33 @@ _SECTION_FINDING_ITEM = re.compile(
     r"|^\s*(?:\d+[.)]|[-*+])\s+\S"
     r"|\*\*Location:\*\*"
     r"|^\s*>\s*\S"
+    r"|^\s*\*\*(?!\s*$)"
 )
 
 
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
-    """True when the findings section starting at *match_end* resolves to a
-    whole-line no-findings statement as its LAST non-empty line, with no
-    finding-shaped item anywhere in the section.
+    """True when the findings section starting at *match_end* opens with a
+    whole-line no-findings statement and carries no finding-shaped content
+    after it.
 
-    Covers the review shape where verification prose precedes the closing
-    "No actionable findings identified." line, which the 60-char suffix
-    window cannot reach (ai-config#2370). The section runs to the next
-    heading or end of body. Last-line anchoring plus the item veto keep the
-    exemption fail-safe: a section that lists anything, tagged or not,
-    stays a finding.
+    The section runs to the next heading or end of body. The FIRST
+    non-empty line must match the NOT_CLEAN_NEGATION_SUFFIX allowlist --
+    the same trigger the old 60-char suffix shortcut keyed on, made
+    line-anchored -- and everything after it must clear the item veto.
+
+    A resolving line reached only AFTER other content (verification prose,
+    alert blocks, items) never exempts: an untagged prose finding is
+    lexically indistinguishable from verification prose, and swallowing a
+    finding is the dangerous direction, so that shape is a deliberate
+    safe-direction re-flag (ai-config#2370's free-prose remainder). The
+    mirror direction shares the residual: untagged PLAIN PROSE after a
+    resolving first line is also indistinguishable and is not vetoed --
+    the same exposure the 60-char shortcut always had.
+
+    No wider than the shortcut except in two vetted ways, both still gated
+    by the item veto: a `- None.` / `* None.` resolving first line (the
+    shortcut's char class already resolved those markers), and no 60-char
+    cap on where the resolving line starts.
     """
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
     section = scan_body[match_end:match_end + next_heading.start()] \
@@ -1016,19 +1025,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    # STRICTLY SAFER THAN THE SUFFIX SHORTCUT, BY CONSTRUCTION. The old
-    # 60-char shortcut exempted whenever resolving vocabulary sat directly
-    # under the heading, whatever followed. This keeps that trigger -- the
-    # FIRST non-empty line (leading bullet tolerated, so "- None." still
-    # resolves) must match the same NOT_CLEAN_NEGATION_SUFFIX allowlist --
-    # and ADDS a veto over everything after it, so "No new issues." above a
-    # listed finding no longer exempts. A resolving line reached only after
-    # other content (verification prose, alert blocks, items) never exempts:
-    # prose findings are lexically indistinguishable from verification
-    # prose, and swallowing a finding is the dangerous direction, so that
-    # shape stays a safe-direction re-flag (ai-config#2370's free-prose
-    # remainder).
-    first_stripped = re.sub(r"^\s*(?:\d+[.)]|[-*+])\s+", "", lines[0])
+    first_stripped = re.sub(r"^\s*[-*]\s+", "", lines[0])
     if not NOT_CLEAN_NEGATION_SUFFIX.search(first_stripped):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
@@ -1055,9 +1052,9 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 # shortcut for this heading: the shortcut read "No new
                 # issues." directly under the heading as resolving the whole
                 # section, even when finding items followed it (ai-config
-                # #2370's review of this very fix). Whole-section logic is
-                # sound in both directions -- last-line anchoring plus the
-                # item veto.
+                # #2370's review of this very fix). The replacement keeps
+                # the shortcut's first-line trigger and adds the item veto
+                # over the rest of the section.
                 if _findings_section_resolves_empty(scan_body, match.end()):
                     continue
             elif pat in FINDING_HEADING_PATTERNS:

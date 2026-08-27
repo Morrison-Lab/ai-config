@@ -1778,6 +1778,20 @@ def main() -> int:
           all(checker._unresolved_finding_pattern(
                   f"### Findings\n\nNo new issues.\n\n{m} `foo()` crashes.\n")
               is not None for m in ("+", "1)")))
+    check("the composite: a bullet-resolving first line no longer covers a "
+          "prose finding ('1. None.' does not resolve)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. None.\n\nThe lease check is silently "
+              "skipped and must be fixed before merge.\n")
+          is not None)
+    check("a bold-lead line after a resolving first line vetoes the exemption",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n**`_scan()` regression:** "
+              "drops rows.\n")
+          is not None)
+    check("a **None.** resolving first line still resolves",
+          checker._unresolved_finding_pattern("### Findings\n\n**None.**\n")
+          is None)
     check("a **Non-blocking:** tagged line vetoes the exemption",
           checker._unresolved_finding_pattern(
               "### Findings\n\nNo new issues.\n\n**Non-blocking:** naming "
@@ -1785,9 +1799,9 @@ def main() -> int:
           is not None)
     # Veto tests. The first three bodies carry NOTHING that any other
     # pattern matches, so each stays flagged only through the section logic
-    # itself -- neutering _SECTION_FINDING_ITEM flips the tagged and
-    # Location cases to exempt (their last line resolves), and breaking the
-    # last-line anchor flips the resolving-first case.
+    # itself -- neutering _SECTION_FINDING_ITEM flips the veto-dependent
+    # cases to exempt, and the resolving-first cases pin the first-line
+    # resolution requirement.
     check("tagged item above a resolving last line stays a finding",
           checker._unresolved_finding_pattern(
               "### Findings\n\n1. **[Convention]** scripts/x.py:1 is oddly "

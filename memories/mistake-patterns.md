@@ -223,8 +223,10 @@ A clean automated review from every available provider evaluating the current HE
   (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
 - **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft...
   Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
-- **Fix**: Right after a final push to a PR that completes its implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
-  Do this before dispatching review workflows or yielding to the user.
+- **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
+  Do this before dispatching review workflows or yielding to the user ---
+  but mind the ready-transition timing in `pr-on-claim.md`:
+  on a repo whose review workflow cancels in progress, do not flip ready within seconds of the final push, or the two triggered review runs race and the survivor can be the cancelled one.
 
 ## Pattern 14: Pausing Without Setting a Timer
 - **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.

@@ -308,6 +308,43 @@ The other cases have no guard and are prose rules here.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
 
+## A verdict phrase separated from its heading by a line break is no verdict
+
+`VERDICT_LINE` matches `Verdict[ \t]*:` and the phrase on the **same line**, optionally heading-prefixed (`### Verdict: Ready for merge`).
+It does not match a heading naming the section with the phrase on the line that follows it:
+
+```
+## Verdict
+
+Ready for merge
+
+Reviewed-Commit: <sha>
+```
+
+`parse_report` returns no verdict for a report shaped that way, and `read_latest_review` then keeps whichever verdict it last successfully parsed from an **earlier** dispatch in the same transcript --- so a later, clean, correctly-formatted review can be invisible while an older `needs_work` review from before it stands as "the latest."
+The refusal then reads "The latest adversarial self-review returned a blocking verdict," which is true about the parsed history and false about what the session actually did.
+It is easy to misdiagnose as the transcript lagging a same-turn dispatch --- a plausible-sounding mechanical explanation that was never actually verified, and that ai-config#2444 was originally filed on before this parsing gap was found instead.
+
+[`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) already specifies the one-line form for its own persona.
+The gap is any other brief that asks something to act as an adversarial reviewer --- a same-vendor fallback subagent, a CLI dispatch, a hand-written prompt --- without repeating that requirement.
+
+- **Do:** put `Verdict: <phrase>` literally on one line in every review brief you compose, whatever is dispatching it --- `### Verdict: Ready for merge`, never a heading with the phrase on its own following line.
+- **Do:** when a guard refuses a push on a verdict you believe is clean, run the guard's own reader (`read_latest_review`/`parse_report`) over the live transcript and print what it parsed per admitted result, before attributing the refusal to a cause like transcript lag.
+- **Don't:** treat a heading form (`## Verdict` with the phrase on the next line) as equivalent to the required one-line form --- it parses as no verdict at all.
+- **Don't:** file or accept a "the transcript lags the current turn" diagnosis for a refused push without first executing the parser against the actual transcript;
+  the two failures produce an identical refusal message.
+
+(ai-config#2444, 2026-08-27: filed on the lag diagnosis, corrected once `read_latest_review`/`parse_report` were run directly against the session transcript and returned the older `needs_work` verdict from a mid-session dispatch, not a stale read of a same-turn one.)
+
+**A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
+`read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
+Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;
+pushing branch A afterward compares its shipped commit `X` against the held `Y`, fails the SHA match, and refuses citing an unreviewed commit --- even though branch A's own review was genuinely clean.
+
+- **Do:** review and push one branch before dispatching a review for a second branch in the same session, when driving more than one branch's push through this guard.
+- **Don't:** read that refusal as a defect in branch A's review;
+  the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
+
 ## The review gates the push, not the work --- and it is one round, not a loop
 
 The rule above is a gate on a **push**.

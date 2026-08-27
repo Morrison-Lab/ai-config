@@ -46,8 +46,14 @@ if (is.null(from)) {
   contributors <- usethis::use_tidy_thanks(repo, from = from)
 }
 
-# use_tidy_thanks() returns the markdown text (invisibly on some
-# usethis versions) rather than guaranteeing it prints to the console
-# itself --- print it explicitly so the markdown always reaches stdout
-# regardless of that return-visibility detail.
-cat(contributors, sep = "\n")
+# use_tidy_thanks() invisibly returns the sorted character vector of
+# bare GitHub usernames; its own markdown-formatted acknowledgment text
+# is only displayed through cli's message stream, which goes to stderr
+# under Rscript. Build the markdown-linked list here from the returned
+# usernames so genuinely markdown-formatted output reaches stdout.
+if (length(contributors) == 0) {
+  cat("No contributors found for this range.\n", file = stderr())
+} else {
+  linked <- paste0("[@", contributors, "](https://github.com/", contributors, ")")
+  cat(paste(linked, collapse = ", "), "\n", sep = "")
+}

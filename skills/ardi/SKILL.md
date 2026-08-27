@@ -140,8 +140,7 @@ sits unread.
    Its brief covers what an inline pass would have done.
    This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
    You must Address, Rebut, or Defer every finding it returns.
-   If a provider skips or cannot produce a verdict (quota, offline),
-   note the skip in your ARD summary comment.
+   If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
    **Re-check reviewer availability every round, not just once:**
    A reviewer that was unavailable a few pushes ago can become available mid-session.
    A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved.

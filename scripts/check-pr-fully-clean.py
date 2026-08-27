@@ -1225,6 +1225,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             matching_items.append(item)
 
     if not matching_items:
+        if quorum == 0:
+            print(f"\u2713 Found 0 clean review(s) evaluating HEAD SHA {sha[:8]}, meeting quorum of 0.")
+            return True, issues
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
@@ -1269,10 +1272,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             if login in unique_authors:
                 unique_authors.remove(login)
 
-        if len(unique_authors) < quorum or len(unique_authors) == 0:
-            if len(unique_authors) == 0:
+        if len(unique_authors) < quorum:
+            if len(unique_authors) == 0 and quorum > 0:
                 issues.append(f"No valid clean review found for HEAD SHA {sha[:8]}.")
-            else:
+            elif quorum > 0:
                 issues.append(f"Multi-provider quorum not met. Expected {quorum} distinct providers, found {len(unique_authors)} ({', '.join(unique_authors)}).")
         else:
             print(f"\u2713 Found {len(unique_authors)} clean review(s) evaluating HEAD SHA {sha[:8]}, meeting quorum of {quorum}.")
@@ -1289,13 +1292,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
     )
 
-    def positive_int(value):
+    def non_negative_int(value):
         ivalue = int(value)
-        if ivalue < 1:
-            raise argparse.ArgumentTypeError(f"quorum must be >= 1, got {value}")
+        if ivalue < 0:
+            raise argparse.ArgumentTypeError(f"quorum must be >= 0, got {value}")
         return ivalue
 
-    parser.add_argument("--quorum", type=positive_int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
+    parser.add_argument("--quorum", type=non_negative_int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
     parser.add_argument("pr_number", help="Pull request number to check")
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",

@@ -238,3 +238,42 @@ reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
+
+## "Local" means CLI-reachable, not on-device --- and the preference is a standing default
+
+Directive from the user, 2026-08-27, given across three messages:
+"use cheap and free local models when feasible";
+"(always)" --- confirming a standing rule rather than a one-off;
+and "by local, I mean available through this computer's CLI;
+I don't care if they run on this computer or in the cloud."
+
+- **Do (user's words):** when delegating or dispatching any feasible task,
+  prefer free CLI-reachable budgets first ---
+  `codex` (ChatGPT plan),
+  `opencode` (its free hosted tier, Zen, and local Ollama),
+  and the `agy --print` CLI ---
+  then OpenRouter's prepaid credit balance,
+  then a cheap Claude tier (haiku, then sonnet) ---
+  and reserve the conductor's own tier for judgment-heavy work.
+- **Do (inferred):** read "local" as "reachable through a CLI on this
+  machine," not "running on this machine's own hardware."
+  A cloud-hosted model reached through a local CLI ---
+  `codex`, `agy`, OpenCode's hosted/Zen tiers, OpenRouter ---
+  qualifies fully, exactly as the on-device `ollama/*` tier does.
+  The ladder above already routes by CLI rather than by where the
+  weights execute; this section makes that criterion explicit instead
+  of leaving it to be inferred from the table.
+- **Don't (inferred):** default a dispatch to the inherited conductor
+  tier because the cheaper route costs setup effort ---
+  staging a brief file, checking a window's remaining budget, or
+  probing an unmeasured destination is the ladder's ordinary cost of
+  entry, not a reason to skip it ---
+  and don't skip a free CLI merely because its model happens to run
+  off-device rather than on this machine.
+- **Don't (inferred):** route work to a cheap tier where it
+  predictably fails --- adversarial review, long-list triage, or
+  anything this file or `select-model`'s decision tree already flags
+  as judgment-heavy --- and count the resulting retry as cheap
+  delegation. Escalate that work to a capable tier up front; a failed
+  cheap attempt plus a retry costs more than starting at the right
+  tier once.

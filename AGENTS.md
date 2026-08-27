@@ -109,8 +109,9 @@ See `shared/workflow/restructure-for-efficiency.md`.
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
-2. **The consumer copies / symlinks.**
-   Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, and when needed `~/.cursor/rules` and `~/.cursor/skills`) contain up-to-date symlinks.
+2. **The consumer install.**
+   Claude Code and Cursor read this repo's skills as a native plugin, not a symlink install --- confirm the plugin is enabled and up to date instead of checking for symlinks.
+   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 
@@ -136,7 +137,8 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 |---|---|---|
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
-| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| upstream Morrison-Lab/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
 
@@ -257,7 +259,44 @@ It knows what the change was meant to say, so it reads the diff and recovers the
 Brief the reviewer with the diff and the standards, never with the rationale for the change.
 
 Pushing without a clean self-review is mechanistically blocked by pre-push
-guards.
+guards on Claude Code.
+Morrison-Lab/ai-config's Cursor adapter skips `no-push-without-self-review.py`
+until [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241).
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch that persona through `Task`.
+Call `parse_report()` from the worktree's
+[`hooks/no-push-without-self-review.py`](hooks/no-push-without-self-review.py)
+on the report recovered from the child's transcript
+when the worktree hook script exists
+(see [`memories/cursor.md`](memories/cursor.md)).
+Do not import `~/.claude/hooks/`:
+it is a different revision from the branch under review.
+When the three-dot diff includes
+`hooks/no-push-without-self-review.py`,
+also parse with `origin/<default-branch>`'s copy, or obtain a CLI review.
+If the worktree script is missing, obtain a CLI review.
+Do not push unless the verdict is `clean` and the
+fingerprint prefix-matches HEAD.
+If there is no fingerprint
+(including a stale-registered persona),
+obtain a CLI review.
+On that Cursor-adapter path, the empty
+[`pr-on-claim`](shared/workflow/pr-on-claim.md)
+`--allow-empty` branch has no report:
+do not invent one,
+do not refuse that push for lack of a verdict,
+and say in the reply that the carve-out was used.
+The carve-out is `git rev-list --count origin/<default-branch>..HEAD`
+equal to 1 and `git diff --quiet HEAD^ HEAD` exit 0
+in the checkout whose push follows.
+Exit 1 means a diff; exit 128 means the command failed.
+Both conditions passing is the `--allow-empty` pr-on-claim commit.
+`git diff origin/<default-branch>...HEAD` empty
+in the checkout whose push follows is tree equality,
+not "this branch carries nothing".
+A net-zero tree of other commits is not the carve-out.
+On Claude Code the same empty branch still needs
+`ALLOW_UNREVIEWED_PUSH=1` on the pushing command.
 Full rule, including why a same-vendor subagent buys independence of intent but not of blind spot: [`shared/workflow/adversarial-self-review.md`](shared/workflow/adversarial-self-review.md).
 
 ## Put PRs in ready mode when they are ready for review
@@ -310,6 +349,8 @@ below).
   - *Model Decision*: Injected dynamically based on task context.
   - *Manual*: Triggered via `@mention` or explicit command.
 - **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
+- **Hooks integration**: Configured via `plugins/ai-config/hooks.json` mapping Antigravity lifecycle events (`PreToolUse`, `Stop`, `PreInvocation`) to shared enforcement hooks via `plugins/ai-config/claude-hook-adapter.py`.
+  See [`memories/antigravity.md`](memories/antigravity.md).
 
 ## Default to action without asking
 
@@ -328,14 +369,45 @@ This grants no merge authority: the strict merge policy below still applies.
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
   Under `mwc`, a PR must be fully clean across CI and review (see
   [`fully-clean.md`](shared/workflow/fully-clean.md)).
-  A clean automated Claude review evaluating the current HEAD commit is strictly required for merging with `mwc`.
+  A clean automated review from every available provider evaluating the current HEAD commit is strictly required for merging with `mwc`.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+  A disagreement among reviews is not fully clean: any reviewer's standing
+  not-clean --- nits included --- vetoes merge even with `mwc` active.
+  ARD every item from every review, then request fresh reviews
+  (ai-config#2274).
+- **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
+  GitHub's `mergeable` field is conflict existence (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`).
+  `mergeStateStatus: CLEAN` is conflict-free (GitHub `mergeable`) plus passing commit status, not a review verdict.
+  Only `DIRTY` / `CONFLICTING` means conflicts.
+  A PR whose latest commit has no authentic clean review is not merge-ready.
+  Report it as blocked on review, not as merge-ready.
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+
+## Always arm a persistent PR loop
+
+This applies in any repo, not only Morrison-Lab ones.
+When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running.
+Keep it running until the PR merges, closes, or the user says stop.
+A one-shot status poll is not babysitting.
+A PR-activity subscription is not a loop.
+PR-activity webhooks (`subscribe_pr_activity`) do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Subscribe when that tool exists, and re-arm a periodic check-in using whatever wake mechanism this session has.
+Claude Code: `/loop`, `send_later`, `CronCreate`, or a `schedule` timer.
+Another harness: its own scheduler or timer.
+A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
+Start the loop if it is not already running, then answer.
+
+Baking a self-merge directive into the loop/wakeup prompt is allowed only under a standing merge-when-confident (`mwc`) session grant.
+A one-off "merge this PR" instruction authorizes merging the current head once.
+It never licenses a later wake to self-merge a different head.
+
+- **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
+- **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
 
 ## Request review and drive every started PR to clean
 

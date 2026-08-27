@@ -6,6 +6,7 @@ Everything below was measured on the user's personal Windows 11 machine on **202
 Both version numbers move on VS Code's monthly train, so re-measure rather than quoting these -- the *mechanisms* are the durable part, the versions are the timestamp.
 
 Companion of the [`register-oaicopilot-models`](../skills/register-oaicopilot-models/SKILL.md) skill, which handles the [machine-dependent alternative route](#which-route-applies-is-a-property-of-the-machine-not-a-preference) to this one.
+Companion also of [`vscode-settings-sync.md`](vscode-settings-sync.md): `settings.json` travels through Settings Sync while the secret does not, so a second machine can silently revert the config documented here.
 Not a companion of [`tools.md`](tools.md)'s "Personal machine setup" section, despite the name: that section documents the shiva login node, a different machine entirely.
 
 ## `code --list-extensions` cannot see a built-in extension, so an absent name is not an absent extension

@@ -54,7 +54,7 @@ If `.quarto/` is already
   `manuscript-schema` is `closed: true` with no `super`, so the keys are silently
   ignored even when placed under `website:` or `format: html:` in `_quarto.yml`.
   Workaround: a Lua filter that reads those keys from metadata and injects the links
-  via inline JS — see `d-morrison/qmt/_repo-links.lua` for a full implementation.
+  via inline JS — see `Morrison-Lab/qmt/_repo-links.lua` for a full implementation.
   Upstream issue: quarto-dev/quarto-cli#14627.
 - **In Quarto Lua filters, use `quarto.doc.input_file` (not `PANDOC_STATE.input_files[1]`)
   to get the real source path.**
@@ -65,7 +65,7 @@ Quarto preprocesses `.qmd` files into temp files before
   the real path.
 To compute the repo-relative path: strip `os.getenv("QUARTO_PROJECT_DIR")`
   from the front (`abs_input:sub(#project_root + 2)`). (Learned while writing `_repo-links.lua`
-  for d-morrison/qmt.)
+  for Morrison-Lab/qmt.)
 - **A plain project-wide `quarto render` (no `--to`) DOES render every format a
   document's own front matter lists** — even formats the project's `_quarto.yml`
   doesn't configure.

@@ -186,7 +186,9 @@ fragment; the fragment's copy is authoritative.
    like once the incident clears, and why a job that is `cancelled` with zero
    recorded steps is an outage casualty rather than a failure to debug.
 
-2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+   A later all-clear from a different reviewer does not supersede a standing
+   not-clean (ai-config#2274).
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,
    from an external reviewer if one is reachable --- self-review is a
@@ -396,16 +398,21 @@ Those rules (`CLAUDE.md`'s "re-read the **most recent** review comment", and
 criterion 2's "latest review") assume the most recent artifact *is* a verdict,
 and say to prefer it over a cached one.
 They do not say what happens when the most recent artifact concludes nothing.
-Absence is not a clearing: the standing verdict is the last one anyone actually
-stated, however much has been posted since.
-Read "latest" as ranging over verdict-bearing statements, not over comments.
+Absence is not a clearing: each reviewer's standing verdict is the last one
+that reviewer actually stated, however much has been posted since.
+Read "latest" as ranging over verdict-bearing statements, not over comments,
+and as per reviewer, not as the globally last comment
+(ai-config#2274).
+A later all-clear from a different reviewer does not supersede a standing
+not-clean.
 
 Note this is wider than the HEAD-SHA scope the rest of criterion 2 uses.
 A "Needs more work" posted against an *earlier* commit is outside every
 HEAD-matching check, and a later verdict-less comment raises no finding either,
-so a PR reads clean on both while its last real verdict was not.
+so a PR reads clean on both while a reviewer's last real verdict was not.
 `scripts/check-pr-fully-clean.py` decides this as its criterion 4, scanning the
-whole review history chronologically for the last verdict-bearing statement.
+whole review history chronologically and failing when any reviewer's latest
+verdict-bearing statement is not-clean.
 
 **Another surface,
 and the one that defeats the gate itself:

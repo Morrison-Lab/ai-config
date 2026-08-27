@@ -1,6 +1,6 @@
-# d-morrison/gha reusable workflows
+# Morrison-Lab/gha reusable workflows
 
-Check `d-morrison/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
+Check `Morrison-Lab/gha` before writing bespoke CI --- it has reusable workflows for common patterns.
 The check is not only for CI you are about to write: a repo already carrying a hand-maintained workflow gha provides is one to migrate, per [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md).
 
 Split out of [`github-actions.md`](github-actions.md) (ai-config#1680) at the 1200-line memory-file gate.
@@ -49,7 +49,7 @@ Generic Actions-authoring material stays there.
 - **`lint-changed-lines.yml@v2`** (gha#276) --- runs `lintr` on changed R files but filters the reported lints down to only the lines a PR **adds or modifies**, so a repo can adopt or tighten a lint rule *incrementally*: new and edited code must comply while untouched legacy code is left alone.
   This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" --- don't disable the linter or reformat everything at once;
   adopt via this workflow and let the rule migrate file-by-file as code is touched.
-  Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
+  Caller stub is ~8 lines (`uses: Morrison-Lab/gha/.github/workflows/lint-changed-lines.yml@v2`).
   Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
   serocalculator#564 is the first consumer.
 - **Convention:** consumer repos call `Morrison-Lab/gha` reusable workflows with a moving major tag, not a SHA-pinned ref.
@@ -115,7 +115,7 @@ Generic Actions-authoring material stays there.
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under `on: workflow_call: inputs:`.
-  2. Forward it in the reusable workflow's `uses: d-morrison/gha/<name>@v1` step's `with:` block.
+  2. Forward it in the reusable workflow's `uses: Morrison-Lab/gha/<name>@v1` step's `with:` block.
   3. Update `examples/<name>.yml` (the caller stub) if the input is consumer-visible.
   4. Update the README table row for `<name>.yml` to list the new input under "Key inputs".
   Missing any of these leaves the input wired only partway --- consumers can't pass it through the reusable workflow even though it exists in the composite.

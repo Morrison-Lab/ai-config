@@ -64,10 +64,9 @@ README = os.path.join(ROOT, "README.md")
 # plugin-path activation, so it is registered by the follow-up after its
 # authoring PR merges.
 KNOWN_UNREGISTERED = {
-    # Inert BY THE GATE: README's activation rule makes the hooks.json entry
-    # itself the plugin-path activation, so this is registered by the
-    # follow-up after its authoring PR merges.
-    "remind-ums-on-scrutiny.py": 2261,
+    # Authoring only: not yet in hooks.json, registered by the follow-up
+    # after its authoring PR merges.
+    "warn-stale-issue-edit.py": 2282,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

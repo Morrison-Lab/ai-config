@@ -46,6 +46,36 @@ Refreshing the parenthetical to 17 entries would have been wrong again
 within weeks, so it became "every fragment under `shared/coding/`, indexed
 by the principle it serves in the catalog above".)
 
+**A softened count is still a pinned count, and hedging one reads as
+compliance.**
+The rule above says to replace a drifted list with a pointer.
+The near-miss is to replace it with a vaguer version of itself --- "roughly
+90K tokens across the ~60 files in it" in place of an exact figure --- which
+acknowledges the imprecision and changes nothing about the mechanism.
+Any number written down is a pinned number: the tree can shrink past
+"90K+" as easily as it grew past an exact one, and the hedged form is
+harder to notice afterwards precisely because it looks careful.
+
+The tell is that the sentence has to describe its own restraint.
+A form that needs a clause like "a count this sentence deliberately does not
+pin" is one that pinned a count, or it would have nothing to disclaim.
+The pointer form needs no such clause, because it names the query instead of
+an answer.
+
+- **Do:** replace the figure with the command or query that derives it, so
+  the reader gets today's answer rather than the day-of-writing answer.
+- **Don't:** hedge the figure and keep it --- an approximation drifts on the
+  same schedule the exact value did.
+
+(Measured on `ucdavis/bcs`#750, 2026-08-27: a fix for a drifted
+"~74-92K tokens across 59 files" was first drafted as
+"on the order of 90K+ tokens across the ~60 files in it, a count the
+filesystem enumerates and this sentence deliberately does not pin", in a
+commit that cited this fragment as its justification.
+An adversarial review rejected it on the grounds above, and it shipped as
+"count it with `find .ai-config/shared -name '*.md' | wc -l` rather than
+trusting a number written here".)
+
 This is conditioned on the external source being **reliably available** ---
 don't add a network fetch or a fragile dependency where a static value would
 do. A constant that has no external owner (a magic number intrinsic to the

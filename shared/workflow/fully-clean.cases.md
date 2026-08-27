@@ -1168,10 +1168,10 @@ The first state, quoted with the two-space indent the script prints:
   - No review comment has been posted evaluating HEAD SHA a72741ec yet
 ```
 
-A fallback review already existed when that printed. It did not match the
-head because it cited the commit as `a72741e`, at seven characters, while the
-matcher tests `sha[:8]` and the full 40. Git's default abbreviation is one
-character short of the gate.
+A fallback review already existed when that printed.
+It did not match the head because it cited the commit as `a72741e`, at seven
+characters, while the matcher tests `sha[:8]` and the full 40.
+Git's default abbreviation is one character short of the gate.
 
 After a later fallback quoted the full SHA, the finding changed:
 
@@ -1183,10 +1183,11 @@ After a later fallback quoted the full SHA, the finding changed:
 
 The tempting reading of that second state is that a self-review posted under
 the author's own login was filtered out as not an automated review.
-That is wrong. The comment was admitted and was quorum-eligible: the
-admission test accepts an `OWNER` or `MEMBER` comment whose body resolves to
-a reviewer identity other than the poster, and these were `MEMBER` comments
-carrying the agent's own marker.
+That is wrong.
+The comment was admitted and was quorum-eligible: the admission test accepts
+an `OWNER` or `MEMBER` comment whose body resolves to a reviewer identity
+other than the poster, and these were `MEMBER` comments carrying the agent's
+own marker.
 
 It failed on **format**.
 `classify_verdict()` reads the phrase `Verdict: Clean` and returns

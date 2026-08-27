@@ -546,7 +546,7 @@ gets a count that was measured, from the wrong line.
 - **Don't:** treat a number as verified because you ran something to get it ---
   ask which artifact answered, and whether it was the one making the claim.
 
-([Morrison-Lab/gha#687](https://github.com/Morrison-Lab/gha/pull/687), 2026-08-27.
+(Measured 2026-08-27 on [gha#687](https://github.com/Morrison-Lab/gha/pull/687).
 Three mutation counts were documented as 5/8/4 in `gha`'s `CLAUDE.md`, read via
 `grep -c '^::error::'`.
 The reviewer independently reproduced 4/7/3 and flagged the mismatch at reduced

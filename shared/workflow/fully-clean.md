@@ -84,8 +84,9 @@ Worked-example case records for the rules below live in
    **A polling loop needs the same negative control a sweep does, because an
    EMPTY check list satisfies "nothing is pending" exactly as well as a
    finished one.**
-   Every rule above concerns a list that came back **short**; this is the case
-   where it comes back **empty**, which none of them reaches.
+   The rules above that concern the check list each found one that came back
+   **short**; this is the case where it comes back **empty**, which none of
+   them reaches.
    "Not yet started" and "finished successfully" produce an identical reading,
    which is [`fail-fast`](../principles/fail-fast.md)'s
    pass-path-equals-failure-path shape failing in the dangerous direction ---

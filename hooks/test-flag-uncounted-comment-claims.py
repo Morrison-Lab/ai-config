@@ -106,6 +106,18 @@ BULLETED_LIST = (
     "- group-attack\n"
 )
 
+# Round 2 of the same adversarial review: fixing bug 1 by letting
+# CARDINALITY_RE's gap backtrack exposed a second bug -- a WORD-counted gap
+# has no sense of a sentence or paragraph boundary, so it happily walked
+# through a period or a newline to find a plural noun in a DIFFERENT
+# sentence. Both are real review-comment phrasing, not contrived text.
+CROSS_SENTENCE_PERIOD = (
+    "Reviewed PR 12 on GitHub. Scripts still need work before merge."
+)
+CROSS_PARAGRAPH_NEWLINE = (
+    "Filed as issue 5 in Slack.\nResults are pending review from the team."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -191,6 +203,13 @@ def unit_checks(mod):
           any(k == "enumeration" and "cycle-charge-flee" in q
               for k, q in claims),
           True)
+
+    # Regression: round 2 of the same review -- fixing bug 1's backtracking
+    # exposed a gap with no sentence/paragraph boundary. Must stay silent.
+    check("find_claims silent on a count and noun split by a sentence period",
+          mod.find_claims(CROSS_SENTENCE_PERIOD), [])
+    check("find_claims silent on a count and noun split by a paragraph break",
+          mod.find_claims(CROSS_PARAGRAPH_NEWLINE), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

@@ -243,22 +243,37 @@ LISTABLE_NOUN_RE = re.compile(r"(?:" + LISTABLE_NOUN_PATTERN + r")", re.I)
 # `some_script`.
 TOKEN = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+"
 
-# CARDINALITY: `\bCOUNT (gap words) PLURAL_LISTABLE_NOUN\b`. The 0-2 word gap
-# mirrors remind-brief-premises.py's `plural_after` window -- and, like that
-# function, the trailing `s` is baked INTO the noun group rather than
-# filtered afterward. That is not cosmetic: with a lazy `{0,2}?` gap and an
-# unconstrained noun group, the engine accepts the very first word it tries
-# (zero gap) without ever needing to look further, so a real match like
-# "18 new files" was never reached -- "new" satisfied an unconstrained noun
-# group and the match returned before "files" was ever examined. Requiring
-# the noun to end in `s` inside the group itself is what forces the engine
-# to keep expanding the gap until it actually finds a plural word. Measured
-# in an adversarial review of this hook (ai-config#2377 round 1): the
-# unconstrained version matched a bare "18 files" and missed every realistic
-# paraphrase with one intervening adjective ("18 new files", "3 remaining
-# bugs", "4 different scripts").
+# CARDINALITY: `\bCOUNT [ \t]+ (bounded gap) PLURAL_LISTABLE_NOUN\b`. Two
+# fixes layered on top of each other, both found by adversarial review of
+# this hook (ai-config#2377), and the second is a direct side effect of the
+# first.
+#
+# Round 1: with a lazy `{0,2}?` WORD-counted gap and an unconstrained noun
+# group, the engine accepted the very first word it tried (zero gap) without
+# ever needing to look further, so a real match like "18 new files" was
+# never reached -- "new" satisfied an unconstrained noun group and the match
+# returned before "files" was ever examined. Requiring the noun to end in
+# `s` INSIDE the group itself (rather than filtering afterward) is what
+# forces the engine to keep expanding the gap until it actually finds a
+# plural word, mirroring remind-brief-premises.py's `plural_after`.
+#
+# Round 2: making the gap backtrack at all is what exposed a second bug --
+# a WORD-counted gap (`(?:[\w./-]+\s+){0,2}?`) has no sense of a sentence or
+# paragraph boundary, so once it needs to search past the first word, it
+# happily walks straight through a period or a newline to find a plural noun
+# in an ENTIRELY DIFFERENT SENTENCE: "Reviewed PR 12 on GitHub. Scripts
+# still need work" matched "12 on GitHub. Scripts" as one claim, and
+# "Filed as issue 5 in Slack.\nResults are pending" matched "5 in Slack.
+# Results" -- both real review-comment phrasing, not contrived corpus text.
+# `ENUM_RE` already had this guard (`[^\n.:]`) from round 1; this regex did
+# not, because round 1's own bug happened to make the gap unreachable in
+# practice. Switching from a word-counted gap to a CHARACTER-bounded one
+# excluding newline/period/colon -- the same shape `ENUM_RE` uses -- closes
+# both the sentence-crossing and paragraph-crossing cases at once: neither
+# character can ever appear inside the gap, so the match simply fails
+# rather than reaching into the next sentence.
 CARDINALITY_RE = re.compile(
-    rf"\b({COUNT})\s+(?:[\w./-]+\s+){{0,2}}?([A-Za-z][\w./-]*s)\b", re.I,
+    rf"\b({COUNT})\b[ \t]+[^\n.:]{{0,24}}?([A-Za-z][\w-]*s)\b", re.I,
 )
 
 # ENUMERATION: a listable noun, an optional short gap (never crossing a

@@ -210,13 +210,13 @@ env_word_not_push = transcript([
 # The anchor rewrite ((?:^|[;&|\n])\s* instead of (?:^|[;&|\n]\s*)) also
 # admits leading whitespace before an unprefixed command -- deliberate, and
 # pinned here so the widening is documented rather than incidental.
-env_prefixed_create = transcript([
-    "git commit -m hook",
-    "GH_TOKEN=x gh pr create --fill",
-])
 leading_ws_push = transcript([
     "git commit -m hook",
     "  git push origin HEAD",
+])
+env_prefixed_create = transcript([
+    "git commit -m hook",
+    "GH_TOKEN=x gh pr create --fill",
 ])
 
 try:

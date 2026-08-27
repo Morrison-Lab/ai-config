@@ -311,12 +311,13 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     Cited finding vocabulary is blanked first so a code span still does not
     match.
 
-    Residual: a shared-login review whose first non-empty line has no known
+    Residual: a shared-login review whose first or last non-empty line has no known
     agent marker falls back to the login, so two unmarked ``github-actions``
     bodies share one identity.
     Real Claude and Antigravity reviews carry the marker on that first line.
+    CLI agents like Codex and OpenCode append the marker on the last line.
     Scanning the whole body would re-open the quote-inheritance hole this
-    first-line rule exists to close.
+    first-and-last-line rule exists to minimize.
     """
     login = str(author or "").strip()
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
@@ -1141,7 +1142,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
 
         author_assoc = (c.get("authorAssociation") or "").upper()
         is_bot_author = _is_bot_author(author_login) or (
-            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
         verdict = classify_verdict(body)
 
@@ -1166,7 +1167,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # detected via strict body text markers, OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
         is_bot_author = _is_bot_author(author_login) or (
-            author_assoc in ("OWNER", "MEMBER", "COLLABORATOR") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
+            author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))

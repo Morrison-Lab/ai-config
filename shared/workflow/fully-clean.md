@@ -185,19 +185,14 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
-**Final approval comes from Claude where Claude is reachable.**
-Another agent's clean verdict clears CI's review gate; it does not clear
-criterion 2 on its own.
+**Final approval requires a clean verdict from every available provider in the pinned quorum.**
+A single agent's clean verdict does not clear criterion 2 on its own; it must be joined by a clean verdict from the rest of the quorum.
 
-This is a directive rather than a derivation, so treat it as a standing
-preference and not as a claim about any agent's general competence.
-What it settles is which verdict a PR is reported **ready** on.
+This is a directive rather than a derivation, so treat it as a standing preference.
+What it settles is when a PR is reported **ready** for merge.
 
-The reason it needs stating is that the two are indistinguishable from the PR
-page.
-Every agent posts the same shape --- a summary, some analysis, a positive
-closing line --- so a findings-free report reads as approval whichever agent
-produced it, and the review-gate check goes green either way.
+The reason it needs stating is that multiple verdicts are indistinguishable from a single one to the CI review gate.
+Every agent posts the same shape --- a summary, some analysis, a positive closing line --- so a findings-free report from just one agent turns the review-gate check green, even while other providers' reviews are pending or blocked.
 
 Two failure modes make the preference concrete, and both have recurred:
 

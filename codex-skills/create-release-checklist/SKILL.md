@@ -1,6 +1,6 @@
 ---
 name: "create-release-checklist"
-description: "Create a release checklist and GitHub issue for an R package."
+description: "Create an R package release-checklist issue."
 ---
 
 # create-release-checklist (Codex wrapper)

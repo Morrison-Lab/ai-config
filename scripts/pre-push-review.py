@@ -160,13 +160,21 @@ def _refusal_reason(report: str) -> Optional[str]:
     return None
 
 
+_HOOK_PARSE_REPORT = None
+
+
 def _load_hook_parse_report():
     """Load parse_report() from hooks/no-push-without-self-review.py.
 
     The hook's filename is not an importable module name, so load it by
-    path. Import errors propagate: a missing or broken hook must fail the
-    parse loudly rather than silently falling back to nothing.
+    path, once per process (the hook itself loads a sibling at module top
+    level, so repeated exec is wasteful). Import errors propagate: a missing
+    or broken hook must fail the parse loudly rather than silently falling
+    back to nothing.
     """
+    global _HOOK_PARSE_REPORT
+    if _HOOK_PARSE_REPORT is not None:
+        return _HOOK_PARSE_REPORT
     import importlib.util
 
     hook_path = (
@@ -179,7 +187,8 @@ def _load_hook_parse_report():
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.parse_report
+    _HOOK_PARSE_REPORT = module.parse_report
+    return _HOOK_PARSE_REPORT
 
 
 def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
@@ -193,10 +202,37 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
     if refusal:
         return False, False, refusal
 
+    # Strip HTML comments before parsing, exactly as the local path does: a
+    # commented-out `Verdict:` line sits at line start and would otherwise be
+    # taken as the report's last verdict.
+    stripped = re.sub(r"<!--.*?-->", "", report, flags=re.DOTALL)
+    if "<!--" in stripped:
+        return False, False, "Unterminated HTML comment detected."
+
     parse_report = _load_hook_parse_report()
-    verdict, reviewed_commit = parse_report(report)
+    verdict, reviewed_commit = parse_report(stripped)
     if verdict is None:
         return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
+
+    if verdict == "clean":
+        # parse_report's verdict regex has no line-end anchor, so a trailing
+        # qualification ("Ready for merge -- after fixing X") would pass it.
+        # Mirror the local contract's rule: any content after the clean
+        # phrase beyond closing emphasis/punctuation invalidates the clean.
+        last_clean = None
+        for m in re.finditer(
+            r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
+            r"(?:Ready for merge)\b(?P<rest>.*)$",
+            strip_fences(stripped),
+        ):
+            last_clean = m
+        if last_clean is not None:
+            rest = re.sub(r"[\*`_.!\s]", "", last_clean.group("rest"))
+            if rest:
+                return False, False, (
+                    f"Invalid clean verdict with trailing qualification: "
+                    f"{last_clean.group(0).strip()!r}"
+                )
 
     if expected_commit_sha:
         if not reviewed_commit:
@@ -255,9 +291,20 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     # one parse rather than re-deriving it here -- one parser per contract,
     # not two parsers for one.
     if None in (summary_text, critical_text, observations_text, verification_text):
+        # Delegate only when EVERY local-only section is absent -- a hybrid
+        # report that carries any of Critical Findings / Observations /
+        # Verification Steps stays on the strict local path, so dropping one
+        # section cannot buy a report the laxer parser. summary_text cannot
+        # join this condition: a pure persona report's `### Verdict:` heading
+        # makes it non-None by construction.
+        purely_persona = (
+            critical_text is None
+            and observations_text is None
+            and verification_text is None
+        )
         persona_findings = extract_section(unfenced_report, r"Findings")
         persona_verdict = extract_section(unfenced_report, r"Verdict")
-        if persona_findings is not None and persona_verdict is not None:
+        if purely_persona and persona_findings is not None and persona_verdict is not None:
             return _parse_persona_verdict(report, expected_commit_sha)
         if summary_text is None: return False, False, "Missing required section: Summary Verdict"
         if critical_text is None: return False, False, "Missing required section: Critical Findings"

@@ -919,6 +919,50 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertNotIn("persona", reason)
 
+    def test_persona_hybrid_report_stays_on_strict_path(self):
+        # A report carrying ANY local-only section (here Critical Findings)
+        # plus persona headings must be graded by the strict local path --
+        # dropping one local section cannot buy the laxer parser.
+        commit = "abc123def4567890"
+        hybrid = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "[P0] blocking bug: data loss on save.\n\n"
+            "### Findings\n"
+            "None.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(hybrid, expected_commit_sha=commit)
+        self.assertFalse(is_clean, reason)
+        self.assertNotIn("persona", reason)
+
+    def test_persona_commented_out_verdict_not_parsed(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\n1. [Defect] broken.\n\n"
+            "### Verdict: Needs more work\n\n"
+            "<!--\nVerdict: Ready for merge\n-->\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertFalse(is_clean, reason)
+
+    def test_persona_trailing_qualification_rejected(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\n1. [Defect] XYZ is broken.\n\n"
+            "### Verdict: Ready for merge -- after fixing XYZ\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_valid, reason)
+        self.assertIn("qualification", reason.lower())
+
     def test_persona_contract_refusal_detected(self):
         report = (
             "### Summary of Changes\nx\n\n"

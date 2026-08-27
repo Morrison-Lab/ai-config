@@ -118,6 +118,32 @@ CROSS_PARAGRAPH_NEWLINE = (
     "Filed as issue 5 in Slack.\nResults are pending review from the team."
 )
 
+# ai-config#2386 review round 1 (claude-review, comment 5435096586): the
+# path-citation guard on ENUM_RE only protects the position immediately
+# after the noun it actually matched. A DIFFERENT listable noun earlier in
+# the same sentence ("occurrences") let the gap swallow a whole bare
+# directory segment ("skills") plus its trailing slash, resuming the
+# token-list match mid-path.
+PATH_CITATION_WITH_EARLIER_NOUN = (
+    "No occurrences found in skills/select-model/SKILL.md after the fix."
+)
+# The same shape, reached via the bulleted-list pattern instead of the
+# inline one -- an intro line citing a path and ending in a colon, followed
+# by unrelated bulleted content.
+PATH_CITATION_BEFORE_BULLETS = (
+    "No occurrences found in skills/select-model/SKILL.md:\n"
+    "- item1\n"
+    "- item2\n"
+)
+
+# Found while verifying the fix above, in the SAME review repro sentence:
+# CARDINALITY_RE's imported COUNT treats "no" as a numeral alongside "zero",
+# so "No occurrences" (a negation -- nothing was found, not a specific
+# derived count) still read as a cardinality claim after the enumeration
+# half was fixed. "zero" stays a real count; "no" does not.
+NEGATION_WITH_LISTABLE_NOUN = "There are no dead branches."
+ZERO_IS_KEPT = "There are zero files remaining."
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -210,6 +236,23 @@ def unit_checks(mod):
           mod.find_claims(CROSS_SENTENCE_PERIOD), [])
     check("find_claims silent on a count and noun split by a paragraph break",
           mod.find_claims(CROSS_PARAGRAPH_NEWLINE), [])
+
+    # Regression: PR #2386 review round 1 -- ENUM_RE's noun-adjacent guard
+    # did not stop a DIFFERENT listable noun earlier in the sentence from
+    # swallowing a bare directory segment plus its slash into the gap.
+    check("find_claims silent when an earlier noun's gap swallows a path",
+          mod.find_claims(PATH_CITATION_WITH_EARLIER_NOUN), [])
+    check("find_claims silent on the same shape before a bulleted list",
+          mod.find_claims(PATH_CITATION_BEFORE_BULLETS), [])
+
+    # Regression: found while verifying the fix above, in the same repro
+    # sentence -- CARDINALITY_RE's COUNT treated "no" as a numeral, so a
+    # negation ("no dead branches") read as a cardinality claim. "zero"
+    # stays a real, checkable count.
+    check("find_claims silent on a negation with a listable noun",
+          mod.find_claims(NEGATION_WITH_LISTABLE_NOUN), [])
+    check("find_claims still catches an explicit 'zero' cardinality claim",
+          mod.find_claims(ZERO_IS_KEPT), [("cardinality", "zero files")])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

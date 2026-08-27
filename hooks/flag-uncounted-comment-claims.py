@@ -272,12 +272,34 @@ TOKEN = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+"
 # both the sentence-crossing and paragraph-crossing cases at once: neither
 # character can ever appear inside the gap, so the match simply fails
 # rather than reaching into the next sentence.
+#
+# `CARDINALITY_COUNT` below is `COUNT` minus the word "no", found while
+# verifying the ENUM_RE fix for ai-config#2377 round 2 against the review's
+# own repro sentence: "No occurrences found in skills/select-model/SKILL.md"
+# still fired a `('cardinality', 'No occurrences')` claim after the
+# enumeration half was fixed, because `COUNT` (imported from
+# remind-brief-premises.py, where it is correctly generic) treats "no" as a
+# numeral alongside "zero". "No occurrences", "no matches", "no dead
+# branches" are negations -- ordinary review-comment hedging, not a specific
+# derived count someone could have gotten wrong -- and they are extremely
+# common phrasing, which is exactly the erosion-of-trust risk the review
+# comment itself named. "zero" is kept: it is unambiguous ("zero files
+# remain" is a real, checkable count) in a way the negation particle "no" is
+# not. This is a LOCAL exclusion, not a change to the shared `COUNT`
+# constant -- `remind-brief-premises.py`'s own Agent-brief use of "no" is a
+# different population (a brief instructing an agent, not review-comment
+# prose) and is out of scope for this hook's fix.
+CARDINALITY_COUNT = (
+    r"\d[\d,]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|zero"
+)
 CARDINALITY_RE = re.compile(
-    rf"\b({COUNT})\b[ \t]+[^\n.:]{{0,24}}?([A-Za-z][\w-]*s)\b", re.I,
+    rf"\b({CARDINALITY_COUNT})\b[ \t]+[^\n.:]{{0,24}}?([A-Za-z][\w-]*s)\b", re.I,
 )
 
 # ENUMERATION: a listable noun, an optional short gap (never crossing a
 # sentence boundary) and optional colon, then >=2 TOKENs joined by `/` or `,`.
+#
 # `(?![-_./])` immediately after the noun is load-bearing, not decorative:
 # without it, a corpus path whose own segments happen to contain hyphens --
 # `skills/select-model/SKILL.md`, this repo's own standard citation shape --
@@ -296,8 +318,29 @@ CARDINALITY_RE = re.compile(
 # this hook (ai-config#2377 round 1): the unguarded pattern matched 43% of
 # this repo's own shared/**/*.md + skills/**/*.md files, the large majority
 # of them exactly this class of false positive.
+#
+# That guard only protects the position IMMEDIATELY after the matched noun,
+# and a DIFFERENT listable noun earlier in the same sentence still reaches
+# the same false positive by a different route: the gap's own character
+# class allowed `/`, so it could swallow an entire BARE directory segment
+# (one with no internal hyphen/underscore/dot of its own -- "skills", not
+# "select-model") plus its trailing slash, and resume the token-list match
+# mid-path. "No occurrences found in skills/select-model/SKILL.md" matched
+# noun "occurrences" (correctly passing the post-noun lookahead, since it is
+# followed by a space) with a gap of "found in skills/" that swallowed the
+# slash itself, so the token list started at "select-model/SKILL.md" -- a
+# single-file citation misread as a two-item list. Found in an adversarial
+# review of this hook (ai-config#2377 round 2), reproduced with
+# `find_claims('No occurrences found in skills/select-model/SKILL.md after
+# the fix.')`. Excluding `/` from the gap's own character class closes this:
+# a real enumeration's gap is prose ("are:", "found in the"), never the
+# list's own separator, so a gap that would need to cross a `/` to reach a
+# token list is exactly the "this is a path, not a hand-typed list" signal
+# -- and `skills`, tried as its own noun candidate once the gap can no
+# longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
+# guarding this case directly.
 ENUM_RE = re.compile(
-    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:]{{0,24}}?:?\s*"
+    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*(?:,|/)\s*{TOKEN}){{1,}})",
     re.I,
 )
@@ -307,9 +350,14 @@ ENUM_RE = re.compile(
 # items joined inline on one line ("a / b / c"); a poster listing the same
 # claim as a bulleted list -- arguably the more natural way to present a
 # file enumeration in a forge comment -- was invisible to it. `{2,}` bullet
-# lines, matching ENUM_RE's own >=2-items bar.
+# lines, matching ENUM_RE's own >=2-items bar. `/` excluded from the gap for
+# the same reason it is excluded from `ENUM_RE`'s (ai-config#2377 round 2):
+# an intro line ending in a colon and citing a path ("No occurrences found
+# in skills/select-model/SKILL.md:") followed by unrelated bulleted content
+# below it would otherwise let the gap swallow the whole path, including its
+# slash, on the way to that colon.
 ENUM_BULLET_RE = re.compile(
-    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n]{{0,40}}?:\s*\n"
+    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n/]{{0,40}}?:\s*\n"
     r"((?:[ \t]*[-*]\s+[^\n]*\n?){2,})",
     re.I,
 )

@@ -14,14 +14,28 @@ repo is bootstrapped.
 Several skills fan a task out across many independent targets — one competitor
 community per research pass, one dependency pin per audit, one claim per
 fact-check — and want each target checked in parallel without risking a stray
-worker writing a file, filing an issue, or running a destructive command. Every
-agent in this repo omits `Edit` and `Write` from its `tools` list, so it can
-never call those tools to change a file — that restriction is **harness-enforced**.
+worker writing a file, filing an issue, or running a destructive command.
+Every agent in this repo omits `Edit` and `Write` from its Claude Code
+`tools` list.
+Claude Code honors that allowlist (the `tools:` field, documented at
+<https://code.claude.com/docs/en/sub-agents> and in this repo since
+[ai-config#341](https://github.com/Morrison-Lab/ai-config/pull/341);
+still the mechanism Claude Code uses as of 2026-08-26).
+Some other harnesses still grant Write schemas to the same persona
+(Cursor Cloud Task, measured 2026-08-25 PDT on
+[ai-config#2265](https://github.com/Morrison-Lab/ai-config/pull/2265),
+[ai-config#2266](https://github.com/Morrison-Lab/ai-config/pull/2266), and
+[ai-config#2272](https://github.com/Morrison-Lab/ai-config/pull/2272)),
+so the restriction is not a universal harness guarantee.
 All but one of them also keep `Bash`, which *can* run write-capable shell
 commands (`git push`, `rm`, a redirect); for those, staying read-only is
 instruction-level discipline, not a harness guarantee (see the note below the
-table). Each agent returns a report; only the calling session, which keeps full
-tool access, applies fixes or writes anything, on the user's go-ahead.
+table).
+Each agent returns a report.
+Even when a harness still grants the worker Write schemas,
+the worker stays read-only by instruction,
+and the calling session is what dispositions findings and applies fixes,
+on the user's go-ahead.
 
 `adversarial-reviewer` is the one that is not a fan-out worker but a **critic**
 --- it reviews the calling session's own diff rather than investigating the
@@ -46,13 +60,20 @@ finding and its disposition together.
 Every agent except `community-demand-scout` keeps `Bash` for read-only checks
 (`grep`, `gh api`, `git submodule status`, `test -e`) --- avoiding a
 write-capable shell command (`renv::update()` without `check = TRUE`,
-`pre-commit autoupdate`) is instruction-level discipline for those, not a
-harness-enforced restriction the way the missing `Edit`/`Write` is.
-Each such agent's file under `.claude/agents/` says so in as many words, so the
-discipline is instructed where it is relied on rather than only asserted here.
+`pre-commit autoupdate`) is instruction-level discipline for those.
+Each such agent's file under `.claude/agents/` says so in as many words,
+so the Bash discipline is instructed where it is relied on rather than
+only asserted here.
+The Claude Code versus other-harness split for `Edit`/`Write` is in
+[Why read-only fan-out workers](#why-read-only-fan-out-workers) above.
+`adversarial-reviewer` is the persona that currently carries the
+Write-schema hedge.
 The `.opencode/` mirrors are not all the same: opencode's own permission block
-can deny `bash` outright, in which case the restriction is harness-enforced
-there and the persona says that instead.
+can deny `bash` outright, in which case the Bash restriction is
+harness-enforced there.
+A harness that still grants Write schemas is not bound by that block.
+Which copy Cursor Cloud reads was not isolated
+(measured 2026-08-25 PDT).
 
 ## How they're invoked
 

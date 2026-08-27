@@ -340,16 +340,17 @@ CARDINALITY_RE = re.compile(
 # longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
 # guarding this case directly.
 #
-# THE PATH-CITATION FALSE-POSITIVE CLASS -- FIVE ROUTES, AND A DESIGN
-# DECISION RATHER THAN A SIXTH PATCH.
-# Five rounds of review on this hook (ai-config#2377/#2386) found the SAME
-# underlying confusion by a different route each time: `TOKEN` cannot tell
-# "one file's own path, N directory segments then a filename" from "several
-# hand-typed identifiers joined by `/`", because both are letters, hyphens,
-# and dots joined by a slash. Routes 1-2 are about WHERE the match starts
-# (the noun); routes 3-5 are about WHAT the captured list's items look like,
-# and after the third one of THOSE the fix stopped being "count separators
-# and items harder" and became a CLASS BOUNDARY, drawn once in
+# THE PATH-VS-LIST GRAMMAR CLASS -- SEVEN ROUTES ACROSS SEVEN REVIEW ROUNDS.
+# Renamed from "false-positive class" once route 6 found the mirror-image
+# failure: the SAME underlying confusion -- `TOKEN` cannot tell "one file's
+# own path, N directory segments then a filename" from "several hand-typed
+# identifiers joined by `/`", because both are letters, hyphens, and dots
+# joined by a slash -- produces an over-broad match in one direction
+# (routes 1-5, false positives) and a match that stops too soon in the
+# other (routes 6-7, false negatives). Routes 1-2 are about WHERE the match
+# starts (the noun); routes 3-5 are about WHAT the captured list's items
+# look like, and after the third one of THOSE the fix stopped being "count
+# separators and items harder" and became a CLASS BOUNDARY, drawn once in
 # `looks_like_one_path()` below rather than re-derived per shape:
 #   1. The NOUN itself sits directly against the path with no separator
 #      (`skills/select-model/SKILL.md` reading "skills" as the noun). Closed
@@ -458,6 +459,62 @@ CARDINALITY_RE = re.compile(
 #      identifiers) is tracked separately as ai-config#2404: fixing it means
 #      widening `TOKEN`, a materially larger and riskier change than
 #      anything routes 1-6 needed, and belongs in its own design pass.
+#
+#   7. Route 6's own `trailing_char` fix was ITSELF too coarse: it treated
+#      ANY `/` sitting immediately after the match as proof the preceding
+#      item was a citation, with no regard for what followed that `/`. A
+#      bare recalled identifier immediately followed by a coincidental,
+#      UNRELATED `/`-suffix (a date, `cycle-charge-flee/2026`; a branch
+#      name, `cycle-charge-flee/main`) got silently promoted to "citation"
+#      and the whole mixed list -- the founding incident's own composite
+#      shape -- went undetected. This is the identical LOCAL SHAPE as route
+#      6's own fix target (a bare piece, no internal `/`, immediately
+#      followed by another `/`): `ai-config` before `/memories/tools.md`
+#      and `cycle-charge-flee` before `/2026` are LEXICALLY INDISTINGUISHABLE
+#      from a single character of lookahead, which is why naively requiring
+#      an internal `/` before `trailing_char` can apply (the reviewer's own
+#      first-pass suggestion) would have REOPENED route 6's fix rather than
+#      closing route 7 -- the two bugs cannot both be fixed by a piece-and-
+#      one-character heuristic. What distinguishes them is what comes AFTER
+#      the dangling `/`: `/memories/tools.md` is entirely `/`-segments
+#      (however bare) that eventually resolve to a real extension; `/2026`
+#      is not even segment-shaped (no path segment, bare or not, starts
+#      with a digit); `/main` IS segment-shaped but resolves to neither an
+#      extension nor a bare trailing `/`. Closed by widening `trailing_char`
+#      into a bounded, whitespace-terminated CONTINUATION and classifying
+#      it with `looks_like_path_continuation()` rather than a single
+#      character -- see that function and `looks_like_citation()` for the
+#      full mechanism.
+#
+#      SEVEN ROUNDS ON ONE GRAMMAR is the signal a structural rewrite --
+#      not another item on this list -- deserves serious consideration
+#      before shipping an eighth special case, and it was: a PRE-PASS that
+#      scans raw prose for citation-shaped spans and replaces each with a
+#      placeholder BEFORE `ENUM_RE` ever runs, so the citation grammar and
+#      the list grammar never share a match to disagree about. Rejected,
+#      not out of caution but because it does not actually buy what it
+#      promises: `ai-config/memories/tools.md`'s own bare "memories"
+#      segment defeats a PRE-PASS SCAN exactly the way it defeats `TOKEN`
+#      inside `ENUM_RE` -- the scan cannot find "ai-config/memories/tools.md"
+#      as one span either, so it would mask nothing, and the identical
+#      truncated-fragment ambiguity resurfaces one layer up, needing the
+#      SAME continuation-lookahead refinement to resolve. A pre-pass would
+#      ALSO have reopened a NEW risk this design avoids: masking a long
+#      citation down to a short placeholder can shrink the distance between
+#      an unrelated COUNT and a distant noun below `CARDINALITY_RE`'s/
+#      `ENUM_RE`'s own 24-character gap bounds, manufacturing cardinality
+#      false positives that do not exist in the unmasked text. Given the
+#      fix needed is the SAME either way, the narrow, already-reviewed
+#      `looks_like_citation`/`looks_like_one_path` apparatus was extended
+#      in place rather than rewritten wholesale seven rounds into this PR.
+#      A genuinely NEW route 8 would need a shape none of the seven routes
+#      or this analysis anticipated; testing "all orderings" for route 7
+#      (see `ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST` in the test suite)
+#      found exactly one more residual, and it traces to ai-config#2404's
+#      ALREADY-TRACKED limitation (a coincidental-slash identifier as the
+#      very FIRST list item defeats the token-list clause's own SEPARATOR,
+#      a different mechanism than `trailing_char`/`continuation`), not to a
+#      new, unrelated route.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*/?(?:,|/)\s*{TOKEN}){{1,}})",
@@ -493,8 +550,78 @@ COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 # a missed reminder, never a wrong one.
 PATH_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
 
+# A path SEGMENT that may itself be bare (no internal hyphen/underscore/dot
+# at all) -- deliberately looser than `TOKEN`, which requires at least one
+# such separator. Used only to describe what a genuine continuation past a
+# dangling `/` could look like, never to decide what counts as an
+# enumeration ITEM -- that job stays `TOKEN`'s alone.
+_BARE_SEGMENT = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*"
 
-def looks_like_citation(text, trailing_char=""):
+# One or more `/segment` hops, each segment possibly bare, with an optional
+# final bare `/`. This is the SHAPE `looks_like_path_continuation` requires
+# a dangling continuation to have before it will even ask whether that
+# continuation resolves to an extension -- see that function.
+CONTINUATION_RE = re.compile(rf"(?:/{_BARE_SEGMENT})+/?")
+
+
+def looks_like_path_continuation(continuation):
+    """True when `continuation` -- text that starts with `/` and runs to
+    the next whitespace in the source -- genuinely continues a path,
+    rather than being a coincidental slash sitting next to unrelated
+    prose.
+
+    Found in an adversarial review of this hook (ai-config#2386 round 7),
+    which discovered that the round-6 fix's `trailing_char` check --
+    "is the very next character in the source a `/`?" -- cannot tell a
+    genuine continuation from a coincidental one, because BOTH shapes are
+    IDENTICAL at the single-character level:
+
+      * `ai-config/memories/tools.md` (round 6's own fix target): TOKEN
+        truncates the match after "ai-config" because "memories" has no
+        internal hyphen/underscore/dot, leaving a dangling `/` that
+        genuinely continues into a real file (`/memories/tools.md`).
+      * `cycle-charge-flee/2026` and `cycle-charge-flee/main` (round 7's
+        repro): a bare recalled identifier happens to sit next to an
+        unrelated `/`-prefixed suffix (a year, a branch name) that has
+        NOTHING to do with a citation.
+
+    Both are "a piece with no internal `/`, immediately followed by
+    another `/` in the source" -- indistinguishable from a single
+    character of lookahead. What DOES distinguish them is what the
+    continuation eventually resolves to: `/memories/tools.md` is entirely
+    `/`-segments (however bare) ending in a real extension; `/2026` is not
+    even segment-shaped (`2026` starts with a digit, which no path
+    segment -- bare or not -- can); `/main` IS segment-shaped but resolves
+    to neither an extension nor a bare trailing `/`, so it stays
+    unclassified rather than being guessed at.
+
+    A bare trailing `/` with NOTHING attached (the ordinary case a
+    directory citation takes when it is the last thing in a sentence,
+    `codex-skills/pre-push-review/ were found`) is the simple case and is
+    handled by the caller directly -- this function is only reached when
+    something IS attached to the slash.
+    """
+    m = CONTINUATION_RE.match(continuation)
+    if not m or m.end() != len(continuation):
+        return False
+    return continuation.endswith("/") or bool(PATH_EXTENSION_RE.search(continuation))
+
+
+def dangling_continuation(prose, pos):
+    """The non-whitespace run starting at `pos` in `prose`, if `prose[pos]`
+    is `/` -- otherwise `""`. A path segment never contains whitespace, so
+    this is exactly the span a continuation past a dangling `/` could
+    plausibly occupy; `looks_like_path_continuation` classifies it. Bounded
+    to 200 characters, matching this file's other gap bounds -- nothing a
+    genuine path continuation needs approaches that length.
+    """
+    if prose[pos:pos + 1] != "/":
+        return ""
+    m = re.match(r"\S{0,200}", prose[pos:])
+    return m.group(0) if m else ""
+
+
+def looks_like_citation(text, continuation=""):
     """True when a single comma-separated PIECE of a captured list is
     itself shaped like a citation to one file or directory -- the item-level
     test the round-5 design decision (documented above `ENUM_RE`) is built
@@ -505,12 +632,13 @@ def looks_like_citation(text, trailing_char=""):
     `codex-skills/pre-push-review/` -- the round-5 sweep's single largest
     false-positive bucket before that round's fix, 104 of 140 hits, since a
     bare N-segment directory path has no extension anywhere to key on), OR
-    -- checked FIRST, independent of any internal `/` -- when
-    `trailing_char` is `/`: the character immediately following the WHOLE
-    match in the source, supplied only for the piece that actually abuts it
-    (`looks_like_one_path` scopes this to the last piece).
+    -- checked FIRST, independent of any internal `/` in the piece itself --
+    when `continuation` (the text immediately following the WHOLE match in
+    the source, supplied only for the piece that actually abuts it; see
+    `dangling_continuation`) is a bare `/` or genuinely continues a path
+    (`looks_like_path_continuation`).
 
-    The `trailing_char` check has to come before the internal-`/`
+    The `continuation` check has to come before the internal-`/`
     requirement, not after it, because of a separate, PRE-EXISTING
     limitation `TOKEN` has always had: it requires every path SEGMENT to
     itself carry an internal hyphen/underscore/dot, so a real citation whose
@@ -518,24 +646,30 @@ def looks_like_citation(text, trailing_char=""):
     "memories" has no separator) truncates the whole `ENUM_RE` match right
     after the segment before it, leaving a piece like bare `"ai-config"` --
     no internal `/` of its own -- immediately followed by the unconsumed
-    `/memories/tools.md` in the source. Checking the internal `/` first
-    means that truncated fragment is judged as a bare identifier rather
-    than as what it actually is: the START of a second, real citation cut
-    short by the SAME segment limitation that keeps this hook from ever
-    matching such a path in full. Ordering `trailing_char` first closes
-    that false positive without touching `TOKEN` itself -- widening `TOKEN`
-    to accept a bare segment is a separate, much larger design question
-    (it is the precision mechanism that keeps ordinary English prose off
-    this list in the first place) and out of scope here.
+    `/memories/tools.md` in the source. Checking the continuation first
+    means that truncated fragment is judged as what it actually is: the
+    START of a second, real citation cut short by the SAME segment
+    limitation that keeps this hook from ever matching such a path in full
+    -- rather than as a bare identifier. Round 6 first closed this with a
+    single-character `trailing_char == "/"` check; round 7 found that
+    single character cannot tell a genuine continuation from a coincidental
+    one (`cycle-charge-flee/2026`), which is why `continuation` is now the
+    full non-whitespace run rather than one character, classified by
+    `looks_like_path_continuation`. Widening `TOKEN` itself to accept a
+    bare segment is a separate, much larger design question (it is the
+    precision mechanism that keeps ordinary English prose off this list in
+    the first place) and stays out of scope, tracked as ai-config#2404.
     """
-    if text.endswith("/") or trailing_char == "/":
+    if text.endswith("/"):
+        return True
+    if continuation == "/" or looks_like_path_continuation(continuation):
         return True
     if "/" not in text:
         return False
     return bool(PATH_EXTENSION_RE.search(text))
 
 
-def looks_like_one_path(group_text, trailing_char=""):
+def looks_like_one_path(group_text, continuation=""):
     """True when a captured ENUM_RE list is entirely made of path citations.
 
     Named for route 3 of the path-citation class documented above `ENUM_RE`
@@ -563,7 +697,7 @@ def looks_like_one_path(group_text, trailing_char=""):
     pieces = COMMA_SPLIT_RE.split(group_text)
     last = len(pieces) - 1
     return all(
-        looks_like_citation(piece, trailing_char if i == last else "")
+        looks_like_citation(piece, continuation if i == last else "")
         for i, piece in enumerate(pieces)
     )
 
@@ -613,7 +747,7 @@ def find_claims(body_text):
         found.append(("cardinality", quote))
 
     for m in ENUM_RE.finditer(prose):
-        if looks_like_one_path(m.group(1), prose[m.end():m.end() + 1]):
+        if looks_like_one_path(m.group(1), dangling_continuation(prose, m.end())):
             continue
         quote = " ".join(m.group(0).split())
         key = ("enumeration", quote.lower())

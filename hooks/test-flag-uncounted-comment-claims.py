@@ -337,6 +337,49 @@ TRUNCATED_CITATION_FRAGMENT = (
     "ai-config/memories/tools.md were found."
 )
 
+# ai-config#2386 review round 7 (claude-review, comment 5436013319): a
+# coincidental slash sitting next to a bare recalled identifier (a date, a
+# branch name) was being read, via round 6's single-character
+# `trailing_char` check, as proof that identifier was itself a citation --
+# silencing a genuine mixed list (real citation + bare recalled identifier)
+# in exactly the founding incident's own composite shape. Both repro
+# sentences from the review, plus the citation in first vs. last position
+# relative to the coincidental-slash item -- ordering the way round 6/7's
+# other fixtures do, by where the CITATION sits, since (see below) where
+# the coincidental item itself sits is what actually still matters here.
+COINCIDENTAL_SLASH_DIGIT_SUFFIX = (
+    "No hits in local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/2026 planned."
+)
+COINCIDENTAL_SLASH_BRANCH_SUFFIX = (
+    "No hits in local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/main was checked."
+)
+COINCIDENTAL_SLASH_CITATION_FIRST = (
+    "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/2026, interval-labels."
+)
+
+# ACCEPTED RESIDUAL, found while verifying round 7's fix in "all orderings"
+# and tracked as an addendum to ai-config#2404: when the coincidental-slash
+# item is the VERY FIRST item in the list (immediately after the
+# introducing noun), the token-list clause's own separator
+# (`\s*/?(?:,|/)\s*`) cannot skip past the non-token content between the
+# stray `/` and the real `,` to reach the rest of the list at all --
+# `ENUM_RE` fails to match ANYWHERE in the sentence, not merely
+# misclassifies. This is a DIFFERENT mechanism than round 7's own finding
+# (mid-match separator parsing, not post-match `continuation`
+# classification), shares ai-config#2404's root cause (content adjacent to
+# a `/` that `TOKEN` cannot parse), and is out of scope for the same
+# reason: a real fix needs the same broader `TOKEN`-parsing redesign that
+# issue already tracks. Pinned here as an ACCEPTED miss, not silently
+# left untested, so a future editor sees it was found and weighed rather
+# than missed.
+ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
+    "The fingerprinted scripts: cycle-charge-flee/2026, "
+    "local-bin/encrypt-gh-token.sh, interval-labels."
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -585,10 +628,38 @@ def unit_checks(mod):
     # bare identifier.
     check("find_claims silent on a truncated-citation-fragment pair",
           mod.find_claims(TRUNCATED_CITATION_FRAGMENT), [])
-    check("looks_like_citation recognizes a bare fragment via trailing_char alone",
-          mod.looks_like_citation("ai-config", trailing_char="/"), True)
-    check("looks_like_citation still requires internal '/' with no trailing_char",
-          mod.looks_like_citation("ai-config", trailing_char=""), False)
+    check("looks_like_citation recognizes a bare fragment via a bare '/' continuation",
+          mod.looks_like_citation("ai-config", continuation="/"), True)
+    check("looks_like_citation still requires internal '/' with no continuation",
+          mod.looks_like_citation("ai-config", continuation=""), False)
+    # Regression: PR #2386 review round 7 -- the refined continuation check.
+    # A coincidental slash (a date, a branch name) must NOT promote a bare
+    # identifier to citation status, even though it has the exact same
+    # single-character shape as the truncated-fragment case above.
+    check("looks_like_citation rejects a coincidental digit-led continuation",
+          mod.looks_like_citation("cycle-charge-flee", continuation="/2026"), False)
+    check("looks_like_citation rejects a coincidental bare-word continuation",
+          mod.looks_like_citation("cycle-charge-flee", continuation="/main"), False)
+    check("looks_like_citation still accepts a genuine multi-hop continuation",
+          mod.looks_like_citation("ai-config", continuation="/memories/tools.md"), True)
+
+    # Regression: review round 7 (comment 5436013319) -- the refined
+    # continuation fix. The reviewer's own two repro sentences, plus the
+    # citation-first ordering, must fire; the coincidental-slash-item-first
+    # ordering is a pinned, documented, accepted miss (see the fixture's
+    # own comment -- a different mechanism than this round's fix, tracked
+    # as an addendum to ai-config#2404).
+    for label, fixture in [
+        ("digit suffix, citation first", COINCIDENTAL_SLASH_DIGIT_SUFFIX),
+        ("branch suffix, citation first", COINCIDENTAL_SLASH_BRANCH_SUFFIX),
+        ("citation first, coincidental item middle", COINCIDENTAL_SLASH_CITATION_FIRST),
+    ]:
+        claims = mod.find_claims(fixture)
+        enum_claims = [c for c in claims if c[0] == "enumeration"]
+        check(f"find_claims catches a mixed list with a coincidental slash ({label})",
+              bool(enum_claims), True)
+    check("find_claims ACCEPTS missing a list starting with the coincidental-slash item",
+          mod.find_claims(ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

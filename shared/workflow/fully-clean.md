@@ -682,7 +682,8 @@ Neither half holds.
 And [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so even the first half is a convention this corpus asks for rather than a property a gate can rely on.
 Both attempts failed the same way.
 Every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item -- and a positive signature is not safer than a negative one merely for being positive.
-A third design stopped dropping anything and blanked that one citation shape inside `strip_cited_finding_vocab` instead.
+A third design stopped dropping anything.
+It blanked the single shape that actually caused the misread --- a prior round's verdict quoted in a bare parenthetical after a cited SHA --- inside `strip_cited_finding_vocab` instead.
 It was refuted too, on a body where the parenthetical IS the live verdict and the explanation follows it outside the blanked span.
 Nothing shipped in the checker: all three were reverted.
 What shipped is a convention in [`ard`](../../skills/ard/SKILL.md)'s summary step --- a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it, and the instrument gains no new fail-open surface.

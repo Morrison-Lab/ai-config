@@ -26,7 +26,7 @@ In every session --- at session start, and again periodically during long sessio
    `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes a script on an event, and its `stale` status names a registered script that is not on disk.
    A hook can be perfectly present and never run, so a report that finds it present is not evidence about registration.
    The failure is silent in the way this corpus is worst at noticing: an unregistered guard and a guard with nothing to block look identical, since neither ever produces output.
-   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- scripts reach `~/.claude/hooks` independently of registration (the retired symlink install placed them, and today only the plugin loader or a manual copy does), so each hook added since the last registration run sits inert.
+   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- scripts reach `~/.claude/hooks` independently of registration (the retired symlink install placed them, and today only a manual copy does), so each hook added since the last registration run sits inert.
    That makes it a per-session freshness item rather than a one-time setup step.
    ```bash
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
@@ -36,7 +36,7 @@ In every session --- at session start, and again periodically during long sessio
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
-   **On the plugin path nothing else is needed: the plugin loader places and loads every hook in `hooks/hooks.json` together.**
+   **On the plugin path nothing else is needed: the plugin loader serves and loads every hook in `hooks/hooks.json` straight from the plugin root.**
    `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
    `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.

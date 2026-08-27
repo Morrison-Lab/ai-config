@@ -278,3 +278,64 @@ A clean automated review from every available provider evaluating the current HE
   override-drops-token test and #2419's veto tests, both caught in
   unposted local pre-push review rounds rather than on those PRs'
   records.)
+
+## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
+- **Mistake**: When the `adversarial-reviewer` subagent type is unregistered
+  in a session, dispatching a same-vendor `general-purpose` Claude subagent
+  with an adversarial-refute-brief prompt as the fallback, without first
+  checking whether a separate CLI (`codex`, `opencode`, `agy`) is reachable
+  on `PATH`.
+  A same-vendor subagent shares the training and therefore the blind spots
+  of the author, per `adversarial-self-review.md` line 21 --- it is not a
+  weaker version of independence, it is the specific thing dispatching was
+  meant to buy and did not.
+- **Example**: 2026-08-27, ai-config#2434 (a memory-only PR).
+  `Agent type 'adversarial-reviewer' not found` fired on the first review
+  attempt.
+  Fell back to a same-vendor `general-purpose` subagent for both review
+  rounds and pushed with `ALLOW_UNREVIEWED_PUSH=1`, without running
+  `which codex`/`which opencode`/`which agy` first.
+  A later check in the same session showed `opencode` and `agy` both
+  resolved on `PATH` (only `codex` was absent), so the documented stronger
+  fallback --- `delegate-to-opencode` --- was available the whole time and
+  simply never tried.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md)
+  ("No Agent tool, or no reviewer registered here?
+  A separate CLI is the same move and a stronger one ---
+  `delegate-to-codex` or `delegate-to-opencode`.").
+- **Fix**: Before falling back to a same-vendor subagent, run
+  `which codex; which opencode; which agy` (or the OS equivalent) and
+  route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.
+  Only fall back to a same-vendor subagent, stating so explicitly in the
+  push reply, when none of those three CLIs are reachable at all.
+
+## Pattern 17: Theorizing a Cause for a Guard Refusal Instead of Running Its Own Reader
+- **Mistake**: When `hooks/no-push-without-self-review.py` refuses a push citing "The latest adversarial self-review returned a blocking verdict" despite believing the most recent dispatch was clean, attributing the refusal to session/harness mechanics (the transcript lagging the current turn) instead of executing the guard's own `read_latest_review`/`parse_report` against the live transcript and reading what it actually parsed.
+  The refusal message is a true statement about the guard's parsed history and a false one about the session's real state whenever the cause is a malformed report, so the two failure modes produce an identical message and only execution distinguishes them.
+- **Example**: 2026-08-27, ai-config#2444, across two concurrent branches --- `fix/2409-driver-comments` and `ums-2409-fail-open-lessons`.
+  Three dispatches ran in one turn --- `needs_work` at `5a45e7fd`, `needs_work` at `446fa0ee`, then a clean `Ready for merge` at `cf08d05f` --- and a later dispatch also returned a clean `Ready for merge` at `629cca1b`.
+  The push was refused.
+  An issue was filed attributing this to the transcript not being flushed for same-turn tool results.
+  Running `read_latest_review` directly against the transcript returned `('needs_work', '446fa0eecaec6a58e2d65e1b8d24265e67e13138', True)` twice, minutes apart --- ruling out a lag that would have resolved on its own.
+  The cause that execution established: the two later reports used a heading-then-separate-line `## Verdict` / `Ready for merge` shape, which `VERDICT_LINE` does not match (it requires the phrase on the same line as `Verdict:`), so `parse_report` returned no verdict for both and the held value never advanced past the second dispatch.
+  A second cause sat unexamined in the same evidence, and naming it is the point of this entry rather than a footnote to it.
+  `git merge-base --is-ancestor` puts `5a45e7fd` and `629cca1b` on `fix/2409-driver-comments` and `446fa0ee` and `cf08d05f` on `ums-2409-fail-open-lessons`, so the four dispatches spanned two branches --- and the guard holds ONE global latest verdict rather than one per branch, so a review of either branch displaces the other's regardless of format.
+  Fixing the format alone would not have made those pushes independent.
+  The near-miss is that the format explanation is sufficient for the observed refusal, arrives first, and is confirmable --- which is exactly when [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s cause check is owed and feels least necessary.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md), "A verdict phrase separated from its heading by a line break is no verdict."
+- **Fix**: When a guard's refusal contradicts your own read of the session, run the guard's own parsing function against the actual artifact it reads (the transcript, a file, a comment body) and print its result per input, before writing down a mechanism-level explanation.
+  State `Verdict: <phrase>` on one line in every review brief, whatever is dispatching it.
+
+## Pattern 18: A Second Refuted Design Is a Prompt to Measure, Not to Design a Third
+- **Mistake**: After a checker-side classification fix is built, reviewed, and refuted by an adversarial round that reproduces the failure against `origin/main` for the second time on the same underlying problem, proposing a third discriminator instead of executing the classifier against the actual failing input to find which specific feature of it drives the wrong output.
+  Each refuted design added a new guard against the previous round's counterexample rather than asking what the real input space has in common with genuine reviewer prose --- so every discriminator available in a comment body turned out to be one some real reviewer also emits.
+- **Example**: 2026-08-27, ai-config#2409, a driver-comment classifier built from real comments on `Morrison-Lab/ai-config#2341`.
+  Three designs, each built and reverted: (1) a "driver ledger" matched on `hold off` / a `Disposition` table row, guarded by negative tests keyed on the Claude/Cursor report format --- failed open on a Copilot review reading "hold off on merging until the null check is added," which carried a real finding;
+  (2) the same classifier gated on the agent-disclosure marker --- failed because genuine not-clean reviews carry that marker too;
+  (3) a citation strip keyed on a disposition verb plus an exact-verdict parenthetical --- blanked a live verdict inside a sentence reporting a fix that introduced a new bug.
+  The turn that mattered was executing `classify_verdict` over the failing comment's own parts, which showed the table and the hold (what designs 1 and 2 were built to detect) produced no verdict at all, and the sole signal was a bare parenthetical after the header neither design had examined.
+  The design that survived review, proposed in PR #2448 and still open at the time of writing, is a one-sentence authoring convention --- backtick a quoted verdict phrase --- as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
+- **Canonical Rule**: [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s cause claim-type ("what else explains it") and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s recurrence test, applied one level earlier: recurring *refutation* of a design is itself the signal to stop designing and measure.
+- **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
+  Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
+  Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.

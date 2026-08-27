@@ -656,9 +656,15 @@ def strip_cited_finding_vocab(text: str) -> str:
 # real signal and missing a not-clean is the dangerous direction here.
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
-    r"(?<!non-)(?<!non\s)(?<!previously-)Block(?:ed|ing)?"
+    r"(?<!non-)(?<!non\s)(?<!previously-)(?<!previously\s)Block(?:ed|ing)?"
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
+
+# The findings-heading pattern is likewise built once: the two list copies
+# below and the section-resolution wiring in _unresolved_finding_pattern
+# compare against this exact string, so a drifted copy would silently
+# disable the ai-config#2370 exemption.
+_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
 
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
@@ -755,7 +761,7 @@ BARE_NOT_CLEAN_PATTERNS = {
 # veto. Keep the two scans on one list so a heading added for one cannot
 # vanish from the other.
 FINDING_PATTERNS = [
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -773,7 +779,7 @@ FINDING_PATTERNS = [
 ]
 FINDING_HEADING_PATTERNS = {
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -966,45 +972,47 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-# Whole-line clean statements a findings SECTION can resolve to. Anchored to
-# a full line on purpose (ai-config#2359: an unguarded negation branch can
-# swallow real findings), and deliberately a short allowlist rather than a
-# free-prose heuristic -- "found no remaining bugs" buried in a paragraph
-# stays a safe-direction re-flag.
-_SECTION_RESOLVED_EMPTY = re.compile(
-    r"(?im)^\s*(?:\*\*)?(?:"
-    r"no\s+(?:actionable|new|blocking)?\s*(?:findings|issues)"
-    r"(?:\s+(?:identified|found))?"
-    r"|none(?:\s+identified)?"
-    r")\.?(?:\*\*)?\s*$"
-)
-
-# A line that IS a finding item: a severity/class tag or a Location marker.
-# Any one of these in the section vetoes the resolved-empty exemption.
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare numbered or bulleted list item
+# vetoes too, because an untagged finding ("1. `foo()` crashes on empty
+# input") is still a finding, and swallowing it is the dangerous direction.
+# The cost is a safe-direction re-flag on reviews whose Findings section
+# numbers its verification bullets before the closing no-findings line.
 _SECTION_FINDING_ITEM = re.compile(
-    r"(?im)^\s*(?:\d+\.|[-*])?\s*(?:\*\*)?\[?"
+    r"(?im)"
+    r"^\s*(?:\*\*)?\[?"
     r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^\s*(?:\d+\.|[-*])\s+\S"
     r"|\*\*Location:\*\*"
 )
 
-_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
-
 
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
-    """True when the findings section starting at *match_end* holds a
-    whole-line no-findings statement and no severity-tagged item.
+    """True when the findings section starting at *match_end* resolves to a
+    whole-line no-findings statement as its LAST non-empty line, with no
+    finding-shaped item anywhere in the section.
 
     Covers the review shape where verification prose precedes the closing
     "No actionable findings identified." line, which the 60-char suffix
     window cannot reach (ai-config#2370). The section runs to the next
-    heading or end of body.
+    heading or end of body. Last-line anchoring plus the item veto keep the
+    exemption fail-safe: a section that lists anything, tagged or not,
+    stays a finding.
     """
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
     section = scan_body[match_end:match_end + next_heading.start()] \
         if next_heading else scan_body[match_end:]
     if _SECTION_FINDING_ITEM.search(section):
         return False
-    return bool(_SECTION_RESOLVED_EMPTY.search(section))
+    lines = [ln for ln in section.splitlines() if ln.strip()]
+    if not lines:
+        return False
+    # The resolving vocabulary is NOT_CLEAN_NEGATION_SUFFIX -- the same
+    # reviewed allowlist the 60-char shortcut used -- applied to the LAST
+    # non-empty line. The item veto above is what makes the broader
+    # vocabulary safe here: "No blocking issues." below two listed findings
+    # never reaches this test.
+    return bool(NOT_CLEAN_NEGATION_SUFFIX.search(lines[-1]))
 
 
 def _unresolved_finding_pattern(body: str) -> Optional[str]:
@@ -1023,13 +1031,20 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
-            if pat in FINDING_HEADING_PATTERNS:
+            if pat == _FINDINGS_HEADING_PATTERN:
+                # The section-resolution check REPLACES the 60-char suffix
+                # shortcut for this heading: the shortcut read "No new
+                # issues." directly under the heading as resolving the whole
+                # section, even when finding items followed it (ai-config
+                # #2370's review of this very fix). Whole-section logic is
+                # sound in both directions -- last-line anchoring plus the
+                # item veto.
+                if _findings_section_resolves_empty(scan_body, match.end()):
+                    continue
+            elif pat in FINDING_HEADING_PATTERNS:
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
-            if pat == _FINDINGS_HEADING_PATTERN and \
-                    _findings_section_resolves_empty(scan_body, match.end()):
-                continue
             if pat == r"changes\s+requested\b":
                 start = match.start()
                 pfx = scan_body[max(0, start - 25):start].lower()

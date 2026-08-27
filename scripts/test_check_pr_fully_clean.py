@@ -1734,6 +1734,10 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The previously-blocking error was fixed.\n", "")
           == "clean")
+    check("classify_verdict: space form 'previously blocking' stays clean too",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking error was fixed.\n", "")
+          == "clean")
     check("classify_verdict: 'No blocking or non-blocking findings' stays clean",
           checker.classify_verdict(
               "No blocking or non-blocking findings.\n### Verdict\nReady for merge.\n", "")
@@ -1752,14 +1756,26 @@ def main() -> int:
               "### Findings\n\nVerification performed: traced all call sites.\n\n"
               "No actionable findings identified.\n\n### Verdict: Ready for merge\n")
           is None)
-    check("findings section with a [Defect] item stays a finding despite a 'no other issues' line",
+    # Non-vacuous veto tests: each body's LAST line matches the resolving
+    # vocabulary, so only the item veto keeps these flagged -- neutering
+    # _SECTION_FINDING_ITEM makes each of these exempt and fail the test.
+    check("tagged item above a resolving last line stays a finding",
           checker._unresolved_finding_pattern(
               "### Findings\n\n1. **[Defect]** scripts/x.py:1 broken.\n\n"
-              "No other issues found.\n\n### Verdict: Needs more work\n")
+              "No actionable findings identified.\n\n### Verdict: Needs more work\n")
+          is not None)
+    check("UNTAGGED numbered item above a resolving last line stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. `foo()` returns None on empty input, "
+              "crashing the caller.\n\nNo blocking issues.\n")
+          is not None)
+    check("resolving line FIRST with an item after it stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n1. `foo()` returns None.\n")
           is not None)
     check("findings section with a **Location:** item stays a finding",
           checker._unresolved_finding_pattern(
-              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified elsewhere.\n")
+              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified.\n")
           is not None)
     check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
           checker._unresolved_finding_pattern(

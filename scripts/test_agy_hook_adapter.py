@@ -439,7 +439,7 @@ class TestAgyHookAdapter(unittest.TestCase):
             MagicMock(returncode=0, stdout="B" * 10000, stderr=""),  # 10000 bytes (total 19999)
             MagicMock(returncode=0, stdout="C" * 10000, stderr=""),  # 10000 bytes (total 29999)
             MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # overflows by 1 byte mid-char
-            MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # must never be reached
+            MagicMock(returncode=0, stdout="Z", stderr=""),  # ASCII: fits the 1 leftover byte
         ]
         mock_run.side_effect = results
 
@@ -456,16 +456,18 @@ class TestAgyHookAdapter(unittest.TestCase):
         # No empty ephemeralMessage entries, however many hooks the
         # boundary overflow would otherwise have visited.
         self.assertNotIn("", messages)
-        # Only the three hooks whose content actually fit contributed --
-        # the fourth hook's content could not fit even one code point
-        # (a boundary mid multi-byte UTF-8 character) and the adapter
-        # must stop accumulating rather than keep padding with empties.
-        self.assertEqual(len(steps), 3)
+        # The fourth hook's content could not fit even one code point
+        # (a boundary mid multi-byte UTF-8 character), so it is skipped
+        # entirely rather than padded in as an empty step -- but the
+        # loop keeps going, so the fifth hook's ASCII output fills the
+        # single leftover byte.
+        self.assertEqual(len(steps), 4)
+        self.assertEqual(messages[-1], "Z")
         total_len = sum(len(m.encode("utf-8")) for m in messages)
-        self.assertEqual(total_len, 29999)
-        # The 5th hook's command must never have run: the adapter should
-        # have already determined nothing more could fit and stopped.
-        self.assertEqual(mock_run.call_count, 4)
+        self.assertEqual(total_len, 30000)
+        # All five hooks ran: an unfittable chunk skips itself, it does
+        # not end accumulation for later hooks that might still fit.
+        self.assertEqual(mock_run.call_count, 5)
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))

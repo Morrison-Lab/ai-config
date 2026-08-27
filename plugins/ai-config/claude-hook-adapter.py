@@ -278,12 +278,15 @@ def main():
         system_messages = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
             for hook in hooks_list:
-                # `script` is a bare diagnostic basename in hooks.json (a
-                # legacy/informational field), never a runnable command
-                # line -- `command` is the canonical field to execute. A
-                # `script`-only entry falls through to `run_hook_command`
-                # unchanged, so it is admitted here as runnable but will
-                # fail as a shell command unless it happens to also be one.
+                # `script` is a bare basename in hooks.json, never a
+                # runnable command line -- `command` is the canonical field
+                # for THIS adapter to execute. (`script` is still load-bearing
+                # for install-hooks.py's non-plugin path, per hooks.json's own
+                # header, so it is not a legacy field -- just not runnable
+                # here.) A `script`-only entry falls through to
+                # `run_hook_command` unchanged, so it is admitted here as
+                # runnable but will fail as a shell command unless it happens
+                # to also be one.
                 cmd = hook.get("command") or hook.get("script")
                 if not cmd:
                     continue
@@ -335,10 +338,11 @@ def main():
         hooks_to_run = extract_hook_list(stop_groups)
         warn_messages = []
         for hook in hooks_to_run:
-            # `script` is a bare diagnostic basename in hooks.json (a
-            # legacy/informational field), never a runnable command line --
-            # `command` is the canonical field to execute; see the identical
-            # note on the PreToolUse extraction above.
+            # `script` is a bare basename in hooks.json, never a runnable
+            # command line -- `command` is the canonical field for this
+            # adapter to execute; see the fuller note on the PreToolUse
+            # extraction above (`script` stays load-bearing for
+            # install-hooks.py's non-plugin path).
             cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
@@ -418,10 +422,11 @@ def main():
         for hook in hooks_to_run:
             if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
                 break
-            # `script` is a bare diagnostic basename in hooks.json (a
-            # legacy/informational field), never a runnable command line --
-            # `command` is the canonical field to execute; see the identical
-            # note on the PreToolUse extraction above.
+            # `script` is a bare basename in hooks.json, never a runnable
+            # command line -- `command` is the canonical field for this
+            # adapter to execute; see the fuller note on the PreToolUse
+            # extraction above (`script` stays load-bearing for
+            # install-hooks.py's non-plugin path).
             cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
@@ -479,19 +484,25 @@ def main():
                                 if trimmed_chunk:
                                     injected_messages.append(trimmed_chunk)
                                     total_injected_bytes += len(trimmed_chunk.encode("utf-8"))
-                                if not trimmed_chunk or total_injected_bytes >= PRE_INVOCATION_TOTAL_BYTE_CAP:
-                                    # Either the remaining budget was too
-                                    # small to hold even one code point of
-                                    # this chunk (a boundary landing mid a
-                                    # multi-byte UTF-8 character --
-                                    # errors="ignore" drops the incomplete
-                                    # tail, yielding an empty trimmed_chunk
-                                    # that must NOT be appended as another
-                                    # empty ephemeralMessage step), or the
-                                    # cap is now exactly full. Either way, no
-                                    # further hook output can fit, since
+                                if total_injected_bytes >= PRE_INVOCATION_TOTAL_BYTE_CAP:
+                                    # The cap is exactly full: no further
+                                    # hook output can fit, since
                                     # remaining_bytes only shrinks from here.
                                     break
+                                if not trimmed_chunk:
+                                    # The remaining budget was too small to
+                                    # hold even one code point of THIS chunk
+                                    # (a boundary landing mid a multi-byte
+                                    # UTF-8 character -- errors="ignore"
+                                    # drops the incomplete tail, yielding an
+                                    # empty trimmed_chunk that must NOT be
+                                    # appended as an empty ephemeralMessage
+                                    # step). A later hook whose output
+                                    # starts with a narrower code point may
+                                    # still fit the 1-3 leftover bytes, so
+                                    # skip this chunk rather than ending the
+                                    # loop.
+                                    continue
                             else:
                                 # Cap already exactly full; nothing more can
                                 # fit.

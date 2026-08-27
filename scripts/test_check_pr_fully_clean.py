@@ -1840,6 +1840,87 @@ def main() -> int:
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
           is not None)
 
+    # --- ai-config#2402: a structured non-bot clean supersedes that same
+    # identity's earlier not-clean, and never counts toward quorum. ---------
+    human_notclean_round = {
+        "createdAt": "2026-08-27T06:44:16Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Needs more work\n\n"
+            "### Critical Findings\n1. The parser drops rows.\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    human_clean_round = {
+        "createdAt": "2026-08-27T06:53:57Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n### Verification Steps\n- suite passes\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    bot_clean_round = {
+        "createdAt": "2026-08-27T07:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed commit: sha123\n"
+        ),
+    }
+    mock_seq = json.dumps({"comments": [human_notclean_round, human_clean_round,
+                                        bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_seq):
+        sup_ok, sup_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean supersedes the same identity's "
+            "earlier not-clean (#2402)",
+            sup_ok and sup_issues == [],
+        )
+
+    # Without the structured clean round, the human identity's not-clean
+    # stands and blocks -- the supersession is what the fix adds.
+    mock_stuck = json.dumps({"comments": [human_notclean_round, bot_clean_round],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_stuck):
+        stuck_ok, stuck_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "the same sequence WITHOUT the clean round still blocks "
+            "(negative control)",
+            (not stuck_ok) and any("d-morrison" in i for i in stuck_issues),
+        )
+
+    # A structured non-bot clean ALONE never meets quorum: approval
+    # authority comes from author identity, not body text (#2308).
+    mock_solo = json.dumps({"comments": [human_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_solo):
+        solo_ok, solo_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean alone does NOT meet quorum (#2308 invariant)",
+            (not solo_ok) and any("No valid clean review" in i or "quorum" in i.lower()
+                                  for i in solo_issues),
+        )
+
+    # A casual human comment saying Ready for merge, with no report
+    # structure, is still not admitted at all (#1798's guard).
+    human_casual = {
+        "createdAt": "2026-08-27T07:10:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": "Looks good to me -- Ready for merge whenever.",
+    }
+    mock_casual = json.dumps({"comments": [human_notclean_round, human_casual,
+                                           bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_casual):
+        cas_ok, cas_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a casual unstructured human clean does not supersede (#1798 guard)",
+            (not cas_ok) and any("d-morrison" in i for i in cas_issues),
+        )
+
     claude_nits_earlier = {
         "createdAt": "2026-08-07T21:56:00Z",
         "author": {"login": "github-actions"},

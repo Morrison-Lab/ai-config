@@ -1191,6 +1191,27 @@ def check_latest_verdict(
     return len(blocking) == 0, issues
 
 
+_REVIEW_STRUCTURE_HEADING = re.compile(
+    r"(?im)^#{1,6}\s*(?:Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
+)
+
+
+def _is_structured_review_body(body: str) -> bool:
+    """True when *body* is shaped like a review REPORT rather than prose.
+
+    Requires both a report heading (Summary / Findings / Verdict families)
+    and a Reviewed-Commit fingerprint line. The two together are what a
+    pre-push-review or adversarial-self-review report always carries and a
+    conversational comment quoting verdict vocabulary does not, which is
+    what keeps #1798's false-CLEAN direction closed while #2402's
+    supersession path opens.
+    """
+    if not _REVIEW_STRUCTURE_HEADING.search(body):
+        return False
+    return bool(re.search(
+        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", body))
+
+
 def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     pr_num, sha, repo, review_decision, branch = pr.pr_num, pr.head_sha, pr.repo, pr.review_decision, pr.branch
     comments = [{"author": {"login": c.author_login}, "createdAt": c.created_at, "body": c.body, "authorAssociation": c.author_association} for c in pr.get_comments()]
@@ -1236,11 +1257,30 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
         # A comment that is neither from a bot account nor carrying a review agent marker is admitted
-        # ONLY if it states a blocking (not-clean) verdict -- fail closed.
+        # when it states a blocking (not-clean) verdict -- fail closed -- OR
+        # when it is a STRUCTURED review report (headings plus a
+        # Reviewed-Commit fingerprint) stating a clean verdict. Without the
+        # second branch, one not-clean self-review round under a human login
+        # pinned that identity's "latest" forever: later Ready-for-merge
+        # rounds under the same account were dropped before
+        # check_latest_verdict ever saw them, manufacturing a permanent
+        # standing veto no ARDI round could clear (ai-config#2402, measured
+        # on #2229's six-round sequence).
+        #
+        # The security invariant from #2308 is preserved by the QUORUM tag,
+        # not by dropping the item: a non-bot clean may supersede that same
+        # identity's own earlier not-clean, and may never count toward the
+        # clean-review quorum that authorizes a merge -- body text still
+        # buys no approval authority (see the unique_authors loop below).
+        # A bare human comment quoting verdict phrases stays out entirely:
+        # the structure test requires report headings AND a fingerprint,
+        # which casual prose does not carry (#1798's guard, restated).
         if is_bot_author:
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, True))
         elif verdict == "not-clean":
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
+        elif verdict == "clean" and _is_structured_review_body(body):
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
 
     for r in reviews:
         body = r.get("body", "")
@@ -1350,6 +1390,14 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         unique_authors = set()
         logins_with_markers = set()
         for item in matching_items:
+            # Quorum eligibility is carried from ADMISSION time (item[6]):
+            # a non-bot item admitted for supersession only (#2402) must
+            # never count toward the clean-review quorum, per #2308's
+            # invariant that approval authority comes from author identity
+            # and never from body text. Items without the flag predate it
+            # and keep their previous (bot-pooled) eligibility.
+            if len(item) > 6 and item[6] is False:
+                continue
             if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
                 login = item[5]
                 identity = _reviewer_identity(item[2], login)

@@ -390,6 +390,7 @@ if proc.returncode != 0:
 if ALLOWLISTED:
     live_env = os.environ.copy()
     live_env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    live_env.pop("HOOK_CATALOG_REPO", None)
     proc = subprocess.run([sys.executable, str(SCRIPT)],
                           capture_output=True, text=True, cwd=str(ROOT),
                           env=live_env)

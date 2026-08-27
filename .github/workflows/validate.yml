@@ -151,7 +151,7 @@ jobs:
         # read, so /issues can 403 and force the documented SKIP path on
         # every CI run. issues: read covers GET /repos/.../issues/{n},
         # including a registration PR number (every pull request is an
-        # issue). Do not send a fork GITHUB_TOKEN to that host --- the
+        # issue). Do not send a fork GITHUB_TOKEN to that repo --- the
         # script drops the token when GITHUB_REPOSITORY is not this repo.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

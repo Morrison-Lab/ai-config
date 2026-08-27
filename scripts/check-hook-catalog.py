@@ -91,7 +91,8 @@ KNOWN_UNREGISTERED = {
 # GITHUB_REPOSITORY to the fork, and that GITHUB_TOKEN 404s an existing
 # issue on Morrison-Lab/ai-config (GitHub REST troubleshooting, "404 Not
 # Found for an existing resource", measured against the 2026-08-26 docs).
-# Override the issues host via HOOK_CATALOG_REPO only in tests.
+# Override the issues repo via HOOK_CATALOG_REPO only in tests; the host
+# is always api.github.com.
 DEFAULT_REPO = "Morrison-Lab/ai-config"
 ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
 UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
@@ -211,9 +212,17 @@ def _token_for_default_repo():
     for Morrison-Lab/ai-config 404s an existing issue. Treating that 404 as
     `missing` would fail the catalog on an open tracker. When
     GITHUB_REPOSITORY is unset (local pre-commit), a present token is used.
+
+    A HOOK_CATALOG_REPO override redirects the request to another repo, so
+    no token is attached then either -- this gate checks scope against
+    DEFAULT_REPO only, and the token must not ride along to a repo the gate
+    never examined.
     """
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if not token:
+        return None
+    override = os.environ.get("HOOK_CATALOG_REPO", "")
+    if override and override.lower() != DEFAULT_REPO.lower():
         return None
     here = os.environ.get("GITHUB_REPOSITORY", "")
     if here and here.lower() != DEFAULT_REPO.lower():

@@ -431,10 +431,17 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
-    def test_run_command_cwd_fallback_to_repo_root(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+    @patch('os.getcwd', return_value='/tmp/mock-caller-project')
+    def test_run_command_cwd_falls_back_to_process_cwd_not_repo_root(self, mock_getcwd, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: when Cwd is absent from the tool args, the hook
+        # subprocess's cwd must be this process's own cwd (the caller's
+        # real project), never ai-config's own repo root -- a guard hook
+        # like hooks/no-clobbering-push.py inherits this cwd to evaluate
+        # the user's project's own git state, and pointing it at
+        # ai-config's checkout instead makes it evaluate the wrong repo.
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result
-        
+
         payload = {
             "toolCall": {
                 "name": "run_command",
@@ -443,13 +450,84 @@ class TestAgyHookAdapter(unittest.TestCase):
         }
         mock_stdin.write(json.dumps(payload))
         mock_stdin.seek(0)
-        
+
         self.adapter.main()
-        
+
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("decision"), "allow")
-        # cwd passed to subprocess.run is repo_root when Cwd is absent
-        self.assertTrue(os.path.isabs(mock_run.call_args_list[0].kwargs['cwd']))
+        actual_cwd = mock_run.call_args_list[0].kwargs['cwd']
+        self.assertEqual(actual_cwd, '/tmp/mock-caller-project')
+        self.assertNotEqual(actual_cwd, ROOT)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    @patch('os.getcwd', return_value='/tmp/mock-caller-project')
+    def test_generic_tool_cwd_falls_back_to_process_cwd_not_repo_root(self, mock_getcwd, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Same regression, on the generic/MCP-tool dispatch path (previously
+        # hardcoded to repo_root regardless of the Cwd fallback).
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "mcp__github__create_pull_request",
+                "args": {"title": "New PR"}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        for call in mock_run.call_args_list:
+            self.assertEqual(call.kwargs['cwd'], '/tmp/mock-caller-project')
+            self.assertNotEqual(call.kwargs['cwd'], ROOT)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    @patch('os.getcwd', return_value='/tmp/mock-caller-project')
+    def test_stop_hook_cwd_falls_back_to_process_cwd_not_repo_root(self, mock_getcwd, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"terminationReason": "model_stop"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/tmp/mock-caller-project')
+        self.assertNotEqual(mock_run.call_args_list[0].kwargs['cwd'], ROOT)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    @patch('os.getcwd', return_value='/tmp/mock-caller-project')
+    def test_pre_invocation_hook_cwd_falls_back_to_process_cwd_not_repo_root(self, mock_getcwd, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/tmp/mock-caller-project')
+        self.assertNotEqual(mock_run.call_args_list[0].kwargs['cwd'], ROOT)
 
     def test_extract_hook_list_supports_script_key(self):
         item = [{"script": "python3 /path/to/script.py"}]
@@ -1053,6 +1131,177 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertIn("prompt-hook.py", mock_run.call_args_list[0].args[0])
         out = json.loads(mock_stdout.getvalue())
         self.assertEqual(out.get("injectSteps"), [{"ephemeralMessage": "context"}])
+
+    # -- Dual-case Subagents lookup ------------------------------------
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_invoke_subagent_lowercase_subagents_key_dispatches(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Every sibling arg lookup in this file (Recipient/recipient,
+        # name/Name, ...) is dual-case and fail-open; Subagents/subagents
+        # must be too, rather than hard-denying a lowercase-only payload.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {
+                    "subagents": [{"typeName": "agent1", "workspace": "share", "prompt": "p1"}]
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        self.assertEqual(mock_run.call_count, 2)
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_invoke_subagent_empty_list_not_treated_as_missing(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # A present-but-falsy Subagents value (an empty list) must not be
+        # treated as absent by the dual-case lookup -- it is a real,
+        # explicit "run zero subagents", not a missing argument.
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {"Subagents": []}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+
+    # -- matches_tool: invalid regex and empty/absent matcher ----------
+
+    def test_matches_tool_invalid_regex_logs_diagnostic(self):
+        buf = io.StringIO()
+        with patch('sys.stderr', buf):
+            result = self.adapter.matches_tool("[invalid(regex", "SomeTool")
+        self.assertFalse(result)
+        self.assertIn("invalid matcher pattern", buf.getvalue())
+        self.assertIn("[invalid(regex", buf.getvalue())
+
+    def test_matches_tool_empty_or_absent_matcher_matches_all(self):
+        # Claude Code's documented PreToolUse semantics: a hook group with
+        # no matcher applies to every tool call, the same as an explicit
+        # "*" -- not "matches nothing".
+        self.assertTrue(self.adapter.matches_tool("", "AnyTool"))
+        self.assertTrue(self.adapter.matches_tool(None, "AnyTool"))
+
+    # -- Nested hookSpecificOutput.additionalContext --------------------
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_event_nested_additional_context_surfaced(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # The documented hook-output shape nests additionalContext under
+        # hookSpecificOutput (as the PreToolUse branch reads it); the Stop
+        # loop must read that nested form too, not only a top-level one.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {"additionalContext": "Unresolved obligations (nested)"}
+        }), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"terminationReason": "model_stop"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("systemMessage"), "Unresolved obligations (nested)")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_nested_additional_context_injected(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({
+            "hookSpecificOutput": {"additionalContext": "Nested context message"}
+        }), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        # MOCK_HOOKS_DEF's UserPromptSubmit group runs two hooks, and both
+        # are mocked to return the same nested-context payload.
+        self.assertEqual(
+            out.get("injectSteps"),
+            [{"ephemeralMessage": "Nested context message"}] * 2,
+        )
+
+    # -- Configurable caps (env-var overrides) ---------------------------
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    def test_fanout_cap_overridable_via_env_var(self, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        with patch.dict(os.environ, {"AGY_ADAPTER_FANOUT_CAP": "2"}):
+            adapter = load_adapter()
+        self.assertEqual(adapter.SUBAGENT_FANOUT_CAP, 2)
+
+        subagents = [{"TypeName": f"agent{i}", "Workspace": "share", "Prompt": f"p{i}"} for i in range(3)]
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {"Subagents": subagents}
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "deny")
+        self.assertIn("exceeded maximum supported fanout limit of 2 subagents", out.get("reason", ""))
+
+    def test_int_env_malformed_value_falls_back_to_default_with_diagnostic(self):
+        buf = io.StringIO()
+        with patch.dict(os.environ, {"AGY_ADAPTER_FANOUT_CAP": "not-an-int"}):
+            with patch('sys.stderr', buf):
+                adapter = load_adapter()
+        self.assertEqual(adapter.SUBAGENT_FANOUT_CAP, 50)
+        self.assertIn("invalid AGY_ADAPTER_FANOUT_CAP", buf.getvalue())
+
+    def test_int_env_missing_value_uses_default_silently(self):
+        buf = io.StringIO()
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGY_ADAPTER_MSG_CAP", None)
+            with patch('sys.stderr', buf):
+                adapter = load_adapter()
+        self.assertEqual(adapter.PRE_INVOCATION_MSG_CAP, 20)
+        self.assertEqual(adapter.PRE_INVOCATION_MSG_BYTE_CAP, 10000)
+        self.assertEqual(adapter.PRE_INVOCATION_TOTAL_BYTE_CAP, 30000)
+        self.assertEqual(buf.getvalue(), "")
 
 if __name__ == "__main__":
     unittest.main()

@@ -253,7 +253,7 @@ Fold a finished session's notebook into durable memory (or prune it) during UMS 
 
 [`shared/workflow/keep-checkouts-fresh.md`](shared/workflow/keep-checkouts-fresh.md)
 
-Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the `~/.claude` consumer copies (symlinks versus Windows real-copies versus a shadowed-container split, verified with `check-install.py` and `install-hooks.py`), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
+Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the consumer install (Claude Code and Cursor load this repo as a native plugin that auto-updates, so confirm the plugin is enabled and not doubled --- any leftover `~/.claude` copies of `shared/`, `hooks/`, or `memories/` predate the symlink-install removal and want a content diff, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
 The fragment above carries the mechanics, the failure modes each check catches, and the case records.
 
 ## Timestamp recaps in local time
@@ -616,7 +616,7 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 ## Claim a GitHub PR/issue before working on it
 
-@shared/workflow/claim-pr.md
+[`shared/workflow/claim-pr.md`](shared/workflow/claim-pr.md)
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
@@ -645,7 +645,7 @@ When a short `CLAUDE.md` names a fuller document as the actual authority --- `.g
 
 ## Open a PR immediately after claiming an issue
 
-@shared/workflow/pr-on-claim.md
+[`shared/workflow/pr-on-claim.md`](shared/workflow/pr-on-claim.md)
 
 The strong form of the claim: after claiming an issue you're about to work, open the PR right away — before implementing — from an empty commit, kept as a draft until the implementation lands.
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
@@ -760,7 +760,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 ## What "fully clean" means
 
-@shared/workflow/fully-clean.md
+[`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md)
 
 Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer <reviewer>`), and surface the open item to me.
 
@@ -772,7 +772,7 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 
 ## Do the review yourself when the @claude workflow doesn't produce a verdict
 
-@shared/workflow/self-review-fallback.md
+[`shared/workflow/self-review-fallback.md`](shared/workflow/self-review-fallback.md)
 
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.

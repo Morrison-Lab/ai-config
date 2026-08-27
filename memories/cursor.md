@@ -42,6 +42,9 @@ hid it, and work continued on the main checkout.)
 
 ## Cursor plugin, `~/.cursor/skills`, and `~/.claude/skills` are alternatives
 
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer links `~/.claude/skills`, `~/.cursor/skills`, or `~/.cursor/rules` at all --- the Cursor plugin is now the only supported route for Cursor.
+Read the rest of this section as describing a machine installed before that change.
+
 A live Cursor plugin (`~/.cursor/plugins/local/ai-config` or
 `~/.cursor/plugins/cache/<org>/ai-config`) **or** `~/.claude/skills`
 already serving this repo is a skip, not a second install.

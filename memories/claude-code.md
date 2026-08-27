@@ -881,8 +881,11 @@ suite — direct process verification via PowerShell resolved both.)
 
 ## A harness pass can replace `~/.claude` skill symlinks with stale copies AFTER `SessionStart`
 
-`bootstrap.sh` symlinks this repo into `~/.claude`, so a `git pull` normally
-refreshes what the Skill tool loads.
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer symlinks into `~/.claude`, `check-install.py` is deleted, and the `UserPromptSubmit` hook that ran it is removed.
+Keep this section as a record of the incident and its ordering lesson, and read its present-tense instructions as historical.
+
+`bootstrap.sh` symlinked this repo into `~/.claude`, so a `git pull` normally
+refreshed what the Skill tool loaded.
 In a web container a later provisioning pass can overwrite a subset of
 `~/.claude/skills/*` with real directories holding older content, and those
 copies then shadow the repo for the rest of the session.
@@ -1121,6 +1124,10 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
 ## `check-install.py --consumer-dir` retargets the Claude manifest, not one file
 
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `check-install.py`, `link_one_claude`, and `scripts/test_bootstrap_link_hints.py` (linked below) no longer exist --- `bootstrap.sh` does not symlink into consumer directories at all any more.
+This whole section describes a bug in, and the fix to, a mechanism that has since been removed;
+keep it only as a record of the incident.
+
 `--consumer-dir` retargets `collect()`, the whole Claude-shaped install
 list (`AGENTS.md`, `CLAUDE.md`, `skills/`, `commands/`, `memories/`, and
 the rest of that manifest).
@@ -1159,10 +1166,10 @@ A first-push review on
 one backup/link instruction.
 That sentence was false for shiva and misnamed the default.
 Addressed in `adffe825` and `848539b7`.
-[`scripts/test_bootstrap_link_hints.py`](../scripts/test_bootstrap_link_hints.py)
-is the instrument: it runs real `bootstrap.sh` against colliding paths
-and asserts the Claude-only `--fix` string does not leak into other
-consumers, and that comments do not regroup dotfiles with the default
+`scripts/test_bootstrap_link_hints.py` was the instrument (removed along
+with `check-install.py`): it ran real `bootstrap.sh` against colliding
+paths and asserted the Claude-only `--fix` string did not leak into other
+consumers, and that comments did not regroup dotfiles with the default
 inheriters.
 
 - **Do:** pass the `--fix` hint only on Claude `link_one` calls.

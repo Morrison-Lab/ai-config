@@ -72,7 +72,7 @@ rather than inferred.
 A THIRD deferral is legitimate, and unlike the other two it suspends the
 whole guard rather than one PR's obligation: a standing user directive not to
 request the reviewer at all. As of 2026-08-19 that is live -- Copilot review is
-off across ALL repos until September 2026 (memories/github.md, "Restated and
+off across ALL repos until September 2026 (memories/gh-cli.md, "Restated and
 widened 2026-08-19"). A user instruction outranks a hook, and every discharge
 this guard offers is the one action the directive forbids, so honoring it left
 the demand repeating on every turn -- the per-message dedup below stops one
@@ -103,7 +103,7 @@ import tempfile
 # --- Copilot moratorium ----------------------------------------------------
 # Every discharge this guard offers is a Copilot reviewer request, so a
 # standing directive NOT to request Copilot leaves it with no satisfiable
-# demand at all. That directive is live: `memories/github.md` ("Restated and
+# demand at all. That directive is live: `memories/gh-cli.md` ("Restated and
 # widened 2026-08-19") forbids the request on ALL repos until September 2026.
 # A user instruction outranks a hook, so honoring it used to mean the demand
 # simply repeated every turn, on a session that was already doing the right
@@ -1715,7 +1715,7 @@ def main() -> int:
             "Then verify a review actually lands at the current head -- the "
             "request itself can 422, and a pending request can vanish from "
             "both `reviewRequests` and the GET endpoint (see "
-            "memories/github.md):\n\n"
+            "memories/gh-cli.md):\n\n"
             "    gh pr view \"<N>\" --json reviews \\\n"
             "      --jq '[.reviews[] | select(.author.login | "
             "startswith(\"copilot\"))] | length'\n\n"

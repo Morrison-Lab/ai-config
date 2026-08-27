@@ -561,7 +561,7 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
   | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
 ```
 
-`memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
+`memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
 **Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
 ```
@@ -624,7 +624,7 @@ The `claim-pr` skill operationalizes this (the exact claim wording, when it appl
 
 [shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
 
-A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/github.md` records auditors mistaking exactly that.
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/gh-cli.md` records auditors mistaking exactly that.
 The forge cannot say it, so the body must: end every agent-posted comment with
 
 ```

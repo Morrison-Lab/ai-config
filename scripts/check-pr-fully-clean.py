@@ -643,6 +643,35 @@ def strip_cited_finding_vocab(text: str) -> str:
     return text
 
 
+# The bare rejection alternation appears in three lists that must stay
+# byte-identical, because BARE_NOT_CLEAN_PATTERNS membership is tested by
+# string equality against the list entries -- so it is built once here.
+#
+# `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
+# boundary, so "non-blocking" -- how a reviewer marks a nit as NOT blocking
+# -- read a Ready-for-merge review as not-clean (ai-config#2369, measured
+# 2026-08-26 on #2288). Only the `non-`/`non ` compounds are exempted.
+# "previously-blocking" is deliberately NOT exempted, although it produces a
+# safe-direction false positive when narrating a fixed finding: "the
+# previously-blocking finding remains open; do not merge" is a real
+# not-clean statement, and a lexical lookbehind cannot tell it from "the
+# previously-blocking error was fixed". Missing a not-clean is the dangerous
+# direction, so the narration form stays an over-flag -- as does any other
+# `-blocking` compound ("merge-blocking" is a real signal) and the
+# emphasized form ("non-**blocking**": the char before `blocking` is `*`,
+# which the lookbehind cannot see through).
+_BARE_REJECTION = (
+    r"\b(?:Rejected|Unapproved|"
+    r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
+    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
+)
+
+# The findings-heading pattern is likewise built once: the two list copies
+# below and the section-resolution wiring in _unresolved_finding_pattern
+# compare against this exact string, so a drifted copy would silently
+# disable the ai-config#2370 exemption.
+_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
+
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
     # ones a reviewer writes. Found by running this classifier over the real
@@ -661,7 +690,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
@@ -728,7 +757,7 @@ BARE_CLEAN_PATTERNS = {
     r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 BARE_NOT_CLEAN_PATTERNS = {
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
@@ -738,7 +767,7 @@ BARE_NOT_CLEAN_PATTERNS = {
 # veto. Keep the two scans on one list so a heading added for one cannot
 # vanish from the other.
 FINDING_PATTERNS = [
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -751,12 +780,12 @@ FINDING_PATTERNS = [
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 FINDING_HEADING_PATTERNS = {
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -949,6 +978,61 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)"
+    r"^\s*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^\s*(?:\d+[.)]|[-*+])\s+\S"
+    r"|\*\*Location:\*\*"
+    r"|^\s*>\s*\S"
+    r"|^\s*\*\*(?!\s*$)"
+)
+
+
+def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
+    """True when the findings section starting at *match_end* opens with a
+    whole-line no-findings statement and carries no finding-shaped content
+    after it.
+
+    The section runs to the next heading or end of body. The FIRST
+    non-empty line must match the NOT_CLEAN_NEGATION_SUFFIX allowlist --
+    the same trigger the old 60-char suffix shortcut keyed on, made
+    line-anchored -- and everything after it must clear the item veto.
+
+    A resolving line reached only AFTER other content (verification prose,
+    alert blocks, items) never exempts: an untagged prose finding is
+    lexically indistinguishable from verification prose, and swallowing a
+    finding is the dangerous direction, so that shape is a deliberate
+    safe-direction re-flag (ai-config#2370's free-prose remainder). The
+    mirror direction shares the residual: untagged PLAIN PROSE after a
+    resolving first line is also indistinguishable and is not vetoed --
+    the same exposure the 60-char shortcut always had.
+
+    No wider than the shortcut except one vetted way, still gated by the
+    item veto: no 60-char cap on where the resolving line starts. The
+    first line is tested UNSTRIPPED against the allowlist, whose own
+    prefix classes already accept the bullet markers the shortcut
+    accepted (`- None.`, `* None.`, `- No new issues.`) and reject the
+    ones it rejected (`* No new issues.`, `1. None.`) -- exact vocabulary
+    parity by reuse rather than by a re-derived strip.
+    """
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
+    section = scan_body[match_end:match_end + next_heading.start()] \
+        if next_heading else scan_body[match_end:]
+    lines = [ln for ln in section.splitlines() if ln.strip()]
+    if not lines:
+        return False
+    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
+        return False
+    return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
+
+
 def _unresolved_finding_pattern(body: str) -> Optional[str]:
     """Return the first unmatched finding pattern in *body*, or None.
 
@@ -965,7 +1049,17 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
-            if pat in FINDING_HEADING_PATTERNS:
+            if pat == _FINDINGS_HEADING_PATTERN:
+                # The section-resolution check REPLACES the 60-char suffix
+                # shortcut for this heading: the shortcut read "No new
+                # issues." directly under the heading as resolving the whole
+                # section, even when finding items followed it (ai-config
+                # #2370's review of this very fix). The replacement keeps
+                # the shortcut's first-line trigger and adds the item veto
+                # over the rest of the section.
+                if _findings_section_resolves_empty(scan_body, match.end()):
+                    continue
+            elif pat in FINDING_HEADING_PATTERNS:
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue

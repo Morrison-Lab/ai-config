@@ -1064,7 +1064,8 @@ Once a positive marker gate is added, a "this guard alone protects this fixture"
 A per-guard neutering/mutation harness --- disabling one guard branch at a time and confirming at least one test fails specifically because that branch is gone --- is what surfaces which test protects which guard, per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue.
 
 Neither finding was fixed in THIS session --- `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430.
-That session then fixed both, which is where the refutations above and the shipped convention come from.
+That session's work is where the refutations above come from.
+Neither is closed yet: the convention is proposed in #2448 and #2430 stays open pending it, so read this record as an account of what was learned rather than of what has landed.
 This documentation pass is tracked as #2429.)
 
 ## A review wake carried one finding out of five

@@ -226,7 +226,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
   Do this before dispatching review workflows or yielding to the user ---
   but mind the ready-transition timing in `pr-on-claim.md`:
-  on a repo whose review workflow cancels in progress, do not flip ready within seconds of the final push, or the two triggered review runs race and the survivor can be the cancelled one.
+  on a repo whose review workflow cancels in progress, do not flip ready within seconds of the final push ---
+  the two triggered review runs race, and the cancelled one can be the newer run, leaving the current head's review check red while a stale-event run survives.
 
 ## Pattern 14: Pausing Without Setting a Timer
 - **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.

@@ -1186,19 +1186,21 @@ inheriters.
 
 A PreToolUse hook (`no-push-without-self-review.py` here) fires on the
 **whole** Bash tool invocation before any of it runs, not per `&&`-joined
-segment. `git commit --allow-empty -m "..." && git push ...` blocked by
-the push guard therefore never ran the commit either -- the harness
-reported the call as blocked, and nothing executed at all.
+segment.
+`git commit --allow-empty -m "..."` chained with `git push ...` and
+blocked by the push guard therefore never ran the commit either --
+the harness reported the call as blocked, and nothing executed at all.
 
 The trap is the natural recovery move: retry with the guard's override
 prefix on a NEW call containing only the flagged command
-(`ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD`). That push succeeds
---- but pushes whatever HEAD already was, since the commit from the
-blocked call never happened. On an empty-commit branch-claim flow this
-is silent: the push reports `[new branch]` either way, and only a
-downstream symptom (here, `gh pr create` refusing with "No commits
-between main and \<branch\>") surfaces the gap. `git log -1`/`git
-reflog` on the target worktree settles it immediately.
+(`ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD`).
+That push succeeds --- but pushes whatever HEAD already was, since the
+commit from the blocked call never happened.
+On an empty-commit branch-claim flow this is silent: the push reports
+`[new branch]` either way, and only a downstream symptom (here,
+`gh pr create` refusing with "No commits between main and the branch")
+surfaces the gap.
+`git log -1`/`git reflog` on the target worktree settles it immediately.
 
 - **Do:** verify state (`git log -1 --format=%H`, `git status`) after
   any compound command a hook blocks, before assuming the unblocked
@@ -1218,20 +1220,23 @@ because `gh pr create` refused on a zero-commit diff.)
 `command > file 2>&1 &` inside a Bash-tool call already passed
 `run_in_background: true` double-backgrounds: the tool's own
 backgrounding waits for the SHELL invocation to exit, and a trailing
-`&` makes that shell exit immediately (having detached the real work),
-so the completion notification and the captured output file both land
+`&` makes that shell exit immediately, having detached the real work.
+So the completion notification and the captured output file both land
 long before the actual command has produced more than its first few
-lines. The output file is not stale or buffered --- it is complete for
-what the tool considered the finished job, which was the near-instant
+lines.
+The output file is not stale or buffered --- it is complete for what
+the tool considered the finished job, which was the near-instant
 `echo $!` after the ampersand, not the process it backgrounded.
 
 The tell is a "completed, exit code 0" notification whose captured
-output looks implausibly short for the work described, especially
-right after the identical command WITHOUT the trailing `&` was still
-running minutes later with no output at all (that one was not
-double-backgrounded, just slow/quiet until its first flush -- a
-different, non-bug explanation for a differently-shaped symptom, which
-is why comparing the two side by side is what exposed this).
+output looks implausibly short for the work described.
+That is especially clear right after the identical command WITHOUT
+the trailing `&` was still running minutes later with no output at
+all.
+That other one was not double-backgrounded, just slow/quiet until its
+first flush -- a different, non-bug explanation for a
+differently-shaped symptom, which is why comparing the two side by
+side is what exposed this.
 
 - **Do:** pass a plain foreground command (no trailing `&`) to a Bash
   call with `run_in_background: true` --- the tool's own backgrounding

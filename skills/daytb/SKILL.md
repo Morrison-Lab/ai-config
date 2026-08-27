@@ -49,6 +49,21 @@ That is what keeps countermanding cheap.
   own explicit authorization.
   Merge authority specifically is [`mwc`](../mwc/SKILL.md)'s grant, not this
   one.
+
+  **Local git housekeeping is the exception, and it is inside the grant.**
+  Removing a stale worktree, deleting a merged local branch, and resetting a
+  diverged local branch ref to its remote are all covered -- do them rather
+  than filing them back as a question.
+  What makes them safe is that they are local and recoverable: the commits
+  stay in the object store and the reflog, and nothing outward-facing
+  changes.
+  Verify before each one -- a worktree's tree is clean and its HEAD is
+  reachable from a remote, or its content is demonstrably superseded; a
+  branch's content is already on the default branch -- and keep anything
+  carrying commits reachable from no remote, which is triage rather than
+  cleanup.
+  A push, a remote-branch deletion, or a `git reset --hard` over unpushed
+  work stays outside the grant.
 - **Not the safety rules.**
   Everything that required confirmation before still does.
 - **Not a licence to guess when you genuinely cannot judge.**
@@ -108,3 +123,5 @@ That is what keeps countermanding cheap.
   is the grant declined, not honoured.
 - Reopening a recommendation you had already made, instead of simply taking
   it.
+- Filing a stale worktree or a merged local branch back as a question, or as
+  an issue for the user to action, when the grant already covers clearing it.

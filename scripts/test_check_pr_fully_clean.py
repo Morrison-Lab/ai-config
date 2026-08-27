@@ -1789,6 +1789,12 @@ def main() -> int:
               "### Findings\n\nNo new issues.\n\n**`_scan()` regression:** "
               "drops rows.\n")
           is not None)
+    check("'* No new issues.' stays flagged (exact base vocabulary parity)",
+          checker._unresolved_finding_pattern("### Findings\n\n* No new issues.\n")
+          is not None)
+    check("'- No new issues.' resolves (base's own class accepts the dash)",
+          checker._unresolved_finding_pattern("### Findings\n\n- No new issues.\n")
+          is None)
     check("a **None.** resolving first line still resolves",
           checker._unresolved_finding_pattern("### Findings\n\n**None.**\n")
           is None)

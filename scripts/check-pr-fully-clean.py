@@ -1014,10 +1014,13 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     resolving first line is also indistinguishable and is not vetoed --
     the same exposure the 60-char shortcut always had.
 
-    No wider than the shortcut except in two vetted ways, both still gated
-    by the item veto: a `- None.` / `* None.` resolving first line (the
-    shortcut's char class already resolved those markers), and no 60-char
-    cap on where the resolving line starts.
+    No wider than the shortcut except one vetted way, still gated by the
+    item veto: no 60-char cap on where the resolving line starts. The
+    first line is tested UNSTRIPPED against the allowlist, whose own
+    prefix classes already accept the bullet markers the shortcut
+    accepted (`- None.`, `* None.`, `- No new issues.`) and reject the
+    ones it rejected (`* No new issues.`, `1. None.`) -- exact vocabulary
+    parity by reuse rather than by a re-derived strip.
     """
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
     section = scan_body[match_end:match_end + next_heading.start()] \
@@ -1025,8 +1028,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    first_stripped = re.sub(r"^\s*[-*]\s+", "", lines[0])
-    if not NOT_CLEAN_NEGATION_SUFFIX.search(first_stripped):
+    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 

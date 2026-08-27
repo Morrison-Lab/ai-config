@@ -159,6 +159,14 @@ jobs:
         # workstation subscription CLIs. Unit tests mock the CLI/subprocess boundaries
         # and verify diff extraction, fallback chains, and forge attribution.
         run: python3 scripts/test_pre_push_review.py
+      - name: Run adversarial-reviewer read-only hedge tests
+        # The persona's declared restriction is not a Write-schema strip on
+        # Cursor Cloud Task (ai-config#2281; measured 2026-08-25 PDT).
+        # Which copy that harness reads was not isolated. This pins the hedge
+        # and rejects the old "can never alter code" claim. A synthetic copy
+        # of that claim must fail, or a green live-file run is not evidence
+        # the predicate works.
+        run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
         # this repo is currently ~4x the shipped budget (ai-config#897), so a

@@ -151,6 +151,31 @@ Addressed findings from review of <commit-or-range>:
 
 Expand each Rebut below the table. Deferred rows must carry a real issue link.
 
+**Backtick any verdict phrase you quote, including the one in the opening line.**
+A disposition summary names the round it is disposing of, and the natural way to write that names the round's verdict too:
+
+```
+Addressed GitHub Claude of `9508454e` (Needs more work). Pushed `8af4edc9`.
+```
+
+`check-pr-fully-clean.py` reads that parenthetical as this comment's OWN verdict.
+Because a driving session never posts a superseding clean one, the per-reviewer rule from #2274 then keeps the PR not-clean permanently, on a citation of a round that was already addressed.
+Measured on ai-config#2341: that line alone froze the PR, while the disposition table and a self-imposed hold in the same comment produced no verdict at all.
+
+The fix is one pair of backticks, because `strip_cited_finding_vocab` already blanks inline code spans as citation (#1202):
+
+```
+Addressed GitHub Claude of `9508454e` (`Needs more work`). Pushed `8af4edc9`.
+```
+
+Do not expect the checker to infer it from the sentence instead.
+Three attempts were built and deleted on ai-config#2409 -- a driver-ledger classifier keyed on claim wording, the same classifier gated on the agent-disclosure marker, and a citation rule keyed on the disposition verb.
+Each dropped or blanked a genuine reviewer's not-clean, because a reviewer rejecting a claimed fix writes the same sentence a driver does ("Addressed in `abc1234` (still Needs more work)").
+The disambiguation has to come from the author, and a code span is how this corpus already spells it.
+
+- **Do:** wrap a quoted verdict phrase in backticks wherever it appears in a disposition comment.
+- **Don't:** leave a bare `(Needs more work)` next to a cited SHA -- that is the exact shape that freezes the PR.
+
 ### 4b. Reply to every inline review thread — and resolve where appropriate
 
 (The standalone [`resolve-pr-threads`](../resolve-pr-threads/SKILL.md) skill

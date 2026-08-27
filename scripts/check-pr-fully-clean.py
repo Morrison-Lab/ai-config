@@ -633,46 +633,6 @@ def strip_cited_finding_vocab(text: str) -> str:
         text,
         flags=re.IGNORECASE,
     )
-    # A FOURTH citation shape, measured on ai-config#2341 (tracked as #2409):
-    # an ARD ledger's own header line cites the round it is disposing of, as a
-    # bare parenthetical after the reviewed SHA --
-    #
-    #     Addressed GitHub Claude of `9508454e` (Needs more work). Pushed `8af4edc9`.
-    #
-    # Nothing above touches it: there are no quotes and no bold. Measured by
-    # execution, this line ALONE is what made that comment classify not-clean;
-    # neither its `Disposition` table nor its "Do not merge. Blocked on review
-    # of `8af4edc9`." hold produces a verdict at all. Because a driver never
-    # posts a superseding clean, the #2274 per-reviewer rule then froze the PR
-    # permanently on a citation of a round that had already been addressed.
-    #
-    # Gated on BOTH signals, the same discipline the #1752 rule above arrived
-    # at after two over-broad versions were refuted:
-    #
-    #   1. the sentence OPENS with an ARD disposition verb reporting a
-    #      completed action, which a live finding never does; and
-    #   2. the parenthetical follows a backticked SHA immediately and holds
-    #      NOTHING BUT the verdict phrase.
-    #
-    # The second is what keeps a reviewer REJECTING a claimed fix -- "Addressed
-    # in `abc1234` (still Needs more work)" -- out of the match: "still" is
-    # extra content, so the paren does not close after the phrase. Requiring an
-    # exact paren body rather than merely containing the phrase is the narrow
-    # choice, and it is the one that keeps the dangerous direction closed.
-    #
-    # Only the parenthetical is blanked, never the disposition verb or the rest
-    # of the line, so any real finding elsewhere in the comment survives. Runs
-    # before the code-span strip below, since the SHA is itself backticked.
-    _DISPOSITION_VERB = r"(?:Addressed|Rebutted|Deferred|Acknowledged)"
-    text = re.sub(
-        r"(?m)^[\s>*_-]{0,8}" + _DISPOSITION_VERB + r"\b[^.!?\n]{0,120}?"
-        r"`[0-9a-f]{7,40}`[ \t]*\(\s*\*{0,2}(?:"
-        r"Needs\s+more\s+work|Changes\s+requested|Not\s+clean|Blocked"
-        r")\*{0,2}\s*\)",
-        lambda m: re.sub(r"\([^)]*\)$", " ", m.group(0)),
-        text,
-        flags=re.IGNORECASE,
-    )
     # Fenced code blocks first, spanning lines.
     text = strip_fences(text, replacement=" ")
     # Inline code spans (`...`), within a line.

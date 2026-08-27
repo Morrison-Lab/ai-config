@@ -132,13 +132,11 @@ and [`memories/cursor.md`](../../memories/cursor.md).
 **Execute the sequential multi-provider review loop on all PRs.**
 You must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 
-Pin all available providers
-(including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent).
+Pin all available providers (including external reviewers like Copilot or Codex, and the local `adversarial-reviewer` subagent).
 Query them sequentially, one at a time.
 Do not request them in parallel.
 Re-check reachability at the start of every cycle:
-a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
-can become reachable mid-session,
+a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit) can become reachable mid-session,
 and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
 confirm a genuine all-clear review is posted at the current head from all reachable providers --

@@ -1,5 +1,5 @@
 "Fully clean" is the terminal state the ARDI review loop drives toward.
-A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py <pr-number>`):
+A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>`):
 
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in

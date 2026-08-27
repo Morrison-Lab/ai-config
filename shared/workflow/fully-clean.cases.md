@@ -1026,7 +1026,7 @@ Tracked as ai-config#1719, which gained the skip-notice trigger the same day, an
 ## A driver-comment classifier drops a Copilot finding it has no guard for
 
 (Morrison-Lab/ai-config#2409 / #2429 / #2430, 2026-08-27.
-`check-pr-fully-clean.py`'s verdict scan (branch `fix/2409-driver-comments`, in progress) added a driver-ledger classifier so that a driving session's own status comments --- claim wording, an ARD disposition table, a self-imposed hold like "Do not merge.
+`check-pr-fully-clean.py`'s verdict scan, on branch `fix/2409-driver-comments`, added a driver-ledger classifier so that a driving session's own status comments --- claim wording, an ARD disposition table, a self-imposed hold like "Do not merge.
 Blocked on review of `<sha>`" --- would stop being admitted as standing reviewer verdicts, per #2409.
 The classifier matches broad English markers (`hold off`, `back off`, a markdown table row carrying `Disposition`) and then abstains from excluding a comment when the comment also carries one of three NEGATIVE guards: a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, or a `**Claude finished` marker.
 
@@ -1039,13 +1039,25 @@ Reproduced by executing the classifier logic against `origin/main` directly (not
 With it active, the comment is dropped and the checker exits 0.
 
 The general shape is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently inside this one checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had, and they inherit it silently, because nobody tests a guard the way they eyeball a matcher's positive output.
-The fix direction is to invert the gate --- require a POSITIVE signature of the class being dropped (the agent-disclosure marker every driver comment carries per [`disclose-agent-authorship`](disclose-agent-authorship.md), which no reviewer report emits) before consulting the over-broad marker at all, rather than adding more dialect-specific negative guards as new reviewer formats show up.
+Inverting the gate was the obvious next move, and it was tried and refuted within hours.
+The candidate positive signature was the agent-disclosure marker, on the premise that every driver comment carries it per [`disclose-agent-authorship`](disclose-agent-authorship.md) and no reviewer report emits it.
+Only the first half holds.
+[`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH the marker appended, so a genuine not-clean review carries it as well, and a marker gate dropped that review exactly as the negative guards dropped Copilot's.
+Both designs failed for one reason: every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item.
+
+What finally shipped drops nothing.
+Executing `classify_verdict` over the #2341 comment's parts showed that neither the `Disposition` table nor the "Do not merge. Blocked on review of `<sha>`" hold produces a verdict at all --- the sole not-clean signal was the header's parenthetical citation of the round being disposed of, "Addressed GitHub Claude of `9508454e` (Needs more work)".
+Both classifiers had therefore been built to detect the parts that never mattered.
+The fix adds that citation shape to `strip_cited_finding_vocab`, gated on the sentence opening with an ARD disposition verb AND the parenthetical holding nothing but the verdict phrase, so a reviewer rejecting a claimed fix ("Addressed in `abc1234` (still Needs more work)") is untouched.
+The comment stays in the scan and simply bears no verdict: #2341's scan reports four examined items, where the drop design reported two.
 
 A second, smaller finding rode along: the driver-ledger classifier's own guard-test fixtures were hand-written from what each guard reads, and both omitted the disclosure marker that the two REAL driver comments the fix was built from (GitHub comment ids 5430672892 and 5430978306 on ai-config#2341) both carry.
 Once a positive marker gate is added, a "this guard alone protects this fixture" test built that way passes through the new gate instead of through the guard it was named for, which is [`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s "A regression fixture must contain something the bug would destroy" section one layer further in: the fixture is not too thin to reach the *bug*, it is too thin to reach the *guard*.
 A per-guard neutering/mutation harness --- disabling one guard branch at a time and confirming at least one test fails specifically because that branch is gone --- is what surfaces which test protects which guard, per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue.
 
-Neither finding was fixed in this session: `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430 instead. #2429 tracks this documentation pass.)
+Neither finding was fixed in THIS session --- `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430.
+That session then fixed both, which is where the refutation above and the shipped design come from.
+This documentation pass is tracked as #2429.)
 
 ## A review wake carried one finding out of five
 

@@ -673,11 +673,22 @@ this is the mirror, a comment wrongly *dropped*.
 A driver-ledger classifier recognizes a session's own status comment (claim wording, an ARD disposition table, a self-imposed hold like "hold off ...") from broad English markers, then protects genuine reviews with negative guards -- a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, a `**Claude finished` marker -- that must all be absent before the exclusion applies.
 Every one of those guards is keyed on Claude's and Cursor's own report structure.
 A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until X is added" emits none of that structure: the broad marker matches, every guard abstains, and the finding is dropped from the verdict scan entirely -- reported FULLY CLEAN.
-This is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently in this checker: the fix should require a POSITIVE signature of the class being dropped (here, the agent-disclosure marker every driver comment carries and no reviewer report emits) before consulting the over-broad marker at all, rather than defending the over-broad marker with negative-only guards.
+This is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently in this checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had.
 
-- **Do:** gate a drop/exempt decision on a positive signature of the class being dropped, and confirm that signature's population matches the marker's population across every producer the checker sees, not just the one the guards were written from.
+**Inverting the gate to a POSITIVE signature was tried next, and refuted the same day, which is the more useful half of the lesson.**
+The candidate signature was the agent-disclosure marker, on the premise that every driver comment carries it and no reviewer report emits it.
+The first half is true and the second is false: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH that marker, so a genuine not-clean review carries it too, and gating on it dropped that review instead.
+Both attempts failed the same way.
+Every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item -- and a positive signature is not safer than a negative one merely for being positive.
+What shipped instead stopped dropping anything: the one citation shape that actually caused the misread was neutralized inside `strip_cited_finding_vocab`, so the comment stays in the scan and simply bears no verdict.
+Measured on ai-config#2341, that keeps the scan at four examined items rather than the two the drop design left.
+
+- **Do:** prefer neutralizing the specific signal that caused the misread over dropping the item, so the item stays visible in the examined count.
+- **Do:** derive, by execution, which line of a body actually produced the verdict, before building a classifier for the parts you assume did.
+- **Do:** confirm a proposed signature's population against every producer the checker sees, and treat "no reviewer emits this" as a claim to check against the corpus rather than a premise.
 - **Do:** read a driver-comment classifier's guard list as a dialect list, and ask what a differently-formatted reviewer's report looks like against it.
 - **Don't:** protect an over-broad exclusion marker with negative guards keyed on one producer's output format -- they abstain on every other producer, which is exactly where the marker is most wrong.
+- **Don't:** read a positive gate as inherently safer than a negative one -- both were tried here, and both dropped a real reviewer's finding.
 - **Don't:** trust a driver-comment classifier's `0 dropped` (or silence) as evidence nothing was excluded;
   the failure here produces no error, just a lower "examined N items" count.
 

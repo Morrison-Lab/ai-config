@@ -126,8 +126,10 @@ gets applied: non-zero cost proves *some* credential authenticated, so it
 identifies **the** credential under test only when the run had exactly one
 available --- no surviving repo-level copy, and no sibling credential (an
 `ANTHROPIC_API_KEY`, say) the workflow could fall back to.
-The canary satisfied it: `Morrison-Lab/qmt` had zero repository secrets,
-verified.
+The canary satisfied both clauses, each verified separately:
+`Morrison-Lab/qmt` had zero repository secrets,
+and no `ANTHROPIC_API_KEY` (or other Anthropic credential) existed at the
+org level or was referenced by any of that repo's workflows.
 
 This is the shape
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)

@@ -333,6 +333,39 @@ The tell is a diff that *quotes no source* for a behavioural claim.
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
 
 
+**While the workflow reviewer is down, the fallback is a full iterate loop of FRESH clean-slate subagent rounds -- run automatically, one per round, until a clean verdict at the current head.**
+The sections above establish that a single dispatched self-review unblocks the round.
+They leave two gaps this section closes, both from a user directive
+(2026-08-26: "do that automatically when the GHA reviews aren't working",
+issued after twice having to ask by hand for another round on ucdavis/bcs#736).
+
+**One review is not the loop.**
+A working workflow reviewer re-reviews every push until it is satisfied;
+a fallback that reviews once and then only verifies its own fixes has quietly
+downgraded ARDI to a single round.
+So after addressing a fallback round's findings and pushing, dispatch the
+next round at the new head without being asked, and keep going until a round
+returns a clean verdict at the head being shipped.
+
+**Each round is a fresh clean-slate reviewer, not a verification pass.**
+Brief the new subagent with the diff and the standards only --- never with the
+prior rounds' findings or dispositions.
+A verifier handed the old finding list confirms the fixes and stops;
+fresh eyes re-derive the whole diff and find what every earlier round missed.
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"Verification passes returned Clean while fresh rounds kept finding defects".
+A verification pass still has its narrow place --- confirming a specific
+fix landed before reporting a round addressed --- but it never substitutes
+for the next fresh round.
+
+- **Do:** dispatch the next fresh round automatically after each
+  address-and-push, while the workflow reviewer cannot produce a verdict.
+- **Do:** brief each round with diff and standards only, so it re-derives
+  rather than confirms.
+- **Don't:** stop after one fallback review plus verification passes ---
+  that is one round wearing the loop's name.
+- **Don't:** hand a new round the previous rounds' findings.
+
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**
 The section above governs the defect a shallow pass never notices.

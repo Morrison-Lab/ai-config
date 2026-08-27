@@ -272,6 +272,13 @@ def main():
          "-b", "a body"),
         ("gh pr merge -R ucdavis/bcs -A me@example.com 749 --delete-branch",
          "-A", "an author email"),
+        # close-only, and the flag that adding `close` support let through:
+        # its value was read as the PR target, silencing the guard on the very
+        # command the subcommand support was added for.
+        ("gh pr close -R ucdavis/bcs -c 'Closing this' 749 --delete-branch",
+         "-c", "a closing comment"),
+        ("gh pr close -R ucdavis/bcs --comment 'Closing' 749 -d",
+         "--comment", "a closing comment, long form"),
     ]:
         _, calls = run(cmd, "child", capture_argv=True)
         views = [c for c in calls if "view" in c]

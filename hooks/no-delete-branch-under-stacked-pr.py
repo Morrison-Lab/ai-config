@@ -130,9 +130,13 @@ DELETING_SUBCOMMANDS = {"merge", "close"}
 
 # Flags whose NEXT token is a value, not the PR target. Without this,
 # `gh pr merge -R o/r -t "Some title" 749 -d` reads "Some title" as the PR.
+# The union across both subcommands, verified against `gh pr merge --help` and
+# `gh pr close --help`. `-c/--comment` is close-only and was the gap that
+# adding `close` support opened: its value was read as the PR target, so the
+# guard went silent on exactly the command it was extended to cover.
 VALUE_FLAGS = {
     "-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file",
-    "--match-head-commit", "-A", "--author-email",
+    "--match-head-commit", "-A", "--author-email", "-c", "--comment",
 }
 
 

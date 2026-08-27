@@ -79,11 +79,14 @@ warning names the child PRs and the safe order.
 
 ## The match condition
 
-Warns when **all** of these hold for one `gh pr merge` simple command:
+Warns when **all** of these hold for one `gh pr merge` or `gh pr close`
+simple command --- both carry the same `-d, --delete-branch`, and it is the
+branch deletion that is the hazard rather than the merge:
 
     the argv carries a delete flag  (--delete-branch, -d, a clustered -sd,
                                      or --delete-branch=<anything but false>)
-    the argv names a repo           (-R / --repo, in any spelling)
+    the argv names a repo           (-R / --repo, in any spelling, including
+                                     -Rowner/repo with no separator)
     the argv names a PR target      (number, URL, or branch -- `gh pr view`
                                      resolves all three)
     `gh` is on PATH
@@ -120,11 +123,16 @@ _SHELL_OPS = set("();|&")
 
 DELETE_FLAGS = {"--delete-branch", "-d"}
 
+# `gh pr close` carries the SAME `-d, --delete-branch` flag as `gh pr merge`,
+# and deleting the branch is the hazard -- not merging. A guard that watches
+# only `merge` leaves the identical incident reachable one subcommand over.
+DELETING_SUBCOMMANDS = {"merge", "close"}
+
 # Flags whose NEXT token is a value, not the PR target. Without this,
 # `gh pr merge -R o/r -t "Some title" 749 -d` reads "Some title" as the PR.
 VALUE_FLAGS = {
     "-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file",
-    "--match-head-commit", "--author-email",
+    "--match-head-commit", "-A", "--author-email",
 }
 
 
@@ -152,20 +160,24 @@ def _simple_commands(cmd):
     return cmds
 
 
-def _gh_pr_merge_argv(argv):
-    """The argv of a `gh pr merge`, or None. Skips env assignments and the
-    usual leading words, so `ALLOW_MERGE=1 gh pr merge ...` still matches."""
+def _gh_pr_argv(argv):
+    """The argv of a `gh pr merge`/`gh pr close`, or None.
+
+    Skips env assignments and the usual leading words, so
+    `ALLOW_MERGE=1 gh pr merge ...` still matches.
+    """
     i = 0
     while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
         i += 1
     rest = argv[i:]
-    if len(rest) >= 3 and rest[0] == "gh" and rest[1] == "pr" and rest[2] == "merge":
+    if (len(rest) >= 3 and rest[0] == "gh" and rest[1] == "pr"
+            and rest[2] in DELETING_SUBCOMMANDS):
         return rest
     return None
 
 
 def _parse_merge(argv):
-    """(target, repo, deletes_branch) from one `gh pr merge` argv.
+    """(target, repo, deletes_branch) from one `gh pr merge`/`close` argv.
 
     `target` is whatever identifies the PR --- a number, a URL, or a branch
     name. `gh pr view` resolves all three, so the guard does not classify it.
@@ -176,7 +188,7 @@ def _parse_merge(argv):
     i = 3
     while i < len(argv):
         tok = argv[i]
-        if tok == "--delete-branch" or tok == "-d":
+        if tok in DELETE_FLAGS:
             deletes = True
         elif tok.startswith("--delete-branch="):
             deletes = tok.split("=", 1)[1].strip().lower() not in ("false", "0", "no")
@@ -190,6 +202,10 @@ def _parse_merge(argv):
             repo = tok.split("=", 1)[1]
         elif tok.startswith("-R="):
             repo = tok.split("=", 1)[1]
+        # `-Rowner/repo`, with neither space nor `=`. Valid pflag shorthand,
+        # and it fails the clustered-flag test below because of the slash.
+        elif tok.startswith("-R") and len(tok) > 2:
+            repo = tok[2:]
         # Clustered boolean shorthand: `-sd` is `--squash --delete-branch`.
         # pflag accepts it, and a matcher that only knows the bare `-d` reads
         # a real delete as no delete.
@@ -264,14 +280,14 @@ def main():
 
     # Only the `gh pr merge` segments matter. A `git branch -d` elsewhere in
     # the same chain is somebody else's `-d`.
-    target = repo = None
+    target = repo = verb = None
     for argv in argvs:
-        merge_argv = _gh_pr_merge_argv(argv)
+        merge_argv = _gh_pr_argv(argv)
         if merge_argv is None:
             continue
         t, r, deletes = _parse_merge(merge_argv)
         if deletes and t and r:
-            target, repo = t, r
+            target, repo, verb = t, r, merge_argv[2]
             break
     if not target or not repo:
         return 0
@@ -295,7 +311,7 @@ def main():
     note = (
         f"`--delete-branch` here may CLOSE {listed} rather than retarget "
         f"{'them' if plural else 'it'}.\n\n"
-        f"    {repo} PR {target} merges `{branch}`\n"
+        f"    {repo} PR {target} ({verb}) removes `{branch}`\n"
         f"    {listed} {'use' if plural else 'uses'} `{branch}` as "
         f"{'their' if plural else 'its'} base\n\n"
         "Retargeting onto the merged PR's base is GitHub's documented "

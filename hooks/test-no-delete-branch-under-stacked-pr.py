@@ -54,6 +54,8 @@ if "list" in args:
         print('{"number": 750}')
     elif mode == "no-number-key":
         print('[{"title": "a"}]')
+    elif mode == "null-number":
+        print('[{"number": null}]')
     elif mode == "scalar":
         print('7')
     elif mode == "garbage":
@@ -126,6 +128,17 @@ SHOULD_WARN = [
      "child", "a branch-name target"),
     ("gh pr merge -R ucdavis/bcs -t 'Some title' 749 --delete-branch", "child",
      "a value-taking flag's argument is not mistaken for the PR target"),
+    # `gh pr close` carries the SAME -d/--delete-branch flag (verified against
+    # `gh pr close --help`). Deleting the branch is the hazard, not merging, so
+    # a guard watching only `merge` leaves the incident reachable one
+    # subcommand over.
+    ("gh pr close 749 -R ucdavis/bcs --delete-branch", "child",
+     "gh pr close --delete-branch is the same hazard"),
+    ("gh pr close 749 -R ucdavis/bcs -d", "child", "gh pr close, short flag"),
+    ("gh pr merge 749 -Rucdavis/bcs --delete-branch", "child",
+     "-Rowner/repo concatenated, with neither space nor equals"),
+    ("sudo gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "child",
+     "a leading word before the command"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -168,6 +181,14 @@ SHOULD_STAY_SILENT = [
      "gh returns a bare JSON scalar"),
     ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "garbage",
      "gh returns output that is not JSON at all"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "null-number",
+     "an entry whose `number` is explicitly null"),
+    # A clustered flag with no `d` in it is not a delete. Without this the
+    # cluster branch can be mutated to fire on ANY cluster and stay green.
+    ("gh pr merge 749 -R ucdavis/bcs -sm", "child",
+     "a clustered flag carrying no d is not a delete"),
+    ("gh pr view 749 -R ucdavis/bcs --delete-branch", "child",
+     "a non-deleting gh pr subcommand, even carrying the flag text"),
 ]
 
 
@@ -239,6 +260,34 @@ def main():
         if "--state" not in l or "open" not in l:
             failures.append(
                 f"the list must be restricted to OPEN PRs: {l}")
+
+    # The value-flag cases must be checked on the ARGV, not on warn-vs-silent:
+    # the shim's `gh pr view` ignores its argument, so dropping "-t" from
+    # VALUE_FLAGS misparses the target and the outcome never changes. This is
+    # the test whose stated purpose was previously unenforced.
+    for cmd, flag, why in [
+        ("gh pr merge -R ucdavis/bcs -t 'Some title' 749 --delete-branch",
+         "-t", "a subject"),
+        ("gh pr merge -R ucdavis/bcs -b 'Some body' 749 --delete-branch",
+         "-b", "a body"),
+        ("gh pr merge -R ucdavis/bcs -A me@example.com 749 --delete-branch",
+         "-A", "an author email"),
+    ]:
+        _, calls = run(cmd, "child", capture_argv=True)
+        views = [c for c in calls if "view" in c]
+        if not views:
+            failures.append(f"no view issued for the {flag} case ({why})")
+        elif "749" not in views[0]:
+            failures.append(
+                f"{flag} consumed the PR target: the value ({why}) was queried "
+                f"instead of 749 -- {views[0]}")
+
+    # A deleting subcommand must be recognized by NAME, not by "anything under
+    # `gh pr`". Without this, loosening the matcher to argv[1]=="pr" survives.
+    _, calls = run("gh pr close 749 -R ucdavis/bcs --delete-branch", "child",
+                   capture_argv=True)
+    if not [c for c in calls if "view" in c]:
+        failures.append("gh pr close --delete-branch issued no query at all")
 
     # `gh` absent entirely: the guard must not raise, and must not warn.
     proc = run("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch",

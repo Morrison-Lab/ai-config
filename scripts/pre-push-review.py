@@ -143,6 +143,76 @@ def get_pr_head_sha(pr_number: int) -> Optional[str]:
     return None
 
 
+REFUSAL_PATTERNS = [
+    "hit your weekly limit",
+    "prepayment credits depleted",
+    "unrecognized argument",
+    "api key is missing",
+]
+
+
+def _refusal_reason(report: str) -> Optional[str]:
+    """Return a refusal message when the engine emitted one, else None."""
+    lowered = report.lower()
+    for pat in REFUSAL_PATTERNS:
+        if pat in lowered:
+            return f"Engine refusal string detected: '{pat}'"
+    return None
+
+
+def _load_hook_parse_report():
+    """Load parse_report() from hooks/no-push-without-self-review.py.
+
+    The hook's filename is not an importable module name, so load it by
+    path. Import errors propagate: a missing or broken hook must fail the
+    parse loudly rather than silently falling back to nothing.
+    """
+    import importlib.util
+
+    hook_path = (
+        Path(__file__).resolve().parent.parent
+        / "hooks"
+        / "no-push-without-self-review.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "no_push_without_self_review", hook_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.parse_report
+
+
+def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
+    """Validate a persona-contract report (Summary / Findings / Verdict /
+    Reviewed-Commit) via the hook's own parse_report() (ai-config#2309).
+
+    Returns the same (is_valid, is_clean, reason) triple as
+    parse_review_verdict, so callers cannot tell which contract answered.
+    """
+    refusal = _refusal_reason(report)
+    if refusal:
+        return False, False, refusal
+
+    parse_report = _load_hook_parse_report()
+    verdict, reviewed_commit = parse_report(report)
+    if verdict is None:
+        return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
+
+    if expected_commit_sha:
+        if not reviewed_commit:
+            return False, False, (
+                f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint after the verdict."
+            )
+        if reviewed_commit != expected_commit_sha.lower():
+            return False, False, (
+                f"Fingerprint SHA mismatch: found {reviewed_commit!r}, expected {expected_commit_sha!r}."
+            )
+
+    if verdict == "clean":
+        return True, True, "Clean (persona contract)"
+    return True, False, "Needs work (persona contract)"
+
+
 def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
     """Parse structured review output and return (is_valid, is_clean, reason).
 
@@ -176,10 +246,23 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     observations_text = extract_section(unfenced_report, r"Observations")
     verification_text = extract_section(unfenced_report, r"Verification(?: Steps)?")
 
-    if summary_text is None: return False, False, "Missing required section: Summary Verdict"
-    if critical_text is None: return False, False, "Missing required section: Critical Findings"
-    if observations_text is None: return False, False, "Missing required section: Observations"
-    if verification_text is None: return False, False, "Missing required section: Verification Steps"
+    # Two report contracts exist (ai-config#2309): this engine's own
+    # (Summary Verdict / Critical Findings / Observations / Verification
+    # Steps) and the adversarial-reviewer persona's (Summary / Findings /
+    # Verdict / Reviewed-Commit), parsed by parse_report() in
+    # hooks/no-push-without-self-review.py. When the local contract's
+    # sections are absent but the persona shape is present, delegate to that
+    # one parse rather than re-deriving it here -- one parser per contract,
+    # not two parsers for one.
+    if None in (summary_text, critical_text, observations_text, verification_text):
+        persona_findings = extract_section(unfenced_report, r"Findings")
+        persona_verdict = extract_section(unfenced_report, r"Verdict")
+        if persona_findings is not None and persona_verdict is not None:
+            return _parse_persona_verdict(report, expected_commit_sha)
+        if summary_text is None: return False, False, "Missing required section: Summary Verdict"
+        if critical_text is None: return False, False, "Missing required section: Critical Findings"
+        if observations_text is None: return False, False, "Missing required section: Observations"
+        if verification_text is None: return False, False, "Missing required section: Verification Steps"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
@@ -288,15 +371,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
 
-    refusal_patterns = [
-        "hit your weekly limit",
-        "prepayment credits depleted",
-        "unrecognized argument",
-        "api key is missing",
-    ]
-    for pat in refusal_patterns:
-        if pat in report.lower():
-            return False, False, f"Engine refusal string detected: '{pat}'"
+    refusal = _refusal_reason(report)
+    if refusal:
+        return False, False, refusal
 
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 

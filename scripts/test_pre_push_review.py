@@ -848,6 +848,89 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "Cursor Agent")
 
 
+    def test_persona_contract_clean_accepted(self):
+        # ai-config#2309: the adversarial-reviewer persona contract
+        # (Summary / Findings / Verdict / Reviewed-Commit) must be accepted
+        # via the hook's own parse_report(), not rejected as missing the
+        # local contract's sections.
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\n"
+            "One commit rewording a docstring.\n\n"
+            "### Findings\n"
+            "No actionable findings identified.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertTrue(is_clean, reason)
+        self.assertIn("persona", reason)
+
+    def test_persona_contract_needs_work(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\n"
+            "One commit.\n\n"
+            "### Findings\n"
+            "1. [Defect] scripts/x.py:1 -- broken.\n\n"
+            "### Verdict: Needs more work\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertFalse(is_clean, reason)
+
+    def test_persona_contract_sha_gates(self):
+        commit = "abc123def4567890"
+        base = (
+            "### Summary of Changes\n"
+            "One commit.\n\n"
+            "### Findings\n"
+            "None identified.\n\n"
+            "### Verdict: Ready for merge\n\n"
+        )
+        # Missing fingerprint entirely
+        is_valid, _, reason = reviewer.parse_review_verdict(base, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("fingerprint", reason.lower())
+        # Wrong fingerprint
+        wrong = base + "Reviewed-Commit: 9999999999999999\n"
+        is_valid, _, reason = reviewer.parse_review_verdict(wrong, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("mismatch", reason.lower())
+
+    def test_persona_contract_does_not_shadow_local(self):
+        # A report carrying the LOCAL contract's four sections must still be
+        # parsed by the local path, including its stricter checks -- the
+        # persona fallback fires only when a local section is absent.
+        commit = "abc123def4567890"
+        local = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "A real, unresolved finding sits here.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\n- ran tests\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(local, expected_commit_sha=commit)
+        # Local path rejects a clean verdict over a non-clean findings body.
+        self.assertFalse(is_valid)
+        self.assertNotIn("persona", reason)
+
+    def test_persona_contract_refusal_detected(self):
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            "You have hit your weekly limit.\n"
+            "Reviewed-Commit: abc123def4567890\n"
+        )
+        is_valid, _, reason = reviewer.parse_review_verdict(report, expected_commit_sha="abc123def4567890")
+        self.assertFalse(is_valid)
+        self.assertIn("refusal", reason.lower())
+
     def test_verdict_negated_blockers_accepted(self):
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] prevents data loss.\n[INFO] No critical vulnerability was introduced.\n### Verification Steps\nNone"
         is_valid, is_clean, _ = reviewer.parse_review_verdict(report)

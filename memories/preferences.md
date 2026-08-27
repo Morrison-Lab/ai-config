@@ -188,17 +188,17 @@
   A later all-clear from one reviewer does not clear another reviewer's
   standing not-clean, even with mwc.
   A rebuttal the reviewer still disputes does NOT count as clean.
-  **`mergeable_state: clean` is NOT Fully Clean**: GitHub API's `mergeable_state: clean` / `mergeStateStatus: CLEAN` indicates ONLY that git merge will succeed without merge conflicts.
-  It does NOT mean CI has passed or that an AI/human review has approved the PR.
-  NEVER merge a PR based on `mergeable_state: clean` without verifying both (1) all CI check runs are green, AND (2) an authentic clean review verdict evaluating the HEAD SHA has been received (triggering `@claude review` / `claude-code-review.yml` when the repo's review workflow did not auto-dispatch for that round). (User correction, 2026-08-17.)
+  **`mergeable_state: clean` is NOT Fully Clean**: GitHub `CLEAN` is conflict-free (GitHub `mergeable`) plus passing commit status, not a review verdict (only `dirty` means conflicts).
+  It does NOT mean a review has approved the PR, or that the PR may be described as merge-ready.
+  NEVER merge --- and never describe as merge-ready --- a PR that lacks an authentic clean review verdict evaluating the HEAD SHA, even when GitHub reports `CLEAN` (user correction, 2026-08-17, restated 2026-08-25).
   Two gotchas when checking CI state: the field names/casing for these states vary by API surface (REST's lowercase `status`/`conclusion` vs `gh pr checks`'s uppercase `state`) --- don't hard-code one casing when scripting a check; and a workflow run blocked on `action_required` before any job starts can complete with zero check runs, invisible to a check-runs-only poll (`gh pr checks`, `get_check_runs`) --- and, verified directly against a real run, GitHub records NEITHER a matching commit/branch NOR a populated PR-linkage field for comment/dispatch-triggered runs, so no single `gh run list` filter reliably narrows to "runs for this PR" --- treat any such cross-check as best-effort, not exhaustive.
   See `shared/workflow/fully-clean.md` for the full detail.
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).
 - If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse.
   Don't loop forever and don't unilaterally override.
-- After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
-  Keep following until the PR is merged or closed (or I say stop).
-  Don't ask "want me to watch it?"; just do it.
+- After creating, pushing to, or being handed a PR, immediately arm a persistent monitoring loop using whatever wake this session has, without asking first.
+  A PR-activity subscription is not a loop.
+  Treat a "are you monitoring?" question as a status check that starts the loop if it is not running.
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
   If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).
   If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md).

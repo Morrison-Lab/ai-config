@@ -787,11 +787,18 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 A request to post a review and leave findings, with no request to edit, is not that kind of touch.
 
 **Driving.**
+The persistent-loop standing yes lives in `AGENTS.md` and applies to every agent.
+This section is only the Claude-specific half: how this harness wakes, and how it must not double-trigger review.
+
 When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
 That answer is a standing yes across all PRs you are driving.
-Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
+Subscribe with `subscribe_pr_activity` when that tool exists (provided by the GitHub MCP server in remote/web sessions), or babysit locally.
+A subscription does not replace the persistent loop: PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
+Re-arm it periodically, since webhooks can't fill that gap.
+Drive every review round to fully-clean.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
+This watch process never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 

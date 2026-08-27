@@ -46,6 +46,43 @@ Refreshing the parenthetical to 17 entries would have been wrong again
 within weeks, so it became "every fragment under `shared/coding/`, indexed
 by the principle it serves in the catalog above".)
 
+**A softened count is still a pinned count.**
+The rule that refreshing a drifted list only resets the clock has a
+near-miss.
+The move it does not rule out is replacing the figure with a vaguer version
+of itself --- "on the order of 90K+ tokens across the ~60 files in it" in
+place of "~74-92K tokens across 59 files".
+Hedging acknowledges the imprecision and changes nothing about the mechanism,
+so the substitution reads as careful while drifting on the same schedule:
+a tree can shrink past "90K+" as easily as it grew past an exact figure.
+
+The tell is that such a sentence has to describe its own restraint.
+A form needing a clause like "a count this sentence deliberately does not
+pin" pinned one, or it would have nothing to disclaim.
+The pointer form needs no such clause, because it names the query rather
+than an answer.
+
+Hedging is the wrong answer whether or not the figure has a source.
+What the source decides is which right answer applies, and the discriminator
+is whether a *source can be named* rather than whether a command exists.
+A figure whose source is nameable --- a directory, an API, a lockfile --- gets
+the pointer.
+A count of the items in the block directly beneath it names nothing, so it
+gets dropped or re-derived instead, per
+[a count in the prose above a block](#a-count-in-the-prose-above-a-block-is-the-same-duplicate-one-line-away).
+
+- **Do:** replace a figure the filesystem or an API enumerates with the
+  command that derives it.
+- **Don't:** hedge such a figure and keep it --- an approximation drifts on
+  the same schedule the exact value did.
+
+(Measured on `ucdavis/bcs`#750, 2026-08-27.
+A hedged draft was rejected in review before it was pushed, in a change whose
+own commit message cited this fragment.
+The shipped text splits along exactly the line above: the *file* count became
+`find .ai-config/shared -name '*.md' | wc -l`, and the *token* figure, which
+no command enumerates, was dropped rather than hedged.)
+
 This is conditioned on the external source being **reliably available** ---
 don't add a network fetch or a fragile dependency where a static value would
 do. A constant that has no external owner (a magic number intrinsic to the

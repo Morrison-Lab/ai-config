@@ -1,6 +1,12 @@
 ---
 name: testing-r-packages
 description: R package testing best practices with testthat 3+.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.1"

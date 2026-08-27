@@ -1,6 +1,12 @@
 ---
 name: quarto-authoring
 description: Quarto document authoring and markdown conversion.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Mickaël Canouil (@mcanouil)
   version: "1.4"

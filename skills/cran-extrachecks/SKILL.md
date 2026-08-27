@@ -1,6 +1,12 @@
 ---
 name: cran-extrachecks
 description: CRAN submission checklist beyond devtools::check().
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.0"

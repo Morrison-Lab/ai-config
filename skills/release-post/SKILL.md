@@ -1,6 +1,12 @@
 ---
 name: release-post
 description: Create professional package release blog posts for Tidyverse/Shiny.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.0"
@@ -28,13 +34,13 @@ This skill supports two blog platforms with different formatting requirements:
   - Uses hugodown
   - R packages primarily
   - More rigid structure and conventions
-  - See `references/tidyverse-formatting.md`
+  - See [references/tidyverse-formatting.md](references/tidyverse-formatting.md)
 
 - **Shiny blog** (shiny.posit.co)
   - Uses Quarto
   - R and Python packages
   - More flexible, feature-focused structure
-  - See `references/shiny-formatting.md`
+  - See [references/shiny-formatting.md](references/shiny-formatting.md)
 
 **First, determine which platform the post is for**, then follow the general workflow and apply platform-specific formatting.
 
@@ -81,7 +87,7 @@ Create the post outline following this order:
 
 ### Step 3: Apply Content Guidelines
 
-Follow the best practices in `references/content-guidelines.md`:
+Follow the best practices in [references/content-guidelines.md](references/content-guidelines.md):
 
 - **Opening style**: "We're [random adjective expressing excitement] to announce the release of..."
 - **Section organization**: Migration → Lifecycle → Features → Improvements → Acknowledgements
@@ -106,13 +112,13 @@ Convert NEWS.md bullets to blog-friendly content:
 
 ### Step 5: Apply Platform-Specific Formatting
 
-**For Tidyverse posts**, read `references/tidyverse-formatting.md` and apply:
+**For Tidyverse posts**, read [references/tidyverse-formatting.md](references/tidyverse-formatting.md) and apply:
 - hugodown frontmatter with `slug`, `photo.url`, `photo.author`
 - Specific slug format: `packagename-x-y-z` (hyphens replace dots)
 - R code blocks with `r` language identifier
 - Acknowledgements always included as final section
 
-**For Shiny posts**, read `references/shiny-formatting.md` and apply:
+**For Shiny posts**, read [references/shiny-formatting.md](references/shiny-formatting.md) and apply:
 - Quarto frontmatter with YAML anchors for social media
 - Flexible title formatting
 - Use tabsets for Python/R or Express/Core variations
@@ -174,7 +180,7 @@ Platform-specific checklist:
 Load these as needed for detailed guidance:
 
 ### Content Guidelines
-**`references/content-guidelines.md`** - General best practices for all release posts:
+**[references/content-guidelines.md](references/content-guidelines.md)** - General best practices for all release posts:
 - Post structure and organization
 - Opening style and tone
 - Section hierarchy and organization
@@ -184,7 +190,7 @@ Load these as needed for detailed guidance:
 
 ### Platform-Specific Formatting
 
-**`references/tidyverse-formatting.md`** - Tidyverse blog requirements:
+**[references/tidyverse-formatting.md](references/tidyverse-formatting.md)** - Tidyverse blog requirements:
 - hugodown frontmatter structure
 - Slug and title conventions
 - Photo attribution
@@ -192,7 +198,7 @@ Load these as needed for detailed guidance:
 - Lifecycle section structure
 - Acknowledgements format
 
-**`references/shiny-formatting.md`** - Shiny blog requirements:
+**[references/shiny-formatting.md](references/shiny-formatting.md)** - Shiny blog requirements:
 - Quarto frontmatter with YAML anchors
 - Social media card configuration
 - Lead paragraphs and callouts
@@ -204,9 +210,9 @@ Load these as needed for detailed guidance:
 ## Resources
 
 - **`scripts/get_contributors.R`**: Fetch formatted contributor list using `usethis::use_tidy_thanks()`
-- **`references/content-guidelines.md`**: General content best practices (platform-agnostic)
-- **`references/tidyverse-formatting.md`**: Tidyverse-specific formatting requirements
-- **`references/shiny-formatting.md`**: Shiny-specific formatting requirements
+- **[references/content-guidelines.md](references/content-guidelines.md)**: General content best practices (platform-agnostic)
+- **[references/tidyverse-formatting.md](references/tidyverse-formatting.md)**: Tidyverse-specific formatting requirements
+- **[references/shiny-formatting.md](references/shiny-formatting.md)**: Shiny-specific formatting requirements
 
 ## Platform-Specific Quick Reference
 

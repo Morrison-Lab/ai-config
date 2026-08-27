@@ -1,6 +1,12 @@
 ---
 name: cli
 description: R command-line interface styling and semantic messaging.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.0"

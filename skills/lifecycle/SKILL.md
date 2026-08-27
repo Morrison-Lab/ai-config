@@ -1,6 +1,12 @@
 ---
 name: lifecycle
 description: Manage R package lifecycle using tidyverse principles.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.1"
@@ -247,4 +253,4 @@ The `what` fragment must work with "was deprecated in..." appended.
 
 ## Reference
 
-See `references/lifecycle-stages.md` for detailed stage definitions and transitions.
+See [references/lifecycle-stages.md](references/lifecycle-stages.md) for detailed stage definitions and transitions.

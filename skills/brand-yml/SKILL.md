@@ -1,6 +1,12 @@
 ---
 name: brand-yml
 description: Create and apply brand.yml files across Shiny and Quarto.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Garrick Aden-Buie (@gadenbuie)
   version: "1.1"
@@ -32,10 +38,10 @@ A single `_brand.yml` file defines:
 Determine the user's goal and follow the appropriate workflow:
 
 1. **Creating a new _brand.yml file?** → Follow "Creating brand.yml Files"
-2. **Using brand.yml in Shiny for R?** → Read `references/shiny-r.md`
-3. **Using brand.yml in Shiny for Python?** → Read `references/shiny-python.md`
-4. **Using brand.yml in Quarto?** → Read `references/quarto.md`
-5. **Using brand.yml in R (general)?** → Read `references/brand-yml-in-r.md` (R Markdown, theming functions, programmatic access)
+2. **Using brand.yml in Shiny for R?** → Read [references/shiny-r.md](references/shiny-r.md)
+3. **Using brand.yml in Shiny for Python?** → Read [references/shiny-python.md](references/shiny-python.md)
+4. **Using brand.yml in Quarto?** → Read [references/quarto.md](references/quarto.md)
+5. **Using brand.yml in R (general)?** → Read [references/brand-yml-in-r.md](references/brand-yml-in-r.md) (R Markdown, theming functions, programmatic access)
 6. **Modifying existing _brand.yml?** → Follow "Modifying Existing Files"
 7. **Troubleshooting integration?** → Follow "Troubleshooting"
 
@@ -53,7 +59,7 @@ Collect brand information:
 
 ### Step 2: Read the Specification
 
-Load `references/brand-yml-spec.md` to understand the complete brand.yml structure, field options, and syntax.
+Load [references/brand-yml-spec.md](references/brand-yml-spec.md) to understand the complete brand.yml structure, field options, and syntax.
 
 ### Step 3: Build the File Incrementally
 
@@ -132,7 +138,7 @@ meta:
 
 ### Step 4: Apply Best Practices
 
-Follow these rules from `references/brand-yml-spec.md`:
+Follow these rules from [references/brand-yml-spec.md](references/brand-yml-spec.md):
 
 - All fields are optional - only include what's needed
 - Use hex color format: `"#0066cc"`
@@ -171,7 +177,7 @@ Common modifications:
 
 When the user wants to apply brand.yml to a Shiny for R app:
 
-1. **Read `references/shiny-r.md`** for complete integration guide
+1. **Read [references/shiny-r.md](references/shiny-r.md)** for complete integration guide
 2. **Key function**: `bs_theme(brand = TRUE)` or `bs_theme(brand = "path")`
 3. **Automatic discovery**: Place `_brand.yml` at app root
 4. **Page functions**: Works with `page_fluid()`, `page_sidebar()`, etc.
@@ -192,7 +198,7 @@ ui <- page_fluid(
 
 When the user wants to apply brand.yml to a Shiny for Python app:
 
-1. **Read `references/shiny-python.md`** for complete integration guide
+1. **Read [references/shiny-python.md](references/shiny-python.md)** for complete integration guide
 2. **Key function**: `ui.Theme.from_brand(__file__)`
 3. **Automatic discovery**: Place `_brand.yml` at app root
 4. **Installation**: Requires `pip install "shiny[theme]"`
@@ -220,7 +226,7 @@ app_ui = ui.page_fluid(
 
 When the user wants to apply brand.yml to Quarto documents:
 
-1. **Read `references/quarto.md`** for complete integration guide
+1. **Read [references/quarto.md](references/quarto.md)** for complete integration guide
 2. **Automatic discovery**: Place `_brand.yml` at project root with `_quarto.yml`
 3. **Supported formats**: HTML, dashboards, RevealJS, Typst PDFs
 4. **Theme layering**: Use `brand` keyword to control precedence
@@ -290,11 +296,11 @@ format:
 
 Load these as needed for detailed information:
 
-- **`references/brand-yml-spec.md`**: Complete brand.yml specification with all sections, fields, examples, and validation rules
-- **`references/shiny-r.md`**: Using brand.yml with Shiny for R via bslib (bs_theme, automatic discovery, Shiny-specific integration)
-- **`references/shiny-python.md`**: Using brand.yml with Shiny for Python via ui.Theme (from_brand(), installation, performance)
-- **`references/quarto.md`**: Using brand.yml with Quarto (formats, light/dark mode, layering, extensions, Typst)
-- **`references/brand-yml-in-r.md`**: General R usage including R Markdown integration, theming functions (ggplot2, gt, flextable, plotly, thematic), and programmatic brand access
+- **[references/brand-yml-spec.md](references/brand-yml-spec.md)**: Complete brand.yml specification with all sections, fields, examples, and validation rules
+- **[references/shiny-r.md](references/shiny-r.md)**: Using brand.yml with Shiny for R via bslib (bs_theme, automatic discovery, Shiny-specific integration)
+- **[references/shiny-python.md](references/shiny-python.md)**: Using brand.yml with Shiny for Python via ui.Theme (from_brand(), installation, performance)
+- **[references/quarto.md](references/quarto.md)**: Using brand.yml with Quarto (formats, light/dark mode, layering, extensions, Typst)
+- **[references/brand-yml-in-r.md](references/brand-yml-in-r.md)**: General R usage including R Markdown integration, theming functions (ggplot2, gt, flextable, plotly, thematic), and programmatic brand access
 
 ## Key Principles
 

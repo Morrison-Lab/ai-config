@@ -1,6 +1,6 @@
 ---
 name: delegate-to-opencode
-description: "Delegate sidecar work to OpenCode (Go subscription, Zen free, local Ollama) or OpenRouter models."
+description: "Delegate sidecar work to OpenCode or OpenRouter models."
 user-invocable: true
 allowed-tools:
   - Bash

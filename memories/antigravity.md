@@ -1,0 +1,78 @@
+# Google Antigravity & `agy` CLI
+
+Claims below about Antigravity's runtime behavior were checked 2026-08-26 unless a claim carries its own date.
+Re-verify against a live install before relying on any of them, since the primary docs were egress-blocked from this session.
+
+## Hook architecture and schema mapping
+
+Antigravity defines lifecycle events in `plugins/<plugin-name>/hooks.json`.
+
+### Command paths must use `${extensionPath}`, never a relative path
+
+A `command` value is resolved against the terminal's active working directory, not against the plugin's own directory --- and Antigravity has a known bug where that cwd can default to `$HOME` regardless of which project is open.
+A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
+Use the plugin-root interpolation token instead: `python3 "${extensionPath}/claude-hook-adapter.py"`.
+`${CLAUDE_PLUGIN_ROOT}` is a **Claude Code** interpolant and has no meaning inside Antigravity's own `hooks.json`.
+Do not use it for `hooks.json`'s own `command` paths (the adapter's *internal* rewrite of catalog-hook commands sourced from Claude's `hooks/hooks.json` is a separate, correct use of `${CLAUDE_PLUGIN_ROOT}`, since those commands are authored for Claude Code).
+<!-- `${extensionPath}` is corroborated by two independent secondary
+sources (search-engine summaries of antigravity.google/docs and a Google
+Cloud community write-up) rather than a directly fetched primary-source
+quote --- the egress proxy blocks antigravity.google and medium.com from this
+environment. Re-verify against a live Antigravity install before treating
+the exact token spelling as certain. -->
+
+### Lifecycle events & payload mapping
+- **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
+  Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
+  - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
+  - The plugin's `PreToolUse` list carries **two** groups rather than one, deliberately: a `"run_command"` group (literal matcher, unchanged since before this split) carrying `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`, and a second group matched on the regex alternation `"invoke_subagent|send_message|define_subagent|mcp__github__.*"` carrying only `claude-hook-adapter.py`.
+    Whether Antigravity treats `matcher` as a regex at all is unverified (2026-08-26), so the split is a de-risking measure: if that assumption is wrong, only the second group's coverage (the newer tool names) fails to fire, and the pre-existing `run_command` merge-control gate --- matched literally, so it does not depend on regex support --- is unaffected.
+  - The second group's `mcp__github__.*` alternative assumes Antigravity names MCP tool calls with Claude Code's `mcp__<server>__<tool>` convention.
+    That is unverified (2026-08-26): the confirmed Antigravity `toolCall.name` values are only `run_command`, `invoke_subagent`, `send_message`, and `define_subagent`, so if the real MCP names differ, the `mcp__github__.*` branch silently never fires --- re-verify against a live install before relying on it as a gate.
+  - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
+  - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
+    A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
+    If any subagent triggers `deny`, the whole tool execution is denied.
+  - `send_message` maps to `SendMessage`.
+  - `define_subagent` maps to `Task`.
+  - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).
+    The adapter forwards it on both the deny and the allow path rather than dropping it.
+- **`Stop`**: Fired on termination attempt (`{"terminationReason": "model_stop", "transcriptPath": "..."}`).
+  - In Antigravity's `hooks.json`, `Stop` handlers are **flat** (a direct list of `{ "type": "command", "command": "..." }` objects without `matcher`/`hooks` wrappers), per Antigravity hook specifications.
+  - To prevent termination (e.g. when unfulfilled obligations or unreviewed commits exist), Antigravity expects `{"decision": "continue", "reason": "..."}`.
+    Any other value (or `{"decision": "allow"}`) allows termination.
+  - `systemMessage` is a **top-level** field accepted on every Claude Code hook event (confirmed in Claude Code's own hooks docs), independent of `decision`.
+    Antigravity's own Stop event is reported to surface it as a warning in the interface, per the same secondary-source synthesis checked 2026-08-26.
+    That surfacing behavior is unconfirmed against a live install, since the primary docs were egress-blocked from this session --- re-verify before relying on it.
+    A warn-only Stop hook (no block/deny decision) still allows the stop, but its message rides along as `{"systemMessage": "..."}` rather than reaching only stderr.
+  - Claude hooks in `hooks/hooks.json` are grouped and output `{"decision": "block", "reason": "..."}`.
+    An adapter must translate `block` to `continue`.
+- **`PreInvocation`**: Fired before the model call.
+  Its documented input fields are `invocationNum`, `initialNumSteps`, `conversationId`, `workspacePaths`, `transcriptPath`, and `artifactDirectoryPath` --- **no prompt text field at all**.
+  A seventh field, `modelName`, is an inference from secondary-source synthesis (checked 2026-08-26), not shown in the example payload those sources reproduce --- treat it as unconfirmed.
+  The adapter's `prompt` extraction (`prompt` / `userPrompt` / `message`, then a `messages` scan for an explicit user/human-authored entry) is therefore a defensive fallback for a payload shape not observed in production, not a mapping of a documented field.
+  Expect `prompt` to be empty on a real Antigravity invocation unless a future payload version adds one.
+  The scan never falls back to an arbitrary last message regardless of role, since that could silently substitute the model's own prior turn for the user's prompt.
+  - In Antigravity's `hooks.json`, `PreInvocation` handlers are also **flat**.
+  - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
+  - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
+    The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50).
+
+### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
+
+A catalog hook that times out or raises inside `subprocess.run` is skipped, and execution proceeds as if that hook had not run.
+This matches Claude Code's own documented behavior for a command-hook PreToolUse timeout: the hook is killed and Claude continues, since command hooks only block via an explicit exit-code-2 (or a JSON deny) response, never via failing to answer.
+Every hook actually shipped in this repo's catalog (`hooks/*.py`) signals a deny via JSON with exit 0, never via exit code 2, so this fail-open path is reached only by a genuine timeout, crash, or missing script --- never by a hook's own deliberate denial being silently discarded.
+
+### Silent failure prevention
+Harness bridge adapters must be gated by isolated unit tests in CI (`validate.yml`, e.g. `scripts/test_agy_hook_adapter.py`).
+Because an incomplete adapter simply returns `{"decision": "allow"}` when it misses an event, adapter gaps fail silently in production unless tested against synthetic payloads.
+
+## `agy` CLI model execution & print mode
+
+- Model names in `agy --model` must match the registered string format, e.g. `agy --model "Claude Sonnet 4.6 (Thinking)" -p "<prompt>"`.
+- Print mode (`-p` / `--print`) runs a single turn.
+  When prompting reasoning/thinking models (such as Claude Thinking models or reasoning Gemini models) non-interactively without tool access, enforce immediate output in the prompt (e.g., "Provide your full review immediately in this response.
+  Do not use tools or acknowledge with a conversational promise.").
+  Otherwise, tool-using models may output an initial conversational acknowledgment expecting a subsequent tool-use turn.

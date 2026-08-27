@@ -143,6 +143,9 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run Antigravity hook adapter tests
+        # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
+        run: python3 scripts/test_agy_hook_adapter.py
       - name: Run hook-runner tests
         # Per-suite timeout and interpreter spawn (ai-config#2098). The
         # runner itself had no test, so a missing timeout would only show

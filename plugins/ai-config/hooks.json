@@ -6,13 +6,34 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ./enforce-mwc-review-gate.py"
+            "command": "python3 \"${extensionPath}/enforce-mwc-review-gate.py\""
           },
           {
             "type": "command",
-            "command": "python3 ./claude-hook-adapter.py"
+            "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
           }
         ]
+      },
+      {
+        "matcher": "invoke_subagent|send_message|define_subagent|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
       }
     ]
   }

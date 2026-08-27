@@ -340,11 +340,15 @@ before filing, and nothing in this session's transcript has listed or
 searched issues with `--state all --search`. A bug that feels obviously
 unfiled is exactly the kind two independent sessions can each hit.
 
-Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode crash had
-four open issues (#1984, #2040, #2048, #2049) before #2086 closed them.
+Measured on Morrison-Lab/ai-config (2026-08): one cp1252 decode crash
+accumulated four concurrently-open issues (#1984, #2040, #2048, #2049)
+before #2086 closed all four together. What that case measures is that no
+search of any kind ran before each filing.
 
 `--state all`, not `--state open`: a bug fixed and closed last week is
-exactly the duplicate an open-state search cannot see.
+exactly the duplicate an open-state search cannot see. The all-state
+requirement guards that separate closed-duplicate risk, which the measured
+case's timeline happens not to exercise.
 
 One query settles it before you spend an issue:
 

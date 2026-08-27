@@ -199,9 +199,20 @@ two_env_push = transcript([
     "git commit -m hook",
     "A=1 B=2 git push origin HEAD",
 ])
+# The discriminating anchor probe: `git push` IS present, preceded by an
+# env-shaped token, but the whole thing sits mid-`echo` -- dropping the
+# segment anchor from PUSH makes this discharge, so the case pins the
+# anchor rather than merely restating the tolerance.
 env_word_not_push = transcript([
     "git commit -m hook",
-    "echo the ALLOW_UNREVIEWED_PUSH=1 form is documented",
+    "echo ALLOW_UNREVIEWED_PUSH=1 git push is the spelling",
+])
+# The anchor rewrite ((?:^|[;&|\n])\s* instead of (?:^|[;&|\n]\s*)) also
+# admits leading whitespace before an unprefixed command -- deliberate, and
+# pinned here so the widening is documented rather than incidental.
+leading_ws_push = transcript([
+    "git commit -m hook",
+    "  git push origin HEAD",
 ])
 
 try:
@@ -224,6 +235,8 @@ try:
         "several env assignments before the push still discharge"
     assert subject.pending_commit(env_word_not_push) is not None, \
         "prose mentioning the env token mid-command is not a push"
+    assert subject.pending_commit(leading_ws_push) is None, \
+        "a leading-whitespace push still discharges (documented widening)"
     assert subject.pending_commit(executed_redirect) is not None, "bash <<EOF > file still executes"
     assert subject.pending_commit(executed_fd_dup) is not None, "2>&1 is not a file write"
     assert subject.pending_commit(indented_decoy) is not None, "an indented decoy is not a terminator"
@@ -268,6 +281,7 @@ finally:
     os.unlink(env_prefixed_commit)
     os.unlink(two_env_push)
     os.unlink(env_word_not_push)
+    os.unlink(leading_ws_push)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")

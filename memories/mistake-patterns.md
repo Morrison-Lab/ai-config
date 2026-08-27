@@ -269,3 +269,11 @@ A clean automated review from every available provider evaluating the current HE
   justification.
   Prefer reusing the instrument's existing vocabulary regex over writing a
   near-copy, so parity holds by construction.
+  Verify each guarding test DISCRIMINATES by neutering the guarded branch
+  (replace the veto or anchor with a never-match, or drop it) and
+  confirming the test flips --- a test that still passes guards nothing,
+  and it usually passes through a different branch than its name claims.
+  (Measured three times on 2026-08-27 alone: #2313's override-drops-token
+  test, three of #2419's veto tests, and #2423's anchor probe each
+  asserted the right outcome for the wrong reason until a neutering
+  control exposed it.)

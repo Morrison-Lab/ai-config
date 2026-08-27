@@ -323,8 +323,10 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     if exclusive:
         return exclusive
     scan = strip_cited_finding_vocab(body or "")
-    first_line = next((ln.strip() for ln in scan.splitlines() if ln.strip()), "")
-    agent = _detect_review_agent(first_line)
+    lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
+    first_line = lines[0] if lines else ""
+    last_line = lines[-1] if lines else ""
+    agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
     if login:

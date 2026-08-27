@@ -162,12 +162,13 @@ Worked-example case records for the rules below live in
    Reporting the regression fixed on that row would have cited an unrelated
    workflow.)
 
-   **Every subsection above explains a check list that is short for a per-PR
+   **Every subsection above explains a check list that is incomplete or
+   misread --- short, empty, or carrying an ambiguous name --- for a per-PR
    reason, and a platform outage produces the same shape for a reason none of
    them can reach.**
 
    **A job's conclusion is set by whichever step failed, which need not be the step whose verdict you read.**
-   Every rule above is about an enumeration that came back short.
+   Every rule above is about an enumeration that came back incomplete or was read wrong.
    This one is the opposite case: the enumeration is complete and terminal, and the answer you read came from the wrong member of it.
    A workflow can carry a guard step that decides what a run *meant* --- a review guard classifying an outcome, a summarizer, a status resolver --- and that step can conclude "this is fine", write its output, and end `success`, while the job is red because an earlier step failed without `continue-on-error`.
    Reading the guard's own log line then reports the opposite of the check.

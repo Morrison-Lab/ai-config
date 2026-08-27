@@ -654,13 +654,19 @@ def strip_cited_finding_vocab(text: str) -> str:
 # 2026-08-27 alone). The lookbehinds enumerate those two compounds rather
 # than exempting every `-blocking` compound, because "merge-blocking" is a
 # real signal and missing a not-clean is the dangerous direction here.
-# Known residual: the lookbehinds see only the literal characters, so an
-# emphasized compound ("previously **blocking**") still reads as the signal
-# -- the char before `blocking` is `*`. Safe direction (over-flag); recorded
-# here so the next #2369-class recurrence is not re-diagnosed from scratch.
+# Only the `non-`/`non ` compounds are exempted: "non-blocking" is how a
+# reviewer marks a nit as NOT blocking (ai-config#2369, measured on #2288).
+# "previously-blocking" is deliberately NOT exempted, although it produced a
+# measured safe-direction false positive too -- "the previously-blocking
+# finding remains open; do not merge" is a real not-clean statement, and a
+# lexical lookbehind cannot tell it from "the previously-blocking error was
+# fixed". Missing a not-clean is the dangerous direction, so the narration
+# form stays an over-flag. Same for emphasis ("non-**blocking**"): the char
+# before `blocking` is `*`, the lookbehind cannot see through it, and the
+# over-flag is the accepted direction.
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
-    r"(?<!non-)(?<!non\s)(?<!previously-)(?<!previously\s)Block(?:ed|ing)?"
+    r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
 
@@ -977,17 +983,18 @@ def classify_verdict(body: str, state: str = "") -> str:
 
 
 # A line that reads as a finding ITEM. Severity/class tags and Location
-# markers are the explicit forms; a bare numbered or bulleted list item
-# vetoes too, because an untagged finding ("1. `foo()` crashes on empty
-# input") is still a finding, and swallowing it is the dangerous direction.
-# The cost is a safe-direction re-flag on reviews whose Findings section
-# numbers its verification bullets before the closing no-findings line.
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
 _SECTION_FINDING_ITEM = re.compile(
     r"(?im)"
     r"^\s*(?:\*\*)?\[?"
-    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
-    r"|^\s*(?:\d+\.|[-*])\s+\S"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^\s*(?:\d+[.)]|[-*+])\s+\S"
     r"|\*\*Location:\*\*"
+    r"|^\s*>\s*\S"
 )
 
 
@@ -1009,17 +1016,22 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    # The resolving vocabulary is NOT_CLEAN_NEGATION_SUFFIX -- the same
-    # reviewed allowlist the per-heading suffix shortcut uses -- applied to
-    # the LAST non-empty line, with a leading bullet marker tolerated so the
-    # common "- None." body still resolves. The item veto then applies only
-    # ABOVE the resolving line: "No blocking issues." below two listed
-    # findings never exempts, while a section whose only content is its
-    # resolution never vetoes itself.
-    last_stripped = re.sub(r"^\s*(?:\d+\.|[-*])\s+", "", lines[-1])
-    if not NOT_CLEAN_NEGATION_SUFFIX.search(last_stripped):
+    # STRICTLY SAFER THAN THE SUFFIX SHORTCUT, BY CONSTRUCTION. The old
+    # 60-char shortcut exempted whenever resolving vocabulary sat directly
+    # under the heading, whatever followed. This keeps that trigger -- the
+    # FIRST non-empty line (leading bullet tolerated, so "- None." still
+    # resolves) must match the same NOT_CLEAN_NEGATION_SUFFIX allowlist --
+    # and ADDS a veto over everything after it, so "No new issues." above a
+    # listed finding no longer exempts. A resolving line reached only after
+    # other content (verification prose, alert blocks, items) never exempts:
+    # prose findings are lexically indistinguishable from verification
+    # prose, and swallowing a finding is the dangerous direction, so that
+    # shape stays a safe-direction re-flag (ai-config#2370's free-prose
+    # remainder).
+    first_stripped = re.sub(r"^\s*(?:\d+[.)]|[-*+])\s+", "", lines[0])
+    if not NOT_CLEAN_NEGATION_SUFFIX.search(first_stripped):
         return False
-    return not _SECTION_FINDING_ITEM.search("\n".join(lines[:-1]))
+    return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 
 
 def _unresolved_finding_pattern(body: str) -> Optional[str]:

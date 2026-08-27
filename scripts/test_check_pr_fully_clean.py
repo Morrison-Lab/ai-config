@@ -1725,24 +1725,29 @@ def main() -> int:
             il_ok and il_issues == [],
         )
 
-    # ai-config#2369: hyphen compounds must not read as the Blocking signal.
+    # ai-config#2369: the non- compound must not read as the Blocking signal.
     check("classify_verdict: 'non-blocking' inside a clean verdict stays clean",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge** (one nit -- non-blocking prose polish).\n", "")
           == "clean")
-    check("classify_verdict: 'previously-blocking ... fixed' stays clean",
-          checker.classify_verdict(
-              "### Verdict\n**Ready for merge.** The previously-blocking error was fixed.\n", "")
-          == "clean")
-    check("classify_verdict: space form 'previously blocking' stays clean too",
-          checker.classify_verdict(
-              "### Verdict\n**Ready for merge.** The previously blocking error was fixed.\n", "")
-          == "clean")
-    check("classify_verdict: 'No blocking or non-blocking findings' stays clean",
-          checker.classify_verdict(
-              "No blocking or non-blocking findings.\n### Verdict\nReady for merge.\n", "")
-          == "clean")
     import re as _re
+    check("_BARE_REJECTION no longer matches inside 'non-blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "one nit -- non-blocking prose polish", _re.I))
+    check("_BARE_REJECTION no longer matches inside 'non blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "a non blocking suggestion", _re.I))
+    # 'previously blocking' is deliberately NOT exempted: the same words
+    # appear in genuinely open statements, and missing a not-clean is the
+    # dangerous direction. Both directions locked:
+    check("classify_verdict: 'previously-blocking finding remains open' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThe previously-blocking finding remains open; do not merge.\n", "")
+          == "not-clean")
+    check("classify_verdict: 'previously blocking crash NOT fixed' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
+          == "not-clean")
     check("_BARE_REJECTION still matches a bare 'merge-blocking' compound",
           bool(_re.search(checker._BARE_REJECTION, "Two merge-blocking issues remain.", _re.I)))
     check("_BARE_REJECTION still matches plain 'Blocking:'",
@@ -1751,11 +1756,33 @@ def main() -> int:
     # ai-config#2370: a findings section that resolves to a whole-line
     # no-findings statement is not an open finding, even when verification
     # prose precedes the closing line.
-    check("findings section closing 'No actionable findings identified.' is not a finding",
+    # A resolving line reached only AFTER other content never exempts:
+    # prose findings are lexically indistinguishable from verification
+    # prose, so this shape is a deliberate safe-direction re-flag.
+    check("verification prose before the closing line stays a (safe-direction) flag",
           checker._unresolved_finding_pattern(
               "### Findings\n\nVerification performed: traced all call sites.\n\n"
               "No actionable findings identified.\n\n### Verdict: Ready for merge\n")
+          is not None)
+    check("an untagged PROSE finding above a resolving line stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n`foo()` returns None on empty input, crashing "
+              "the caller.\n\nNo other findings.\n")
+          is not None)
+    check("a resolving first line with a trailing summary sentence resolves empty",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone.\n\nThe change is well-scoped and the "
+              "tests pass.\n")
           is None)
+    check("+ bullet and 1) numbered items veto the exemption",
+          all(checker._unresolved_finding_pattern(
+                  f"### Findings\n\nNo new issues.\n\n{m} `foo()` crashes.\n")
+              is not None for m in ("+", "1)")))
+    check("a **Non-blocking:** tagged line vetoes the exemption",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n**Non-blocking:** naming "
+              "could be tidier.\n")
+          is not None)
     # Veto tests. The first three bodies carry NOTHING that any other
     # pattern matches, so each stays flagged only through the section logic
     # itself -- neutering _SECTION_FINDING_ITEM flips the tagged and
@@ -1765,6 +1792,11 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings\n\n1. **[Convention]** scripts/x.py:1 is oddly "
               "wrapped.\n\nNo actionable findings identified.\n")
+          is not None)
+    check("a resolving first line with a tagged item after it stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone identified so far.\n\n"
+              "1. **[Defect]** scripts/x.py:1 broken.\n")
           is not None)
     check("UNTAGGED numbered item above a resolving last line stays a finding",
           checker._unresolved_finding_pattern(

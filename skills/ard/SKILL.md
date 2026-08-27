@@ -173,8 +173,20 @@ Three attempts were built and deleted on ai-config#2409 -- a driver-ledger class
 Each dropped or blanked a genuine reviewer's not-clean, because a reviewer rejecting a claimed fix writes the same sentence a driver does ("Addressed in `abc1234` (still Needs more work)").
 The disambiguation has to come from the author, and a code span is how this corpus already spells it.
 
-- **Do:** wrap a quoted verdict phrase in backticks wherever it appears in a disposition comment.
+**The opening line is the commonest instance, not the only one.**
+The same wire is tripped by a verdict phrase left bare anywhere in the comment --- a table cell summarizing what the reviewer said, or a paraphrase inside a Rebuttal expansion:
+
+```
+| 1 | Reviewer said `Needs more work` on the null check | Address | Fixed in `8af4edc9` |
+```
+
+Verified by execution: without those backticks, that row alone classifies the whole comment not-clean, exactly as the header line does.
+So sweep the finished comment for the phrase rather than backticking only the line the example shows.
+
+- **Do:** wrap a quoted verdict phrase in backticks wherever it appears in a disposition comment --- the opening line, a table cell, and a Rebuttal paraphrase alike.
+- **Do:** re-read the finished comment for any remaining bare verdict phrase before posting it.
 - **Don't:** leave a bare `(Needs more work)` next to a cited SHA -- that is the exact shape that freezes the PR.
+- **Don't:** backtick the opening line and stop, on the strength of the worked example above.
 
 ### 4b. Reply to every inline review thread — and resolve where appropriate
 

@@ -387,26 +387,61 @@ _DRIVER_LEDGER_MARKERS = re.compile(
     r"|^\|[^\n]*\bDisposition\b[^\n]*\|\s*$"
 )
 
+# The agent-disclosure marker every agent-posted forge comment carries
+# (CLAUDE.md, "Every comment you post to a forge says an agent posted it").
+# Kept byte-identical to hooks/require-agent-disclosure.py's MARKER_RE, which
+# is the canonical definition; test_disclosure_marker_parity locks the two
+# together so a change there cannot silently widen or narrow this one.
+_DISCLOSURE_MARKER_RE = re.compile(
+    r"posted by .{0,40}\(ai agent\)[^\n]{0,12}not written by a human",
+    re.IGNORECASE)
+
 
 def _is_driver_ledger(body: str) -> bool:
     """True when *body* is a driving session's claim or disposition ledger.
 
-    Fail-safe direction: mis-skipping a REAL review would swallow a
-    not-clean, so anything carrying a review's own structure is never
-    classified as a ledger, whatever else it contains -- a Verdict heading,
-    a plain `Verdict:` label line (parse_report's contract makes the
-    heading optional), a Reviewed-Commit fingerprint, a completed-review
-    marker, or the structured-report shape. The ledger markers are matched
-    over the cited-vocab-STRIPPED body, so a review merely QUOTING the
-    claim invariants in backticks or a fence stays a review (#1202's
-    convention, same as classify_verdict).
+    Classification is gated on a POSITIVE driver signature -- the
+    agent-disclosure marker -- before any ledger marker is consulted, and
+    that ordering is the whole safety argument. The ledger markers are bare
+    English (`hold off`, a `Disposition` table row) that ordinary review
+    prose reaches: a Copilot report saying "hold off on merging until the
+    null check is added" carries a real finding and matches every one of
+    them. Guarding that by NEGATION alone cannot work, because every
+    negative guard below keys on Claude's and Cursor's own report format,
+    which a Copilot, Codex, or human reviewer simply does not emit -- so the
+    guards abstain exactly where the marker over-matches, and a genuine
+    not-clean is swallowed into a FULLY CLEAN report. The disclosure marker
+    inverts that: agent-posted driver comments always carry it (CLAUDE.md
+    mandates it on every claim, release, status, and disposition comment),
+    and no reviewer report does. A body without it is never a ledger,
+    whatever else it says.
+
+    The gate errs toward admitting: a driver comment predating the
+    disclosure convention, or one posted without the marker, stays admitted
+    and can still freeze the scan the way #2409 describes. That is the
+    recoverable direction -- a false not-clean is visible and one comment
+    away from being cleared, while a false clean authorizes a merge.
+
+    Fail-safe direction, secondarily: anything carrying a review's own
+    structure is never classified as a ledger, whatever else it contains --
+    a Verdict heading, a plain `Verdict:` label line (parse_report's
+    contract makes the heading optional), a Reviewed-Commit fingerprint, or
+    a completed-review marker. The ledger markers are matched over the
+    cited-vocab-STRIPPED body, so a review merely QUOTING the claim
+    invariants in backticks or a fence stays a review (#1202's convention,
+    same as classify_verdict).
     """
     # Every guard and the marker match run over the SAME cited-vocab
     # stripped text: a real review's own heading and fingerprint are
     # unfenced and survive the strip, while a ledger QUOTING a report
     # inside a fence loses the quoted structure and stays a ledger --
     # the same one-dialect rule parse_report applies to its own searches.
+    # The disclosure marker is read from the same stripped text for the same
+    # reason: a review QUOTING the marker in a fence has not disclosed
+    # anything, and must not inherit a driver's exemption by citing one.
     scan = strip_cited_finding_vocab(body)
+    if not _DISCLOSURE_MARKER_RE.search(scan):
+        return False
     # One unified verdict-line guard instead of separate heading and label
     # forms: a line opening with any mix of heading/emphasis glyphs and the
     # word Verdict -- `### Verdict`, `Verdict:`, `**Verdict**`,
@@ -416,14 +451,22 @@ def _is_driver_ledger(body: str) -> bool:
     # from matching; `\b` alone cannot, because `_` is a word character,
     # which is how the balanced-underscore heading slipped an earlier
     # asterisk-only guard.
-    if re.search(r"(?im)^[\s#*_]{0,8}Verdict[*_]{0,3}(?=\s*:|\s|$)", scan):
+    #
+    # `>` sits in both leading classes so a blockquoted verdict or
+    # fingerprint still fires the guard. GitHub's own Reply control prefixes
+    # every quoted line with `> `, so that shape arrives unprompted. Firing
+    # on it keeps the item ADMITTED, which is the conservative outcome even
+    # when the quoting body really is a driver's.
+    if re.search(r"(?im)^[\s#*_>]{0,8}Verdict[*_]{0,3}(?=\s*:|\s|$)", scan):
         return False
-    if re.search(r"(?im)^[*_]{0,3}Reviewed[- ]Commit[*_]{0,3}\s*:", scan):
+    if re.search(r"(?im)^[>\s]{0,4}[*_]{0,3}Reviewed[- ]Commit[*_]{0,3}\s*:", scan):
         return False
     if "claude finished" in scan.lower():
         return False
-    if _is_structured_review_body(body):
-        return False
+    # No _is_structured_review_body guard here: its own fingerprint regex
+    # (`^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:`) is a strict subset of the
+    # fingerprint guard directly above, so it could never be reached with a
+    # True value. It was dead code, and no test failed when it was neutered.
     return bool(_DRIVER_LEDGER_MARKERS.search(scan))
 
 

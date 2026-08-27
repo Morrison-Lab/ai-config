@@ -1974,6 +1974,16 @@ def main() -> int:
         )
 
     # --- ai-config#2409: a driving session's ledger is not a verdict. ----
+    # Every ledger fixture below carries the agent-disclosure marker, because
+    # every real one does: both measured #2341 driver comments end with it
+    # (5430672892 and 5430978306), and CLAUDE.md mandates it on every
+    # agent-posted forge comment. Omitting it made these fixtures imitate an
+    # artifact that does not exist, and let the per-guard tests below pass
+    # through the marker gate instead of through the guard each was named
+    # for (shared/workflow/fixtures-are-not-evidence.md).
+    DISCLOSURE = (
+        "\n_Posted by Cursor Grok 4.6 (AI agent) --- not written by a human._\n"
+    )
     driver_ledger = {
         "createdAt": "2026-08-26T20:52:56Z",
         "author": {"login": "cursor"},
@@ -1982,7 +1992,7 @@ def main() -> int:
             "Pushed `8af4edc9`.\n\n"
             "| # | Tag | Disposition |\n|---|---|---|\n"
             "| 1 conflated | **Address** | Recreate rule is MERGED only. |\n\n"
-            "Do not merge. Blocked on review of `8af4edc9`.\n"
+            "Do not merge. Blocked on review of `8af4edc9`.\n" + DISCLOSURE
         ),
     }
     later_bot_clean = {
@@ -2083,6 +2093,7 @@ def main() -> int:
         "body": (
             "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
             "### Verdict\n**Needs more work** -- see items above.\n"
+            + DISCLOSURE
         ),
     }
     # (b) fingerprint guard sole protector: bold label line would be caught
@@ -2093,36 +2104,46 @@ def main() -> int:
         "author": {"login": "cursor"},
         "body": (
             "Please hold off on merging; item 1 is open.\n\n"
-            "Reviewed-Commit: sha123\n"
+            "Reviewed-Commit: sha123\n" + DISCLOSURE
         ),
     }
     # (c) label-line guard sole protector: plain `Verdict:` label + marker,
     # no heading, no fingerprint.
     label_only_review = {
-        "body": "Verdict: Needs more work\n\nPlease hold off on merging.\n",
+        "body": "Verdict: Needs more work\n\nPlease hold off on merging.\n"
+                + DISCLOSURE,
     }
     # (d) claude-finished guard sole protector: marker phrase + hold-off,
     # nothing else review-shaped (a truncated/stub review).
     stub_only_review = {
-        "body": "**Claude finished review**\n\nPlease hold off on merging.\n",
+        "body": "**Claude finished review**\n\nPlease hold off on merging.\n"
+                + DISCLOSURE,
     }
-    # (e) underscore-emphasis forms of the label and fingerprint guards.
+    # (e) underscore-emphasis forms of the label and fingerprint guards, and
+    # (f) the blockquoted forms GitHub's own Reply control produces.
     for body, name in ((label_only_review["body"], "label-line"),
                        (stub_only_review["body"], "claude-finished"),
-                       ("__Verdict__: Needs more work\n\nPlease hold off on merging.\n",
+                       ("__Verdict__: Needs more work\n\nPlease hold off on merging.\n"
+                        + DISCLOSURE,
                         "underscore label"),
                        ("Please hold off on merging; item 1 open.\n\n"
-                        "__Reviewed-Commit__: sha123\n",
+                        "__Reviewed-Commit__: sha123\n" + DISCLOSURE,
                         "underscore fingerprint"),
                        ("## __Verdict__\nNeeds more work\n\n"
-                        "Please hold off on merging.\n",
+                        "Please hold off on merging.\n" + DISCLOSURE,
                         "underscore-emphasized heading"),
                        ("**Verdict**\nNeeds more work\n\n"
-                        "Please hold off on merging.\n",
+                        "Please hold off on merging.\n" + DISCLOSURE,
                         "bare emphasized verdict line"),
                        ("***Verdict***: Needs more work\n\n"
-                        "Please hold off on merging.\n",
-                        "triple-emphasis label")):
+                        "Please hold off on merging.\n" + DISCLOSURE,
+                        "triple-emphasis label"),
+                       ("> Please hold off on merging.\n> ### Verdict\n"
+                        "> Needs more work\n" + DISCLOSURE,
+                        "blockquoted verdict heading"),
+                       ("> Please hold off on merging.\n"
+                        "> Reviewed-Commit: sha123\n" + DISCLOSURE,
+                        "blockquoted fingerprint")):
         check(f"the {name} guard alone keeps a marker-carrying review "
               "out of the ledger class",
               not checker._is_driver_ledger(body))
@@ -2130,7 +2151,63 @@ def main() -> int:
           checker._is_driver_ledger(
               "Verdicts were mixed last round. Addressed all.\n\n"
               "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
-              "Do not merge.\n"))
+              "Do not merge.\n" + DISCLOSURE))
+
+    # The disclosure-marker gate is the sole protector here: a Copilot
+    # report saying "hold off" carries a real finding and NO agent-disclosure
+    # marker, and emits none of Claude's report structure -- so every
+    # negative guard abstains and only the marker gate keeps it admitted.
+    # Neutering that gate alone reports this PR FULLY CLEAN over an open
+    # finding, which is the failure this fixture exists to catch.
+    copilot_holdoff_review = (
+        "Needs more work. This PR should hold off on merging until the null "
+        "check is added.\n\n"
+        "- `foo.py:12`: possible NoneType dereference if `x` is unset.\n"
+    )
+    check("a markerless Copilot review saying 'hold off' is never a ledger",
+          not checker._is_driver_ledger(copilot_holdoff_review))
+    check("nor is a markerless review carrying a Disposition table row",
+          not checker._is_driver_ledger(
+              "Needs more work.\n\n| # | Disposition |\n|---|---|\n"
+              "| 1 | the ard skill's own column |\n"))
+    mock_copilot = json.dumps({
+        "comments": [
+            {"createdAt": "2026-08-26T20:30:00Z",
+             "author": {"login": "copilot-pull-request-reviewer[bot]"},
+             "body": copilot_holdoff_review},
+            later_bot_clean,
+        ],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_copilot):
+        cp_ok, cp_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a Copilot not-clean containing 'hold off' still vetoes (#2409 "
+            "fail-open regression)",
+            (not cp_ok) and any("NOT clean" in i for i in cp_issues),
+        )
+
+    # A review QUOTING the disclosure marker inside a fence has disclosed
+    # nothing, so it must not inherit a driver's exemption by citing one.
+    check("a review quoting the disclosure marker in a fence is not a ledger",
+          not checker._is_driver_ledger(
+              "### Findings\n1. Every comment must end with\n"
+              "```\n_Posted by Claude Code (AI agent) --- not written by a "
+              "human._\n```\nand this one does not. Please hold off.\n"))
+
+    # The marker regex is duplicated from hooks/require-agent-disclosure.py
+    # rather than imported (the checker runs in CI and must not depend on a
+    # hook module). This locks the copy to the canonical definition.
+    _hook_src = (Path(__file__).resolve().parent.parent
+                 / "hooks" / "require-agent-disclosure.py")
+    _hook_spec = importlib.util.spec_from_file_location(
+        "require_agent_disclosure", _hook_src)
+    _hook_mod = importlib.util.module_from_spec(_hook_spec)
+    _hook_spec.loader.exec_module(_hook_mod)
+    check("the checker's disclosure-marker regex matches the canonical one "
+          "in hooks/require-agent-disclosure.py",
+          checker._DISCLOSURE_MARKER_RE.pattern == _hook_mod.MARKER_RE.pattern
+          and checker._DISCLOSURE_MARKER_RE.flags == _hook_mod.MARKER_RE.flags)
 
     for fixture, name in ((heading_only_review, "heading"),
                           (fingerprint_only_review, "fingerprint")):

@@ -1,6 +1,12 @@
 ---
 name: r-package-development
 description: R package dev with devtools, testthat, and roxygen2.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Edit
+  - Write
+  - Bash
 metadata:
   author: Simon P. Couch (@simonpcouch)
   version: "1.2"
@@ -89,7 +95,8 @@ This skill is a day-to-day dev-loop reference (load, test, document, format) wit
 It does not replace, and does not cover:
 
 - [`r-pkg-check`](../r-pkg-check/SKILL.md) --- running and triaging `devtools::check()` output.
-- [`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) --- the CRAN submission checklist (Title case, `@return` tags, `urlchecker`, win-builder, revdeps).
+- [`r-pkg-cran-checklist`](../r-pkg-cran-checklist/SKILL.md) --- the CRAN release mechanics (win-builder, revdep checks, `devtools::release()`).
+- [`cran-extrachecks`](../cran-extrachecks/SKILL.md) --- the ad-hoc/stylistic CRAN checklist (Title case, `@return` tags, URL hygiene) that `devtools::check()` doesn't catch on its own.
 - [`r-pkg-news`](../r-pkg-news/SKILL.md) --- matching a package's existing `NEWS.md` style, which overrides this skill's own default above.
 - [`testing-r-packages`](../testing-r-packages/SKILL.md) --- the full testthat API (fixtures, mocking, snapshots, BDD-style tests).
   Match the package's existing `expect_error()`/`expect_warning()` or snapshot-testing style where precedent exists.

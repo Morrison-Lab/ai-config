@@ -48,6 +48,19 @@ The condition is decidable, which is what makes this a guard rather than a
 reminder: a PR's base branch is a queryable field, so "does any open PR use
 this branch as its base" has an exact answer before the merge runs.
 
+## Matching one command, not the whole string
+
+The first draft scanned the raw `command` string, and a review found it firing
+on the most routine chain in this corpus --- `post-merge`'s own cleanup:
+
+    gh pr merge 749 -R o/r --squash && git checkout main && git branch -d b
+
+There is no `--delete-branch` there. The `-d` belongs to `git branch -d`, and
+a whole-string scan cannot tell whose flag it is, so the guard warned on the
+one sequence it should never touch. Six sibling `PreToolUse` hooks already
+split with `shlex` for exactly this reason; this one now does too, and reads
+flags off the `gh pr merge` argv alone.
+
 ## What it does
 
 Warns, never blocks. Deleting a branch is recoverable while a copy survives,
@@ -59,17 +72,95 @@ Exit 0 always. Anything unexpected (no `gh`, no network, unparsable command)
 stays silent rather than guessing.
 """
 import json
-import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 
-# `gh pr merge <n>` with --delete-branch (or -d) somewhere in the same command.
-MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b")
-DELETE_RE = re.compile(r"(?:^|\s)(?:--delete-branch|-d)(?:\s|$|=)")
-PR_NUM_RE = re.compile(r"\bgh\s+pr\s+merge\s+(?:[^\s]+\s+)*?(\d+)\b")
-REPO_RE = re.compile(r"(?:-R|--repo)[=\s]+([^\s'\"]+/[^\s'\"]+)")
+# Segmentation borrowed verbatim in construction from `no-clobbering-push.py`
+# and `flag-reset-hard-uncommitted-work.py`. Matching the raw command string
+# is what the first draft did, and it produced a false positive on the most
+# routine sequence there is -- this repo's own `post-merge` cleanup:
+#
+#     gh pr merge 749 -R o/r --squash && git checkout main && git branch -d b
+#
+# There is no `--delete-branch` there at all. The `-d` belongs to the
+# unrelated `git branch -d`, and a whole-string scan cannot tell the two
+# apart, so the guard fired on the one chain it should never fire on.
+RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec"}
+_SHELL_OPS = set("();|&")
+
+DELETE_FLAGS = {"--delete-branch", "-d"}
+
+
+def _simple_commands(cmd):
+    """Split a shell command into simple-command argv lists; None on error."""
+    cmd = re.sub(r"\\\r?\n", " ", cmd)
+    cmd = RX_HEREDOC.sub("<<", cmd)
+    cmd = cmd.replace("\n", ";")
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None
+    cmds, cur = [], []
+    for t in toks:
+        if t and set(t) <= _SHELL_OPS:
+            if cur:
+                cmds.append(cur)
+                cur = []
+        else:
+            cur.append(t)
+    if cur:
+        cmds.append(cur)
+    return cmds
+
+
+def _gh_pr_merge_argv(argv):
+    """The argv of a `gh pr merge`, or None. Skips env assignments and the
+    usual leading words, so `ALLOW_MERGE=1 gh pr merge ...` still matches."""
+    i = 0
+    while i < len(argv) and (ASSIGNMENT.match(argv[i]) or argv[i] in LEAD_WORDS):
+        i += 1
+    rest = argv[i:]
+    if len(rest) >= 3 and rest[0] == "gh" and rest[1] == "pr" and rest[2] == "merge":
+        return rest
+    return None
+
+
+def _parse_merge(argv):
+    """(pr_number, repo, deletes_branch) from one `gh pr merge` argv.
+
+    `pr_number` is None when the target is a URL or a branch name rather than
+    a number -- the guard stays silent there rather than guessing, since the
+    query needs a number.
+    """
+    deletes = False
+    repo = None
+    number = None
+    i = 3
+    while i < len(argv):
+        tok = argv[i]
+        if tok in DELETE_FLAGS or tok.startswith("--delete-branch="):
+            if not tok.startswith("--delete-branch=") or \
+                    tok.split("=", 1)[1].strip().lower() not in ("false", "0"):
+                deletes = True
+        elif tok in ("-R", "--repo"):
+            i += 1
+            if i < len(argv):
+                repo = argv[i]
+        elif tok.startswith("--repo="):
+            repo = tok.split("=", 1)[1]
+        elif tok.startswith("-R="):
+            repo = tok.split("=", 1)[1]
+        elif not tok.startswith("-") and number is None and tok.isdigit():
+            number = tok
+        i += 1
+    return number, repo, deletes
 
 
 def find_child_prs(repo, branch):
@@ -115,18 +206,23 @@ def main():
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
 
-    if not MERGE_RE.search(command) or not DELETE_RE.search(command):
+    argvs = _simple_commands(command)
+    if not argvs:
         return 0
 
-    # A repo is required by a sibling guard, so it is normally present. Without
-    # it the query target is ambiguous and the check stays silent.
-    repo_match = REPO_RE.search(command)
-    num_match = PR_NUM_RE.search(command)
-    if not repo_match or not num_match:
+    # Only the `gh pr merge` segments matter. A `git branch -d` elsewhere in
+    # the same chain is somebody else's `-d`.
+    number = repo = None
+    for argv in argvs:
+        merge_argv = _gh_pr_merge_argv(argv)
+        if merge_argv is None:
+            continue
+        n, r, deletes = _parse_merge(merge_argv)
+        if deletes and n and r:
+            number, repo = n, r
+            break
+    if not number or not repo:
         return 0
-
-    repo = repo_match.group(1)
-    number = num_match.group(1)
 
     if not shutil.which("gh"):
         return 0

@@ -79,6 +79,11 @@ SHOULD_WARN = [
      "--repo long form"),
     ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "two-children",
      "several stacked children"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch && "
+     "git checkout main", "child",
+     "the real flag still warns when the command is chained"),
+    ("gh pr merge 749 --repo=ucdavis/bcs --squash --delete-branch", "child",
+     "--repo=owner/name with an equals sign"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -96,6 +101,22 @@ SHOULD_STAY_SILENT = [
      "no PR number to resolve"),
     ("gh pr merge 749 --squash --delete-branch", "child",
      "no -R, so the repo is ambiguous"),
+    # The review finding: a chained post-merge cleanup carries `git branch -d`,
+    # whose `-d` a whole-string scan cannot distinguish from `gh pr merge -d`.
+    # This is the repo's own post-merge sequence, so a guard that fires here
+    # fires on the commonest chain there is.
+    ("gh pr merge 749 -R ucdavis/bcs --squash && git checkout main && "
+     "git branch -d some-branch", "child",
+     "chained `git branch -d` is not this merge's delete flag"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash; git branch -d other", "child",
+     "same, separated by a semicolon"),
+    ("git branch -d some-branch && gh pr merge 749 -R ucdavis/bcs --squash",
+     "child", "same, with the cleanup first"),
+    ("gh pr merge https://github.com/ucdavis/bcs/pull/749 -R ucdavis/bcs "
+     "--squash --delete-branch", "child",
+     "a URL target yields no number to query with"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch=false", "child",
+     "an explicitly disabled delete flag"),
 ]
 
 

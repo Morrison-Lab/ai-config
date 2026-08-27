@@ -2073,6 +2073,64 @@ def main() -> int:
             (not qr_ok) and any("NOT clean" in i for i in qr_issues),
         )
 
+    # Per-guard discriminating fixtures: each is protected by exactly ONE
+    # refusal guard, so deleting that guard alone fails its test.
+    # (a) heading guard sole protector: heading + marker, no fingerprint,
+    # no label line, no structure (structure needs the fingerprint).
+    heading_only_review = {
+        "createdAt": "2026-08-26T20:47:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
+            "### Verdict\n**Needs more work** -- see items above.\n"
+        ),
+    }
+    # (b) fingerprint guard sole protector: bold label line would be caught
+    # by the label guard, so use marker + fingerprint ONLY (no verdict
+    # heading or label): stays admitted purely on the fingerprint.
+    fingerprint_only_review = {
+        "createdAt": "2026-08-26T20:48:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "Please hold off on merging; item 1 is open.\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    for fixture, name in ((heading_only_review, "heading"),
+                          (fingerprint_only_review, "fingerprint")):
+        check(f"the {name} guard alone keeps a marker-carrying review "
+              "out of the ledger class",
+              not checker._is_driver_ledger(fixture["body"]))
+
+    # A driver ledger delivered through the FORMAL-REVIEW surface
+    # (state COMMENTED) is skipped like its issue-comment twin; a formal
+    # CHANGES_REQUESTED still vetoes on state alone.
+    ledger_as_formal_review = {
+        "state": "COMMENTED",
+        "submittedAt": "2026-08-26T20:52:56Z",
+        "author": {"login": "cursor"},
+        "commit": {"oid": "sha123"},
+        "body": driver_ledger["body"],
+    }
+    mock_formal = json.dumps({"comments": [later_bot_clean],
+                              "reviews": [ledger_as_formal_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_formal):
+        fl_ok, fl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a driver ledger posted as a COMMENTED formal review is skipped "
+            "(#2409 formal twin)",
+            fl_ok and fl_issues == [],
+        )
+    cr_formal = dict(ledger_as_formal_review, state="CHANGES_REQUESTED")
+    mock_cr = json.dumps({"comments": [later_bot_clean],
+                          "reviews": [cr_formal]})
+    with patch.object(checker, "run_cmd", return_value=mock_cr):
+        cr_ok, cr_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a CHANGES_REQUESTED formal review still vetoes whatever its body",
+            not cr_ok,
+        )
+
     # A casual human comment saying Ready for merge, with no report
     # structure, is still not admitted at all (#1798's guard).
     human_casual = {

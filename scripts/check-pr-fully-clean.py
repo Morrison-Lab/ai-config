@@ -401,16 +401,22 @@ def _is_driver_ledger(body: str) -> bool:
     claim invariants in backticks or a fence stays a review (#1202's
     convention, same as classify_verdict).
     """
-    if re.search(r"(?im)^#{0,6}\s*Verdict\s*:", body) or \
-            re.search(r"(?im)^#{1,6}\s*Verdict\b", body):
+    # Every guard and the marker match run over the SAME cited-vocab
+    # stripped text: a real review's own heading and fingerprint are
+    # unfenced and survive the strip, while a ledger QUOTING a report
+    # inside a fence loses the quoted structure and stays a ledger --
+    # the same one-dialect rule parse_report applies to its own searches.
+    scan = strip_cited_finding_vocab(body)
+    if re.search(r"(?im)^\*{0,2}#{0,6}\s*\*{0,2}Verdict\*{0,2}\s*:", scan) or \
+            re.search(r"(?im)^\*{0,2}#{1,6}\s*\*{0,2}Verdict\b", scan):
         return False
-    if re.search(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}\s*:", body):
+    if re.search(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}\s*:", scan):
         return False
-    if "claude finished" in body.lower():
+    if "claude finished" in scan.lower():
         return False
     if _is_structured_review_body(body):
         return False
-    return bool(_DRIVER_LEDGER_MARKERS.search(strip_cited_finding_vocab(body)))
+    return bool(_DRIVER_LEDGER_MARKERS.search(scan))
 
 
 def is_non_review_notice(body: str) -> bool:

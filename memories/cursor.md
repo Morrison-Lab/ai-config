@@ -142,6 +142,12 @@ cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
 That transcript is the admissible source for `parse_report()`
 and the HEAD fingerprint check.
+`scripts/cursor-self-review-check.py` is the interim instrument for
+both halves --- `verdict --transcript <file> --expect-head <sha>` runs
+`parse_report()` and the fingerprint comparison, and
+`gates --recorded-head <sha> --recorded-branch <name> -C <checkout>`
+runs the git-decidable refusal gates below --- so neither is re-derived
+by hand (ai-config#2299, #2310; retired when #2241 restores the hook).
 The dry-run tip check and the source-ref check take no input
 from the transcript:
 they come from the same-argv

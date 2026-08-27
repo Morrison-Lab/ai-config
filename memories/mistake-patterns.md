@@ -221,13 +221,15 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
   The user had to manually ask "why is 2295 still in draft mode".
   (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
-- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft... Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
+- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft...
+  Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
 - **Fix**: Right after a final push to a PR that completes its implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
   Do this before dispatching review workflows or yielding to the user.
 
 ## Pattern 14: Pausing Without Setting a Timer
 - **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.
-  Pattern 5g above is the PR-monitoring special case of this; this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
+  Pattern 5g above is the PR-monitoring special case of this;
+  this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
 - **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
 - **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.

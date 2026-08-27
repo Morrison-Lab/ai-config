@@ -130,15 +130,22 @@ sits unread.
    Re-applying fixes that are already in the tree wastes a round and muddies the diff.
    If *nothing* remains outstanding (every finding is already applied), don't push an empty commit --- skip to step 6 and re-request the review directly.
 
-    **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), self-review immediately -- don't stall the PR waiting on it.
-    In the same round, also check whether a **different** configured external reviewer is available (e.g. Copilot code review, if the repo/org has it) and request it in parallel with posting the self-review, not after -- the two reviewers can fail independently, and self-review is a fallback for when *no* working external reviewer is reachable, never a substitute once one is.
-    **Dispatch the self-review; don't perform it.**
-    Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
-    The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-    Its brief covers what an inline pass would have done --- the current PR diff against its base, each changed call path and edge case, the focused tests and the relevant lint/documentation checks --- and you Address, Rebut, or Defer every finding it returns.
-    Note the skip in your ARD summary comment.
-    **Re-check reviewer availability every round, not just once** -- a reviewer that was unavailable a few pushes ago can become available mid-session.
-    A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires an external verdict at the current head whenever one is reachable, not just a self-review.
+   **Execute the sequential multi-provider review loop** defined in `shared/workflow/adversarial-self-review.md`.
+   You must pin all available providers (including external reviewers and the local `adversarial-reviewer` subagent).
+   You must query them sequentially, one at a time.
+   Do not request them in parallel.
+   **When the loop reaches the local self-review step, don't perform it.**
+   Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
+   The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+   Its brief covers what an inline pass would have done.
+   This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
+   You must Address, Rebut, or Defer every finding it returns.
+   If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
+   **Re-check reviewer availability every round, not just once:**
+   A reviewer that was unavailable a few pushes ago can become available mid-session.
+   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved.
+   See [*The bar: "fully clean"*](#the-bar-fully-clean).
+   It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
    "minor", "nit", "optional", "consider", "if you want" are for the user's
@@ -338,12 +345,12 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.
 - [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
-- [ ] That review is a genuine posted verdict at the current head from an external reviewer, if one is reachable -- re-checked right before declaring clean, not just assumed from an earlier round's self-review.
+- [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 - [ ] Every inline review thread is resolved.
 - [ ] The only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply --- normally a top-level PR comment, not an inline thread).

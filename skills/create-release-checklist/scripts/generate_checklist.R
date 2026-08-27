@@ -40,12 +40,14 @@ url <- if (length(args) >= 2) args[2] else NULL
 # deprecation warning, so fail with a concrete fallback rather than a raw
 # error.
 fallback_message <- paste(
-  "Error: usethis's internal checklist API is unavailable or has changed",
-  "(this script calls unexported usethis:::cran_version() and",
-  "usethis:::release_checklist(), which carry no compatibility guarantee).",
-  "Fall back to running usethis::use_release_issue() directly --- it",
-  "creates the release issue itself, without this skill's interactive",
-  "customization step.",
+  "Error: could not generate the checklist. This may be an ordinary",
+  "failure (not run from inside a package directory, no network access,",
+  "not a git repository) or it may mean usethis's internal checklist API",
+  "has changed --- this script calls unexported usethis:::cran_version()",
+  "and usethis:::release_checklist(), which carry no compatibility",
+  "guarantee. Fall back to running usethis::use_release_issue() directly",
+  "--- it creates the release issue itself, without this skill's",
+  "interactive customization step.",
   sep = "\n"
 )
 

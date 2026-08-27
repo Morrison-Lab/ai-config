@@ -213,4 +213,4 @@ This was a critical misunderstanding of the security invariant:
 
 **Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
 Do not attempt to "fix" the script to admit fallback reviews for merging.
-A clean automated Claude review evaluating the current HEAD commit is strictly required for an autonomous merge.
+A clean automated review from every available provider evaluating the current HEAD commit is strictly required for an autonomous merge.

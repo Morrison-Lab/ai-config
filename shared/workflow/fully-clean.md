@@ -208,19 +208,17 @@ Two failure modes make the preference concrete, and both have recurred:
   Not a difference of opinion about a nit --- a checkable factual error, at the
   same commit, that the clean verdict passed over.
 
-So when Claude is reachable, its verdict is the one to report on:
+So when the pinned quorum is reachable, their verdicts are the ones to report on:
 
-- **Do:** dispatch a Claude review and wait for its verdict before reporting a
-  PR ready, whatever another agent has already said.
-- **Do:** name which agent produced the verdict you are reporting, so "clean"
+- **Do:** dispatch reviews to the quorum and wait for all verdicts before reporting a
+  PR ready, whatever one agent has already said.
+- **Do:** name which agents produced the verdicts you are reporting, so "clean"
   is attributable rather than anonymous.
-- **Do:** treat another agent's findings as real findings --- this ranks whose
-  *approval* is final, not whose objections count.
-- **Don't:** report a PR ready on a non-Claude clean verdict while Claude is
-  reachable, however thorough that report reads.
+- **Do:** treat any agent's findings as real findings --- every provider's objections count.
+- **Don't:** report a PR ready on a single clean verdict while the quorum is still
+  reachable and pending, however thorough that report reads.
 - **Don't:** read a green review-gate check as settling this; the gate does not
-  know which agent answered, and on a selector-based setup the agent is chosen
-  at random.
+  know how many agents answered, only that one did.
 
 **A disagreement among reviews vetoes merge, including under `mwc`.**
 Criterion 2 is every reviewer's latest verdict, not the globally last comment.
@@ -243,18 +241,16 @@ which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a
 cross-vendor split is a prompt to check the item yourself.
 That section weighs corroboration; this one names whose approval is terminal.
-They compose --- a cross-vendor reviewer is still worth chasing, and its clean
-verdict still is not the one a PR is reported ready on while Claude is
+They compose --- a cross-vendor reviewer is always required, and every clean
+verdict is necessary before a PR is reported ready while the quorum is
 reachable.
 
-Where Claude is genuinely unreachable --- quota-skipped, a stub with no stated
+Where a quorum provider is genuinely unreachable --- quota-skipped, a stub with no stated
 verdict, or not configured --- fall back per
 [`self-review-fallback`](self-review-fallback.md), which already governs that
 case.
-Another agent's clean verdict is worth more than nothing there, and it is still
-not Claude's; say which one you have.
 Note that merging autonomously under `mwc` (merge-when-confident) strictly requires
-a genuine clean automated Claude review verdict evaluating the HEAD commit;
+genuine clean automated review verdicts from the reachable quorum evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 

@@ -190,7 +190,7 @@ os.unlink(tf.name)
 with tempfile.TemporaryDirectory() as tmp:
     remote = Path(tmp) / "remote.git"
     subprocess.run(["git", "init", "--bare", "-q", "-b", "main", str(remote)],
-               check=True)
+                   check=True)
     work = Path(tmp) / "work"
     env = {**os.environ,
            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",

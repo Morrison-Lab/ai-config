@@ -48,8 +48,12 @@ fires constantly trains everyone to ignore it.
 ## Classifying write-capable
 
 `subagent_type` is the only reliable signal in the payload; prompt text is not.
+Two exemption bases, both contracts rather than tool inventories:
 `Explore` and `Plan` are exempt because the harness defines them as read-only
-**roles**: it grants neither `Edit`, `Write`, nor `NotebookEdit` to either.
+**roles** (it grants neither `Edit`, `Write`, nor `NotebookEdit` to either),
+and `adversarial-reviewer` is exempt on the repo-declared persona contract
+(its `tools:` line omits Edit/Write, and read-only is instructed discipline
+on a harness that over-grants -- ai-config#2281, #2276).
 Everything else warns, `claude-code-guide` included.
 
 Be precise about what that exemption rests on, because the shorter reason is

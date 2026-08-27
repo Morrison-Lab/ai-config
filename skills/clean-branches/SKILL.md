@@ -85,7 +85,7 @@ branch --- `feat/`, `fix/`, `claude/` --- which is every branch anyone named
 conventionally, including the ones carrying open PRs.
 Nothing errors; the count merely comes back smaller and entirely plausible.
 Note this is the **opposite** of pathspec matching, where `*` does cross a
-slash; see `memories/git.md`, "A ref pattern is not a pathspec".
+slash; see `memories/git-diffing.md`, "A ref pattern is not a pathspec".
 
 ```bash
 git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/**'

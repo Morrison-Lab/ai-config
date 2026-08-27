@@ -32,7 +32,7 @@ trivially. So the refusal is always satisfiable, and being wrong about it
 costs a retype rather than a lost commit.
 
 `ALLOW_FORCE_PUSH=1` is the escape hatch, and it is deliberately not tied to a
-worked example. The case that looks like it needs one is not: `memories/git.md`
+worked example. The case that looks like it needs one is not: `memories/git-branches.md`
 records `--force-with-lease` failing with `stale info` after a squash-merge with
 auto-delete removed the branch, and says the lease is unsatisfiable rather than
 violated, so a PLAIN push is the fix and `--force` is unnecessary. That is
@@ -391,7 +391,7 @@ DENY = (
     "fetch you never saw no longer satisfies the lease.\n\n"
     "Where the remote ref does not exist, the lease succeeds trivially -- so "
     "this is never the worse command.\n\n"
-    "A `stale info` refusal is NOT a reason to force. `memories/git.md` "
+    "A `stale info` refusal is NOT a reason to force. `memories/git-branches.md` "
     "records that case -- a squash-merge with auto-delete removed the branch "
     "your ref still names -- and states that the lease is unsatisfiable "
     "rather than violated, so `--force` is unnecessary and there is nothing "

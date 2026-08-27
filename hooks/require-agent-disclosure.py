@@ -4,7 +4,7 @@
 A comment posted through `gh`/`glab` under the account holder's credentials
 carries THEIR login, avatar and `MEMBER` association, and reads as
 `type: User` -- so nothing in the API distinguishes it from a comment they
-typed. `memories/github.md` records auditors making exactly that mistake. The
+typed. `memories/gh-cli.md` records auditors making exactly that mistake. The
 forge cannot say it; the body has to.
 
 See `shared/workflow/disclose-agent-authorship.md` for the rule and the marker.

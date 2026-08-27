@@ -85,7 +85,7 @@ sits unread.
      review-link case above; the reviews list itself is `READ_PR_REVIEWS`)
      before treating it as an all-clear:
      `gh api`'s own `--jq` flag has no `--arg`/`--argjson` (see
-     [`memories/github.md`](../../memories/github.md)'s `gh api`/`jq` note) --
+     [`memories/gh-cli.md`](../../memories/gh-cli.md)'s `gh api`/`jq` note) --
      pipe the raw paginated output into standalone `jq -s` instead, which
      supports both:
      ```bash

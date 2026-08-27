@@ -67,7 +67,7 @@ migrated the macros to the `d-morrison/macros` submodule while the pkgdown-to-al
 PR was open; pkgdown had rendered fine, altdoc's staged build could not find
 `../macros/macros.qmd`.)
 
-(d-morrison/wai#6, 2026-07-14: a chapter migration from one Quarto repo to
+(Morrison-Lab/wai#6, 2026-07-14: a chapter migration from one Quarto repo to
 another moved 25 `.qmd` fragments referencing five meme images, but never
 copied the `assets/images/` directory itself. HTML rendering silently
 degraded to missing-image placeholders and every other CI check passed, so

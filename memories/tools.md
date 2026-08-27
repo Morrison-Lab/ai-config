@@ -1,5 +1,18 @@
 # Local tools & CLIs
 
+## Available subscriptions & model providers
+
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active
+subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
+OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+than duplicating the table here.
+That includes the OpenRouter activation mechanics
+(the `~/.config/opencode/opencode.jsonc` provider entry
+and the `OPENROUTER_API_KEY` variable) ---
+see delegation.md's bolded "A fourth destination" passage, not a copy here.
+One fact specific to this machine's configuration, not covered there:
+- Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
+
 ## Cursor
 
 See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior
@@ -24,7 +37,8 @@ codex plugin add <plugin>@<new-name> --json
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
 This sequence preserves the source repository while replacing only its stale local registration.
 
-(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
+(2026-08-08: `Morrison-Lab/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`;
+`upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
 
 ## Julia in Claude Code cloud / web sessions
 - To install Julia, prefer downloading the official binary tarball from
@@ -454,7 +468,7 @@ preview is still worth reading before passing `--write`.
 
 The contrast that motivated the fix: its CI counterpart,
 `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+[`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha), was diff-scoped by
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
 

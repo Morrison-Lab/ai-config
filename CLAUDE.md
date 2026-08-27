@@ -182,21 +182,17 @@ So the lever there is to **recommend** a change rather than make one.
 When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-Two metered CLI budgets remain, and the standing preference is to try both
-before Claude: `codex` first
-(ChatGPT plan, operationalized by `delegate-to-codex`),
-then `agy` CLI as availability allows.
-`agy` (Google Antigravity)'s API route was retired
-(user directive, 2026-08-20; ai-config#1776),
-so route no API-dispatched subagent work to it;
-headless `agy` CLI dispatch remains available
-per the 2026-08-25 clarification.
-Scope corrected 2026-08-23: the interactive subscription/extension is
-unaffected and not at quota.
-`opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
-`memories/delegation.md` carries the rule and the usage-window semantics
-across `opencode`, `codex`, and `agy`
-(CLI available since 2026-08-25; API retired).
+Active delegation budgets include `codex` (ChatGPT plan, operationalized by
+`delegate-to-codex`), `opencode` (OpenCode Go subscription, free models via
+Zen, local Ollama, operationalized by `delegate-to-opencode`), `agy` CLI
+(headless dispatch available since the 2026-08-25 clarification), and
+OpenRouter (prepaid credit balance for frontier/stealth previews).
+`agy` (Google Antigravity)'s **API** route was permanently retired for
+dispatched work (user directive, 2026-08-20, ai-config#1776).
+Only that route is out --- the `agy --print` CLI and the interactive
+subscription/extension are unaffected and not at quota.
+`memories/delegation.md` carries the rule, the usage-window semantics
+across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**
@@ -766,7 +762,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer <reviewer>`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -787,11 +783,18 @@ A fallback self-review is easy to under-scrutinize precisely because it feels li
 A request to post a review and leave findings, with no request to edit, is not that kind of touch.
 
 **Driving.**
+The persistent-loop standing yes lives in `AGENTS.md` and applies to every agent.
+This section is only the Claude-specific half: how this harness wakes, and how it must not double-trigger review.
+
 When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
 That answer is a standing yes across all PRs you are driving.
-Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
+Subscribe with `subscribe_pr_activity` when that tool exists (provided by the GitHub MCP server in remote/web sessions), or babysit locally.
+A subscription does not replace the persistent loop: PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
+Re-arm it periodically, since webhooks can't fill that gap.
+Drive every review round to fully-clean.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
+This watch process never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 
@@ -1518,7 +1521,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 
 ## Useful prompt formats for coding agents
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from Morrison-Lab/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/prompt-formats.md](shared/vendored/prompt-formats.md)
 
 ## Review with Copilot before requesting human review
@@ -1526,7 +1529,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 This is shared lab guidance on getting an automated review before asking a human reviewer.
 When *I* iterate a PR, the ARDI loop above is the mechanism — it already addresses whatever the `@claude` or Copilot reviewer flags — so read this as the lab-member-facing statement of the same principle, not a second loop to run.
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from Morrison-Lab/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/copilot-review-before-human.md](shared/vendored/copilot-review-before-human.md)
 
 ## Growth mindset: seek resources rather than accept limitations

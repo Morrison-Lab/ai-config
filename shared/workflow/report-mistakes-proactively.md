@@ -23,10 +23,17 @@ a product one.
    The flag is a heads-up, not a request.
    Ending it with an offer ("worth an issue --- say the word and I'll file
    it") is the failure this rule exists to prevent, dressed as courtesy.
-2. **Dupe-check the tracker.** Search the target repo's issues first (the
-   same search step [`issue-first`](issue-first.md) runs); when an open
-   issue already covers the mistake, comment there with the new evidence
-   instead of filing a duplicate.
+2. **Dupe-check the tracker.**
+   Search the target repo's issues first with a qualifying all-state search
+   (the same search step [`issue-first`](issue-first.md) runs:
+   `gh issue list --state all --search` or `glab issue list --all --search`).
+   Not an open-only listing: a closed issue for the same bug is the
+   duplicate an open-state search cannot see.
+   When an **open** issue already covers the mistake, comment there with
+   the new evidence instead of filing a duplicate.
+   A closed match is not a skip: surface it and confirm before deciding
+   whether to reopen it or file a new one, per
+   [`issue-first`](issue-first.md).
 3. **File the issue immediately, without waiting for approval.**
    Do it in the same work stride as noticing it, not batched for a wrap-up
    step, mirroring `CLAUDE.md`'s "run UMS proactively" timing rule.
@@ -291,14 +298,10 @@ There the reader is a hook, and separability is enough.
 Here the reader is you, so the query has to **finish in its own call**, with
 its output in front of you, before the gated command is composed at all.
 
-**The existing instrument does not reach this, so do not expect a warning.**
-`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create`,
-`glab mr create`, and `mcp__github__create_pull_request`, and no
-`gh issue create` counterpart exists anywhere in `hooks/`.
-Its discharge is a session-wide lexical scan of the transcript for any earlier
-PR-surfacing command, so it asks whether a query happened rather than whether
-its result was read --- which is the distinction this section is entirely
-about.
+**The missing-search instrument does not reach this, so do not expect it to warn here.**
+`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create` / `glab mr create` / `mcp__github__create_pull_request` and, as of #2324 (closing the proposal in #2088), `gh issue create` / `glab issue create` / the MCP create-issue tools.
+Its discharge is a session-wide lexical scan of the transcript for any earlier qualifying search, so it asks whether a query happened rather than whether its result was read --- which is the distinction this section is entirely about.
+`hooks/warn-dupe-check-chained-to-create.py` is the instrument for the same-call shape this section names.
 
 - **Do:** run the gating query in its own call, read its result, and only then
   run the action it gates.

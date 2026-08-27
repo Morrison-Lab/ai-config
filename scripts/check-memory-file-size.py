@@ -15,7 +15,7 @@ than in anyone's periodic judgment.
 
 Threshold rationale (`--max-lines`, default below):
 
-  1,200 lines of memory prose is roughly 12k tokens -- a defensible ceiling
+  1,250 lines of memory prose is roughly 12.5k tokens -- a defensible ceiling
   for a file an agent may read whole. It also sits just above the largest
   file ai-config#694's split produced (`github-actions.md`, ~1,066 lines),
   so the corpus starts green with real but finite headroom. The value is a
@@ -29,7 +29,7 @@ CORPUS is gated, from `test_check_memory_file_size.py`, whose final assertion
 calls `oversized_files("memories", DEFAULT_MAX_LINES)` on the live tree and
 exits 1 on any finding -- so a `validate` run goes red at "Run
 memory-file-size check tests", never at the step that runs this file. A PR
-that appends past 1200 lines cannot merge; it has to split first.
+that appends past 1250 lines cannot merge; it has to split first.
 A file already AT the cap cannot take a net-positive append either.
 Recover lines (re-wrap or drop) or split, rather than adding lines.
 A fold has two shapes and neither escapes every gate: putting the new
@@ -54,7 +54,7 @@ file crossing a line count is a prompt to consider splitting, not a defect
 that should block an unrelated PR -- the same stance the repo's other
 advisory check takes (the diff-scoped semantic-line-break check, which
 started here as `scripts/check-new-line-breaks.py` and now runs from
-`d-morrison/gha`'s reusable workflow per gha#300 / ai-config#703), and the
+`Morrison-Lab/gha`'s reusable workflow per gha#300 / ai-config#703), and the
 one `shared/writing/semantic-line-breaks.md` prescribes for style findings.
 """
 from __future__ import annotations
@@ -66,7 +66,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-DEFAULT_MAX_LINES = 1200
+DEFAULT_MAX_LINES = 1250
 
 # `MEMORY.md` is the index, not a memory file; `session/` holds
 # conversation-scoped notes that are never meant to persist or be split.

@@ -34,6 +34,9 @@ don't.
 PR can have every check passing and still carry unaddressed review findings.
 Report CI state and review verdict as **separate columns** --- never collapse
 them into one "OK".
+GitHub's `mergeable` / `mergeStateStatus: CLEAN` field is conflict existence, not a merge-readiness verdict --- don't report it as one in the status table.
+A PR without a clean review verdict on the latest commit is not merge-ready.
+Do not describe it as merge-ready.
 
 ## Procedure
 
@@ -234,7 +237,7 @@ When detailed git/thread metrics are needed, include the extended columns:
 |:---|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
 
 Below the table, list each PR's open findings briefly (or "none"), and call out anything needing action: branches behind main, failing CI, drafts, reviews that returned `null`, or a pending human review.
-Do **not** label a PR "ready to merge" unless it is **fully clean** -- **Human is `none`** (a blocking human review overrides everything below) *and* at least one of Review or External is `clean` at the current head *and* neither one has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
+Do **not** label a PR "ready to merge" or "merge-ready" unless it is **fully clean** --- **Human is `none`** (a blocking human review overrides everything below) *and* at least one of Review or External is `clean` at the current head *and* neither one has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
 Never hedge with "ready except for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)

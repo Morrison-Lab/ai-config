@@ -143,6 +143,152 @@ def get_pr_head_sha(pr_number: int) -> Optional[str]:
     return None
 
 
+REFUSAL_PATTERNS = [
+    "hit your weekly limit",
+    "prepayment credits depleted",
+    "unrecognized argument",
+    "api key is missing",
+]
+
+
+def _refusal_reason(report: str) -> Optional[str]:
+    """Return a refusal message when the engine emitted one, else None."""
+    lowered = report.lower()
+    for pat in REFUSAL_PATTERNS:
+        if pat in lowered:
+            return f"Engine refusal string detected: '{pat}'"
+    return None
+
+
+_HOOK_MODULE = None
+
+
+def _load_hook_module():
+    """Load hooks/no-push-without-self-review.py as a module.
+
+    The hook's filename is not an importable module name, so load it by
+    path, once per process (the hook itself loads a sibling at module top
+    level, so repeated exec is wasteful). Import errors propagate: a missing
+    or broken hook must fail the parse loudly rather than silently falling
+    back to nothing.
+
+    The whole module is returned rather than just parse_report, because the
+    persona path must blank fences in the HOOK'S dialect (its `_blank_fences`)
+    before comment-stripping and qualification-scanning -- mixing this
+    script's CommonMark `strip_fences` with the hook's laxer fence regex left
+    a gap where a pseudo-closed fence hid a qualified verdict line from the
+    guard while parse_report still read it.
+    """
+    global _HOOK_MODULE
+    if _HOOK_MODULE is not None:
+        return _HOOK_MODULE
+    import importlib.util
+
+    hook_path = (
+        Path(__file__).resolve().parent.parent
+        / "hooks"
+        / "no-push-without-self-review.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "no_push_without_self_review", hook_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _HOOK_MODULE = module
+    return _HOOK_MODULE
+
+
+def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
+    """Validate a persona-contract report (Summary / Findings / Verdict /
+    Reviewed-Commit) via the hook's own parse_report() (ai-config#2309).
+
+    Returns the same (is_valid, is_clean, reason) triple as
+    parse_review_verdict, so callers cannot tell which contract answered.
+    """
+    refusal = _refusal_reason(report)
+    if refusal:
+        return False, False, refusal
+
+    hook = _load_hook_module()
+
+    # One fence dialect end to end: blank fences with the HOOK's own
+    # _blank_fences first, then strip HTML comments, then parse and guard
+    # over that same text. Blanking first also keeps a comment opener quoted
+    # inside a fence from reading as an unterminated comment.
+    blanked, unclosed = hook._blank_fences(report)
+    if unclosed:
+        return False, False, "Unbalanced or unterminated markdown code fence detected."
+
+    # A commented-out `Verdict:` line sits at line start and would otherwise
+    # be taken as the report's last verdict. Replace comment spans with
+    # equal-shape whitespace rather than deleting them: deletion can
+    # juxtapose surviving characters into a fence marker that never existed
+    # in the raw text, and parse_report's own re-blanking would then hide a
+    # later verdict line behind the synthesized fence.
+    stripped = re.sub(
+        r"<!--.*?-->",
+        lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+        blanked,
+        flags=re.DOTALL,
+    )
+    if "<!--" in stripped:
+        return False, False, "Unterminated HTML comment detected."
+
+    # Invariant: _blank_fences blanks delimiter lines too, so a successful
+    # blank pass leaves zero FENCE-matching lines, and space-substitution
+    # creates no backticks -- it can only promote a surviving run into fence
+    # indentation (a comment ending at line start directly before a backtick
+    # run). Any FENCE match here is therefore synthesized, and parse_report's
+    # internal re-blank would pair such lines and hide a verdict between
+    # them. Fail closed instead.
+    if hook.FENCE.search(stripped):
+        return False, False, (
+            "Comment stripping synthesized a fence marker; report unparseable."
+        )
+
+    verdict, reviewed_commit = hook.parse_report(stripped)
+    if verdict is None:
+        return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
+
+    if verdict == "clean":
+        # parse_report's verdict regex has no line-end anchor, so a trailing
+        # qualification ("Ready for merge -- after fixing X") would pass it.
+        # Mirror the local contract's rule: any content after the clean
+        # phrase beyond closing emphasis/punctuation invalidates the clean.
+        # `stripped` is fence-blanked in the hook's dialect, offsets survive
+        # comment-stripping, and the synthesized-fence check above guarantees
+        # parse_report's internal re-blank is a no-op -- so this scan and
+        # parse_report read the same effective lines.
+        last_clean = None
+        for m in re.finditer(
+            r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
+            r"(?:Ready for merge)\b(?P<rest>.*)$",
+            stripped,
+        ):
+            last_clean = m
+        if last_clean is not None:
+            rest = re.sub(r"[\*`_.!\s]", "", last_clean.group("rest"))
+            if rest:
+                return False, False, (
+                    f"Invalid clean verdict with trailing qualification: "
+                    f"{last_clean.group(0).strip()!r}"
+                )
+
+    if expected_commit_sha:
+        if not reviewed_commit:
+            return False, False, (
+                f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint after the verdict."
+            )
+        if reviewed_commit != expected_commit_sha.lower():
+            return False, False, (
+                f"Fingerprint SHA mismatch: found {reviewed_commit!r}, expected {expected_commit_sha!r}."
+            )
+
+    if verdict == "clean":
+        return True, True, "Clean (persona contract)"
+    return True, False, "Needs work (persona contract)"
+
+
 def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
     """Parse structured review output and return (is_valid, is_clean, reason).
 
@@ -176,10 +322,34 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     observations_text = extract_section(unfenced_report, r"Observations")
     verification_text = extract_section(unfenced_report, r"Verification(?: Steps)?")
 
-    if summary_text is None: return False, False, "Missing required section: Summary Verdict"
-    if critical_text is None: return False, False, "Missing required section: Critical Findings"
-    if observations_text is None: return False, False, "Missing required section: Observations"
-    if verification_text is None: return False, False, "Missing required section: Verification Steps"
+    # Two report contracts exist (ai-config#2309): this engine's own
+    # (Summary Verdict / Critical Findings / Observations / Verification
+    # Steps) and the adversarial-reviewer persona's (Summary / Findings /
+    # Verdict / Reviewed-Commit), parsed by parse_report() in
+    # hooks/no-push-without-self-review.py. When the local contract's
+    # sections are absent but the persona shape is present, delegate to that
+    # one parse rather than re-deriving it here -- one parser per contract,
+    # not two parsers for one.
+    if None in (summary_text, critical_text, observations_text, verification_text):
+        # Delegate only when EVERY local-only section is absent -- a hybrid
+        # report that carries any of Critical Findings / Observations /
+        # Verification Steps stays on the strict local path, so dropping one
+        # section cannot buy a report the laxer parser. summary_text cannot
+        # join this condition: a pure persona report's `### Verdict:` heading
+        # makes it non-None by construction.
+        purely_persona = (
+            critical_text is None
+            and observations_text is None
+            and verification_text is None
+        )
+        persona_findings = extract_section(unfenced_report, r"Findings")
+        persona_verdict = extract_section(unfenced_report, r"Verdict")
+        if purely_persona and persona_findings is not None and persona_verdict is not None:
+            return _parse_persona_verdict(report, expected_commit_sha)
+        if summary_text is None: return False, False, "Missing required section: Summary Verdict"
+        if critical_text is None: return False, False, "Missing required section: Critical Findings"
+        if observations_text is None: return False, False, "Missing required section: Observations"
+        if verification_text is None: return False, False, "Missing required section: Verification Steps"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
@@ -288,15 +458,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
 
-    refusal_patterns = [
-        "hit your weekly limit",
-        "prepayment credits depleted",
-        "unrecognized argument",
-        "api key is missing",
-    ]
-    for pat in refusal_patterns:
-        if pat in report.lower():
-            return False, False, f"Engine refusal string detected: '{pat}'"
+    refusal = _refusal_reason(report)
+    if refusal:
+        return False, False, refusal
 
     return True, is_clean, f"Verdict: {'CLEAN' if is_clean else 'NEEDS WORK'}"
 

@@ -1,10 +1,20 @@
 Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
-Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap --- don't interrupt mid-task to say it.
+Use the `⚠️ **FLAG** ---` tag from `CLAUDE.md`'s chat-output-tagging convention.
+Place it on one line, at the natural end of that turn's recap (or immediately before a `wrap-up` report).
+Don't interrupt mid-task to say it.
 
-**Always state whether or not the session is at a clean stopping point.** The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
+**Always state whether or not the session is at a clean stopping point.**
+The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session
+(though for non-clean stopping points, the declaration need not be the absolute final line of the message)
+(e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
+Whenever ending a session, completing a turn, or wrapping up work
+(whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`),
+ALWAYS include an explicit `**Stopping Point**` declaration.
+Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
+(User corrections / directives, 2026-08-17, 2026-08-18.)
 
 **The declaration is for a human reading a recap, so it does not apply where the last message is consumed by a machine instead.**
-The rule says the last message MUST be the declaration.
+The rigid interpretation of the rule says the last separate message MUST be the declaration.
 A CI harness that posts an agent's reply to a PR or issue thread typically takes the **last assistant message** and posts that.
 Two rules then claim the same slot, and the declaration wins every time, because it is by construction written last --- so the answer is replaced by a status marker and discarded.
 
@@ -14,7 +24,7 @@ It is also self-concealing, because a stopping-point line reads like a completed
 So: **when the final message is not being read by a person --- a non-interactive run whose output is posted somewhere by a harness --- put the declaration inside the substantive reply rather than after it, or omit the declaration.**
 The tell is that nothing about the session resembles a terminal recap: no human is reading turn-by-turn, and the "session" is a single automated invocation whose whole output is one artifact.
 
-- **Do:** end with the declaration in an interactive session, where a person reads the recap.
+- **Do:** end with the declaration in an interactive session, where a person reads the recap (though for non-clean stopping points, pending work may follow the declaration).
 - **Do:** fold it into the substantive message, or leave it out, when a harness will post your last message verbatim.
 - **Don't:** emit a bare declaration as a separate final message in a CI run --- that is the whole failure, and it looks like compliance.
 - **Don't:** assume the harness concatenates your turn.
@@ -142,10 +152,51 @@ Run UMS first if it is owed, per [`run-ums-proactively`](run-ums-proactively.md)
 - **Don't:** barrel into a new PR carrying a long, unrelated session by reflex, just because opening a PR feels like forward motion rather than a stopping point.
 - **Don't:** `/clear` or abandon a session while a PR it opened is still unmerged -- that drops the monitoring loop the bright line protects.
 
+**Check for a stopping point instead of asking for more tasks.**
+Never ask for more tasks.
+Never say "what would you like me to do next?"
+When a session has grown long and hits a natural stopping point,
+run `wrap-up`'s state sweep to gather the live state,
+per this file's own "Run `wrap-up`'s state sweep" instruction above,
+rather than invoking the full `wrap-up` skill.
+The full skill's own UMS step is not owed at every task boundary:
+per [`run-ums-proactively`](run-ums-proactively.md),
+a learning gets recorded the moment it surfaces,
+so the pass should already be current by the time one task ends.
+Use the live state the sweep surfaced,
+together with the criteria in this file,
+to decide whether a session-management recommendation applies.
+This file's criteria decide the declaration,
+not `wrap-up`'s own default assessment
+--- e.g. this file permits a `/clear` recommendation
+when the only open work belongs to another session,
+a case `wrap-up`'s closing checklist does not carve out on its own.
+If a recommendation applies,
+prefix it with the `⚠️ **FLAG** ---` tag and present it.
+Regardless of whether a recommendation applies,
+report what the sweep found:
+every open PR and issue, linked,
+any uncommitted changes,
+and any leftover branches or worktrees.
+For a clean stopping point,
+end the reply with the stopping-point declaration (subject to the CI exception above).
+For a non-clean stopping point,
+place the open questions and pending tasks after the declaration,
+so they remain the final and most visible element of the reply,
+per `wrap-up`'s instruction to end the reply with the open questions,
+last and clearly visible.
+
+- **Do:** run `wrap-up`'s state sweep when a session hits a natural stopping point.
+- **Do:** prefix any recommendation with the flag, instead of offering to take on more tasks.
+- **Don't:** ask "what next?" when you just finished a task.
+- **Don't:** trust `wrap-up`'s raw stopping-point declaration when the only open item belongs to another session --- this file's criteria decide the declaration.
+
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.
-Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large --- many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
+Proactively flag (using the same `⚠️ **FLAG** ---` tag) when a session is still mid-task but has grown large.
+This applies when there are many tool calls, or long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured.
+It also applies to a session that's already been through one automatic compaction and is heading for another.
 Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
 
 Use this instead of the `/clear` flag above when there's still live state worth carrying forward: an unfinished task, an unmerged PR this session opened or pushed to, or an open question.

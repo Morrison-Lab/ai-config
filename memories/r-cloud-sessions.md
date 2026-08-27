@@ -181,7 +181,7 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   worktree bullet above) sidesteps it entirely, since the actual installed
   versions come from `renv.lock`'s pinned SHAs regardless of where `Remotes:`
   points. (`d-morrison/rme#772`, tracked in `d-morrison/rme#994` and `d-morrison/rme#996`, fixed centrally in
-  `d-morrison/gha#241`.)
+  `Morrison-Lab/gha#241`.)
 - **R in these containers defaults to the `C` locale**, so
   `read.delim(..., fileEncoding="UTF-8")` (or any read) of a file with multibyte
   chars (π, μ, ℓ, …) **silently truncates at the first non-ASCII byte**, emitting

@@ -10,47 +10,23 @@ In every session --- at session start, and again periodically during long sessio
    See [`fail-fast`](../principles/fail-fast.md), "A proxy that answers a narrower question passes the same way".
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
-2. **The `~/.claude` consumer copies.** On symlink-capable systems the children of `~/.claude` (`skills/`, `shared/`, `commands/`, `memories/`) are symlinks into the checkout, so the pull alone refreshes them; rerun `bootstrap.sh` only when the repo gained a new top-level dir.
-   On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate there --- copy-sync every file whose repo version changed into `~/.claude`.
+2. **The `~/.claude` consumer install.**
+   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so there is nothing to freshness-check there.
+   `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
+   The dedicated verification instrument this section used to name (`check-install.py`, which compared installed copies against the checkout and repaired drift with `--fix`) was removed along with that symlink install and has no replacement yet either.
+   Until one lands, use the manual branch-plus-diff check in this file's "The blast radius is the whole consumer surface" paragraph below, which does not depend on that instrument and still works whether the local copy is a symlink or a real copy.
+   On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate to a real-copy install --- copy-sync every file whose repo version changed by hand.
    Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.
    Don't rely on mtime to spot local edits --- git operations reset mtimes on checkout, so it false-positives right after a `pull`, the case this check most needs to handle correctly.
    **Don't rely on it in the other direction either --- to spot a copy that has gone stale.**
    A file copied once and never needing to change carries an old mtime and current contents, which is the reading a genuinely stale file also gives, so the proxy discriminates nothing.
-   Run the `check-install.py` instrument, or a direct content comparison.
+   Run a direct content comparison instead.
    See [`verify-the-right-artifact`](verify-the-right-artifact.md), "A drift claim is relational, so one read cannot settle it".
-   **Don't read "symlink-capable system" as "therefore all four children are symlinks" -- verify per child, because the split can fall inside one `~/.claude`.**
-   In a remote/web container, a subset of `~/.claude/skills/` ends up as real directories holding older content, which shadow the repo for the whole session.
-   `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
-   `git pull` cannot fix it, because the loaded file is a copy rather than a link.
-   Don't sweep this by hand.
-   Run the instrument, which compares whole trees rather than `SKILL.md` alone and repairs what it finds, backing up every displaced copy:
-   ```bash
-   python3 ~/.claude/scripts/check-install.py          # report
-   python3 ~/.claude/scripts/check-install.py --fix     # repair
-   ```
-   It reports `stale` (a real copy that has drifted -- the active defect), `unlinked` (a real copy that matches today but won't track the next pull), `missing`, `misdirected`, and `foreign`.
-   **`~/.claude/scripts/` can itself be absent, and then that command is unreachable in exactly the container it diagnoses -- run the repo's own copy instead of concluding there is no instrument.**
-   The path above assumes `~/.claude` links back to the checkout; a container can ship `~/.claude` holding **only** a real-copy `skills/`, with no `scripts/`, `shared/`, `memories/`, `commands/`, or `CLAUDE.md` at all, which is a strictly worse shape than the partial split described above.
-   `$HOME` need not be anywhere near the checkout either (`/root` versus `/home/user/ai-config`), so a `~`-relative path is the wrong instrument for finding the repo at all.
-   Run `python3 <ai-config-checkout>/scripts/check-install.py` against the checkout the session actually has.
-   **Point 1 is a precondition for this one, not merely an earlier item in a list.**
-   The instrument compares installed copies against the checkout, so a checkout that has not been pulled makes every report suspect -- both by measuring drift against stale reference content, and by hiding the script itself when it landed in a commit you do not have yet.
-   Pull first, then measure, and re-read any figure taken before the pull as unreliable rather than merely approximate.
-   **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
-   The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
-   Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.
-   The repo's `UserPromptSubmit` hook runs the repair once per session, so this is normally already done by the time you would think to check.
-   **The clobber happens after `bootstrap.sh`, not before it, so don't diagnose this as bootstrap skipping a pre-seeded copy.**
-   Measured in one container: at `07:25:00.084` bootstrap reported 527 `already linked` and zero skips, so every skill was still a symlink; `~/.claude/skills` was then modified at `07:25:01.608`, leaving 53 real directories.
-   The upstream cause is `upload_skills.sh`, which is idempotent by **skipping** any skill already in the workspace (`skip (exists)`) rather than adding a version, so the workspace copy the harness syncs down stays frozen at whatever revision was first uploaded.
-   That is why a repair wired into `SessionStart` would run before the damage and report a clean install every time.
-   **`check-install.py` says nothing about whether the hooks are *registered*, so run `install-hooks.py` as a separate freshness check.**
-   The two answer different questions and are easy to conflate, because both concern `~/.claude` and both report a tidy count.
-   `check-install.py` compares **files**: it asks whether `~/.claude/hooks/<script>` tracks the checkout.
-   `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes those scripts on an event.
-   A hook can be perfectly linked and never run, so a clean report from the first is not evidence about the second.
+   **Whether a hook's script is present and whether it is *registered* are two different questions, and `install-hooks.py` answers only the second.**
+   `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes a script on an event, and its `stale` status names a registered script that is not on disk.
+   A hook can be perfectly present and never run, so a report that finds it present is not evidence about registration.
    The failure is silent in the way this corpus is worst at noticing: an unregistered guard and a guard with nothing to block look identical, since neither ever produces output.
-   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- `bootstrap.sh` places every new script, while registration happens only when someone runs the second command, so each hook added since the last run sits inert.
+   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- scripts reach `~/.claude/hooks` independently of registration (the retired symlink install placed them, and today only a manual copy does), so each hook added since the last registration run sits inert.
    That makes it a per-session freshness item rather than a one-time setup step.
    ```bash
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
@@ -60,13 +36,12 @@ In every session --- at session start, and again periodically during long sessio
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
-   **Run `check-install.py --fix` first, so the scripts are on disk before anything binds to them.**
-   `install-hooks.py` only writes `settings.json`.
-   It never places a file, and it does not check that the script it is registering exists.
+   **On the plugin path nothing else is needed: the plugin loader serves and loads every hook in `hooks/hooks.json` straight from the plugin root.**
+   `install-hooks.py --fix` covers the non-plugin path only, and its own docstring is explicit about what it does not do: it never places a file, and it does not check that the script it is registering exists.
+   `bootstrap.sh` no longer places `hooks/` under `~/.claude` (see its header comment), so this path currently only helps on a machine whose `~/.claude/hooks` already holds the scripts some other way.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
-   `--fix` prints the note naming this division of labour only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
-   **Point 1 governs this instrument too, and its stale run is the more dangerous of the two.**
-   A stale `check-install.py` run reports suspect numbers.
+   `--fix` prints a note naming this only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
+   **Point 1 governs this instrument too, and its stale run is dangerous.**
    A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
    Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
    **A container with no `settings.json` at all is the degenerate case, and it arms nothing --- so every guard in this corpus is inert there, not just a drifted one.**
@@ -112,25 +87,23 @@ In every session --- at session start, and again periodically during long sessio
    The gap that incident exposes is not a rule but a **moment**: README's activation gate forbids registering before the PR merges and names nothing that happens after, so the owed registration has no owner.
    [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner, and carries the incident, the mechanics, and the argument for why a hook cannot be the instrument here.
 
-   - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
+   - **Do:** run `install-hooks.py` each session, and report its counts.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
-   - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
    - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
-   **An entry that genuinely IS a symlink resolves through the checkout's CURRENT BRANCH, so both instruments pass over a file from the wrong branch.**
+   **An entry that genuinely IS a symlink resolves through the checkout's CURRENT BRANCH, so a freshness check can pass over a file from the wrong branch.**
    Everything above splits the world into symlinks, which a pull refreshes, and real copies, which it does not.
    That split is real and it is not exhaustive.
    A symlink points at a **path in the working tree**, never at a commit, so the file the harness loads is whatever branch that checkout happens to have out --- which on a machine driving several PRs is routinely a feature branch rather than `main`.
    A `git pull` on `main` then updates a ref the loaded file does not resolve through, and `git branch -f main origin/main` does not help either, for the same reason.
    Note this is the opening sentence of point 2 failing, not a further wrinkle in the Windows real-copy case: "the pull alone refreshes them" holds only while the checkout is on the branch you pulled.
 
-   Neither instrument can see it, and the reason is structural rather than an oversight.
-   `check-install.py` classifies a symlink by **where it points** --- `misdirected` when it leaves this repo, `ok` otherwise --- and its `stale` category is defined over real copies only, its own legend reading `stale  real copy whose content differs from the repo`.
-   So a symlink cannot be classified `stale` whatever content sits behind it.
-   `install-hooks.py` reads `settings.json` and never opens the file at all.
-   A clean report from both is therefore consistent with every loaded file being a branch behind, which makes this a third way the installed state can be wrong, alongside the drifted registration and the registered-but-never-placed script in [`claude-code-hooks.md`](../../memories/claude-code-hooks.md).
+   Nothing that merely inspects `settings.json` or a symlink's destination can see it, and the reason is structural rather than an oversight.
+   A symlink resolving inside this repo says nothing about *which commit* the working tree currently has checked out.
+   `install-hooks.py` reads `settings.json` and never opens the linked file at all.
+   A clean report from it is therefore consistent with every loaded file being a branch behind, which makes this a third way the installed state can be wrong, alongside registration drift and the registered-but-never-placed script in [`claude-code-hooks.md`](../../memories/claude-code-hooks.md).
 
    The blast radius is the whole consumer surface rather than hooks alone, because `skills/`, `shared/`, `memories/`, and `CLAUDE.md` are linked the same way --- so the `@shared/...` fragments this file imports are exactly as exposed as a guard is.
-   One read settles it, and it is the content comparison neither instrument performs:
+   One read settles it, and it is the content comparison no instrument here performs:
    ```bash
    git -C <ai-config-checkout> rev-parse --abbrev-ref HEAD                  # is it even on main?
    git -C <ai-config-checkout> diff origin/main --stat -- shared hooks skills memories CLAUDE.md
@@ -140,7 +113,7 @@ In every session --- at session start, and again periodically during long sessio
    Report the drift instead and read from `origin/main` directly (`git show origin/main:<path>`).
    - **Do:** read the checkout's current branch before believing any freshness report, and diff the consumer surface against `origin/main` when a loaded rule or guard matters.
    - **Do:** say which branch a `~/.claude` file resolved through when reporting an install clean.
-   - **Don't:** read `check-install.py`'s `N/N ok` as meaning a symlinked file matches `main` --- it only means the link lands inside this repo.
+   - **Don't:** read a symlink or a registered path resolving inside this repo as meaning its content matches `main` --- it only means the path lands inside this repo, whatever branch that repo has checked out.
    - **Don't:** switch a checkout parked on another session's branch to refresh your own hook, or expect `git branch -f main origin/main` to move what a symlink resolves through.
 
 3. **The working repo's main checkout.**

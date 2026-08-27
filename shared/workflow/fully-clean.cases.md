@@ -115,11 +115,28 @@ Nothing about the reading announces that it could not see everything.
 The rule directly above this one had been loaded into context, and the reporting error happened anyway, on a check whose failures had been *watched* three times earlier in that same session.
 Having seen the check red, the author reported a green count that did not contain it and did not notice the absence.
 
-That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md) describes: a rule is consulted at read time and broken at composition time, so re-reading it does not reach the moment it breaks.
-The remedy was the hook `hooks/no-incomplete-check-enumeration.py`, which fires on the decidable condition --- a terminal clean claim, a `gh pr checks` reading, and no complete enumeration since the last push.
+That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md) describes:
+a rule is consulted at read time and broken at composition time,
+so re-reading it does not reach the moment it breaks.
+The remedy was the hook `hooks/no-incomplete-check-enumeration.py`,
+which fires on the decidable condition ---
+a terminal clean claim,
+a partial reading (`gh pr checks` or `statusCheckRollup`),
+and no complete enumeration since the last push.
 
-- **Do:** take a clean verdict from `check-pr-fully-clean.py` or a paginated `commits/<sha>/check-runs` read.
-- **Don't:** report a PR clean from `gh pr checks` counts, however current the reading is --- currency and completeness are different properties, and only one of them has a hook watching it.
+- **Do:** take a fully-clean verdict from `check-pr-fully-clean.py`.
+  A paginated `commits/<sha>/check-runs` read covers the check-run half only
+  (progress reports / criterion 1); it does not authorize a terminal claim.
+- **Don't:** report a PR clean from `gh pr checks` counts,
+  however current the reading is ---
+  currency and completeness are different properties,
+  and only one of them has a hook watching it.
+- **Don't:** treat GraphQL `statusCheckRollup` as enough for a terminal claim either
+  (ai-config#2277, 2026-08-26:
+  a "Ready for merge" claim rested on the rollup;
+  the rollup matched the endpoint 8==8;
+  `check-pr-fully-clean.py` exited 1 for missing automated review;
+  the hook now matches both partial surfaces).
 
 ## Criterion 2's verdict-vs-findings disagreement rate, measured
 
@@ -343,7 +360,8 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25;
+filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 
@@ -446,7 +464,7 @@ agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
 Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
 and then failed
 `Command failed: git fetch origin --depth=20 pull/77/head:main`.
-`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`Morrison-Lab/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
 
@@ -762,6 +780,15 @@ Only reading the bodies separates them.
 
 The fix landed in `8cf34dce` and Claude's next round at that head returned
 `Ready for merge`, having re-verified both cited source facts itself.)
+
+Merging on Antigravity's LGTM while Claude's `Needs more work` still stood
+is forbidden either way: the standing not-clean vetoes merge, `mwc` included.
+On this PR the not-clean was last, so the old global-latest scan already
+failed it.
+The #2274 hole is the reverse order --- an earlier not-clean, then a later
+all-clear from a different reviewer --- which that scan missed.
+ARD the union, then request fresh reviews.
+`check-pr-fully-clean.py` now fails that per-reviewer split too.
 
 ## Three PRs reported clean by grepping the checker's own output
 

@@ -1,9 +1,19 @@
 Whenever you are working a PR/MR, run the full **ARDI** loop by default, without
 being asked: **A**ddress every flagged item, **R**ebut findings that are wrong,
 **D**efer out-of-scope items to tracked issues, then **I**terate with a fresh
-review --- repeating until the latest review is **fully clean**. Don't stop at
+review --- repeating until every reviewer's latest verdict is **fully clean**.
+Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
+
+Posting a review as comments, with no request to edit the branch, is not
+working the PR.
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+"Watch and ARDI every PR you touch" applies when you are driving the
+branch, not when you were asked only to read it.
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in
@@ -171,6 +181,11 @@ The one exception: if the human has explicitly granted the `mwc`
 instruction, not a self-authored one, so baking a self-merge step into a
 wakeup/loop prompt is fine for the rest of that session. See
 [`mwc`](../../skills/mwc/SKILL.md) for the grant's scope and limits.
+The Scope Limit still binds: a disagreement among reviews --- one all-clear
+and another with findings, nits included --- is not fully clean, so `mwc`
+does not authorize merging it.
+ARD every item from every review, then request fresh reviews
+(ai-config#2274).
 
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A
@@ -407,7 +422,7 @@ pull requests share one number space.**
   harmless; check whether the target was open.
 
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
-message".
+message" and "A negated closing-keyword sentence still closes the issue".
 
 **A SHA's provenance is the question its source command answers, not merely
 that a command produced it.**
@@ -586,6 +601,30 @@ mid-flight, and there the SHA comparison usually has nothing to compare.**
 - **Don't:** treat green CI as evidence that a claimed fix landed.
 - **Don't:** infer that a finding is stale because a comment says it was
   addressed.
+
+**Your own fix-round commit makes the same claim one step earlier, and a
+file-count coincidence is what lets it through.**
+A commit message that enumerates a review round's findings asserts that the
+commit's diff touches every file those findings name, and nothing checks that
+assertion by default.
+Measured 2026-08-27 on
+[ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229): a
+seven-finding fix commit changed seven files, and the match read as
+confirmation --- but the findings named eight distinct files, because two
+findings each spanned two files while one file was named by two findings.
+The commit covered seven of the eight, so the one unfixed finding hid behind
+the equal counts, and the next review round re-raised the finding against a
+commit message that claimed to have fixed it.
+A matching count is not a matching set.
+Derive the union of files the round's findings name, compare it against the
+fix commit's own changed-file list (`git show --name-only`, which prints
+full one-per-line paths where `--stat` may ellipsize them) before pushing,
+and account for every member missing from either side.
+
+- **Do:** compare the fix commit's changed-file list against the files the
+  findings name, member by member, before pushing a round.
+- **Don't:** read "N findings, N files changed" as the round being covered
+  --- the count coincidence is exactly what masked the miss.
 
 **Run that same command before *any* readiness claim, not only against an
 inherited one --- a PR whose branch carries no implementation is green on

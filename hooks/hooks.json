@@ -101,6 +101,28 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-on-scrutiny.py\"",
+            "timeout": 10,
+            "script": "remind-ums-on-scrutiny.py",
+            "why": "ai-config#2261 'run UMS when work is scrutinized'. Injects, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it -- the scrutiny sibling of remind-ums-after-error.py (first-person admission) and remind-learn-from-review.py (accepted finding).",
+            "_note_not_a_stop_hook": [
+              "UserPromptSubmit, inject-only, for the same reason as",
+              "remind-ums-after-error.py and remind-learn-from-review.py:",
+              "reading a review and correcting a claim are RIGHT, so this can",
+              "only ADD context and never blocks. It covers a review-read",
+              "before Address, and a closed Q&A whose correction never said",
+              "'I was wrong'. Those overlap the admission sibling when the",
+              "correction also matches ADMISSION; that overlap is deliberate.",
+              "Critical feedback that is not lexically decidable stays a",
+              "written rule, not a matcher.",
+              "",
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-both-sides-from-git.py\"",
             "timeout": 10,
             "script": "remind-both-sides-from-git.py",
@@ -281,7 +303,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
+            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal; issue-first.md and report-mistakes-proactively.md require the same search before gh issue create. Both rules are consulted at read time while the omission happens at composition time. PR half measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Issue half measured on Morrison-Lab/ai-config 2026-08: one cp1252 decode crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed them. Issue discharge requires --state all --search (or gh search issues / MCP search_issues), not --state open, per check-open-prs-before-duplicating.md. Warns rather than blocks -- a duplicate is cheap to close and a blocked creation is expensive, since creating the PR or filing the issue is the act that makes work visible. Anchored on a command position with heredoc bodies stripped. Fails open. Tracked as #1748 (PR) and #2088 (issue)."
           },
           {
             "type": "command",
@@ -487,7 +509,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request and CREATE_ISSUE to mcp__github__issue_write (method=create) (legacy mcp__github__create_issue still matched), and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           },
           {
             "type": "command",
@@ -522,6 +544,13 @@
             "timeout": 10,
             "script": "no-stale-pr-status.py",
             "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-incomplete-check-enumeration.py\"",
+            "timeout": 10,
+            "script": "no-incomplete-check-enumeration.py",
+            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks or statusCheckRollup (short surfaces, not check-pr-fully-clean.py). Distinct from no-stale-pr-status.py, which asks whether a reading is current."
           },
           {
             "type": "command",

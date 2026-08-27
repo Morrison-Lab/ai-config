@@ -708,8 +708,8 @@ for both and there is no case where dropping it helps.
 (`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for
 the same reason.)
 
-Then raise it as a `⚠️ FLAG` in step 5's report, naming the tag and what is
-unreachable until it moves.
+Then raise it as a `⚠️ **FLAG** ---` in step 5's report,
+naming the tag and what is unreachable until it moves.
 An offer is not a flag: say plainly that the slide is owed and that it needs
 the human, the same way
 [`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md)
@@ -759,13 +759,14 @@ Do not carry 3.5's "don't run it yourself" bullet over to this step; here
 that would leave the guard inert, which is the failure rather than the
 caution.
 
-One lookup and two calls settle it, run in the ai-config checkout after step 2
+One lookup and three calls settle it, run in the ai-config checkout after step 2
 has already put it on `main` and pulled:
 
 ```bash
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
 python3 scripts/install-hooks.py                # report: registered / missing / stale
 python3 scripts/install-hooks.py --fix          # the call that actually registers
+python3 scripts/check-hook-catalog.py           # print NOTE for allowlisted hooks; exits 0 unless it FAILs
 ```
 
 **`--fix` is the load-bearing flag.**
@@ -783,13 +784,42 @@ the merged content in one commit; it decides nothing, so do not skip the
 instrument when it comes back empty.
 
 Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md)
-point 2, the `~/.claude` consumer copies, which already owns the mechanics: run
-`check-install.py --fix` first so the script is on disk before anything binds
-to it, check `enabledPlugins` before `--fix` since the plugin path already
-loads every hook and a second registration makes each one fire twice, compare
+point 2, the `~/.claude` consumer copies, which already owns the mechanics: if
+the Claude Code plugin is enabled, its loader serves hooks straight from the
+plugin root, so there is nothing to run --- the merged hook goes live at the
+next session start (or `/reload-plugins`), since plugin hooks connect at
+session start rather than the moment `main` moves.
+Otherwise (`install-hooks.py --fix`'s non-plugin path), check `enabledPlugins`
+first since the plugin path already loads every hook and a second
+registration makes each one fire twice, confirm `~/.claude/hooks` actually
+holds the merged script first --- `bootstrap.sh` no longer places it there
+(see its header comment; tracked as
+[#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)) --- compare
 the printed `examined N` against the current `hooks/hooks.json` before
 believing a clean report, and say that hooks connect at session start so a
 mid-session `--fix` arms nothing until a restart.
+
+**`--fix` binds the manifest, not every hook file on disk.**
+A hook whose authoring PR left it in the catalog allowlist of
+documented-but-inert hooks is absent from `hooks/hooks.json`, so this
+step cannot arm it.
+`--fix` then prints `All hooks registered.` over that gap, because
+it iterates only the manifest.
+`check-hook-catalog.py` is the detector: it prints
+`NOTE: <script> is documented but not registered (known, ai-config#N)`
+and exits 0 on that path, so read the NOTE, not the exit status.
+Search for an existing activation issue before filing a follow-up
+(the allowlist maps each entry to that tracker).
+If the listed tracker has closed and the hook is still inert, repoint
+the allowlist (and the README **not registered** marker) at a live issue.
+If none is open, file one covering the manifest entry, dropping
+the allowlist row, and dropping **not registered** from the README row.
+The PR that resolves that issue is when this step can bind the hook.
+
+- **Do:** treat a documented-but-inert catalog row as a deferred
+  registration, not as a `--fix` miss on this merge.
+- **Don't:** report the merged hook as live after this step when it is still
+  allowlisted.
 
 **A hook cannot be the instrument that BOOTSTRAPS this**, which is worth
 stating so nobody reaches for one first.

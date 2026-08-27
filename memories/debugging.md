@@ -31,7 +31,7 @@ Pattern: any loop that accumulates lines before processing should break (or trac
 - Fenced code block inside a blockquote (`> ``` … > ``` `)
 - Multi-line code block body (not just single-line) in each of the above
 
-Hit on d-morrison/ai-config#265: the semantic-line-breaks script lacked fence
+Hit on Morrison-Lab/ai-config#265: the semantic-line-breaks script lacked fence
 tracking in the bullet continuation loop and the blockquote collection loop.
 Both took two rounds of review to fully fix (single-line fence caught in round 1,
 multi-line body in blockquotes caught in round 2).
@@ -348,7 +348,7 @@ The remedy above was already written and not reached for, so what recurs is
 recall rather than knowledge, and this machine's BSD `grep` also rejects `-P`.
 
 ## Writing robust bash scripts (recurring review findings)
-Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —
+Lessons the reviewer flagged across the `session-lock` PR (Morrison-Lab/ai-config#38) —
 pre-empt these when authoring shell, especially under `set -euo pipefail`:
 - **`mktemp` + rename: add a cleanup trap.** A process killed between `mktemp`
   and the `mv` orphans temp files forever. Pattern: `tmp=$(mktemp -- "<dir>"/.tmp.XXXXXX);
@@ -598,8 +598,10 @@ website render that collides.
 
 When you fix such a post-merge-only failure, don't stop at the fix — add a
 **cheap static check that runs on `pull_request`** so the bug class can't regress
-unnoticed. It needn't reproduce the whole heavy job; a few seconds of parsing
-that asserts the invariant is enough. d-morrison/rme#970 added `check-render-headers`, a
+unnoticed.
+It needn't reproduce the whole heavy job; a few seconds of parsing
+that asserts the invariant is enough.
+d-morrison/rme#970 added `check-render-headers`, a
 ~120-line Python + PyYAML script that asserts "no two of a render-list page's
 formats resolve to the same output file," runs in ~8s, and would have caught the
 original bug at PR time. Prevention (fix the scaffolder/template that emits the
@@ -881,7 +883,7 @@ occurrence, not the flagged one.)
   a rendered docs-site preview runs ~40+ MB, so a couple dozen closed PRs'
   previews reach 1 GB on their own.
 - Fix: dispatch the repo's `cleanup-pr-previews` workflow (the
-  `d-morrison/gha` reusable: deletes previews for non-open PRs, then
+  `Morrison-Lab/gha` reusable: deletes previews for non-open PRs, then
   orphan-squashes `gh-pages` under `compact-history`) rather than waiting
   for its weekly Sunday cron — the limit can be crossed mid-week. Re-measure
   after, and expect the next successful Pages build to pick up everything
@@ -942,7 +944,7 @@ occurrence, not the flagged one.)
   `.../gh-pages/pr-preview/pr-598/vignettes/x.html`. Then grep the HTML for
   the thing you're verifying.
 - This is strictly better than the "403 on the docs page, so raw-fetch its
-  `.qmd` source instead" fallback in `d-morrison/gha`'s `CLAUDE.md`: the
+  `.qmd` source instead" fallback in `Morrison-Lab/gha`'s `CLAUDE.md`: the
   source only tells you what SHOULD render, while the `gh-pages` blob is the
   actual rendered artifact the reader sees, so it verifies the whole
   toolchain end to end.
@@ -1012,7 +1014,7 @@ interpret replacement escapes like `\\1`.
 If you do need regex matching (`fixed = FALSE`), replacement escapes can still
 apply, so validate any claim about replacement behavior against a runnable
 example before recording a generalized rule.
-(Correction logged from review on d-morrison/ai-config#641, 2026-07-22.)
+(Correction logged from review on Morrison-Lab/ai-config#641, 2026-07-22.)
 
 ## When a diagnosis asserts an ordering, measure the ordering
 

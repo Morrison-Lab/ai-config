@@ -32,33 +32,52 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Read every cited source against what it actually says, rather than checking that the link resolves.
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
 
-3. **Check quality and repo conventions**
+3. **The Slop Detector**
+   - Default to skepticism: evaluate what the artifact actually does, never what the surrounding comment or commit message claims it does.
+     A `// TODO: handle edge case` comment is not a handled edge case.
+     File it under step 1's unhandled-edge-case check rather than taking the comment's word for it.
+   - Flag obvious placeholder comments (e.g. `// increment counter` above `counter++`), copy-paste artifacts, cargo cult code, and dead code.
+   - Flag lazy naming only when the name is genuinely uninformative in its context (`data1`, `temp`, `foo`, a single unexplained letter used across an unrelated scope).
+     A conventional, widely-used short name --- `df` for a data frame, the idiom this corpus's own examples use in `shared/coding/tidy-code.md` and `shared/coding/per-operation-grouping.md` --- is not by itself a finding.
+   - Flag a function doing multiple unrelated things, a file with no coherent purpose ("everything else" catch-all), inconsistent patterns within the same diff, or an import added but never used --- each as a concrete `[Defect]` naming the file, line, and what the fix would be, never as an unfalsifiable vibe.
+
+4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
 
-4. **Deliver a structured verdict**
-
+5. **Deliver a structured verdict**
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-5. **Fingerprint what you read**
+6. **Fingerprint what you read**
 
-   End the report, after the verdict, with the commit you reviewed:
+   End the report, after the verdict, with the commit you reviewed
+   as a bare line, not inside a fence:
 
-   ```text
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
-   ```
 
    Read that sha yourself rather than taking it from the brief.
-   The pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
+   On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
+   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it last.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
-   Write the label plainly on its own line: emphasis around it is tolerated, but the guard reads the first fingerprint AFTER your verdict, so put it last.
+   Write the label plainly on its own line: emphasis around it is tolerated.
 
-State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
+State the verdict on its own line in that exact form.
+Return the structured report as this call's own message,
+not as a pointer to a file.
+Emit nothing after the fingerprint.
+`parse_report()` (Claude Code's pre-push guard, and the
+Cursor Cloud recovery gate) accepts `Needs work` as well as
+`Needs more work`, an optional heading, and spaces around the colon.
+Emphasis wrapping the whole verdict line is no verdict.
+Fenced content is blanked before both searches.
+An unclosed fence is no verdict.
+A fingerprint only inside a fence is no fingerprint.
+A verdict line in any other form is no verdict.
 
 You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).

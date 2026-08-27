@@ -38,7 +38,7 @@ We build code and prose that is:
   degrades quadratically as the input grows.
 - **Secure and private** — no leaked secrets or PHI (the `check-phi`
   capability in
-  [`d-morrison/gha`](https://github.com/d-morrison/gha) scans for it),
+  [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) scans for it),
   third-party dependencies vetted and SHA-pinned, and borrowed code
   license-gated with attribution
   ([`scout-peers`](../../skills/scout-peers/SKILL.md)).
@@ -174,7 +174,7 @@ Operationalized by:
 composes across call sites only when what varies between them is exposed
 as a parameter, not buried as a literal), and the
 "highly modular and idiomatic" review priorities in
-[`gha`'s `CLAUDE.md`](https://github.com/d-morrison/gha/blob/main/CLAUDE.md)
+[`gha`'s `CLAUDE.md`](https://github.com/Morrison-Lab/gha/blob/main/CLAUDE.md)
 (favor small, single-purpose functions over long monolithic blocks;
 flag duplicated logic, functions that do too much, and steps that
 should be extracted and named).
@@ -190,7 +190,7 @@ has to earn it.
 Operationalized by:
 [`tidy-code`](../coding/tidy-code.md) and the "idiomatic" half of the
 review priorities in
-[`gha`'s `CLAUDE.md`](https://github.com/d-morrison/gha/blob/main/CLAUDE.md)
+[`gha`'s `CLAUDE.md`](https://github.com/Morrison-Lab/gha/blob/main/CLAUDE.md)
 (the Modularity entry above carries the "modular" half), following the
 [SERG lab manual](https://ucd-serg.github.io/lab-manual/) and the
 [tidyverse style guide](https://style.tidyverse.org/).

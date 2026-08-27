@@ -1,10 +1,8 @@
 # Claude Code hooks: manifest, registration, and install failures
 
-How this repo's hooks reach a machine and how that goes wrong --- the native
-`hooks/hooks.json` schema, the split between `install-hooks.py` (which binds)
-and `check-install.py` / `bootstrap.sh` (which place), and the two routes to a
-registered hook whose script is absent, one of which takes the whole `Bash`
-tool down.
+How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and a manual copy (which places, the plugin loader serving its hooks from the plugin root instead), and the two routes to a registered hook whose script is absent, one of which takes the whole `Bash` tool down.
+`check-install.py`, this file's original placement instrument, was removed along with the symlink install it verified.
+[ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) tracks a replacement, so read every reference to it below as historical.
 
 Split out of [`claude-code.md`](claude-code.md), which had reached the
 1200-line advisory threshold; the harness behaviour that is not about hooks
@@ -140,10 +138,10 @@ That existence test runs only after `find_entry` has already found the entry.
 A hook classified `missing` (declared in the manifest, absent from settings.json) is registered with no existence check at all, so `--fix` manufactures precisely the `stale` state the same run would have refused to write.
 
 **The warning exists and `--fix` does not print it.**
-The note naming the division of labour is inside the `if not args.fix:` branch:
+The note naming the division of labour is inside the `if not args.fix:` branch (wording as of the ai-config#2229 rewrite):
 
 ```
-Note --fix only edits settings.json. The scripts themselves are placed by bootstrap.sh; run scripts/check-install.py --fix if ~/.claude/hooks holds real copies instead of symlinks.
+Note --fix only edits settings.json and never places the scripts themselves. On a fresh machine, install the Claude Code plugin instead (it registers the full catalog with no separate step); this path only helps if ~/.claude/hooks already holds the scripts some other way.
 ```
 
 A plain run prints it; the `--fix` run that causes the damage does not.
@@ -153,6 +151,8 @@ So the operator sees it one command before it matters and never at the moment it
 It walks the whole manifest, so a hook merged days earlier and never registered rides along with the two you just merged.
 
 **Recovery: `/reload-plugins` places the symlinks, and is better than the alternatives above.**
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** the recovery below relied on the retired install placing symlinks into `~/.claude/hooks` --- today `/reload-plugins` refreshes the plugin, whose hooks run from the plugin root, and nothing places symlinks there.
+Keep it as the incident record it is.
 The parent section prefers restoring the file to a settings.json edit, and is right, but hand-creating a no-op pass-through is not the way to do it when the scripts exist in the checkout.
 `/reload-plugins` re-runs the install and links every declared hook at once, so all the broken entries become valid together rather than one path at a time.
 It also needs no Bash, which matters because Bash is exactly what is down.
@@ -166,10 +166,9 @@ The transferable half is not about hooks.
 The operation the operator wanted was composite, it needs two tools, and half of it is worse than none.
 That is [`fail-fast`](../shared/principles/fail-fast.md)'s "partial is worse than absent" one layer out: there the guard is partially *written*, here the guard is complete, correct, and partially *installed*.
 
-- **Do:** run `check-install.py --fix` before `install-hooks.py --fix`, so every script is on disk before anything binds to it.
-  (Inferred from the incident, not given as a user directive.)
+- **Do:** confirm `~/.claude/hooks/<script>` exists before running `install-hooks.py --fix` for it --- there is no automated placement instrument for this any more (see the top of this file), so verify by hand or use the Claude Code plugin path instead, which needs no placement at all: the loader serves and binds every declared hook from the plugin root. (Inferred from the incident, not given as a user directive.)
 - **Do:** read a tool's success line as covering that tool's own scope, and name the other half of a composite operation yourself.
-- **Do:** reach for `/reload-plugins` when registered hooks point at absent scripts that do exist in the checkout.
+- **Do:** reach for `/reload-plugins` when the plugin's own hooks look stale or broken --- its symlink-repair reading (registered hooks pointing at absent `~/.claude/hooks` scripts) is historical, per the marker above.
 - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
 - **Don't:** expect `--fix` to warn you about this.
   It prints that note only when run *without* `--fix`.
@@ -185,6 +184,20 @@ The user ran `/reload-plugins`.
 `ls -la ~/.claude/hooks` then showed all three as symlinks into the repo, timestamped at the reload.
 No user correction was given --- the finding is inferred from the incident.
 Verified against the scripts rather than recalled: the docstrings quoted above, `classify()`'s existence test, and the note's placement inside the non-`--fix` branch.)
+
+2nd occurrence, 2026-08-26, Morrison-Lab/ai-config#2292 post-merge on
+Cursor Cloud: `install-hooks.py --fix` ran while `check-install.py`
+reported 15 missing including `hooks`, writing 47 bindings into a
+newly created `~/.claude/settings.json` that pointed at
+`$HOME/.claude/hooks/` before that directory existed.
+`check-install.py --fix` immediately afterwards placed the 15
+symlinks, and a later `install-hooks.py` report was
+`registered=47 missing=0 stale=0`.
+Cursor Cloud does not load Claude `PreToolUse` hooks, so Bash in that
+session did not die; the settings.json was still the
+registered-but-absent state the 2026-08-05 incident produced.
+The order in the Do bullet above is the recovery as well as the
+prevention.
 
 ## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
 

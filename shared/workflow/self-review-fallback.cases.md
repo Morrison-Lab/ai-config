@@ -55,10 +55,15 @@ grant --- that grant's scope limit is a **fully clean** PR, and a PR one human
 action short of a reachable reviewer is not one.)
 
 2nd occurrence, 2026-08-25, [ai-config#2234](https://github.com/Morrison-Lab/ai-config/pull/2234):
-Cursor Cloud comments post as `cursor[bot]` / `NONE`, so the same
-OWNER/MEMBER/COLLABORATOR allowlist on `jules-review.yml` skipped the
-request.
-Do not re-post from a session whose comments post as `cursor[bot]` / `NONE`;
+Cursor Cloud comments post as `cursor[bot]`.
+A 2026-08-25 memory recorded that identity as `NONE`;
+a 2026-08-26 REST re-read of the `@jules review` comment
+([5415839558](https://github.com/Morrison-Lab/ai-config/pull/2234#issuecomment-5415839558))
+returns `CONTRIBUTOR`.
+Either value is outside OWNER/MEMBER/COLLABORATOR, so the same
+allowlist on `jules-review.yml` skipped the request.
+Do not re-post from a session whose comments post as `cursor[bot]`
+outside that allowlist;
 a human OWNER/MEMBER/COLLABORATOR comment is the unblock
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 
@@ -267,3 +272,20 @@ the contamination explanation has cheap remedies of its own, in the [`adversaria
 Take the case as establishing that a clean same-vendor verdict is not evidence of absence, which all three explanations deliver, rather than as measuring how much of the gap each one accounts for.
 
 The tracking issue is [ai-config#2177](https://github.com/Morrison-Lab/ai-config/issues/2177).
+
+## Verification passes returned Clean while fresh rounds kept finding defects
+
+Measured on ucdavis/bcs#736, 2026-08-26, during a repo-wide review-workflow
+outage.
+Two verification passes --- each briefed with the prior round's findings and
+asked whether the fixes landed --- returned Clean at their heads.
+Two successive fresh clean-slate rounds then each found real defects every
+earlier round had passed over: the checking machinery self-declared in its
+own input set (a refactor of the checker would have flipped all five
+artifacts stale, at an HPC-rerun cost measured in weeks), and an undeclared
+runtime CSV input in the silent stale-verifies-current direction.
+A third fresh round then caught an over-declaration the second fresh round's
+fix had itself introduced, and the fourth returned Clean.
+The series is the fragment's argument in miniature: verification confirms,
+fresh eyes re-derive, and only re-derivation finds the defect nobody was
+asked about.

@@ -58,9 +58,10 @@ It fails quietly toward the narrower scope,
 and nothing about the resulting secret looks wrong in a listing.
 
 `Morrison-Lab`'s `GEMINI_API_KEY` is the worked example.
-It sits at `private` while its three siblings sit at `all`,
-and the only private repo in the org does not use it,
-so the secret reaches nothing
+At the time of the migration it sat at `private`
+while its four siblings sat at `all`,
+and the only private repo in the org did not use it,
+so the secret reached nothing
 ([ai-config#2361](https://github.com/Morrison-Lab/ai-config/issues/2361)).
 
 The plan gate is separate,
@@ -119,6 +120,12 @@ Real turns and real spend.
 A credential that failed to authenticate cannot produce a non-zero
 `total_cost_usd`,
 so that field is the discriminator and the conclusion is not.
+The inference needs one precondition, restated here because this is where it
+gets applied: non-zero cost proves *some* credential authenticated, so it
+identifies **the** credential under test only when the run had exactly one
+available --- no surviving repo-level copy, and no sibling credential (an
+`ANTHROPIC_API_KEY`, say) the workflow could fall back to.
+The canary satisfied it: `qmt` had zero repository secrets, verified.
 
 This is the shape
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)
@@ -157,27 +164,47 @@ Tracked as [ai-config#2371](https://github.com/Morrison-Lab/ai-config/issues/237
 - **Don't:** leave a discovery step
   whose empty result is indistinguishable from its healthy one.
 
-## `require-gh-repo-flag.py` blocks every org-secret write
+## `require-gh-repo-flag.py` blocks the bare org-secret write
 
 The local guard discharges only on `-R`/`--repo`,
 but an org secret is addressed with `-o/--org`,
-so every org-secret write is refused.
-The block message advises adding `-R <owner>/<repo>`,
-which would write a repository secret instead.
+so the natural spelling of an org-secret write is refused,
+and the block message steers toward `-R`,
+which is the wrong flag for the org form.
 
-It also splits on the pipe character,
-so the stdin idiom that keeps a secret value out of `argv` is blocked,
-and it matches command text inside a heredoc,
-so writing *about* the pattern trips it too.
+The workaround is stated here because the first draft of this file got it
+wrong, and an adversarial review round refuted the error by executing both
+halves (PR #2373): `gh` ignores an inherited `-R` when `-o` is present,
+so adding a redundant `-R <owner>/<repo>` **discharges the guard and still
+writes the org secret** --- verified with `--no-store`,
+which encrypted against the org public key
+even when the `-R` value named a nonexistent repository.
+The false belief worth recording alongside the fact:
+"the hint would cause a wrong-target write" reads as obviously true from the
+guard's message and is refuted by one probe of the tool itself,
+which is [`self-review-fallback`](../shared/workflow/self-review-fallback.md)'s
+check-the-tool's-own-documentation rule in miniature.
+
+Two real defects remain in the guard.
+The discharge-on-`-R` behaviour above means the guard is satisfied by an
+**inert** flag, which is a proxy for "target named" rather than the thing
+itself; widening the discharge to `-o`/`--org` and `-u`/`--user` is the fix.
+And it matches command text inside a heredoc,
+so writing *about* the pattern trips it too
+(measured while filing the tracking issue).
 
 Tracked as [ai-config#2367](https://github.com/Morrison-Lab/ai-config/issues/2367).
-Until it lands, write org secrets through the web UI.
+The pipe split in the guard is real but not the blocker it first appears:
+a piped stdin write carrying an explicit target passes,
+and the org form was blocked by the missing `-R` with or without a pipe.
 
 ## Keeping a token out of an agent's context
 
-Actions secrets are write-only over the API.
-`secrets/<NAME>` returns `name`, `visibility`, and `updated_at`,
-never the value.
+Actions secrets are write-only over the API:
+no endpoint returns the value.
+The org-scoped `secrets/<NAME>` returns `name`, `visibility`,
+`created_at`, and `updated_at`;
+the repo-scoped one returns no `visibility` at all.
 So an agent can verify a secret's configuration
 and prove it authenticates,
 without ever being able to read it.

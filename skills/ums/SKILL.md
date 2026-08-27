@@ -328,7 +328,7 @@ committed pass.
    | What | Where | Change |
    |------|-------|--------|
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
-   | glab has no --state flag | `/memories/github.md` | New bullet |
+   | glab has no --state flag | `/memories/gitlab.md` | New bullet |
 
 ## What to look for (checklist)
 

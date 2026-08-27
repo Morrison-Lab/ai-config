@@ -335,8 +335,8 @@ grep -nE 'draft|if:' /tmp/rw/.github/workflows/<called-workflow>.yml
 ```
 
 An out-of-scope repo still clones, since the git proxy serves anonymous public
-reads --- see [`memories/github.md`](../../memories/github.md)'s ladder, which
-covers the same fallback for ref lookups.
+reads --- see [`memories/github-remote-sessions.md`](../../memories/github-remote-sessions.md)'s
+ladder, which covers the same fallback for ref lookups.
 
 **Working several issues in one session? Verify you actually switched branches
 before writing the second issue's code.** The `git checkout -b <type>/<slug>

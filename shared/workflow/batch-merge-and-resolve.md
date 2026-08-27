@@ -416,11 +416,10 @@ direction --- see
 [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md), which owns that
 fact.
 
-## Three silent failure modes arrive through a conflict-free merge
+## Four silent failure modes arrive through a merge nothing flags
 
 The reason "no conflict" is not an all-clear.
-All three landed through merges that git resolved cleanly, with nothing in the
-diff to point at and no check turning red.
+All four landed through merges that left nothing in the PR diff to point at and no check turning red --- three through merges git resolved cleanly, and one through a marked conflict resolved the wrong way.
 
 **Version parity.**
 A clean merge of `main` can leave an R package's `DESCRIPTION` `Version:` at
@@ -442,12 +441,10 @@ The result is a valid tight item that renders inconsistently beside its loose
 neighbours.
 
 **A branch-side fix, reverted line by line.**
-A real conflict --- not the clean auto-merges the other two cases in this
-section describe --- can still resolve silently toward `main`'s side, discarding
-a fix the branch made without ever raising a marker.
-Because the restored text is byte-identical to `main`'s copy, the reverted
-line produces zero diff against `main` and is invisible to an ordinary PR-diff
-review.
+A merge of `main` can restore a line the branch had deliberately changed, discarding the branch's fix.
+In the measured case the region raised a real conflict marker and the manual resolution picked `main`'s side;
+git's own heuristics can also resolve such a region cleanly, with no marker at all, when only one side appears to have changed it.
+Either way the reversion is invisible afterwards: because the restored text is byte-identical to `main`'s copy, the reverted line produces zero diff against `main` and an ordinary PR-diff review cannot see it.
 [`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one
 line at a time" section owns this case, including the pre-merge-tip-to-merge
 comparison that is the only check able to see it.

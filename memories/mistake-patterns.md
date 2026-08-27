@@ -278,3 +278,33 @@ A clean automated review from every available provider evaluating the current HE
   override-drops-token test and #2419's veto tests, both caught in
   unposted local pre-push review rounds rather than on those PRs'
   records.)
+
+## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
+- **Mistake**: When the `adversarial-reviewer` subagent type is unregistered
+  in a session, dispatching a same-vendor `general-purpose` Claude subagent
+  with an adversarial-refute-brief prompt as the fallback, without first
+  checking whether a separate CLI (`codex`, `opencode`, `agy`) is reachable
+  on `PATH`.
+  A same-vendor subagent shares the training and therefore the blind spots
+  of the author, per `adversarial-self-review.md` line 21 --- it is not a
+  weaker version of independence, it is the specific thing dispatching was
+  meant to buy and did not.
+- **Example**: 2026-08-27, ai-config#2434 (a memory-only PR).
+  `Agent type 'adversarial-reviewer' not found` fired on the first review
+  attempt.
+  Fell back to a same-vendor `general-purpose` subagent for both review
+  rounds and pushed with `ALLOW_UNREVIEWED_PUSH=1`, without running
+  `which codex`/`which opencode`/`which agy` first.
+  A later check in the same session showed `opencode` and `agy` both
+  resolved on `PATH` (only `codex` was absent), so the documented stronger
+  fallback --- `delegate-to-opencode` --- was available the whole time and
+  simply never tried.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md)
+  ("No Agent tool, or no reviewer registered here?
+  A separate CLI is the same move and a stronger one ---
+  `delegate-to-codex` or `delegate-to-opencode`.").
+- **Fix**: Before falling back to a same-vendor subagent, run
+  `which codex; which opencode; which agy` (or the OS equivalent) and
+  route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.
+  Only fall back to a same-vendor subagent, stating so explicitly in the
+  push reply, when none of those three CLIs are reachable at all.

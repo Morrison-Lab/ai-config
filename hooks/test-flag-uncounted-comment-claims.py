@@ -641,6 +641,41 @@ ACCEPTED_MISS_BLOCKQUOTED_LIST = (
     "> - interval-labels\n"
 )
 
+# ai-config#2386 round 13 (comment 5437115827): GFM task-list checkboxes
+# (`- [ ] item` / `- [x] item`) extracted ZERO tokens per item -- `[`
+# matches neither the optional backtick nor TOKEN's required leading
+# letter -- so the whole claim silently vanished below the 2-token floor,
+# even though ENUM_BULLET_RE's block scan already matched. Fixed by
+# tolerating an optional checkbox between the marker and the token. Must-
+# fire fixtures for unchecked, checked (lowercase and uppercase x), and
+# mixed checked/unchecked forms; a must-not-fire fixture confirming the
+# citation filter applies identically with a checkbox present.
+TASK_LIST_UNCHECKED_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- [ ] cycle-charge-flee\n"
+    "- [ ] interval-labels\n"
+)
+TASK_LIST_CHECKED_LOWERCASE_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- [x] cycle-charge-flee\n"
+    "- [x] interval-labels\n"
+)
+TASK_LIST_CHECKED_UPPERCASE_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- [X] cycle-charge-flee\n"
+    "- [X] interval-labels\n"
+)
+TASK_LIST_MIXED_CHECKED_STATE_RECALLED_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- [ ] cycle-charge-flee\n"
+    "- [x] interval-labels\n"
+)
+TASK_LIST_ALL_CITATIONS_MUST_NOT_FIRE = (
+    "The fingerprinted scripts:\n"
+    "- [ ] ai-config/claude-hook-adapter.py\n"
+    "- [x] local-bin/encrypt-gh-token.sh\n"
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -1020,6 +1055,29 @@ def unit_checks(mod):
           mod.find_claims(ACCEPTED_MISS_ORDERED_LIST_PAREN_DELIMITER), [])
     check("find_claims ACCEPTS missing a blockquoted list",
           mod.find_claims(ACCEPTED_MISS_BLOCKQUOTED_LIST), [])
+
+    # Regression: review round 13 (comment 5437115827) -- GFM task-list
+    # checkboxes extracted zero tokens per item, silently discarding the
+    # whole claim below the 2-token floor. Fixed via an optional checkbox
+    # tolerated between the marker and the token.
+    claims = mod.find_claims(TASK_LIST_UNCHECKED_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches an unchecked task list of recalled identifiers",
+          bool(enum_claims), True)
+    claims = mod.find_claims(TASK_LIST_CHECKED_LOWERCASE_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a lowercase-checked task list of recalled identifiers",
+          bool(enum_claims), True)
+    claims = mod.find_claims(TASK_LIST_CHECKED_UPPERCASE_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches an uppercase-checked task list of recalled identifiers",
+          bool(enum_claims), True)
+    claims = mod.find_claims(TASK_LIST_MIXED_CHECKED_STATE_RECALLED_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a task list mixing checked and unchecked items",
+          bool(enum_claims), True)
+    check("find_claims silent on a task list of genuine path citations",
+          mod.find_claims(TASK_LIST_ALL_CITATIONS_MUST_NOT_FIRE), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

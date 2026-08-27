@@ -914,17 +914,37 @@ ENUM_BULLET_RE = re.compile(
 # (round 12, ai-config#2386 comment 5436859164) -- see that constant's own
 # comment above `ENUM_BULLET_RE` for why, and the "BULLET-LIST FORMAT
 # COVERAGE" note below for the fuller inventory this round also produced.
-BULLET_TOKEN_RE = re.compile(rf"^[ \t]*{BULLET_MARKER}\s+`?({TOKEN}(?:/{TOKEN})*)`?", re.M)
+#
+# Optional GFM task-list checkbox (`[ ]`/`[x]`/`[X]`) tolerated between the
+# marker and the token, round 13 (ai-config#2386 comment 5437115827): a
+# checkbox-prefixed item (`- [ ] cycle-charge-flee`) previously extracted
+# ZERO tokens, not a misclassified one -- `[` matches neither the optional
+# backtick nor `TOKEN`'s required leading letter, so the per-item regex
+# failed outright on every checkbox line while `ENUM_BULLET_RE`'s block
+# scan (which does not care what follows the marker) still matched,
+# meaning the surrounding claim silently vanished below the `len(tokens) <
+# 2` floor. Fixed the same way the optional backtick already is: an
+# optional non-capturing group consumed before the token, mirroring rather
+# than duplicating that existing pattern. Unlike round 12's two reasoned
+# exclusions (`)`-delimiters: rare; blockquotes: someone else's quoted
+# text), a task-list checkbox has no comparable justification to leave
+# out -- it is a first-party, extremely common way to present exactly the
+# "here's what I checked" enumeration this hook exists to catch, so fixed
+# rather than pinned as an accepted miss. See the "BULLET-LIST FORMAT
+# COVERAGE" note below for where this is recorded in the inventory.
+BULLET_TOKEN_RE = re.compile(
+    rf"^[ \t]*{BULLET_MARKER}\s+(?:\[[ xX]\]\s+)?`?({TOKEN}(?:/{TOKEN})*)`?", re.M)
 
-# BULLET-LIST FORMAT COVERAGE (ai-config#2386 round 12, comment 5436859164):
-# an inventory of markdown list/format shapes considered this round, each
-# tested directly against `find_claims`, so a future round can cite this
-# note instead of re-discovering one format gap per round the way rounds
-# 10/11/12 each found one (the bulleted-list detection path itself predates
-# this round's own review-round numbering, so no specific round is cited
-# for its original introduction -- verified via `git log -S` that it landed
-# in a self-review commit before round 4's own review ran, so "round 4" is
-# NOT the right attribution and is deliberately not claimed here):
+# BULLET-LIST FORMAT COVERAGE (ai-config#2386 rounds 12-13, comments
+# 5436859164 and 5437115827): an inventory of markdown list/format shapes
+# considered across these rounds, each tested directly against
+# `find_claims`, so a future round can cite this note instead of
+# re-discovering one format gap per round the way rounds 10/11/12/13 each
+# did (the bulleted-list detection path itself predates this round's own
+# review-round numbering, so no specific round is cited for its original
+# introduction -- verified via `git log -S` that it landed in a
+# self-review commit before round 4's own review ran, so "round 4" is NOT
+# the right attribution and is deliberately not claimed here):
 #
 #   COVERED (fires correctly, verified by fixture in the test suite):
 #   * Hyphen bullets (`- item`), the original marker this detection path
@@ -936,6 +956,14 @@ BULLET_TOKEN_RE = re.compile(rf"^[ \t]*{BULLET_MARKER}\s+`?({TOKEN}(?:/{TOKEN})*
 #   * A single leading space/tab of indentation before the marker (`[ \t]*`
 #     in both regexes above) -- an ordinary, unindented-looking list that
 #     happens to sit one space in still matches.
+#   * GFM task-list checkboxes (`- [ ] item` / `- [x] item` / `- [X]
+#     item`) -- round 13. An extremely common first-party syntax for
+#     exactly the "here's what I checked" enumeration this hook exists to
+#     catch, unlike the two reasoned exclusions below, so fixed (an
+#     optional `(?:\[[ xX]\]\s+)?` tolerated between the marker and the
+#     token, mirroring the existing optional-backtick tolerance) rather
+#     than excluded. Works with any marker type, checked or unchecked,
+#     and a list mixing checked and unchecked items.
 #
 #   TESTED, FOUND ALREADY COVERED (no code change needed):
 #   * A lazy continuation line AFTER the last marker line in a block (a
@@ -1000,6 +1028,23 @@ BULLET_TOKEN_RE = re.compile(rf"^[ \t]*{BULLET_MARKER}\s+`?({TOKEN}(?:/{TOKEN})*
 #     reasoning `visible_prose` already applies to a blockquoted SENTENCE
 #     claim (`> There are 3 files` does not fire either, by design) --
 #     consistent rather than a new gap, so not revisited here.
+#
+#   ON FUTURE GFM CONSTRUCTS NOT LISTED ABOVE (per ai-config#2386 round 13,
+#   comment 5437115827): rounds 10-13 each found and closed one format gap
+#   -- marker character, then trailing-slash regression, then marker
+#   character again (numbered/`+`), then this checkbox gap -- which is
+#   diminishing returns on a per-item basis for a warn-only, fail-open
+#   hook. If a future round finds a further GFM list/format construct this
+#   inventory does not name, the right response is to extend THIS note's
+#   reasoning wholesale (i.e. decide and document a general policy for
+#   "an unlisted GFM construct is <covered-by-default|excluded-by-default>
+#   unless it meets <criteria>", covering the whole remaining space at
+#   once) rather than adding a fifteenth per-construct bullet the way this
+#   list has grown so far. No such policy is stated yet because round 13
+#   is not that trigger -- checkboxes had a clean, cheap, low-risk fix
+#   available, same as rounds 10-12's gaps -- but the NEXT unlisted
+#   construct, whatever it is, should prompt writing that policy rather
+#   than another isolated fix-or-exclude decision.
 
 
 def _bullet_dangling_extends(continuation):

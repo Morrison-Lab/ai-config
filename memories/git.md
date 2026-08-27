@@ -455,3 +455,34 @@ The flagged commits were in the **ai-config** checkout, pulled in minutes
 earlier by a routine `git pull --ff-only`, authored by the repo owner.
 `git merge-base --is-ancestor HEAD origin/main` returned true, settling it
 in one command.)
+
+## Git --- a test fixture's bare repo needs its default branch pinned
+
+`git init --bare` names its initial branch from `init.defaultBranch`,
+and that setting is not yours to assume:
+GitHub Actions runners leave it unset (upstream default `master`),
+while a dev machine often sets `main` ---
+on macOS, Apple Git's vendor gitconfig
+(`/Library/Developer/CommandLineTools/usr/share/git-core/gitconfig`)
+sets `init.defaultBranch=main` in a file that survives
+`HOME=` and `GIT_CONFIG_SYSTEM=/dev/null` overrides,
+so a "clean-env" re-run with those still reads `main`.
+`GIT_CONFIG_NOSYSTEM=1` is what actually removes it
+(`git var GIT_DEFAULT_BRANCH` then reports `master`).
+A fixture that creates a bare remote and later pushes `main`
+passes locally and fails in CI:
+the remote's `HEAD` symref stays on unborn `master`,
+a second clone checks out nothing,
+and the scenario silently degrades.
+Pin it: `git init --bare -b main` (git 2.28+).
+
+- **Do:** pass `-b main` (or set `init.defaultBranch` in the fixture's
+  own env) whenever a test creates a repo another step will clone.
+- **Do:** use `GIT_CONFIG_NOSYSTEM=1` for a discriminating clean-env
+  re-run on macOS; `HOME=$(mktemp -d)` does not remove the vendor config.
+- **Don't:** read a locally-green fixture suite as CI-safe when it
+  creates repos without pinning the branch name.
+
+(Measured 2026-08-27 on ai-config#2318: the rejected-push test passed
+locally under Apple Git's vendored `main` and failed under
+`GIT_CONFIG_NOSYSTEM=1`; caught by the external review before CI.)

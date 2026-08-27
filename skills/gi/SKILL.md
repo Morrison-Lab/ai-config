@@ -180,7 +180,7 @@ WIP — opened up front to claim the issue; implementing now."   # CREATE_PR
 # GitLab — draft MR
 glab mr create --draft --title "<title>" --description "Closes #<N>
 
-WIP — opened up front to claim the issue; implementing now." --assignee <your-gitlab-username>  # default: demorrison
+WIP — opened up front to claim the issue; implementing now." --assignee <your-gitlab-username>  # default: <user>
 ```
 
 Keep it a draft: a draft doesn't trigger the `@claude` review bot, so no review

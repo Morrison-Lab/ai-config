@@ -152,14 +152,19 @@ it; use the correct private tracker and redact sensitive details when needed.
 
 @shared/workflow/flag-session-boundaries.md
 
-Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
+This could be a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, or an open question answered with nothing pending.
+Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.
 A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 
 ## Flag good moments to run `compress-session`, too
 
-The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
+The mid-task counterpart is covered in the fragment above.
+Don't wait for automatic compaction to guess what matters.
+Flag it yourself (using the same `⚠️ **FLAG** ---` tag) once a session has grown large with a live task still in flight.
+This applies when there are many tool calls, long tool outputs no longer needed, or a session is already through one auto-compaction.
 Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
 ## Actively manage quota usage: models, compaction, and workflow structure
@@ -177,21 +182,17 @@ So the lever there is to **recommend** a change rather than make one.
 When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-Two metered CLI budgets remain, and the standing preference is to try both
-before Claude: `codex` first
-(ChatGPT plan, operationalized by `delegate-to-codex`),
-then `agy` CLI as availability allows.
-`agy` (Google Antigravity)'s API route was retired
-(user directive, 2026-08-20; ai-config#1776),
-so route no API-dispatched subagent work to it;
-headless `agy` CLI dispatch remains available
-per the 2026-08-25 clarification.
-Scope corrected 2026-08-23: the interactive subscription/extension is
-unaffected and not at quota.
-`opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
-`memories/delegation.md` carries the rule and the usage-window semantics
-across `opencode`, `codex`, and `agy`
-(CLI available since 2026-08-25; API retired).
+Active delegation budgets include `codex` (ChatGPT plan, operationalized by
+`delegate-to-codex`), `opencode` (OpenCode Go subscription, free models via
+Zen, local Ollama, operationalized by `delegate-to-opencode`), `agy` CLI
+(headless dispatch available since the 2026-08-25 clarification), and
+OpenRouter (prepaid credit balance for frontier/stealth previews).
+`agy` (Google Antigravity)'s **API** route was permanently retired for
+dispatched work (user directive, 2026-08-20, ai-config#1776).
+Only that route is out --- the `agy --print` CLI and the interactive
+subscription/extension are unaffected and not at quota.
+`memories/delegation.md` carries the rule, the usage-window semantics
+across `opencode`, `codex`, and `agy`, and the prepaid-balance details.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**
@@ -343,7 +344,7 @@ Boxed (a `===` line above and below the labeled block):
 Prefixed, no box (informational, frequent):
 
 - 📊 **UPDATE** — status or progress.
-- ⚠️ **FLAG** — non-blocking heads-up or risk.
+- ⚠️ **FLAG** --- non-blocking heads-up or risk.
 - ✔️ **DONE** — a completed action.
 - 🟢 **ALL CLEAR** — nothing needs the user right now; work continues in the background. The recap's standing sign-off.
 
@@ -710,7 +711,9 @@ Its second half is the general principle: best practice outranks repo precedent 
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
-The proactive counterpart to issue-first above: when a mistake shows up in any medium — code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else — even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
+The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else),
+even if it is out of scope for the current task, flag it in chat (`⚠️ **FLAG** ---`),
+and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 
@@ -759,7 +762,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer <reviewer>`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -774,18 +777,36 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
 A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
-## Watch and ARDI every PR you touch — don't ask first
+## Watch and ARDI every PR you touch --- don't ask first
 
-When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
-That answer is a standing yes across all PRs and all repos.
-Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP server in remote/web sessions) or babysit locally, drive every review round to fully-clean, and re-arm a periodic check-in since webhooks don't deliver CI-success or merge-conflict transitions.
+"Touch" here means driving the branch: you opened it, were asked to iterate or take it to clean, or are pushing fixes.
+A request to post a review and leave findings, with no request to edit, is not that kind of touch.
 
-This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
+**Driving.**
+The persistent-loop standing yes lives in `AGENTS.md` and applies to every agent.
+This section is only the Claude-specific half: how this harness wakes, and how it must not double-trigger review.
+
+When you open (or are handed) a PR/MR to drive, in any repo, subscribe to its activity and run the ARDI loop to clean **automatically** --- never ask "should I watch this?" or "should I iterate it?" first.
+That answer is a standing yes across all PRs you are driving.
+Subscribe with `subscribe_pr_activity` when that tool exists (provided by the GitHub MCP server in remote/web sessions), or babysit locally.
+A subscription does not replace the persistent loop: PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
+Re-arm it periodically, since webhooks can't fill that gap.
+Drive every review round to fully-clean.
+
+This watch process never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
 Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
+
+**Review-only.**
+Do not start ARDI, do not push fixes, and do not merge.
+Leave the findings and stop unless asked to iterate.
+A later request to iterate is a driving request.
+
+(UCD-SERG/shigella#31, 2026-08-25.)
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 
@@ -1500,7 +1521,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 
 ## Useful prompt formats for coding agents
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from Morrison-Lab/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/prompt-formats.md](shared/vendored/prompt-formats.md)
 
 ## Review with Copilot before requesting human review
@@ -1508,7 +1529,7 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 This is shared lab guidance on getting an automated review before asking a human reviewer.
 When *I* iterate a PR, the ARDI loop above is the mechanism — it already addresses whatever the `@claude` or Copilot reviewer flags — so read this as the lab-member-facing statement of the same principle, not a second loop to run.
 
-<!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
+<!-- Vendored from Morrison-Lab/wai; edit there, not here. See README, "Shared content". -->
 [shared/vendored/copilot-review-before-human.md](shared/vendored/copilot-review-before-human.md)
 
 ## Growth mindset: seek resources rather than accept limitations
@@ -1654,6 +1675,9 @@ recurred immediately in a `jq` filter reading a PR review body.)
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
+  A disagreement among reviews is not fully clean: any standing not-clean
+  --- nits included --- vetoes merge even with `mwc` active
+  (ai-config#2274).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

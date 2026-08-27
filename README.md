@@ -322,7 +322,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
-| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs |
+| `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks` or `statusCheckRollup` (short surfaces, not the complete instrument) |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
@@ -344,7 +344,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
-| `warn-pr-create-without-dupe-check.py` | `PreToolUse` (Bash, mcp__github__.*) | warns when a command creates a PR and no earlier command in the session could have surfaced an already-open one; warns rather than blocks, since a duplicate PR is cheap to close and a blocked creation is not |
+| `warn-pr-create-without-dupe-check.py` | `PreToolUse` (Bash, mcp__github__.*) | warns when a command creates a PR or an issue and no earlier command in the session could have surfaced an existing one; issue discharge requires `--state all --search` (or `gh search issues` / MCP search_issues), not `--state open`; warns rather than blocks, since a duplicate is cheap to close and a blocked creation is not |
 | `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
@@ -360,6 +360,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless a separate `adversarial-reviewer` subagent returned a clean verdict as its own call result AND that report's `Reviewed-Commit:` fingerprint matches the commits the push would ship (refspec resolved), or the push itself is prefixed with `ALLOW_UNREVIEWED_PUSH=1`; a verdict quoted anywhere else --- in another file, or in this guard's own denial --- does not count |
 | `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
+| `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed (not registered -- see ai-config#2282) |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -418,7 +419,10 @@ Every hook must ship a companion `test-<name>.py` beside it in the same change b
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
 *tested* guard cannot regress unnoticed and an *untested* one cannot hide.
-It gates `validate` and pre-commit.
+Each suite has a 900-second deadline
+(override with `HOOK_TEST_SUITE_TIMEOUT`);
+a hung suite reports FAIL rather than stalling the sweep.
+The runner gates `validate` and pre-commit.
 One hook is untested today
 (`inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in
@@ -615,7 +619,7 @@ The `@claude` CI bot reads `shared/` from the repo root.
 
 ### Vendored from wai (`shared/vendored/`)
 
-A few fragments are authored in **[d-morrison/wai](https://github.com/d-morrison/wai)**
+A few fragments are authored in **[Morrison-Lab/wai](https://github.com/Morrison-Lab/wai)**
 instead (prompt formats, the Copilot-review workflow) — that repo hosts the
 UCD-SERG lab's "Working with AI" notes, migrated out of the lab manual once
 they outgrew a single chapter. This repo can't add wai as a submodule — wai

@@ -31,6 +31,13 @@ jobs:
         run: python3 scripts/check-jules-review-workflow.py
       - name: Run Jules-review workflow tests
         run: python3 scripts/test_check_jules_review_workflow.py
+      - name: Check github-actions step-if memory
+        # ai-config#2307: GitHub auto-applies success() unless if: names a
+        # status-check function. This gate fails if the memory reintroduces
+        # the claim that any explicit if: discards that default.
+        run: python3 scripts/check-github-actions-step-if.py
+      - name: Run github-actions step-if memory tests
+        run: python3 scripts/test_check_github_actions_step_if.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
       - name: Check tui-alloc README defaults
@@ -58,7 +65,11 @@ jobs:
         # scope rests on.
         run: python3 scripts/test_find_near_duplicates.py
       - name: Run harness-ignore-files check tests
+        # check-install.py and its install-integrity tests were removed with
+        # the symlink install logic; only the harness-ignores check remains.
         run: python3 scripts/test_check_harness_ignores.py
+      - name: Run Ollama locality verification tests
+        run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run Cursor rules-sync tests
@@ -110,6 +121,14 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run Antigravity hook adapter tests
+        # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
+        run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run hook-runner tests
+        # Per-suite timeout and interpreter spawn (ai-config#2098). The
+        # runner itself had no test, so a missing timeout would only show
+        # up as a Windows hang.
+        run: python3 scripts/test_test_hooks.py
       - name: Check the hook catalog against hooks.json
         # test_hooks.py above compares hooks against their TESTS. Nothing
         # compared them against their BINDINGS or against the README table a

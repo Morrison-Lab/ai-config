@@ -240,7 +240,7 @@ def verdict(hook_path, repo, command, subdir):
     payload = bash(command)
     cwd = os.path.join(repo, subdir) if subdir else repo
     proc = subprocess.run(
-        ["python3", hook_path], input=json.dumps(payload),
+        [sys.executable, hook_path], input=json.dumps(payload),
         capture_output=True, text=True, cwd=cwd,
     )
     if proc.returncode != 0:

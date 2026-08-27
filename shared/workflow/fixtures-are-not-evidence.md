@@ -503,6 +503,21 @@ The reviewer identified it precisely --- "the fixture likely only exercised two
 declarations with nothing substantive before them" --- and the replacement
 fixtures each place a real answer behind the run.)
 
+**The missing content can be a whole FIELD every real instance carries, not just a value inside one, and it hides behind a guard test rather than a bug fixture.**
+The case above is a fixture too thin to exercise the *bug*.
+This is a fixture too thin to exercise the *guard*, and it is worth naming separately because a guard-test fixture is usually written from what the guard reads rather than from a captured artifact, which guarantees it exercises that guard and nothing about whether the guard matches reality.
+
+(Measured 2026-08-27 on Morrison-Lab/ai-config#2409 / #2429.
+A driver-ledger classifier's fixtures modelled the two kinds of comment it needed to tell apart, but omitted the agent-disclosure marker ("_Posted by Claude Code (AI agent) --- not written by a human._") that BOTH real captured driver comments the classifier was built from (GitHub comment ids 5430672892 and 5430978306 on ai-config#2341) actually carry.
+The omission was invisible while the classifier had no positive gate to test -- every existing "this guard alone protects this fixture" test still passed, because negative guards don't need the marker to abstain correctly.
+It would have stopped being invisible the moment a positive marker gate was added: a fixture without the marker would pass through the NEW gate instead of through the guard it was written to test, so the test would keep passing for the wrong reason and report nothing about whether the intended guard still worked.
+The remedy that actually surfaces this is a per-guard neutering harness -- disable one guard branch at a time and confirm at least one test fails specifically because that branch is gone -- per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue;
+a fixture built from a real artifact is necessary and the neutering run is what proves it is also sufficient.)
+
+- **Do:** build a guard-test fixture from a real captured artifact, including fields that feel incidental to the guard you are naming it for.
+- **Do:** run a per-guard neutering harness and confirm which test fails when each guard is disabled, rather than trusting that a passing suite means every guard is covered.
+- **Don't:** hand-write a fixture for one guard's test from what that guard reads --- it is guaranteed to exercise that guard and tells you nothing about whether the fixture resembles a real instance.
+
 **A fixture can also reach the expected outcome by a second route, and the
 revert check above is what exposes that one.**
 The section above concerns a fixture too thin to exercise the bug.

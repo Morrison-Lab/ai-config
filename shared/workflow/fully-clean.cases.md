@@ -1023,6 +1023,30 @@ The admitted one bore no verdict because its verdict phrase sits inside a code s
 The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
 Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)
 
+## A driver-comment classifier drops a Copilot finding it has no guard for
+
+(Morrison-Lab/ai-config#2409 / #2429 / #2430, 2026-08-27.
+`check-pr-fully-clean.py`'s verdict scan (branch `fix/2409-driver-comments`, in progress) added a driver-ledger classifier so that a driving session's own status comments --- claim wording, an ARD disposition table, a self-imposed hold like "Do not merge.
+Blocked on review of `<sha>`" --- would stop being admitted as standing reviewer verdicts, per #2409.
+The classifier matches broad English markers (`hold off`, `back off`, a markdown table row carrying `Disposition`) and then abstains from excluding a comment when the comment also carries one of three NEGATIVE guards: a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, or a `**Claude finished` marker.
+
+Every one of those three guards is keyed on Claude's or Cursor's own report format.
+A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until the null check is added" emits none of that structure -- Copilot's report has no `### Verdict` heading, no `Reviewed-Commit:` line, and no `**Claude finished` marker.
+So the broad `hold off` marker matches, all three guards abstain, the comment is classified as a driver's own ledger, and it is dropped from the verdict scan before `classify_verdict()` ever sees it.
+The PR reports FULLY CLEAN with a genuine not-clean finding sitting unexamined on the thread.
+
+Reproduced by executing the classifier logic against `origin/main` directly (not read, not reasoned about): with the driver-ledger exclusion bypassed, the same Copilot comment correctly vetoes the PR.
+With it active, the comment is dropped and the checker exits 0.
+
+The general shape is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently inside this one checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had, and they inherit it silently, because nobody tests a guard the way they eyeball a matcher's positive output.
+The fix direction is to invert the gate --- require a POSITIVE signature of the class being dropped (the agent-disclosure marker every driver comment carries per [`disclose-agent-authorship`](disclose-agent-authorship.md), which no reviewer report emits) before consulting the over-broad marker at all, rather than adding more dialect-specific negative guards as new reviewer formats show up.
+
+A second, smaller finding rode along: the driver-ledger classifier's own guard-test fixtures were hand-written from what each guard reads, and both omitted the disclosure marker that the two REAL driver comments the fix was built from (GitHub comment ids 5430672892 and 5430978306 on ai-config#2341) both carry.
+Once a positive marker gate is added, a "this guard alone protects this fixture" test built that way passes through the new gate instead of through the guard it was named for, which is [`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s "A regression fixture must contain something the bug would destroy" section one layer further in: the fixture is not too thin to reach the *bug*, it is too thin to reach the *guard*.
+A per-guard neutering/mutation harness --- disabling one guard branch at a time and confirming at least one test fails specifically because that branch is gone --- is what surfaces which test protects which guard, per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue.
+
+Neither finding was fixed in this session: `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430 instead. #2429 tracks this documentation pass.)
+
 ## A review wake carried one finding out of five
 
 (`Morrison-Lab/gha#571`, 2026-08-21/22.

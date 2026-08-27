@@ -667,6 +667,29 @@ Reading the formal-review loop and generalizing its author check to comments is 
 
 See [`fully-clean.rationale.md`](fully-clean.rationale.md) for both mechanisms, and [`fully-clean.cases.md`](fully-clean.cases.md), "A skip notice exits the checker clean over an empty verdict scan".
 
+**A classifier written to EXCLUDE driver-status comments from the verdict scan is itself a matcher, and its negative guards protect only the dialect they were written against.**
+The section above is a comment wrongly *admitted*;
+this is the mirror, a comment wrongly *dropped*.
+A driver-ledger classifier recognizes a session's own status comment (claim wording, an ARD disposition table, a self-imposed hold like "hold off ...") from broad English markers, then protects genuine reviews with negative guards -- a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, a `**Claude finished` marker -- that must all be absent before the exclusion applies.
+Every one of those guards is keyed on Claude's and Cursor's own report structure.
+A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until X is added" emits none of that structure: the broad marker matches, every guard abstains, and the finding is dropped from the verdict scan entirely -- reported FULLY CLEAN.
+This is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently in this checker: the fix should require a POSITIVE signature of the class being dropped (here, the agent-disclosure marker every driver comment carries and no reviewer report emits) before consulting the over-broad marker at all, rather than defending the over-broad marker with negative-only guards.
+
+- **Do:** gate a drop/exempt decision on a positive signature of the class being dropped, and confirm that signature's population matches the marker's population across every producer the checker sees, not just the one the guards were written from.
+- **Do:** read a driver-comment classifier's guard list as a dialect list, and ask what a differently-formatted reviewer's report looks like against it.
+- **Don't:** protect an over-broad exclusion marker with negative guards keyed on one producer's output format -- they abstain on every other producer, which is exactly where the marker is most wrong.
+- **Don't:** trust a driver-comment classifier's `0 dropped` (or silence) as evidence nothing was excluded;
+  the failure here produces no error, just a lower "examined N items" count.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "A driver-comment classifier drops a Copilot finding it has no guard for".
+
+**Dropping an item from the verdict scan is a distinct fail-open route from misreading one that IS scanned, and it leaves no trace in the output at all.**
+Every case in this file up to here is about an item that entered the scan and was then misread -- a stale SHA, a truncated body, a wrong author filter.
+A dropped item never enters the scan, so the "examined N items" line the checker prints simply reads one lower, which is indistinguishable from a PR that genuinely received one fewer review comment.
+
+- **Do:** when a verdict scan reports fewer items than the PR thread has comments, ask what was dropped and why, not just what the scanned items said.
+- **Don't:** read a clean scan, however many items it examined, as evidence every review comment on the thread was considered.
+
 **A verdict comment quotes verdict phrases, so a phrase search identifies
 nothing --- and it misreads in both directions at once.**
 

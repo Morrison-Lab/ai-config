@@ -511,6 +511,40 @@ BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM = (
     "- warn-pr-create\n"
 )
 
+# REGRESSION, found by claude-review (ai-config#2386 round 11, comment
+# 5436711690): round 10's `BULLET_TOKEN_RE` widening blindly swallowed the
+# very next `/` after a captured token regardless of what followed it, so
+# a coincidental bare-segment suffix ("v2" has no internal separator, no
+# further `/{TOKEN}` hop matches) still left a trailing `/` folded into
+# the capture -- `cycle-charge-flee/v2/` read as `cycle-charge-flee/`,
+# satisfying `looks_like_citation`'s unconditional `text.endswith("/")`
+# branch directly. Confirmed a genuine regression, not a member of the
+# standing pre-disposition: fired correctly one commit before round 10
+# (verified against `git show 6c6f7174e6:hooks/...`). Fixed by dropping
+# the blind trailing `/?` from `BULLET_TOKEN_RE` and replacing it with
+# `_bullet_dangling_extends`, a per-item check STRICTER than
+# `looks_like_path_continuation` -- see that function's own docstring for
+# why it deliberately does not accept this shape the way the inline
+# route's route-9 residual does.
+BULLETED_MIXED_CITATION_AND_COINCIDENTAL_TRAILING_SLASH_MUST_FIRE = (
+    "The fingerprinted scripts:\n"
+    "- ai-config/claude-hook-adapter.py\n"
+    "- cycle-charge-flee/v2/\n"
+)
+
+# Reinforces the route-10 must-not-fire coverage against the round-11 fix's
+# OWN mechanism: a genuine multi-segment citation whose MIDDLE segment is
+# bare ("memories" has no internal separator) must still resolve via
+# `_bullet_dangling_extends`'s extension-terminated branch, exactly as
+# `ai-config/memories/tools.md` already does for the inline route
+# (rounds 6-7). If this fixture ever starts firing, `_bullet_dangling_extends`
+# has been narrowed too far.
+BULLETED_ALL_CITATIONS_BARE_MIDDLE_SEGMENT = (
+    "The fingerprinted scripts:\n"
+    "- ai-config/memories/tools.md\n"
+    "- local-bin/encrypt-gh-token.sh\n"
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -839,6 +873,16 @@ def unit_checks(mod):
     # ACCEPTED_MISS_BARE_WORD_TRUNCATION_* above.
     check("find_claims ACCEPTS missing a bulleted 2-item list via bare-word leading-segment truncation",
           mod.find_claims(BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM), [])
+
+    # Regression: review round 11 (comment 5436711690) -- round 10's own
+    # BULLET_TOKEN_RE widening blindly folded a coincidental trailing `/`
+    # into the capture; must fire again now that the fix is in.
+    claims = mod.find_claims(BULLETED_MIXED_CITATION_AND_COINCIDENTAL_TRAILING_SLASH_MUST_FIRE)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims catches a bulleted mixed list with a coincidental trailing-slash suffix",
+          bool(enum_claims), True)
+    check("find_claims silent on a bulleted citation with a bare middle segment",
+          mod.find_claims(BULLETED_ALL_CITATIONS_BARE_MIDDLE_SEGMENT), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

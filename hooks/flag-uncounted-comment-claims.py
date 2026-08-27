@@ -870,16 +870,64 @@ ENUM_BULLET_RE = re.compile(
     re.I,
 )
 # Captures a bullet line's FULL item, not just its leading segment: TOKEN,
-# then any `/`-joined continuations, then an optional bare trailing `/` --
-# the same multi-segment shape `ENUM_RE`'s own token-list clause builds for
-# the inline form. Widened from a bare `{TOKEN}` capture (ai-config#2386
-# round 10): the narrower version threw away everything after the first
-# `/`, so `find_claims`'s bullet loop could never even ASK whether a bullet
-# item was a citation -- it only ever saw "ai-config", never
-# "ai-config/claude-hook-adapter.py" -- which is why route 10's fix (below)
-# needs this capture widened before `looks_like_one_path` has anything
-# meaningful to classify.
-BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN}(?:/{TOKEN})*/?)`?", re.M)
+# then any `/`-joined continuations -- the same multi-segment shape
+# `ENUM_RE`'s own token-list clause builds for the inline form. Widened
+# from a bare `{TOKEN}` capture (ai-config#2386 round 10): the narrower
+# version threw away everything after the first `/`, so `find_claims`'s
+# bullet loop could never even ASK whether a bullet item was a citation --
+# it only ever saw "ai-config", never "ai-config/claude-hook-adapter.py" --
+# which is why route 10's fix (below) needs this capture widened before
+# `looks_like_one_path` has anything meaningful to classify.
+#
+# Deliberately does NOT also swallow a trailing `/?` the way round 10's
+# first version did (ai-config#2386 round 11, comment 5436711690): a
+# blind trailing `/?` consumes the very next `/` in the source regardless
+# of what follows it, so a coincidental bare-segment suffix
+# (`cycle-charge-flee/v2/` -- "v2" has no internal separator, matches no
+# further `/{TOKEN}` hop) still gets a trailing `/` folded into the
+# capture, making the token read as `cycle-charge-flee/` -- which then
+# satisfies `looks_like_citation`'s unconditional `text.endswith("/")`
+# branch directly, with `looks_like_path_continuation()` never even
+# invoked. That is a genuine regression, not a member of the standing
+# pre-disposition above: it fired correctly one commit before the round-10
+# widening (verified against `git show 6c6f7174e6:...`), so it is fixed
+# here rather than pinned as an accepted residual. Any trailing-`/`
+# handling is deferred to `_bullet_dangling_extends` below, called once
+# per token in `find_claims`'s bullet loop, on the SAME dangling text
+# `dangling_continuation` already computes for the inline route.
+BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN}(?:/{TOKEN})*)`?", re.M)
+
+
+def _bullet_dangling_extends(continuation):
+    """True when a bulleted item's dangling `/`-suffix should be folded
+    into its token text before citation classification -- STRICTER than
+    `looks_like_path_continuation` above, and deliberately so.
+
+    Two cases only: `continuation` is exactly `"/"` (the trailing slash
+    directly abuts the captured token with nothing else attached -- the
+    ordinary directory-citation case, `codex-skills/pre-push-review/`), or
+    `continuation` is genuinely path-segment-shaped AND resolves to a real
+    extension (`ai-config/memories/tools.md`-style, where a middle segment
+    is bare but the whole continuation still ends in `.md`).
+
+    What this explicitly does NOT accept, unlike `looks_like_path_continuation`:
+    a continuation that is segment-shaped and ends in a bare trailing `/`
+    but has a bare segment attached before that slash (`/v2/` --
+    `looks_like_path_continuation("/v2/")` is True, matching route 9's own
+    accepted `.../main/` residual for the INLINE route). Reusing that
+    exact function here would silently re-accept the round-11 regression
+    under route 9's umbrella instead of fixing it, which is not what was
+    asked: the reviewer distinguished a demonstrated regression (fired
+    correctly one commit ago) from a pre-existing, pre-dispositioned gap,
+    and only the latter is accepted-residual material. The bullet route is
+    therefore intentionally stricter here than the inline route is.
+    """
+    if continuation == "/":
+        return True
+    m = CONTINUATION_RE.match(continuation)
+    if not m or m.end() != len(continuation):
+        return False
+    return bool(PATH_EXTENSION_RE.search(continuation))
 # ACCEPTED RESIDUAL, found by round 10's own two-sided derivation sweep run
 # against bulleted forms (not requested by either of round 10's two
 # findings; confirmed NOT a regression -- reproduces identically against
@@ -939,16 +987,31 @@ def find_claims(body_text):
         found.append(("enumeration", quote))
 
     for m in ENUM_BULLET_RE.finditer(prose):
-        tokens = BULLET_TOKEN_RE.findall(m.group(1))
+        block = m.group(1)
+        tokens = []
+        for bm in BULLET_TOKEN_RE.finditer(block):
+            token = bm.group(1)
+            # Per-item dangling-`/` check (ai-config#2386 round 11): each
+            # bullet item is its own line, so -- unlike the inline route,
+            # where only the LAST item in one match can abut a dangling
+            # continuation -- every item here can independently trail off
+            # into a coincidental or genuine `/`-suffix. Checked and folded
+            # in BEFORE joining, via `_bullet_dangling_extends` (stricter
+            # than `looks_like_path_continuation`; see that function).
+            continuation = dangling_continuation(block, bm.end(1))
+            if _bullet_dangling_extends(continuation):
+                token += continuation
+            tokens.append(token)
         if len(tokens) < 2:
             continue
         # Mirror the inline path's own filtering (ai-config#2386 round 10):
         # a bulleted list of genuine path citations -- the exact
         # false-positive shape routes 1-5 spent five rounds closing for
         # `ENUM_RE` -- went unfiltered here, since this loop never called
-        # `looks_like_one_path` at all. Joining the (now full-item)
-        # `tokens` with `,` reuses that same comma-first, per-item
-        # classification rather than a second, bullet-specific one.
+        # `looks_like_one_path` at all. Joining the (now full-item,
+        # continuation-extended) `tokens` with `,` reuses that same
+        # comma-first, per-item classification rather than a second,
+        # bullet-specific one.
         if looks_like_one_path(", ".join(tokens)):
             continue
         quote = " ".join(m.group(0).split())

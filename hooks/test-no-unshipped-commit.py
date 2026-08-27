@@ -210,6 +210,10 @@ env_word_not_push = transcript([
 # The anchor rewrite ((?:^|[;&|\n])\s* instead of (?:^|[;&|\n]\s*)) also
 # admits leading whitespace before an unprefixed command -- deliberate, and
 # pinned here so the widening is documented rather than incidental.
+env_prefixed_create = transcript([
+    "git commit -m hook",
+    "GH_TOKEN=x gh pr create --fill",
+])
 leading_ws_push = transcript([
     "git commit -m hook",
     "  git push origin HEAD",
@@ -237,6 +241,8 @@ try:
         "prose mentioning the env token mid-command is not a push"
     assert subject.pending_commit(leading_ws_push) is None, \
         "a leading-whitespace push still discharges (documented widening)"
+    assert subject.pending_commit(env_prefixed_create) is None, \
+        "an env-prefixed gh pr create discharges too (CREATE symmetry)"
     assert subject.pending_commit(executed_redirect) is not None, "bash <<EOF > file still executes"
     assert subject.pending_commit(executed_fd_dup) is not None, "2>&1 is not a file write"
     assert subject.pending_commit(indented_decoy) is not None, "an indented decoy is not a terminator"
@@ -282,6 +288,7 @@ finally:
     os.unlink(two_env_push)
     os.unlink(env_word_not_push)
     os.unlink(leading_ws_push)
+    os.unlink(env_prefixed_create)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")

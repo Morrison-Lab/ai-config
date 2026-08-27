@@ -407,10 +407,10 @@ def _is_driver_ledger(body: str) -> bool:
     # inside a fence loses the quoted structure and stays a ledger --
     # the same one-dialect rule parse_report applies to its own searches.
     scan = strip_cited_finding_vocab(body)
-    if re.search(r"(?im)^\*{0,2}#{0,6}\s*\*{0,2}Verdict\*{0,2}\s*:", scan) or \
-            re.search(r"(?im)^\*{0,2}#{1,6}\s*\*{0,2}Verdict\b", scan):
+    if re.search(r"(?im)^[*_]{0,2}#{0,6}\s*[*_]{0,2}Verdict[*_]{0,2}\s*:", scan) or \
+            re.search(r"(?im)^[*_]{0,2}#{1,6}\s*[*_]{0,2}Verdict\b", scan):
         return False
-    if re.search(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}\s*:", scan):
+    if re.search(r"(?im)^[*_]{0,2}Reviewed[- ]Commit[*_]{0,2}\s*:", scan):
         return False
     if "claude finished" in scan.lower():
         return False

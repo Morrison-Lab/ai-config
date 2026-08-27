@@ -2096,6 +2096,28 @@ def main() -> int:
             "Reviewed-Commit: sha123\n"
         ),
     }
+    # (c) label-line guard sole protector: plain `Verdict:` label + marker,
+    # no heading, no fingerprint.
+    label_only_review = {
+        "body": "Verdict: Needs more work\n\nPlease hold off on merging.\n",
+    }
+    # (d) claude-finished guard sole protector: marker phrase + hold-off,
+    # nothing else review-shaped (a truncated/stub review).
+    stub_only_review = {
+        "body": "**Claude finished review**\n\nPlease hold off on merging.\n",
+    }
+    # (e) underscore-emphasis forms of the label and fingerprint guards.
+    for body, name in ((label_only_review["body"], "label-line"),
+                       (stub_only_review["body"], "claude-finished"),
+                       ("__Verdict__: Needs more work\n\nPlease hold off on merging.\n",
+                        "underscore label"),
+                       ("Please hold off on merging; item 1 open.\n\n"
+                        "__Reviewed-Commit__: sha123\n",
+                        "underscore fingerprint")):
+        check(f"the {name} guard alone keeps a marker-carrying review "
+              "out of the ledger class",
+              not checker._is_driver_ledger(body))
+
     for fixture, name in ((heading_only_review, "heading"),
                           (fingerprint_only_review, "fingerprint")):
         check(f"the {name} guard alone keeps a marker-carrying review "

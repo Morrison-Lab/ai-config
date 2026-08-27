@@ -129,6 +129,82 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
+**A fallback review has to be *admitted* before its verdict is even read, and
+the admission turns on where the agent marker sits.**
+`scripts/check-pr-fully-clean.py` does **not** apply these as a pipeline, and
+describing them as one is what makes the mechanics hard to predict.
+Admission comes first and gates everything.
+What follows it is two *independent* readings of the admitted pool, neither
+feeding the other.
+
+**Admission** decides whether a comment enters the pool at all.
+There are two admission paths, and a fallback review takes the **comment**
+one: `gh pr comment` posts an issue comment, not a formal review object, so
+the branch that governs is the issue-comment block in
+`check-pr-fully-clean.py` (around `:1256-1291`), not the `("review", ...)`
+append that follows it.
+Both paths apply the same identity rule, which is why the distinction rarely
+matters for behaviour and always matters for reading the code.
+
+Cite `_reviewer_identity()` by name rather than by line when checking this:
+three consecutive review rounds on this passage produced a wrong line number,
+and a citation that drifts is worse than none, since it sends a reader to a
+branch that looks close enough to confirm the claim.
+
+That function reads only the **first and last non-blank line** of the body.
+A marker anywhere between them resolves to the poster's own login, the comment
+is not admitted as an agent's review, and nothing else about it is ever
+consulted.
+
+Then, over everything admitted:
+
+- **The verdict check reads the whole history, not the current commit**
+  (`check_latest_verdict(all_items, ...)`, `:1325`).
+  `classify_verdict()` reads the phrase `Verdict: Clean` on one line; a
+  `### Verdict` heading whose word sits on the next line returns `unreadable`.
+  This runs over *every* admitted item regardless of which commit it
+  evaluated, and the code says why: a not-clean verdict at an earlier commit
+  stands until a later clean from the **same** reviewer supersedes it.
+- **The head match narrows to comments evaluating the commit under test**
+  (`:1334`), answering the separate question of whether anything has reviewed
+  this head at all.
+  The body must quote the commit.
+  Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
+  substring, so a 7-character `--short` SHA matches, as does the full 40.
+
+The independence is the part with consequences, and it is the opposite of what
+a pipeline model predicts.
+A stale not-clean verdict from an *earlier* commit still blocks, because the
+verdict check never sees the head filter.
+So pushing a fix does not clear a previous round's verdict; only a later clean
+from that same reviewer does.
+
+Neither admission nor verdict form announces itself.
+An unadmitted comment produces `No review comment has been posted evaluating
+HEAD SHA <sha> yet`, which reads as *nothing was posted* rather than as *what
+you posted did not count*.
+An unparsed verdict surfaces only as a `NOTE: ... has a format the verdict
+classifier cannot read` line, which is deliberately **non-blocking** --- so it
+prints among the notes rather than among the findings.
+
+- **Do:** open or close the comment with the agent's own marker line, so the
+  first or last line resolves to an agent.
+- **Do:** write `### Verdict: Clean` on one line.
+- **Do:** read a `NOTE:` about an unreadable review as being about *your own*
+  fallback, since a bot's report is already in the parsed form.
+- **Don't:** bury the marker mid-body under a heading of your own --- that is
+  the failure that reports as "nothing was posted".
+
+(Measured on `ucdavis/bcs`#745, 2026-08-27.
+The first fallback opened with a `## Self-review fallback` heading of its own
+and was never admitted, though it quoted the commit correctly at seven
+characters.
+The second opened with the marker, was admitted, and then failed on the split
+verdict heading instead.
+Six fallback reviews across that sweep used the split form; reposting them
+inline moved every PR from `0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean`, with no change to any review's content.)
+
 **Execute the sequential multi-provider review loop on all PRs.**
 You must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 

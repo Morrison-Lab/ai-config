@@ -130,13 +130,9 @@ sits unread.
    Re-applying fixes that are already in the tree wastes a round and muddies the diff.
    If *nothing* remains outstanding (every finding is already applied), don't push an empty commit --- skip to step 6 and re-request the review directly.
 
-   **If the reviewer explicitly skips or cannot produce a verdict**,
-   you must execute the sequential multi-provider review loop
+   **Execute the sequential multi-provider review loop**
    defined in `shared/workflow/adversarial-self-review.md`.
-   This applies in cases like quota exhaustion, an outage,
-   or a policy that prevents a reviewer from self-reviewing its own work.
-
-   This loop requires you to pin all available providers
+   You must pin all available providers
    (including external reviewers and the local `adversarial-reviewer` subagent).
    You must query them sequentially, one at a time.
    Do not request them in parallel.
@@ -155,7 +151,7 @@ sits unread.
    the focused tests,
    and the relevant lint/documentation checks.
    You must Address, Rebut, or Defer every finding it returns.
-   Note the skip in your ARD summary comment.
+   If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
    **Re-check reviewer availability every round, not just once** --
    a reviewer that was unavailable a few pushes ago can become available mid-session.
    A skipped review is never a clean external verdict on its own

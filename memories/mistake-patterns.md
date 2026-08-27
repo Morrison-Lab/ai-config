@@ -237,7 +237,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
 
-## Pattern 15: Widening a Fail-Safe Instrument's Exemption Without a Base-Parity Proof
+## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
 - **Mistake**: Adding or widening an exemption in a fail-closed checker (a
   verdict scan, a findings gate, a guard) and reasoning about its safety
   from the diff, instead of proving the new acceptance set is no wider than

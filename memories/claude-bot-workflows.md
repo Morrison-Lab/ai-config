@@ -283,6 +283,25 @@ Triggering a review, and what becomes of the reply it writes, live in
   cleanly both times it recurred (rme#706, #976) — so a subsequent normal
   push can clear it too; try `workflow_dispatch` if you have the permission
   and a normal push isn't an option (e.g. no new commit to make).
+- **A bot-sender push never triggers the ai-config review workflow --- every
+  `review /` job skips, and the run still reads `completed/success`.**
+  Measured 2026-08-27 on ai-config#2340: three pushes by the Cursor cloud
+  agent each produced a "Claude Code Review" run whose `gather-context`
+  succeeded and whose `review / *` jobs all skipped, because the callee
+  (`Morrison-Lab/gha/claude-code-review.yml@v2`) gates its jobs on
+  `github.event.sender.type != 'Bot'` (drafts and fork heads are filtered by
+  the same `if:`).
+  Nothing in the PR announces it: the head sits "unreviewed" while the runs
+  list looks green.
+  The same `if:` admits `workflow_dispatch` unconditionally, so the fix is
+  one dispatch: `gh workflow run claude-review.yml -R Morrison-Lab/ai-config
+  -f pr_number=<N>` --- which produced a real verdict on the same head the
+  push-triggered runs had skipped.
+  - **Do:** on a PR whose recent heads were pushed by a bot (Cursor,
+    @claude's own sync), read the review run's *job* conclusions before
+    concluding a review ran; dispatch `claude-review.yml` for the head.
+  - **Don't:** read a green "Claude Code Review" run on a bot-pushed head as
+    a review having happened --- `success` there is the skip path.
 - **Write accurate `workflow_dispatch` comments when adapting the upstream
   `claude-code-review.yml` template.** The upstream template says "workflow_dispatch is
   fired by claude.yml" — but that's only true when the repo's `claude.yml` actually

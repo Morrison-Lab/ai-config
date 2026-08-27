@@ -1159,56 +1159,60 @@ are the same conflation run in opposite directions.
 
 `scripts/check-pr-fully-clean.py` settles it, exiting 1 on all three.
 
-**The second finding then changed wording as the PR state changed, and both
-causes are worth having.**
+**The second finding then changed wording as the PR state changed, and the
+change is the instructive part.**
 
-The first state, quoted with the two-space indent the script prints:
+Before any fallback review was *admitted*, the script reported:
 
 ```
   - No review comment has been posted evaluating HEAD SHA a72741ec yet
 ```
 
-A fallback review already existed when that printed.
-It did not match the head because it cited the commit as `a72741e`, at seven
-characters, while the matcher tests `sha[:8]` and the full 40.
-Git's default abbreviation is one character short of the gate.
+A fallback review existed when that printed, and it quoted the commit
+correctly --- the matcher tests `sha[:7]`, so a default `git --short`
+abbreviation matches.
+It was never admitted: `_reviewer_identity()` reads only the **first and last
+non-blank line**, that comment opened with a `## Self-review fallback`
+heading of its own, and a marker buried below the first line resolves to the
+poster's login rather than to an agent.
+An unadmitted comment cannot become a matching item whatever SHA it carries,
+so the finding reads *nothing was posted* when the truth is *what you posted
+did not count*.
 
-After a later fallback quoted the full SHA, the finding changed:
+A later fallback opened with the marker and was admitted.
+The finding then became a different branch (headers elided):
 
 ```
   verdict scan: examined 2 dated automated review item(s), 0 bore a verdict, latest = NONE
+...
   - NOTE: Review from Claude (2026-08-27T09:15:56Z) has a format the verdict classifier cannot read -- not treated as 'no review'
+...
   - No valid clean review found for HEAD SHA a72741ec.
 ```
 
 The tempting reading of that second state is that a self-review posted under
-the author's own login was filtered out as not an automated review.
-That is wrong.
-The comment was admitted and was quorum-eligible: the admission test accepts
-an `OWNER` or `MEMBER` comment whose body resolves to a reviewer identity
-other than the poster, and these were `MEMBER` comments carrying the agent's
-own marker.
+the author's own login was filtered out for being the author's.
+That is wrong, and checking rather than assuming is what shows it: this
+comment *was* admitted and was quorum-eligible, because the admission test
+accepts an `OWNER` or `MEMBER` comment whose first or last line resolves to
+an agent, and these were `MEMBER` comments opening with the agent's marker.
 
 It failed on **format**.
-`classify_verdict()` reads the phrase `Verdict: Clean` and returns
-`unreadable` for a `### Verdict` heading whose word sits on the next line ---
-`unreadable` rather than empty, and the distinction is what produces the
-`NOTE:` line above at all.
-That third state fires only when the body also carries an agent marker; the
-same split heading with no marker returns nothing and prints no note.
+`classify_verdict()` reads `Verdict: Clean` on one line and returns
+`unreadable` for a `### Verdict` heading whose word sits on the next ---
+`unreadable` rather than empty, and that distinction is what produces the
+`NOTE:` line at all.
+The same split heading without a marker returns nothing and prints no note.
 
 So the outage was real, and on top of it every fallback verdict written to
-stand in for the bot was unreadable to the instrument that checks for one.
-The only sign was a `NOTE:` line, which the script emits **non-blocking by
-design** --- it is a warning rather than a finding, so it prints away from
-the findings and reads as a remark about somebody else's review.
+stand in for the bot failed one of two silent gates.
+The only sign was a `NOTE:` line the script emits **non-blocking by
+design**.
 
-Two requirements follow, and a fallback has to satisfy both:
-the verdict must be the parsed inline phrase, and the body must quote at
-least the 8-character commit.
-[`self-review-fallback.md`](self-review-fallback.md) carries them as rules.
+[`self-review-fallback.md`](self-review-fallback.md) carries the three
+requirements as rules.
 
-Reposting the same verdicts in that form settled it: the scan went from
+Reposting the same verdicts in the parsed form settled it: the scan went from
 `0 bore a verdict, latest = NONE` to
 `1 bore a verdict, latest = clean; per-reviewer: Claude=clean`, and the
 `No valid clean review found` finding cleared on every PR, leaving only the

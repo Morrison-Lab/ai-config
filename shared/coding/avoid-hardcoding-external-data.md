@@ -62,13 +62,14 @@ pin" pinned one, or it would have nothing to disclaim.
 The pointer form needs no such clause, because it names the query rather
 than an answer.
 
-Hedging is the wrong answer whether or not the figure has a source; what the
-source decides is which right answer applies.
-A figure some command enumerates gets the pointer.
-One nothing enumerates gets dropped, or re-derived before pushing when the
-number does real work --- the remedies
-[a count in the prose above a block](#a-count-in-the-prose-above-a-block-is-the-same-duplicate-one-line-away)
-sets out.
+Hedging is the wrong answer whether or not the figure has a source.
+What the source decides is which right answer applies, and the discriminator
+is whether a *source can be named* rather than whether a command exists.
+A figure whose source is nameable --- a directory, an API, a lockfile --- gets
+the pointer.
+A count of the items in the block directly beneath it names nothing, so it
+gets dropped or re-derived instead, per
+[a count in the prose above a block](#a-count-in-the-prose-above-a-block-is-the-same-duplicate-one-line-away).
 
 - **Do:** replace a figure the filesystem or an API enumerates with the
   command that derives it.

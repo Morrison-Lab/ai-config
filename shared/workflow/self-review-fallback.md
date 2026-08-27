@@ -129,33 +129,52 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
-**Write the verdict in the form the checker parses, and cite the commit at
-eight characters or more.**
-`scripts/check-pr-fully-clean.py` reads a verdict *phrase*
-(`Verdict:\s*(?:Clean|Approved|Ready)`), never a `### Verdict` heading whose
-word sits on the following line, and it matches a report to the head by
-looking for `sha[:8]` or the full 40 in the body.
-Miss either and the report does not count: the structure above is satisfied,
-the comment reads as a review to any human, and the instrument that checks a
-PR has a verdict reports it has none.
+**A fallback review has to be *admitted* before its verdict is even read, and
+the admission turns on where the agent marker sits.**
+`scripts/check-pr-fully-clean.py` decides three things in order, and a
+fallback that satisfies the last two while failing the first counts for
+nothing.
 
-Neither miss announces itself.
-An abbreviated commit fails silently, and an unparsed verdict surfaces only
-as a `NOTE: ... has a format the verdict classifier cannot read` line, which
-is deliberately **non-blocking** --- so it prints among the notes rather than
-among the findings, and reads as a remark about somebody else's review.
+1. **Admission.**
+   `_reviewer_identity()` reads only the **first and last non-blank line** of
+   the body.
+   A marker anywhere between them resolves to the poster's own login, the
+   comment is not admitted as an agent's review, and nothing later in it is
+   consulted.
+2. **Verdict form.**
+   `classify_verdict()` reads the phrase `Verdict: Clean` on one line.
+   A `### Verdict` heading whose word sits on the next line returns
+   `unreadable`, and that state only exists at all when the body carried a
+   marker --- without one it returns nothing and prints no note.
+3. **Head match.**
+   The body must quote the commit.
+   Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
+   substring, so a 7-character `--short` SHA matches, as does the full 40.
 
-- **Do:** write `### Verdict: Clean` on one line, and quote at least the
-  8-character commit.
-- **Don't:** split the heading from the word, or cite a 7-character
-  abbreviation --- git's default `--short` length is one character too few.
+Neither of the first two announces itself.
+An unadmitted comment produces `No review comment has been posted evaluating
+HEAD SHA <sha> yet`, which reads as *nothing was posted* rather than as *what
+you posted did not count*.
+An unparsed verdict surfaces only as a `NOTE: ... has a format the verdict
+classifier cannot read` line, which is deliberately **non-blocking** --- so it
+prints among the notes rather than among the findings.
+
+- **Do:** open or close the comment with the agent's own marker line, so the
+  first or last line resolves to an agent.
+- **Do:** write `### Verdict: Clean` on one line.
 - **Do:** read a `NOTE:` about an unreadable review as being about *your own*
   fallback, since a bot's report is already in the parsed form.
+- **Don't:** bury the marker mid-body under a heading of your own --- that is
+  the failure that reports as "nothing was posted".
 
-(Measured on `ucdavis/bcs`, 2026-08-27: six fallback reviews used the split
-form, and the first also cited a 7-character SHA.
-Reposting them as `### Verdict: Clean` with the full SHA moved every PR from
-`0 bore a verdict, latest = NONE` to
+(Measured on `ucdavis/bcs`#745, 2026-08-27.
+The first fallback opened with a `## Self-review fallback` heading of its own
+and was never admitted, though it quoted the commit correctly at seven
+characters.
+The second opened with the marker, was admitted, and then failed on the split
+verdict heading instead.
+Six fallback reviews across that sweep used the split form; reposting them
+inline moved every PR from `0 bore a verdict, latest = NONE` to
 `1 bore a verdict, latest = clean`, with no change to any review's content.)
 
 **Execute the sequential multi-provider review loop on all PRs.**

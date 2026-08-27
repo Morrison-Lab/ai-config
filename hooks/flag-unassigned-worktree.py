@@ -77,13 +77,22 @@ its input is malformed costs more than the omission it reports.
 import json
 import sys
 
-# The harness declares these two read-only ROLES; that contract, not their tool
-# inventory, is what the exemption rests on. Both are granted Bash, so a strict
-# can-this-touch-a-file test would exempt nothing. See "Classifying
+# The harness declares Explore and Plan as read-only ROLES; that contract, not
+# their tool inventory, is what the exemption rests on. Both are granted Bash,
+# so a strict can-this-touch-a-file test would exempt nothing. See "Classifying
 # write-capable" above for why Bash is the hole in the contract rather than a
 # separate weakness. Any other value -- and a missing value -- is treated as
 # write-capable.
-READ_ONLY = {"Explore", "Plan"}
+#
+# adversarial-reviewer is exempt on the same kind of contract, declared by the
+# repo rather than the harness: its persona omits Edit/Write from `tools:` and
+# instructs read-only discipline where a harness still grants Write schemas
+# (ai-config#2281). Every self-review dispatch is deliberately un-isolated --
+# the reviewer reads a diff and returns a report -- so warning on each one
+# trains the reader to ignore the warning (ai-config#2276). For a warn-only
+# hook the cost runs the safe way: a missed warning on a harness that
+# over-grants, never a wrong block.
+READ_ONLY = {"Explore", "Plan", "adversarial-reviewer"}
 
 NOTE = (
     "No `isolation` on this Agent launch, and `{subagent_type}` is write-capable.\n\n"

@@ -67,7 +67,6 @@ KNOWN_UNREGISTERED = {
     # Authoring only: not yet in hooks.json, registered by the follow-up
     # after its authoring PR merges.
     "warn-stale-issue-edit.py": 2282,
-    "flag-uncounted-comment-claims.py": 2377,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

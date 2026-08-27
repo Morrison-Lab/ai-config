@@ -273,7 +273,8 @@ A clean automated review from every available provider evaluating the current HE
   (replace the veto or anchor with a never-match, or drop it) and
   confirming the test flips --- a test that still passes guards nothing,
   and it usually passes through a different branch than its name claims.
-  (Measured three times on 2026-08-27 alone: #2313's override-drops-token
-  test, three of #2419's veto tests, and #2423's anchor probe each
-  asserted the right outcome for the wrong reason until a neutering
-  control exposed it.)
+  (Measured three times on 2026-08-27: #2423's anchor probe --- the one
+  instance on a PR record, its round-1 blocking finding --- plus #2313's
+  override-drops-token test and #2419's veto tests, both caught in
+  unposted local pre-push review rounds rather than on those PRs'
+  records.)

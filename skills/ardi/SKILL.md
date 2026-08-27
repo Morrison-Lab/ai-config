@@ -359,12 +359,14 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py [--quorum <N>] <pr-number>` returned exit code `0`
+      (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.
 - [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
-- [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
+- [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum
+      -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 - [ ] Every inline review thread is resolved.
 - [ ] The only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply --- normally a top-level PR comment, not an inline thread).

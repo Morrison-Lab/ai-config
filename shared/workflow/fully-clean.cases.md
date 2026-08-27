@@ -1048,7 +1048,7 @@ Both designs failed for one reason: every discriminator available in a comment b
 
 A third design was then built and refuted in turn, which is what settles the shape of the answer.
 Executing `classify_verdict` over the #2341 comment's parts showed that neither the `Disposition` table nor the self-imposed hold produces a verdict at all.
-The sole not-clean signal was the header's parenthetical citation of the round being disposed of, `Addressed GitHub Claude of \`9508454e\` (Needs more work)`.
+The sole not-clean signal was the header's parenthetical citation of the round being disposed of, ``Addressed GitHub Claude of `9508454e` (Needs more work)``.
 Both earlier classifiers had therefore been built to detect the parts that never mattered.
 So the third design stopped dropping anything and instead blanked that citation inside `strip_cited_finding_vocab`, gated on the sentence opening with an ARD disposition verb AND the parenthetical holding nothing but the verdict phrase.
 An adversarial round refuted it too: it blanked the live verdict in "Addressed the null-check nit in `9508454e` (Needs more work): the fix introduced a new NoneType dereference at foo.py:42", where the parenthetical IS this comment's verdict and the explanation sits outside the blanked span.

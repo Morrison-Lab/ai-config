@@ -272,7 +272,7 @@ def cmd_gates(args) -> int:
                 print(f"FAIL gate 3: unparseable dry-run row: {line!r}")
                 failures += 1
                 continue
-            from_ref, _, to_ref = parts[1].partition(":")
+            from_ref = parts[1].partition(":")[0]
             summary = parts[2].strip()
             if line[:1] == "!":
                 # The remote moved (or the push is otherwise refused).

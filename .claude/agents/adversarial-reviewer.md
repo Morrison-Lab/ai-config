@@ -38,7 +38,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      File it under step 1's unhandled-edge-case check rather than taking the comment's word for it.
    - Flag obvious placeholder comments (e.g. `// increment counter` above `counter++`), copy-paste artifacts, cargo cult code, and dead code.
    - Flag lazy naming only when the name is genuinely uninformative in its context (`data1`, `temp`, `foo`, a single unexplained letter used across an unrelated scope).
-     A name this corpus's own style guide prefers --- `df` for a data frame, per `shared/coding/tidy-code.md` --- is not a finding.
+     A conventional, widely-used short name --- `df` for a data frame, the idiom this corpus's own examples use in `shared/coding/tidy-code.md` and `shared/coding/per-operation-grouping.md` --- is not by itself a finding.
    - Flag a function doing multiple unrelated things, a file with no coherent purpose ("everything else" catch-all), inconsistent patterns within the same diff, or an import added but never used --- each as a concrete `[Defect]` naming the file, line, and what the fix would be, never as an unfalsifiable vibe.
 
 4. **Check quality and repo conventions**

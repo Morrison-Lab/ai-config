@@ -2113,10 +2113,24 @@ def main() -> int:
                         "underscore label"),
                        ("Please hold off on merging; item 1 open.\n\n"
                         "__Reviewed-Commit__: sha123\n",
-                        "underscore fingerprint")):
+                        "underscore fingerprint"),
+                       ("## __Verdict__\nNeeds more work\n\n"
+                        "Please hold off on merging.\n",
+                        "underscore-emphasized heading"),
+                       ("**Verdict**\nNeeds more work\n\n"
+                        "Please hold off on merging.\n",
+                        "bare emphasized verdict line"),
+                       ("***Verdict***: Needs more work\n\n"
+                        "Please hold off on merging.\n",
+                        "triple-emphasis label")):
         check(f"the {name} guard alone keeps a marker-carrying review "
               "out of the ledger class",
               not checker._is_driver_ledger(body))
+    check("'Verdicts were mixed' prose does not refuse ledger classification",
+          checker._is_driver_ledger(
+              "Verdicts were mixed last round. Addressed all.\n\n"
+              "| # | Disposition |\n|---|---|\n| 1 | Address |\n\n"
+              "Do not merge.\n"))
 
     for fixture, name in ((heading_only_review, "heading"),
                           (fingerprint_only_review, "fingerprint")):

@@ -407,10 +407,18 @@ def _is_driver_ledger(body: str) -> bool:
     # inside a fence loses the quoted structure and stays a ledger --
     # the same one-dialect rule parse_report applies to its own searches.
     scan = strip_cited_finding_vocab(body)
-    if re.search(r"(?im)^[*_]{0,2}#{0,6}\s*[*_]{0,2}Verdict[*_]{0,2}\s*:", scan) or \
-            re.search(r"(?im)^[*_]{0,2}#{1,6}\s*[*_]{0,2}Verdict\b", scan):
+    # One unified verdict-line guard instead of separate heading and label
+    # forms: a line opening with any mix of heading/emphasis glyphs and the
+    # word Verdict -- `### Verdict`, `Verdict:`, `**Verdict**`,
+    # `## __Verdict__`, `***Verdict***:` -- refuses ledger classification.
+    # The lookahead (colon, whitespace, or EOL directly after the word,
+    # emphasis consumed first) is what keeps "Verdicts were mixed" prose
+    # from matching; `\b` alone cannot, because `_` is a word character,
+    # which is how the balanced-underscore heading slipped an earlier
+    # asterisk-only guard.
+    if re.search(r"(?im)^[\s#*_]{0,8}Verdict[*_]{0,3}(?=\s*:|\s|$)", scan):
         return False
-    if re.search(r"(?im)^[*_]{0,2}Reviewed[- ]Commit[*_]{0,2}\s*:", scan):
+    if re.search(r"(?im)^[*_]{0,3}Reviewed[- ]Commit[*_]{0,3}\s*:", scan):
         return False
     if "claude finished" in scan.lower():
         return False

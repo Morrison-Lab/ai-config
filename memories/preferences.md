@@ -237,6 +237,14 @@
   A blank subagent re-reading what's already known is waste, not thoroughness.
 - Delegating implementation does NOT mean trusting an agent's "CLEAN, ready to merge" report blind.
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
+  In status recaps, name the venue as well as the verdict.
+  A subagent transcript is a "private/local pre-push adversarial check",
+  never a statement that the PR "has a clean review";
+  reserve that wording for a genuine verdict posted in the forge review record,
+  and link the posted verdict when citing it.
+  If the private artifact has no user-visible URL, say that plainly rather than
+  letting "independent review" imply an externally visible review.
+  (User correction, 2026-08-27, ucdavis/rampp#153.)
   ESPECIALLY when the bot review self-skipped:
   a PR editing the review workflow itself --- the reusable `claude-code-review`
   workflow in `d-morrison/gha`, or the repo's own caller that invokes it,

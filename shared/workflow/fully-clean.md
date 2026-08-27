@@ -680,10 +680,12 @@ The candidate signature was the agent-disclosure marker, on the premise that eve
 The first half is true and the second is false: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH that marker, so a genuine not-clean review carries it too, and gating on it dropped that review instead.
 Both attempts failed the same way.
 Every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item -- and a positive signature is not safer than a negative one merely for being positive.
-What shipped instead stopped dropping anything: the one citation shape that actually caused the misread was neutralized inside `strip_cited_finding_vocab`, so the comment stays in the scan and simply bears no verdict.
-Measured on ai-config#2341, that keeps the scan at four examined items rather than the two the drop design left.
+A third design stopped dropping anything and blanked that one citation shape inside `strip_cited_finding_vocab` instead.
+It was refuted too, on a body where the parenthetical IS the live verdict and the explanation follows it outside the blanked span.
+Nothing shipped in the checker: all three were reverted.
+What shipped is a convention in [`ard`](../../skills/ard/SKILL.md)'s summary step --- a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it, and the instrument gains no new fail-open surface.
 
-- **Do:** prefer neutralizing the specific signal that caused the misread over dropping the item, so the item stays visible in the examined count.
+- **Do:** prefer fixing the input at the author's end over teaching the checker to guess -- three checker-side designs were refuted here, and a pair of backticks was not.
 - **Do:** derive, by execution, which line of a body actually produced the verdict, before building a classifier for the parts you assume did.
 - **Do:** confirm a proposed signature's population against every producer the checker sees, and treat "no reviewer emits this" as a claim to check against the corpus rather than a premise.
 - **Do:** read a driver-comment classifier's guard list as a dialect list, and ask what a differently-formatted reviewer's report looks like against it.

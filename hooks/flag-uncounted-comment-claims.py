@@ -340,8 +340,11 @@ CARDINALITY_RE = re.compile(
 # longer swallow it, fails the SAME `(?![-_./])` lookahead that was already
 # guarding this case directly.
 #
-# THE PATH-VS-LIST GRAMMAR CLASS -- NINE ROUTES ACROSS NINE REVIEW ROUNDS
-# (SEVEN FIXED, TWO PRE-DISPOSITIONED -- SEE THE STANDING STATEMENT BELOW).
+# THE PATH-VS-LIST GRAMMAR CLASS -- TEN ROUTES ACROSS TEN REVIEW ROUNDS
+# (EIGHT FIXED, TWO PRE-DISPOSITIONED -- SEE THE STANDING STATEMENT BELOW).
+# Route 10 is OUT OF CLASS (a plain false positive in the bulleted-list
+# path, not a coincidental-slash-continuation variant) and was fixed, not
+# pre-dispositioned -- see its own entry below for why it stayed in scope.
 # Renamed from "false-positive class" once route 6 found the mirror-image
 # failure: the SAME underlying confusion -- `TOKEN` cannot tell "one file's
 # own path, N directory segments then a filename" from "several hand-typed
@@ -517,13 +520,31 @@ CARDINALITY_RE = re.compile(
 #      a different mechanism than `trailing_char`/`continuation`), not to a
 #      new, unrelated route.
 #
-#   8. `looks_like_path_continuation()`'s extension check cannot tell a real
-#      file extension from a version-number tail (`feature/v2.1`), so a
-#      coincidental version-like suffix reopens route 7's exact failure
-#      through the same `PATH_EXTENSION_RE` this whole class already
-#      accepted one trade for (see that regex's own comment, extended for
-#      this route). PINNED AS AN ACCEPTED RESIDUAL
-#      (`ACCEPTED_MISS_VERSION_SUFFIX_*`), not fixed with a ninth predicate.
+#   8. Originally believed to be `looks_like_path_continuation()`'s
+#      extension check confusing a real file extension with a version-
+#      number tail (`feature/v2.1`), and pinned/named that way at first.
+#      CORRECTED in round 10 (ai-config#2386, comment 5436484201): for the
+#      two originally-pinned repro sentences, `local-bin/encrypt-gh-
+#      token.sh` already self-satisfies `ENUM_RE`'s own `{1,}` minimum on
+#      its two hyphenated segments, so the match ends at the following
+#      comma and `feature/v2.1` is never reached at all --
+#      `looks_like_path_continuation()`/`PATH_EXTENSION_RE` are NEVER
+#      INVOKED for them. The true mechanism is `TOKEN` truncation at the
+#      plain word "feature" (no internal separator of its own) -- the SAME
+#      ai-config#2404 family as the coincidental-slash-item-first residual
+#      above, confirmed by reproducing the identical silence with the
+#      version suffix removed entirely. Renamed to
+#      `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match. The extension-vs-
+#      version-tail confusion this route was ORIGINALLY named for is still
+#      real, just reachable through a different shape (a coincidental item
+#      whose OWN leading segment is independently `TOKEN`-shaped, so it
+#      joins the main match directly rather than via `continuation` at
+#      all) -- pinned separately as
+#      `ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM`. Both remain
+#      PINNED AS ACCEPTED RESIDUALS, not fixed with a ninth predicate; the
+#      lesson for future editors is to verify which code path a repro
+#      actually reaches (as this correction did) before naming a fixture
+#      after an assumed mechanism.
 #   9. `looks_like_path_continuation()`'s OTHER branch --
 #      `continuation.endswith("/")`, untouched by routes 7-8 -- has the same
 #      gap: ANY coincidental continuation ending in a bare trailing `/`
@@ -558,6 +579,27 @@ CARDINALITY_RE = re.compile(
 # DEMONSTRATED instance is still welcome, purely as documentation of what
 # was checked, but is not a precondition for treating the class itself as
 # already disposed of.
+#
+#   10. OUT OF CLASS, and FIXED rather than pre-dispositioned (ai-config#2386
+#       review round 10, comment 5436484201): the bulleted-list enumeration
+#       loop (`ENUM_BULLET_RE`/`BULLET_TOKEN_RE`, below) never called
+#       `looks_like_one_path()` at all, so a bulleted list of genuine path
+#       citations fired unfiltered -- the exact false-positive shape routes
+#       1-5 spent five rounds closing for the INLINE form, just never
+#       mirrored onto the bullet path when it was added. This is not a
+#       member of the coincidental-slash-continuation class the standing
+#       pre-disposition above covers: that class is about
+#       `looks_like_path_continuation()` misclassifying WHAT a dangling `/`
+#       continues into; this was a code path performing NO citation
+#       classification whatsoever, and a false POSITIVE besides -- wrong
+#       nags are what get a warn-only hook unregistered, which is why this
+#       stayed in scope despite the standing pre-disposition covering
+#       everything else found this round. Fixed by widening
+#       `BULLET_TOKEN_RE` to capture each bullet's FULL multi-segment item
+#       (not just its leading hyphen-segment) and filtering the joined
+#       result through the same `looks_like_one_path()` the inline path
+#       already uses, rather than inventing a second, bullet-specific
+#       classifier.
 ENUM_RE = re.compile(
     rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:/]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*/?(?:,|/)\s*{TOKEN}){{1,}})",
@@ -592,31 +634,47 @@ COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 # case in this corpus's own comment history takes that form and the cost is
 # a missed reminder, never a wrong one.
 #
-# THAT TRADE DOES NOT TRANSFER CLEANLY to `looks_like_path_continuation()`'s
-# use of this same regex (added in round 7, ai-config#2386), and round 8's
-# review said so explicitly. Here the version-shaped span is not the FLAGGED
-# item's own text -- it is dangling content after a DIFFERENT, unrelated
-# bare identifier (`cycle-charge-flee/feature/v2.1`-style: a coincidental
-# branch/version suffix, not a citation at all). `_BARE_SEGMENT` parses
-# `v2`/`v3` as an ordinary segment, and `.1` then satisfies this regex
-# exactly as `.md` would, so `feature/v2.1` reads as "resolves to an
-# extension" and the WHOLE mixed list -- founding-incident shape, real
-# citation plus recalled identifiers -- goes silent. That is a materially
-# worse cost than the original trade: not "one version-named item
-# misclassified" but "the entire enumeration undetected," the same severity
-# routes 6 and 7 were both fixed for.
+# THAT TRADE WAS ORIGINALLY BELIEVED not to transfer cleanly to
+# `looks_like_path_continuation()`'s use of this same regex (added in round
+# 7, ai-config#2386) -- round 8 reported a version-shaped continuation
+# (`feature/v2.1`) reopening the coincidental-slash silencing through this
+# extension check, and two fixtures were pinned and named for it.
 #
-# ACCEPTED ANYWAY, explicitly rather than left implicit, per round 8's own
-# framing -- this hook is warn-only and fail-open, and eight rounds on one
-# grammar is reason enough to stop adding narrower predicates rather than
-# start a ninth. Pinned as `ACCEPTED_MISS_VERSION_SUFFIX_*` in the test
-# suite (both of round 8's own repro sentences), the same way every other
-# accepted miss in this file is pinned rather than left to a comment alone.
-# The known next step, if this residual ever bites in a real comment: require
-# the extension to contain at least one LETTER (ruling out purely-numeric
-# tails like `.1`/`.3` while still accepting `.md`/`.py`/`.io`) -- tracked as
-# part of ai-config#2404, the same issue already tracking this file's other
-# `TOKEN`/extension-parsing residuals, rather than opened as a new one.
+# CORRECTED in round 10 (comment 5436484201): for BOTH of round 8's
+# originally-pinned repro sentences, this regex -- and
+# `looks_like_path_continuation()` entirely -- is NEVER REACHED. Verified
+# directly: `dangling_continuation()` returns `""` for them, because
+# `local-bin/encrypt-gh-token.sh` already self-satisfies `ENUM_RE`'s own
+# `{1,}` minimum on its two hyphenated segments, so the match ends at the
+# following comma. `feature/v2.1` is silently dropped for a DIFFERENT
+# reason entirely: "feature" itself has no internal hyphen/underscore/dot,
+# so `TOKEN` can't match it, and the `{1,}` repetition simply cannot extend
+# past the already-complete citation to reach it -- the same
+# `ai-config#2404` family (`TOKEN` requiring every item to carry its own
+# separator) as the coincidental-slash-item-first residual documented
+# above `ENUM_RE`. Confirmed by removing the version suffix entirely
+# (`"...encrypt-gh-token.sh, feature was tested."`) and reproducing the
+# identical silence. Those two fixtures are renamed
+# `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` to match what actually causes them.
+#
+# The extension-vs-version-tail confusion this section originally described
+# is still real, just reachable through a DIFFERENT shape: a coincidental
+# item whose own leading segment (`cycle-charge-flee`, unlike `feature`) is
+# independently `TOKEN`-shaped, so `ENUM_RE`'s main match captures the whole
+# `cycle-charge-flee/v2.1` directly (via the SAME internal-`/`-continuation
+# mechanism route 3 always used, not `continuation` at all), and `v2.1`
+# genuinely satisfies this regex the way `.md` would. Pinned separately as
+# `ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM`.
+#
+# Both remain ACCEPTED, per round 8's original framing -- this hook is
+# warn-only and fail-open, and this many rounds on one grammar is reason
+# enough to stop adding narrower predicates. The known next step, if either
+# residual ever bites in a real comment: require the extension to contain
+# at least one LETTER (ruling out purely-numeric tails like `.1`/`.3` while
+# still accepting `.md`/`.py`/`.io`) -- tracked as part of ai-config#2404,
+# though note it would close ONLY the genuine extension-vs-version-tail
+# fixture, not the bare-word-truncation ones, which need `TOKEN` itself
+# widened (the same larger, out-of-scope change that issue already tracks).
 PATH_EXTENSION_RE = re.compile(r"\.[A-Za-z0-9]{1,8}$")
 
 # A path SEGMENT that may itself be bare (no internal hyphen/underscore/dot
@@ -673,15 +731,27 @@ def looks_like_path_continuation(continuation):
     TWO ACCEPTED RESIDUALS remain in the classification below, found in
     rounds 8 and 9 (routes 8-9 in the class doc-comment above `ENUM_RE`,
     which also carries the standing pre-disposition covering any FURTHER
-    variant of this same shape): `PATH_EXTENSION_RE` cannot tell a real
-    extension from a version-number tail (`/main/v2.1` -- route 8), and the
-    `continuation.endswith("/")` branch below cannot tell a genuine
-    directory citation from a coincidental suffix that merely happens to
-    end in a bare `/` (`/main/` -- route 9, the mirror of the very `/main`
-    example above that this docstring already says "stays unclassified" --
-    it does, right up until one more trailing slash is appended). Both are
-    pinned as regression fixtures (`ACCEPTED_MISS_VERSION_SUFFIX_*` and
-    `ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_*`) rather than narrowed further.
+    variant of this same shape). Route 8 does NOT reach this function at
+    all for its own originally-pinned repro (`feature/v2.1`, corrected in
+    round 10, comment 5436484201) -- that one is silenced earlier, by
+    `TOKEN` truncation at the bare word "feature", the same
+    no-internal-separator family as the coincidental-slash-item-first
+    residual documented above `ENUM_RE`. The extension-vs-version-tail
+    confusion this function's own `PATH_EXTENSION_RE` check is genuinely
+    exposed to needs a DIFFERENT shape, where the item before the slash is
+    itself `TOKEN`-shaped (`cycle-charge-flee/v2.1`, not `/main/v2.1`) so
+    the match reaches this function's extension check at all; `v2.1` then
+    satisfies `PATH_EXTENSION_RE` exactly as `.md` would. Route 9 is
+    unaffected by that correction: the `continuation.endswith("/")` branch
+    below still cannot tell a genuine directory citation from a
+    coincidental suffix that merely happens to end in a bare `/`
+    (`/main/` -- route 9, the mirror of the very `/main` example above
+    that this docstring already says "stays unclassified" -- it does,
+    right up until one more trailing slash is appended). Both are pinned
+    as regression fixtures (`ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_*`
+    and `ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_*`) rather than narrowed
+    further; `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` is pinned separately,
+    nearer the enumeration-level matching it actually exercises, not here.
     """
     m = CONTINUATION_RE.match(continuation)
     if not m or m.end() != len(continuation):
@@ -799,7 +869,37 @@ ENUM_BULLET_RE = re.compile(
     r"((?:[ \t]*[-*]\s+[^\n]*\n?){2,})",
     re.I,
 )
-BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN})`?", re.M)
+# Captures a bullet line's FULL item, not just its leading segment: TOKEN,
+# then any `/`-joined continuations, then an optional bare trailing `/` --
+# the same multi-segment shape `ENUM_RE`'s own token-list clause builds for
+# the inline form. Widened from a bare `{TOKEN}` capture (ai-config#2386
+# round 10): the narrower version threw away everything after the first
+# `/`, so `find_claims`'s bullet loop could never even ASK whether a bullet
+# item was a citation -- it only ever saw "ai-config", never
+# "ai-config/claude-hook-adapter.py" -- which is why route 10's fix (below)
+# needs this capture widened before `looks_like_one_path` has anything
+# meaningful to classify.
+BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN}(?:/{TOKEN})*/?)`?", re.M)
+# ACCEPTED RESIDUAL, found by round 10's own two-sided derivation sweep run
+# against bulleted forms (not requested by either of round 10's two
+# findings; confirmed NOT a regression -- reproduces identically against
+# the pre-round-10 hook): because this regex is anchored to the bullet's
+# line start, a leading path segment that fails `TOKEN` (no internal
+# separator -- "tests" in "tests/testthat.R", same bare-word shape as
+# `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*` above `PATH_EXTENSION_RE`) drops
+# the WHOLE item from the token count rather than partially matching it.
+# In a 2-item bulleted list pairing one such citation with one bare
+# recalled identifier, this collapses the count to 1, under
+# `find_claims`'s `len(tokens) < 2` floor, so the claim goes unrecognized
+# -- pinned as `BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM`.
+# Scoped to exactly 2 items (swept and confirmed silent at n=3-5, where the
+# remaining items supply enough tokens on their own). Same
+# `TOKEN`-separator-requirement family as routes 8-9's standing
+# pre-disposition above, tracked under the same `ai-config#2404`, though
+# arrived at via item-count collapse in this bullet route rather than
+# `looks_like_path_continuation()` misclassifying a dangling `/` in the
+# inline route -- the pre-disposition's own class definition, so no new
+# numbered route or review round is needed to accept it.
 
 
 def find_claims(body_text):
@@ -841,6 +941,15 @@ def find_claims(body_text):
     for m in ENUM_BULLET_RE.finditer(prose):
         tokens = BULLET_TOKEN_RE.findall(m.group(1))
         if len(tokens) < 2:
+            continue
+        # Mirror the inline path's own filtering (ai-config#2386 round 10):
+        # a bulleted list of genuine path citations -- the exact
+        # false-positive shape routes 1-5 spent five rounds closing for
+        # `ENUM_RE` -- went unfiltered here, since this loop never called
+        # `looks_like_one_path` at all. Joining the (now full-item)
+        # `tokens` with `,` reuses that same comma-first, per-item
+        # classification rather than a second, bullet-specific one.
+        if looks_like_one_path(", ".join(tokens)):
             continue
         quote = " ".join(m.group(0).split())
         key = ("enumeration", quote.lower())

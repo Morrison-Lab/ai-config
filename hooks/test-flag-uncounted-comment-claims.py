@@ -380,24 +380,48 @@ ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST = (
     "local-bin/encrypt-gh-token.sh, interval-labels."
 )
 
-# ai-config#2386 review round 8 (claude-review, comment 5436238489): round
-# 7's `continuation` classifier fixed the digit-only and bare-word
-# coincidental-slash cases, but a version-shaped suffix (`v2.1`) still
-# reopens the exact same failure -- `_BARE_SEGMENT` parses `v2` as an
-# ordinary segment and `.1` satisfies `PATH_EXTENSION_RE` exactly as a real
-# extension would, so `feature/v2.1` reads as "resolves to an extension"
-# and the whole mixed list goes silent. Explicitly accepted per round 8's
-# own verdict rather than patched with a ninth predicate -- see the
-# extended comment above `PATH_EXTENSION_RE`'s definition for the full
-# reasoning and the letter-required-extension idea tracked as a future
-# narrowing under ai-config#2404. Both of the reviewer's own repro
-# sentences are pinned here as deliberate, tested residuals.
-ACCEPTED_MISS_VERSION_SUFFIX_TWO_ITEM = (
+# ai-config#2386 review round 8 (claude-review, comment 5436238489): these
+# two sentences were ORIGINALLY pinned and named as "version suffix defeats
+# PATH_EXTENSION_RE via looks_like_path_continuation()". Round 10 (comment
+# 5436484201) demonstrated that diagnosis was WRONG for these two specific
+# sentences: `local-bin/encrypt-gh-token.sh` already satisfies `ENUM_RE`'s
+# own `{1,}` minimum on its own two hyphenated segments, so the match ends
+# at the following comma and `feature/v2.1` is never even reached --
+# `dangling_continuation()` returns `""` (confirmed: the character right
+# after the match is `,`, not `/`), so `looks_like_path_continuation()` and
+# `PATH_EXTENSION_RE` are NEVER INVOKED for these fixtures. The real cause
+# is `TOKEN` truncation at the plain word "feature" (no internal hyphen/
+# underscore/dot of its own), the SAME `ai-config#2404` family as
+# `ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST` above -- confirmed by
+# reproducing the identical silence with the version-suffix removed
+# entirely (`"...encrypt-gh-token.sh, feature was tested."` -> also `[]`).
+# Renamed from `ACCEPTED_MISS_VERSION_SUFFIX_*` to name the TRUE mechanism,
+# so a future reader (and a future implementer of ai-config#2404's
+# "letter-required extension" remedy) is not misdirected: that remedy
+# would NOT close either of these two fixtures, since the extension check
+# it would narrow is never reached for them.
+ACCEPTED_MISS_BARE_WORD_TRUNCATION_TWO_ITEM = (
     "No hits in local-bin/encrypt-gh-token.sh, feature/v2.1 was tested."
 )
-ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM = (
+ACCEPTED_MISS_BARE_WORD_TRUNCATION_THREE_ITEM = (
     "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
     "feature/v2.1, interval-labels."
+)
+
+# The GENUINE extension-vs-version-tail confusion DOES exist -- just not in
+# the two fixtures above. Reached when the coincidental item's OWN leading
+# segment ("cycle-charge-flee") is itself TOKEN-shaped (unlike "feature"),
+# so `ENUM_RE`'s main match captures the whole `cycle-charge-flee/v2.1` as
+# two internally-joined tokens directly (no `dangling_continuation` needed
+# at all) -- and `v2.1` genuinely satisfies `PATH_EXTENSION_RE` the way a
+# real extension would. This is what the letter-required-extension remedy
+# tracked under ai-config#2404 would actually need to close. A third,
+# unrelated bare item unmasks it again (`looks_like_one_path`'s `all()`),
+# the same way route 9's trailing-slash-suffix residual is masked by a
+# third item -- so only the 2-item form is pinned as an accepted miss here.
+ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM = (
+    "No hits in local-bin/encrypt-gh-token.sh, "
+    "cycle-charge-flee/v2.1 was tested."
 )
 
 # ai-config#2386 review round 9 (claude-review, comment 5436345773): the
@@ -426,6 +450,65 @@ ACCEPTED_MISS_TRAILING_SLASH_SUFFIX_VERSION = (
 TRAILING_SLASH_SUFFIX_THREE_ITEM_STILL_FIRES = (
     "The fingerprinted scripts: local-bin/encrypt-gh-token.sh, "
     "interval-labels, cycle-charge-flee/v2/ was checked."
+)
+
+# ai-config#2386 review round 10 (claude-review, comment 5436484201): a
+# genuinely NEW false-positive gap, OUTSIDE the pre-dispositioned
+# coincidental-slash-continuation class (round 9's standing statement) --
+# this is a code path that performed no citation classification at all,
+# not a member of the classified-but-imperfect family that block covers.
+# The bulleted-list enumeration loop never called `looks_like_one_path`,
+# so a bulleted list of genuine path citations -- the exact shape routes
+# 1-5 spent five rounds closing for the inline form -- fired unfiltered.
+# Both citations are the exact strings this file's own inline fixtures
+# (`PATH_BOTH_SEGMENTS_HYPHENATED_1`/`_2`) already use as real content.
+BULLETED_ALL_CITATIONS_MUST_NOT_FIRE = (
+    "The fingerprinted scripts:\n"
+    "- ai-config/claude-hook-adapter.py\n"
+    "- local-bin/encrypt-gh-token.sh\n"
+)
+# A bulleted list mixing citations with recalled bare identifiers -- the
+# composite shape the inline mixed-list fixtures (rounds 6-7) already
+# cover -- must still fire, mirroring the inline `all()` semantics.
+BULLETED_MIXED_CITATION_AND_IDENTIFIERS = (
+    "The fingerprinted scripts:\n"
+    "- ai-config/claude-hook-adapter.py\n"
+    "- cycle-charge-flee\n"
+    "- interval-labels\n"
+)
+# A bulleted list of a trailing-slash directory citation plus an
+# extension-terminated one -- both citation FLAVORS this file's inline
+# fixtures already cover, now exercised via the bullet path.
+BULLETED_ALL_CITATIONS_TRAILING_SLASH_AND_EXTENSION = (
+    "The fingerprinted scripts:\n"
+    "- codex-skills/pre-push-review/\n"
+    "- local-bin/encrypt-gh-token.sh\n"
+)
+
+# ACCEPTED RESIDUAL, found by the round-10 two-sided derivation sweep
+# (ai-config#2386 comment 5436484201's own instruction to re-run it against
+# bulleted forms) -- not requested by either of round 10's two findings, and
+# confirmed NOT a regression from round 10's fix: reproduces identically
+# against the pre-round-10 hook (`git show HEAD:hooks/...` before this PR's
+# round-10 commit). Same root cause as `ACCEPTED_MISS_BARE_WORD_TRUNCATION_*`
+# above -- `TOKEN` requires an internal separator, so "tests" in
+# "tests/testthat.R" cannot match it -- but a DIFFERENT failure shape:
+# `BULLET_TOKEN_RE` is anchored to a bullet's line start, so when the
+# leading segment of a multi-segment path fails `TOKEN`, the WHOLE line
+# fails to match (not a partial capture the way the inline route's
+# mid-string truncation works), and the item is dropped from the token
+# count entirely rather than misclassified. In a 2-item bulleted list this
+# collapses the token count to 1 (the single bare identifier), which is
+# below `find_claims`'s `len(tokens) < 2` floor, so the whole claim goes
+# unrecognized. Scoped to exactly 2 items: at 3+ the remaining items supply
+# enough tokens on their own regardless of this one's loss (swept and
+# confirmed: 0 failures at n=3,4,5 against 30 sampled orderings each).
+# Tracked as part of ai-config#2404, the same TOKEN-separator-requirement
+# family as the fixtures above, rather than opened as a new issue.
+BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM = (
+    "The fingerprinted scripts:\n"
+    "- tests/testthat.R\n"
+    "- warn-pr-create\n"
 )
 
 
@@ -709,13 +792,21 @@ def unit_checks(mod):
     check("find_claims ACCEPTS missing a list starting with the coincidental-slash item",
           mod.find_claims(ACCEPTED_MISS_COINCIDENTAL_SLASH_ITEM_FIRST), [])
 
-    # Regression: review round 8 (comment 5436238489) -- both of the
-    # reviewer's own repro sentences, pinned as deliberate, tested
-    # accepted misses per that round's own explicit exit.
-    check("find_claims ACCEPTS missing a 2-item list with a version-suffix citation",
-          mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_TWO_ITEM), [])
-    check("find_claims ACCEPTS missing a 3-item list with a version-suffix citation",
-          mod.find_claims(ACCEPTED_MISS_VERSION_SUFFIX_THREE_ITEM), [])
+    # Regression: review round 8 (comment 5436238489), RENAMED in round 10
+    # (comment 5436484201) once the true mechanism was demonstrated (TOKEN
+    # truncation at the bare word "feature", not an extension-check
+    # confusion). Both of the reviewer's own repro sentences, pinned as
+    # deliberate, tested accepted misses.
+    check("find_claims ACCEPTS missing a 2-item list truncated at a bare word",
+          mod.find_claims(ACCEPTED_MISS_BARE_WORD_TRUNCATION_TWO_ITEM), [])
+    check("find_claims ACCEPTS missing a 3-item list truncated at a bare word",
+          mod.find_claims(ACCEPTED_MISS_BARE_WORD_TRUNCATION_THREE_ITEM), [])
+    # The genuine extension-vs-version-tail confusion, confirmed reachable
+    # via a different repro shape (see the fixture's own comment) -- this
+    # is what ai-config#2404's letter-required-extension remedy would
+    # actually need to close, unlike the two fixtures directly above.
+    check("find_claims ACCEPTS missing a 2-item list via a genuine version-tail extension match",
+          mod.find_claims(ACCEPTED_MISS_GENUINE_EXTENSION_VS_VERSION_TWO_ITEM), [])
 
     # Regression: review round 9 (comment 5436345773) -- the third variant,
     # in looks_like_path_continuation()'s bare-trailing-slash branch. Both
@@ -730,6 +821,24 @@ def unit_checks(mod):
     enum_claims = [c for c in claims if c[0] == "enumeration"]
     check("find_claims still catches the 3-item trailing-slash-suffix case (masked, not fixed)",
           bool(enum_claims), True)
+
+    # Regression: review round 10 (comment 5436484201) -- a genuinely new,
+    # out-of-class false positive: the bulleted-list loop never filtered
+    # through looks_like_one_path the way the inline loop always has.
+    check("find_claims silent on a bulleted list of genuine path citations",
+          mod.find_claims(BULLETED_ALL_CITATIONS_MUST_NOT_FIRE), [])
+    check("find_claims silent on a bulleted trailing-slash + extension citation pair",
+          mod.find_claims(BULLETED_ALL_CITATIONS_TRAILING_SLASH_AND_EXTENSION), [])
+    claims = mod.find_claims(BULLETED_MIXED_CITATION_AND_IDENTIFIERS)
+    enum_claims = [c for c in claims if c[0] == "enumeration"]
+    check("find_claims still catches a bulleted mixed citation+identifier list",
+          bool(enum_claims), True)
+    # Accepted residual (found by round 10's own two-sided sweep, confirmed
+    # pre-existing -- see the fixture's comment): a bulleted 2-item list
+    # loses this one to token-count collapse, the bulleted-route sibling of
+    # ACCEPTED_MISS_BARE_WORD_TRUNCATION_* above.
+    check("find_claims ACCEPTS missing a bulleted 2-item list via bare-word leading-segment truncation",
+          mod.find_claims(BULLETED_ACCEPTED_MISS_BARE_WORD_LEADING_SEGMENT_TWO_ITEM), [])
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

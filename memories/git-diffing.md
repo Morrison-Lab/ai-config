@@ -1,0 +1,391 @@
+# Git diffing
+
+Diff-range selection, diff-scoped check pitfalls, and pathspec/glob/ref
+pattern-matching mismatches -- what a `git diff`, `git ls-files`, or
+`git rev-parse <ref>:<path>` call actually sees.
+Split out of [`git.md`](git.md) (ai-config#694 pattern) at the 1200-line
+gate.
+
+## A diff-scoped local check silently no-ops on an empty/uncommitted diff --- commit before running it, not after
+
+A repo's own pre-push check script can include steps that gate on `git diff
+<merge-base> HEAD` (a comment-citation scanner, a units-convention linter, a
+patch-coverage calculator) rather than the raw working tree.
+If you run such
+a script against **uncommitted** changes --- reasoning "let me verify before I
+commit" --- the diff-scoped steps compare HEAD against itself (or whatever the
+last commit was), see no changes, and silently report a clean pass ("no
+GDScript changes in this diff") without having examined your actual edits at
+all.
+Only the disk-based steps in the same invocation (a plain test run, a
+character-encoding scan of the working tree) give real signal; the
+diff-scoped ones are pure no-ops that LOOK identical to a genuine clean
+result in the printed summary.
+
+This cost one delegated subagent roughly two hours and most of a million
+tokens in one session: it wrote a real, working feature, then spent that
+time re-running the full check suite (each pass ~15-20 minutes) against its
+own uncommitted working tree, never noticing that three of the five
+requested checks were quietly checking nothing.
+The fix, once diagnosed,
+was mechanical --- commit first, then re-run the checks against a real diff ---
+but the diagnosis itself only happened after the orchestrating session
+noticed a suspicious mismatch (two full turns and heavy token spend, yet
+`git log`/`git status` showed no commits and no uncommitted changes) and
+asked the agent directly why there was no visible progress.
+
+**How to apply:** before trusting a "PASS" from any check step whose own
+description implies it scopes to a diff (a comment scanner, a
+units-convention check, coverage-of-new-lines), confirm there IS a
+non-empty diff for it to have scanned --- commit (even a rough, uncommitted-
+but-final draft) before the verification pass, not after.
+When briefing a
+subagent to implement-and-verify a feature, say so explicitly: "commit your
+changes before running the diff-scoped checks (comments/units/patch_coverage
+in this repo's `tools/check.sh`), not after --- they silently no-op against
+an empty diff."
+And when an orchestrating session sees a subagent burn
+much more wall-clock/tokens than its own diff would justify, checking
+`git log`/`git status` directly is a fast, decisive way to catch this class
+of problem rather than trusting the subagent's own narration that it's
+"still verifying." (Sparta `gii-mwc` session, 2026-07-19, `tools/check.sh`'s
+`comments`/`units`/`patch_coverage` steps.)
+
+**This is not only a subagent-scale failure --- it bites a single session
+running one check by hand, and the ai-config corpus's own
+`check-new-line-breaks` is one of these.**
+Its script runs `git diff --unified=0 <base_ref>...HEAD`, so a working tree
+full of uncommitted edits is invisible to it: on `main` with changes not yet
+committed, `HEAD` *is* `origin/main`, the diff is empty, and it prints
+`No lines missing semantic breaks.`
+That message is indistinguishable from a genuine pass, and it is especially
+seductive here because the check is *also* advisory (it warns and exits 0 ---
+see [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)), so
+neither its exit code nor its output gives the game away.
+The habit that actually works: `git checkout -b`, `git add`, `git commit`,
+**then** run the diff-scoped checks, and only then push.
+(ai-config#730 and #732, 2026-07-25, in the same session: both ran the check
+against an uncommitted tree, both got a false clean, and both had the real
+violations found afterward --- #730's by the check itself once the first
+commit existed, #732's by a reviewer.
+The second time is what makes this worth recording, since the entry above
+already existed and was not applied.)
+
+**Green on the push event is not green on the pull_request event, for a diff-scoped checker --- the two triggers diff different bases.**
+Same commit, ai-config#2074, 2026-08-24: the push-event `new-line-breaks / check-new-line-breaks` run passed on three consecutive heads while the pull_request-event run failed each time, because that run diffs lines added since the merge-base, which is the set the PR is actually judged on.
+Judge a branch by its pull_request-event runs.
+A green push-event run of the same check name proves nothing about the PR verdict.
+
+## Picking the diff range: `..` vs `...` vs the working tree
+
+Three forms answer three different questions, and reaching for the wrong one
+produces a confident, wrong read of your own PR.
+
+- `git diff origin/main..HEAD` (two dots) compares the two **tips**.
+  When your branch is behind `main`, main's newer commits show up as
+  **deletions** -- files your PR never touched look removed by it.
+- `git diff origin/main...HEAD` (three dots) compares against the **merge
+  base**, which is the PR's actual diff and what GitHub shows.
+  Use this to reason about what the PR changes.
+- `git diff origin/main` (no second ref) compares the **working tree**, so it
+  includes uncommitted edits; both `..` and `...` see only committed work.
+
+Both mistakes hit the same session (gha#318, 2026-07-26).
+The two-dot form made #317's changelog fragment -- merged to `main` after the
+branch was cut -- appear deleted by the PR, and it was nearly reported to the
+user as a finding before `...` showed the real four-file diff.
+Later, a non-ASCII/em-dash self-check run as `git diff origin/main...HEAD |
+grep` printed clean while the em-dashes sat uncommitted in the working tree;
+`git diff origin/main` found them immediately.
+
+That second failure is the by-hand instance of the diff-scoped-no-op section
+above, with a second fix available: when the edits are deliberately still
+uncommitted, use the worktree-comparing `git diff origin/main` rather than
+committing first just to make a check see them.
+After you merge `main` into the branch, the merge base becomes `origin/main`
+and all three forms agree on committed content -- which is exactly when it is
+easiest to stop thinking about the distinction and get bitten by the next
+stale-branch case.
+
+**A reviewer can make this mistake against your PR, and the finding it
+produces is far more convincing than the self-check version above.**
+The cases above are you misreading your own diff, where the fix is just to
+rerun the command.
+Here someone else runs `git diff --stat origin/main HEAD` and reports, in
+detail, that your branch deletes files you never touched.
+Three things make it hard to dismiss.
+It arrives itemized, as a table of real paths with real line counts, because
+every one of those files genuinely does differ between the two tips.
+It is internally consistent, so a count or an index that moved in the same
+upstream commit corroborates the "deletions" and reads as deliberate intent.
+And it invites a destructive repair: reverting those files from your branch
+would actually revert whatever merged to `main` while your PR was open.
+
+Check the base before believing the finding, and answer with the merge-base
+diff rather than by arguing.
+GitHub's own Changed Files panel is the tell, since it always diffs the merge
+base, so a reviewer's file list that disagrees with the panel is a diff-range
+artifact until shown otherwise rather than a defect in your branch.
+Merging `main` in makes the two agree, which lets the rebuttal end with the
+reviewer's own command reproducing the panel's numbers.
+(ai-config#765, 2026-07-28: a review reported 20 changed files and 822
+deletions against a 7-file PR, listed three skills, three Codex wrappers, a
+shared fragment and four memory files as deleted, and asked whether to revert
+them.
+All of it was four commits that reached `main` after the branch was cut.
+`skills.qmd`'s count reading `171+` against main's `175+` was the
+corroborating detail, and it had moved in the same commit that added the
+skills.
+The next review round retracted the finding once `main` was merged in.)
+
+## A `git diff` self-check is blind to untracked files, whatever range you pick
+
+The section above chooses between `..`, `...`, and the bare worktree form.
+None of the three sees a file git is not tracking yet.
+So a self-check driven by `git diff` skips a PR's brand-new file entirely, and a new file is usually the one carrying the most unreviewed added lines.
+`git add -N <path>` (or a plain `git add`) is what makes it visible;
+`git status --short` marks with `??` exactly what a diff-based check is currently ignoring.
+
+The failure runs in the direction that reads as a pass, so print a count of what the check examined rather than only its hits, per [`fail-fast`](../shared/principles/fail-fast.md)'s by-hand-check rule.
+A scan reporting `0 banned-punctuation hits` looks identical whether it read the whole diff or nothing at all.
+(ai-config#760, 2026-07-28: a pre-push scan for banned punctuation and multi-sentence lines printed `examined 11 added lines, 0 hits` on a PR whose new fragment ran to 85 lines.
+The count was the only thing that gave it away;
+staging first and re-running scanned all 85.)
+
+## An untracked copy sitting where a tracked file lives on another branch runs instead of it
+
+The entry above is about a check that cannot **see** an untracked file.
+This is the inverse and the worse half: an untracked file you cannot help but
+**run**.
+A scratch copy of a script, left at the same relative path as the tracked
+version that lives on some other branch, is what `./scripts/<name>.sh`
+resolves to.
+The inputs are fine, the invocation is right, and the binary is wrong.
+
+Nothing at the call site distinguishes them.
+Same path, same name, executable, plausible output.
+`git status --short` marks it `??`, but an untracked file among a working
+tree's other untracked files is unremarkable, and the checkout around it is
+fresh --- which is what makes this harder to spot than an ordinary stale
+checkout, where at least everything is stale together.
+
+The failure is also **self-confirming**, not merely silent.
+A stale copy's already-fixed bug presents as a genuine finding, so the wrong
+binary generates apparently productive work: a diagnosis, a fix, a test.
+A wrong *artifact* would eventually contradict something; this produces a
+correct fix to a problem that no longer exists, and every step after the first
+looks like progress.
+
+One command settles it before you trust any behaviour you observed:
+
+```bash
+git ls-files --error-unmatch scripts/<name>.sh    # exit 0 = tracked here
+```
+
+Non-zero on a path you expected to be tracked is the tell.
+Then ask the second question, which the first does not answer: **is this branch
+the one that owns the file?**
+A path untracked on `main` and tracked on a feature branch is exactly the
+shape, so check the owning PR's copy before concluding anything about the
+script's behaviour --- and diff the two rather than assuming yours is behind
+only where you noticed.
+
+`ucdavis/bcs`'s own `CLAUDE.md` already leans on this command for a different
+purpose (deciding whether a path under `inst/extdata/` is restricted data), so
+it is a cheap habit with two payoffs rather than a new one.
+
+- **Do:** run `git ls-files --error-unmatch <path>` before treating a script's
+  behaviour as the artifact's behaviour.
+- **Do:** compare against the copy on the branch that owns the file, and read
+  its version before writing a fix.
+- **Don't:** read a fresh checkout as evidence that every file in it is the
+  tracked one.
+- **Don't:** trust a bug you found by running a script until you have confirmed
+  which copy ran --- an already-fixed bug reads exactly like a new one.
+
+(`ucdavis/bcs#530`, 2026-07-31: `scripts/resolve-version-conflict.sh` lives on
+that PR's branch, and an untracked copy of an earlier revision sat at the same
+path in the main checkout, where `git status` showed it as `??`.
+Running it exercised the stale copy, whose final "still unmerged elsewhere"
+guard counted the file it had just resolved --- it never staged it --- so it
+exited 1 on its own success path.
+That bug was diagnosed correctly, fixed, and tested in both directions, all of
+it redundant: #530's copy already fixed it, and additionally guards on
+`git rev-parse --is-inside-work-tree`, where the independently-written fix would
+have aborted under `set -e` outside a work tree.
+Running the same three-case fixture against #530's copy gave exit 0 on the
+handled case, exit 1 naming the genuine second conflict, and exit 0 outside a
+work tree.)
+
+## A pattern resolved by `git ls-files` is a pathspec, not a shell glob -- `*.md` is recursive and `**/*.md` drops root-level files
+
+Any tool that selects files by handing a pattern to `git ls-files -- <pattern>`
+takes a **git pathspec**, and git's pathspec matching differs from shell and
+globby matching in one load-bearing way: `*` matches `/` too.
+
+The consequences invert the usual intuition:
+
+- `*.md` matches at **any depth**, root-level files included.
+  It is already recursive.
+- `**/*.md` requires **at least one `/`**, so it matches nothing at the repo
+  root.
+
+Measured on `ucdavis/bcs`:
+
+```console
+$ git ls-files -- '*.md' | wc -l
+28
+$ git ls-files -- '**/*.md' | wc -l
+23
+$ git ls-files -- '**/*.md' | grep -v /     # any root-level hits?
+```
+
+The third command prints nothing at all: `**/*.md` matches no root-level file.
+The five it loses are `NEWS.md`, `README.md`, `CLAUDE.md`, `AGENTS.md`, and
+`LICENSE.md` -- in most repos, the ones that matter most.
+
+**Why this is worth a section rather than a footnote: the wrong form fails
+silently.**
+`*.md` reads as non-recursive to anyone carrying shell intuition,
+so "correcting" it to `**/*.md` looks like a straightforward fix.
+Nothing turns red when it lands.
+The linter still runs, still reports success, and still prints a file count --
+just a smaller one -- so the repo's most important files stop being checked
+with no signal that anything changed.
+
+**The rule is "know which matcher you are feeding", not "never write
+`**/*.md`".**
+The same pattern behaves oppositely in the two engines, so a blanket ban would
+break the globby-based configs it does not apply to.
+Two files, one at the root and one nested, in the same repo:
+
+```console
+$ npx markdownlint-cli2 '**/*.md'      # globby
+Linting: 2 file(s)
+
+$ git ls-files -- '**/*.md'            # git pathspec
+sub/nested.md
+
+$ git ls-files -- '*.md'               # git pathspec
+root.md
+sub/nested.md
+```
+
+Globby's `**/*.md` finds both files; the identical pathspec finds only the
+nested one, and `*.md` is the pathspec that matches what globby matched.
+
+This corpus relies on both conventions at once, correctly: its own
+`.markdownlint-cli2.jsonc` sets `"globs": ["**/*.md"]`, which is right because
+`markdownlint-cli2` resolves globs with globby, while a gha workflow input
+consumed by `git ls-files` needs `*.md` for the same coverage.
+
+**Settle it by measuring, not by reasoning about glob semantics.**
+Both forms through `git ls-files`, compare the counts, and look specifically
+for root-level hits with `grep -v /`.
+One command decides it, which is the
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) rule
+applied to a question that otherwise invites a confident wrong answer.
+
+This is not specific to one repo.
+`Morrison-Lab/gha`'s `lint-markdown` and `lint-yaml` both resolve their `globs`
+input this way (`_pathspec.mjs` / `_pathspec.py`, `trackedFiles()`) and
+document it as "git pathspecs ... recursive by default", so every consuming
+repo inherits the same trap.
+
+(`ucdavis/bcs#445`, 2026-07-27: a review of the PR wiring `lint-markdown`
+suggested changing `globs: '*.md'` to `'**/*.md'` "for recursive matching",
+reasoning correctly from globby semantics and incorrectly assuming they
+applied here.
+Running both forms before replying is what caught it; applying the suggestion
+would have silently un-gated all five root-level files, including the
+`NEWS.md` whose merge-splice defect motivated the PR.)
+
+## `git rev-parse <ref>:<path>` writes its own input to stdout when the path is absent
+
+`git rev-parse` resolves `<ref>:<path>` to a blob SHA.
+When that path does not exist in that ref it fails **and still writes to stdout** -- the literal input string, unchanged.
+Verified on git 2.34.1, 2026-07-30:
+
+```console
+$ git rev-parse origin/main:not/a/real/path; echo "rc=$?"
+fatal: path 'not/a/real/path' does not exist in 'origin/main'
+origin/main:not/a/real/path
+rc=128
+$ git rev-parse origin/main:README.md; echo "rc=$?"
+939ce89cb74324b1c783fe726a20a1d2b4d9b06b
+rc=0
+```
+
+The two lines go to different streams, so a capture keeps the echoed input whichever way stderr is handled:
+
+```console
+$ out=$(git rev-parse origin/main:not/a/real/path 2>/dev/null); echo "[$out]"
+[origin/main:not/a/real/path]
+```
+
+A capture that merges stderr with `2>&1`, or that ignores the exit status, therefore comes back non-empty with a value that reads as an ordinary answer.
+It is also unequal to every real SHA, which is what makes it worse than an empty result.
+A "does this path differ between two refs" check compares two such strings, finds them unequal, and reports **differs** when the true answer was **absent from one side**.
+That is the by-hand-check shape [`fail-fast`](../shared/principles/fail-fast.md) describes, where the failure path and the pass path print the same kind of thing.
+
+Test the exit status, or use `git cat-file -e "$ref:$path"`, which writes nothing to stdout at all:
+
+```console
+$ out=$(git cat-file -e origin/main:not/a/real/path 2>/dev/null); echo "rc=$? out=[$out]"
+rc=128 out=[]
+```
+
+- **Do:** read `rc` from `git rev-parse <ref>:<path>`, or switch to `git cat-file -e` when only existence is in question.
+- **Do:** treat an output that is not SHA-shaped as "the path was absent" rather than as a difference.
+- **Don't:** pipe `git rev-parse <ref>:<path>` through `2>&1` into a comparison.
+- **Don't:** compare two `git rev-parse <ref>:<path>` outputs for equality without first establishing that both resolved -- two absent paths echo two different strings, which reads as a difference.
+
+(2026-07-30, a `ucdavis/bcs` branch sweep: a per-path comparison built this way reported that a branch was about to destroy another session's work, and that went out as a blocker.
+The paths were absent on one side rather than different, and a real set-difference over the two file lists showed the branch was safe.)
+
+## A ref pattern is not a pathspec: `*` does NOT cross a slash in `for-each-ref`, but DOES in `ls-files`
+
+The section above establishes that a **pathspec** `*` matches `/` too.
+Git's other pattern matcher does the opposite, with identical syntax, so the
+intuition you just built is wrong one command over.
+
+`git for-each-ref <pattern>` (and `git branch --list`, and a refspec's left
+side) matches with `fnmatch` under `FNM_PATHNAME`, where `*` stops at a slash.
+So `refs/remotes/origin/*` matches `origin/main` and misses
+`origin/feat/anything`.
+
+Measured together on git 2.34.1, in one repo, same syntax:
+
+```bash
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/*'    # 8
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/**'   # 18
+git ls-files -- 'skills/*'                                              # 180
+git ls-files -- 'skills/**'                                             # 180
+```
+
+The ref matcher halves the result; the pathspec matcher cannot tell the two
+patterns apart.
+
+**The failure direction is a silent false all-clear, and it is biased toward
+the refs that matter.**
+Slash-named branches are exactly the conventional ones -- `feat/`, `fix/`,
+`docs/`, `claude/` -- so a sweep keyed on the single star quietly omits every
+branch anyone named properly, including the ones carrying open PRs, while
+reporting a clean run over whatever is left.
+Nothing errors and the count looks plausible.
+
+Use `**` for ref patterns, or `git branch -r` / `git branch --list`, which
+enumerate without a pattern.
+And per [[algorithmatize-checks]], give any ref sweep a control: check that a
+known slash-named branch appears in its output before trusting a total.
+
+- **Do:** use `refs/remotes/origin/**` when you mean every remote branch.
+- **Do:** confirm a known nested ref is in the result before quoting a count.
+- **Don't:** carry pathspec intuition into `for-each-ref` -- the two matchers
+  disagree on the one character that decides it.
+- **Don't:** read a smaller-than-expected ref count as "this repo is tidy".
+
+(2026-08-02, a `clean-branches` sweep on `Morrison-Lab/ai-config`: the single
+star reported 17 of 34 `origin/**` refs and hid all five open PRs' branches.
+Caught only because the open-PR column came back empty against a known count of
+five.)

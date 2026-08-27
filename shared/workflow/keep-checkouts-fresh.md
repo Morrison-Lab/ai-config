@@ -168,9 +168,9 @@ fetch.prune=true, git fetch               ->  origin/feat GONE
 
 So a stale ref survives a session that both set the config and ran a prune,
 which is a third state alongside the two
-[`memories/git.md`](../../memories/git.md)'s "Cleaning up a branch deleted on
-`origin`" section describes: not "no prune ran", but "a prune ran and did not
-cover this".
+[`memories/git-branches.md`](../../memories/git-branches.md)'s "Cleaning up a
+branch deleted on `origin`" section describes: not "no prune ran", but "a
+prune ran and did not cover this".
 Its `[gone]` sweep reports a false clean either way.
 
 The consequence lands on the next push.
@@ -178,8 +178,9 @@ The consequence lands on the next push.
 longer exists at all --- reproduced in the same scratch repo, followed by an
 empty `git ls-remote` and a plain push reporting `* [new branch]`.
 That failure's meaning and its remedy are already recorded, so read
-[`memories/git.md`](../../memories/git.md)'s "`stale info` after `checkout -B`"
-bullet rather than re-deriving them; what this section adds is only that a
+[`memories/git-branches.md`](../../memories/git-branches.md)'s "`stale info`
+after `checkout -B`" bullet rather than re-deriving them; what this section
+adds is only that a
 scoped `--prune` is one of the ways you arrive there.
 
 - **Do:** run an unscoped `git fetch --prune` before relying on any

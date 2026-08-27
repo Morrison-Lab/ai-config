@@ -508,7 +508,7 @@ output.
 went into the PR body; the same content flagged 7 lines the moment it was
 run again after committing.)
 
-(A fourth pre-commit false clean, counting `memories/git.md`'s two:
+(A fourth pre-commit false clean, counting `memories/git-diffing.md`'s two:
 ai-config#2381, 2026-08-27.
 A pre-commit run passed over new uncommitted lines,
 and the identical post-commit invocation flagged one of them.
@@ -516,7 +516,7 @@ The session then nearly recorded this rule a third time, in
 `memories/tools.md`, because its dupe grep was phrase-keyed ---
 `nlb|NLB_BASE_REF|gha-check-new-line-breaks` over `memories/` ---
 a population that never included this fragment at all,
-and `memories/git.md`'s entry contained none of those strings;
+and `memories/git-diffing.md`'s entry contained none of those strings;
 a mechanism-keyed grep (`unified=0`) found both at once, per
 [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md).
 That recurrence count meets

@@ -195,7 +195,7 @@ pushes:
   as an option value when its value *is* the remote.
 
 The seventh is the one worth generalizing.
-The diff cited [`memories/git.md`](../../memories/git.md) as authority for
+The diff cited [`memories/git-branches.md`](../../memories/git-branches.md) as authority for
 "a `stale info` refusal is the one case that genuinely needs bare `--force`".
 That file says the reverse in as many words: the lease is unsatisfiable rather
 than violated, "`--force` is unnecessary, and there is nothing to race".

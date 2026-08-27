@@ -214,3 +214,25 @@ This was a critical misunderstanding of the security invariant:
 **Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
 Do not attempt to "fix" the script to admit fallback reviews for merging.
 A clean automated review from every available provider evaluating the current HEAD commit is strictly required for an autonomous merge.
+
+## Pattern 13: Forgetting to Undraft a Review-Ready PR
+- **Mistake**: Pushing a fully completed feature or bugfix but leaving the PR in draft mode.
+  This silently stalls progress because reviewers and automations treat drafts as WIP.
+- **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
+  The user had to manually ask "why is 2295 still in draft mode".
+  (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
+- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft...
+  Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
+- **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
+  Do this before dispatching review workflows or yielding to the user ---
+  but mind the ready-transition timing in `pr-on-claim.md`:
+  on a repo whose review workflow cancels in progress, do not flip ready within seconds of the final push ---
+  the two triggered review runs race, and the cancelled one can be the newer run, leaving the current head's review check red while a stale-event run survives.
+
+## Pattern 14: Pausing Without Setting a Timer
+- **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.
+  Pattern 5g above is the PR-monitoring special case of this;
+  this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
+- **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
+- **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
+- **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.

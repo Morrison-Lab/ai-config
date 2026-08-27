@@ -110,15 +110,17 @@ The dispatch this corpus requires is foreground
 Measured 2026-08-25 PDT on a Cursor Cloud Grok conductor in this repo:
 that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
-`flag-unassigned-worktree.py` emits a warning on every such dispatch
-because the Cursor adapter maps `Task` to `Agent`
+The Cursor adapter maps `Task` to `Agent`
 when `subagent_type` is not explore/plan/shell
 ([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
-and [`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py)'s
-`READ_ONLY` set is Explore/Plan.
-Deciding the child needs no worktree is fine;
-the schema has no `isolation` field to mark that decision.
-Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
+and the schema has no `isolation` field to mark
+a deliberate no-worktree decision.
+[`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py)'s
+`READ_ONLY` set now includes `adversarial-reviewer`
+(ai-config#2276), so a self-review dispatch no longer warns;
+other write-capable `Task` dispatches still do,
+and deciding such a child needs no worktree is fine ---
+the warning is the unmarkable decision's cost on this route.
 
 Commit first.
 A review of uncommitted work names a commit that does not exist yet

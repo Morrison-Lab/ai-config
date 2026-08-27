@@ -4,7 +4,8 @@ Portable AI agent config --- skills, memories, and commands
 synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
-Claude Code, Codex, and Cursor install this repo's skills natively as a plugin (see each harness's section below).
+Claude Code and Cursor install this repo's skills natively as a plugin (see each harness's section below);
+Codex has no plugin mechanism yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).
 `bootstrap.sh` handles what a plugin install can't: Gemini CLI / Antigravity config and per-machine dotfiles.
 
 ## Setup on a new machine
@@ -32,7 +33,7 @@ cat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 
-In a Claude Code, Codex, or Cursor session with the plugin installed (see each harness's section below), type `/` and confirm the skills appear (e.g. `/scout-peers`, `/ardi`).
+In a Claude Code or Cursor session with the plugin installed (see each harness's section below), type `/` and confirm the skills appear (e.g. `/scout-peers`, `/ardi`).
 
 ### Antigravity & Gemini CLI
 
@@ -144,7 +145,7 @@ resolving for other models.
 
 ## Claude Code on the web
 
-In cloud (web) sessions you can't run `bootstrap.sh` by hand, and the environment "Setup script" runs at build time *before* this repo is checked out — so it can't reference `bootstrap.sh` either.
+In cloud (web) sessions you can't run `bootstrap.sh` by hand, and the environment "Setup script" runs at build time *before* this repo is checked out --- so it can't reference `bootstrap.sh` either.
 Skills and commands need no such step, though: this repo is a native Claude Code plugin (`.claude-plugin/plugin.json`), so a web session working in ai-config itself discovers `skills/` and `commands/` directly.
 The committed `SessionStart` hook (`.claude/settings.json` → `.claude/hooks/session-start.sh`) instead runs `bootstrap.sh` once the repo is on disk, for its remaining job: Gemini CLI / Antigravity config and per-machine dotfiles.
 The hook is a no-op outside remote sessions (`CLAUDE_CODE_REMOTE`) and idempotent, so local machines are unaffected.
@@ -580,7 +581,7 @@ activated.")
 - `AGENTS.md` --- universal vendor-neutral instruction file for all coding agents
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)
-- `commands/` — slash commands (Claude Code via plugin install)
+- `commands/` --- slash commands (Claude Code via plugin install)
 - `memories/` — persistent notes & preferences (symlinked into VS Code Copilot memory dir)
 - `references/` — reviewed reference material / worked examples (e.g. a cloud
   Setup script). Documentation only: `bootstrap.sh` skips it, so it is **not**
@@ -651,7 +652,7 @@ These are either machine-specific, sensitive, or pure session state:
   and per-CWD memory state, keyed by absolute home path.
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
-- `plugins/` (in `~/.claude`) — managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
+- `plugins/` (in `~/.claude`) --- managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
   `bootstrap.sh` registers `~/.gemini/config/plugins.json` with this checkout's path, no symlink.)
 
 If a per-machine variation appears that's worth syncing (e.g., a global `CLAUDE.md`), add it as a top-level entry here and wire it into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.

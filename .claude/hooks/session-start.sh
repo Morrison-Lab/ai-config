@@ -13,7 +13,7 @@
 # any such symlinking either -- see its own header comment.
 #
 # bootstrap.sh is idempotent, so re-running on resume/clear/compact is a
-# no-op. The Julia install is likewise guarded — it only does real work on a
+# no-op. The Julia install is likewise guarded -- it only does real work on a
 # fresh container's first startup, and is a no-op once juliaup is present.
 
 set -euo pipefail

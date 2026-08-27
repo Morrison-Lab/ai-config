@@ -785,8 +785,10 @@ instrument when it comes back empty.
 
 Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md)
 point 2, the `~/.claude` consumer copies, which already owns the mechanics: if
-the Claude Code plugin is enabled, its loader already picked up the merged
-hook the moment `main` moved, so there is nothing to run.
+the Claude Code plugin is enabled, its loader serves hooks straight from the
+plugin root, so there is nothing to run --- the merged hook goes live at the
+next session start (or `/reload-plugins`), since plugin hooks connect at
+session start rather than the moment `main` moves.
 Otherwise (`install-hooks.py --fix`'s non-plugin path), check `enabledPlugins`
 first since the plugin path already loads every hook and a second
 registration makes each one fire twice, confirm `~/.claude/hooks` actually

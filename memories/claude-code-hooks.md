@@ -138,10 +138,10 @@ That existence test runs only after `find_entry` has already found the entry.
 A hook classified `missing` (declared in the manifest, absent from settings.json) is registered with no existence check at all, so `--fix` manufactures precisely the `stale` state the same run would have refused to write.
 
 **The warning exists and `--fix` does not print it.**
-The note naming the division of labour is inside the `if not args.fix:` branch:
+The note naming the division of labour is inside the `if not args.fix:` branch (wording as of the ai-config#2229 rewrite):
 
 ```
-Note --fix only edits settings.json. The scripts themselves are placed by bootstrap.sh; run scripts/check-install.py --fix if ~/.claude/hooks holds real copies instead of symlinks.
+Note --fix only edits settings.json and never places the scripts themselves. On a fresh machine, install the Claude Code plugin instead (it registers the full catalog with no separate step); this path only helps if ~/.claude/hooks already holds the scripts some other way.
 ```
 
 A plain run prints it; the `--fix` run that causes the damage does not.

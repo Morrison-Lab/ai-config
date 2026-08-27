@@ -881,8 +881,11 @@ suite — direct process verification via PowerShell resolved both.)
 
 ## A harness pass can replace `~/.claude` skill symlinks with stale copies AFTER `SessionStart`
 
-`bootstrap.sh` symlinks this repo into `~/.claude`, so a `git pull` normally
-refreshes what the Skill tool loads.
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer symlinks into `~/.claude`, `check-install.py` is deleted, and the `UserPromptSubmit` hook that ran it is removed.
+Keep this section as a record of the incident and its ordering lesson, and read its present-tense instructions as historical.
+
+`bootstrap.sh` symlinked this repo into `~/.claude`, so a `git pull` normally
+refreshed what the Skill tool loaded.
 In a web container a later provisioning pass can overwrite a subset of
 `~/.claude/skills/*` with real directories holding older content, and those
 copies then shadow the repo for the rest of the session.

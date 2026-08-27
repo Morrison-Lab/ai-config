@@ -24,7 +24,7 @@ cat ~/.gemini/config/skills.json ~/.gemini/config/plugins.json
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
 ```
 
-In a Claude Code, Codex, or Cursor session with the plugin installed, type `/` and confirm skills appear (e.g. `/ardi`, `/scout-peers`).
+In a Claude Code or Cursor session with the plugin installed, type `/` and confirm skills appear (e.g. `/ardi`, `/scout-peers`).
 
 In Cursor, open **Customize -> Rules** and confirm the `cursor-rules/` files appear as user rules (from the plugin).
 Skills appear under **Customize -> Skills** from the plugin.

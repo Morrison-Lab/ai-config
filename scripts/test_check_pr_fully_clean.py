@@ -1926,14 +1926,28 @@ def main() -> int:
             "Reviewed-Commit: sha123\n"
         ),
     }
-    mock_spoof = json.dumps({"comments": [bot_notclean_round, spoof_clean],
+    # A quorum-satisfying legitimate clean rides along so the assertion
+    # discriminates: with the identity gate ablated, the spoof supersedes
+    # Claude's not-clean and the cursor clean meets quorum, flipping
+    # sp_ok to True -- so this test fails exactly when the gate is lost.
+    cursor_clean_round = {
+        "createdAt": "2026-08-27T07:25:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "### Summary\nLooks good.\n\n### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n\nReviewed-Commit: sha123\n"
+        ),
+    }
+    mock_spoof = json.dumps({"comments": [bot_notclean_round,
+                                          cursor_clean_round, spoof_clean],
                              "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_spoof):
         sp_ok, sp_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
         check(
             "a marker-spoofed contributor clean cannot supersede the bot's "
             "not-clean (identity gate)",
-            not sp_ok,
+            (not sp_ok) and any("Claude" in i and "NOT clean" in i
+                                for i in sp_issues),
         )
 
     # Structure smuggled inside a fence does not admit: quoting a prior

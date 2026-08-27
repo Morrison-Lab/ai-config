@@ -1450,7 +1450,7 @@ def main() -> int:
         )
         check(
             "POSITIVE CONTROL is non-vacuous: criterion 4 is the ONLY thing that fires",
-            len(v_issues) == 1,
+            len(v_issues) == 1
         )
 
     # NEGATIVE CONTROL -- the ordinary ARDI flow the check must not break:
@@ -2338,8 +2338,8 @@ def main() -> int:
     }
     with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_b], "reviews": []})):
         q1_ok, q1_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
-    check("two comments from the same shared-login provider (one marked, one unmarked) are seen as TWO providers",
-          q1_ok and len(q1_issues) == 0)
+    check("two comments from the same shared-login provider (one marked, one unmarked) do NOT masquerade as two distinct providers",
+          not q1_ok and len(q1_issues) > 0)
 
     round_c = {
         "author": {"login": "d-morrison"},

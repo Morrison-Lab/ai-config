@@ -1227,7 +1227,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
     latest_by_provider = {}
     for item in dated_matching:
-        if classify_verdict(item[2], item[4]) in ("clean", "not-clean", "unreadable") or _unresolved_finding_pattern(item[2]):
+        if classify_verdict(item[2], item[4]) in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
     matching_items = list(latest_by_provider.values())
@@ -1252,7 +1252,19 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             issues.append(f"Review comment for SHA {sha[:8]} explicitly blocks.")
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
-        unique_authors = set(_reviewer_identity(item[2], item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
+        unique_authors = set()
+        logins_with_markers = set()
+        for item in matching_items:
+            if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
+                login = item[5]
+                identity = _reviewer_identity(item[2], login)
+                unique_authors.add(identity)
+                if identity != login and identity != "unknown":
+                    logins_with_markers.add(login)
+        for login in logins_with_markers:
+            if login in unique_authors:
+                unique_authors.remove(login)
+
         if len(unique_authors) < quorum or len(unique_authors) == 0:
             if len(unique_authors) == 0:
                 issues.append(f"No valid clean review found for HEAD SHA {sha[:8]}.")

@@ -136,8 +136,7 @@ Pin all available providers (including external reviewers like Copilot or Codex,
 Query them sequentially, one at a time.
 Do not request them in parallel.
 Re-check reachability at the start of every cycle:
-a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit) can become reachable mid-session,
-and must be included in the next pinned quorum.
+a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit) can become reachable mid-session, and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
 confirm a genuine all-clear review is posted at the current head from all reachable providers.
 Your inferred clean state from CI and threads does not satisfy this requirement.

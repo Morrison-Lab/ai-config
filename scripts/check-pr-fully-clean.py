@@ -1253,7 +1253,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
 
     if not has_findings and not any(i for i in issues if not i.startswith("NOTE: ")):
         unique_authors = set(_reviewer_identity(item[2], item[5]) for item in matching_items if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean")
-        if len(unique_authors) < quorum:
+        if len(unique_authors) < quorum or len(unique_authors) == 0:
             if len(unique_authors) == 0:
                 issues.append(f"No valid clean review found for HEAD SHA {sha[:8]}.")
             else:
@@ -1272,7 +1272,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         prog="check-pr-fully-clean.py",
         description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
     )
-    parser.add_argument("--quorum", type=int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
+    
+    def positive_int(value):
+        ivalue = int(value)
+        if ivalue < 1:
+            raise argparse.ArgumentTypeError(f"quorum must be >= 1, got {value}")
+        return ivalue
+
+    parser.add_argument("--quorum", type=positive_int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
     parser.add_argument("pr_number", help="Pull request number to check")
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",

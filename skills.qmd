@@ -130,7 +130,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`back`](skills/back/SKILL.md) | | Cancel the `away` grant and surface a decision log of what was resolved unattended |
 | [`daytb`](skills/daytb/SKILL.md) | `do-as-you-think-best` | Decide the question at hand yourself and report the choice -- scoped to that task, unlike `away`'s whole-session grant |
 | [`delegate-to-codex`](skills/delegate-to-codex/SKILL.md) | `dtc` | Offload heavy read/draft/verify work to the `codex` CLI before spending Claude quota, with Claude fallback |
-| [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.md) | `dto` | Offload mechanical work to opencode's free hosted or fully local models, and route anything that must stay on the machine to the local tier |
+| [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.md) | `dto` | Offload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models |
 | [`prompt-me`](skills/prompt-me/SKILL.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.md) | `pma` | Restate every open question still waiting on user input, uncapped |
 | [`pending-decisions`](skills/pending-decisions/SKILL.md) | `pd` | Sweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time |

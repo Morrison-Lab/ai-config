@@ -1,5 +1,18 @@
 # Local tools & CLIs
 
+## Available subscriptions & model providers
+
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active
+subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
+OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+than duplicating the table here.
+That includes the OpenRouter activation mechanics
+(the `~/.config/opencode/opencode.jsonc` provider entry
+and the `OPENROUTER_API_KEY` variable) ---
+see delegation.md's bolded "A fourth destination" passage, not a copy here.
+One fact specific to this machine's configuration, not covered there:
+- Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
+
 ## Cursor
 
 See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior

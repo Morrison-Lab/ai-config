@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Unified preflight and health check diagnostic for ai-config.
 
-Inspects repository health, git worktree status, consumer symlinks, generated
-wrapper freshness, hook catalogs, context budgets, and submodule integrity in
-a single fast pass.
+Inspects repository health, git worktree status, generated wrapper
+freshness, hook catalogs, context budgets, and submodule integrity in a
+single fast pass.
+
+Consumer symlink freshness is no longer part of this check: `bootstrap.sh`
+no longer symlinks skills/commands into a consumer's home directory (Claude
+Code and Cursor now install this repo as a native plugin instead, and Codex
+has no replacement install path yet -- see ai-config#2352), so there is
+nothing left for a `check-install.py`-style comparison to audit.
 
 Usage:
     python3 scripts/doctor.py
-    python3 scripts/doctor.py --fix
     python3 scripts/doctor.py --json
     python3 scripts/doctor.py --strict
 """
@@ -157,31 +162,7 @@ def check_context_closure() -> Dict[str, Any]:
     }
 
 
-def check_consumer_installs(fix: bool = False) -> Dict[str, Any]:
-    """Check installed consumer symlinks in ~/.claude or $CLAUDE_HOME."""
-    cmd = [sys.executable, str(REPO_ROOT / "scripts" / "check-install.py"), "--strict"]
-    if fix:
-        cmd.append("--fix")
-
-    code, out, err = run_cmd(cmd)
-    if code == 0:
-        return {
-            "name": "consumer_install",
-            "ok": True,
-            "status": "OK",
-            "details": "Consumer installation is fresh and tracks this repository.",
-            "output": out,
-        }
-    return {
-        "name": "consumer_install",
-        "ok": False,
-        "status": "WARN",
-        "details": "Consumer installation contains stale, unlinked, or missing entries. Re-run doctor with --fix to repair.",
-        "output": out,
-    }
-
-
-def run_doctor(fix: bool = False) -> Dict[str, Any]:
+def run_doctor() -> Dict[str, Any]:
     """Execute all diagnostic health checks."""
     checks = [
         check_git_status(),
@@ -189,7 +170,6 @@ def run_doctor(fix: bool = False) -> Dict[str, Any]:
         check_codex_wrappers(),
         check_hook_catalog(),
         check_context_closure(),
-        check_consumer_installs(fix=fix),
     ]
 
     all_ok = all(c["ok"] for c in checks)
@@ -227,11 +207,10 @@ def format_text_report(report: Dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
-    parser.add_argument("--fix", action="store_true", help="Attempt automatic repair of repairable defects")
     parser.add_argument("--strict", action="store_true", help="Exit 1 on any check failure or warning")
     args = parser.parse_args()
 
-    report = run_doctor(fix=args.fix)
+    report = run_doctor()
 
     if args.json:
         print(json.dumps(report, indent=2))

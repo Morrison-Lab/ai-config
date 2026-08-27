@@ -66,43 +66,24 @@ jobs:
         # conceptually adjacent pairs score low) that the script's documented
         # scope rests on.
         run: python3 scripts/test_find_near_duplicates.py
-      - name: Run install-integrity check tests
-        # Only the tests run here. check-install.py itself compares against a
-        # consumer directory (~/.claude) that no CI runner has, so on a runner
-        # it correctly reports "nothing installed to check" and proves nothing.
-        run: |
-          python3 scripts/test_check_install.py
-          python3 scripts/test_check_harness_installs.py
-          python3 scripts/test_check_harness_ignores.py
+      - name: Run harness-ignore-files check tests
+        # check-install.py and its install-integrity tests were removed with
+        # the symlink install logic; only the harness-ignores check remains.
+        run: python3 scripts/test_check_harness_ignores.py
+      - name: Run plugin-overlap library tests
+        # The check-plugin-overlap.py CLI went with the symlink install, but
+        # scripts/lib/plugin_overlap.py stays live: install-hooks.py imports
+        # enabled_ai_config_plugins for its double-registration warning.
+        run: python3 scripts/test_plugin_overlap.py
       - name: Run Ollama locality verification tests
         run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
-      - name: Run plugin-overlap detector tests
-        # Only the tests run here. check-plugin-overlap.py itself inspects a
-        # consumer directory (~/.claude) plus its settings.json, which no CI
-        # runner has, so on a runner it correctly reports nothing examined and
-        # proves nothing (ai-config#1409).
-        run: python3 scripts/test_plugin_overlap.py
-      - name: Run Codex skill-install tests
-        # Bootstrap must choose either an ai-config Codex plugin or its bare
-        # wrappers. Installing both doubles the routing catalog and can exceed
-        # the skill-listing context budget.
+      - name: Run Cursor rules-sync tests
+        # cursor-rules/ and .cursor/rules/ must stay identical where they overlap.
         run: |
-          python3 scripts/test_codex_plugin_enabled.py
-          python3 scripts/test_bootstrap_codex_plugin.py
-      - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills or
-        # ~/.cursor/rules links.
-        run: |
-          python3 scripts/test_cursor_plugin_enabled.py
-          python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
           python3 scripts/test_cursor_hook_adapter.py
-      - name: Run bootstrap consumer-hint tests
-        # check-install.py --fix is Claude-only. A collision in Copilot, Gemini,
-        # Codex, or Cursor must not print that hint (ai-config#2286).
-        run: python3 scripts/test_bootstrap_link_hints.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must

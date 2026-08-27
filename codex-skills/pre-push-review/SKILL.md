@@ -1,6 +1,6 @@
 ---
 name: "pre-push-review"
-description: "Run local adversarial AI code review using desktop quota."
+description: "Run local adversarial AI code review on desktop subscription quota."
 ---
 
 # pre-push-review (Codex wrapper)

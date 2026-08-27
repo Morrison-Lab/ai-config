@@ -76,7 +76,7 @@ An earlier reading of this same evidence counted reviewer *logins* rather than
 review *bodies*, saw `copilot-pull-request-reviewer` as the only reviewer, and
 concluded Copilot was active here --- which inverted the finding, since every
 one of those review objects is the refusal string quoted in
-[`memories/github.md`](../../memories/github.md).
+[`memories/gh-cli.md`](../../memories/gh-cli.md).
 That is the login-versus-body distinction
 [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already
 warns about, met in the direction that flatters the repo.)

@@ -223,7 +223,7 @@ standing directive, a moratorium, a repo where its demand is meaningless ---
 put the switch **in the script**, where both installation shapes read it, and
 prefer a self-expiring form over a flag somebody has to remember to clear.
 `hooks/no-unreviewed-pr.py`'s `MORATORIUM_END` is the worked example, and
-[`memories/github.md`](../../memories/github.md)'s Copilot-moratorium section
+[`memories/gh-cli.md`](../../memories/gh-cli.md)'s Copilot-moratorium section
 carries that one incident's own record --- read this section for the general
 rule about installation shapes, and that one for what the moratorium requires
 of a session today.

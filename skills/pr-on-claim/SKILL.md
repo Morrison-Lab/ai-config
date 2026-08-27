@@ -50,7 +50,7 @@ gh pr checks <N>
 
 In a remote/web session without `gh`, use `mcp__github__request_copilot_review` instead.
 
-**Some repos schedule Copilot automatically via a `copilot_code_review` ruleset rule** (`review_on_push: true`, optionally `review_draft_pull_requests: true`), which re-requests Copilot on every push --- see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) for how to read that off a repo's rulesets, and [`memories/github.md`](../../memories/github.md) for the case record.
+**Some repos schedule Copilot automatically via a `copilot_code_review` ruleset rule** (`review_on_push: true`, optionally `review_draft_pull_requests: true`), which re-requests Copilot on every push --- see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) for how to read that off a repo's rulesets, and [`memories/gh-cli.md`](../../memories/gh-cli.md) for the case record.
 Request explicitly anyway when you can't tell whether that applies; a redundant request costs nothing, and skipping it on a repo without the ruleset leaves Copilot unrequested.
 
 Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head.

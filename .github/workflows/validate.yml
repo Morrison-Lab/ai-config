@@ -32,6 +32,13 @@ jobs:
         run: python3 scripts/check-jules-review-workflow.py
       - name: Run Jules-review workflow tests
         run: python3 scripts/test_check_jules_review_workflow.py
+      - name: Check github-actions step-if memory
+        # ai-config#2307: GitHub auto-applies success() unless if: names a
+        # status-check function. This gate fails if the memory reintroduces
+        # the claim that any explicit if: discards that default.
+        run: python3 scripts/check-github-actions-step-if.py
+      - name: Run github-actions step-if memory tests
+        run: python3 scripts/test_check_github_actions_step_if.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
       - name: Check tui-alloc README defaults
@@ -40,6 +47,8 @@ jobs:
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
+      - name: Validate OAICopilot model-template policy
+        run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
       - name: Run check-pr-body-figures tests
@@ -58,41 +67,24 @@ jobs:
         # conceptually adjacent pairs score low) that the script's documented
         # scope rests on.
         run: python3 scripts/test_find_near_duplicates.py
-      - name: Run install-integrity check tests
-        # Only the tests run here. check-install.py itself compares against a
-        # consumer directory (~/.claude) that no CI runner has, so on a runner
-        # it correctly reports "nothing installed to check" and proves nothing.
-        run: |
-          python3 scripts/test_check_install.py
-          python3 scripts/test_check_harness_installs.py
-          python3 scripts/test_check_harness_ignores.py
+      - name: Run harness-ignore-files check tests
+        # check-install.py and its install-integrity tests were removed with
+        # the symlink install logic; only the harness-ignores check remains.
+        run: python3 scripts/test_check_harness_ignores.py
+      - name: Run plugin-overlap library tests
+        # The check-plugin-overlap.py CLI went with the symlink install, but
+        # scripts/lib/plugin_overlap.py stays live: install-hooks.py imports
+        # enabled_ai_config_plugins for its double-registration warning.
+        run: python3 scripts/test_plugin_overlap.py
+      - name: Run Ollama locality verification tests
+        run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
-      - name: Run plugin-overlap detector tests
-        # Only the tests run here. check-plugin-overlap.py itself inspects a
-        # consumer directory (~/.claude) plus its settings.json, which no CI
-        # runner has, so on a runner it correctly reports nothing examined and
-        # proves nothing (ai-config#1409).
-        run: python3 scripts/test_plugin_overlap.py
-      - name: Run Codex skill-install tests
-        # Bootstrap must choose either an ai-config Codex plugin or its bare
-        # wrappers. Installing both doubles the routing catalog and can exceed
-        # the skill-listing context budget.
+      - name: Run Cursor rules-sync tests
+        # cursor-rules/ and .cursor/rules/ must stay identical where they overlap.
         run: |
-          python3 scripts/test_codex_plugin_enabled.py
-          python3 scripts/test_bootstrap_codex_plugin.py
-      - name: Run Cursor skill-install tests
-        # Bootstrap must not stack a Cursor plugin with ~/.cursor/skills or
-        # ~/.cursor/rules links.
-        run: |
-          python3 scripts/test_cursor_plugin_enabled.py
-          python3 scripts/test_bootstrap_cursor_plugin.py
           python3 scripts/test_cursor_rules_sync.py
           python3 scripts/test_cursor_hook_adapter.py
-      - name: Run bootstrap consumer-hint tests
-        # check-install.py --fix is Claude-only. A collision in Copilot, Gemini,
-        # Codex, or Cursor must not print that hint (ai-config#2286).
-        run: python3 scripts/test_bootstrap_link_hints.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must
@@ -137,6 +129,14 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Run Antigravity hook adapter tests
+        # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
+        run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run hook-runner tests
+        # Per-suite timeout and interpreter spawn (ai-config#2098). The
+        # runner itself had no test, so a missing timeout would only show
+        # up as a Windows hang.
+        run: python3 scripts/test_test_hooks.py
       - name: Check the hook catalog against hooks.json
         # test_hooks.py above compares hooks against their TESTS. Nothing
         # compared them against their BINDINGS or against the README table a

@@ -79,11 +79,11 @@ README = os.path.join(ROOT, "README.md")
 # plugin-path activation, so it is registered by the follow-up after its
 # authoring PR merges.
 KNOWN_UNREGISTERED = {
-    # Inert BY THE GATE: README's activation rule makes the hooks.json entry
-    # itself the plugin-path activation, so this is registered by the
-    # follow-up after its authoring PR merges. Tracker is that open
-    # registration PR, not the closed authoring issue (#2261).
-    "remind-ums-on-scrutiny.py": 2265,
+    # Authoring only: not yet in hooks.json, registered by the follow-up
+    # after its authoring PR merges. Tracker is the open activation issue
+    # (#2390), not the closed authoring issue (#2282) -- this file's own
+    # closed-tracker check fails on a closed mapping.
+    "warn-stale-issue-edit.py": 2390,
 }
 
 # Public repo (measured 2026-08-26); unauthenticated GET works. A token is

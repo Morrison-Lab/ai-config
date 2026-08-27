@@ -1,6 +1,6 @@
 ---
 name: pre-push-review
-description: "Run local adversarial AI code review using desktop subscription quota (Claude, Codex, OpenCode, Antigravity)."
+description: "Run local adversarial AI code review on desktop subscription quota."
 user-invocable: true
 allowed-tools:
   - Bash

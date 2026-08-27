@@ -32,6 +32,13 @@ without asking confirmation before every merge.
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped Claude review.
   A clean automated Claude review evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
+  **A disagreement among reviews is unresolved findings.**
+  If one review is all-clear and another raises blocking issues, nits, or any
+  other flagged items, MWC does not authorize a merge.
+  ARD every item from every review, then request fresh reviews.
+  `check-pr-fully-clean.py` fails that state (ai-config#2274).
+  A later all-clear from a different reviewer does not supersede a standing
+  not-clean; only a later clean from the same reviewer does.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

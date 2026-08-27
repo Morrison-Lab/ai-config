@@ -46,6 +46,11 @@ Worked-example case records for the rules below live in
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**
+   GraphQL `statusCheckRollup` is the same kind of short surface for a
+   *progress* report --- not enough for a terminal "fully clean" /
+   "ready to merge" claim.
+   That claim needs `scripts/check-pr-fully-clean.py`
+   (ai-config#2277, 2026-08-26).
 
    **`--paginate` is load-bearing, not tidiness.**
 
@@ -166,7 +171,8 @@ Worked-example case records for the rules below live in
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)
 
-2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+   A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
 
 **Criterion 2's test is the absence of findings, not the presence of a verdict
 line saying so.**
@@ -217,6 +223,22 @@ So when Claude is reachable, its verdict is the one to report on:
 - **Don't:** read a green review-gate check as settling this; the gate does not
   know which agent answered, and on a selector-based setup the agent is chosen
   at random.
+
+**A disagreement among reviews vetoes merge, including under `mwc`.**
+Criterion 2 is every reviewer's latest verdict, not the globally last comment.
+If one review is all-clear and another raises blocking issues, nits, minor
+items, or any other flagged heading, the findings win.
+ARD every item from every review, then request fresh reviews.
+A later all-clear from a different reviewer does not supersede a standing
+not-clean; only a later clean from the same reviewer does
+(the ordinary ARDI iterate path).
+`check-pr-fully-clean.py` encodes the per-reviewer scan
+(ai-config#2274).
+
+- **Do:** ARD the union of findings from every review, then request a fresh
+  round from the reviewers that spoke.
+- **Don't:** merge on one reviewer's all-clear while another still has a
+  standing not-clean, even with `mwc` active.
 
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
@@ -699,8 +721,13 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+`mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
+A PR without a clean review verdict on the latest commit is not merge-ready.
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
-- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
+- **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
+- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
+- **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

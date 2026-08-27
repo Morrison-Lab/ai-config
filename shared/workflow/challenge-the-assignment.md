@@ -586,10 +586,14 @@ It does predict it: [`semantic-line-breaks`](../writing/semantic-line-breaks.md)
 already documents the runnable `gha` gate, which reproduced CI's failure verbatim
 on `bb533295` and passed on `5643a872`.
 The same message's other half was right, and is the reusable part --- the belief
-that `scripts/semantic-line-breaks.py --write` is the pre-push gate is wrong in a
-way that bites: the script has no width policy, so it JOINS hand-wrapped
-sentences and thereby manufactures the long-line-with-a-semicolon violation the
-CI gate rejects, which is how three commits failed that check in one day.
+that `scripts/semantic-line-breaks.py --write` is the pre-push gate was wrong in a
+way that bites: before #2085 the script had no width policy, so it joined
+hand-wrapped sentences and manufactured the long-line-with-a-semicolon
+violation the CI gate rejects, which is how three commits failed that check
+in one day.
+After #2085 the reformatter consumes the gate's `classify_line`, so that
+particular manufacture is gone.
+The script is still not the diff-scoped job.
 That fragment's own Don't pair already said not to treat it as the check CI runs.)
 
 ## Relationship to neighbouring rules

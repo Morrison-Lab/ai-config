@@ -70,6 +70,11 @@ jobs:
         # check-install.py and its install-integrity tests were removed with
         # the symlink install logic; only the harness-ignores check remains.
         run: python3 scripts/test_check_harness_ignores.py
+      - name: Run plugin-overlap library tests
+        # The check-plugin-overlap.py CLI went with the symlink install, but
+        # scripts/lib/plugin_overlap.py stays live: install-hooks.py imports
+        # enabled_ai_config_plugins for its double-registration warning.
+        run: python3 scripts/test_plugin_overlap.py
       - name: Run Ollama locality verification tests
         run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue

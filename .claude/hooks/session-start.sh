@@ -10,7 +10,7 @@
 # this repo is a native Claude Code plugin (.claude-plugin/plugin.json), so a
 # web session working in ai-config itself discovers skills/ and commands/
 # directly, with no symlink into ~/.claude/. bootstrap.sh no longer performs
-# any such symlinking either — see its own header comment.
+# any such symlinking either -- see its own header comment.
 #
 # bootstrap.sh is idempotent, so re-running on resume/clear/compact is a
 # no-op. The Julia install is likewise guarded — it only does real work on a

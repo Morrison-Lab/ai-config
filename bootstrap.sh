@@ -3,7 +3,8 @@
 # and run machine-specific dotfile installers.
 #
 # Note: Global symlink installations for Claude Code, Codex, and Cursor have
-# been removed in favor of native plugin configuration architectures.
+# been removed. Claude Code and Cursor install this repo as a native plugin;
+# Codex has no replacement install path yet (see ai-config#2352).
 
 set -euo pipefail
 

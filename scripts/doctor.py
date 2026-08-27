@@ -7,8 +7,9 @@ single fast pass.
 
 Consumer symlink freshness is no longer part of this check: `bootstrap.sh`
 no longer symlinks skills/commands into a consumer's home directory (Claude
-Code, Codex, and Cursor now install this repo as a native plugin instead),
-so there is nothing left for a `check-install.py`-style comparison to audit.
+Code and Cursor now install this repo as a native plugin instead, and Codex
+has no replacement install path yet -- see ai-config#2352), so there is
+nothing left for a `check-install.py`-style comparison to audit.
 
 Usage:
     python3 scripts/doctor.py

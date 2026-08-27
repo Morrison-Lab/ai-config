@@ -1122,7 +1122,8 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 ## `check-install.py --consumer-dir` retargets the Claude manifest, not one file
 
 **Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `check-install.py`, `link_one_claude`, and `scripts/test_bootstrap_link_hints.py` (linked below) no longer exist --- `bootstrap.sh` does not symlink into consumer directories at all any more.
-This whole section describes a bug in, and the fix to, a mechanism that has since been removed; keep it only as a record of the incident.
+This whole section describes a bug in, and the fix to, a mechanism that has since been removed;
+keep it only as a record of the incident.
 
 `--consumer-dir` retargets `collect()`, the whole Claude-shaped install
 list (`AGENTS.md`, `CLAUDE.md`, `skills/`, `commands/`, `memories/`, and

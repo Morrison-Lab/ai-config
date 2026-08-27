@@ -568,7 +568,7 @@ activated.")
 
 ## What's tracked
 
-- `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, `~/.gemini/skills/` via `bootstrap.sh`)
+- `skills/` --- reusable workflow skills (Claude Code and Cursor via plugin install, and Gemini/Antigravity via the `skills.json` registration `bootstrap.sh` writes against the checkout's own `skills/` path)
 - `codex-skills/` --- generated Codex wrappers (no install path yet --- [#2352](https://github.com/Morrison-Lab/ai-config/issues/2352))
 - `cursor-rules/` --- user-global Cursor rules (shipped by the Cursor plugin's `rules` field, `~/.cursor/rules/`)
 - `.cursor/rules/` --- project Cursor rules for this repo as a workspace

@@ -26,7 +26,7 @@ In every session --- at session start, and again periodically during long sessio
    `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes a script on an event, and its `stale` status names a registered script that is not on disk.
    A hook can be perfectly present and never run, so a report that finds it present is not evidence about registration.
    The failure is silent in the way this corpus is worst at noticing: an unregistered guard and a guard with nothing to block look identical, since neither ever produces output.
-   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- `bootstrap.sh` places every new script, while registration happens only when someone runs the second command, so each hook added since the last run sits inert.
+   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- scripts reach `~/.claude/hooks` independently of registration (the retired symlink install placed them, and today only the plugin loader or a manual copy does), so each hook added since the last registration run sits inert.
    That makes it a per-session freshness item rather than a one-time setup step.
    ```bash
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report

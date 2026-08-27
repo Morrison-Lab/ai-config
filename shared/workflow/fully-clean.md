@@ -598,6 +598,65 @@ read above exists to preserve.
 - **Don't:** treat the refusal as a PR problem, or spend a round diagnosing it;
   the absence of `gh` is the whole cause.
 
+**The mirror case is worse: a review job running the checker on the PR it is
+reviewing gets an answer, and the answer is always not-clean.**
+The section above is the checker declining to answer, which is loud and exits
+`2`.
+This one exits **`1`** --- a verdict --- and it is wrong every time.
+
+A review job querying its own PR's check state observes itself as
+`in_progress`, and the checker requires that a completed automated review exist
+on the current head.
+The reviewer is the thing that would produce that review, so the predicate is
+unsatisfiable by construction: it cannot authorize itself in advance, at any
+round, on any PR, however clean the diff.
+
+The failure is quiet in the way the `gh` case is not.
+Exit `2` announces itself as a non-answer; exit `1` is indistinguishable from a
+real finding, and it reaches the PR as a withheld verdict that blocks merge
+under [`mwc`](../../.claude/skills/mwc/SKILL.md)'s Scope Limit --- on a PR the
+same review just declared sound.
+
+**It also poisons the rounds after it.**
+Re-triggering does not clear it, which is the natural first remedy and the
+wrong one: once a `Needs more work` comment exists for that head, the next
+round's verdict scan reads a standing not-clean and the loop cannot converge.
+Each attempt costs another paid review.
+
+The discrimination to make is between two different claims:
+
+- *"The diff is sound, and I cannot observe my own completion"* --- a statement
+  about the **instrument**, which belongs in the report.
+- *"This needs more work"* --- a statement about the **diff**, which is the
+  verdict field and the thing that blocks.
+
+Routing the first into the second is the defect.
+It is the same conflation
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names elsewhere: an
+inability to measure is being reported as a measurement.
+
+- **Do:** state the instrument's status in the report, and keep the verdict a
+  judgment about the diff.
+- **Do:** exclude the calling run when a reviewer evaluates its own PR, or say
+  the check was not applicable rather than running it.
+- **Don't:** put "cannot determine cleanliness" in the verdict field --- it
+  blocks merge and reads as a finding to everyone who does not read the
+  reasoning.
+- **Don't:** re-trigger to clear it; the standing not-clean comment makes the
+  next round worse rather than better.
+
+(Measured 2026-08-27 on
+[ai-config#2442](https://github.com/Morrison-Lab/ai-config/pull/2442).
+Three rounds found one hyperlink nit, one citation-order nit, then nothing ---
+and all three returned `Needs more work`, each naming
+`review / claude-review` (itself) among the pending checks.
+The third round said so explicitly: "not due to any content defect", "no
+further content changes are needed on my end".
+CI was 10/10 green and `require-review` passed.
+The three rounds cost $4.60 between them, and the PR merged only on an explicit
+user decision to treat the verdict as non-blocking.
+Tracked as [ai-config#2441](https://github.com/Morrison-Lab/ai-config/issues/2441).)
+
 (Measured 2026-08-19 on a remote session driving
 [ai-config#1673](https://github.com/Morrison-Lab/ai-config/pull/1673).
 Tracked as

@@ -247,33 +247,48 @@ Directive from the user, 2026-08-27, given across three messages:
 and "by local, I mean available through this computer's CLI;
 I don't care if they run on this computer or in the cloud."
 
-- **Do (user's words):** when delegating or dispatching any feasible task,
-  prefer free CLI-reachable budgets first ---
+- **Do (user's words):** prefer cheap and free models when feasible,
+  always ---
+  and treat "local" as "reachable through this computer's CLI,"
+  not as "running on this computer's own hardware."
+- **Do (inferred):** apply that preference as this file's own ladder:
+  free CLI-reachable budgets first ---
   `codex` (ChatGPT plan),
   `opencode` (its free hosted tier, Zen, and local Ollama),
   and the `agy --print` CLI ---
   then OpenRouter's prepaid credit balance,
   then a cheap Claude tier (haiku, then sonnet) ---
-  and reserve the conductor's own tier for judgment-heavy work.
-- **Do (inferred):** read "local" as "reachable through a CLI on this
-  machine," not "running on this machine's own hardware."
-  A cloud-hosted model reached through a local CLI ---
-  `codex`, `agy`, OpenCode's hosted/Zen tiers, OpenRouter ---
-  qualifies fully, exactly as the on-device `ollama/*` tier does.
-  The ladder above already routes by CLI rather than by where the
-  weights execute; this section makes that criterion explicit instead
-  of leaving it to be inferred from the table.
+  reserving the conductor's own tier for judgment-heavy work.
+  No new priority is implied within that free/CLI group beyond what
+  the rest of this file already sets:
+  `opencode`'s free and local tiers have no window to exhaust,
+  so they go ahead of the metered `codex` and `agy` windows,
+  per the "no window to exhaust" paragraph above.
+- **Do (inferred):** read "local" as CLI-reachable everywhere in this
+  ladder EXCEPT the data-sensitivity trigger,
+  where on-device residency --- not CLI-reachability --- is still the
+  deciding factor.
+  A cloud-hosted model reached through a local CLI
+  (`codex`, `agy`, OpenCode's hosted/Zen tiers, OpenRouter)
+  still sends its payload off-machine,
+  so only the `ollama/*` tier's loopback check (see above) satisfies a
+  "must not leave this machine" requirement ---
+  this section widens what counts as "local" for the cost-ordering
+  preference, not for that separate residency check.
 - **Don't (inferred):** default a dispatch to the inherited conductor
   tier because the cheaper route costs setup effort ---
   staging a brief file, checking a window's remaining budget, or
   probing an unmeasured destination is the ladder's ordinary cost of
-  entry, not a reason to skip it ---
+  entry, not a reason to skip the cheaper route ---
   and don't skip a free CLI merely because its model happens to run
   off-device rather than on this machine.
 - **Don't (inferred):** route work to a cheap tier where it
-  predictably fails --- adversarial review, long-list triage, or
-  anything this file or `select-model`'s decision tree already flags
-  as judgment-heavy --- and count the resulting retry as cheap
-  delegation. Escalate that work to a capable tier up front; a failed
-  cheap attempt plus a retry costs more than starting at the right
-  tier once.
+  predictably fails for a small model ---
+  adversarial review, long-list triage, or any of the judgment-heavy
+  work [`select-model`](../skills/select-model/SKILL.md)'s decision
+  tree already carves out (architecture, a subtle-bug hunt, security
+  review, synthesis) ---
+  and count the resulting retry as cheap delegation.
+  Escalate that work to a capable tier up front;
+  a failed cheap attempt plus a retry costs more than starting at the
+  right tier once.

@@ -445,9 +445,7 @@ A merge of `main` can restore a line the branch had deliberately changed, discar
 In the measured case the region raised a real conflict marker and the manual resolution picked `main`'s side;
 git's own heuristics can also resolve such a region cleanly, with no marker at all, when only one side appears to have changed it.
 Either way the reversion is invisible afterwards: because the restored text is byte-identical to `main`'s copy, the reverted line produces zero diff against `main` and an ordinary PR-diff review cannot see it.
-[`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one
-line at a time" section owns this case, including the pre-merge-tip-to-merge
-comparison that is the only check able to see it.
+[`sync-with-main`](sync-with-main.md)'s "The same silent reversion happens one line at a time" section owns this case, including the pre-merge-tip-to-merge comparison that is the only check able to see it.
 
 **A threshold breach that exists only in the sum.**
 A file under a size, count, or coverage cap can take an append from two branches

@@ -32,20 +32,28 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Read every cited source against what it actually says, rather than checking that the link resolves.
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
 
-3. **Check quality and repo conventions**
+3. **The Slop Detector**
+   - Default to skepticism: evaluate what the artifact actually does, never what the surrounding comment or commit message claims it does.
+     A `// TODO: handle edge case` comment is not a handled edge case.
+     File it under step 1's unhandled-edge-case check rather than taking the comment's word for it.
+   - Flag obvious placeholder comments (e.g. `// increment counter` above `counter++`), copy-paste artifacts, cargo cult code, and dead code.
+   - Flag lazy naming only when the name is genuinely uninformative in its context (`data1`, `temp`, `foo`, a single unexplained letter used across an unrelated scope).
+     A conventional, widely-used short name --- `df` for a data frame, the idiom this corpus's own examples use in `shared/coding/tidy-code.md` and `shared/coding/per-operation-grouping.md` --- is not by itself a finding.
+   - Flag a function doing multiple unrelated things, a file with no coherent purpose ("everything else" catch-all), inconsistent patterns within the same diff, or an import added but never used --- each as a concrete `[Defect]` naming the file, line, and what the fix would be, never as an unfalsifiable vibe.
+
+4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
 
-4. **Deliver a structured verdict**
-
+5. **Deliver a structured verdict**
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-5. **Fingerprint what you read**
+6. **Fingerprint what you read**
 
    End the report, after the verdict, with the commit you reviewed
    as a bare line, not inside a fence:

@@ -3,7 +3,7 @@
 
 Without an explicit -R/--repo, `gh` takes its target from the current working
 directory. That is fine for reads and dangerous for writes: on 2026-07-29 a
-`gh secret set CLAUDE_CODE_OAUTH_TOKEN` meant for d-morrison/wai ran while cwd
+`gh secret set CLAUDE_CODE_OAUTH_TOKEN` meant for Morrison-Lab/wai ran while cwd
 was the ucdavis/bcs checkout and overwrote bcs's token instead. Nothing in the
 command named the wrong repo, so nothing looked wrong.
 

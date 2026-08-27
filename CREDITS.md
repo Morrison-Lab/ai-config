@@ -36,5 +36,8 @@ reused — via clean-room reimplementation, with no code or text copied.
   [jeremylongshore/claude-code-plugins-plus-skills](https://github.com/jeremylongshore/claude-code-plugins-plus-skills)
   (MIT). Reimplemented from scratch.
 
+- **R and Quarto authoring skills** --- `skills/brand-yml/`, `skills/cli/`, `skills/cran-extrachecks/`, `skills/create-release-checklist/`, `skills/lifecycle/`, `skills/quarto-authoring/`, `skills/r-package-development/`, `skills/release-post/`, `skills/testing-r-packages/` --- adapted from [posit-dev/skills](https://github.com/posit-dev/skills) (MIT).
+  The upstream license text is kept verbatim at `skills/POSIT-DEV-LICENSE.txt`.
+
 See the [`scout-peers`](skills/scout-peers/SKILL.md) skill for the full peer
 survey and the license-checking procedure used to vet every borrow above.

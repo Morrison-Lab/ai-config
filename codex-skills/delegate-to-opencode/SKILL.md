@@ -1,6 +1,6 @@
 ---
 name: "delegate-to-opencode"
-description: "Delegate sidecar work to opencode free or local models."
+description: "Delegate sidecar work to OpenCode or OpenRouter models."
 ---
 
 # delegate-to-opencode (Codex wrapper)

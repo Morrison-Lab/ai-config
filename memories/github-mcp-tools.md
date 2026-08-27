@@ -389,7 +389,7 @@ See ai-config#694 for the precedent.
   looking correct on any unmerged one you spot-check it against.
   A constant carries no information, the argument
   [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
-  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+  Measured on `Morrison-Lab/ai-config`, 2026-08-01, over 101 rows all `false`:
 
   | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
   |---|---|---|---|
@@ -779,7 +779,7 @@ See ai-config#694 for the precedent.
 - **`add_repo` refuses a cross-owner add once the session already has a repo from a
   different owner** ("cross-tier adds are not supported in v1: requested `<owner>/<repo>`
   but session already has repos from owner(s) `[...]`") — it does NOT fall back to a
-  read-only or degraded mode, so a session scoped to e.g. `d-morrison/*` repos cannot add
+  read-only or degraded mode, so a session scoped to e.g. `Morrison-Lab/*` repos cannot add
   a `UCD-SERG/*` repo (or vice versa) no matter how the request is phrased. When a task
   needs to read a PR/issue in such an out-of-scope repo, don't stop at the `add_repo`
   failure or a raw `api.github.com` 403 (a plain `WebFetch` GET to
@@ -793,7 +793,7 @@ See ai-config#694 for the precedent.
   title, state, and recent comment/review content (works even for reading a *specific*
   comment by its anchor), succeeding where both the MCP tool and the JSON API failed.
   (Used to read UCD-SERG/serodynamics#193's `@claude`-bot comment from a
-  `d-morrison/gha`-scoped session, which surfaced the root cause fixed in gha#191.)
+  `Morrison-Lab/gha`-scoped session, which surfaced the root cause fixed in gha#191.)
 - **`add_repo` (and likely other approval-gated MCP tools) can fail repeatedly
   and silently under auto-mode, with no useful error.** In auto mode, a call
   that needs an interactive permission-dialog approval has no human present to
@@ -857,7 +857,7 @@ See ai-config#694 for the precedent.
   disproved by this very bullet's own PR, `ai-config#724`, whose description
   lost an angle-bracket span from inside a code span in the heading that
   introduced this entry.)
-- `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
+- `Morrison-Lab/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
   (the "GitHub access in remote / web sessions" section), scoped to that repo.
   `Morrison-Lab/ai-config` has its own cross-model registry at
   [`tool-mappings.md`](../tool-mappings.md) (generated from `tool-mappings.yml`),

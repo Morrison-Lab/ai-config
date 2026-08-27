@@ -137,10 +137,21 @@ Admission comes first and gates everything.
 What follows it is two *independent* readings of the admitted pool, neither
 feeding the other.
 
-**Admission** decides whether a comment enters the pool at all
-(`check-pr-fully-clean.py:1316`).
-`_reviewer_identity()` reads only the **first and last non-blank line** of the
-body.
+**Admission** decides whether a comment enters the pool at all.
+There are two admission paths, and a fallback review takes the **comment**
+one: `gh pr comment` posts an issue comment, not a formal review object, so
+the branch that governs is the issue-comment block in
+`check-pr-fully-clean.py` (around `:1256-1291`), not the `("review", ...)`
+append that follows it.
+Both paths apply the same identity rule, which is why the distinction rarely
+matters for behaviour and always matters for reading the code.
+
+Cite `_reviewer_identity()` by name rather than by line when checking this:
+three consecutive review rounds on this passage produced a wrong line number,
+and a citation that drifts is worse than none, since it sends a reader to a
+branch that looks close enough to confirm the claim.
+
+That function reads only the **first and last non-blank line** of the body.
 A marker anywhere between them resolves to the poster's own login, the comment
 is not admitted as an agent's review, and nothing else about it is ever
 consulted.

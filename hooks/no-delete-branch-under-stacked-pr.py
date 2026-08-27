@@ -14,11 +14,20 @@ The merge succeeded. The `--delete-branch` then removed
 closes a pull request whose base branch is deleted. #750 went to `CLOSED`
 rather than being retargeted to `main`.
 
-The retarget is what everyone expects to happen, and it usually does --- GitHub
-moves a stacked child onto the parent's base when the parent merges. It did not
-save this one, because the deletion landed in the same operation as the merge.
-So the flag turned a routine stacked merge into a closed PR, silently: `gh`
-reported the merge as successful and said nothing about the child.
+Retargeting is the **documented** behaviour, which is what makes this worth a
+guard rather than a note. GitHub's own docs say that deleting a head branch
+after its pull request is merged causes it to find open PRs using that branch
+as a base and move them to the merged PR's base. So the expectation is
+correct, and the observed close is a *failure of a documented feature* rather
+than the rule.
+
+Why it failed here is unknown, and this guard does not claim to know: the
+timeline shows `base_ref_deleted` and `closed` at the same second, and
+community reports of the same shape exist with no established cause. What is
+certain is the consequence --- `gh` reported the merge as successful and said
+nothing about the child, so the close is silent whatever triggered it. The
+guard therefore warns that the flag **may** close a stacked child, not that
+it will.
 
 ## Why the recovery deserves naming
 
@@ -68,8 +77,24 @@ and the query needs the network, so a hard block would fail closed whenever
 `gh` is unavailable or slow --- turning a tidy-up flag into an outage. The
 warning names the child PRs and the safe order.
 
-Exit 0 always. Anything unexpected (no `gh`, no network, unparsable command)
-stays silent rather than guessing.
+## The match condition
+
+Warns when **all** of these hold for one `gh pr merge` simple command:
+
+    the argv carries a delete flag  (--delete-branch, -d, a clustered -sd,
+                                     or --delete-branch=<anything but false>)
+    the argv names a repo           (-R / --repo, in any spelling)
+    the argv names a PR target      (number, URL, or branch -- `gh pr view`
+                                     resolves all three)
+    `gh` is on PATH
+    the PR's headRefName resolves
+    at least one OPEN PR uses that branch as its base
+
+Anything else is silence, including every failure mode: `gh` absent, the
+network down, a non-zero exit, output that is not JSON, and output that is
+valid JSON of an unexpected shape. Exit status is 0 in every one of those
+cases --- the guard never blocks and never raises, because a `PreToolUse`
+hook that raises is an outage on a tidy-up flag.
 """
 import json
 import re
@@ -94,6 +119,13 @@ LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec"}
 _SHELL_OPS = set("();|&")
 
 DELETE_FLAGS = {"--delete-branch", "-d"}
+
+# Flags whose NEXT token is a value, not the PR target. Without this,
+# `gh pr merge -R o/r -t "Some title" 749 -d` reads "Some title" as the PR.
+VALUE_FLAGS = {
+    "-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file",
+    "--match-head-commit", "--author-email",
+}
 
 
 def _simple_commands(cmd):
@@ -133,60 +165,80 @@ def _gh_pr_merge_argv(argv):
 
 
 def _parse_merge(argv):
-    """(pr_number, repo, deletes_branch) from one `gh pr merge` argv.
+    """(target, repo, deletes_branch) from one `gh pr merge` argv.
 
-    `pr_number` is None when the target is a URL or a branch name rather than
-    a number -- the guard stays silent there rather than guessing, since the
-    query needs a number.
+    `target` is whatever identifies the PR --- a number, a URL, or a branch
+    name. `gh pr view` resolves all three, so the guard does not classify it.
     """
     deletes = False
     repo = None
-    number = None
+    target = None
     i = 3
     while i < len(argv):
         tok = argv[i]
-        if tok in DELETE_FLAGS or tok.startswith("--delete-branch="):
-            if not tok.startswith("--delete-branch=") or \
-                    tok.split("=", 1)[1].strip().lower() not in ("false", "0"):
-                deletes = True
+        if tok == "--delete-branch" or tok == "-d":
+            deletes = True
+        elif tok.startswith("--delete-branch="):
+            deletes = tok.split("=", 1)[1].strip().lower() not in ("false", "0", "no")
         elif tok in ("-R", "--repo"):
             i += 1
             if i < len(argv):
                 repo = argv[i]
+        elif tok in VALUE_FLAGS:
+            i += 1  # skip the value
         elif tok.startswith("--repo="):
             repo = tok.split("=", 1)[1]
         elif tok.startswith("-R="):
             repo = tok.split("=", 1)[1]
-        elif not tok.startswith("-") and number is None and tok.isdigit():
-            number = tok
+        # Clustered boolean shorthand: `-sd` is `--squash --delete-branch`.
+        # pflag accepts it, and a matcher that only knows the bare `-d` reads
+        # a real delete as no delete.
+        elif re.fullmatch(r"-[A-Za-z]{2,}", tok):
+            if "d" in tok[1:]:
+                deletes = True
+        elif not tok.startswith("-") and target is None:
+            target = tok
         i += 1
-    return number, repo, deletes
+    return target, repo, deletes
 
 
 def find_child_prs(repo, branch):
-    """Open PRs whose base is `branch`. None means 'could not determine'."""
+    """Numbers of open PRs whose base is `branch`. None means 'unknown'.
+
+    The shape is validated rather than trusted: `gh` returning valid JSON that
+    is not a list of objects carrying `number` is the difference between a
+    silent guard and a traceback, and this hook's whole contract is that it
+    never raises.
+    """
     try:
         out = subprocess.run(
             ["gh", "pr", "list", "-R", repo, "--base", branch,
-             "--state", "open", "--json", "number,title"],
-            capture_output=True, text=True, timeout=15,
+             "--state", "open", "--json", "number"],
+            capture_output=True, text=True, timeout=8,
         )
     except Exception:
         return None
     if out.returncode != 0:
         return None
     try:
-        return json.loads(out.stdout or "[]")
-    except json.JSONDecodeError:
+        parsed = json.loads(out.stdout or "[]")
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None
+    if not isinstance(parsed, list):
+        return None
+    numbers = []
+    for entry in parsed:
+        if isinstance(entry, dict) and entry.get("number") is not None:
+            numbers.append(entry["number"])
+    return numbers
 
 
-def head_branch_of(repo, number):
+def head_branch_of(repo, target):
     try:
         out = subprocess.run(
-            ["gh", "pr", "view", str(number), "-R", repo,
+            ["gh", "pr", "view", str(target), "-R", repo,
              "--json", "headRefName", "--jq", ".headRefName"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=8,
         )
     except Exception:
         return None
@@ -212,51 +264,54 @@ def main():
 
     # Only the `gh pr merge` segments matter. A `git branch -d` elsewhere in
     # the same chain is somebody else's `-d`.
-    number = repo = None
+    target = repo = None
     for argv in argvs:
         merge_argv = _gh_pr_merge_argv(argv)
         if merge_argv is None:
             continue
-        n, r, deletes = _parse_merge(merge_argv)
-        if deletes and n and r:
-            number, repo = n, r
+        t, r, deletes = _parse_merge(merge_argv)
+        if deletes and t and r:
+            target, repo = t, r
             break
-    if not number or not repo:
+    if not target or not repo:
         return 0
 
     if not shutil.which("gh"):
         return 0
 
-    branch = head_branch_of(repo, number)
+    branch = head_branch_of(repo, target)
     if not branch:
         return 0
 
     children = find_child_prs(repo, branch)
     if not children:
-        # Empty list: nothing is stacked, so the flag is safe. None: the query
-        # failed, and guessing either way is worse than silence.
+        # Empty list means nothing is stacked; None means the query failed or
+        # came back in a shape this guard will not interpret. Both are silence,
+        # so the two are deliberately not distinguished here.
         return 0
 
-    listed = ", ".join(f"#{c['number']}" for c in children)
+    listed = ", ".join(f"#{n}" for n in children)
     plural = len(children) > 1
     note = (
-        f"`--delete-branch` here will CLOSE {listed}, not retarget "
+        f"`--delete-branch` here may CLOSE {listed} rather than retarget "
         f"{'them' if plural else 'it'}.\n\n"
-        f"    {repo}#{number} merges `{branch}`\n"
+        f"    {repo} PR {target} merges `{branch}`\n"
         f"    {listed} {'use' if plural else 'uses'} `{branch}` as "
         f"{'their' if plural else 'its'} base\n\n"
-        "GitHub closes a pull request whose base branch is deleted. The "
-        "retarget-on-merge you are expecting does not happen when the deletion "
-        "lands in the same operation, and `gh` reports the merge as successful "
-        "without mentioning the child.\n\n"
+        "Retargeting onto the merged PR's base is GitHub's documented "
+        "behaviour and usually happens. A measured case closed the child "
+        "instead, for reasons nobody has established, and either way `gh` "
+        "reports the merge as successful without mentioning the child.\n\n"
         "Recovering is worse than avoiding: a closed PR cannot be retargeted "
-        "and cannot be reopened while its base branch is gone, so the only way "
-        "out is to push the deleted branch back, reopen, retarget, and delete "
-        "it again -- possible only while a copy of the branch still exists.\n\n"
-        "Merge without `--delete-branch`, retarget the child, then delete:\n\n"
-        f"    gh pr merge {number} -R {repo} --squash\n"
+        "and cannot be reopened while its base branch is gone, so the only "
+        "way out is to push the deleted branch back, reopen, retarget, and "
+        "delete it again -- possible only while a copy of the branch still "
+        "exists.\n\n"
+        "Safer order: merge without `--delete-branch`, confirm where the "
+        "child landed, then delete the branch.\n\n"
+        f"    <your merge command, minus --delete-branch>\n"
         f"    gh pr edit <child> -R {repo} --base <the parent's base>\n"
-        f"    git push origin --delete {branch}\n\n"
+        f"    gh api -X DELETE repos/{repo}/git/refs/heads/{branch}\n\n"
         "This is a warning, not a refusal: proceed if you mean to."
     )
     print(json.dumps({
@@ -265,7 +320,7 @@ def main():
             "additionalContext": note,
         },
         "systemMessage": (
-            f"--delete-branch would close {listed}, which "
+            f"--delete-branch may close {listed}, which "
             f"{'use' if plural else 'uses'} `{branch}` as a base."
         ),
     }))

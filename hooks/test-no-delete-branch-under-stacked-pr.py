@@ -26,9 +26,20 @@ import tempfile
 HOOK = sys.argv[1]
 
 GH_SHIM = """#!/usr/bin/env python3
-import os, sys
+import json, os, sys
 mode = os.environ.get("FAKE_GH_MODE", "child")
 args = sys.argv[1:]
+
+# Record the argv so the test can assert WHAT was queried, not merely that
+# something was. A shim that ignores argv lets a mutated query ship green:
+# swapping `headRefName` for `baseRefName`, or dropping `--base`, both make
+# the guard warn on nearly every merge and neither changes a single result
+# here unless the query itself is under test.
+log = os.environ.get("FAKE_GH_LOG")
+if log:
+    with open(log, "a") as fh:
+        fh.write(json.dumps(args) + "\\n")
+
 if "view" in args:
     print(os.environ.get("FAKE_GH_BRANCH", "parent-branch"))
     sys.exit(0)
@@ -39,6 +50,14 @@ if "list" in args:
         print('[{"number": 750, "title": "a"}, {"number": 752, "title": "b"}]')
     elif mode == "none":
         print('[]')
+    elif mode == "not-a-list":
+        print('{"number": 750}')
+    elif mode == "no-number-key":
+        print('[{"title": "a"}]')
+    elif mode == "scalar":
+        print('7')
+    elif mode == "garbage":
+        print('not json at all')
     elif mode == "fail":
         sys.stderr.write("boom\\n")
         sys.exit(1)
@@ -47,9 +66,13 @@ sys.exit(0)
 """
 
 
-def run(command, mode="child", with_gh=True):
+def run(command, mode="child", with_gh=True, capture_argv=False):
+    """Run the hook. With capture_argv, also return the gh argvs it issued."""
+    calls = []
     with tempfile.TemporaryDirectory() as tmp:
         env = dict(os.environ)
+        if capture_argv:
+            env["FAKE_GH_LOG"] = os.path.join(tmp, "argv.log")
         if with_gh:
             shim = os.path.join(tmp, "gh")
             with open(shim, "w") as fh:
@@ -65,7 +88,11 @@ def run(command, mode="child", with_gh=True):
             [sys.executable, HOOK], input=json.dumps(payload),
             capture_output=True, text=True, env=env, timeout=30,
         )
-    return proc
+        if capture_argv:
+            log = env.get("FAKE_GH_LOG")
+            if log and os.path.exists(log):
+                calls = [json.loads(line) for line in open(log) if line.strip()]
+    return (proc, calls) if capture_argv else proc
 
 
 SHOULD_WARN = [
@@ -84,6 +111,21 @@ SHOULD_WARN = [
      "the real flag still warns when the command is chained"),
     ("gh pr merge 749 --repo=ucdavis/bcs --squash --delete-branch", "child",
      "--repo=owner/name with an equals sign"),
+    # Review finding: pflag accepts clustered boolean shorthand, so `-sd` is a
+    # real `--delete-branch`. A matcher knowing only the bare `-d` reads it as
+    # no delete -- the silent direction.
+    ("gh pr merge 749 -R ucdavis/bcs -sd", "child",
+     "clustered short flags: -sd is --squash --delete-branch"),
+    ("gh pr merge 749 -R ucdavis/bcs -ds", "child", "clustered, other order"),
+    # `gh pr merge` documents a URL and a branch name as targets, and
+    # `gh pr view` resolves all three -- so the guard passes the token through
+    # rather than classifying it.
+    ("gh pr merge https://github.com/ucdavis/bcs/pull/749 -R ucdavis/bcs "
+     "--squash --delete-branch", "child", "a URL target"),
+    ("gh pr merge my-feature-branch -R ucdavis/bcs --squash --delete-branch",
+     "child", "a branch-name target"),
+    ("gh pr merge -R ucdavis/bcs -t 'Some title' 749 --delete-branch", "child",
+     "a value-taking flag's argument is not mistaken for the PR target"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -112,11 +154,20 @@ SHOULD_STAY_SILENT = [
      "same, separated by a semicolon"),
     ("git branch -d some-branch && gh pr merge 749 -R ucdavis/bcs --squash",
      "child", "same, with the cleanup first"),
-    ("gh pr merge https://github.com/ucdavis/bcs/pull/749 -R ucdavis/bcs "
-     "--squash --delete-branch", "child",
-     "a URL target yields no number to query with"),
     ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch=false", "child",
      "an explicitly disabled delete flag"),
+    # Review finding: the docstring promises "Exit 0 always", and these four
+    # shapes crashed it. `gh` returning valid JSON that is not a list of
+    # objects carrying `number` is not hypothetical -- a schema change, an
+    # error object, or an extension wrapping the output all produce it.
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "not-a-list",
+     "gh returns a JSON object rather than a list"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "no-number-key",
+     "list entries carry no `number` key"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "scalar",
+     "gh returns a bare JSON scalar"),
+    ("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch", "garbage",
+     "gh returns output that is not JSON at all"),
 ]
 
 
@@ -154,6 +205,40 @@ def main():
             failures.append(
                 f"expected silence, got output: {why}\n  {command}\n"
                 f"  {(proc.stdout or proc.stderr).strip()[:120]}")
+
+    # The QUERY itself is under test, not merely that a query happened. Each
+    # of these fields is load-bearing, and mutating any one of them leaves
+    # every decision assertion above passing.
+    _, calls = run("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch",
+                   "child", capture_argv=True)
+    views = [c for c in calls if "view" in c]
+    lists = [c for c in calls if "list" in c]
+    if not views:
+        failures.append("no `gh pr view` was issued to resolve the head branch")
+    else:
+        v = views[0]
+        if "headRefName" not in " ".join(v):
+            failures.append(
+                "the view must ask for headRefName -- the branch this merge "
+                f"DELETES. baseRefName is a different branch: {v}")
+        if "-R" not in v or "ucdavis/bcs" not in v:
+            failures.append(f"the view must be scoped to the named repo: {v}")
+        if "749" not in v:
+            failures.append(f"the view must name the PR being merged: {v}")
+    if not lists:
+        failures.append("no `gh pr list` was issued to find stacked children")
+    else:
+        l = lists[0]
+        if "--base" not in l:
+            failures.append(
+                "the list must filter on --base: without it every open PR in "
+                f"the repo reads as a stacked child: {l}")
+        if "parent-branch" not in l:
+            failures.append(
+                f"the list must filter on the merged PR's head branch: {l}")
+        if "--state" not in l or "open" not in l:
+            failures.append(
+                f"the list must be restricted to OPEN PRs: {l}")
 
     # `gh` absent entirely: the guard must not raise, and must not warn.
     proc = run("gh pr merge 749 -R ucdavis/bcs --squash --delete-branch",

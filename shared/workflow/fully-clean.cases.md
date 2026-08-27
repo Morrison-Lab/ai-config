@@ -1055,7 +1055,7 @@ An adversarial round refuted it too: it blanked the live verdict in "Addressed t
 
 **Nothing shipped in the checker.**
 All three designs were reverted, and `scripts/check-pr-fully-clean.py` is unchanged.
-What shipped is a convention in [`ard`](../../skills/ard/SKILL.md)'s summary-comment step: a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it.
+The fix went to [`ard`](../../skills/ard/SKILL.md)'s summary-comment step instead, as #2448: a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it.
 That adds no new fail-open surface to the instrument at all, and when an author forgets, the PR reads not-clean --- the recoverable direction, on their own PR.
 The guard that would catch a forgotten backtick at authoring time is #2443.
 

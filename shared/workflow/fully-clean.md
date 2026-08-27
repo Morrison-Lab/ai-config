@@ -686,7 +686,7 @@ A third design stopped dropping anything.
 It blanked the single shape that actually caused the misread --- a prior round's verdict quoted in a bare parenthetical after a cited SHA --- inside `strip_cited_finding_vocab` instead.
 It was refuted too, on a body where the parenthetical IS the live verdict and the explanation follows it outside the blanked span.
 Nothing shipped in the checker: all three were reverted.
-What shipped is a convention in [`ard`](../../skills/ard/SKILL.md)'s summary step --- a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it, and the instrument gains no new fail-open surface.
+The fix went to [`ard`](../../skills/ard/SKILL.md)'s summary step instead (#2448) --- a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it, and the instrument gains no new fail-open surface.
 
 - **Do:** prefer fixing the input at the author's end over teaching the checker to guess -- three checker-side designs were refuted here, and a pair of backticks was not.
 - **Do:** derive, by execution, which line of a body actually produced the verdict, before building a classifier for the parts you assume did.

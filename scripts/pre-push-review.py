@@ -220,8 +220,17 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         return False, False, "Unbalanced or unterminated markdown code fence detected."
 
     # A commented-out `Verdict:` line sits at line start and would otherwise
-    # be taken as the report's last verdict.
-    stripped = re.sub(r"<!--.*?-->", "", blanked, flags=re.DOTALL)
+    # be taken as the report's last verdict. Replace comment spans with
+    # equal-shape whitespace rather than deleting them: deletion can
+    # juxtapose surviving characters into a fence marker that never existed
+    # in the raw text, and parse_report's own re-blanking would then hide a
+    # later verdict line behind the synthesized fence.
+    stripped = re.sub(
+        r"<!--.*?-->",
+        lambda m: re.sub(r"[^\n]", " ", m.group(0)),
+        blanked,
+        flags=re.DOTALL,
+    )
     if "<!--" in stripped:
         return False, False, "Unterminated HTML comment detected."
 
@@ -234,8 +243,9 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         # qualification ("Ready for merge -- after fixing X") would pass it.
         # Mirror the local contract's rule: any content after the clean
         # phrase beyond closing emphasis/punctuation invalidates the clean.
-        # `stripped` is already fence-blanked in the hook's dialect, so this
-        # scan sees exactly the lines parse_report saw.
+        # `stripped` is fence-blanked in the hook's dialect with offsets
+        # preserved through comment-stripping, so this scan and parse_report
+        # read the same effective lines.
         last_clean = None
         for m in re.finditer(
             r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"

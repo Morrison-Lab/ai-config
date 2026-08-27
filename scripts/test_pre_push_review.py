@@ -963,6 +963,24 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid, reason)
         self.assertIn("qualification", reason.lower())
 
+    def test_persona_comment_strip_cannot_synthesize_fences(self):
+        # Deleting comment spans could juxtapose backticks into a fence
+        # marker that never existed in the raw text, letting parse_report's
+        # internal re-blanking hide a later Needs-more-work line. The strip
+        # is offset-preserving, so the blocking verdict must survive.
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n"
+            f"Reviewed-Commit: {commit}\n"
+            "``<!-- -->`\n"
+            "### Verdict: Needs more work\n"
+            "``<!-- -->`\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_clean, reason)
+
     def test_persona_contract_refusal_detected(self):
         report = (
             "### Summary of Changes\nx\n\n"

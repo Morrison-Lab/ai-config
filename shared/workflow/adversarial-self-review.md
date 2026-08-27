@@ -334,7 +334,9 @@ The gap is any other brief that asks something to act as an adversarial reviewer
 - **Don't:** file or accept a "the transcript lags the current turn" diagnosis for a refused push without first executing the parser against the actual transcript;
   the two failures produce an identical refusal message.
 
-(ai-config#2444, 2026-08-27: filed on the lag diagnosis, corrected once `read_latest_review`/`parse_report` were run directly against the session transcript and returned the older `needs_work` verdict from a mid-session dispatch, not a stale read of a same-turn one.)
+(ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
+Read that issue's title for the corrected diagnosis and its body as the superseded one.
+The body still argues the lag theory, and its closing section still says the parsing was not at fault.)
 
 **A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
 `read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.

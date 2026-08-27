@@ -312,12 +312,16 @@ A clean automated review from every available provider evaluating the current HE
 ## Pattern 17: Theorizing a Cause for a Guard Refusal Instead of Running Its Own Reader
 - **Mistake**: When `hooks/no-push-without-self-review.py` refuses a push citing "The latest adversarial self-review returned a blocking verdict" despite believing the most recent dispatch was clean, attributing the refusal to session/harness mechanics (the transcript lagging the current turn) instead of executing the guard's own `read_latest_review`/`parse_report` against the live transcript and reading what it actually parsed.
   The refusal message is a true statement about the guard's parsed history and a false one about the session's real state whenever the cause is a malformed report, so the two failure modes produce an identical message and only execution distinguishes them.
-- **Example**: 2026-08-27, ai-config#2444 (session on `fix/2409-driver-comments`).
+- **Example**: 2026-08-27, ai-config#2444, across two concurrent branches --- `fix/2409-driver-comments` and `ums-2409-fail-open-lessons`.
   Three dispatches ran in one turn --- `needs_work` at `5a45e7fd`, `needs_work` at `446fa0ee`, then a clean `Ready for merge` at `cf08d05f` --- and a later dispatch also returned a clean `Ready for merge` at `629cca1b`.
   The push was refused.
   An issue was filed attributing this to the transcript not being flushed for same-turn tool results.
   Running `read_latest_review` directly against the transcript returned `('needs_work', '446fa0eecaec6a58e2d65e1b8d24265e67e13138', True)` twice, minutes apart --- ruling out a lag that would have resolved on its own.
-  The actual cause: the two later reports used a heading-then-separate-line `## Verdict` / `Ready for merge` shape, which `VERDICT_LINE` does not match (it requires the phrase on the same line as `Verdict:`), so `parse_report` returned no verdict for both and the held value never advanced past the second dispatch.
+  The cause that execution established: the two later reports used a heading-then-separate-line `## Verdict` / `Ready for merge` shape, which `VERDICT_LINE` does not match (it requires the phrase on the same line as `Verdict:`), so `parse_report` returned no verdict for both and the held value never advanced past the second dispatch.
+  A second cause sat unexamined in the same evidence, and naming it is the point of this entry rather than a footnote to it.
+  `git merge-base --is-ancestor` puts `5a45e7fd` and `0c339271` on `fix/2409-driver-comments` and `446fa0ee` and `cf08d05f` on `ums-2409-fail-open-lessons`, so the four dispatches spanned two branches --- and the guard holds ONE global latest verdict rather than one per branch, so a review of either branch displaces the other's regardless of format.
+  Fixing the format alone would not have made those pushes independent.
+  The near-miss is that the format explanation is sufficient for the observed refusal, arrives first, and is confirmable --- which is exactly when [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s cause check is owed and feels least necessary.
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md), "A verdict phrase separated from its heading by a line break is no verdict."
 - **Fix**: When a guard's refusal contradicts your own read of the session, run the guard's own parsing function against the actual artifact it reads (the transcript, a file, a comment body) and print its result per input, before writing down a mechanism-level explanation.
   State `Verdict: <phrase>` on one line in every review brief, whatever is dispatching it.
@@ -330,7 +334,7 @@ A clean automated review from every available provider evaluating the current HE
   (2) the same classifier gated on the agent-disclosure marker --- failed because genuine not-clean reviews carry that marker too;
   (3) a citation strip keyed on a disposition verb plus an exact-verdict parenthetical --- blanked a live verdict inside a sentence reporting a fix that introduced a new bug.
   The turn that mattered was executing `classify_verdict` over the failing comment's own parts, which showed the table and the hold (what designs 1 and 2 were built to detect) produced no verdict at all, and the sole signal was a bare parenthetical after the header neither design had examined.
-  The fix that stuck (PR #2448) was a one-sentence authoring convention --- backtick a quoted verdict phrase --- landed as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
+  The design that survived review, proposed in PR #2448 and still open at the time of writing, is a one-sentence authoring convention --- backtick a quoted verdict phrase --- as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
 - **Canonical Rule**: [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s cause claim-type ("what else explains it") and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s recurrence test, applied one level earlier: recurring *refutation* of a design is itself the signal to stop designing and measure.
 - **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
   Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.

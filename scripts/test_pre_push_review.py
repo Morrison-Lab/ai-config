@@ -981,6 +981,26 @@ class TestPrePushReview(unittest.TestCase):
         is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
         self.assertFalse(is_clean, reason)
 
+    def test_persona_comment_strip_cannot_promote_indentation(self):
+        # Round-4 variant: a comment terminator at line start directly before
+        # a backtick/tilde run substitutes to <=3 spaces plus the run, which
+        # is inside FENCE's indent bound -- a fence synthesized from a line
+        # that matched nothing raw. Two such lines would pair inside
+        # parse_report's re-blank and hide the blocking verdict between them.
+        commit = "abc123def4567890"
+        for run in ("```", "~~~"):
+            report = (
+                "### Summary of Changes\nx\n\n"
+                "### Findings\nNone.\n\n"
+                "### Verdict: Ready for merge\n"
+                f"Reviewed-Commit: {commit}\n"
+                f"<!-- a\n-->{run}\n"
+                "### Verdict: Needs more work\n"
+                f"<!-- b\n-->{run}\n"
+            )
+            is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+            self.assertFalse(is_clean, f"{run}: {reason}")
+
     def test_persona_contract_refusal_detected(self):
         report = (
             "### Summary of Changes\nx\n\n"

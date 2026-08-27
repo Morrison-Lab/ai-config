@@ -234,6 +234,18 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
     if "<!--" in stripped:
         return False, False, "Unterminated HTML comment detected."
 
+    # Invariant: _blank_fences blanks delimiter lines too, so a successful
+    # blank pass leaves zero FENCE-matching lines, and space-substitution
+    # creates no backticks -- it can only promote a surviving run into fence
+    # indentation (a comment ending at line start directly before a backtick
+    # run). Any FENCE match here is therefore synthesized, and parse_report's
+    # internal re-blank would pair such lines and hide a verdict between
+    # them. Fail closed instead.
+    if hook.FENCE.search(stripped):
+        return False, False, (
+            "Comment stripping synthesized a fence marker; report unparseable."
+        )
+
     verdict, reviewed_commit = hook.parse_report(stripped)
     if verdict is None:
         return False, False, "Persona-contract report has no verdict line parse_report() recognizes."
@@ -243,9 +255,10 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         # qualification ("Ready for merge -- after fixing X") would pass it.
         # Mirror the local contract's rule: any content after the clean
         # phrase beyond closing emphasis/punctuation invalidates the clean.
-        # `stripped` is fence-blanked in the hook's dialect with offsets
-        # preserved through comment-stripping, so this scan and parse_report
-        # read the same effective lines.
+        # `stripped` is fence-blanked in the hook's dialect, offsets survive
+        # comment-stripping, and the synthesized-fence check above guarantees
+        # parse_report's internal re-blank is a no-op -- so this scan and
+        # parse_report read the same effective lines.
         last_clean = None
         for m in re.finditer(
             r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"

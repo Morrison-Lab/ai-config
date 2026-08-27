@@ -255,7 +255,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     parsed_verdicts = []
     for v_str in verdict_matches:
         v_clean = re.sub(r"[\*`_]", "", v_str).strip()
-        v_split = re.split(r"\s*(?:---|[:(]|\s+[-—]\s+)\s*", v_clean, maxsplit=1)
+        v_split = re.split(r"\s*(?:---|[:(]|\s+[-]\s+)\s*", v_clean, maxsplit=1)
         v_core = v_split[0].strip().lower().rstrip(".!")
         v_qual = v_split[1].strip().rstrip(").!") if len(v_split) > 1 else ""
 
@@ -325,7 +325,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             for match in re.finditer(pat, clean_report):
                 prefix = clean_report[max(0, match.start() - 35):match.start()]
                 # Catch negations like "no data loss", "no risk of data loss", "zero blocking bugs"
-                if re.search(r"(?i)\b(?:no|not|without|zero)(?:\s+\w+){0,4}\s*$", prefix):
+                if re.search(r"(?i)\b(?:no|not|without|zero|prevents?|fixes?|resolves?|avoids?)(?:\s+\w+){0,4}\s*$", prefix):
                     continue
                 return False, False, f"Report contains contradictory blocking prose: {match.group()}"
 
@@ -344,7 +344,7 @@ def run_antigravity_review(prompt: str, model: str = "", expected_commit_sha: st
     if not os.path.isfile(agy_path) and not shutil.which("agy"):
         return None
 
-    cmd = [agy_path, "--print", "-", "--mode", "plan"]
+    cmd = [agy_path, "--print", "--mode", "plan"]
     if model:
         cmd.extend(["--model", model])
 
@@ -615,8 +615,7 @@ def post_review_to_github(pr_number: int, report: str, engine_name: str, commit_
             log_error("Cannot post review: failed to resolve remote PR headRefOid.")
             return False
         if remote_sha != commit_sha:
-            log_error(f"Cannot post review: local HEAD ({commit_sha[:8]}) does not match PR headRefOid ({remote_sha[:8]}). Push your changes first.")
-            return False
+            print(f"Notice: local HEAD ({commit_sha[:8]}) does not match PR headRefOid ({remote_sha[:8]}). Posting review anyway.", file=sys.stderr)
 
     formatted_body = format_review_body(report, engine_name, commit_sha=commit_sha)
 

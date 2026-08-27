@@ -129,6 +129,35 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
+**Write the verdict in the form the checker parses, and cite the commit at
+eight characters or more.**
+`scripts/check-pr-fully-clean.py` reads a verdict *phrase*
+(`Verdict:\s*(?:Clean|Approved|Ready)`), never a `### Verdict` heading whose
+word sits on the following line, and it matches a report to the head by
+looking for `sha[:8]` or the full 40 in the body.
+Miss either and the report does not count: the structure above is satisfied,
+the comment reads as a review to any human, and the instrument that checks a
+PR has a verdict reports it has none.
+
+Neither miss announces itself.
+An abbreviated commit fails silently, and an unparsed verdict surfaces only
+as a `NOTE: ... has a format the verdict classifier cannot read` line, which
+is deliberately **non-blocking** --- so it prints among the notes rather than
+among the findings, and reads as a remark about somebody else's review.
+
+- **Do:** write `### Verdict: Clean` on one line, and quote at least the
+  8-character commit.
+- **Don't:** split the heading from the word, or cite a 7-character
+  abbreviation --- git's default `--short` length is one character too few.
+- **Do:** read a `NOTE:` about an unreadable review as being about *your own*
+  fallback, since a bot's report is already in the parsed form.
+
+(Measured on `ucdavis/bcs`, 2026-08-27: six fallback reviews used the split
+form, and the first also cited a 7-character SHA.
+Reposting them as `### Verdict: Clean` with the full SHA moved every PR from
+`0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean`, with no change to any review's content.)
+
 **Execute the sequential multi-provider review loop on all PRs.**
 You must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
 

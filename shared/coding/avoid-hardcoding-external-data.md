@@ -47,10 +47,11 @@ within weeks, so it became "every fragment under `shared/coding/`, indexed
 by the principle it serves in the catalog above".)
 
 **A softened count is still a pinned count.**
-The paragraph above says a refreshed list only resets the clock.
+The rule that refreshing a drifted list only resets the clock has a
+near-miss.
 The move it does not rule out is replacing the figure with a vaguer version
 of itself --- "on the order of 90K+ tokens across the ~60 files in it" in
-place of an exact count.
+place of "~74-92K tokens across 59 files".
 Hedging acknowledges the imprecision and changes nothing about the mechanism,
 so the substitution reads as careful while drifting on the same schedule:
 a tree can shrink past "90K+" as easily as it grew past an exact figure.
@@ -61,27 +62,25 @@ pin" pinned one, or it would have nothing to disclaim.
 The pointer form needs no such clause, because it names the query rather
 than an answer.
 
-This is the *sourced* case, and only that case: it applies to a figure some
-command enumerates, which is what makes a pointer possible.
-A count of the items in the block directly beneath it has no source to point
-at, and the section below on a count in the prose above a block prescribes
-dropping or re-deriving it instead.
+Hedging is the wrong answer whether or not the figure has a source; what the
+source decides is which right answer applies.
+A figure some command enumerates gets the pointer.
+One nothing enumerates gets dropped, or re-derived before pushing when the
+number does real work --- the remedies
+[a count in the prose above a block](#a-count-in-the-prose-above-a-block-is-the-same-duplicate-one-line-away)
+sets out.
 
 - **Do:** replace a figure the filesystem or an API enumerates with the
   command that derives it.
 - **Don't:** hedge such a figure and keep it --- an approximation drifts on
   the same schedule the exact value did.
 
-(Measured on `ucdavis/bcs`, 2026-08-27.
-A fix for a drifted "~74-92K tokens across 59 files" was first drafted as a
-hedge, in a commit citing this fragment as its justification, and an
-adversarial review rejected it before it was pushed.
-Note what the shipped text does and does not do: the *file* count became
-`find .ai-config/shared -name '*.md' | wc -l`, and the *token* figure was
-dropped rather than derived, no command being available for it.
-Dropping is the honest outcome when nothing enumerates the quantity ---
-the failure is keeping a number, hedged, that neither a command nor the
-argument needs.)
+(Measured on `ucdavis/bcs`#750, 2026-08-27.
+A hedged draft was rejected in review before it was pushed, in a change whose
+own commit message cited this fragment.
+The shipped text splits along exactly the line above: the *file* count became
+`find .ai-config/shared -name '*.md' | wc -l`, and the *token* figure, which
+no command enumerates, was dropped rather than hedged.)
 
 This is conditioned on the external source being **reliably available** ---
 don't add a network fetch or a fragile dependency where a static value would

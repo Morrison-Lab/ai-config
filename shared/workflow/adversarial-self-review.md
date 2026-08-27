@@ -360,10 +360,8 @@ The honest answer to the question was "nothing".)
 When obtaining adversarial reviews,
 you need a clean verdict from **every** available provider.
 You must define the initial pinned quorum by performing an exhaustive discovery/availability check across the complete enumerated set of known providers (e.g., Cursor, OpenCode, Codex, and Claude).
-Every provider found reachable at the start of the cycle
-must be included in the pinned quorum.
-Any exclusion of a known provider must be recorded explicitly with its reason
-(e.g., quota blocked, CLI offline).
+Every provider found reachable at the start of the cycle must be included in the pinned quorum.
+Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).
 Do not stop after one provider returns clean.
 Query them sequentially, one at a time.
 Once one provider gives a clean review,
@@ -373,14 +371,11 @@ you must address the feedback.
 When you make fixes,
 **do not hold the branch**:
 push the verified fixes immediately.
-Pushing the new commit naturally restarts the sequential query process
-against the new HEAD from the first provider.
+Pushing the new commit naturally restarts the sequential query process against the new HEAD from the first provider.
 When requesting review on the new push,
 proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
-This ensures providers do not redundantly re-raise settled non-code issues
-on the new diff.
-You must submit your rebuttal to the provider
-and request a new review.
+This ensures providers do not redundantly re-raise settled non-code issues on the new diff.
+You must submit your rebuttal to the provider and request a new review.
 This allows them to post a clean verdict at HEAD
 that supersedes their previous findings.
 Only after the provider posts a new clean verdict
@@ -391,16 +386,11 @@ until the current HEAD receives clean verdicts from the entire pinned quorum.
 The set of required providers must be pinned at the start of the review cycle.
 If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits),
 you must wait and retry.
-Alternatively,
-request explicit user permission to drop it from the quorum.
-If the quorum size is zero at the start of the cycle,
-or drops to zero at any point during the cycle,
+Alternatively, request explicit user permission to drop it from the quorum.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle,
 you must fail closed and wait until at least one becomes reachable.
-This applies if, for example,
-all external providers and the local fallback self-review subagent
-are offline or fail.
-Alternatively,
-request explicit user permission to proceed.
+This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
+Alternatively, request explicit user permission to proceed.
 Do not bypass the review gate.
 If any provider (or combination of providers) creates an unbounded loop ---
 whether through irreconcilably contradictory requirements,

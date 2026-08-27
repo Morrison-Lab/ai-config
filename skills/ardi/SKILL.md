@@ -141,13 +141,11 @@ sits unread.
    This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
    You must Address, Rebut, or Defer every finding it returns.
    If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
-   **Re-check reviewer availability every round, not just once** --
-   a reviewer that was unavailable a few pushes ago can become available mid-session.
-   A skipped review is never a clean external verdict on its own
-   and does not authorize marking the PR as approved.
+   **Re-check reviewer availability every round, not just once:**
+   A reviewer that was unavailable a few pushes ago can become available mid-session.
+   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved.
    See [*The bar: "fully clean"*](#the-bar-fully-clean).
-   It requires clean verdicts at the current head from all reachable providers in your pinned quorum,
-   not just a self-review.
+   It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
    "minor", "nit", "optional", "consider", "if you want" are for the user's

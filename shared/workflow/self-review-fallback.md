@@ -139,9 +139,8 @@ Re-check reachability at the start of every cycle:
 a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit) can become reachable mid-session,
 and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
-confirm a genuine all-clear review is posted at the current head from all reachable providers --
-a clean state you inferred yourself from green CI and resolved threads
-doesn't satisfy this once external verdicts are obtainable.
+confirm a genuine all-clear review is posted at the current head from all reachable providers.
+Your inferred clean state from CI and threads does not satisfy this requirement.
 Merging autonomously under `mwc` (merge-when-confident) unconditionally requires automated clean external review verdicts evaluating the HEAD commit.
 A fallback self-review allows iteration and unblocks PR progress.
 However, it NEVER authorizes autonomous merge under MWC.

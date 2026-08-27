@@ -1224,7 +1224,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
-    dated_matching = sorted((it for it in matching_items if it[1]), key=lambda it: it[1])
+    dated_matching = sorted(matching_items, key=lambda it: it[1] or "")
     latest_by_provider = {}
     for item in dated_matching:
         if classify_verdict(item[2], item[4]) in ("clean", "not-clean", "unreadable") or _unresolved_finding_pattern(item[2]):

@@ -1182,6 +1182,69 @@ inheriters.
 - **Don't:** write comments that group default-inheriters with callers
   that override the hint, or call the default a backup/link instruction.
 
+## A blocked compound `cmd1 && cmd2` Bash call blocks BOTH halves, not just the flagged one
+
+A PreToolUse hook (`no-push-without-self-review.py` here) fires on the
+**whole** Bash tool invocation before any of it runs, not per `&&`-joined
+segment. `git commit --allow-empty -m "..." && git push ...` blocked by
+the push guard therefore never ran the commit either -- the harness
+reported the call as blocked, and nothing executed at all.
+
+The trap is the natural recovery move: retry with the guard's override
+prefix on a NEW call containing only the flagged command
+(`ALLOW_UNREVIEWED_PUSH=1 git push -u origin HEAD`). That push succeeds
+--- but pushes whatever HEAD already was, since the commit from the
+blocked call never happened. On an empty-commit branch-claim flow this
+is silent: the push reports `[new branch]` either way, and only a
+downstream symptom (here, `gh pr create` refusing with "No commits
+between main and \<branch\>") surfaces the gap. `git log -1`/`git
+reflog` on the target worktree settles it immediately.
+
+- **Do:** verify state (`git log -1 --format=%H`, `git status`) after
+  any compound command a hook blocks, before assuming the unblocked
+  half already ran.
+- **Do:** re-run the FULL original command after fixing whatever the
+  guard flagged, rather than splicing an override onto just the
+  flagged segment.
+- **Don't:** assume a compound command's earlier stages executed just
+  because a later stage is what the guard's message named.
+
+(2026-08-27, `Morrison-Lab/ai-config#2412`: an empty claim commit for
+a hook-registration PR silently never happened this way; caught only
+because `gh pr create` refused on a zero-commit diff.)
+
+## Nesting your own `&` inside a `run_in_background: true` Bash call reports "done" the instant the wrapper shell returns, not when the backgrounded work finishes
+
+`command > file 2>&1 &` inside a Bash-tool call already passed
+`run_in_background: true` double-backgrounds: the tool's own
+backgrounding waits for the SHELL invocation to exit, and a trailing
+`&` makes that shell exit immediately (having detached the real work),
+so the completion notification and the captured output file both land
+long before the actual command has produced more than its first few
+lines. The output file is not stale or buffered --- it is complete for
+what the tool considered the finished job, which was the near-instant
+`echo $!` after the ampersand, not the process it backgrounded.
+
+The tell is a "completed, exit code 0" notification whose captured
+output looks implausibly short for the work described, especially
+right after the identical command WITHOUT the trailing `&` was still
+running minutes later with no output at all (that one was not
+double-backgrounded, just slow/quiet until its first flush -- a
+different, non-bug explanation for a differently-shaped symptom, which
+is why comparing the two side by side is what exposed this).
+
+- **Do:** pass a plain foreground command (no trailing `&`) to a Bash
+  call with `run_in_background: true` --- the tool's own backgrounding
+  is sufficient and is what keeps the completion notification honest.
+- **Don't:** add your own `&` (or `nohup ... &`, `disown`, etc.) on top
+  of `run_in_background: true` --- the two backgrounding mechanisms
+  don't compose, they race, and the tool's own wins.
+
+(2026-08-27, same session: `python3 -u scripts/test_hooks.py > log 2>&1
+&` reported complete in seconds with a 3-line log; the identical
+command without the trailing `&` ran to a real completion minutes
+later with the full ~45-suite output.)
+
 (2026-08-26,
 [#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
 [#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)

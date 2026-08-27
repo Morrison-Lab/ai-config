@@ -602,6 +602,28 @@ mid-flight, and there the SHA comparison usually has nothing to compare.**
 - **Don't:** infer that a finding is stale because a comment says it was
   addressed.
 
+**Your own fix-round commit makes the same claim one step earlier, and a
+file-count coincidence is what lets it through.**
+A commit message that enumerates a review round's findings asserts that the
+commit's diff touches every file those findings name, and nothing checks that
+assertion by default.
+Measured 2026-08-27 on
+[ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229): a
+seven-finding fix commit changed seven files, and the match read as
+confirmation --- but two findings shared a file, another file carried two
+findings' fixes, and the one file a remaining finding named was untouched, so
+the next review round re-raised it against a commit message that claimed it
+fixed.
+A matching count is not a matching set.
+Derive the union of files the round's findings name, compare it against the
+fix commit's own changed-file list (`git show --stat`) before pushing, and
+account for every member missing from either side.
+
+- **Do:** compare the fix commit's changed-file list against the files the
+  findings name, member by member, before pushing a round.
+- **Don't:** read "N findings, N files changed" as the round being covered
+  --- the count coincidence is exactly what masked the miss.
+
 **Run that same command before *any* readiness claim, not only against an
 inherited one --- a PR whose branch carries no implementation is green on
 every check.**

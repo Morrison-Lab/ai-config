@@ -93,7 +93,7 @@ accepted review findings of this shape, in one afternoon:
 - An owner-rename sweep derived from the literal `d-morrison/ai-config` and
   missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
   `site-url` --- a genuinely broken reference, not mere staleness, invisible
-  to the slash form (d-morrison/ai-config#1482, round 1).
+  to the slash form (Morrison-Lab/ai-config#1482, round 1).
   The broken plugin refs (`ai-config@the repository owner`) and marketplace key
   (`"the repository owner"`) had needed their own second pattern in the same sweep for
   the same reason.

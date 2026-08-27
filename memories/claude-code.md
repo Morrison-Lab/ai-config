@@ -1182,6 +1182,10 @@ inheriters.
 - **Don't:** write comments that group default-inheriters with callers
   that override the hint, or call the default a backup/link instruction.
 
+(2026-08-26,
+[#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
+[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)
+
 ## A blocked compound `cmd1 && cmd2` Bash call blocks BOTH halves, not just the flagged one
 
 A PreToolUse hook fires on the **whole** Bash invocation before any of
@@ -1225,7 +1229,3 @@ still running minutes later with fuller output.
 &` reported complete in seconds with a 3-line log; the identical
 command without the trailing `&` ran to a real completion minutes
 later with the full ~45-suite output.)
-
-(2026-08-26,
-[#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
-[#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)

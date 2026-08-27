@@ -278,6 +278,12 @@ def main():
         system_messages = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
             for hook in hooks_list:
+                # `script` is a bare diagnostic basename in hooks.json (a
+                # legacy/informational field), never a runnable command
+                # line -- `command` is the canonical field to execute. A
+                # `script`-only entry falls through to `run_hook_command`
+                # unchanged, so it is admitted here as runnable but will
+                # fail as a shell command unless it happens to also be one.
                 cmd = hook.get("command") or hook.get("script")
                 if not cmd:
                     continue
@@ -329,6 +335,10 @@ def main():
         hooks_to_run = extract_hook_list(stop_groups)
         warn_messages = []
         for hook in hooks_to_run:
+            # `script` is a bare diagnostic basename in hooks.json (a
+            # legacy/informational field), never a runnable command line --
+            # `command` is the canonical field to execute; see the identical
+            # note on the PreToolUse extraction above.
             cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
@@ -408,6 +418,10 @@ def main():
         for hook in hooks_to_run:
             if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
                 break
+            # `script` is a bare diagnostic basename in hooks.json (a
+            # legacy/informational field), never a runnable command line --
+            # `command` is the canonical field to execute; see the identical
+            # note on the PreToolUse extraction above.
             cmd = hook.get("command") or hook.get("script")
             if not cmd:
                 continue
@@ -432,22 +446,58 @@ def main():
                             text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or nested_context or ""
                     except Exception:
                         pass
+                    # A parsed field (systemMessage / additionalContext / the
+                    # nested hookSpecificOutput.additionalContext) is not
+                    # guaranteed to be a string -- a hook may return a dict,
+                    # list, or number here. Coerce defensively, mirroring the
+                    # str(...) coercion the PreToolUse and Stop branches above
+                    # already apply to their own systemMessage /
+                    # additionalContext reads, so a non-string value renders
+                    # as its Python repr instead of crashing the byte-capping
+                    # logic below with an uncaught AttributeError (which,
+                    # unlike the json.loads() above, was not wrapped in a
+                    # try/except and so previously killed this whole process
+                    # with no JSON emitted at all).
+                    if text_out and not isinstance(text_out, str):
+                        text_out = str(text_out)
                     if text_out:
-                        # Cap single injected message at PRE_INVOCATION_MSG_BYTE_CAP
-                        # (UTF-8 bytes) and cumulative bytes at
-                        # PRE_INVOCATION_TOTAL_BYTE_CAP.
-                        raw_bytes = text_out.encode("utf-8")[:PRE_INVOCATION_MSG_BYTE_CAP]
-                        chunk = raw_bytes.decode("utf-8", errors="ignore")
-                        chunk_bytes = len(chunk.encode("utf-8"))
-                        if total_injected_bytes + chunk_bytes <= PRE_INVOCATION_TOTAL_BYTE_CAP:
-                            injected_messages.append(chunk)
-                            total_injected_bytes += chunk_bytes
-                        elif total_injected_bytes < PRE_INVOCATION_TOTAL_BYTE_CAP:
-                            remaining_bytes = PRE_INVOCATION_TOTAL_BYTE_CAP - total_injected_bytes
-                            encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
-                            trimmed_chunk = encoded_trimmed.decode("utf-8", errors="ignore")
-                            injected_messages.append(trimmed_chunk)
-                            total_injected_bytes += len(trimmed_chunk.encode("utf-8"))
+                        try:
+                            # Cap single injected message at
+                            # PRE_INVOCATION_MSG_BYTE_CAP (UTF-8 bytes) and
+                            # cumulative bytes at
+                            # PRE_INVOCATION_TOTAL_BYTE_CAP.
+                            raw_bytes = text_out.encode("utf-8")[:PRE_INVOCATION_MSG_BYTE_CAP]
+                            chunk = raw_bytes.decode("utf-8", errors="ignore")
+                            chunk_bytes = len(chunk.encode("utf-8"))
+                            if total_injected_bytes + chunk_bytes <= PRE_INVOCATION_TOTAL_BYTE_CAP:
+                                injected_messages.append(chunk)
+                                total_injected_bytes += chunk_bytes
+                            elif total_injected_bytes < PRE_INVOCATION_TOTAL_BYTE_CAP:
+                                remaining_bytes = PRE_INVOCATION_TOTAL_BYTE_CAP - total_injected_bytes
+                                encoded_trimmed = chunk.encode("utf-8")[:remaining_bytes]
+                                trimmed_chunk = encoded_trimmed.decode("utf-8", errors="ignore")
+                                if trimmed_chunk:
+                                    injected_messages.append(trimmed_chunk)
+                                    total_injected_bytes += len(trimmed_chunk.encode("utf-8"))
+                                if not trimmed_chunk or total_injected_bytes >= PRE_INVOCATION_TOTAL_BYTE_CAP:
+                                    # Either the remaining budget was too
+                                    # small to hold even one code point of
+                                    # this chunk (a boundary landing mid a
+                                    # multi-byte UTF-8 character --
+                                    # errors="ignore" drops the incomplete
+                                    # tail, yielding an empty trimmed_chunk
+                                    # that must NOT be appended as another
+                                    # empty ephemeralMessage step), or the
+                                    # cap is now exactly full. Either way, no
+                                    # further hook output can fit, since
+                                    # remaining_bytes only shrinks from here.
+                                    break
+                            else:
+                                # Cap already exactly full; nothing more can
+                                # fit.
+                                break
+                        except Exception as exc:
+                            print(f"claude-hook-adapter: failed to accumulate PreInvocation message: {exc}", file=sys.stderr)
 
         if injected_messages:
             steps = [{"ephemeralMessage": msg} for msg in injected_messages[:PRE_INVOCATION_MSG_CAP]]

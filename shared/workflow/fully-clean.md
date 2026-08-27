@@ -81,6 +81,45 @@ Worked-example case records for the rules below live in
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A `check_suite.completed` wake at a superseded head".
 
+   **A polling loop needs the same negative control a sweep does, because an
+   EMPTY check list satisfies "nothing is pending" exactly as well as a
+   finished one.**
+   The rules above that concern the check list each found one that came back
+   **short**; this is the case where it comes back **empty**, which none of
+   them reaches.
+   "Not yet started" and "finished successfully" produce an identical reading,
+   which is [`fail-fast`](../principles/fail-fast.md)'s
+   pass-path-equals-failure-path shape failing in the dangerous direction ---
+   it reports a PR ready.
+   [`batch-merge-and-resolve`](batch-merge-and-resolve.md) states the
+   governing rule for a **sweep**, and a sweep and a poll do not resemble each
+   other from the inside --- one feels like a measurement, the other like
+   waiting --- so that rule loads and matches nothing here.
+
+   A non-empty population is necessary and **not sufficient**, because the
+   population grows while the poll runs.
+   Measured on the corrected run: the total went 13, then 16, 17, 18 across
+   two minutes, as later workflows registered their checks.
+   So a threshold only rules out the empty case, and a poller that happened to
+   observe zero pending at total 13 would have exited before five further
+   checks existed.
+   Require the terminal reading to repeat --- zero pending **and** an
+   unchanged total across two consecutive polls --- and print the total each
+   tick, so growth is visible rather than inferred.
+
+   - **Do:** require a non-empty population before reading zero-pending as
+     done, and report how many check runs were examined.
+   - **Do:** confirm the total is unchanged since the previous poll, since the
+     population grows as workflows register.
+   - **Don't:** arm a poller assuming the push already created the checks ---
+     a draft-to-ready transition creates them on a separate event, so a
+     poller armed at push time can run entirely inside a zero-check window.
+   - **Don't:** treat a single zero-pending reading as terminal, however large
+     the population was when you took it.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A poller exited on an empty check list".
+
    **A check-run NAME is not unique across workflows, so a name alone does not
    identify which check passed.**
    Two workflows in one repo can each define a job with the same name, and
@@ -124,13 +163,14 @@ Worked-example case records for the rules below live in
    Reporting the regression fixed on that row would have cited an unrelated
    workflow.)
 
-   **Every subsection above explains a check list that is short for a per-PR
-   reason, and a platform outage produces the same shape for a reason none of
-   them can reach.**
+   **Every subsection above explains a per-PR failure in reading the check
+   state --- a short or empty list, a lagging status surface, an ambiguous
+   name --- and a platform outage produces the same shape for a reason none
+   of them can reach.**
 
    **A job's conclusion is set by whichever step failed, which need not be the step whose verdict you read.**
-   Every rule above is about an enumeration that came back short.
-   This one is the opposite case: the enumeration is complete and terminal, and the answer you read came from the wrong member of it.
+   Most rules above concern an enumeration that came back incomplete.
+   This one's enumeration is complete and terminal, and the answer you read came from the wrong member of it.
    A workflow can carry a guard step that decides what a run *meant* --- a review guard classifying an outcome, a summarizer, a status resolver --- and that step can conclude "this is fine", write its output, and end `success`, while the job is red because an earlier step failed without `continue-on-error`.
    Reading the guard's own log line then reports the opposite of the check.
    So when a red job's log carries a green verdict, do not treat it as a contradiction to explain: enumerate the steps and find the one whose conclusion is `failure`.

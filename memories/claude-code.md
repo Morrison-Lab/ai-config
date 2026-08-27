@@ -1185,3 +1185,47 @@ inheriters.
 (2026-08-26,
 [#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
 [#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)
+
+## A blocked compound `cmd1 && cmd2` Bash call blocks BOTH halves, not just the flagged one
+
+A PreToolUse hook fires on the **whole** Bash invocation before any of
+it runs, not per `&&`-joined segment, so a commit-then-push call
+blocked by a push guard never ran the commit either.
+The trap: retrying with just the guard's override on a NEW call
+containing only the push pushes whatever HEAD already was, since the
+commit from the blocked call never happened.
+On an empty-commit branch claim this is silent -- `[new branch]`
+prints either way -- until a downstream symptom (`gh pr create`
+refusing "No commits between main and the branch") surfaces it.
+
+- **Do:** verify state (`git log -1`, `git status`) after any blocked
+  compound command, before assuming the unblocked half ran.
+- **Do:** re-run the FULL original command after fixing what the
+  guard flagged, rather than splicing an override onto one segment.
+- **Don't:** assume earlier stages executed just because a later one
+  is what the guard named.
+
+(2026-08-27, `Morrison-Lab/ai-config#2412`: an empty claim commit for
+a hook-registration PR silently never happened this way; caught only
+because `gh pr create` refused on a zero-commit diff.)
+
+## Nesting your own `&` inside a `run_in_background: true` Bash call reports "done" instantly, not when the backgrounded work finishes
+
+`command > file 2>&1 &` under `run_in_background: true`
+double-backgrounds: the tool waits for the SHELL to exit, and the
+trailing `&` makes that shell exit immediately having detached the
+real work -- so the notification and captured output land long before
+the command has produced more than its first few lines.
+Tell: a "completed, exit 0" notification whose output looks
+implausibly short, especially beside the SAME command minus the `&`
+still running minutes later with fuller output.
+
+- **Do:** pass a plain foreground command (no trailing `&`) under
+  `run_in_background: true` --- its own backgrounding is sufficient.
+- **Don't:** add your own `&`/`nohup`/`disown` on top --- the two
+  mechanisms race, and the tool's own notification wins, falsely.
+
+(2026-08-27, same session: `python3 -u scripts/test_hooks.py > log 2>&1
+&` reported complete in seconds with a 3-line log; the identical
+command without the trailing `&` ran to a real completion minutes
+later with the full ~45-suite output.)

@@ -1840,6 +1840,156 @@ def main() -> int:
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
           is not None)
 
+    # --- ai-config#2402: a structured non-bot clean supersedes that same
+    # identity's earlier not-clean, and never counts toward quorum. ---------
+    human_notclean_round = {
+        "createdAt": "2026-08-27T06:44:16Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Needs more work\n\n"
+            "### Critical Findings\n1. The parser drops rows.\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    human_clean_round = {
+        "createdAt": "2026-08-27T06:53:57Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n### Verification Steps\n- suite passes\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    bot_clean_round = {
+        "createdAt": "2026-08-27T07:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed commit: sha123\n"
+        ),
+    }
+    mock_seq = json.dumps({"comments": [human_notclean_round, human_clean_round,
+                                        bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_seq):
+        sup_ok, sup_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean supersedes the same identity's "
+            "earlier not-clean (#2402)",
+            sup_ok and sup_issues == [],
+        )
+
+    # Without the structured clean round, the human identity's not-clean
+    # stands and blocks -- the supersession is what the fix adds.
+    mock_stuck = json.dumps({"comments": [human_notclean_round, bot_clean_round],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_stuck):
+        stuck_ok, stuck_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "the same sequence WITHOUT the clean round still blocks "
+            "(negative control)",
+            (not stuck_ok) and any("d-morrison" in i for i in stuck_issues),
+        )
+
+    # A structured non-bot clean ALONE never meets quorum: approval
+    # authority comes from author identity, not body text (#2308).
+    mock_solo = json.dumps({"comments": [human_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_solo):
+        solo_ok, solo_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean alone does NOT meet quorum (#2308 invariant)",
+            (not solo_ok) and any("No valid clean review" in i or "quorum" in i.lower()
+                                  for i in solo_issues),
+        )
+
+    # SPOOF GUARD: a CONTRIBUTOR pasting an agent marker into a structured
+    # clean body must not supersede the real bot's standing not-clean --
+    # the identity gate refuses any body whose resolved identity differs
+    # from the poster's login.
+    bot_notclean_round = {
+        "createdAt": "2026-08-27T07:20:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Findings\n1. Real defect.\n\n"
+            "### Verdict\n**Needs more work**\n\nReviewed commit: sha123\n"
+        ),
+    }
+    spoof_clean = {
+        "createdAt": "2026-08-27T07:30:00Z",
+        "author": {"login": "drive-by-account"},
+        "authorAssociation": "CONTRIBUTOR",
+        "body": (
+            "**Claude finished review**\n\n### Summary\nAll good.\n\n"
+            "### Findings\nNone.\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    # A quorum-satisfying legitimate clean rides along so the assertion
+    # discriminates: with the identity gate ablated, the spoof supersedes
+    # Claude's not-clean and the cursor clean meets quorum, flipping
+    # sp_ok to True -- so this test fails exactly when the gate is lost.
+    cursor_clean_round = {
+        "createdAt": "2026-08-27T07:25:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "### Summary\nLooks good.\n\n### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n\nReviewed-Commit: sha123\n"
+        ),
+    }
+    mock_spoof = json.dumps({"comments": [bot_notclean_round,
+                                          cursor_clean_round, spoof_clean],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_spoof):
+        sp_ok, sp_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a marker-spoofed contributor clean cannot supersede the bot's "
+            "not-clean (identity gate)",
+            (not sp_ok) and any("Claude" in i and "NOT clean" in i
+                                for i in sp_issues),
+        )
+
+    # Structure smuggled inside a fence does not admit: quoting a prior
+    # report's headings and fingerprint in a fenced block, plus a bare
+    # clean phrase, is still conversational prose.
+    fenced_quote = {
+        "createdAt": "2026-08-27T07:40:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "Quoting the earlier report:\n\n```\n### Verdict\n"
+            "Ready for merge\nReviewed-Commit: sha123\n```\n\n"
+            "Verdict: Ready for merge\n"
+        ),
+    }
+    mock_fenced = json.dumps({"comments": [human_notclean_round, fenced_quote],
+                              "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_fenced):
+        fq_ok, fq_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "fenced-quoted structure does not admit a casual clean "
+            "(stripped-body structure test)",
+            (not fq_ok) and any("NOT clean" in i for i in fq_issues),
+        )
+
+    # A casual human comment saying Ready for merge, with no report
+    # structure, is still not admitted at all (#1798's guard).
+    human_casual = {
+        "createdAt": "2026-08-27T07:10:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": "Looks good to me -- Ready for merge whenever.",
+    }
+    mock_casual = json.dumps({"comments": [human_notclean_round, human_casual,
+                                           bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_casual):
+        cas_ok, cas_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a casual unstructured human clean does not supersede (#1798 guard)",
+            (not cas_ok) and any("d-morrison" in i for i in cas_issues),
+        )
+
     claude_nits_earlier = {
         "createdAt": "2026-08-07T21:56:00Z",
         "author": {"login": "github-actions"},

@@ -151,6 +151,8 @@ So the operator sees it one command before it matters and never at the moment it
 It walks the whole manifest, so a hook merged days earlier and never registered rides along with the two you just merged.
 
 **Recovery: `/reload-plugins` places the symlinks, and is better than the alternatives above.**
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** the recovery below relied on the retired install placing symlinks into `~/.claude/hooks` --- today `/reload-plugins` refreshes the plugin, whose hooks run from the plugin root, and nothing places symlinks there.
+Keep it as the incident record it is.
 The parent section prefers restoring the file to a settings.json edit, and is right, but hand-creating a no-op pass-through is not the way to do it when the scripts exist in the checkout.
 `/reload-plugins` re-runs the install and links every declared hook at once, so all the broken entries become valid together rather than one path at a time.
 It also needs no Bash, which matters because Bash is exactly what is down.
@@ -164,9 +166,9 @@ The transferable half is not about hooks.
 The operation the operator wanted was composite, it needs two tools, and half of it is worse than none.
 That is [`fail-fast`](../shared/principles/fail-fast.md)'s "partial is worse than absent" one layer out: there the guard is partially *written*, here the guard is complete, correct, and partially *installed*.
 
-- **Do:** confirm `~/.claude/hooks/<script>` exists before running `install-hooks.py --fix` for it --- there is no automated placement instrument for this any more (see the top of this file), so verify by hand or use the Claude Code plugin path instead, which places and binds together. (Inferred from the incident, not given as a user directive.)
+- **Do:** confirm `~/.claude/hooks/<script>` exists before running `install-hooks.py --fix` for it --- there is no automated placement instrument for this any more (see the top of this file), so verify by hand or use the Claude Code plugin path instead, which needs no placement at all: the loader serves and binds every declared hook from the plugin root. (Inferred from the incident, not given as a user directive.)
 - **Do:** read a tool's success line as covering that tool's own scope, and name the other half of a composite operation yourself.
-- **Do:** reach for `/reload-plugins` when registered hooks point at absent scripts that do exist in the checkout.
+- **Do:** reach for `/reload-plugins` when the plugin's own hooks look stale or broken --- its symlink-repair reading (registered hooks pointing at absent `~/.claude/hooks` scripts) is historical, per the marker above.
 - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
 - **Don't:** expect `--fix` to warn you about this.
   It prints that note only when run *without* `--fix`.

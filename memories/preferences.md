@@ -23,7 +23,9 @@
   Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.
   (User directive / CAI, 2026-08-21: the request named specific `ucdavis` repositories.
   Read `ucdavis` as the incident rather than as the rule's boundary --- as of 2026-08-21, review still ran everywhere else, `ucdavis/bcs` had the Claude app installed, and no `Morrison-Lab` repository was ever in scope.
-  See [`github.md`](github.md)'s "Verify GitHub App installation per repository" for how to check a given repository.)
+  See [`github-consumer-ci.md`](github-consumer-ci.md)'s
+  "Verify GitHub App installation per repository" for how to check a given
+  repository.)
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) --- don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known --- rather than repeating it back as fact.

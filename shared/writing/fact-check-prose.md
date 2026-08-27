@@ -584,7 +584,8 @@ a page: a check that cannot separate "not fixed" from "not built yet" is not
 yet a check.
 
 The mechanics live elsewhere and are not repeated here.
-[`memories/github.md`](../../memories/github.md) covers reading the deployed
+[`memories/github-remote-sessions.md`](../../memories/github-remote-sessions.md)
+covers reading the deployed
 bytes off `gh-pages` when the served URL is blocked, and reading that branch's
 own commit log to see which build is actually deployed.
 [`check-rendered-refs`](../../skills/check-rendered-refs/SKILL.md) covers the

@@ -76,7 +76,7 @@ For standing instructions that should always be in context:
 | Category | Example | Where |
 |----------|---------|-------|
 | Bug diagnosis | "bash EOF error = CRLF line endings" | `/memories/debugging.md` |
-| Tool quirk | "glab has no GITLAB_TOKEN env var" | The matching topical file -- `/memories/github.md` here; see `memories/MEMORY.md` |
+| Tool quirk | "glab reads GITLAB_TOKEN, and it takes precedence over the stored config" | The matching topical file -- `/memories/gitlab.md` here; see `memories/MEMORY.md` |
 | Codebase fact | "CI only runs on branch pushes, not PR events" | That repo's own agent docs (or staging) |
 | Workflow | "Always run r-pkg-spellcheck before push" | Skill file |
 | Preference | "Always request the repository owner as reviewer" | `/memories/preferences.md` |

@@ -692,3 +692,21 @@ You must wait for those new runs to pass before the PR is fully clean again.
 
 (Measured 2026-08-25 via `gh pr update-branch --help`)
 
+## Strict branch protection makes a clean PR queue merge serially
+
+Under branch protection with `required_status_checks.strict: true`,
+`update-branch` (the section above) is also the toll every merge pays:
+a PR whose checks passed against an older base reads `BEHIND`
+and `gh pr merge` refuses it,
+so a queue of clean PRs merges strictly serially ---
+update one, wait out its CI and review re-run, merge,
+and every remaining PR is `BEHIND` again.
+Batch-updating the queue wastes the re-runs:
+all but the next PR go stale before their turn.
+(Measured 2026-08-27 clearing the ai-config queue: five PRs,
+one update-plus-rerun cycle each.)
+
+- **Do:** update one PR at a time and merge it the moment it is green,
+  then start the next PR's update.
+- **Don't:** batch-update the whole queue --- every PR but the next one
+  goes `BEHIND` again before its turn, and its re-run is wasted.

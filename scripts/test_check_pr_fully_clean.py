@@ -1756,13 +1756,15 @@ def main() -> int:
               "### Findings\n\nVerification performed: traced all call sites.\n\n"
               "No actionable findings identified.\n\n### Verdict: Ready for merge\n")
           is None)
-    # Non-vacuous veto tests: each body's LAST line matches the resolving
-    # vocabulary, so only the item veto keeps these flagged -- neutering
-    # _SECTION_FINDING_ITEM makes each of these exempt and fail the test.
+    # Veto tests. The first three bodies carry NOTHING that any other
+    # pattern matches, so each stays flagged only through the section logic
+    # itself -- neutering _SECTION_FINDING_ITEM flips the tagged and
+    # Location cases to exempt (their last line resolves), and breaking the
+    # last-line anchor flips the resolving-first case.
     check("tagged item above a resolving last line stays a finding",
           checker._unresolved_finding_pattern(
-              "### Findings\n\n1. **[Defect]** scripts/x.py:1 broken.\n\n"
-              "No actionable findings identified.\n\n### Verdict: Needs more work\n")
+              "### Findings\n\n1. **[Convention]** scripts/x.py:1 is oddly "
+              "wrapped.\n\nNo actionable findings identified.\n")
           is not None)
     check("UNTAGGED numbered item above a resolving last line stays a finding",
           checker._unresolved_finding_pattern(
@@ -1773,10 +1775,14 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings\n\nNo new issues.\n\n1. `foo()` returns None.\n")
           is not None)
-    check("findings section with a **Location:** item stays a finding",
+    check("a **Location:** line above a resolving last line vetoes the exemption",
+          not checker._findings_section_resolves_empty(
+              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified.\n",
+              len("### Findings")))
+    check("a bulleted '- None.' body still resolves empty (no self-veto)",
           checker._unresolved_finding_pattern(
-              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified.\n")
-          is not None)
+              "### Findings\n\n- None.\n\n### Verdict: Ready for merge\n")
+          is None)
     check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
           checker._unresolved_finding_pattern(
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")

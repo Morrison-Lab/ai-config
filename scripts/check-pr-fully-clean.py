@@ -654,6 +654,10 @@ def strip_cited_finding_vocab(text: str) -> str:
 # 2026-08-27 alone). The lookbehinds enumerate those two compounds rather
 # than exempting every `-blocking` compound, because "merge-blocking" is a
 # real signal and missing a not-clean is the dangerous direction here.
+# Known residual: the lookbehinds see only the literal characters, so an
+# emphasized compound ("previously **blocking**") still reads as the signal
+# -- the char before `blocking` is `*`. Safe direction (over-flag); recorded
+# here so the next #2369-class recurrence is not re-diagnosed from scratch.
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
     r"(?<!non-)(?<!non\s)(?<!previously-)(?<!previously\s)Block(?:ed|ing)?"
@@ -1002,17 +1006,20 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
     section = scan_body[match_end:match_end + next_heading.start()] \
         if next_heading else scan_body[match_end:]
-    if _SECTION_FINDING_ITEM.search(section):
-        return False
     lines = [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
     # The resolving vocabulary is NOT_CLEAN_NEGATION_SUFFIX -- the same
-    # reviewed allowlist the 60-char shortcut used -- applied to the LAST
-    # non-empty line. The item veto above is what makes the broader
-    # vocabulary safe here: "No blocking issues." below two listed findings
-    # never reaches this test.
-    return bool(NOT_CLEAN_NEGATION_SUFFIX.search(lines[-1]))
+    # reviewed allowlist the per-heading suffix shortcut uses -- applied to
+    # the LAST non-empty line, with a leading bullet marker tolerated so the
+    # common "- None." body still resolves. The item veto then applies only
+    # ABOVE the resolving line: "No blocking issues." below two listed
+    # findings never exempts, while a section whose only content is its
+    # resolution never vetoes itself.
+    last_stripped = re.sub(r"^\s*(?:\d+\.|[-*])\s+", "", lines[-1])
+    if not NOT_CLEAN_NEGATION_SUFFIX.search(last_stripped):
+        return False
+    return not _SECTION_FINDING_ITEM.search("\n".join(lines[:-1]))
 
 
 def _unresolved_finding_pattern(body: str) -> Optional[str]:

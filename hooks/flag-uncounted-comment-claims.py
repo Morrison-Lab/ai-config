@@ -215,15 +215,24 @@ parse_comment_post = getattr(_rebuttal, "parse_comment_post", None)
 # path anchor carries in remind-brief-premises.py. Deliberately excludes
 # generic measure words (minutes, dollars, times, people, days) that would
 # fire on ordinary cardinality prose no forge comment needs to re-derive.
+# Deliberately EXCLUDES the review-housekeeping words a forge comment uses
+# in routine, self-evident summary prose ("found 2 issues", "three commits",
+# "fixes one bug") -- an adversarial review of this hook (ai-config#2377
+# round 1) measured that vocabulary firing on exactly those two phrasings,
+# which is precisely the noise this hook's own docstring says it must not
+# create. `issues?`/`prs?`/`pulls?`/`commits?`/`findings?`/`changes?`/
+# `edits?`/`fixes?`/`bugs?`/`errors?`/`warnings?`/`rounds?`/`regressions?`
+# were all in an earlier version of this list and are gone for that reason.
+# What remains is ARTIFACT-enumeration vocabulary: the kind of noun a
+# session names when it lists concrete, checkable things (files, scripts,
+# skills, tests), not when it summarizes what a review round did.
 LISTABLE_NOUN_PATTERN = (
     r"files?|scripts?|lines?|tests?|comments?|mentions?|sites?"
-    r"|occurrences?|references?|instances?|entries?|findings?"
-    r"|issues?|prs?|pulls?|commits?|threads?|checks?|workflows?"
-    r"|functions?|methods?|classes?|modules?|examples?|cases?"
-    r"|items?|rows?|columns?|records?|changes?|edits?|fixes?"
-    r"|bugs?|errors?|warnings?|hooks?|skills?|memories?|branches?"
-    r"|repos?|repositories?|places?|spots?|locations?|callers?"
-    r"|usages?|matches?|hits?|results?|rounds?|regressions?"
+    r"|occurrences?|references?|instances?|entries?|threads?"
+    r"|checks?|workflows?|functions?|methods?|classes?|modules?"
+    r"|examples?|cases?|items?|rows?|columns?|records?|hooks?"
+    r"|skills?|memories?|branches?|repos?|repositories?|places?"
+    r"|spots?|locations?|callers?|usages?|matches?|hits?|results?"
 )
 LISTABLE_NOUN_RE = re.compile(r"(?:" + LISTABLE_NOUN_PATTERN + r")", re.I)
 
@@ -235,18 +244,61 @@ LISTABLE_NOUN_RE = re.compile(r"(?:" + LISTABLE_NOUN_PATTERN + r")", re.I)
 TOKEN = r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+"
 
 # CARDINALITY: `\bCOUNT (gap words) PLURAL_LISTABLE_NOUN\b`. The 0-2 word gap
-# mirrors remind-brief-premises.py's `plural_after` window.
+# mirrors remind-brief-premises.py's `plural_after` window -- and, like that
+# function, the trailing `s` is baked INTO the noun group rather than
+# filtered afterward. That is not cosmetic: with a lazy `{0,2}?` gap and an
+# unconstrained noun group, the engine accepts the very first word it tries
+# (zero gap) without ever needing to look further, so a real match like
+# "18 new files" was never reached -- "new" satisfied an unconstrained noun
+# group and the match returned before "files" was ever examined. Requiring
+# the noun to end in `s` inside the group itself is what forces the engine
+# to keep expanding the gap until it actually finds a plural word. Measured
+# in an adversarial review of this hook (ai-config#2377 round 1): the
+# unconstrained version matched a bare "18 files" and missed every realistic
+# paraphrase with one intervening adjective ("18 new files", "3 remaining
+# bugs", "4 different scripts").
 CARDINALITY_RE = re.compile(
-    rf"\b({COUNT})\s+(?:[\w./-]+\s+){{0,2}}?([A-Za-z][\w./-]*)\b", re.I,
+    rf"\b({COUNT})\s+(?:[\w./-]+\s+){{0,2}}?([A-Za-z][\w./-]*s)\b", re.I,
 )
 
 # ENUMERATION: a listable noun, an optional short gap (never crossing a
 # sentence boundary) and optional colon, then >=2 TOKENs joined by `/` or `,`.
+# `(?![-_./])` immediately after the noun is load-bearing, not decorative:
+# without it, a corpus path whose own segments happen to contain hyphens --
+# `skills/select-model/SKILL.md`, this repo's own standard citation shape --
+# reads as "skills" (the noun, taken straight from the path) followed by a
+# two-item `/`-joined list ("select-model", "SKILL.md"). A narrower `(?!/)`
+# is not enough on its own: a listable noun that is itself the FIRST
+# hyphenated segment of a longer compound identifier (`checks?` matching
+# "check" inside `check-open-prs-before-duplicating`) reads the rest of that
+# same identifier as a `/`-joined list the same way. Requiring the noun be
+# followed by neither a path separator NOR a hyphen/underscore/dot is what
+# tells a single identifier's own internal structure apart from a hand-typed
+# list of SEVERAL identifiers, without giving up the "no explicit numeral
+# needed" case the incident's own wrong claim used -- a real list still
+# needs only a colon or a space between the noun and its items, never a
+# hyphen glued straight onto the noun. Measured in an adversarial review of
+# this hook (ai-config#2377 round 1): the unguarded pattern matched 43% of
+# this repo's own shared/**/*.md + skills/**/*.md files, the large majority
+# of them exactly this class of false positive.
 ENUM_RE = re.compile(
-    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b[^\n.:]{{0,24}}?:?\s*"
+    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n.:]{{0,24}}?:?\s*"
     rf"({TOKEN}(?:\s*(?:,|/)\s*{TOKEN}){{1,}})",
     re.I,
 )
+
+# ENUMERATION, bulleted-list form: a listable noun introducing a markdown
+# bullet list, each line an identifier-shaped token. `ENUM_RE` only sees
+# items joined inline on one line ("a / b / c"); a poster listing the same
+# claim as a bulleted list -- arguably the more natural way to present a
+# file enumeration in a forge comment -- was invisible to it. `{2,}` bullet
+# lines, matching ENUM_RE's own >=2-items bar.
+ENUM_BULLET_RE = re.compile(
+    rf"\b(?:{LISTABLE_NOUN_PATTERN})\b(?![-_./])[^\n]{{0,40}}?:\s*\n"
+    r"((?:[ \t]*[-*]\s+[^\n]*\n?){2,})",
+    re.I,
+)
+BULLET_TOKEN_RE = re.compile(rf"^[ \t]*[-*]\s+`?({TOKEN})`?", re.M)
 
 
 def find_claims(body_text):
@@ -264,8 +316,6 @@ def find_claims(body_text):
     for m in CARDINALITY_RE.finditer(prose):
         noun = m.group(2)
         low = noun.lower()
-        if not low.endswith("s"):
-            continue
         if low in NOT_PLURAL or NOT_A_NOUN.search(noun):
             continue
         if not LISTABLE_NOUN_RE.fullmatch(low):
@@ -278,6 +328,17 @@ def find_claims(body_text):
         found.append(("cardinality", quote))
 
     for m in ENUM_RE.finditer(prose):
+        quote = " ".join(m.group(0).split())
+        key = ("enumeration", quote.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(("enumeration", quote))
+
+    for m in ENUM_BULLET_RE.finditer(prose):
+        tokens = BULLET_TOKEN_RE.findall(m.group(1))
+        if len(tokens) < 2:
+            continue
         quote = " ".join(m.group(0).split())
         key = ("enumeration", quote.lower())
         if key in seen:

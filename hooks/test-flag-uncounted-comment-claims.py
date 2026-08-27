@@ -66,6 +66,46 @@ ARD_SUMMARY = "Addressed, Rebutted, or Deferred every finding this round."
 # LISTABLE_NOUN's curated vocabulary deliberately excludes.
 NON_LISTABLE = "This took about three hours across two people."
 
+# Regression fixtures for an adversarial review of this hook (ai-config#2377
+# round 1), which found two blocking bugs in the original regexes -- see the
+# comments on CARDINALITY_RE and ENUM_RE in the hook itself for the
+# mechanism. Both are pinned here so neither regresses silently.
+
+# Bug 1: a count followed by an adjective before the noun ("18 NEW files")
+# was invisible, because the noun group had no plural-`s` requirement baked
+# into the regex itself, so a lazy gap quantifier never backtracked past the
+# adjective to find the real noun.
+CARDINALITY_WITH_ADJECTIVE = "There are 18 new files on main."
+
+# Bug 2: routine review-summary phrasing this corpus posts constantly
+# ("found 2 issues", "three commits") used to fire, because the curated
+# noun vocabulary originally included review-housekeeping words. It must
+# not fire post-fix.
+ROUTINE_REVIEW_PHRASING = "I found 2 issues while reviewing; three commits fixed them."
+
+# Bug 2's sibling: a two-level corpus path whose own segments are hyphenated
+# (`skills/<slug>/SKILL.md`, this repo's own standard citation shape) was
+# misread as a listable noun ("skills") followed by a hand-typed two-item
+# list. A third variant -- a listable noun that is itself the FIRST
+# hyphenated segment of a longer compound identifier (`checks?` matching
+# "check" inside `check-open-prs-before-duplicating`) -- reached the same
+# false positive by a different route and needed the same fix widened.
+PATH_CITATION = "See skills/select-model/SKILL.md for the routing logic."
+COMPOUND_IDENTIFIER_PATH = (
+    "The rule lives in skills/check-open-prs-before-duplicating/SKILL.md."
+)
+
+# The bulleted-list form of the incident's own enumeration claim -- the same
+# content ENUM_RE already catches when slash-joined on one line, but as a
+# markdown bullet list, which the original regex could not see at all.
+BULLETED_LIST = (
+    "The fingerprinted scripts:\n"
+    "- cycle-charge-flee\n"
+    "- interval-labels\n"
+    "- multi-unit-form-up-modes\n"
+    "- group-attack\n"
+)
+
 
 def body_file_with(text):
     fh = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False,
@@ -129,6 +169,28 @@ def unit_checks(mod):
     # hyphenated list is not this hook's concern either.
     check("find_claims silent on a bare content assertion",
           mod.find_claims("CLAUDE.md carries the units convention."), [])
+
+    # Regression: bug 1 (adjective between count and noun).
+    claims = mod.find_claims(CARDINALITY_WITH_ADJECTIVE)
+    check("find_claims catches a count with an adjective before the noun",
+          claims, [("cardinality", "18 new files")])
+
+    # Regression: bug 2 (routine review-summary phrasing must stay silent).
+    check("find_claims silent on routine 'found N issues'/'N commits' phrasing",
+          mod.find_claims(ROUTINE_REVIEW_PHRASING), [])
+
+    # Regression: bug 2's path-citation variant, both shapes.
+    check("find_claims silent on a skills/<slug>/SKILL.md path citation",
+          mod.find_claims(PATH_CITATION), [])
+    check("find_claims silent on a noun-prefixed compound-identifier path",
+          mod.find_claims(COMPOUND_IDENTIFIER_PATH), [])
+
+    # New coverage: a bulleted-list enumeration (finding 4).
+    claims = mod.find_claims(BULLETED_LIST)
+    check("find_claims catches a bulleted-list enumeration",
+          any(k == "enumeration" and "cycle-charge-flee" in q
+              for k, q in claims),
+          True)
 
     # Discharge: a counting command in the body's own code span discharges
     # a cardinality claim; a bare listing command does NOT (needs COUNT).

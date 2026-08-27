@@ -15,15 +15,17 @@ lifecycle: `gh pr merge --delete-branch` orphaning a stacked PR, a
 head-branch rename closing its own PR, rebuilding a stacked PR across a
 squash-merge, pushing a stray branch instead of HEAD, the remote-session
 push-proxy deletion no-op / HTTP 403, pruning a `[gone]` local branch
-safely, recovering a closed PR's branch from `refs/pull/N/head`, and an
-orphaned `refs/remotes/<ns>/*` namespace.
+safely, recovering a closed PR's branch from `refs/pull/N/head`,
+uncommitted leftovers on a merged branch as a rejected direction rather
+than unfinished work, and an orphaned `refs/remotes/<ns>/*` namespace.
 
 ## Git diffing
 
 See [`git-diffing.md`](git-diffing.md) for diff-range selection
 (`..` vs `...` vs the working tree), diff-scoped check pitfalls
 (no-op-ing on an uncommitted diff, blindness to untracked files, an
-untracked copy shadowing a tracked script), and the pathspec-vs-glob /
+untracked copy shadowing a tracked script), `git rev-parse <ref>:<path>`
+echoing its own input on a missing path, and the pathspec-vs-glob /
 `for-each-ref`-vs-`ls-files` matcher mismatches.
 
 ## Git tags

@@ -1200,16 +1200,19 @@ def _is_structured_review_body(body: str) -> bool:
     """True when *body* is shaped like a review REPORT rather than prose.
 
     Requires both a report heading (Summary / Findings / Verdict families)
-    and a Reviewed-Commit fingerprint line. The two together are what a
-    pre-push-review or adversarial-self-review report always carries and a
-    conversational comment quoting verdict vocabulary does not, which is
-    what keeps #1798's false-CLEAN direction closed while #2402's
-    supersession path opens.
+    and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
+    STRIPPED body so a casual comment quoting a prior report inside a
+    fence cannot smuggle the structure in (#1202's convention). The two
+    together are what a pre-push-review or adversarial-self-review report
+    always carries and conversational prose does not, which is what keeps
+    #1798's false-CLEAN direction closed while #2402's supersession path
+    opens.
     """
-    if not _REVIEW_STRUCTURE_HEADING.search(body):
+    scan = strip_cited_finding_vocab(body)
+    if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
     return bool(re.search(
-        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", body))
+        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
 
 
 def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
@@ -1279,7 +1282,18 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, True))
         elif verdict == "not-clean":
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
-        elif verdict == "clean" and _is_structured_review_body(body):
+        elif (
+            verdict == "clean"
+            and _is_structured_review_body(body)
+            and _reviewer_identity(body, author_login) == author_login
+        ):
+            # The identity gate is load-bearing: without it, any commenter
+            # could paste an agent marker (`**Claude finished review**`)
+            # into a structured clean body and SUPERSEDE the real bot's
+            # standing not-clean, since supersession keys on
+            # _reviewer_identity over body text. Marker-free bodies
+            # resolve to the poster's own login, so a non-bot clean can
+            # clear only that same account's earlier verdicts.
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
 
     for r in reviews:

@@ -93,7 +93,8 @@ The failure is only visible as an absence.
 The sharpest finding,
 and the one that generalizes past secrets.
 
-The canary run went green and posted **no** review comment.
+The canary run (a dispatched review on `Morrison-Lab/qmt`, the migration's
+canary repo) went green and posted **no** review comment.
 Two natural checks were each available,
 and each would have been wrong:
 
@@ -125,7 +126,8 @@ gets applied: non-zero cost proves *some* credential authenticated, so it
 identifies **the** credential under test only when the run had exactly one
 available --- no surviving repo-level copy, and no sibling credential (an
 `ANTHROPIC_API_KEY`, say) the workflow could fall back to.
-The canary satisfied it: `qmt` had zero repository secrets, verified.
+The canary satisfied it: `Morrison-Lab/qmt` had zero repository secrets,
+verified.
 
 This is the shape
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)

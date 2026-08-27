@@ -610,14 +610,16 @@ assertion by default.
 Measured 2026-08-27 on
 [ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229): a
 seven-finding fix commit changed seven files, and the match read as
-confirmation --- but two findings shared a file, another file carried two
-findings' fixes, and the one file a remaining finding named was untouched, so
-the next review round re-raised it against a commit message that claimed it
-fixed.
+confirmation --- but the findings named eight distinct files, because two
+findings each spanned two files while one file was named by two findings.
+The commit covered seven of the eight, so the one unfixed finding hid behind
+the equal counts, and the next review round re-raised the finding against a
+commit message that claimed to have fixed it.
 A matching count is not a matching set.
 Derive the union of files the round's findings name, compare it against the
-fix commit's own changed-file list (`git show --stat`) before pushing, and
-account for every member missing from either side.
+fix commit's own changed-file list (`git show --name-only`, which prints
+full one-per-line paths where `--stat` may ellipsize them) before pushing,
+and account for every member missing from either side.
 
 - **Do:** compare the fix commit's changed-file list against the files the
   findings name, member by member, before pushing a round.

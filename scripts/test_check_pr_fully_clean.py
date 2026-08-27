@@ -2373,5 +2373,3 @@ def main() -> int:
 if __name__ == "__main__":
     sys.exit(main())
 
-# ---
-# To be appended before the `sys.exit` part

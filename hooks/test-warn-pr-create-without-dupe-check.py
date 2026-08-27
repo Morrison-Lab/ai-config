@@ -394,6 +394,17 @@ prose_issue_list = write_transcript(
 quoted_state_in_search = write_transcript(
     ['gh issue list --state open --search "--state all"'])
 
+# ai-config#2376: a literal `--search` embedded inside an UNRELATED flag's
+# quoted value is a search term, not a flag occurrence -- it must not win
+# the last-flag-wins scan over the genuine `--search`.
+embedded_search_in_label = write_transcript(
+    ['gh issue list --state all --search "cp1252" '
+     '--label "needs --search is:open styling"'])
+# The mirror: only an embedded (quoted) `--search` and no genuine one --
+# there is no real search flag, so no discharge.
+only_embedded_search = write_transcript(
+    ['gh issue list --state all --label "try --search is:open styling"'])
+
 
 def write_mcp_input(tool_name, payload):
     fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
@@ -415,6 +426,11 @@ check("gh short flags -s all -S discharge",
       hook.transcript_has_issue_dupe_check(with_issue_all_short), True)
 check("--state open --search does not discharge",
       hook.transcript_has_issue_dupe_check(with_issue_open), False)
+check("an embedded --search inside another flag's quoted value does not "
+      "override the genuine one (#2376)",
+      hook.transcript_has_issue_dupe_check(embedded_search_in_label), True)
+check("an embedded --search with no genuine flag does not discharge",
+      hook.transcript_has_issue_dupe_check(only_embedded_search), False)
 check("--state all without --search does not discharge",
       hook.transcript_has_issue_dupe_check(with_issue_all_no_search), False)
 check("--search without --state all does not discharge",

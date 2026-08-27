@@ -86,6 +86,11 @@ jobs:
         run: |
           python3 scripts/test_cursor_rules_sync.py
           python3 scripts/test_cursor_hook_adapter.py
+      - name: Run Cursor self-review CLI tests
+        # Interim instrument over parse_report and the git refusal gates
+        # (ai-config#2299, #2310); retired when #2241 restores the hook on
+        # the Cursor adapter.
+        run: python3 scripts/test_cursor_self_review_check.py
       - name: Run PR-monitor installer tests
         # Only the tests run here. install-pr-monitor.py itself installs a
         # daemon under the operator's systemd/cron, which a CI runner must

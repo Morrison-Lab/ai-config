@@ -377,6 +377,7 @@
 - When borrowing code or ideas from another repo, verify its license from the source FIRST (fetch its LICENSE file / `gh api repos/<o>/<r>/license`).
   MIT/BSD/Apache/ISC → may adapt WITH attribution recorded in a root `CREDITS.md` (keep copyright notices); no-license / "all rights reserved" → reimplement the *idea* clean-room, never copy text/code verbatim; copyleft (GPL/AGPL/MPL) → flag the compatibility consequence before copying.
   The `/scout-peers` skill encodes the full survey → license-gate → borrow-with-attribution loop.
+  - **Second occurrence, 2026-08-25**: Failed to check the license of `posit-dev/skills` before vendoring the R and Quarto workflows into our `skills/` directory.
 - Before starting work on an issue/MR, always review the MR history (merged and closed) to ensure the proposed changes don't undo past progress or re-introduce previously fixed problems.
 - Before building setup/infra/toolchain config in a repo, fetch origin/main and scan the repo's own reference material (e.g. `references/`, `docs/`) and recent main commits for an existing or just-merged solution --- build on / align with it rather than a parallel, possibly contradictory approach. (Learned after drafting a juliaup-based Julia install that conflicted with the repo's reviewed curl+tarball cloud-setup reference.)
 - Always simplify code where feasible (without feature loss) --- prune dead code paths, remove unreachable branches, simplify variable assignments that can never take their fallback values given the current invocation context.

@@ -2353,10 +2353,26 @@ def main() -> int:
     check("two comments from different providers DO satisfy a quorum of 2",
           q2_ok and len(q2_issues) == 0)
 
-    
+
+    round_cursor = {
+        "author": {"login": "cursor"},
+        "authorAssociation": "CONTRIBUTOR",
+        "createdAt": "2026-08-25T14:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-4"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_cursor], "reviews": []})):
+        q3_ok, q3_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("a cursor-authored clean review counts toward quorum",
+          q3_ok and len(q3_issues) == 0)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
+# ---
+# To be appended before the `sys.exit` part
+

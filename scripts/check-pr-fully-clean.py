@@ -214,7 +214,7 @@ def _is_bot_author(login: Optional[str]) -> bool:
     if not login_str:
         return False
     return (
-        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        login_str in ("github-actions", "github-actions[bot]", "claude[bot]", "claude", "cursor")
         or login_str.endswith("[bot]")
     )
 
@@ -236,6 +236,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
 EXCLUSIVE_BOT_IDENTITY: Dict[str, str] = {
     "jules": "Jules",
     "jules[bot]": "Jules",
+    "cursor": "Cursor",
 }
 
 
@@ -1287,7 +1288,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         prog="check-pr-fully-clean.py",
         description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
     )
-    
+
     def positive_int(value):
         ivalue = int(value)
         if ivalue < 1:

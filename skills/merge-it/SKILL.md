@@ -36,7 +36,7 @@ standing yes (see `preferences.md`).
 - Confirm it is **fully clean** before merging (the ARDI terminal state — see
   `shared/workflow/fully-clean.md`): every CI workflow and check run — not
   just required ones — is green **and completed** (never still queued or in
-  progress) AND the latest review is clean.
+  progress) AND every reviewer's latest verdict is clean.
   Verify with a fresh query, not a cached verdict:
   `mcp__github__pull_request_read` (`get` for `mergeable_state`, `get_check_runs`
   for CI) — or `gh pr view <N>` / `gh pr checks <N>` in a local session.
@@ -47,7 +47,7 @@ standing yes (see `preferences.md`).
 - Check `mergeStateStatus` in addition to `mergeable`. A PR can be
   `"MERGEABLE"` but `"BLOCKED"` when branch protection requires at least one
   approving review and only bot/comment reviews exist. Fix: request
-  `the repository owner` as reviewer (`gh pr edit <N> --add-reviewer d-morrison` —
+  `the repository owner` as reviewer (`gh pr edit <N> --add-reviewer <reviewer>` —
   `EDIT_PR`) and leave a note that the PR is clean and ready. Don't attempt to
   force-merge.
   **Except in `Lacaedemon/sparta`, which never requests `the repository owner`** --- see
@@ -116,7 +116,7 @@ In remote/web sessions, load the merge tool's schema with `ToolSearch`
 (`select:mcp__github__merge_pull_request`) before the first call to confirm the
 exact name and parameters -- [`tool-mappings.md`](../../tool-mappings.md) is
 the canonical `gh`→MCP reference (per `CLAUDE.md`'s "Skills that call
-gh/glab" rule); `d-morrison/gha`'s own CLAUDE.md carries an equivalent table
+gh/glab" rule); `Morrison-Lab/gha`'s own CLAUDE.md carries an equivalent table
 for that repo.
 
 ### 3. Verify the merge landed — never assume

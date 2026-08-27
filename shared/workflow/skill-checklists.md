@@ -39,10 +39,7 @@ It follows from whether the steps are independent.
 
 The tell for Read-Do is that **reordering the steps changes the answer**.
 
-Session-start freshness is Read-Do: `check-install.py` compares installed
-copies against the checkout, so a report taken before the pull is not merely
-early, it is measuring against stale reference content and can hide the
-script itself.
+Session-start freshness is Read-Do: `install-hooks.py` compares `settings.json`'s registered hooks against the checkout's own `hooks/hooks.json`, so a report taken before the pull is not merely early, it is measuring against stale reference content and can miss an entry that merged since.
 A merge is Read-Do for the other reason -- nothing after it is a
 confirmation, because the irreversible act already happened.
 

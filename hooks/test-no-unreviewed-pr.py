@@ -763,7 +763,7 @@ case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}")],
 # a separate `gh workflow run` dispatch -- rather than a tidied one-liner. The
 # guard is designed against a SUMMARY of the incident, so the literal text is
 # what tests whether the design survives contact with it.
-PUSH_CMD = ('cd /home/demorrison/Projects/ai-config\n'
+PUSH_CMD = ('cd /home/<user>/Projects/ai-config\n'
             'git push -q origin HEAD 2>&1 | tail -3\n'
             'echo "local:  $(git rev-parse HEAD)"')
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),

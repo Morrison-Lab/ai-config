@@ -396,6 +396,23 @@ case_exits(
 )
 case_exits("missing preflight step", MISSING_PREFLIGHT_ID, 1, "id: preflight")
 case_exits("missing success() gate", MISSING_SUCCESS, 1, "success()")
+# Unique-negative on the finding TEXT (ai-config#2307): the first wording
+# claimed any explicit if: drops the default. GitHub auto-applies success()
+# unless if: names a status-check function.
+with tempfile.TemporaryDirectory() as tmpdir:
+    _ms_code, missing_success_out = run_check(
+        write_fixture(tmpdir, MISSING_SUCCESS)
+    )
+check(
+    "missing-success finding names status-check functions",
+    "status-check function" in missing_success_out,
+    missing_success_out,
+)
+check(
+    "missing-success finding does not claim any explicit if: drops the default",
+    "any explicit" not in missing_success_out.lower(),
+    missing_success_out,
+)
 case_exits("success() only in a comment", COMMENTED_SUCCESS, 1, "success()")
 case_exits(
     "success() only on a non-node step",

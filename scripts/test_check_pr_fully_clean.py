@@ -62,6 +62,45 @@ def check(name: str, condition: bool):
         failures += 1
 
 
+
+# Compatibility wrappers for refactored check_ci_runs and check_review_comments
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.lib.pull_request import PullRequest
+
+original_check_ci_runs = checker.check_ci_runs
+def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = "123"
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    pr._data = {"headRefOid": sha}
+    pr._check_runs = None
+    return original_check_ci_runs(pr)
+
+original_check_review_comments = checker.check_review_comments
+def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch="", quorum=1):
+    pr = PullRequest.__new__(PullRequest)
+    pr.pr_num = pr_num
+    pr.repo = repo
+    pr._fetcher = checker.run_cmd
+    import json
+    out = checker.run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
+    if isinstance(out, str):
+        data = json.loads(out)
+    else:
+        data = {}
+    data["headRefOid"] = sha
+    data["reviewDecision"] = review_decision
+    data["headRefName"] = branch
+    pr._data = data
+    pr._check_runs = None
+    return original_check_review_comments(pr, quorum)
+
+checker.check_ci_runs = wrapped_check_ci_runs
+checker.check_review_comments = wrapped_check_review_comments
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 
@@ -87,7 +126,7 @@ def main() -> int:
     no_major_changes_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
         "author": {"login": "github-actions"},
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\nNo major changes requested. Everything looks clean and ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\n### Verdict\n\n**Ready for merge**\n\nNo major changes requested."
     }
 
     none_author_review = {
@@ -252,24 +291,40 @@ def main() -> int:
         )
 
     # Regression (PR #2180 round 5): non-bot comment containing review marker
-    # and HEAD SHA cannot spoof an automated review approval.
+    # and HEAD SHA DOES NOT satisfy review admission if the author is not authorized!
     spoofed_passerby_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
         "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": "random-passerby"},
+        "authorAssociation": "NONE"
     }
     mock_spoofed = json.dumps({"comments": [spoofed_passerby_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_spoofed):
         sp_ok, sp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
-            "non-bot comment with marker and HEAD SHA does not satisfy review admission",
+            "non-bot comment with marker and HEAD SHA does not satisfy review admission if unauthorized",
             (not sp_ok) and any("No automated review" in i for i in sp_issues),
+        )
+
+    # CLI agents post under human accounts, but MUST have an authorized association.
+    authorized_cli_agent_comment = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "author": {"login": "the-repo-owner"},
+        "authorAssociation": "OWNER"
+    }
+    mock_authorized = json.dumps({"comments": [authorized_cli_agent_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_authorized):
+        auth_ok, auth_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check(
+            "authorized human comment with agent marker DOES satisfy review admission (CLI agents)",
+            auth_ok and len(auth_issues) == 0,
         )
 
     # Regression (PR #2180 round 6): comment with author: None (deleted account) cannot spoof review
     spoofed_null_author_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
-        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "body": "code review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": None,
     }
     mock_null_author = json.dumps({"comments": [spoofed_null_author_comment], "reviews": []})
@@ -283,7 +338,7 @@ def main() -> int:
     # Regression (PR #2180 round 6): author with null login {"author": {"login": None}} does not crash _is_bot_author
     spoofed_null_login_comment = {
         "createdAt": "2026-08-06T00:00:00Z",
-        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "body": "code review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
         "author": {"login": None},
     }
     mock_null_login = json.dumps({"comments": [spoofed_null_login_comment], "reviews": []})
@@ -321,7 +376,7 @@ def main() -> int:
             "**Claude finished** review\n\n"
             "All prior findings addressed. The earlier round was blocked on a missing test fixture, "
             "which is now resolved.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_blk = json.dumps({"comments": [resolved_blocker_comment], "reviews": []})
@@ -339,7 +394,7 @@ def main() -> int:
         "body": (
             "**Claude finished** review\n\n"
             "No deadlock or impasse here -- the prior rebuttal convinced the reviewer.\n\n"
-            "### Verdict\n\nClean / Ready for merge.\n\n(reviewed at `sha123`)"
+            "### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)"
         ),
     }
     mock_res_imp = json.dumps({"comments": [resolved_impasse_comment], "reviews": []})
@@ -431,6 +486,326 @@ def main() -> int:
     check(
         "check_latest_verdict: sorts by timestamp when later item has alphabetically earlier login",
         (not dl_ok) and any("NOT clean" in i for i in dl_issues),
+    )
+
+    # ai-config#2274: a later all-clear from a DIFFERENT reviewer must not
+    # supersede an earlier not-clean. Both comments use the same bot login,
+    # which is why identity is taken from the agent marker, not the author.
+    items_cross_reviewer = [
+        (
+            "comment",
+            "2026-08-26T00:00:00Z",
+            (
+                "**Claude finished** review\n\n### Verdict\n\n"
+                "**Needs more work** -- two findings remain.\n\n"
+                "(reviewed at `oldsha00`)"
+            ),
+            "",
+            "",
+            "github-actions",
+        ),
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            (
+                "### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+                "Reviewed HEAD sha123.\n\n"
+                "Verdict: Clean / Ready for merge."
+            ),
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    xr_ok, xr_issues = checker.check_latest_verdict(items_cross_reviewer)
+    check(
+        "check_latest_verdict: later all-clear from a different reviewer does not "
+        "supersede an earlier not-clean (#2274)",
+        (not xr_ok)
+        and any("different reviewer" in i for i in xr_issues)
+        and any("Claude" in i for i in xr_issues),
+    )
+
+    items_same_reviewer = [
+        (
+            "comment",
+            "2026-08-26T00:00:00Z",
+            (
+                "**Claude finished** review\n\n### Verdict\n\n"
+                "**Needs more work** -- two findings remain.\n\n"
+                "(reviewed at `oldsha00`)"
+            ),
+            "",
+            "",
+            "github-actions",
+        ),
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            (
+                "**Claude finished** review\n\n### Verdict\n\n"
+                "**Ready for merge**\n\n(reviewed at `sha123`)"
+            ),
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    sr_ok, sr_issues = checker.check_latest_verdict(items_same_reviewer)
+    check(
+        "check_latest_verdict: later clean from the SAME reviewer still supersedes",
+        sr_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:")) for i in sr_issues
+        ),
+    )
+    check(
+        "_reviewer_identity: Claude and Antigravity differ under the same bot login",
+        checker._reviewer_identity(items_cross_reviewer[0][2], "github-actions")
+        == "Claude"
+        and checker._reviewer_identity(items_cross_reviewer[1][2], "github-actions")
+        == "Antigravity",
+    )
+
+    quoted_claude_in_agy = (
+        "### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+        "Reviewed HEAD sha123.\n\n"
+        "Round 1 opened with **Claude finished** at the earlier SHA.\n\n"
+        "Verdict: Clean / Ready for merge."
+    )
+    check(
+        "_reviewer_identity: a later quote of Claude's opener does not inherit Claude",
+        checker._reviewer_identity(quoted_claude_in_agy, "github-actions")
+        == "Antigravity",
+    )
+    items_quoted = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            quoted_claude_in_agy,
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    q_ok, q_issues = checker.check_latest_verdict(items_quoted)
+    check(
+        "check_latest_verdict: quoted Claude opener in an Antigravity all-clear "
+        "does not collapse the two reviewers (#2274)",
+        (not q_ok) and any("Claude" in i and "different reviewer" in i for i in q_issues),
+    )
+
+    quoted_claude_same_para = (
+        "### \U0001f916 Antigravity Agent Report (Code-Review)\n"
+        "Round 1 opened with **Claude finished** at the earlier SHA.\n\n"
+        "Verdict: Clean / Ready for merge."
+    )
+    check(
+        "_reviewer_identity: Claude quoted on line 2 of an Antigravity header "
+        "does not inherit Claude",
+        checker._reviewer_identity(quoted_claude_same_para, "github-actions")
+        == "Antigravity",
+    )
+    quoted_claude_on_agy_first_line = (
+        "### \U0001f916 Antigravity Agent Report --- see **Claude finished** "
+        "from round 1"
+    )
+    check(
+        "_reviewer_identity: leftmost marker on the first line wins, not "
+        "REVIEW_AGENT_MARKERS dict order",
+        checker._reviewer_identity(quoted_claude_on_agy_first_line, "github-actions")
+        == "Antigravity",
+    )
+    items_first_line_quote = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            quoted_claude_on_agy_first_line + "\n\nVerdict: Clean / Ready for merge.",
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    fl_ok, fl_issues = checker.check_latest_verdict(items_first_line_quote)
+    check(
+        "check_latest_verdict: Antigravity header quoting Claude on the same "
+        "line does not collapse the two reviewers (#2274)",
+        (not fl_ok) and any("Claude" in i and "different reviewer" in i for i in fl_issues),
+    )
+    unmarked_ga = (
+        "**Round-2 verification** --- adversarial re-check.\n\n"
+        "### Verdict\n\n**Ready for merge**"
+    )
+    check(
+        "_reviewer_identity: a shared-login body with no first-line agent "
+        "marker falls back to the login",
+        checker._reviewer_identity(unmarked_ga, "github-actions") == "github-actions",
+    )
+    items_unmarked_after_claude = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            unmarked_ga,
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    um_ok, um_issues = checker.check_latest_verdict(items_unmarked_after_claude)
+    check(
+        "check_latest_verdict: an unmarked later all-clear does not clear a "
+        "marked Claude not-clean (#2274 residual: unmarked bodies share the "
+        "login, which is a different identity from Claude)",
+        (not um_ok) and any("Claude" in i and "different reviewer" in i for i in um_issues),
+    )
+    items_same_para = [
+        items_cross_reviewer[0],
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            quoted_claude_same_para,
+            "",
+            "",
+            "github-actions",
+        ),
+    ]
+    sp_ok, sp_issues = checker.check_latest_verdict(items_same_para)
+    check(
+        "check_latest_verdict: same-paragraph Claude quote in an Antigravity "
+        "all-clear does not collapse the two reviewers (#2274)",
+        (not sp_ok) and any("Claude" in i and "different reviewer" in i for i in sp_issues),
+    )
+
+    check(
+        "_reviewer_identity: Jules login is Jules on both block and approve",
+        checker._reviewer_identity("VERDICT: block -- two findings.", "jules[bot]")
+        == "Jules"
+        and checker._reviewer_identity(
+            "VERDICT: approve\n\nReady for merge.", "jules[bot]"
+        )
+        == "Jules",
+    )
+    items_jules = [
+        (
+            "comment",
+            "2026-08-26T00:00:00Z",
+            "VERDICT: block -- two findings must be addressed.",
+            "",
+            "",
+            "jules[bot]",
+        ),
+        (
+            "comment",
+            "2026-08-26T01:00:00Z",
+            "VERDICT: approve\n\nReady for merge.",
+            "",
+            "",
+            "jules[bot]",
+        ),
+    ]
+    ju_ok, ju_issues = checker.check_latest_verdict(items_jules)
+    check(
+        "check_latest_verdict: later Jules approve supersedes Jules block "
+        "(same reviewer, #2274)",
+        ju_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:")) for i in ju_issues
+        ),
+    )
+
+    copilot_cr = (
+        "review",
+        "2026-08-26T00:00:00Z",
+        "Please rename the helper.",
+        "oldsha00",
+        "CHANGES_REQUESTED",
+        "copilot-pull-request-reviewer[bot]",
+    )
+    claude_ready = items_same_reviewer[1]
+    cr_ok, cr_issues = checker.check_latest_verdict([copilot_cr, claude_ready])
+    check(
+        "check_latest_verdict: Copilot CHANGES_REQUESTED is not cleared by a "
+        "later Claude all-clear (#2274)",
+        (not cr_ok) and any("copilot-pull-request-reviewer[bot]" in i for i in cr_issues),
+    )
+    cr_approved_ok, cr_approved_issues = checker.check_latest_verdict(
+        [copilot_cr, claude_ready],
+        approved_authors={"copilot-pull-request-reviewer[bot]"},
+    )
+    check(
+        "check_latest_verdict: Copilot APPROVED supersedes Copilot's own "
+        "earlier CHANGES_REQUESTED",
+        cr_approved_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:"))
+            for i in cr_approved_issues
+        ),
+    )
+    copilot_empty_approved = (
+        "review",
+        "2026-08-26T01:00:00Z",
+        "",
+        "sha123",
+        "APPROVED",
+        "copilot-pull-request-reviewer[bot]",
+    )
+    cr_then_approved_ok, cr_then_approved_issues = checker.check_latest_verdict(
+        [copilot_cr, copilot_empty_approved],
+        approved_authors={"copilot-pull-request-reviewer[bot]"},
+    )
+    check(
+        "check_latest_verdict: Copilot empty APPROVED after CR is still "
+        "cleared when Copilot is in approved_authors",
+        cr_then_approved_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:"))
+            for i in cr_then_approved_issues
+        ),
+    )
+    cr_then_approved_uncleared_ok, cr_then_approved_uncleared = (
+        checker.check_latest_verdict([copilot_cr, copilot_empty_approved])
+    )
+    check(
+        "check_latest_verdict: Copilot empty APPROVED does not clear CR "
+        "without approved_authors",
+        (not cr_then_approved_uncleared_ok)
+        and any("Latest verdict-bearing review statement" in i for i in cr_then_approved_uncleared),
+    )
+    jules_cr = (
+        "review",
+        "2026-08-26T00:00:00Z",
+        "VERDICT: block -- rename the helper.",
+        "oldsha00",
+        "CHANGES_REQUESTED",
+        "jules[bot]",
+    )
+    jules_cr_ok, jules_cr_issues = checker.check_latest_verdict(
+        [jules_cr, claude_ready],
+    )
+    check(
+        "check_latest_verdict: Jules CHANGES_REQUESTED is not cleared by a "
+        "later Claude all-clear (#2274)",
+        (not jules_cr_ok) and any("Jules" in i for i in jules_cr_issues),
+    )
+    jules_approved_ok, jules_approved_issues = checker.check_latest_verdict(
+        [jules_cr, claude_ready],
+        approved_authors={"jules[bot]"},
+    )
+    check(
+        "check_latest_verdict: Jules APPROVED supersedes Jules's own "
+        "earlier CHANGES_REQUESTED",
+        jules_approved_ok and not any(
+            ("NOT clean" in i and not i.startswith("NOTE:"))
+            for i in jules_approved_issues
+        ),
+    )
+    ga_ok, ga_issues = checker.check_latest_verdict(
+        items_cross_reviewer,
+        approved_authors={"github-actions"},
+    )
+    check(
+        "check_latest_verdict: a github-actions APPROVED does not clear Claude "
+        "(shared login, #2274)",
+        (not ga_ok) and any("Claude" in i and "different reviewer" in i for i in ga_issues),
     )
 
     # Regression (PR #2180 round 11): incidental prose negation outside verdict section does not fail
@@ -1114,7 +1489,7 @@ def main() -> int:
         )
         check(
             "POSITIVE CONTROL is non-vacuous: criterion 4 is the ONLY thing that fires",
-            len(v_issues) == 1,
+            len(v_issues) == 1
         )
 
     # NEGATIVE CONTROL -- the ordinary ARDI flow the check must not break:
@@ -1138,6 +1513,259 @@ def main() -> int:
         check(
             "NEGATIVE CONTROL: a later clean verdict DOES supersede an earlier 'Needs more work'",
             s_ok and s_issues == [],
+        )
+
+    # ai-config#2274 through check_review_comments: Claude not-clean at an
+    # earlier SHA, Antigravity all-clear at HEAD. Criterion 3 cannot see the
+    # Claude comment (wrong SHA). Criterion 4 used to take the global latest
+    # and report clean. The per-reviewer scan must still fail.
+    claude_not_clean_earlier = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n### Verdict\n\n"
+            "**Needs more work** -- two findings remain.\n\n"
+            "(reviewed at `oldsha00`)"
+        ),
+    }
+    agy_clean_at_head = {
+        "createdAt": "2026-08-07T23:05:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "All findings are addressed.\n\nVerdict: Clean / Ready for merge."
+        ),
+    }
+    mock_disagree = json.dumps({
+        "comments": [claude_not_clean_earlier, agy_clean_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_disagree):
+        d_ok, d_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: later Antigravity all-clear does not clear "
+            "an earlier Claude not-clean (#2274)",
+            (not d_ok)
+            and any("different reviewer" in i for i in d_issues)
+            and any("Claude" in i for i in d_issues),
+        )
+
+    nits_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Nits\n\n1. Rename the helper.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nits = json.dumps({"comments": [nits_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nits):
+        nit_ok, nit_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: a ## Nits heading at HEAD is a finding (#2274)",
+            (not nit_ok) and any("Nits" in i for i in nit_issues),
+        )
+
+    nits_none_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Nits\n\nnone identified\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nits_none = json.dumps({"comments": [nits_none_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nits_none):
+        nn_ok, nn_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: '## Nits none identified' is not a finding",
+            nn_ok and nn_issues == [],
+        )
+
+    # Bold-wrapped negations: '**None.**' under an empty section heading is the
+    # commonest AI-reviewer phrasing for "nothing here", so the negation suffix
+    # must see through leading emphasis markers (review finding on #2298).
+    for label, section in (
+        ("'## Nits' + '**None.**'", "## Nits\n\n**None.**\n\n"),
+        ("'## Nits' + '**None identified.**'", "## Nits\n\n**None identified.**\n\n"),
+        ("'## Non-blocking' + '**None.**'", "## Non-blocking\n\n**None.**\n\n"),
+    ):
+        bold_none_at_head = {
+            "createdAt": "2026-08-26T01:00:00Z",
+            "author": {"login": "github-actions"},
+            "body": (
+                "**Claude finished** review\n\n"
+                + section
+                + "### Verdict\n\n**Ready for merge**\n\n"
+                "(reviewed at `sha123`)"
+            ),
+        }
+        mock_bold_none = json.dumps({"comments": [bold_none_at_head], "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_bold_none):
+            bn_ok, bn_issues = checker.check_review_comments("2298", "sha123", TEST_REPO)
+            check(
+                f"check_review_comments: {label} is not a finding (#2298)",
+                bn_ok and bn_issues == [],
+            )
+
+    # Negative controls for the emphasis tolerance above: a bold span that
+    # merely OPENS with a negator while carrying a real finding must still be
+    # flagged. Only the whole-negation alternatives (none/n-slash-a) tolerate
+    # emphasis; nothing/0/no-... deliberately do not (review finding on #2298).
+    for label, section in (
+        ("bold 'Nothing major, but...' real finding",
+         "## Nits\n\n**Nothing major, but the retry loop leaks a file handle on timeout.**\n\n"),
+        ("bold '0-day exploit...' real finding",
+         "## Nits\n\n**0-day exploit possible in the auth handler.**\n\n"),
+        ("bold 'No issues, however...' real finding",
+         "## Nits\n\n**No issues, however the login flow is broken.**\n\n"),
+        ("bold 'None of the tests...' real finding",
+         "## Nits\n\n**None of the tests cover this path.**\n\n"),
+    ):
+        bold_finding_at_head = {
+            "createdAt": "2026-08-26T01:00:00Z",
+            "author": {"login": "github-actions"},
+            "body": (
+                "**Claude finished** review\n\n"
+                + section
+                + "### Verdict\n\n**Ready for merge**\n\n"
+                "(reviewed at `sha123`)"
+            ),
+        }
+        mock_bold_finding = json.dumps(
+            {"comments": [bold_finding_at_head], "reviews": []}
+        )
+        with patch.object(checker, "run_cmd", return_value=mock_bold_finding):
+            bf_ok, bf_issues = checker.check_review_comments(
+                "2298", "sha123", TEST_REPO
+            )
+            check(
+                f"check_review_comments: {label} IS a finding (#2298)",
+                (not bf_ok) and any("Nits" in i for i in bf_issues),
+            )
+
+    nits_bold_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "**Nits**\n\n1. Rename the helper.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nits_bold = json.dumps({"comments": [nits_bold_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nits_bold):
+        nb_ok, nb_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: a **Nits** heading at HEAD is a finding (#2274)",
+            (not nb_ok) and any("Nits" in i for i in nb_issues),
+        )
+
+    nonblocking_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Non-blocking\n\n1. Rename the helper.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nbh = json.dumps({"comments": [nonblocking_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nbh):
+        nbl_ok, nbl_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: a ## Non-blocking heading at HEAD is a "
+            "finding (#2274)",
+            (not nbl_ok) and any("Non-blocking" in i for i in nbl_issues),
+        )
+
+    nonblocking_bold_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "**Non-blocking**\n\n1. Rename the helper.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_nbb = json.dumps({"comments": [nonblocking_bold_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nbb):
+        nbb_ok, nbb_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: a **Non-blocking** heading at HEAD is a "
+            "finding (#2274)",
+            (not nbb_ok) and any("Non-blocking" in i for i in nbb_issues),
+        )
+
+    inline_nit_at_head = {
+        "createdAt": "2026-08-26T01:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "The leftover item is a **nit** and does not block merge.\n\n"
+            "This is **non-blocking**.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `sha123`)"
+        ),
+    }
+    mock_inline = json.dumps({"comments": [inline_nit_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_inline):
+        il_ok, il_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: inline **nit** / **non-blocking** prose "
+            "is not a finding heading",
+            il_ok and il_issues == [],
+        )
+
+    claude_nits_earlier = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Nits\n\n1. Rename the helper.\n\n"
+            "### Verdict\n\n**Ready for merge**\n\n"
+            "(reviewed at `oldsha00`)"
+        ),
+    }
+    mock_nits_cross = json.dumps({
+        "comments": [claude_nits_earlier, agy_clean_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_nits_cross):
+        nc_ok, nc_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: earlier Claude ## Nits is not cleared by a "
+            "later Antigravity all-clear (#2274)",
+            (not nc_ok) and any("Claude" in i for i in nc_issues),
+        )
+
+    claude_nits_no_verdict = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished** review\n\n"
+            "## Nits\n\n1. Rename the helper.\n\n"
+            "(reviewed at `oldsha00`)"
+        ),
+    }
+    mock_unread_nits = json.dumps({
+        "comments": [claude_nits_no_verdict, agy_clean_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_unread_nits):
+        un_ok, un_issues = checker.check_review_comments("2274", "sha123", TEST_REPO)
+        check(
+            "check_review_comments: earlier Claude ## Nits without a verdict "
+            "line is not cleared by a later Antigravity all-clear (#2274)",
+            (not un_ok) and any("Claude" in i for i in un_issues),
         )
 
     # Ordering, not payload order: the chronology must come from the timestamps,
@@ -1224,6 +1852,67 @@ def main() -> int:
     with patch.object(checker, "run_cmd", return_value=mock_ci_failure):
         ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
+
+    mock_ci_cancel_superseded = json.dumps({
+        "check_runs": [
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "cancelled",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "review / claude-review", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]
+    })
+
+    def cancel_superseded_router(cmd):
+        joined = " ".join(cmd)
+        if "check-runs" in joined:
+            return mock_ci_cancel_superseded
+        if "/actions/runs/" in joined:
+            run_id = cmd[-1].rsplit("/", 1)[-1]
+            return json.dumps({
+                "path": ".github/workflows/claude-review.yml",
+            })
+        return "{}"
+
+    with patch.object(checker, "run_cmd", side_effect=cancel_superseded_router):
+        cancel_ok, cancel_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check(
+            "cancelled check run is ignored when same workflow later succeeded",
+            cancel_ok and cancel_issues == [],
+        )
+
+    mock_ci_cancel_collision = json.dumps({
+        "check_runs": [
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "cancelled",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]
+    })
+
+    def cancel_collision_router(cmd):
+        joined = " ".join(cmd)
+        if "check-runs" in joined:
+            return mock_ci_cancel_collision
+        if "/actions/runs/" in joined:
+            run_id = cmd[-1].rsplit("/", 1)[-1]
+            paths = {
+                "1": ".github/workflows/R-CMD-check.yaml",
+                "2": ".github/workflows/check-readme.yaml",
+            }
+            return json.dumps({"path": paths.get(run_id, "")})
+        return "{}"
+
+    with patch.object(checker, "run_cmd", side_effect=cancel_collision_router):
+        collision_ok, collision_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check(
+            "cancelled run is not ignored when success is from a different workflow",
+            (not collision_ok)
+            and any("cancelled" in i for i in collision_issues),
+        )
 
     # A job name is not unique across workflows (#1869). The live case:
     # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
@@ -1473,8 +2162,9 @@ def main() -> int:
               for i in skip_issues))
 
     # Negative control, MINIMAL: the identical body with only the marker phrase
-    # deleted. It must read clean, which is what proves the assertion above is
-    # about the marker rather than about some other property of the fixture.
+    # deleted. It will still not read clean (because it lacks an explicit
+    # verdict), but it proves the marker's effect because it is now treated as
+    # a review rather than being skipped, producing a different failure reason.
     #
     # The earlier version of this control substituted a whole different body (an
     # Antigravity report with an explicit `Verdict: Clean`), so it routed through
@@ -1489,9 +2179,12 @@ def main() -> int:
           and len(control["body"]) > 0.8 * len(skip_at_head["body"]))
     with patch.object(checker, "run_cmd",
                       return_value=json.dumps({"comments": [control], "reviews": []})):
-        ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
-    check("negative control: the same body without the marker DOES read clean",
-          ctrl_ok)
+        ctrl_ok, ctrl_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("negative control: the same body without the marker NO LONGER reads clean (quorum requires explicit verdict)",
+          not ctrl_ok)
+    check("negative control: is NOT skipped as a notice (different failure reason)",
+          not any("No automated review" in i or "No review comment" in i
+                  for i in ctrl_issues))
 
     # --- review findings on #1862 ------------------------------------------
     #
@@ -1669,9 +2362,53 @@ def main() -> int:
     check("negative control: a readable-stderr failure still raises RuntimeError",
           outcome2.startswith("RuntimeError:") and "404" in outcome2)
 
+    # Test multi-provider quorum logic.
+    round_a = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T11:00:00Z",
+        "body": "**Claude finished** review\n\n### Verdict\n\n**Ready for merge**\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-1"
+    }
+    round_b = {
+        "author": {"login": "github-actions[bot]"},
+        "createdAt": "2026-08-25T12:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-2"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_b], "reviews": []})):
+        q1_ok, q1_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from the same shared-login provider (one marked, one unmarked) do NOT masquerade as two distinct providers",
+          not q1_ok and len(q1_issues) > 0)
+
+    round_c = {
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "MEMBER",
+        "createdAt": "2026-08-25T13:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)\n\n_Posted by Codex (AI agent) --- not written by a human._",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-3"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_c], "reviews": []})):
+        q2_ok, q2_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("two comments from different providers DO satisfy a quorum of 2",
+          q2_ok and len(q2_issues) == 0)
+
+
+    round_cursor = {
+        "author": {"login": "cursor"},
+        "authorAssociation": "CONTRIBUTOR",
+        "createdAt": "2026-08-25T14:00:00Z",
+        "body": "Verdict: Ready for merge\n\n(reviewed at `sha123`)",
+        "url": "https://github.com/Morrison-Lab/ai-config/pull/2256#issuecomment-4"
+    }
+    with patch.object(checker, "run_cmd", return_value=json.dumps({"comments": [round_a, round_cursor], "reviews": []})):
+        q3_ok, q3_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
+    check("a cursor-authored clean review counts toward quorum",
+          q3_ok and len(q3_issues) == 0)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

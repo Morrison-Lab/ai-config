@@ -91,7 +91,9 @@ the check was honoured has drawn a conclusion this instrument does not support.
 
 Its sibling `warn-pr-create-without-dupe-check.py` has the mirror limit from the
 other side: it asks whether a surfacing query appeared ANYWHERE earlier in the
-session, so it establishes that a query ran and never that its result mattered.
+session (a PR-surfacing command before `gh pr create`, or a `--state all
+--search` issue query before `gh issue create`), so it establishes that a query
+ran and never that its result mattered.
 Between them the two cover "no query at all" and "query in the same string".
 Neither covers "query read by nobody", and no lexical instrument can.
 

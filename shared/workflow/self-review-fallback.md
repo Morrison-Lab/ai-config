@@ -104,6 +104,12 @@ Everything in this fragment governs *when* a self-review is owed and to what sta
 The author is the one party who cannot: the session that wrote the diff knows what it was meant to say, so it reads the artifact and recovers the intent, which is confirmation rather than review.
 Dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) against the diff, brief it with the standards rather than with your rationale for the change, and disposition its findings per [`ard`](../../skills/ard/SKILL.md).
 See [`adversarial-self-review`](adversarial-self-review.md) for the full rule, including why a same-vendor subagent buys independence of intent and not of blind spot --- which is why the cross-vendor reviewer below is still worth chasing on top of it.
+On Cursor Cloud, when `Task` lists `adversarial-reviewer`,
+dispatch through `Task`.
+If `Task` is absent or does not list that persona, that is the
+CLI-fallback case in
+[`adversarial-self-review`](adversarial-self-review.md).
+The recipe is in [`memories/cursor.md`](../../memories/cursor.md).
 
 **The posted comment is that reviewer's report, not a recap the author writes around it.**
 Dispatching and then composing a different comment is the same failure as
@@ -123,26 +129,23 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
-**Self-review is the immediate fallback so the PR never stalls --
-but declaring the PR clean still requires an external verdict whenever one is reachable.**
-Don't wait to self-review: post it right away, same as above.
-But also check, the same round, whether a *different* configured reviewer is reachable
-(e.g. Copilot code review, if the repo/org has it) --
-not just whether the `@claude` bot specifically produced a verdict,
-since the two can fail independently (one quota-exhausted, the other working fine, or vice versa) --
-and request it in parallel with posting the self-review, not after.
-Re-check reachability every round:
-a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
-can become reachable mid-session.
+**Execute the sequential multi-provider review loop on all PRs.**
+You must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
+
+Pin all available providers (e.g., Cursor, OpenCode, Codex, Copilot, Claude, and the local `adversarial-reviewer` subagent).
+Query them sequentially, one at a time.
+Do not request them in parallel.
+Re-check reachability at the start of every cycle:
+A reviewer that was ineligible/quota-exhausted a few pushes ago can become reachable mid-session and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
-confirm a genuine all-clear review is posted at the current head from an external reviewer, if one is reachable --
-a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
-doesn't satisfy this once an external verdict is obtainable.
-Merging autonomously under `mwc` (merge-when-confident) unconditionally requires an automated clean Claude review verdict evaluating the HEAD commit;
-a fallback self-review allows iteration and unblocks PR progress, but NEVER authorizes autonomous merge under MWC.
+confirm a genuine all-clear review is posted at the current head from all reachable providers.
+Your inferred clean state from CI and threads does not satisfy this requirement.
+Merging autonomously under `mwc` (merge-when-confident) unconditionally requires automated clean external review verdicts evaluating the HEAD commit.
+A fallback self-review allows iteration and unblocks PR progress.
+However, it NEVER authorizes autonomous merge under MWC.
 
 **Weight two reviewers' agreement by whether they share a vendor, and prefer a cross-vendor second reviewer over a second run of the same one.**
-The section above says to check whether a *different* configured reviewer is reachable, and treats every second reviewer as interchangeable.
+When pinning a quorum of available providers, do not treat every second reviewer as interchangeable.
 They are not.
 Two reviewers built on the same vendor's models share their training and so share their blind spots, which means a defect both of them pass over is one neither was ever likely to catch.
 Their agreement therefore measures the shared blind spot rather than the diff.
@@ -167,13 +170,15 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
-Those two are not interchangeable, which is why the preference still needs
+So the pairing above is now Copilot and `delegate-to-codex`.
+Copilot and that CLI reviewer are not interchangeable, which is why the preference still needs
 reading rather than collapsing to one name.
 Copilot is **requested** on the PR, and answers only where the org's licensing
 reaches it.
-`delegate-to-codex` is the only cross-vendor reviewer this corpus can
-**dispatch** itself.
+`delegate-to-codex` is the billed ChatGPT-plan CLI this corpus
+**dispatches** for that pairing.
+The Cursor `Task` route above is the same-session self-review
+dispatch, not this second-reviewer pairing.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.
@@ -324,6 +329,39 @@ The tell is a diff that *quotes no source* for a behavioural claim.
 
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
 
+
+**While the workflow reviewer is down, the fallback is a full iterate loop of FRESH clean-slate subagent rounds -- run automatically, one per round, until a clean verdict at the current head.**
+The sections above establish that a single dispatched self-review unblocks the round.
+They leave two gaps this section closes, both from a user directive
+(2026-08-26: "do that automatically when the GHA reviews aren't working",
+issued after twice having to ask by hand for another round on ucdavis/bcs#736).
+
+**One review is not the loop.**
+A working workflow reviewer re-reviews every push until it is satisfied;
+a fallback that reviews once and then only verifies its own fixes has quietly
+downgraded ARDI to a single round.
+So after addressing a fallback round's findings and pushing, dispatch the
+next round at the new head without being asked, and keep going until a round
+returns a clean verdict at the head being shipped.
+
+**Each round is a fresh clean-slate reviewer, not a verification pass.**
+Brief the new subagent with the diff and the standards only --- never with the
+prior rounds' findings or dispositions.
+A verifier handed the old finding list confirms the fixes and stops;
+fresh eyes re-derive the whole diff and find what every earlier round missed.
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"Verification passes returned Clean while fresh rounds kept finding defects".
+A verification pass still has its narrow place --- confirming a specific
+fix landed before reporting a round addressed --- but it never substitutes
+for the next fresh round.
+
+- **Do:** dispatch the next fresh round automatically after each
+  address-and-push, while the workflow reviewer cannot produce a verdict.
+- **Do:** brief each round with diff and standards only, so it re-derives
+  rather than confirms.
+- **Don't:** stop after one fallback review plus verification passes ---
+  that is one round wearing the loop's name.
+- **Don't:** hand a new round the previous rounds' findings.
 
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**

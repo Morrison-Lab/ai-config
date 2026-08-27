@@ -2006,11 +2006,17 @@ def main() -> int:
     # A REAL review from the same login (structured, own Verdict heading)
     # must still be admitted -- the ledger discriminator keys on structure,
     # not on the login.
+    # This body deliberately CARRIES a ledger marker (a disposition-recap
+    # table) beside its own Verdict heading, so it exercises the guards:
+    # deleting the heading/fingerprint/structure guards flips this to a
+    # skipped ledger and fails the test below.
     cursor_real_notclean = {
         "createdAt": "2026-08-26T20:37:29Z",
         "author": {"login": "cursor"},
         "body": (
             "### Summary of Changes\nProse edits.\n\n"
+            "Prior round recap:\n\n| # | Disposition |\n|---|---|\n"
+            "| 1 | Address |\n\n"
             "### Findings\n1. [Defect] scripts/x.py:1 broken.\n\n"
             "### Verdict: Needs more work\n\nReviewed-Commit: sha123\n"
         ),
@@ -2023,6 +2029,48 @@ def main() -> int:
             "a real structured review from the same login is still admitted "
             "and its not-clean still vetoes",
             (not rn_ok) and any("NOT clean" in i for i in rn_issues),
+        )
+
+    # A headingless review whose verdict is a plain `Verdict:` label line,
+    # containing "back off" as ordinary technical prose -- spec-compliant
+    # per parse_report's optional-heading contract; must stay admitted.
+    plain_label_review = {
+        "createdAt": "2026-08-26T20:40:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "1. The polling loop should back off exponentially when "
+            "rate-limited.\n\nVerdict: Needs more work\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    mock_plain = json.dumps({"comments": [plain_label_review,
+                                          later_bot_clean], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_plain):
+        pl_ok, pl_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a plain Verdict-label review containing 'back off' prose is "
+            "still admitted and vetoes",
+            (not pl_ok) and any("NOT clean" in i for i in pl_issues),
+        )
+
+    # A review QUOTING the claim invariants in backticks stays a review:
+    # the marker match runs on the stripped body.
+    quoting_review = {
+        "createdAt": "2026-08-26T20:45:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "### Findings\n1. The doc should cite `hold off|paws off|back "
+            "off` as the claim alternation.\n\n"
+            "### Verdict: Needs more work\n\nReviewed-Commit: sha123\n"
+        ),
+    }
+    mock_quote = json.dumps({"comments": [quoting_review, later_bot_clean],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_quote):
+        qr_ok, qr_issues = checker.check_review_comments("2341", "sha123", TEST_REPO)
+        check(
+            "a review quoting the claim invariants stays admitted and vetoes",
+            (not qr_ok) and any("NOT clean" in i for i in qr_issues),
         )
 
     # A casual human comment saying Ready for merge, with no report

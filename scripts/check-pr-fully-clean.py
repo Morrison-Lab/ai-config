@@ -392,17 +392,25 @@ def _is_driver_ledger(body: str) -> bool:
     """True when *body* is a driving session's claim or disposition ledger.
 
     Fail-safe direction: mis-skipping a REAL review would swallow a
-    not-clean, so anything carrying a review's own structure -- a Verdict
-    heading, a completed-review marker, or the structured-report shape --
-    is never classified as a ledger, whatever else it contains.
+    not-clean, so anything carrying a review's own structure is never
+    classified as a ledger, whatever else it contains -- a Verdict heading,
+    a plain `Verdict:` label line (parse_report's contract makes the
+    heading optional), a Reviewed-Commit fingerprint, a completed-review
+    marker, or the structured-report shape. The ledger markers are matched
+    over the cited-vocab-STRIPPED body, so a review merely QUOTING the
+    claim invariants in backticks or a fence stays a review (#1202's
+    convention, same as classify_verdict).
     """
-    if re.search(r"(?im)^#{1,6}\s*Verdict\b", body):
+    if re.search(r"(?im)^#{0,6}\s*Verdict\s*:", body) or \
+            re.search(r"(?im)^#{1,6}\s*Verdict\b", body):
+        return False
+    if re.search(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}\s*:", body):
         return False
     if "claude finished" in body.lower():
         return False
     if _is_structured_review_body(body):
         return False
-    return bool(_DRIVER_LEDGER_MARKERS.search(body))
+    return bool(_DRIVER_LEDGER_MARKERS.search(strip_cited_finding_vocab(body)))
 
 
 def is_non_review_notice(body: str) -> bool:
@@ -1348,6 +1356,13 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_bot_author = _is_bot_author(author_login) or (
             author_assoc in ("OWNER", "MEMBER") and _reviewer_identity(body, author_login) not in (author_login, "unknown")
         )
+        # A driver ledger posted through the formal-review surface (state
+        # COMMENTED) is skipped the same way as its issue-comment twin
+        # (ai-config#2409). A blocking CHANGES_REQUESTED/REJECTED state
+        # still vetoes whatever the body looks like -- the state is the
+        # forge's own signal, not body text.
+        if state == "COMMENTED" and _is_driver_ledger(body):
+            continue
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 

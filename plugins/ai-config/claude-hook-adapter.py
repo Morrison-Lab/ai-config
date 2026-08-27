@@ -76,6 +76,29 @@ def matches_tool(matcher_pattern, tool_name):
         print(f"claude-hook-adapter: invalid matcher pattern {matcher_pattern!r}: {exc}", file=sys.stderr)
         return False
 
+# Claude Code's `isolation` mode enum, as read by
+# hooks/flag-unassigned-worktree.py.
+RECOGNIZED_ISOLATION_MODES = ("worktree", "remote")
+
+def normalize_isolation(raw_workspace):
+    """Map Antigravity's Workspace concept onto Claude Code's `isolation`
+    enum, or return None when the value isn't a recognized isolation mode.
+
+    Antigravity's Workspace values (e.g. "share"/"branch") are not the same
+    enum as Claude Code's `isolation` mode ("worktree"/"remote").
+    hooks/flag-unassigned-worktree.py gates its warning on the truthiness of
+    `isolation`, so passing an unrecognized Workspace value through
+    unconditionally would silently suppress that warning for every
+    subagent launch whose Workspace happens to be non-empty. Only a
+    recognized value maps through; anything else -- including an unset,
+    non-string, or unrecognized Workspace -- yields None, which that
+    hook's `.get()` treats the same as an absent field.
+    """
+    if not isinstance(raw_workspace, str):
+        return None
+    normalized = raw_workspace.strip().lower()
+    return normalized if normalized in RECOGNIZED_ISOLATION_MODES else None
+
 def parse_timeout(val):
     if val is None:
         return None
@@ -83,6 +106,32 @@ def parse_timeout(val):
         return float(val)
     except (ValueError, TypeError):
         return None
+
+# Default timeout (seconds) applied to any hook entry that doesn't specify
+# its own "timeout" -- shared by every call site that resolves a hook's
+# runnable command.
+DEFAULT_HOOK_TIMEOUT = 30.0
+
+def resolve_cmd_and_timeout(hook, repo_root):
+    """Extract the runnable command and effective timeout from a single
+    hook entry, or return None when the entry has nothing runnable to skip
+    it.
+
+    `script` is a bare basename in hooks.json, never a runnable command
+    line -- `command` is the canonical field for this adapter to execute.
+    (`script` is still load-bearing for install-hooks.py's non-plugin path,
+    per hooks.json's own header, so it is not a legacy field -- just not
+    runnable here.) A `script`-only entry is admitted here as runnable but
+    will fail as a shell command unless it happens to also be one.
+    """
+    cmd = hook.get("command") or hook.get("script")
+    if not cmd:
+        return None
+    cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
+    timeout_val = parse_timeout(hook.get("timeout"))
+    if timeout_val is None:
+        timeout_val = DEFAULT_HOOK_TIMEOUT
+    return cmd, timeout_val
 
 def extract_hook_list(groups_or_hooks):
     """Support grouped ({'hooks': [...]}), flat ([{'command': ...}]), and single group dicts."""
@@ -220,11 +269,18 @@ def main():
                     print(json.dumps({"decision": "deny", "reason": reason}))
                     return
                 agent_name = sub.get("TypeName") or sub.get("typeName") or f"subagent_{idx}"
+                raw_workspace = sub.get("Workspace") or sub.get("workspace")
                 agent_payload = {
                     "tool_name": "Agent",
                     "tool_input": {
                         "subagent_type": sub.get("TypeName") or sub.get("typeName"),
-                        "isolation": sub.get("Workspace") or sub.get("workspace"),
+                        "isolation": normalize_isolation(raw_workspace),
+                        # The raw Antigravity Workspace value, preserved for
+                        # any downstream consumer that wants it -- it is not
+                        # the same concept as `isolation` above, so it is
+                        # kept under its own key rather than overloaded onto
+                        # the Claude Code enum field.
+                        "workspace": raw_workspace,
                         "prompt": sub.get("Prompt") or sub.get("prompt")
                     }
                 }
@@ -278,22 +334,10 @@ def main():
         system_messages = []
         for hooks_list, c_payload, cwd, desc in tasks_to_run:
             for hook in hooks_list:
-                # `script` is a bare basename in hooks.json, never a
-                # runnable command line -- `command` is the canonical field
-                # for THIS adapter to execute. (`script` is still load-bearing
-                # for install-hooks.py's non-plugin path, per hooks.json's own
-                # header, so it is not a legacy field -- just not runnable
-                # here.) A `script`-only entry falls through to
-                # `run_hook_command` unchanged, so it is admitted here as
-                # runnable but will fail as a shell command unless it happens
-                # to also be one.
-                cmd = hook.get("command") or hook.get("script")
-                if not cmd:
+                resolved = resolve_cmd_and_timeout(hook, repo_root)
+                if resolved is None:
                     continue
-                cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-                timeout_val = parse_timeout(hook.get("timeout"))
-                if timeout_val is None:
-                    timeout_val = 30.0
+                cmd, timeout_val = resolved
 
                 result = run_hook_command(cmd, c_payload, cwd, timeout_val)
                 if result and result.returncode == 0 and result.stdout:
@@ -338,18 +382,10 @@ def main():
         hooks_to_run = extract_hook_list(stop_groups)
         warn_messages = []
         for hook in hooks_to_run:
-            # `script` is a bare basename in hooks.json, never a runnable
-            # command line -- `command` is the canonical field for this
-            # adapter to execute; see the fuller note on the PreToolUse
-            # extraction above (`script` stays load-bearing for
-            # install-hooks.py's non-plugin path).
-            cmd = hook.get("command") or hook.get("script")
-            if not cmd:
+            resolved = resolve_cmd_and_timeout(hook, repo_root)
+            if resolved is None:
                 continue
-            cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout"))
-            if timeout_val is None:
-                timeout_val = 30.0
+            cmd, timeout_val = resolved
 
             result = run_hook_command(cmd, stop_payload, os.getcwd(), timeout_val)
             if result and result.returncode == 0 and result.stdout:
@@ -422,19 +458,11 @@ def main():
         for hook in hooks_to_run:
             if len(injected_messages) >= PRE_INVOCATION_MSG_CAP:
                 break
-            # `script` is a bare basename in hooks.json, never a runnable
-            # command line -- `command` is the canonical field for this
-            # adapter to execute; see the fuller note on the PreToolUse
-            # extraction above (`script` stays load-bearing for
-            # install-hooks.py's non-plugin path).
-            cmd = hook.get("command") or hook.get("script")
-            if not cmd:
+            resolved = resolve_cmd_and_timeout(hook, repo_root)
+            if resolved is None:
                 continue
-            cmd = cmd.replace("${CLAUDE_PLUGIN_ROOT}", repo_root)
-            timeout_val = parse_timeout(hook.get("timeout"))
-            if timeout_val is None:
-                timeout_val = 30.0
-            
+            cmd, timeout_val = resolved
+
             result = run_hook_command(cmd, ups_payload, os.getcwd(), timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
@@ -449,8 +477,13 @@ def main():
                             hso = parsed.get("hookSpecificOutput") or {}
                             nested_context = hso.get("additionalContext") if isinstance(hso, dict) else None
                             text_out = parsed.get("systemMessage") or parsed.get("additionalContext") or nested_context or ""
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        # Not valid JSON -- fall back to the raw text as-is
+                        # (text_out is left unchanged), same as every other
+                        # parse-failure path in this file, but this one was
+                        # the sole exception silently swallowed with no
+                        # stderr diagnostic.
+                        print(f"claude-hook-adapter: failed to parse PreInvocation hook output: {exc}", file=sys.stderr)
                     # A parsed field (systemMessage / additionalContext / the
                     # nested hookSpecificOutput.additionalContext) is not
                     # guaranteed to be a string -- a hook may return a dict,

@@ -154,6 +154,29 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertIn("Stop", bundle)
         self.assertIn("PreInvocation", bundle)
 
+    def test_plugins_hooks_json_run_command_split_into_its_own_group(self):
+        # De-risk regression guard: "run_command" must sit in its own
+        # literal-matcher group, separate from the newer tool names' regex
+        # alternation, so a wrong assumption about Antigravity treating
+        # `matcher` as a regex costs only the newer coverage and never the
+        # pre-existing merge-control gate on run_command.
+        with open(PLUGIN_HOOKS_JSON, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        pre_tool_use = data["enforce-merge-control"]["PreToolUse"]
+        matchers = [group.get("matcher") for group in pre_tool_use]
+        self.assertIn("run_command", matchers, "run_command must have its own literal-matcher group")
+        run_command_group = next(g for g in pre_tool_use if g.get("matcher") == "run_command")
+        run_command_commands = [h.get("command", "") for h in run_command_group.get("hooks", [])]
+        self.assertTrue(
+            any("enforce-mwc-review-gate.py" in c for c in run_command_commands),
+            "run_command's group must still carry enforce-mwc-review-gate.py",
+        )
+        for matcher in matchers:
+            self.assertNotIn(
+                "run_command|", matcher or "",
+                "run_command must not be combined into a regex alternation with other tool names",
+            )
+
     @patch('os.path.exists', return_value=False)
     @patch('sys.stdin', new_callable=io.StringIO)
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -803,6 +826,78 @@ class TestAgyHookAdapter(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     @patch('sys.stderr', new_callable=io.StringIO)
     @patch('subprocess.run')
+    def test_invoke_subagent_unrecognized_workspace_not_mapped_to_isolation(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: Antigravity's Workspace concept ("share",
+        # "branch") is not the same enum as Claude Code's `isolation` mode
+        # ("worktree"/"remote"). hooks/flag-unassigned-worktree.py gates its
+        # warning on the truthiness of `isolation`, so a non-empty but
+        # unrecognized Workspace value must NOT surface as a truthy
+        # `isolation` -- that would silently suppress the warning for every
+        # subagent launch.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {
+                    "Subagents": [
+                        {"TypeName": "agent1", "Workspace": "share", "Prompt": "p1"}
+                    ]
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertIsNone(call_input["tool_input"].get("isolation"))
+        # The raw Workspace value must still be preserved somewhere, just
+        # not under the `isolation` key.
+        self.assertEqual(call_input["tool_input"].get("workspace"), "share")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_invoke_subagent_worktree_workspace_mapped_to_isolation(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # The positive case: a Workspace value that IS one of Claude Code's
+        # recognized isolation modes must still map through.
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {
+                    "Subagents": [
+                        {"TypeName": "agent1", "Workspace": "worktree", "Prompt": "p1"}
+                    ]
+                }
+            }
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertEqual(out.get("decision"), "allow")
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input["tool_input"].get("isolation"), "worktree")
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
     def test_invoke_subagent_json_string_subagents(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         mock_result = MagicMock(returncode=0, stdout=json.dumps({"hookSpecificOutput": {}}), stderr="")
         mock_run.return_value = mock_result
@@ -1352,6 +1447,79 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(len(out["injectSteps"]), 2)
         for step in out["injectSteps"]:
             self.assertEqual(step["ephemeralMessage"], str({"nested": "object"}))
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_invalid_json_output_logs_diagnostic_and_falls_back_to_raw_text(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        # Regression guard: the PreInvocation JSON-parse fallback used to be
+        # the file's only `except Exception: pass` with no diagnostic. A
+        # hook returning non-JSON text must still fall back to using that
+        # raw text (unchanged behavior) AND must log a stderr diagnostic,
+        # like every sibling parse handler in this file.
+        mock_result = MagicMock(returncode=0, stdout="not valid json {", stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {"invocationNum": 1, "prompt": "test"}
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        out = json.loads(mock_stdout.getvalue())
+        self.assertIn("injectSteps", out)
+        # MOCK_HOOKS_DEF's UserPromptSubmit group runs two hooks, and both
+        # are mocked to return the same non-JSON text.
+        self.assertEqual(len(out["injectSteps"]), 2)
+        for step in out["injectSteps"]:
+            self.assertEqual(step["ephemeralMessage"], "not valid json {")
+        self.assertIn("failed to parse PreInvocation hook output", mock_stderr.getvalue())
+
+    def test_default_timeout_applied_at_all_three_call_sites(self):
+        # Regression guard for the resolve_cmd_and_timeout() extraction:
+        # a hook entry with no "timeout" key must fall back to the same
+        # 30-second default at PreToolUse, Stop, and PreInvocation alike,
+        # since all three now share one helper.
+        no_timeout_hooks_def = {
+            "hooks": {
+                "PreToolUse": [
+                    {"matcher": "Bash", "hooks": [{"command": "cmd_pretooluse"}]}
+                ],
+                "Stop": [
+                    {"hooks": [{"command": "cmd_stop"}]}
+                ],
+                "UserPromptSubmit": [
+                    {"hooks": [{"command": "cmd_preinvocation"}]}
+                ]
+            }
+        }
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+
+        with patch('os.path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data=json.dumps(no_timeout_hooks_def))), \
+             patch('subprocess.run', return_value=mock_result) as mock_run, \
+             patch('sys.stderr', new_callable=io.StringIO):
+
+            with patch('sys.stdin', io.StringIO(json.dumps(
+                    {"toolCall": {"name": "run_command", "args": {"CommandLine": "x"}}}))), \
+                 patch('sys.stdout', new_callable=io.StringIO):
+                self.adapter.main()
+            self.assertEqual(mock_run.call_args_list[-1].kwargs['timeout'], 30.0)
+
+            with patch('sys.stdin', io.StringIO(json.dumps(
+                    {"terminationReason": "model_stop"}))), \
+                 patch('sys.stdout', new_callable=io.StringIO):
+                self.adapter.main()
+            self.assertEqual(mock_run.call_args_list[-1].kwargs['timeout'], 30.0)
+
+            with patch('sys.stdin', io.StringIO(json.dumps(
+                    {"invocationNum": 1, "prompt": "test"}))), \
+                 patch('sys.stdout', new_callable=io.StringIO):
+                self.adapter.main()
+            self.assertEqual(mock_run.call_args_list[-1].kwargs['timeout'], 30.0)
 
     # -- Configurable caps (env-var overrides) ---------------------------
 

@@ -1023,6 +1023,53 @@ The admitted one bore no verdict because its verdict phrase sits inside a code s
 The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
 Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)
 
+## A driver-comment classifier drops a Copilot finding it has no guard for
+
+(Morrison-Lab/ai-config#2409 / #2429 / #2430, 2026-08-27.
+`check-pr-fully-clean.py`'s verdict scan, on branch `fix/2409-driver-comments`, added a driver-ledger classifier so that a driving session's own status comments --- claim wording, an ARD disposition table, a self-imposed hold like "Do not merge.
+Blocked on review of `<sha>`" --- would stop being admitted as standing reviewer verdicts, per #2409.
+The classifier matches broad English markers (`hold off`, `back off`, a markdown table row carrying `Disposition`) and then abstains from excluding a comment when the comment also carries one of three NEGATIVE guards: a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, or a `**Claude finished` marker.
+
+Every one of those three guards is keyed on Claude's or Cursor's own report format.
+A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until the null check is added" emits none of that structure -- Copilot's report has no `### Verdict` heading, no `Reviewed-Commit:` line, and no `**Claude finished` marker.
+So the broad `hold off` marker matches, all three guards abstain, the comment is classified as a driver's own ledger, and it is dropped from the verdict scan before `classify_verdict()` ever sees it.
+The PR reports FULLY CLEAN with a genuine not-clean finding sitting unexamined on the thread.
+
+Reproduced by executing the classifier logic against `origin/main` directly (not read, not reasoned about): with the driver-ledger exclusion bypassed, the same Copilot comment correctly vetoes the PR.
+With it active, the comment is dropped and the checker exits 0.
+
+The general shape is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently inside this one checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had, and they inherit it silently, because nobody tests a guard the way they eyeball a matcher's positive output.
+Inverting the gate was the obvious next move, and it was tried and refuted within hours.
+The candidate positive signature was the agent-disclosure marker, on the premise that every driver comment carries it per [`disclose-agent-authorship`](disclose-agent-authorship.md) and no reviewer report emits it.
+Neither half survives.
+The second fails outright: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH the marker appended, so a genuine not-clean review carries it as well, and a marker gate dropped that review exactly as the negative guards dropped Copilot's.
+The first is weaker than it reads, too: [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so "every driver comment carries it" is a convention this corpus asks for rather than a property a gate can rely on.
+Both designs failed for one reason: every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item.
+
+A third design was then built and refuted in turn, which is what settles the shape of the answer.
+Executing `classify_verdict` over the #2341 comment's parts showed that neither the `Disposition` table nor the self-imposed hold produces a verdict at all.
+The sole not-clean signal was the header's parenthetical citation of the round being disposed of, ``Addressed GitHub Claude of `9508454e` (Needs more work)``.
+Both earlier classifiers had therefore been built to detect the parts that never mattered.
+So the third design stopped dropping anything and instead blanked that citation inside `strip_cited_finding_vocab`, gated on the sentence opening with an ARD disposition verb AND the parenthetical holding nothing but the verdict phrase.
+An adversarial round refuted it too: it blanked the live verdict in "Addressed the null-check nit in `9508454e` (Needs more work): the fix introduced a new NoneType dereference at foo.py:42", where the parenthetical IS this comment's verdict and the explanation sits outside the blanked span.
+
+**Nothing shipped in the checker.**
+All three designs were reverted, and `scripts/check-pr-fully-clean.py` is unchanged.
+The fix went to [`ard`](../../skills/ard/SKILL.md)'s summary-comment step instead, as #2448: a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it.
+That adds no new fail-open surface to the instrument at all, and when an author forgets, the PR reads not-clean --- the recoverable direction, on their own PR.
+The guard that would catch a forgotten backtick at authoring time is #2443.
+
+A second, smaller finding rode along: the driver-ledger classifier's own guard-test fixtures were hand-written from what each guard reads, and both omitted the disclosure marker that the two REAL driver comments the fix was built from (GitHub comment ids 5430672892 and 5430978306 on ai-config#2341) both carry.
+Once a positive marker gate is added, a "this guard alone protects this fixture" test built that way passes through the new gate instead of through the guard it was named for, which is [`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s "A regression fixture must contain something the bug would destroy" section one layer further in: the fixture is not too thin to reach the *bug*, it is too thin to reach the *guard*.
+A per-guard neutering/mutation harness --- disabling one guard branch at a time and confirming at least one test fails specifically because that branch is gone --- is what surfaces which test protects which guard, per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue.
+
+Neither finding was fixed in THIS session --- `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430.
+That session's work is where the refutations above come from.
+That convention shipped as #2448, which merged and closed #2409.
+The checker-side defect stays open as #2430, since the convention routes around it rather than fixing it.
+So the account above is of three designs refuted and one authoring convention adopted, not of a checker that was repaired.
+This documentation pass is tracked as #2429.)
+
 ## A review wake carried one finding out of five
 
 (`Morrison-Lab/gha#571`, 2026-08-21/22.

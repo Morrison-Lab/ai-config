@@ -403,6 +403,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-27/28, ai-config#2371 / PR #2478: the first fix for point 4 printed "found in NO scope --- neither org-level nor any repo copy" on the `--repos`-only code path, where the org-level sweep never ran.
   The reviewer reproduced the false claim directly.
 - **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) (a guard's pass path must not be reachable by its failure path, applied here to a message's claimed scope rather than to a boolean outcome).
+  Pattern 23 above and [`github-actions-secrets.md`](github-actions-secrets.md)'s #2371 entry carry the same underlying issue/PR (#2371 / PR #2478) this pattern was found on.
 - **Fix**: When adding an error/exit branch, enumerate the flag combinations that can reach it and word the message to name only what was actually examined on that path.
   Never reuse a full-sweep message on a narrowed path.
 - **Algorithmatizable?**

@@ -134,10 +134,7 @@ reliably suggests a behaviour --- so "the adversarial one" resolves to
 `skills/opposition-research/SKILL.md` and "the fan-out one" to
 `skills/ardia/SKILL.md` on nominal fit alone, and the citation reads as apt
 while asserting a content claim nobody verified.
-The check is one grep against the cited file for the behaviour you are
-attributing to it, per
-[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s rule
-that a citation is a verifiable claim rather than a recollection.
+The check is one grep against the cited file for the behaviour you are attributing to it, per [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s rule to mark which claims are measured and which are recalled, and cite the recalled ones.
 A zero-hit result is the tell that the name carried the citation.
 
 - **Do:** grep the cited file's own text for the behaviour you cite it as an

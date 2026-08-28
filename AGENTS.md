@@ -191,6 +191,22 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 
+## Summarize analysis effects in PR descriptions
+
+When a code change affects analysis outputs or their interpretation, summarize
+the changed results in the PR description and state how the change affects the
+conclusions.
+Give material before-and-after values when they make the effect easier to judge.
+State explicitly when the conclusions do not change if that fact matters to
+review.
+
+- **Do:** connect implementation changes to their effects on analysis results
+  and conclusions when those effects are relevant.
+- **Don't:** describe only code mechanics when the diff changes analysis
+  outputs or interpretation.
+- **Don't:** add an analysis-impact section when the change has no relevant
+  effect on analysis results or conclusions.
+
 ## Temporal limitations on software and technology facts
 
 Facts about software, platforms, libraries, APIs, harnesses, CLI tools,

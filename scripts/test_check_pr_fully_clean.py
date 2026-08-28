@@ -1888,11 +1888,19 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings \u2014 none\n")
           is None)
-    check("recognized Findings heading suffixes still resolve empty bodies",
+    check("wordy decorative Findings suffixes still resolve empty bodies",
           all(checker._unresolved_finding_pattern(
                   f"## Findings{suffix}\n\nNone.\n") is None
-              for suffix in (" on the diff content", " (blocking)",
-                             " and notes")))
+              for suffix in (" on the diff content", " and notes")))
+    # A parenthetical suffix lands on the flag side since the second
+    # #2488-round pass: a paren can carry a real finding, and the gate
+    # cannot tell "(blocking)" from "(crash() is missing a null check)"
+    # without swallowing the latter -- over-flagging is the recoverable
+    # direction.
+    check("a parenthetical Findings suffix re-flags (safe direction)",
+          checker._unresolved_finding_pattern(
+              "## Findings (blocking)\n\nNone.\n")
+          is not None)
     check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
           checker._unresolved_finding_pattern(
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")

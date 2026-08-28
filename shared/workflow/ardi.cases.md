@@ -882,3 +882,18 @@ section.
 And the earlier hypothesis was tested by dispatching a real review rather than
 inferred from the upstream commit having landed, which is the only reason the
 second cause was found at all.)
+
+## A green check credited to a timeout raise that never ran
+
+(ucdavis/bcs#761, 2026-08-28: the PR carried one red required check, `docs`, which had been killed twice at a 40-minute `Build site` step timeout.
+bcs#763 had since raised that step's limit from 40 to 90 minutes on `main`, post-dating the branch's merge-base, so `main` was merged into the branch and the PR thread was told the fix for the red check was being ported.
+
+The next run passed, and the pass was reported as the ported fix having unblocked the PR.
+
+The passing run took 22 minutes 44 seconds --- comfortably inside the *old* 40-minute limit, so the raised ceiling was never reached and the same head would very likely have passed without the merge at all.
+Three runs of identical content within nine hours went killed-at-40-min, killed-at-40-min, passed-in-23-min, which is variance rather than a fix.
+
+The duration was computed from the job's start and end timestamps after the merge, out of ordinary diligence rather than suspicion.
+Nothing about the green check prompted it, and without it a false causal claim would have stood on a merged PR and in an issue thread.
+The merge itself was correct to perform under [`sync-with-main`](sync-with-main.md) and stays;
+only the causal claim was wrong.)

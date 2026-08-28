@@ -13,26 +13,36 @@ In every session --- at session start, and again periodically during long sessio
 2. **The `~/.claude` consumer install.**
    Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*).
    **That settles what is SERVED, and says nothing about what is left over.**
-   An earlier version of this line concluded "so there is nothing to freshness-check there", which is the one sentence that stops the check ever being run: a `~/.claude/skills` symlink placed by an install predating the plugin survives the switch, and the plugin does not remove it.
-   Both then load, so every skill is listed twice --- bare `ums` alongside `ai-config:ums` --- and the doubled listing overflows the client's skill-listing budget, truncating most `ai-config:*` entries to name-only and degrading the routing the descriptions exist to drive.
-   Measured 2026-08-27 ([#2405](https://github.com/Morrison-Lab/ai-config/issues/2405)): ~198 skills listed twice, an estimated ~3k resident tokens per session, found by a `/doctor` pass rather than by this check.
-   Nothing announces it, because both halves are working correctly on their own terms.
-   `skills/`, `shared/`, `hooks/`, and `memories/` are therefore all worth looking for under `~/.claude`, in the symlink form as well as the copy form.
-   The last three have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
-   `skills/` is the different case, and the one the old wording missed: it HAS a plugin replacement, which is exactly why a leftover is redundant rather than merely stale, and why the damage is duplication rather than drift.
-   Remove it; the plugin keeps serving the skills and bare invocation still resolves.
+   A `~/.claude/skills` symlink or copy placed by an install predating the plugin survives the switch, because a replacement does not remove what it replaced.
+   Both then load, so every skill is listed twice --- bare `ums` alongside `ai-config:ums` --- and the doubling spends the client's skill-listing budget (`SKILL_LISTING_BUDGET_CHARS`, 9,000 characters, in `scripts/validate-skills.py`;
+   see [#1852](https://github.com/Morrison-Lab/ai-config/issues/1852)) twice over.
+   Past that budget the client truncates entries to name-only, which strips exactly the descriptions skill routing selects on.
+   Measured 2026-08-27 ([#2405](https://github.com/Morrison-Lab/ai-config/issues/2405)): 198 skills listed twice, an estimated 3k resident tokens per session, found by Claude Code's built-in `/doctor` rather than by this check.
+
+   `skills/` is the case this list keeps missing, and it differs from the other three.
+   `shared/`, `hooks/`, and `memories/` have no plugin equivalent ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so a leftover there is **stale** and wants a content diff.
+   `skills/` does have one, so a leftover there is **redundant**, and the damage is duplication rather than drift.
+
+   **Existence is not the test for `skills/`, and this is where the check has to differ from the other three.**
+   `~/.claude/shared`, `~/.claude/hooks`, and `~/.claude/memories` are not directories any client creates, so finding one is already the finding.
+   `~/.claude/skills` is a standard client location for a user's own personal skills, so its presence carries no information at all --- on the machine this paragraph was written on it holds `session-start-hook/` and `synced/`, neither from this repo.
+   The discriminator is contents, so look for this repo's skills inside it rather than for the directory:
 
    ```bash
-   ls -ld ~/.claude/skills ~/.claude/shared ~/.claude/hooks ~/.claude/memories 2>/dev/null
+   for p in ~/.claude/shared ~/.claude/hooks ~/.claude/memories; do
+     [ -e "$p" ] && echo "$p LEFTOVER" || echo "$p absent"
+   done
+   [ -e ~/.claude/skills/ums ] && echo "~/.claude/skills DOUBLED (holds this repo's skills)" \
+     || echo "~/.claude/skills clean (personal skills only, or absent)"
    ```
 
-   The dedicated verification instrument this section used to name (`check-install.py`, which compared installed copies against the checkout and repaired drift with `--fix`) was removed along with that symlink install and has no replacement yet either.
-   Until one lands, use the manual branch-plus-diff check in this file's "The blast radius is the whole consumer surface" paragraph below, which does not depend on that instrument and still works whether the local copy is a symlink or a real copy.
+   Remove a doubled `~/.claude/skills` only once `enabledPlugins` in `settings.json` confirms the ai-config plugin is actually enabled, per the check below --- on a machine where the plugin is off (this file records one, with `CLAUDE_PLUGIN_ROOT` unset) that directory is the only source of the corpus, and deleting it removes the skills entirely.
+   With the plugin serving them, removal is safe and bare invocation still resolves.
 
-   - **Do:** look for a leftover `~/.claude/skills` even though skills are plugin-served, and delete it when the plugin is enabled.
-   - **Do:** read a doubled skill listing (a bare name and an `ai-config:`-prefixed name for the same skill) as the symptom, since the token cost itself is invisible.
-   - **Don't:** read "the plugin serves it" as "there is nothing installed to check" --- a replacement does not remove what it replaced.
-   - **Don't:** limit the leftover sweep to the three directories with no plugin equivalent.
+   - **Do:** test `~/.claude/skills` by its contents, since a client's own personal-skills directory lives at that exact path.
+   - **Do:** confirm the plugin is enabled before deleting a doubled directory, and read a doubled listing (a bare name beside an `ai-config:`-prefixed one) as the symptom, since the token cost is invisible.
+   - **Don't:** read "the plugin serves it" as "nothing is installed to check" --- a replacement does not remove what it replaced.
+   - **Don't:** sweep only `shared/`, `hooks/`, and `memories/`, and don't delete a `~/.claude/skills` you have not shown to hold this repo's skills.
 
    On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate to a real-copy install --- copy-sync every file whose repo version changed by hand.
    Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.

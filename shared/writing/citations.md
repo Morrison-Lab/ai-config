@@ -390,39 +390,26 @@ The reviewer that flagged it named the reason precisely:
 The instruments above assume the source is a file, a commit, or a page.
 A sentence attributed to the user in conversation feels like none of those, so the natural conclusion is that no check applies and the quotation has to be trusted.
 
-That conclusion is false, and it is the whole of this failure.
-Claude Code writes every turn, the user's included, to a JSONL transcript on disk under `~/.claude/projects/`.
-This repository already knows that: `grep -ln transcript_path hooks/*.py` returns 55 hooks that parse it.
-So the source is fetchable, the file's substring test applies unchanged, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
+That conclusion is false, and believing it is the whole of this failure.
+Claude Code writes every turn, the user's included, to a JSONL transcript under `~/.claude/projects/`.
+This repository already knows: 29 non-test hooks read `transcript_path`, 28 of which open the file.
+So the source is fetchable, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
 
-The check is one command.
+[`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
 
 ```bash
-TRANSCRIPT=$(ls -t ~/.claude/projects/*/*.jsonl | head -1)
-python3 - "$TRANSCRIPT" "the sentence you are about to quote" <<'PY'
-import json, sys
-
-path, needle = sys.argv[1], sys.argv[2]
-for line in open(path, encoding="utf-8", errors="replace"):
-    rec = json.loads(line)
-    msg = rec.get("message") or {}
-    if msg.get("role") != "user":
-        continue
-    body = msg.get("content")
-    if not isinstance(body, str):
-        body = " ".join(p.get("text", "") for p in body if isinstance(p, dict))
-    summarized = rec.get("isCompactSummary") or body.lstrip().startswith(
-        "This session is being continued"
-    )
-    if needle in body:
-        print("SUMMARY" if summarized else "TURN", repr(body[:90]))
-PY
+python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
 ```
 
-**The filter is the part that carries the check, not the search.**
-A compaction summary is a user-role record too, and its content is a restatement written by the assistant.
-A match inside one is the adjacent-artifact substitution: a copy of the claim rather than the source, so a bare grep for the string reports a hit and settles nothing.
-Only a `TURN` line is evidence.
+**The classifier is what carries the check, not the search**, and that is why this is a script rather than a grep.
+`message.role == "user"` is a **transport** role, not an authorship claim.
+The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, and --- inside a subagent's transcript --- the dispatch brief the assistant wrote.
+Matching one of those and calling it a hit is the adjacent-artifact substitution: a copy of the claim rather than the source, arriving with a verification's authority.
+So a bare string search over the file is worse than no check, and the script reports each near miss with the reason it was excluded rather than hiding it.
+
+Its three exit codes keep apart two things that are easy to conflate: a phrase absent from the typed turns (`1`) and a search space that was never established (`2`, no transcript root, or no typed turns anywhere in it).
+Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
+Every run prints what it examined --- files, records, typed turns, unparseable lines --- so a zero is never mistaken for a detector that never engaged.
 
 Two things make the quotation marks worse than an ordinary misremembering.
 
@@ -432,39 +419,45 @@ A quote asserts that verification already happened, which is why reaching for qu
 
 **A correction to a fabricated quote can itself carry one, and accepting it feels like diligence.**
 Being told you misquoted someone produces an immediate impulse to publish the real sentence, and the replacement arrives from the same kind of recollection as the original.
-So run the command on the correction too, before repeating it.
+Run the check on the correction too, before repeating it.
 
 The remedy is the neighbouring section's, reached by a different route.
 That section already carries the un-quotable branch:
 
 > When you cannot find a sentence to quote, that is the finding: make the argument in your own voice and cite the source for what it does supply.
 
-What differs here is only which branch you land on.
-There, you looked and came up empty.
-Here the sentence is very likely present, so the honest default is to run the command and quote the `TURN` it returns.
-Fall back to your own voice, marked as your reading --- "as I understood it" --- when it returns nothing.
+What differs here is only that the source can be searched, so which branch you land on is a question with an answer rather than a judgment.
+Run the script.
+Quote the typed turn it returns, and fall back to your own voice, marked as your reading --- "as I understood it" --- when it returns nothing.
 
-`CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception to this.
-Its paraphrase is unquoted, so nothing there needs the transcript at all;
-the `_Posted by Claude Code (AI agent)_` marker names the poster rather than the voice, and does not license a quotation.
-If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the command, since the one person who could refute the attribution is not reading the thread.
+`CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception.
+Its paraphrase is unquoted, so nothing there needs the transcript at all, and the required marker --- `_Posted by Claude Code (AI agent) --- not written by a human._` --- exists because such a comment is written in the user's voice under the user's login.
+It discloses the author; it does not license a quotation.
+If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the script, since the person who could refute the attribution may not be reading the thread.
 
-- **Do:** run the transcript command before putting the user's words in quotation marks, and quote the `TURN` it returns.
+- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and quote the typed turn it returns.
 - **Do:** run it again on a correction that supplies the "real" sentence.
-- **Do:** state your reading unquoted and attributed to yourself when the command returns nothing.
-- **Don't:** treat a `SUMMARY` hit as the message --- it is the assistant's restatement, which is the artifact substitution rather than the source.
+- **Do:** state your reading unquoted and attributed to yourself when it reports the phrase absent.
+- **Don't:** treat a match inside an excluded record as the message --- a compaction summary, a subagent brief, and an injected skill body are all assistant prose wearing a user-role field.
+- **Don't:** read exit `2` as an absence.
+  It says the space was never searched, and reporting it as "never said" is the substitution one level up.
 - **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
   That is a copy of the claim, and it is the move that most looks like compliance.
-- **Don't:** conclude that a conversation cannot be checked;
-  the transcript is on disk, and 55 hooks in this repository read it.
+
+The Claude Code paths above are specific to that harness.
+On another agent, `--root` takes a transcript directory;
+where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
 
 (2026-08-28, [ai-config#2538](https://github.com/Morrison-Lab/ai-config/issues/2538).
 Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I put a sentence of my own inside quotation marks and attributed it to the user.
 It stated a criterion for merging on a light review verdict, which is the direction I was already moving.
-A review pass flagged it and supplied what it gave as the user's actual message, and I repeated that into the issue and into the first draft of this section without checking either.
+A review pass flagged it and supplied what it gave as the user's actual message;
+I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
-Running the command above returned **0** `TURN` hits and **1** `SUMMARY` hit across the only session file, against 486 user-role records --- so neither my clause nor the replacement was ever a user turn, and the session's genuine typed turns numbered four.
-Both sentences are omitted here because the command refutes them, not because they could not be checked.)
+Running the script over 21 transcript files --- 6,671 records, 1,979 user-role, 3 typed turns, 0 unparseable lines --- returns **no hit** for either sentence, and `--show-excluded` places both matches in a compaction summary and a subagent's own transcript.
+Neither was a typed turn.
+The first two drafts of this section asserted the opposite premise, and each passed its own local checks;
+what refuted them was executing a command, which is why this section ships one.)
 
 ## A permalink that resolves can still cite the wrong content
 

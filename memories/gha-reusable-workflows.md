@@ -175,3 +175,25 @@ Generic Actions-authoring material stays there.
   - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
 
   (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)
+
+- **`lint-markdown.yml`'s `fail: false` covers markdownlint ONLY, not its three companion checks --- so a workflow configured warn-only still fails the build.**
+
+  `lint-markdown` runs four things: markdownlint itself, a list-item merge-splice check, a fenced-code-block length check, and a GFM table-split check.
+  The `fail` input gates the first.
+  The other three read `fail-on-item-splices`, `fail-on-long-code-blocks`, and `fail-on-table-splits`, each defaulting to **true**.
+
+  This reads as a contradiction from the PR page, which is what makes it cost a round.
+  The caller says `fail: false`, the check goes red, and the natural conclusion is that the input was ignored or the pin is wrong.
+  Neither is true: a different check inside the same job failed, and the job's conclusion comes from whichever step failed rather than from the one whose name is on the caller.
+
+  The same shape holds for `lint-yaml.yml`, whose `fail` gates yamllint while `fail-on-long-scripts` gates its long-`run:`-block companion.
+
+  Adopting the workflow warn-only, to work down a pre-existing backlog, therefore does **not** buy a green check.
+  Set the companion toggles explicitly when that is the intent.
+
+  - **Do:** read a composite's full step list before concluding that one input makes the whole job advisory.
+  - **Do:** set `fail-on-item-splices`, `fail-on-long-code-blocks`, and `fail-on-table-splits` explicitly when adopting `lint-markdown` warn-only.
+  - **Don't:** read `fail: false` plus a red check as evidence the input was ignored or the tag is wrong.
+  - **Don't:** assume one `fail` input generalizes across a multi-check composite --- `check-typos` and `check-new-line-breaks` really do have a single one, which is what makes the generalization tempting.
+
+  (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.)

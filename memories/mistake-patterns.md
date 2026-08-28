@@ -346,9 +346,10 @@ A clean automated review from every available provider evaluating the current HE
   Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
   Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.
 - **2nd occurrence, 2026-08-28** (ai-config#2449 / PR #2515, after #2409 above), on the same module and with a second resolution direction worth adding: where each refuted design breaks a *different* consumer, the measurement to run is over the REPRESENTATION rather than over the failing input.
-  Four designs widened what `strip_cited_finding_vocab` blanked, and each broke a different downstream pass --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, reviewer-identity extraction --- for nine fail-opens on a fail-closed instrument across five adversarial rounds.
-  Unrelated breakages are not four bugs;
-  they are one fact restated four times, namely that a dozen character-and-offset-sensitive consumers read the buffer being edited.
+  Four designs widened what `strip_cited_finding_vocab` blanked, and no two of them failed the same way;
+  between them they broke six distinct downstream passes --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, and reviewer-identity extraction --- producing nine fail-opens on a fail-closed instrument across five adversarial rounds.
+  The three counts are not a one-to-one mapping and should not be read as one: the fourth design alone broke several passes, and one broken pass can fail open on more than one shape.
+  What matters is that the failures were *unrelated*, which makes them one fact restated four times rather than four bugs --- namely that many character-and-offset-sensitive consumers read the buffer being edited.
   The design that shipped leaves the scan byte-identical and carries a parallel citation mask, making the class unreachable rather than patched member by member, and giving parity by identity rather than by proof.
   Canonical rule: [`fail-fast.md`](../shared/principles/fail-fast.md)'s "Where many consumers key on a shared buffer, filter the matches rather than editing the buffer".
 

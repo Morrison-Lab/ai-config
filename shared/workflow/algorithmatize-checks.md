@@ -363,7 +363,9 @@ Run every control at least once in the configuration where its own expected answ
 (Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
 The negative control patched `strip_cited_finding_vocab` after the scans it guards had moved to `strip_cited_finding_vocab_with_mask`.
 Local runs kept reporting a plausible divergence;
-CI, which compares a clean checkout against itself, was what caught it.)
+CI, which compares a clean checkout against itself, was what caught it.
+Re-pointed at the function the scans actually call, the control fires as it should: measured 2026-08-28, it produces 120 divergences within the first 8,000 generated bodies, the first at index 485.
+That is what a control catching something looks like, and it is the reading the dead one had been imitating.)
 
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 

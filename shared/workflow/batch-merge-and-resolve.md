@@ -283,12 +283,26 @@ It is also self-corroborating: the paths it lists are real, they are genuinely i
 Take the other side's file list from the commits themselves --- `git show --name-only --format= <sha>`, or `git diff --name-only <base>...<head>` with three dots --- so the set is what that side changed rather than what the two tips differ in.
 See [`git-diffing.md`](../../memories/git-diffing.md)'s "Picking the diff range" section for why the two-dot form behaves this way.
 
-The wrong query doubles as this sweep's **negative control**, which the "Any conflict sweep needs a negative control" section below requires: it returns a large intersection where the correct one returns zero, so running both shows the comparison discriminates and an empty result is a real empty rather than a dead query.
+The zero this produces still needs the control the "Any conflict sweep needs a negative control" section below requires, and the wrong query above is **not** that control.
+Swapping the query changes the input list, so its non-zero says nothing about whether the *correct* query can find a collision --- if the correct query returned empty for an unrelated reason (a mistyped SHA, a dropped `--format=`, a base that advanced by more than the one commit you looked at), the wrong query still returns your whole file set and still reads as discriminating.
+
+Run the **correct** query against a base commit you already know touches one of your files, and confirm it comes back non-empty:
+
+```bash
+git diff --name-only origin/main...HEAD | sort > /tmp/mine.txt
+git show --name-only --format= <known-colliding-sha> | sort > /tmp/known.txt
+comm -12 /tmp/known.txt /tmp/mine.txt      # must be NON-empty
+git show --name-only --format= <the-sha-you-care-about> | sort > /tmp/theirs.txt
+comm -12 /tmp/theirs.txt /tmp/mine.txt     # the real question
+```
+
+The known-colliding SHA is usually free: any earlier commit on the base that touched a file this branch also touches will do.
 
 - **Do:** derive each side's file list from that side's own commits, with `git show --name-only` or a three-dot range.
 - **Do:** treat an intersection that contains your whole file set as a wrong-range symptom, not as a finding.
 - **Don't:** use `git diff --name-only A..B` to derive a file-set intersection --- two-tip output carries your own files.
-- **Don't:** announce a merge-order constraint off an intersection you have not sanity-checked against a query you expect to return zero.
+- **Don't:** announce a merge-order constraint off an intersection whose query has not been shown to find a collision it should find.
+- **Don't:** treat the wrong query's large answer as a control --- a control varies the *input*, not the method, or it cannot tell a working query from a silently empty one.
 
 (Measured 2026-08-28 while checking [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) against a `main` that had advanced by one commit.
 The two-dot query returned all 9 of the PR's own files;

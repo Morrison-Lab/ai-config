@@ -558,8 +558,8 @@ check: nothing in CI could have caught it.)
 
 **An eighth: what a change TRANSFORMS, standing in for what it CONCLUDES.**
 
-Every shape above substitutes one artifact for another.
-This one substitutes one *property* of the right artifact, and it does so inside a verification built specifically to catch the error it then misses --- so the substitution arrives wearing the clothes of a parity proof.
+The shapes above substitute one artifact, environment, or property for another, and this one substitutes a property too --- so what distinguishes it is not *what* gets swapped but *where* the swap happens.
+It happens inside a verification built specifically to catch the error it then misses, so the substitution arrives wearing the clothes of a parity proof, and the instrument's own clean number is what conceals it.
 
 A change to a fail-closed instrument widens what it blanks before scanning, and the proof asks: does every character the new revision blanks and the old one did not lie inside a code span the change is meant to blank?
 That question cannot come back non-zero for any implementation of that shape.
@@ -590,4 +590,6 @@ A proof that cannot fail is not a weak proof, it is an absent one wearing a numb
 (Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), fixing [#2449](https://github.com/Morrison-Lab/ai-config/issues/2449).
 The first parity instrument compared what `strip_cited_finding_vocab` blanked across two revisions and reported 0 extra characters outside a code span.
 The replacement, `scripts/check-verdict-scan-parity.py`, diffs what the two revisions conclude instead, triages each widening by offset, and runs a negative control first.
-Its discrimination is demonstrable rather than asserted: against the four designs that were tried and rejected on that branch it reports 3,924 / 108 / 270 / non-zero off-axis divergences, and 0 for the design that shipped.)
+Only half of its discrimination claim is reproducible, and the entry says which half.
+Running it against the shipped design reports 0, which any reader can re-run.
+The 3,924 / 108 / 270 / non-zero off-axis figures for the four rejected designs were recorded on that branch before #2515 was **squash-merged** as `07847b9`, so those commits are unreachable and no reader can reproduce them --- a squash merge is itself the adjacent-artifact substitution this section is about, discarding the history a figure was derived from while leaving the figure.)

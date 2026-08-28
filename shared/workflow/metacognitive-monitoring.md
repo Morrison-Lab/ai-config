@@ -456,23 +456,25 @@ A negative control that fires on the full corpus finds nothing under the cap, be
 Read that as evidence about the sampling, not as evidence about the corpus --- and note it is the same reading the paragraphs above prescribe, arriving in a form where "what do the sampled items share" has a mechanical answer.
 
 The fix is to take a **stride** across the product space rather than a prefix, so every axis is varied within the cap.
-Compute the step in floating point and index by rounding, because an integer `len // limit` collapses to 1 for any limit above half the corpus and degenerates straight back to the prefix --- which is the regime a generously-raised cap puts you in, so the naive stride is most likely to be wrong exactly when someone has tried to be careful.
-See [`python.md`](../../memories/python.md).
+The arithmetic that gets this wrong lives in [`python.md`](../../memories/python.md) and is not restated here;
+what belongs here is the reading, which is that a capped figure and a swept figure answer different questions and a run that does not say which it took cannot be quoted as either.
+
+The blind-prefix **length** is a measurement, so it expires like any other.
+Widening the generator reorders it, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s "widening an instrument invalidates every figure it produced" applied to a sampling bound.
+Re-derive it before quoting it;
+the axis structure is what you can quote freely, since the outermost axis stays outermost. (Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py` in [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529): a blind-prefix figure recorded against a ~221k-body corpus survived that same PR's widening to 1,693,440 unre-derived, and the real first divergence sits at prefix index 485.
+Tracked for the source comment as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532).)
 
 - **Do:** name what the sampled items share, before generalizing from their
   shared emptiness.
 - **Do:** ask how a capped sample was *taken*, and read a contiguous prefix over a nested product as a slice of the outer axis rather than a sample of the whole.
-- **Do:** stride across a product space when capping it, and verify the step does not round to 1 at the cap you chose.
+- **Do:** re-derive a blind-prefix or coverage bound whenever the population it was measured against changes, and quote the axis structure rather than the bound when you cannot.
 - **Do:** raise the bound until the answer stops changing, or carry the window
   into the sentence.
-- **Do:** sample along a second axis --- one large item beside four small ones
-  --- rather than adding a fifth of the same kind.
-- **Do:** scope the claim to what was measured, keeping "these four produced
-  none" distinct from "none has ever".
-- **Do:** enumerate the cases a quantified claim did NOT list, since the ones
-  it listed were chosen by whoever wrote the claim.
-- **Don't:** read a query returning exactly `--limit N` rows as a complete
-  answer --- that is precisely what a truncated one looks like.
+- **Do:** sample along a second axis --- one large item beside four small ones --- rather than adding a fifth of the same kind.
+- **Do:** scope the claim to what was measured, keeping "these four produced none" distinct from "none has ever".
+- **Do:** enumerate the cases a quantified claim did NOT list, since the ones it listed were chosen by whoever wrote the claim.
+- **Don't:** read a query returning exactly `--limit N` rows as a complete answer --- that is precisely what a truncated one looks like.
 - **Don't:** cap a generated corpus with a contiguous prefix;
   that fixes the slowest-varying axis and hides every shape it produces.
 - **Don't:** read repeated absence as accumulating evidence when a single
@@ -482,8 +484,7 @@ See [`python.md`](../../memories/python.md).
 - **Don't:** read a reviewer's endorsement of a universal as evidence for it
   when the reviewer checked the claim's own examples.
 
-(Three instances, all 2026-08-24, all in one session, on three different
-agents.
+(The three instances below, all 2026-08-24, all in one session, on three different agents.
 The falsifications and figures are measured.
 The second-axis remedy and the sample-frame reading are inferred from them.
 

@@ -189,7 +189,7 @@ The `@claude` bot's own behaviour lives in
   workflow, copy the `permissions:` block from the matching `examples/<name>.yml` verbatim
   rather than hand-picking keys, and re-diff against it when the stub drifts. (ai-config#224.)
 - **Detached HEAD on `pull_request` events.**
-  `actions/checkout` without an explicit `ref` on a PR event checks out a synthetic merge commit in detached HEAD — `git push` then fails.
+  `actions/checkout` without an explicit `ref` on a PR event checks out a synthetic merge commit in detached HEAD --- `git push` then fails.
   Fix: pass `ref: ${{ github.head_ref }}` so the branch name is checked out, not the merge commit SHA.
   Required for any reusable workflow that needs to `git push` from a PR caller.
   **The reading consequence is separate and is the one with no error message.**

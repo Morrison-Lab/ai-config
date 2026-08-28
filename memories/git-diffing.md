@@ -470,7 +470,9 @@ A negative control for a two-revision comparison is normally "run it against ide
 [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "A control's patch point drifts" section carries the case where that gap hid a dead control.
 
 Pass **both** revisions explicitly whenever the intent is a self-comparison, rather than naming one and letting the other default.
-Read the tool's own `--help` for the second flag rather than guessing its name: `scripts/check-verdict-scan-parity.py` calls it `--candidate-rev`, and its help text says outright that omitting it compares the working tree.
+Read the tool's own `--help` for the second flag rather than guessing its name: `scripts/check-verdict-scan-parity.py` calls it `--candidate-rev`, whose help reads "Compare a committed revision instead of the working tree."
+Note what that sentence does and does not say --- it names the working tree as the alternative, and leaves you to infer that omitting the flag selects it.
+That inference is correct here, and reading a default off a help string is exactly the adjacent-artifact substitution this file warns about elsewhere, so confirm it in the source (`default=""`, then a branch on truthiness) rather than in the help.
 When a tool has no second flag at all, commit or stash first, and prefer designing one that names both sides over one that silently adopts the tree --- an implicit side cannot be audited from the command line anyone pastes into a PR.
 
 - **Do:** pass both revisions explicitly when the expected answer is "no difference", reading the second flag's name from the tool's `--help` rather than assuming it.
@@ -481,4 +483,5 @@ When a tool has no second flag at all, commit or stash first, and prefer designi
 - **Don't:** treat a non-zero result from such a run as evidence the tool discriminates --- your own uncommitted edits produce one.
 
 (Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
-Its `--base-rev` defaults to `origin/main` and its other side is the working-tree copy of the checker unless `--candidate-rev` names a revision, so `--base-rev HEAD` over a dirty tree is `HEAD`-vs-worktree.)
+Read from the source rather than the help: `--base-rev` carries `default="origin/main"`, and the other side is loaded from the working-tree copy of the checker unless `--candidate-rev` is non-empty.
+So `--base-rev HEAD` over a dirty tree is `HEAD`-vs-worktree.)

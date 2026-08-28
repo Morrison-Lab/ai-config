@@ -899,13 +899,14 @@ Widening what the normalizer blanks then looks like a local change to one functi
 Every consumer that measured the old buffer now measures a different one, and each breaks in its own way.
 
 The recognizable signal is that successive designs fail in **unrelated** ways.
-One design breaks the negation window, the next breaks a boundary test, the next destroys a tag.
+One design re-pairs delimiters across a live finding, the next shifts every downstream pair, the next lets an anchored negation window reach a finding it was never next to, the next destroys a findings-item tag.
 Read as bugs, that is four fixes.
 Read correctly, it is one fact restated four times: the text is load-bearing for consumers that never asked to be edited.
 Where a failure class is being enumerated a member at a time, stop patching members.
 
 The fix is to leave the buffer **byte-identical** and carry the new information alongside it --- a parallel mask of offsets, a set of ranges, a second array --- and have each consumer decide for itself whether a match it found falls inside.
-That makes the class unreachable rather than patched, and every consumer that did not opt in keeps its exact previous behaviour by construction, which is the strongest form of parity available: not proven equal, but identical.
+That makes the class unreachable rather than patched, and every consumer that did not opt in keeps its exact previous behaviour by construction.
+That byte-identity is the strongest form of parity available: not proven equal, but identical.
 
 It also usually expresses the actual intent better than the edit did.
 "Blank more text" was never the goal;
@@ -920,12 +921,13 @@ Behaviour the blanking designs could not express then falls out for free --- a m
   its blast radius is every consumer of what that function returns.
 
 (Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
-Four designs blanked more text;
-each broke a different downstream pass --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, reviewer-identity extraction --- for nine fail-opens on a fail-closed instrument across five adversarial review rounds.
+Four designs blanked more text, and between them broke six distinct downstream passes --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, and reviewer-identity extraction --- for nine fail-opens on a fail-closed instrument across five adversarial review rounds.
+The counts differ because the relation is not one-to-one: the fourth design alone broke several passes, and one broken pass can fail open on more than one shape.
+What the numbers share is that no two designs failed the *same* way, which is the signal the section is about.
 The design that shipped leaves the scan byte-identical to `origin/main` and returns a citation mask beside it.
 [#2525](https://github.com/Morrison-Lab/ai-config/issues/2525) tracks the two consumers that were deliberately left un-migrated, which the byte-identity guarantees behave exactly as before.)
 
-## Two detectors that over-reach in OPPOSITE directions can be intersected
+## Intersecting two over-claiming detectors moves every error into one direction
 
 The "Guarding an unsound pattern with a second pattern" section above forbids adding a precondition over the same stream.
 This is the composition it does not forbid, and the distinction is worth stating because the two look alike from a distance.
@@ -934,21 +936,32 @@ A guard runs *after* an unsound filter and asks whether this particular case is 
 An **intersection** runs two detectors over the same input and keeps only what both claim.
 Nothing arbitrates, nothing is asked to detect its sibling's failures, and every disagreement resolves the same way by construction.
 
-It is sound only under one condition, which has to be established rather than hoped for: the two detectors must over-reach in **opposite** directions, and the direction the intersection fails in must be the safe one.
-Two detectors that are wrong the same way intersect to something equally wrong, which is the "two methods agreeing is not corroboration when both are narrow in the same way" trap one step along.
+What makes it sound is set containment rather than any claim about which way each detector errs.
+An intersection is a subset of both inputs, so it can only ever claim **less** than either --- it cannot invent a claim neither made.
+Every error it has therefore runs in one direction, under-claiming, and the whole condition to establish is that under-claiming is the safe direction for the consumer.
 
-The worked case is a code-span scanner.
-A whole-body scan over-reaches **downward**: it pairs stray delimiters across line boundaries and claims a span the author never opened.
-A per-line scan over-reaches **upward**: it can *manufacture* a span out of runs the whole-body scan already consumed into a span opened on the previous line.
-Neither is a subset of the other, and neither is correct.
-Their intersection claims less than either, so anything only one scan sees is left unclaimed --- which, in an instrument whose unclaimed direction is over-flagging, is exactly where the residue belongs.
+Two things follow, and the second is the one that is easy to get backwards.
+The intersection is **exact** when the two detectors' false positives are disjoint, since nothing false survives being claimed twice.
+It is merely **safe**, not exact, when they overlap --- a shape both detectors get wrong survives, which is the "two methods agreeing is not corroboration when both are narrow in the same way" trap one step along.
+So overlap costs you exactness and never costs you the direction, which is why the direction is the thing to check first.
+
+The worked case is a code-span scanner, and it is worth stating carefully because the two scans are wrong in the **same** direction, not opposite ones: both claim spans CommonMark does not have.
+What differs is *where* each invents them.
+A whole-body scan pairs stray delimiters across line boundaries, claiming a span the author never opened.
+A per-line scan can instead manufacture a span out of runs the whole-body scan already consumed into a span opened on the line above.
+Neither is a subset of the other, so neither can be dropped;
+their false positives largely do not coincide, which is what makes the intersection close to exact.
+And because an intersection only shrinks, the residue is unclaimed span rather than invented span --- in an instrument where an unmasked citation merely over-flags, exactly where the residue belongs.
 
 State the failure direction explicitly when you ship one.
 "Strictly safer than either" is a claim about which way the disagreements fall, and it is false for the same construction in an instrument whose safe direction is reversed.
 
-- **Do:** establish that two detectors err in opposite directions, and name the direction their disagreements resolve toward, before intersecting them.
+- **Do:** name the consumer's safe direction first, and intersect only when under-claiming is it --- that is the whole soundness condition.
 - **Do:** prefer an intersection over a guard when both are available --- it has no silent branch to fail open.
-- **Don't:** intersect two detectors that are narrow in the same way and read their agreement as corroboration.
+- **Do:** ask whether the two detectors' false positives overlap, to know whether you are getting exactness or only safety.
+- **Don't:** require the detectors to err in *opposite* directions;
+  two detectors that both over-claim, as a per-line and a whole-body span scan both do, are the ordinary case this serves.
+- **Don't:** read an intersection as corroboration --- a shape both detectors get wrong survives being claimed twice.
 - **Don't:** carry "the intersection is safer" into an instrument whose safe direction is the opposite one;
   the property belongs to the pair plus the consumer, not to the pair.
 

@@ -153,7 +153,15 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
 Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
-Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below: the first 8,000 generated bodies all carried one leading fragment, and a run capped there contained no instance of the shape the tool's negative control detects --- so the capped run reported itself blind while the uncapped 1,693,440-body sweep found the shape immediately.
+The structural claim holds whatever the corpus size: on `scripts/check-verdict-scan-parity.py` (shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below), `LEAD` is the outermost of seven `itertools.product` axes, so a prefix holds `LEAD[0]` fixed for the first 241,920 of 1,693,440 bodies.
+The **blind-prefix length** is the part that decays, and it decayed here: re-derived 2026-08-28, the negative control's first divergence is at prefix index **485**, with 120 divergences inside the first 8,000, so `--limit 500` already prints `DISCRIMINATES`.
+An earlier reading of this entry said the first 8,000 were blind.
+That was true when measured against a ~221k-body corpus and false after the same PR widened the corpus to 1,693,440 --- adding `FILLER_EXTRA`, two `LEAD` values, two `NEGATION` values and a further template (the generator now carries five;
+the count before the widening is unrecoverable, since #2515 was squash-merged) --- which changed generation order entirely, and nobody re-derived it.
+That is [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "Widening an instrument invalidates every figure it produced" committed into the instrument built to catch that class.
+The same stale sentence is still a source comment on `main`, tracked as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532).
+Re-derive a blind-prefix length before quoting one;
+quote the axis structure freely, since it does not decay.
 
 Striding fixes it, and the arithmetic has one trap.
 An integer step, `step = len(items) // limit`, is exactly `1` for every `limit` strictly above half the corpus, so the "stride" degenerates back to a prefix --- and that is the regime a generously-raised cap puts you in, which is why the naive form is likeliest to be wrong precisely when someone has tried to be careful.
@@ -167,14 +175,17 @@ if limit is not None and limit < total:
 ```
 
 `total / limit` is a `float` and stays above 1 for every `limit < total`, so each index advances.
-`range(0, total, total // limit)` reproduces the same bug, and fails loudly rather than silently only in the one case where `limit > total`: the step is then `0` and `range` raises `ValueError: range() arg 3 must not be zero`.
+`range(0, total, total // limit)` fails in the **opposite** direction rather than reproducing the prefix bug: for `total=100, limit=51` the step is `1`, so it yields all 100 indices and caps nothing at all.
+Only when `limit > total` does it fail loudly, the step being `0` and `range` raising `ValueError: range() arg 3 must not be zero`.
+So the integer-step trap has two distinct outcomes worth separating --- a slice stride degenerates to a prefix, while a `range` step degenerates to no cap --- and neither is the even spread the arithmetic was supposed to buy.
 
-A generator has no `len()`, so striding it requires either materializing it (fine for a bounded corpus) or making the generator itself accept the stride.
-Materializing 1.7M short strings is cheap;
-materializing an unbounded generator is not, and that asymmetry is what decides which form to reach for.
+A generator has no `len()`, so striding it requires either materializing it or making the generator itself accept the stride.
+Apply the cap *inside* the generator where you can, since materializing first spends the whole cost the cap was meant to avoid ([ai-config#2534](https://github.com/Morrison-Lab/ai-config/issues/2534)).
+Materializing is not free either, and "short strings" hides the cost: 1,693,440 of these bodies took 5.9 s and peaked at 511 MB max RSS (328 MB by `tracemalloc`), measured 2026-08-28 on CPython 3.11 under Linux.
+That is affordable for a bounded corpus and unbounded for a generator with no end, which is the asymmetry that decides which form to reach for --- but quote the number rather than calling it cheap, since half a gigabyte is a real constraint on a small runner.
 
 - **Do:** stride across a generated product space when capping it, computing the step as a float and indexing by `int(i * step)`.
-- **Do:** state in the run's own output which sampling mode produced the figures, so a capped number is never read as a swept one.
+- **Do:** state in the run's own output which sampling mode produced the figures, so a capped number is never read as a swept one (the tool this entry is drawn from does not, tracked as [ai-config#2534](https://github.com/Morrison-Lab/ai-config/issues/2534)).
 - **Don't:** implement a `--limit` as `itertools.islice` over a nested product generator --- that fixes the slowest-varying component.
 - **Don't:** use `total // limit` as a stride;
   it is 1 for every limit above half the corpus, which is a prefix by another name.

@@ -217,10 +217,10 @@ Generic Actions-authoring material stays there.
   Measured 2026-08-28.
   A session filed [UCD-SERG/shigella#36](https://github.com/UCD-SERG/shigella/issues/36) claiming the reviewer there "works from whatever prose the repo happens to carry" because neither caller passed the input.
   The shared `ai-config` corpus had been loading on every run all along.
-  Two PRs then shipped against that premise ([#36](https://github.com/UCD-SERG/shigella/pull/38) and a duplicate), and the change is a behavioural no-op --- worth having, since it records intent and survives a default moving, but not the fix the issue described.
+  [#38](https://github.com/UCD-SERG/shigella/pull/38) then shipped against that premise, and the change it makes is a behavioural no-op --- worth having, since it records intent and survives a default moving, but not the fix the issue described.
 
   **The recurrence is the part to notice.**
-  This is the second entry in this file from the same session and the same file, both from assuming a default instead of reading one --- the other being `lint-markdown`'s companion toggles directly above.
+  This is the second entry in this memory file from one session, both from assuming a default instead of reading one in the same `@v2` workflow file --- the other being `lint-markdown`'s companion toggles directly above.
   That session had opened `@v2`'s `claude-code-review.yml` three times that evening, for the `ANTHROPIC_API_KEY` secret and for the companion defaults, and never scrolled to this input.
   So the failure is not "I lacked the file";
   it is asking the file only the question already in mind.

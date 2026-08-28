@@ -101,7 +101,9 @@ The five minutes run *after* the comment, not concurrently with the twenty --- t
 
 (ai-config#2460.
 Measured 2026-08-27: a session driving #2433 and #2447 found #2448 --- a peer's PR fixing the very artifact blocking #2447 --- at exit 0, five minutes after its clean verdict.
-It held, which under this rule is the correct call.)
+It held, and the peer then pushed a further commit fourteen minutes later before merging the PR itself.
+So the counterfactual is not hypothetical: merging at the five-minute mark would have discarded a commit that did not yet exist, and nothing about the PR at that moment distinguished it from one that was finished.
+That is the whole argument for the interval, and for the warning step on top of it.)
 
 ## The standing per-repository grant
 

@@ -37,13 +37,20 @@ Four properties are deliberate:
   unchanged token reports the write as unverified. That errs toward a false
   alarm rather than a false pass, which is the safe direction.
 
-Only repos that ALREADY carry the secret are touched.
-`--repos` bypasses repo discovery, not secret discovery, so naming a repo that
-lacks the secret just drops it from the run, the same as any other repo
+Only scopes that ALREADY carry the secret are touched.
+Since ai-config#2360 the estate's primary copy is an ORG-LEVEL secret, so the
+sweep covers both scopes: each org discovered (or named via `--owners`) is
+checked for an org-level secret, and the per-repo sweep still runs because a
+repo-level override remains legitimate for a repo that should spend a
+different account's quota. The two scopes are reported separately, so an org
+rotation is never silently counted as covering a repo that still overrides it.
+`--repos` bypasses discovery entirely (org sweep included), so naming a repo
+that lacks the secret just drops it from the run, the same as any other repo
 without the secret.
-Provisioning the secret into a repo that lacks it is a separate, deliberate
-per-repo decision and out of this script's scope; do it directly with
-`gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<name>`.
+Provisioning the secret into a scope that lacks it is a separate, deliberate
+decision and out of this script's scope; do it directly with
+`gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<name>` or
+`gh secret set CLAUDE_CODE_OAUTH_TOKEN --org <org> --visibility all`.
 
 `claude setup-token` is the USER's to run, in their own terminal. It opens a
 browser as its first act and then blocks reading an authorization code from
@@ -183,6 +190,112 @@ def secret_updated_at(repo: str, secret: str) -> str | None:
     return None
 
 
+def org_secret_info(org: str, secret: str) -> tuple[str, str] | None:
+    """`(updated_at, visibility)` for the org-level `secret`, or None.
+
+    A 404 also returns None: the owner is a user rather than an org, so the
+    endpoint does not exist for it. That is a normal result -- the owners
+    list mixes the authenticated login in with real orgs -- not a failure.
+    Any other error (403 permission, network) raises, so an org that exists
+    but cannot be read is reported rather than silently counted secretless.
+    The `--jq` projection is required for the same pagination reason as
+    `secret_updated_at` above.
+    """
+    try:
+        out = gh(
+            [
+                "api",
+                f"/orgs/{org}/actions/secrets",
+                "--paginate",
+                "--jq",
+                ".secrets[]",
+            ]
+        )
+    except GhError as exc:
+        if "404" in str(exc):
+            return None
+        raise
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        if entry["name"] == secret:
+            return entry["updated_at"], entry.get("visibility", "private")
+    return None
+
+
+def find_org_targets(
+    owners: list[str], secret: str
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str]]]:
+    """Split `owners` into orgs carrying `secret` and those that errored.
+
+    Returns `(targets, errors)`, where `targets` is
+    `(org, updated_at, visibility)` and `errors` is `(owner, message)`.
+    A user login, or an org without the secret, appears in neither.
+    """
+    targets: list[tuple[str, str, str]] = []
+    errors: list[tuple[str, str]] = []
+    for owner in owners:
+        try:
+            info = org_secret_info(owner, secret)
+        except (GhError, json.JSONDecodeError) as exc:
+            errors.append((owner, str(exc)))
+            continue
+        if info is not None:
+            targets.append((owner, info[0], info[1]))
+    return sorted(targets), sorted(errors)
+
+
+def org_selected_repos(org: str, secret: str) -> list[str]:
+    """`owner/name` for each repo an org-level `selected` secret reaches."""
+    out = gh(
+        [
+            "api",
+            f"/orgs/{org}/actions/secrets/{secret}/repositories",
+            "--paginate",
+            "--jq",
+            ".repositories[].full_name",
+        ]
+    )
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def rotate_org(
+    org: str, secret: str, token: str, previous: str, visibility: str
+) -> str:
+    """Set the org-level `secret`, then confirm `updated_at` actually moved.
+
+    `--visibility` is always passed explicitly, preserving what the secret
+    already had: the API default is `private`, which reaches no repo (see
+    ai-config#2361), so relying on the default would silently narrow an
+    `all` secret in the act of rotating it. A `selected` secret keeps its
+    repo list by reading it back and passing it through, and refuses to
+    write if that list cannot be read -- writing `selected` with no repos
+    would detach the secret from every repo it serves.
+    """
+    args = ["secret", "set", secret, "--org", org, "--visibility", visibility]
+    if visibility == "selected":
+        selected = org_selected_repos(org, secret)
+        if not selected:
+            raise GhError(
+                f"{secret} on org {org} has visibility=selected but its "
+                "repo list could not be read; refusing to write a selected "
+                "secret with no repos"
+            )
+        args.extend(["--repos", ",".join(selected)])
+    gh(args, stdin=token)
+    info = org_secret_info(org, secret)
+    if info is None:
+        raise GhError(f"{secret} is absent from org {org} after the write")
+    current, _ = info
+    if current == previous:
+        raise GhError(
+            f"{secret} on org {org} still reports updated_at={current}; "
+            "the write did not take effect"
+        )
+    return current
+
+
 def find_targets(
     repos: list[str], secret: str, workers: int
 ) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
@@ -310,47 +423,73 @@ def main() -> None:
     print(f"Repos inspected: {len(repos)}")
 
     targets, errors = find_targets(repos, args.secret, args.workers)
+    # The org sweep runs off the same owners list; with --repos there are no
+    # owners, so discovery (org sweep included) is bypassed, per the
+    # docstring.
+    org_targets, org_errors = find_org_targets(owners, args.secret)
+    errors.extend(org_errors)
 
     # Report what could not be read before reporting what was found: an
-    # unreadable repo is indistinguishable from one without the secret in the
-    # counts below, so a silent error would understate the target list.
-    for repo, message in errors:
-        print(f"  ERROR {repo}: {message}", file=sys.stderr)
+    # unreadable scope is indistinguishable from one without the secret in
+    # the counts below, so a silent error would understate the target list.
+    for scope, message in errors:
+        print(f"  ERROR {scope}: {message}", file=sys.stderr)
     if errors:
-        print(f"{len(errors)} repo(s) could not be read.", file=sys.stderr)
+        print(f"{len(errors)} scope(s) could not be read.", file=sys.stderr)
 
+    # The two scopes are reported separately, so an org-level rotation is
+    # never silently counted as covering a repo that still overrides it.
+    print(f"Orgs carrying {args.secret} at org level: {len(org_targets)}")
+    for org, updated_at, visibility in org_targets:
+        print(f"  {org:<44} updated={updated_at} visibility={visibility}")
     print(f"Repos carrying {args.secret}: {len(targets)}")
     for repo, updated_at in targets:
         print(f"  {repo:<44} updated={updated_at}")
 
-    if not targets:
+    if not targets and not org_targets:
         print("\nNothing to rotate.")
         sys.exit(1 if errors else 0)
 
+    total = len(org_targets) + len(targets)
     if not args.apply:
         print(
             f"\nPreview only; nothing was changed. "
-            f"Re-run with --apply to rotate all {len(targets)}."
+            f"Re-run with --apply to rotate all {total}."
         )
         sys.exit(1 if errors else 0)
 
     token = read_token(args.secret)
 
-    print(f"\nRotating {len(targets)} repo(s):")
     rotated = 0
-    for repo, previous in targets:
-        try:
-            current = rotate(repo, args.secret, token, previous)
-        except GhError as exc:
-            print(f"  FAILED  {repo}: {exc}", file=sys.stderr)
-            errors.append((repo, str(exc)))
-            continue
-        rotated += 1
-        print(f"  ok      {repo:<44} updated={current}")
+    if org_targets:
+        print(f"\nRotating {len(org_targets)} org secret(s):")
+        for org, previous, visibility in org_targets:
+            try:
+                current = rotate_org(
+                    org, args.secret, token, previous, visibility
+                )
+            except GhError as exc:
+                print(f"  FAILED  org:{org}: {exc}", file=sys.stderr)
+                errors.append((org, str(exc)))
+                continue
+            rotated += 1
+            print(f"  ok      org:{org:<40} updated={current}")
 
-    print(f"\nRotated {rotated} of {len(targets)}.")
+    if targets:
+        print(f"\nRotating {len(targets)} repo(s):")
+        for repo, previous in targets:
+            try:
+                current = rotate(repo, args.secret, token, previous)
+            except GhError as exc:
+                print(f"  FAILED  {repo}: {exc}", file=sys.stderr)
+                errors.append((repo, str(exc)))
+                continue
+            rotated += 1
+            print(f"  ok      {repo:<44} updated={current}")
+
+    print(f"\nRotated {rotated} of {total}.")
     if errors:
-        print(f"{len(errors)} repo(s) failed; see above.", file=sys.stderr)
+        print(f"{len(errors)} scope(s) failed; see above.", file=sys.stderr)
         sys.exit(1)
 
 

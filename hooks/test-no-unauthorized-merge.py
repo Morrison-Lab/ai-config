@@ -659,13 +659,20 @@ def quadratic_scan(text):
         text.count("q", i)
 
 
-_control_growth, _, _ = growth_of(
+_control_growth, _, _control_base = growth_of(
     lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=quadratic_scan)
-_control_ok = _control_growth > SCAN_GROWTH_BOUND
-check(_control_ok)
-print(f"  {'allow' if _control_ok else 'WRONG':<6} "
-      f"negative control: a quadratic scan grew {_control_growth:.1f}x, "
-      f"past the {SCAN_GROWTH_BOUND:g}x bound")
+if _control_base < SCAN_FLOOR_SECONDS:
+    _control_ok = False
+    check(_control_ok)
+    print(f"  WRONG  negative control: baseline of {_control_base * 1000:.1f}ms "
+          f"is below the {SCAN_FLOOR_SECONDS * 1000:.0f}ms floor, so this "
+          f"platform's CPU clock cannot measure the growth")
+else:
+    _control_ok = _control_growth > SCAN_GROWTH_BOUND
+    check(_control_ok)
+    print(f"  {'allow' if _control_ok else 'WRONG':<6} "
+          f"negative control: a quadratic scan grew {_control_growth:.1f}x, "
+          f"past the {SCAN_GROWTH_BOUND:g}x bound")
 
 # The executor scan reads a DIFFERENT string from the one being masked, and the
 # two are interchangeable only because both are length-preserving. A caller that

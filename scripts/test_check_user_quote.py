@@ -169,6 +169,33 @@ def main() -> int:
           cuq._rank({"shape": "message/assistant", "origin.kind": "(absent)"})
           > cuq._rank({"shape": "message/user", "origin.kind": "(absent)"}))
 
+    # A text repeated across FILES: the count was right and the file shown was
+    # only the first, so "(x2 records)" could be read as two copies in it.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "one.jsonl", [user("SENTINEL_SPREAD across files", human=True)])
+        write(root, "two.jsonl", [user("SENTINEL_SPREAD across files", human=True)])
+        code, out = run(root, "SENTINEL_SPREAD across files")
+        check("a text repeated across files is collapsed once", code == 0
+              and "1 distinct text(s) in 2 record(s)" in out)
+        check("...and the report names the other file rather than hiding it",
+              "more file(s)" in out)
+    check("collapse tracks every file a duplicate came from",
+          cuq.collapse([
+              {"file": "a", "shape": "message/user", "text": "t", "origin.kind": "human",
+               "flags": "(none)", "userType": "x", "session": "s"},
+              {"file": "b", "shape": "message/user", "text": "t", "origin.kind": "human",
+               "flags": "(none)", "userType": "x", "session": "s"},
+          ])[0]["files"] == ["a", "b"])
+
+    # A degraded run that DID find candidates must not talk about an absence.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "ok.jsonl", [user("SENTINEL_FOUND here", human=True)])
+        (Path(root) / "gone.jsonl").symlink_to(Path(root) / "nothing-here")
+        code, out = run(root, "SENTINEL_FOUND here")
+        check("a degraded run that found candidates still exits 2", code == 2)
+        check("...and says there may be more, not that an absence is unestablished",
+              "further records" in out and "absence here is not established" not in out)
+
     # -- HONESTY: a degraded read is never an absence -----------------------
     with tempfile.TemporaryDirectory() as root:
         path = Path(root) / "torn.jsonl"

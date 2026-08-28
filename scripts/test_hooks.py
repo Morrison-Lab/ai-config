@@ -159,7 +159,7 @@ def run_one_suite(test_path, subject, timeout):
     rel_test = os.path.relpath(test_path, ROOT)
     print(f"RUN: {rel_test}", flush=True)
     proc = subprocess.Popen(
-        [sys.executable, test_path, subject],
+        [sys.executable, "-W", "error::SyntaxWarning", test_path, subject],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         stdout, stderr = proc.communicate(timeout=timeout)

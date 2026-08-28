@@ -263,7 +263,7 @@ RX_GH_STATE_FLAG = re.compile(
     r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))(\S+)"
 )
 RX_GH_SEARCH_FLAG = re.compile(
-    r"(?:--search\b|(?<![A-Za-z0-9-])-S\b)"
+    r"(?:(?<![A-Za-z0-9-])--search\b|(?<![A-Za-z0-9-])-S\b)"
 )
 
 # The VALUE following --search/-S (gh) or --search (glab): a single- or
@@ -272,7 +272,8 @@ RX_GH_SEARCH_FLAG = re.compile(
 # (`--search` with nothing after it, which gh itself would refuse to run)
 # and to inspect the value for an embedded is:/state: qualifier.
 RX_SEARCH_VALUE = re.compile(
-    r"(?:--search(?:=|\s+)|(?<![A-Za-z0-9-])-S(?:=|\s+))"
+    r"(?:(?<![A-Za-z0-9-])--search(?:=|\s+)|"
+    r"(?<![A-Za-z0-9-])-S(?:=|\s+))"
     r"(?P<val>'[^']*'|\"(?:[^\"\\]|\\.)*\"|\S+)"
 )
 
@@ -286,7 +287,7 @@ RX_SEARCH_VALUE = re.compile(
 RX_GLAB_ALL_FLAG = re.compile(
     r"(?:--all|(?<![A-Za-z0-9-])-A)\b(?:=(\S+))?"
 )
-RX_GLAB_SEARCH_FLAG = re.compile(r"--search\b")
+RX_GLAB_SEARCH_FLAG = re.compile(r"(?<![A-Za-z0-9-])--search\b")
 
 # Quoted spans in a list command's flags are search terms, not flags.
 # `--state open --search "--state all"` must not discharge. The double-quote

@@ -14,47 +14,25 @@ three ways rather than two:
   UNATTRIBUTED  no `origin`, `origin.kind == "unclassified"`, or a kind this
                 table has not seen
 
-Why UNATTRIBUTED cannot simply be excluded, from two independent directions:
+UNATTRIBUTED cannot simply be excluded: 2,270 of 2,339 user-role records in
+one transcript root carried no `origin` key at all on 2026-08-28, and one of
+the CLI's own human predicates reads (de-minified) `O0(o.origin) &&
+o.verifiedSlackHumanTurn !== true`, so a labelled record can be somebody else's
+message relayed from a channel. `shared/writing/citations.md` carries the
+argument; this notes only what the code depends on.
 
-  observed  Of 2,339 user-role records in this machine's transcript root on
-            2026-08-28, **2,270 carry no `origin` key at all** -- 2 are
-            `human`, 64 `task-notification`, 3 `coordinator`, and
-            `unclassified` occurs zero times. Excluding the unlabelled would
-            discard 97% of the corpus and deny real quotations.
-  in the CLI A sanitizer in the shipped 2.1.250 binary rewrites a user
-            record's origin to `unclassified` when the kind is `human` or
-            `auto-continuation` (de-minified from `if(n.type==="user"&&(s==null
-            ||s.kind==null||s.kind==="human"||s.kind==="auto-continuation"))
-            n.origin={kind:"unclassified"}`, where `s` is bound by
-            `let s=n.origin;`). Whether records so rewritten reach the
-            on-disk transcript is NOT established -- the observed count above
-            says they do not, here -- so this is a reason to treat the value
-            as possible, not evidence that it occurs.
-
-`verifiedSlackHumanTurn` is excluded because one of the CLI's own human tests
-carries it: de-minified, `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
-That record is stamped human and relayed, so it is somebody's typed turn and
-not necessarily this user's. The check here is a SUBSET of that predicate: it
-omits the `toolUseResult === undefined` conjunct, which is safe only because a
-tool-result carrier has no text block for `text_blocks` to return.
+The check here is a SUBSET of that predicate in one respect and stricter in
+another: it does not implement `O0` itself, and it excludes any record carrying
+`toolUseResult` outright rather than reasoning about whether such a record can
+hold text.
 
 Related instrument: `hooks/no-misattributed-quote.py` does the structurally
-similar job for a phrase attributed to a corpus FILE. It is not reused here --
-its corpus resolution and n-gram matcher answer a different question -- but a
-Stop-hook form of this check, firing on a quote attributed to the user with no
-prior run of this script, is the obvious next step and is not in this change.
+similar job for a phrase attributed to a corpus FILE. A Stop-hook form of this
+check -- firing on a quote attributed to the user with no prior run of this
+script -- is the obvious next step and is not in this change.
 
-Classification is per record; matching is per non-envelope REGION of a block.
-A human-labelled record can carry injected text, and can carry it mid-block
-rather than at the start -- so well-formed envelopes are cut out of a block
-before the phrase is looked for, and a phrase found only inside one is not the
-user's.
-
-A closing tag is required, so a turn writing ABOUT a tag stays quotable.  The
-one exception is a block that OPENS with an unclosed opener, which is read as a
-truncated injection and yields nothing: that denies a quotation a user could
-conceivably have typed, and the alternative is certifying harness prose, which
-is the failure this tool exists to prevent.
+Classification is per record; matching is per text block. A block containing
+any tag-shaped opener is unquotable in full, and blocks are never concatenated.
 
 Exit codes. `shared/writing/citations.md` is the statement of record; this is
 what the code does.
@@ -65,7 +43,7 @@ what the code does.
      result than one over two thousand, and the count is always reported
   2  no such region was available to search: a missing root, a root that could
      not be resolved, an unreadable file or directory, an unparseable line, an
-     empty phrase, or a crash inside the scan
+     empty phrase, or a crash anywhere after the arguments parse
   3  found only in an unattributed region, with `--allow-unattributed`
 
 Exit 2 is kept distinct from 1 so a degraded read can never be reported as an
@@ -75,9 +53,12 @@ for a certified one.
 Known limits, stated rather than left to be discovered:
   - A phrase spanning two blocks of one record is not found; blocks are never
     concatenated.
-  - A block carrying any envelope opener is unquotable in full, so a turn
-    written ABOUT a tag cannot be quoted from that block. `--show-excluded`
-    names the reason.
+  - A block carrying any tag-shaped opener is unquotable in full, so a turn
+    written ABOUT a tag cannot be quoted from that block. The run exits 2 and
+    says the phrase is present but unsearchable; `--show-excluded` shows which
+    block.
+  - `unparseable` is a root-wide latch: one torn line anywhere makes every
+    absence report as could-not-search until it is repaired. Safe, and blunt.
 """
 from __future__ import annotations
 
@@ -89,23 +70,24 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-# Structural harness envelopes. A block containing ANY of these openers is
-# unquotable IN FULL -- the tool does not try to work out where the envelope
-# ends.
+# A block containing ANY tag-shaped opener is unquotable in full.
 #
-# Five successive revisions tried to: strip the tag pair, then per record, then
-# per block, then per region. Each shipped, and each was broken by a shape the
-# last had not considered -- an appended reminder, a mid-block one, leftovers
-# joined across a cut, a repeated opener, a literal closing tag inside injected
-# content. That is delimiter-matching over untrusted text with a regex, and the
-# supply of shapes does not run out.
+# The previous revision enumerated four names and claimed "nothing is parsed".
+# That was false: the parse had moved from grammar to VOCABULARY, and the
+# vocabulary was not mine. The shipped CLI defines at least fifteen tag names
+# it emits into or strips from user content -- command-name, command-message,
+# bash-stdout, bash-stderr, local-command-stdout, local-command-stderr,
+# local-command-caveat, tick, task-notification, task-id, task-type,
+# output-file, status, summary, teammate-message -- and the four-name list
+# intersected that set in exactly one. `teammate-message` is another agent's
+# words in a user-role record; `ide_selection` is editor content appended to
+# the user's own typed prompt. Both certified at exit 0.
 #
-# So the question changed from "which part of this block is the harness's?" to
-# "is any of it?". The cost is that a user writing ABOUT a tag cannot be quoted
-# from that block; the tool says so rather than reporting an absence. The gain
-# is that there is nothing left to parse, so there is no next shape.
-ENVELOPE_TAGS = ("task-notification", "system-reminder", "wake", "command-name")
-_OPENER_RX = re.compile(r"<(" + "|".join(ENVELOPE_TAGS) + r")\b", re.IGNORECASE)
+# So the test is structural rather than enumerated. Measured on this machine's
+# transcript root, it denies zero human-labelled blocks and one unattributed
+# block (an assistant-written dispatch brief), so the recall it costs on real
+# data is nil while the name list it removes was already incomplete.
+_OPENER_RX = re.compile(r"<[A-Za-z][A-Za-z0-9_-]*(?:\s[^>]*)?>")
 
 # Prose markers that open a harness-written record. Applied ONLY to a record
 # the harness did not label human: they are ordinary English, so a real turn
@@ -179,6 +161,9 @@ def _regions(block: str) -> List[str]:
     return [block] if block.strip() else []
 
 
+
+
+
 def classify_record(record: dict) -> Tuple[str, str]:
     """Record-level verdict, before any block is examined."""
     message = record.get("message") or {}
@@ -191,6 +176,14 @@ def classify_record(record: dict) -> Tuple[str, str]:
     if user_type is not None and user_type != "external":
         return EXCLUDED, f"userType={user_type}"
 
+    if record.get("toolUseResult") is not None:
+        # The CLI's own human predicate carries `toolUseResult === undefined`.
+        # The previous revision omitted it and argued the omission was safe
+        # because such a record has no text block -- true of the observed
+        # corpus, and an assumption of exactly the shape this file's history is
+        # made of. Enforced rather than assumed.
+        return EXCLUDED, "tool-result carrier"
+
     origin = record.get("origin")
     kind = origin.get("kind") if isinstance(origin, dict) else None
     if kind == "human":
@@ -199,12 +192,12 @@ def classify_record(record: dict) -> Tuple[str, str]:
         return EXCLUDED, f"origin.kind={kind}"
 
     # Unlabelled or demoted. Only here do the English prose markers apply.
+    # Every block, not the first: a leading empty block -- which text_blocks
+    # produces for a non-str `text` field -- would otherwise hide a marker.
     for block in text_blocks(message):
         stripped = block.lstrip()
-        for prefix in TRANSCRIPT_PREFIXES:
-            if stripped.startswith(prefix):
-                return EXCLUDED, "harness transcript marker"
-        break
+        if any(stripped.startswith(prefix) for prefix in TRANSCRIPT_PREFIXES):
+            return EXCLUDED, "harness transcript marker"
     return UNATTRIBUTED, f"origin.kind={kind}" if kind else "no origin.kind label"
 
 
@@ -227,6 +220,7 @@ class Scan:
         self.hits: List[Tuple[str, str]] = []
         self.uncertified: List[Tuple[str, str]] = []
         self.near_misses: List[Tuple[str, str, str]] = []
+        self.denied = 0   # the phrase is present, but only outside a quotable region
 
 
 def _walk(root: Path, result: Scan) -> List[Path]:
@@ -299,17 +293,18 @@ def _scan_line(line: str, name: str, target: str, show_excluded: bool, result: S
         return
     matched = next((r for r in regions if target in norm(r)), None)
     if matched is None:
-        if not show_excluded:
-            return
+        # Derived unconditionally, not only under --show-excluded: whether the
+        # phrase is present-but-unsearchable decides the EXIT CODE, and a
+        # denial reported as a bare exit 1 says "the user never said it" about
+        # a sentence sitting in the transcript.
         blocks = text_blocks(message)
-        # Derive the reason rather than assert one: the phrase may be inside a
-        # block this record excluded, or only across a join of two blocks, and
-        # those are different facts about the user's own text.
         whole_block = next((b for b in blocks if target in norm(b)), None)
         if whole_block is not None:
-            why = reason if kind == EXCLUDED else "block carries a harness envelope tag"
-            result.near_misses.append((name, why, whole_block.strip()[:160]))
-        elif target in norm(" ".join(blocks)):
+            result.denied += 1
+            if show_excluded:
+                why = reason if kind == EXCLUDED else "block carries a tag-shaped opener"
+                result.near_misses.append((name, why, whole_block.strip()[:160]))
+        elif show_excluded and target in norm(" ".join(blocks)):
             result.near_misses.append(
                 (name, "spans two blocks; never contiguous in one", " ".join(blocks).strip()[:160]))
         return
@@ -328,6 +323,10 @@ def status(result: Scan, allow_unattributed: bool) -> str:
         # Deliberately not "found": a scripted caller branching on the exit code
         # must not read the weaker reading as a certified one.
         return "accepted-unattributed"
+    if result.denied:
+        # Present in the transcript, in a block nothing could search. That is a
+        # could-not-search, not an absence.
+        return "unsearchable"
     searchable = result.human or (allow_unattributed and result.unattributed)
     # An unparseable line is the commonest degraded read there is -- a live
     # session appends while this reads, so a torn final line is normal -- and it
@@ -348,6 +347,7 @@ def _payload(outcome: str, root: Path, result: Scan, reason: str = "") -> dict:
         "human_regions": result.human,
         "unattributed_regions": result.unattributed,
         "unparseable_lines": result.unparseable,
+        "denied_blocks": result.denied,
         "unreadable": result.unreadable,
         "hits": [{"file": f, "text": t} for f, t in result.hits],
         "unattributed_matches": [{"file": f, "text": t} for f, t in result.uncertified],
@@ -379,7 +379,11 @@ def report(result: Scan, root: Path, allow_unattributed: bool) -> None:
               "It is a candidate, not evidence. Do not quote it without a second source.")
     outcome = status(result, allow_unattributed)
     if outcome == "unsearchable":
-        if result.unreadable or result.unparseable:
+        if result.denied:
+            print(f"\nThe phrase is present in {result.denied} block(s) that could not be "
+                  "searched -- each carries a tag-shaped opener, or its record is excluded. "
+                  "That is not an absence. Re-run with --show-excluded to see them.")
+        elif result.unreadable or result.unparseable:
             print("\nPart of the space could not be read, so an absence here is not established.")
         else:
             print("\nNo quotable human regions were found at all -- this is an unsearched "
@@ -389,8 +393,26 @@ def report(result: Scan, root: Path, allow_unattributed: bool) -> None:
         print(f"\nNot present in any of {result.human} quotable human region(s). Do not quote it.")
 
 
+def _harden_stdout() -> None:
+    """A transcript carries whatever the user typed; the console may not encode it.
+
+    Without this, `LC_ALL=C` plus an em-dash in a matched turn kills the process
+    while PRINTING the hit, and Python's default status for that is 1 -- the
+    code this tool documents as "absent".
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    _harden_stdout()
+    parser = argparse.ArgumentParser(
+        description=(__doc__ or "check whether a phrase was typed by the user").splitlines()[0])
     parser.add_argument("phrase", help="the sentence you are about to attribute to the user")
     parser.add_argument("--root", help="transcript directory "
                         "(default: $CLAUDE_CONFIG_DIR/projects, else ~/.claude/projects)")
@@ -446,6 +468,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         result = scan(root, args.phrase, args.show_excluded)
+        outcome = status(result, args.allow_unattributed)
+        if args.as_json:
+            print(json.dumps(_payload(outcome, root, result), indent=2))
+        else:
+            report(result, root, args.allow_unattributed)
+        return {"found": 0, "absent": 1, "unsearchable": 2, "accepted-unattributed": 3}[outcome]
     except Exception as exc:  # noqa: BLE001 -- mapped to exit 2, never to 1
         # Python's default status for an uncaught exception is 1, which this
         # tool documents as "absent". A crash is a search that did not happen.
@@ -456,14 +484,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             print(message, file=sys.stderr)
         return 2
-    outcome = status(result, args.allow_unattributed)
-
-    if args.as_json:
-        print(json.dumps(_payload(outcome, root, result), indent=2))
-    else:
-        report(result, root, args.allow_unattributed)
-
-    return {"found": 0, "absent": 1, "unsearchable": 2, "accepted-unattributed": 3}[outcome]
 
 
 if __name__ == "__main__":

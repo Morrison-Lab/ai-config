@@ -427,8 +427,8 @@ Of 2,339 user-role records in one machine's transcript root on 2026-08-28, **2,2
 2 are `human`, 64 `task-notification`, 3 `coordinator`.
 So the label is absent from 97% of the corpus, and treating its absence as a rejection would discard almost everything.
 Separately, a sanitizer in the shipped CLI 2.1.250 rewrites a user record's origin to `unclassified` when the kind is `human` or `auto-continuation`, and one of the CLI's own human tests reads (de-minified) `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
-Whether records that sanitizer rewrites reach the on-disk transcript is not established --- the count above says they do not, here --- so it argues the value is possible rather than showing it occurs.
-Both readings point the same way: a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
+Whether records that sanitizer rewrites reach the on-disk transcript is not established --- the count above says they do not, here --- so the sanitizer argues the value is possible rather than showing it occurs.
+Both reasons point the same way: a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
 A record carrying no usable label is therefore **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
 That distinction is not fastidiousness.
 Five successive versions tried to identify *which part* of a record was the harness's.
@@ -440,14 +440,23 @@ splitting properly fixed that and still leaked on a repeated opener, and on inje
 Each shipped, each passed its suite, and each was broken by a shape the last had not considered.
 
 That is delimiter-matching over untrusted text with a regular expression, and the supply of shapes does not run out.
-So the question changed from *which part of this block is the harness's* to *is any of it*:
-a block carrying any envelope opener is now unquotable in full, and nothing is parsed.
-The cost is real and worth stating --- a turn written **about** a tag cannot be quoted from that block --- and the run says so rather than reporting an absence.
+So the question changed from *which part of this block is the harness's* to *is any of it*: a block carrying an opener is unquotable in full.
+
+The first attempt at that named four tags and claimed nothing was parsed.
+It was still parsing --- the parse had moved from **grammar** to **vocabulary**, and the vocabulary belongs to the harness rather than to the checker.
+The shipped CLI emits or strips at least fifteen tag names inside user content, and the four-name list intersected them in one;
+`teammate-message` carries another agent's words in a user-role record, and `ide_selection` carries editor content appended to the user's own prompt.
+Both certified at exit `0`.
+The test is structural now --- any tag-shaped opener --- which removes the enumeration rather than shortening it.
+Measured on one real transcript root, it denies **zero** human-labelled blocks.
+
+The cost is real and worth stating: a turn written **about** a tag cannot be quoted from that block.
+The run exits `2` and says the phrase is present in a block it could not search, rather than reporting an absence --- and that holds in the default invocation, not only behind a flag, since a bare exit `1` is exactly the "the user never said it" claim the contract exists to prevent.
 
 The residual, rather than a claim of completeness:
 a phrase spanning two blocks of one record is not found;
 an unlabelled record is never certified, only offered;
-and the opener list is a fixed set, so a tag the harness adds later is invisible until it is added here.
+and the opener test is lexical, so injected text carrying no tag-shaped opener at all --- were the harness ever to deliver some that way --- would not be caught.
 
 The exit codes keep apart two things that are easy to conflate:
 a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash inside the scan).

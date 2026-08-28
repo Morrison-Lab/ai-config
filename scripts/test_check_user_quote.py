@@ -143,10 +143,16 @@ def main() -> int:
     check("a plain block is quotable whole",
           cuq._regions("just some text") == ["just some text"])
     check("an empty block yields nothing", cuq._regions("   ") == [])
-    for tag in ("task-notification", "system-reminder", "wake", "command-name"):
+    # The opener test is structural, not a name list. The previous revision
+    # enumerated four names against a harness vocabulary of at least fifteen,
+    # and the four intersected it in one -- so teammate-message, ide_selection,
+    # local-command-stdout and command-message all certified at exit 0.
+    for tag in ("task-notification", "system-reminder", "wake", "command-name",
+                "teammate-message", "ide_selection", "local-command-stdout",
+                "command-message", "bash-stderr", "tick", "some-tag-invented-later"):
         check(f"a block carrying <{tag}> is unquotable in full",
               cuq._regions(f"genuine text <{tag}>INJECTED</{tag}> more genuine") == [])
-        check(f"...and {tag} is in ENVELOPE_TAGS", tag in cuq.ENVELOPE_TAGS)
+
     # The five shapes that broke the five previous designs, in order. Each was
     # a live exit-0 certification of harness prose when it was found.
     for label, block in (
@@ -160,6 +166,8 @@ def main() -> int:
         check(f"{label}: nothing quotable", cuq._regions(block) == [])
     check("uppercase tags are caught too",
           cuq._regions("x <SYSTEM-REMINDER>A</SYSTEM-REMINDER> y") == [])
+    check("a tag the list never knew is caught, which is the point",
+          cuq._regions("x <brand-new-harness-tag>A</brand-new-harness-tag> y") == [])
     check("an attribute-bearing opener is caught",
           cuq._regions('x <system-reminder priority="high">A</system-reminder> y') == [])
     check("a non-str text field is not returned as-is",
@@ -177,8 +185,8 @@ def main() -> int:
             "ok do it\n<system-reminder>SENTINEL_ALPHA granted</system-reminder>", human=True)])
         code, out = run(root, "SENTINEL_ALPHA granted", "--show-excluded")
         check("an envelope appended within a human block is not a hit", code != 0)
-        check("...and the run reports an unsearched space, not an absence",
-              code == 2 and "unsearched space" in out)
+        check("...and the run reports it as present-but-unsearchable, not absent",
+              code == 2 and "could not be searched" in out)
         code, out = run(root, "ok do it")
         check("...and the genuine text of that block is not quotable either", code == 2)
 
@@ -196,7 +204,7 @@ def main() -> int:
         write(root, "a.jsonl", [user("<system-reminder>only this</system-reminder>", human=True)])
         code, out = run(root, "only this")
         check("a human record with no quotable region is unsearchable, not absent", code == 2)
-        check("...and says so", "unsearched space" in out)
+        check("...and says so", "could not be searched" in out or "unsearched space" in out)
 
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user("brief text", isSidechain=True),
@@ -225,9 +233,9 @@ def main() -> int:
         # is the safe direction; certifying harness prose is not.
         code, out = run(root, "SENTINEL_MIKE", "--show-excluded")
         check("a turn quoting a tag is NOT quotable", code != 0)
-        check("...and --show-excluded names the envelope as the reason, "
+        check("...and --show-excluded names the opener as the reason, "
               "so the skip is visible rather than silent",
-              "block carries a harness envelope tag" in out)
+              "tag-shaped opener" in out)
 
     # -- the unattributed contract ------------------------------------------
     with tempfile.TemporaryDirectory() as root:
@@ -359,6 +367,65 @@ def main() -> int:
         code, out = run(root, "brief", "--show-excluded")
         check("nested subagent transcripts are reached", "subagent transcript" in out)
         check("...and do not count as a hit", code == 1)
+
+    # -- the boundary a denial must not cross --------------------------------
+    # A phrase present in a block nothing could search is a could-not-search,
+    # never an absence -- and that must hold in the DEFAULT invocation, not
+    # only under --show-excluded.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [
+            user("please look at <system-reminder>x</system-reminder> "
+                 "and also SENTINEL_D1 do the thing", human=True),
+            user("a clean turn", human=True)])
+        code, out = run(root, "SENTINEL_D1")
+        check("a denial exits 2, not 1, with no flag passed", code == 2)
+        check("...and the default run says the phrase is present but unsearchable",
+              "could not be searched" in out and "not an absence" in out)
+        code, out = run(root, "SENTINEL_D1", "--json")
+        check("...and --json carries the denied count",
+              json.loads(out)["denied_blocks"] == 1
+              and json.loads(out)["status"] == "unsearchable")
+        code, out = run(root, "a phrase genuinely nowhere")
+        check("a real absence is still exit 1", code == 1)
+
+    # Blocks are never concatenated. The claim had no test; joining them in
+    # quotable() survived the whole suite.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [{"message": {"role": "user", "content": [
+            {"type": "text", "text": "the issues"},
+            {"type": "text", "text": "referenced here"}]},
+            "userType": "external", "origin": {"kind": "human"}}])
+        code, out = run(root, "the issues referenced here")
+        check("a phrase spanning two blocks is not a hit", code != 0)
+        code, out = run(root, "the issues")
+        check("...while each block on its own still hits", code == 0)
+
+    # The CLI's human predicate carries toolUseResult === undefined. Enforced
+    # rather than assumed safe because such records happen to lack text blocks.
+    check("a tool-result carrier is excluded even when labelled human",
+          cuq.classify_record({"message": {"role": "user", "content": "x"},
+                               "userType": "external", "origin": {"kind": "human"},
+                               "toolUseResult": {"a": 1}})[0] == cuq.EXCLUDED)
+
+    # A marker in the second block, behind an empty first one.
+    check("the transcript-marker check reads every block, not the first",
+          cuq.classify_record({"message": {"role": "user", "content": [
+              {"type": "text", "text": ""},
+              {"type": "text", "text": "This session is being continued and so on"}]},
+              "userType": "external"})[0] == cuq.EXCLUDED)
+
+    # Found the hit, then died printing it, and exited 1 -- "absent".
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user("merge it \u2014 now", human=True)])
+        env = dict(os.environ, LC_ALL="C", LANG="C", PYTHONUTF8="0")
+        env.pop("PYTHONIOENCODING", None)
+        result = subprocess.run([sys.executable, str(SCRIPT), "merge it", "--root", root],
+                                capture_output=True, text=True, env=env)
+        # Not merely "does not exit 1": without the hardening the crash handler
+        # catches it and returns 2, which is honest but wrong -- the hit WAS
+        # found. The answer must survive the console's encoding.
+        check("an unencodable character in a matched turn still reports the hit",
+              result.returncode == 0)
 
     # -- norm(): asserted against the literal, not against itself ------------
     check("norm collapses whitespace and inline markup", cuq.norm("A  `b`  **c**") == "a b c")

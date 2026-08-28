@@ -9,7 +9,8 @@
   status check; the tool treats an empty or omitted list as `git add` for all
   files and can stage generated artifacts.
 - Observed 2026-08-27 in `matt.contracts`: `files: []` staged `Rplots.pdf` and
-  the full `_quarto/` render tree. They were unstaged before commit or push.
+  the full `_quarto/` render tree.
+  They were unstaged before commit or push.
 
 ## Available subscriptions & model providers
 

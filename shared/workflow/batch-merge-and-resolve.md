@@ -271,6 +271,29 @@ One collision runs the other way, and is the reason the file-set sweep is not me
 Confirm the contents match before treating such a pair as a duplicate, since set equality is not content equality: two PRs editing the same two files differently have an identical file set and genuinely conflict.
 That is why the script reports identical sets separately from partial overlaps rather than folding them together.
 
+**When neither instrument is available, the fallback's *range* decides whether the intersection means anything, and the wrong one inflates it silently.**
+`pr-overlap.py` needs `gh`, and so does the `gh pr diff --name-only` fallback beside it, so a session without `gh` reaches for raw git and has to pick a range.
+`git diff --name-only <yours>..origin/main` is the natural-looking choice and is wrong: a two-tip comparison reports every file the two tips differ in, which includes **your own** changed files.
+The intersection then comes back containing your entire file set, and the reading it invites --- that the base collides with everything you touched --- is the opposite of the truth, since those files are yours and the base has not touched them at all.
+
+The failure direction is what makes it worth a rule.
+An inflated intersection manufactures a merge-order constraint that does not exist, which `CLAUDE.md`'s "Surface merge-order constraints" section would then have you announce, draft-gate, or sequence around.
+It is also self-corroborating: the paths it lists are real, they are genuinely in your diff, and every one of them checks out individually.
+
+Take the other side's file list from the commits themselves --- `git show --name-only --format= <sha>`, or `git diff --name-only <base>...<head>` with three dots --- so the set is what that side changed rather than what the two tips differ in.
+See [`git-diffing.md`](../../memories/git-diffing.md)'s "Picking the diff range" section for why the two-dot form behaves this way.
+
+The wrong query doubles as this sweep's **negative control**, which the "Any conflict sweep needs a negative control" section below requires: it returns a large intersection where the correct one returns zero, so running both shows the comparison discriminates and an empty result is a real empty rather than a dead query.
+
+- **Do:** derive each side's file list from that side's own commits, with `git show --name-only` or a three-dot range.
+- **Do:** treat an intersection that contains your whole file set as a wrong-range symptom, not as a finding.
+- **Don't:** use `git diff --name-only A..B` to derive a file-set intersection --- two-tip output carries your own files.
+- **Don't:** announce a merge-order constraint off an intersection you have not sanity-checked against a query you expect to return zero.
+
+(Measured 2026-08-28 while checking [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) against a `main` that had advanced by one commit.
+The two-dot query returned all 9 of the PR's own files;
+`git show --name-only` on the advancing commit returned its 2, and the intersection was empty.)
+
 The script's own boundary is the one `CLAUDE.md`'s merge-order section already states, and it prints it on every run rather than only when it finds something.
 An intersection sees **collisions** and never **dependencies**, so a PR asserting something another PR makes true is reported clean by construction.
 A zero from it is not a merge-order all-clear.

@@ -80,6 +80,7 @@ fire.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -195,8 +196,22 @@ SYS_CLOSED = (
 )
 
 
+@functools.lru_cache(maxsize=512)
 def strip_heredocs(command):
-    """Remove heredoc BODIES, keeping the rest of the opener line."""
+    """Remove heredoc BODIES, keeping the rest of the opener line.
+
+    Memoized because both `command_views_issue` and `command_fetches_remote`
+    call it on the same command, so every Bash entry in the transcript was
+    stripped twice. The hook runs on every Write/Edit/NotebookEdit
+    (ai-config#2390), so halving the work is worth a cache.
+
+    An early exit from `evaluate`'s loop once `view_after` and `fetch_after`
+    are both set would be the larger win and is NOT safe: that same loop
+    collects `view_results`, and `closed_after` reads the result of the LAST
+    after-view, which arrives in a later entry than the tool_use that set the
+    flag. Breaking would drop it and lose the closed-issue case.
+    ai-config#2536 carries the remaining bound, on RX_HEREDOC itself.
+    """
     return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 

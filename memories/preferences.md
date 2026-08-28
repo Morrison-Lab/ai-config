@@ -23,7 +23,9 @@
   Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.
   (User directive / CAI, 2026-08-21: the request named specific `ucdavis` repositories.
   Read `ucdavis` as the incident rather than as the rule's boundary --- as of 2026-08-21, review still ran everywhere else, `ucdavis/bcs` had the Claude app installed, and no `Morrison-Lab` repository was ever in scope.
-  See [`github.md`](github.md)'s "Verify GitHub App installation per repository" for how to check a given repository.)
+  See [`github-consumer-ci.md`](github-consumer-ci.md)'s
+  "Verify GitHub App installation per repository" for how to check a given
+  repository.)
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) --- don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known --- rather than repeating it back as fact.
@@ -639,7 +641,7 @@
   Standing maintainer directive, restated and widened to all repos on 2026-08-19.
   It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
   State the directive as the reason when a PR ships without one, and re-verify at the expiry.
-  Full statement, measurements, and Do/Don't pair: [`github.md`](github.md), "Restated and widened 2026-08-19".
+  Full statement, measurements, and Do/Don't pair: [`gh-cli.md`](gh-cli.md), "Restated and widened 2026-08-19".
 - Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".

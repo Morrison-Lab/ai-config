@@ -1015,6 +1015,10 @@ def _iter_blocks(record: dict):
 def _blank_fences(text: str) -> tuple[str, bool]:
     """Blank the contents of fenced code blocks, preserving offsets.
 
+    scripts/pre-push-review.py's persona path calls this by name (so its
+    qualification guard shares this parser's fence dialect); renaming it
+    breaks that consumer at call time.
+
     A SCANNER rather than positional pairing. `zip(fences[0::2], fences[1::2])`
     mis-pairs the moment fences nest -- an outer ````` ```` ````` wrapping an inner
     ````` ``` ````` pairs (outer-open, inner-open) and (inner-close, outer-close),

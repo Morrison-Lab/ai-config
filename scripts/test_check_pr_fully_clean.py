@@ -1725,6 +1725,271 @@ def main() -> int:
             il_ok and il_issues == [],
         )
 
+    # ai-config#2369: the non- compound must not read as the Blocking signal.
+    check("classify_verdict: 'non-blocking' inside a clean verdict stays clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge** (one nit -- non-blocking prose polish).\n", "")
+          == "clean")
+    import re as _re
+    check("_BARE_REJECTION no longer matches inside 'non-blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "one nit -- non-blocking prose polish", _re.I))
+    check("_BARE_REJECTION no longer matches inside 'non blocking'",
+          not _re.search(checker._BARE_REJECTION,
+                         "a non blocking suggestion", _re.I))
+    # 'previously blocking' is deliberately NOT exempted: the same words
+    # appear in genuinely open statements, and missing a not-clean is the
+    # dangerous direction. Both directions locked:
+    check("classify_verdict: 'previously-blocking finding remains open' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nThe previously-blocking finding remains open; do not merge.\n", "")
+          == "not-clean")
+    check("classify_verdict: 'previously blocking crash NOT fixed' stays not-clean",
+          checker.classify_verdict(
+              "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
+          == "not-clean")
+    check("_BARE_REJECTION still matches a bare 'merge-blocking' compound",
+          bool(_re.search(checker._BARE_REJECTION, "Two merge-blocking issues remain.", _re.I)))
+    check("_BARE_REJECTION still matches plain 'Blocking:'",
+          bool(_re.search(checker._BARE_REJECTION, "Blocking: the API change.", _re.I)))
+
+    # ai-config#2370: a findings section that resolves to a whole-line
+    # no-findings statement is not an open finding, even when verification
+    # prose precedes the closing line.
+    # A resolving line reached only AFTER other content never exempts:
+    # prose findings are lexically indistinguishable from verification
+    # prose, so this shape is a deliberate safe-direction re-flag.
+    check("verification prose before the closing line stays a (safe-direction) flag",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nVerification performed: traced all call sites.\n\n"
+              "No actionable findings identified.\n\n### Verdict: Ready for merge\n")
+          is not None)
+    check("an untagged PROSE finding above a resolving line stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n`foo()` returns None on empty input, crashing "
+              "the caller.\n\nNo other findings.\n")
+          is not None)
+    check("a resolving first line with a trailing summary sentence resolves empty",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone.\n\nThe change is well-scoped and the "
+              "tests pass.\n")
+          is None)
+    check("+ bullet and 1) numbered items veto the exemption",
+          all(checker._unresolved_finding_pattern(
+                  f"### Findings\n\nNo new issues.\n\n{m} `foo()` crashes.\n")
+              is not None for m in ("+", "1)")))
+    check("the composite: a bullet-resolving first line no longer covers a "
+          "prose finding ('1. None.' does not resolve)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. None.\n\nThe lease check is silently "
+              "skipped and must be fixed before merge.\n")
+          is not None)
+    check("a bold-lead line after a resolving first line vetoes the exemption",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n**`_scan()` regression:** "
+              "drops rows.\n")
+          is not None)
+    check("'* No new issues.' stays flagged (exact base vocabulary parity)",
+          checker._unresolved_finding_pattern("### Findings\n\n* No new issues.\n")
+          is not None)
+    check("'- No new issues.' resolves (base's own class accepts the dash)",
+          checker._unresolved_finding_pattern("### Findings\n\n- No new issues.\n")
+          is None)
+    check("a **None.** resolving first line still resolves",
+          checker._unresolved_finding_pattern("### Findings\n\n**None.**\n")
+          is None)
+    check("a **Non-blocking:** tagged line vetoes the exemption",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n**Non-blocking:** naming "
+              "could be tidier.\n")
+          is not None)
+    # Veto tests. The first three bodies carry NOTHING that any other
+    # pattern matches, so each stays flagged only through the section logic
+    # itself -- neutering _SECTION_FINDING_ITEM flips the veto-dependent
+    # cases to exempt, and the resolving-first cases pin the first-line
+    # resolution requirement.
+    check("tagged item above a resolving last line stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. **[Convention]** scripts/x.py:1 is oddly "
+              "wrapped.\n\nNo actionable findings identified.\n")
+          is not None)
+    check("a resolving first line with a tagged item after it stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone identified so far.\n\n"
+              "1. **[Defect]** scripts/x.py:1 broken.\n")
+          is not None)
+    check("UNTAGGED numbered item above a resolving last line stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n1. `foo()` returns None on empty input, "
+              "crashing the caller.\n\nNo blocking issues.\n")
+          is not None)
+    check("resolving line FIRST with an item after it stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNo new issues.\n\n1. `foo()` returns None.\n")
+          is not None)
+    check("a **Location:** line above a resolving last line vetoes the exemption",
+          not checker._findings_section_resolves_empty(
+              "### Findings\n\n**Location:** scripts/x.py:1\n\nNone identified.\n",
+              len("### Findings")))
+    check("a bulleted '- None.' body still resolves empty (no self-veto)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\n- None.\n\n### Verdict: Ready for merge\n")
+          is None)
+    check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
+          is not None)
+
+    # --- ai-config#2402: a structured non-bot clean supersedes that same
+    # identity's earlier not-clean, and never counts toward quorum. ---------
+    human_notclean_round = {
+        "createdAt": "2026-08-27T06:44:16Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Needs more work\n\n"
+            "### Critical Findings\n1. The parser drops rows.\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    human_clean_round = {
+        "createdAt": "2026-08-27T06:53:57Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations\nNone.\n\n### Verification Steps\n- suite passes\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    bot_clean_round = {
+        "createdAt": "2026-08-27T07:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed commit: sha123\n"
+        ),
+    }
+    mock_seq = json.dumps({"comments": [human_notclean_round, human_clean_round,
+                                        bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_seq):
+        sup_ok, sup_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean supersedes the same identity's "
+            "earlier not-clean (#2402)",
+            sup_ok and sup_issues == [],
+        )
+
+    # Without the structured clean round, the human identity's not-clean
+    # stands and blocks -- the supersession is what the fix adds.
+    mock_stuck = json.dumps({"comments": [human_notclean_round, bot_clean_round],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_stuck):
+        stuck_ok, stuck_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "the same sequence WITHOUT the clean round still blocks "
+            "(negative control)",
+            (not stuck_ok) and any("d-morrison" in i for i in stuck_issues),
+        )
+
+    # A structured non-bot clean ALONE never meets quorum: approval
+    # authority comes from author identity, not body text (#2308).
+    mock_solo = json.dumps({"comments": [human_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_solo):
+        solo_ok, solo_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a structured non-bot clean alone does NOT meet quorum (#2308 invariant)",
+            (not solo_ok) and any("No valid clean review" in i or "quorum" in i.lower()
+                                  for i in solo_issues),
+        )
+
+    # SPOOF GUARD: a CONTRIBUTOR pasting an agent marker into a structured
+    # clean body must not supersede the real bot's standing not-clean --
+    # the identity gate refuses any body whose resolved identity differs
+    # from the poster's login.
+    bot_notclean_round = {
+        "createdAt": "2026-08-27T07:20:00Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Findings\n1. Real defect.\n\n"
+            "### Verdict\n**Needs more work**\n\nReviewed commit: sha123\n"
+        ),
+    }
+    spoof_clean = {
+        "createdAt": "2026-08-27T07:30:00Z",
+        "author": {"login": "drive-by-account"},
+        "authorAssociation": "CONTRIBUTOR",
+        "body": (
+            "**Claude finished review**\n\n### Summary\nAll good.\n\n"
+            "### Findings\nNone.\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed-Commit: sha123\n"
+        ),
+    }
+    # A quorum-satisfying legitimate clean rides along so the assertion
+    # discriminates: with the identity gate ablated, the spoof supersedes
+    # Claude's not-clean and the cursor clean meets quorum, flipping
+    # sp_ok to True -- so this test fails exactly when the gate is lost.
+    cursor_clean_round = {
+        "createdAt": "2026-08-27T07:25:00Z",
+        "author": {"login": "cursor"},
+        "body": (
+            "### Summary\nLooks good.\n\n### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n\nReviewed-Commit: sha123\n"
+        ),
+    }
+    mock_spoof = json.dumps({"comments": [bot_notclean_round,
+                                          cursor_clean_round, spoof_clean],
+                             "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_spoof):
+        sp_ok, sp_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a marker-spoofed contributor clean cannot supersede the bot's "
+            "not-clean (identity gate)",
+            (not sp_ok) and any("Claude" in i and "NOT clean" in i
+                                for i in sp_issues),
+        )
+
+    # Structure smuggled inside a fence does not admit: quoting a prior
+    # report's headings and fingerprint in a fenced block, plus a bare
+    # clean phrase, is still conversational prose.
+    fenced_quote = {
+        "createdAt": "2026-08-27T07:40:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "Quoting the earlier report:\n\n```\n### Verdict\n"
+            "Ready for merge\nReviewed-Commit: sha123\n```\n\n"
+            "Verdict: Ready for merge\n"
+        ),
+    }
+    mock_fenced = json.dumps({"comments": [human_notclean_round, fenced_quote],
+                              "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_fenced):
+        fq_ok, fq_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "fenced-quoted structure does not admit a casual clean "
+            "(stripped-body structure test)",
+            (not fq_ok) and any("NOT clean" in i for i in fq_issues),
+        )
+
+    # A casual human comment saying Ready for merge, with no report
+    # structure, is still not admitted at all (#1798's guard).
+    human_casual = {
+        "createdAt": "2026-08-27T07:10:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": "Looks good to me -- Ready for merge whenever.",
+    }
+    mock_casual = json.dumps({"comments": [human_notclean_round, human_casual,
+                                           bot_clean_round], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_casual):
+        cas_ok, cas_issues = checker.check_review_comments("2229", "sha123", TEST_REPO)
+        check(
+            "a casual unstructured human clean does not supersede (#1798 guard)",
+            (not cas_ok) and any("d-morrison" in i for i in cas_issues),
+        )
+
     claude_nits_earlier = {
         "createdAt": "2026-08-07T21:56:00Z",
         "author": {"login": "github-actions"},

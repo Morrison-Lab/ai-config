@@ -19,9 +19,18 @@ import tempfile
 # PUSH carries the same guard for symmetry rather than as a second repair:
 # `git push` has no hyphenated plumbing sibling today, so that half prevents
 # the mirror bug instead of fixing a live one.
-COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit(?![\w-])", re.MULTILINE)
-PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push(?![\w-])", re.MULTILINE)
-CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
+# `_ENV` tolerates leading NAME=value assignments before the command word.
+# Without it, `ALLOW_UNREVIEWED_PUSH=1 git push` -- the sibling pre-push
+# guard's own documented override spelling -- was invisible to PUSH, so a
+# session whose every push carried the prefix was told on every Stop that a
+# commit was never pushed, and only a literal no-op `git push` silenced it
+# (ai-config#2365, #2395: three identical blocks on one shipped commit).
+# The two guards' interaction guaranteed the loop: one required the prefix,
+# the other could not see prefixed pushes.
+_ENV = r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+COMMIT = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+commit(?![\w-])", re.MULTILINE)
+PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+push(?![\w-])", re.MULTILINE)
+CREATE = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"gh\s+pr\s+create\b", re.MULTILINE)
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
 # ... EOF` writes the lines rather than running them. A corpus about git

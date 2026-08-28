@@ -184,6 +184,41 @@ real_commit = transcript([REAL_COMMIT])
 plumbing_then_real = transcript([PLUMBING_THEN_REAL])
 push_sibling = transcript([REAL_COMMIT, PUSH_SIBLING_DOES_NOT_DISCHARGE])
 
+# --- ai-config#2365 / #2395: an env-prefixed push must discharge -------------
+# `ALLOW_UNREVIEWED_PUSH=1 git push` is the sibling pre-push guard's own
+# documented override spelling; a session whose every push carries it was
+# blocked on every Stop, and only a no-op plain push silenced it.
+env_prefixed_push = transcript([
+    "git commit -m hook",
+    "ALLOW_UNREVIEWED_PUSH=1 git push origin HEAD",
+])
+env_prefixed_commit = transcript([
+    "GIT_AUTHOR_DATE='2026-01-01T00:00:00' git commit -m hook",
+])
+two_env_push = transcript([
+    "git commit -m hook",
+    "A=1 B=2 git push origin HEAD",
+])
+# The discriminating anchor probe: `git push` IS present, preceded by an
+# env-shaped token, but the whole thing sits mid-`echo` -- dropping the
+# segment anchor from PUSH makes this discharge, so the case pins the
+# anchor rather than merely restating the tolerance.
+env_word_not_push = transcript([
+    "git commit -m hook",
+    "echo ALLOW_UNREVIEWED_PUSH=1 git push is the spelling",
+])
+# The anchor rewrite ((?:^|[;&|\n])\s* instead of (?:^|[;&|\n]\s*)) also
+# admits leading whitespace before an unprefixed command -- deliberate, and
+# pinned here so the widening is documented rather than incidental.
+leading_ws_push = transcript([
+    "git commit -m hook",
+    "  git push origin HEAD",
+])
+env_prefixed_create = transcript([
+    "git commit -m hook",
+    "GH_TOKEN=x gh pr create --fill",
+])
+
 try:
     assert subject.pending_commit(unshipped) == "git commit -m hook"
     assert subject.pending_commit(pushed) is None
@@ -196,6 +231,18 @@ try:
     assert subject.pending_commit(executed_heredoc) is not None, "an executed heredoc must still arm"
     assert subject.pending_commit(quoted_then_real) is not None, "a real commit after a quoted one must arm"
     assert subject.pending_commit(quoted_push) is not None, "a quoted push must not discharge"
+    assert subject.pending_commit(env_prefixed_push) is None, \
+        "an env-prefixed push must discharge (ai-config#2365/#2395)"
+    assert subject.pending_commit(env_prefixed_commit) is not None, \
+        "an env-prefixed commit must still arm"
+    assert subject.pending_commit(two_env_push) is None, \
+        "several env assignments before the push still discharge"
+    assert subject.pending_commit(env_word_not_push) is not None, \
+        "prose mentioning the env token mid-command is not a push"
+    assert subject.pending_commit(leading_ws_push) is None, \
+        "a leading-whitespace push still discharges (documented widening)"
+    assert subject.pending_commit(env_prefixed_create) is None, \
+        "an env-prefixed gh pr create discharges too (CREATE symmetry)"
     assert subject.pending_commit(executed_redirect) is not None, "bash <<EOF > file still executes"
     assert subject.pending_commit(executed_fd_dup) is not None, "2>&1 is not a file write"
     assert subject.pending_commit(indented_decoy) is not None, "an indented decoy is not a terminator"
@@ -236,9 +283,16 @@ finally:
     os.unlink(real_commit)
     os.unlink(plumbing_then_real)
     os.unlink(push_sibling)
+    os.unlink(env_prefixed_push)
+    os.unlink(env_prefixed_commit)
+    os.unlink(two_env_push)
+    os.unlink(env_word_not_push)
+    os.unlink(leading_ws_push)
+    os.unlink(env_prefixed_create)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")
 print("PASS: WRITER and REDIRECT are scoped to the segment that owns the heredoc")
 print("PASS: a <<< herestring is not mistaken for a heredoc")
 print("PASS: commit-tree and commit-graph are not commits, while a plain commit still arms")
+print("PASS: an env-prefixed push discharges; an env-prefixed commit still arms")

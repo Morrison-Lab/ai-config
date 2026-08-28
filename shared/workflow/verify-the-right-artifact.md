@@ -511,3 +511,47 @@ push that added two fixtures, and "there is no offline test" after a push that
 added one.
 ai-config#1833's body still carried, verbatim, all three prose defects that
 three review rounds had just corrected in the file it was describing.)
+
+**A suite's own summary line is the verdict; a count you derive from its log is
+an adjacent artifact.**
+
+The narrowest form of this substitution, and the one that survives review
+because the derived number is *nearly* right.
+
+A test suite typically reports two things: one line per failing case, and a
+final line saying how many failed.
+Counting the first with `grep -c` looks like reading the result and is not ---
+the summary line is usually formatted like a finding (`::error::N of 14 cases
+...` is itself an `::error::` line), so it counts as a case and every figure
+comes out inflated by exactly one.
+
+That constant offset is what makes it durable.
+A wildly wrong number invites a second look; `5` where the truth is `4` reads
+as plausible, stays plausible when re-derived the same way, and is not
+checkable against anything else in the report.
+Nothing in the suite's output contradicts it, because the suite never made the
+claim --- you did.
+
+It bites hardest on **mutation counts**, where the number is the entire
+evidence for "this assertion is load-bearing".
+A corpus that asks for counts to be confirmed by mutation rather than assumed
+gets a count that was measured, from the wrong line.
+
+- **Do:** read the suite's own summary line, or its exit status, as the
+  verdict.
+- **Do:** state which line you read it from when a count reaches prose someone
+  will rely on.
+- **Don't:** `grep -c` a suite's findings and call the result its failure
+  count.
+- **Don't:** treat a number as verified because you ran something to get it ---
+  ask which artifact answered, and whether it was the one making the claim.
+
+(Measured 2026-08-27 on [gha#687](https://github.com/Morrison-Lab/gha/pull/687).
+Three mutation counts were documented as 5/8/4 in `gha`'s `CLAUDE.md`, read via
+`grep -c '^::error::'`.
+The reviewer independently reproduced 4/7/3 and flagged the mismatch at reduced
+confidence, guessing the mutation implementations might differ.
+They did not --- the suite's summary line was being counted as a fourteenth
+case, which is why all three were off by the same amount.
+Note the detector here was a second party re-running the measurement, not a
+check: nothing in CI could have caught it.)

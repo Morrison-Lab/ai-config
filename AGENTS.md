@@ -40,6 +40,16 @@ The implication runs one way: a timer fires once and dies, so it cannot keep a s
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
 
+## Resume every non-clean pause
+
+Whenever work remains at a pause, arm a timer or equivalent wake mechanism that
+will resume the next concrete step.
+Report what will fire and its clock time.
+Use an active background monitor or durable scheduled trigger if the harness has
+no reliable timer.
+A verified clean stopping point needs no timer because no work remains to resume.
+Do not substitute a promise to return for a mechanism that will actually fire.
+
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its
@@ -182,7 +192,7 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
   The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
   `--force-if-includes` (git 2.30+) closes that.
   Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git.md`).
+  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git-branches.md`).
   `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
   State the reason when you use it.
 
@@ -190,6 +200,22 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
+
+## Summarize analysis effects in PR descriptions
+
+When a code change affects analysis outputs or their interpretation, summarize
+the changed results in the PR description and state how the change affects the
+conclusions.
+Give material before-and-after values when they make the effect easier to judge.
+State explicitly when the conclusions do not change if that fact matters to
+review.
+
+- **Do:** connect implementation changes to their effects on analysis results
+  and conclusions when those effects are relevant.
+- **Don't:** describe only code mechanics when the diff changes analysis
+  outputs or interpretation.
+- **Don't:** add an analysis-impact section when the change has no relevant
+  effect on analysis results or conclusions.
 
 ## Temporal limitations on software and technology facts
 

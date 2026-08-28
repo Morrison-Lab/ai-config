@@ -643,6 +643,35 @@ def strip_cited_finding_vocab(text: str) -> str:
     return text
 
 
+# The bare rejection alternation appears in three lists that must stay
+# byte-identical, because BARE_NOT_CLEAN_PATTERNS membership is tested by
+# string equality against the list entries -- so it is built once here.
+#
+# `Block(?:ed|ing)?` needs lookbehinds because `\b` treats a hyphen as a
+# boundary, so "non-blocking" -- how a reviewer marks a nit as NOT blocking
+# -- read a Ready-for-merge review as not-clean (ai-config#2369, measured
+# 2026-08-26 on #2288). Only the `non-`/`non ` compounds are exempted.
+# "previously-blocking" is deliberately NOT exempted, although it produces a
+# safe-direction false positive when narrating a fixed finding: "the
+# previously-blocking finding remains open; do not merge" is a real
+# not-clean statement, and a lexical lookbehind cannot tell it from "the
+# previously-blocking error was fixed". Missing a not-clean is the dangerous
+# direction, so the narration form stays an over-flag -- as does any other
+# `-blocking` compound ("merge-blocking" is a real signal) and the
+# emphasized form ("non-**blocking**": the char before `blocking` is `*`,
+# which the lookbehind cannot see through).
+_BARE_REJECTION = (
+    r"\b(?:Rejected|Unapproved|"
+    r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
+    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
+)
+
+# The findings-heading pattern is likewise built once: the two list copies
+# below and the section-resolution wiring in _unresolved_finding_pattern
+# compare against this exact string, so a drifted copy would silently
+# disable the ai-config#2370 exemption.
+_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
+
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
     # ones a reviewer writes. Found by running this classifier over the real
@@ -661,7 +690,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
@@ -728,7 +757,7 @@ BARE_CLEAN_PATTERNS = {
     r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 BARE_NOT_CLEAN_PATTERNS = {
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 }
 
@@ -738,7 +767,7 @@ BARE_NOT_CLEAN_PATTERNS = {
 # veto. Keep the two scans on one list so a heading added for one cannot
 # vanish from the other.
 FINDING_PATTERNS = [
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -751,12 +780,12 @@ FINDING_PATTERNS = [
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
-    r"\b(?:Rejected|Unapproved|Block(?:ed|ing)?|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b",
+    _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 FINDING_HEADING_PATTERNS = {
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+    _FINDINGS_HEADING_PATTERN,
     r"\*\*Actionable Findings\*\*",
     r"\*\*Detailed Findings\*\*",
     r"#+\s*Issues",
@@ -949,6 +978,61 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)"
+    r"^\s*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^\s*(?:\d+[.)]|[-*+])\s+\S"
+    r"|\*\*Location:\*\*"
+    r"|^\s*>\s*\S"
+    r"|^\s*\*\*(?!\s*$)"
+)
+
+
+def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
+    """True when the findings section starting at *match_end* opens with a
+    whole-line no-findings statement and carries no finding-shaped content
+    after it.
+
+    The section runs to the next heading or end of body. The FIRST
+    non-empty line must match the NOT_CLEAN_NEGATION_SUFFIX allowlist --
+    the same trigger the old 60-char suffix shortcut keyed on, made
+    line-anchored -- and everything after it must clear the item veto.
+
+    A resolving line reached only AFTER other content (verification prose,
+    alert blocks, items) never exempts: an untagged prose finding is
+    lexically indistinguishable from verification prose, and swallowing a
+    finding is the dangerous direction, so that shape is a deliberate
+    safe-direction re-flag (ai-config#2370's free-prose remainder). The
+    mirror direction shares the residual: untagged PLAIN PROSE after a
+    resolving first line is also indistinguishable and is not vetoed --
+    the same exposure the 60-char shortcut always had.
+
+    No wider than the shortcut except one vetted way, still gated by the
+    item veto: no 60-char cap on where the resolving line starts. The
+    first line is tested UNSTRIPPED against the allowlist, whose own
+    prefix classes already accept the bullet markers the shortcut
+    accepted (`- None.`, `* None.`, `- No new issues.`) and reject the
+    ones it rejected (`* No new issues.`, `1. None.`) -- exact vocabulary
+    parity by reuse rather than by a re-derived strip.
+    """
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
+    section = scan_body[match_end:match_end + next_heading.start()] \
+        if next_heading else scan_body[match_end:]
+    lines = [ln for ln in section.splitlines() if ln.strip()]
+    if not lines:
+        return False
+    if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
+        return False
+    return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
+
+
 def _unresolved_finding_pattern(body: str) -> Optional[str]:
     """Return the first unmatched finding pattern in *body*, or None.
 
@@ -965,7 +1049,17 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
-            if pat in FINDING_HEADING_PATTERNS:
+            if pat == _FINDINGS_HEADING_PATTERN:
+                # The section-resolution check REPLACES the 60-char suffix
+                # shortcut for this heading: the shortcut read "No new
+                # issues." directly under the heading as resolving the whole
+                # section, even when finding items followed it (ai-config
+                # #2370's review of this very fix). The replacement keeps
+                # the shortcut's first-line trigger and adds the item veto
+                # over the rest of the section.
+                if _findings_section_resolves_empty(scan_body, match.end()):
+                    continue
+            elif pat in FINDING_HEADING_PATTERNS:
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
@@ -1097,6 +1191,30 @@ def check_latest_verdict(
     return len(blocking) == 0, issues
 
 
+_REVIEW_STRUCTURE_HEADING = re.compile(
+    r"(?im)^#{1,6}\s*(?:Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
+)
+
+
+def _is_structured_review_body(body: str) -> bool:
+    """True when *body* is shaped like a review REPORT rather than prose.
+
+    Requires both a report heading (Summary / Findings / Verdict families)
+    and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
+    STRIPPED body so a casual comment quoting a prior report inside a
+    fence cannot smuggle the structure in (#1202's convention). The two
+    together are what a pre-push-review or adversarial-self-review report
+    always carries and conversational prose does not, which is what keeps
+    #1798's false-CLEAN direction closed while #2402's supersession path
+    opens.
+    """
+    scan = strip_cited_finding_vocab(body)
+    if not _REVIEW_STRUCTURE_HEADING.search(scan):
+        return False
+    return bool(re.search(
+        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
+
+
 def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     pr_num, sha, repo, review_decision, branch = pr.pr_num, pr.head_sha, pr.repo, pr.review_decision, pr.branch
     comments = [{"author": {"login": c.author_login}, "createdAt": c.created_at, "body": c.body, "authorAssociation": c.author_association} for c in pr.get_comments()]
@@ -1142,11 +1260,41 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
         # Automated reviews must be authored by a recognized bot author or contain a known review agent marker.
         # A comment that is neither from a bot account nor carrying a review agent marker is admitted
-        # ONLY if it states a blocking (not-clean) verdict -- fail closed.
+        # when it states a blocking (not-clean) verdict -- fail closed -- OR
+        # when it is a STRUCTURED review report (headings plus a
+        # Reviewed-Commit fingerprint) stating a clean verdict. Without the
+        # second branch, one not-clean self-review round under a human login
+        # pinned that identity's "latest" forever: later Ready-for-merge
+        # rounds under the same account were dropped before
+        # check_latest_verdict ever saw them, manufacturing a permanent
+        # standing veto no ARDI round could clear (ai-config#2402, measured
+        # on #2229's six-round sequence).
+        #
+        # The security invariant from #2308 is preserved by the QUORUM tag,
+        # not by dropping the item: a non-bot clean may supersede that same
+        # identity's own earlier not-clean, and may never count toward the
+        # clean-review quorum that authorizes a merge -- body text still
+        # buys no approval authority (see the unique_authors loop below).
+        # A bare human comment quoting verdict phrases stays out entirely:
+        # the structure test requires report headings AND a fingerprint,
+        # which casual prose does not carry (#1798's guard, restated).
         if is_bot_author:
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, True))
         elif verdict == "not-clean":
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
+        elif (
+            verdict == "clean"
+            and _is_structured_review_body(body)
+            and _reviewer_identity(body, author_login) == author_login
+        ):
+            # The identity gate is load-bearing: without it, any commenter
+            # could paste an agent marker (`**Claude finished review**`)
+            # into a structured clean body and SUPERSEDE the real bot's
+            # standing not-clean, since supersession keys on
+            # _reviewer_identity over body text. Marker-free bodies
+            # resolve to the poster's own login, so a non-bot clean can
+            # clear only that same account's earlier verdicts.
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
 
     for r in reviews:
         body = r.get("body", "")
@@ -1256,6 +1404,14 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         unique_authors = set()
         logins_with_markers = set()
         for item in matching_items:
+            # Quorum eligibility is carried from ADMISSION time (item[6]):
+            # a non-bot item admitted for supersession only (#2402) must
+            # never count toward the clean-review quorum, per #2308's
+            # invariant that approval authority comes from author identity
+            # and never from body text. Items without the flag predate it
+            # and keep their previous (bot-pooled) eligibility.
+            if len(item) > 6 and item[6] is False:
+                continue
             if len(item) > 5 and classify_verdict(item[2], item[4]) == "clean":
                 login = item[5]
                 identity = _reviewer_identity(item[2], login)

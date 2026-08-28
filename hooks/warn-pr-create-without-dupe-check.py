@@ -442,8 +442,22 @@ def _search_value_ok(rest_raw):
     `rest_raw` must be UNSTRIPPED (quotes intact) so the value token can be
     told apart from the flags around it, and so a quoted qualifier
     (`--search "is:open foo"`) is still inspected rather than erased.
+
+    Working unstripped cuts the other way too: a literal `--search` embedded
+    inside an UNRELATED flag's quoted value is not a flag occurrence, and
+    counting it let the textually-last embedded copy win over the genuine
+    one (`--search "cp1252" --label "needs --search is:open styling"`
+    returned False -- ai-config#2376, measured by execution). So only
+    matches whose FLAG position sits outside every quoted span count; the
+    value inspection stays unstripped exactly as before.
     """
-    matches = list(RX_SEARCH_VALUE.finditer(rest_raw))
+    quoted_spans = [m.span() for m in RX_QUOTED_SPAN.finditer(rest_raw)]
+
+    def _flag_in_quotes(pos):
+        return any(a <= pos < b for a, b in quoted_spans)
+
+    matches = [m for m in RX_SEARCH_VALUE.finditer(rest_raw)
+               if not _flag_in_quotes(m.start())]
     if not matches:
         return False
     match = matches[-1]

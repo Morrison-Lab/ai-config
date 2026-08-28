@@ -170,7 +170,7 @@ Nothing in that requires a deletion or a rename, which is why a
 deleted-or-renamed path set is the wrong instrument for it.
 
 **The pre-merge check already exists and is scoped to the wrong trigger.**
-[`memories/git.md`](../../memories/git.md) and
+[`memories/git-branches.md`](../../memories/git-branches.md) and
 [`stack-prs`](../../skills/stack-prs/SKILL.md) both prescribe
 `gh pr list --base <branch>` before merging, and both gate it on
 `gh pr merge --delete-branch`, whose harm is the dependent PR being

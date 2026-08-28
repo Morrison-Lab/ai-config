@@ -561,7 +561,7 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
   | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
 ```
 
-`memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
+`memories/gh-cli.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
 
 **Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
 ```
@@ -624,7 +624,7 @@ The `claim-pr` skill operationalizes this (the exact claim wording, when it appl
 
 [shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
 
-A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/github.md` records auditors mistaking exactly that.
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/gh-cli.md` records auditors mistaking exactly that.
 The forge cannot say it, so the body must: end every agent-posted comment with
 
 ```
@@ -847,7 +847,7 @@ An earlier fetch is a measurement of a moment that has passed, and it expires ex
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
 Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-A `stale info` refusal is not a reason to force either: `memories/git.md` records that it means the remote branch is gone, so a plain push is the fix.
+A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone, so a plain push is the fix.
 `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
 `hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
 
@@ -1678,6 +1678,13 @@ recurred immediately in a `jq` filter reading a PR review body.)
   A disagreement among reviews is not fully clean: any standing not-clean
   --- nits included --- vetoes merge even with `mwc` active
   (ai-config#2274).
+- **Another session's PR needs a second condition: clean, and clean for more than twenty minutes --- then warned.**
+  Every other rule here settles *when* a PR may be merged;
+  this one settles *whose*.
+  A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
+  Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
+  The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
+  [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

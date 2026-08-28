@@ -176,6 +176,26 @@ fix is what made the preamble false.
 Round 2 flagged the stale count, fixed in `42214b0` as "Four reads settle it
 before you touch anything:".)
 
+### A qualitative generalization above a block goes unchecked where a count would be re-derived
+
+The section above governs a **count** stated above the block it counts, and its remedy is to drop the count or re-derive it by command.
+A qualitative claim over the same block is the same shape, and it slips past that remedy entirely, because it carries no number to re-derive.
+
+A count invites verification because it is obviously a number someone must have measured, and a stale one reads as a typo waiting to be caught.
+A qualitative claim --- "always", "independently of", "in every case", "the same in both" --- carries no such tell.
+It reads as characterization rather than as a checkable fact, so it survives review exactly where a count would not.
+
+The check is not "re-derive the number" --- there is none --- but "read the introducing sentence against the block", applied here to the sentence a table or block sits directly beneath.
+
+- **Do:** re-read a lead-in sentence against its block for what it generalizes or quantifies, not only for a stated count.
+- **Do:** treat "always", "independently of", "in every case", "the same in both" as tells that a claim needs checking against the data beneath it.
+- **Don't:** assume a qualitative lead-in is safe because it carries no number that could go stale.
+
+(Morrison-Lab/ai-config#1543, 2026-08-16, review round 1: a new section in `shared/workflow/grep-is-not-coverage.md` opened "Case sensitivity moves the number again, independently of the ref." directly above its own case record's table, which showed the two flag settings agreeing at the merge-base and differing only at the head --- the opposite of ref-independent.
+Every number in the table had been re-derived by command before publishing;
+the sentence generalizing about it had not been checked against it at all, because it carried no number to re-derive.
+Fixed in `b02e3ff`.)
+
 ## Where the rule stops: text that records what was observed
 
 Everything above pushes toward replacing a literal with whatever owns it.

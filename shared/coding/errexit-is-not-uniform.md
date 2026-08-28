@@ -472,6 +472,55 @@ Measured 2026-08-24 in Morrison-Lab/gha#603: the offline suite caught the
 escaped exit within one run --- expected `exitcode=2`, got no line ---
 which is the same offline-suite payoff this file argues for above.
 
+## Process substitution does not propagate a status, so `set -e` never fires
+
+The rules above are about a status that is *reported* and misread.
+This is the case where no status is reported at all.
+
+`mapfile -t ARR < <(cmd)` runs `cmd` in a process substitution, whose exit
+status is not the status of the redirection and is not checked by `mapfile`.
+So `set -e` sees a successful `mapfile`, and a failing `cmd` reaches nobody.
+A command substitution in an assignment does propagate:
+
+```bash
+V="$(bash fail.sh)"                 # set -e ABORTS here
+mapfile -t A < <(bash fail.sh)      # set -e does NOT; A is empty, rc is 0
+```
+
+Measured on bash 5.3.15 (`REACHED, n=0` for the second form).
+
+The reason to care is what the empty array does next, which is where this
+stops being a curiosity.
+A helper that fails **closed** --- refusing rather than printing an empty list,
+precisely so a caller cannot examine nothing --- has its refusal discarded by
+this construct.
+The array is empty, and `grep PATTERN "${ARR[@]}"` with no file arguments falls
+through to reading **stdin**, which in a CI step is an immediate EOF.
+The audit passes, having examined nothing.
+That is the pass-path-equals-failure-path shape
+[`fail-fast`](../principles/fail-fast.md) names, arriving through the one
+construct added to make the check robust.
+
+The tell is that process substitution is what everyone reaches for when
+feeding `mapfile`, because it reads as the direct form and avoids a variable.
+The safe form is the indirect one.
+
+- **Do:** assign first (`OUT="$(cmd)"`) and feed `mapfile` from a here-string,
+  so `set -e` sees the failure.
+- **Do:** ask what an empty array does at every use site, since that is the
+  state a swallowed failure produces.
+- **Don't:** read `set -euo pipefail` at the top of a script as covering
+  `< <(...)` --- `pipefail` governs pipelines, and this is not one.
+- **Don't:** rely on a helper's fail-closed guard while calling it through a
+  construct that discards its status.
+
+(`Morrison-Lab/gha#719`, 2026-08-28.
+Two workflow audits were rewritten to take their file list from a helper that
+refuses an empty directory.
+Both called it through `< <(...)`, so the refusal was inert; the shape was
+caught in review before it shipped, and the empty-array consequence was
+reproduced directly rather than reasoned about.)
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely

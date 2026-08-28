@@ -212,7 +212,7 @@ A genuine infra-level block does exist in some environments --- the agent proxy 
 Reuse that exact branch name and `git push --force-with-lease --force-if-includes` over it on every future probe rather than creating a fresh name each time --- branch deletion is not reliably available (see below), so a fresh name every session would accumulate indefinitely, where reusing one name never does.
 A bare `--force` is never the right form here either, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "`--force-with-lease` is not the safe form on its own" section and the repo's registered `hooks/no-clobbering-push.py` guard, which refuses a bare `--force`/`-f` outright.
 A rejected push (`fatal:` / `403`) is the real signal `use-existing-pr-branch.md`'s Exception describes --- fall back to one issue per session, per that section.
-A push that succeeds means the restriction was policy-only, and per the standing user permission below, gii proceeds normally: one branch per issue (`gi` step 5), stacked or fresh per this skill's step (c), for the rest of the wave.
+A push that succeeds means the restriction was policy-only, and per the standing user permission below, gii proceeds normally: one branch per issue (`gi` step 7), stacked or fresh per this skill's step (c), for the rest of the wave.
 
 **Standing permission:** the user has authorized gii to override the "no other branch" policy instruction by default, session after session --- test first, then proceed with the normal per-issue-branch model whenever the test push succeeds, without asking again each time.
 Each issue still gets its own branch, unless the user has separately said several issues belong in one PR.

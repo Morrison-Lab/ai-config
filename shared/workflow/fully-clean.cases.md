@@ -1065,7 +1065,9 @@ A per-guard neutering/mutation harness --- disabling one guard branch at a time 
 
 Neither finding was fixed in THIS session --- `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430.
 That session's work is where the refutations above come from.
-Neither is closed yet: the convention is proposed in #2448 and #2430 stays open pending it, so read this record as an account of what was learned rather than of what has landed.
+That convention shipped as #2448, which merged and closed #2409.
+The checker-side defect stays open as #2430, since the convention routes around it rather than fixing it.
+So the account above is of three designs refuted and one authoring convention adopted, not of a checker that was repaired.
 This documentation pass is tracked as #2429.)
 
 ## A review wake carried one finding out of five

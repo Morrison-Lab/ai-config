@@ -239,6 +239,51 @@ reaffirmed 2026-07-06 ("always use codex first
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
 
+## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
+
+Measured 2026-08-27/28 PT across a 13-merge GIA sweep on Morrison-Lab/ai-config, comparing four lanes on real work rather than a benchmark.
+
+**codex** implemented five well-specified hook/script briefs with high fidelity.
+Its only misses traced back to the *brief* being wrong --- one brief was built from a truncated issue-body read, and codex faithfully implemented the truncated version.
+That is a briefing defect, not a codex defect, so the fix is to verify the brief's own inputs before dispatch, not to trust codex less.
+
+**codex's macOS sandbox cannot write a git worktree's shared `.git` directory.**
+A worktree's `.git` is a file pointing at the parent repo's shared `.git/worktrees/<name>` directory, and codex's sandbox denies a write there with `index.lock: Operation not permitted`, even under a sandbox mode that otherwise permits writes inside the worktree's own tracked files.
+The orchestrator commits on codex's behalf --- codex prepares the diff, the parent session runs `git add`/`git commit` --- rather than treating the denial as a codex task failure to retry.
+
+**opencode (free tier) and the `agy` CLI each completed a small doc task correctly on first real dispatch**, and each still needed the same adversarial pass any diff gets.
+`agy`'s output drew three style findings plus one finding that flatly contradicted standing text elsewhere in the corpus, on a later round.
+opencode's output drew an `away`-scope overclaim (asserting coverage the skill's own text does not support) and an imprecise boundary phrase, both caught only by fact-checking the claim against the cited skill's actual text rather than by a structural read.
+Neither miss was visible from the diff's surface;
+both needed the underlying claim traced back to its source.
+
+**Sonnet adversarial reviewers were the highest-value spend in the sweep.**
+Across roughly 20 review rounds they surfaced a pre-existing verdict-spoofing parser vulnerability already live on `main`, several straddle/swallow enumeration bypasses, and repeatedly refused to accept an enumeration-based patch until a structural fix replaced it --- holding the line across multiple rounds rather than accepting the first plausible-looking patch.
+
+- **Do:** route a well-specified, mechanical brief to `codex` first.
+- **Do:** give a cheap CLI's output --- `codex`, `opencode`, or `agy` --- the same adversarial review any diff gets;
+  a clean run is not a clean review.
+- **Do:** fact-check every scope or boundary claim a cheap model writes against the source it cites, not against how the sentence reads.
+- **Do:** have the orchestrator commit on codex's behalf when a worktree write is denied by the sandbox, rather than reading the denial as a task failure.
+- **Don't:** read a cheap CLI's own "checks passed," or a clean-looking diff, as review.
+- **Don't:** brief any implementer --- cheap or not --- from a sliced or truncated issue-body read;
+  verify the brief's own inputs before dispatch.
+
+## The auto-mode classifier allows plain headless CLI dispatch and denies interactive-trust flags
+
+Measured 2026-08-27/28 PT, same GIA sweep.
+Claude Code's auto-mode permission classifier denied `cursor-agent --trust` (see [`cursor.md`](cursor.md)'s "`cursor-agent --trust` can be denied outright" section for that specific case), `agy --dangerously-skip-permissions`, and `agy --mode accept-edits`, while allowing plain `agy --print` and plain `opencode run` --- each launched via the harness's own backgrounding (`run_in_background`) rather than a shell `&` with redirects.
+The pattern across all three denials is the same: a flag that grants the dispatched CLI standing permission to bypass its own future confirmations reads to the classifier as a blanket permission override, and gets denied on that basis even though the underlying dispatch --- a single non-interactive run --- is otherwise unremarkable.
+
+**A classifier denial on a compound Bash call kills every segment of that call, not just the flagged one.**
+When a single Bash invocation bundles a heredoc that writes a brief file with the dispatch that reads it, and the classifier denies the call, nothing in the call ran --- including the heredoc.
+The next dispatch attempt then reads a brief file that was never written, and fails with "brief does not exist," which reads like a missing-file bug rather than like the actual cause: an earlier denial that took the whole compound call down with it.
+
+- **Do:** write a brief file in its own Bash call, separate from the call that dispatches on it.
+- **Do:** dispatch a headless CLI (`agy --print`, `opencode run`) via the harness's own `run_in_background`, not a shell-level background operator.
+- **Don't:** bundle a file-write with a dispatch that might be denied --- assume nothing in a denied compound call executed, including segments before the denied one.
+- **Don't:** reach for an interactive-trust or standing-permission flag (`--trust`, `--dangerously-skip-permissions`, `--mode accept-edits`) to make a headless dispatch "just work" --- the plain non-interactive form is both sufficient and classifier-approved.
+
 ## "Local" means CLI-reachable, not on-device --- and the preference is a standing default
 
 Directive from the user, 2026-08-27, given across three messages:

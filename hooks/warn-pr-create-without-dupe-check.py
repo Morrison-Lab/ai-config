@@ -262,6 +262,10 @@ RX_OPEN_CLOSED_QUALIFIER = re.compile(
 RX_GH_STATE_FLAG = re.compile(
     r"(?:--state(?:=|\s+)|(?<![A-Za-z0-9-])-s(?:=|\s+))(\S+)"
 )
+# The lookbehind on the long-form --search (mirroring the -S branch's)
+# stops the flag matching as a substring of a longer unquoted token,
+# e.g. `--label needs--search stuff`, which otherwise discharges the
+# dupe-check without any search having run (ai-config#2427).
 RX_GH_SEARCH_FLAG = re.compile(
     r"(?:(?<![A-Za-z0-9-])--search\b|(?<![A-Za-z0-9-])-S\b)"
 )
@@ -271,6 +275,7 @@ RX_GH_SEARCH_FLAG = re.compile(
 # escaping), or an unquoted bareword. Used to reject an empty/missing value
 # (`--search` with nothing after it, which gh itself would refuse to run)
 # and to inspect the value for an embedded is:/state: qualifier.
+# Long-form --search lookbehind: see RX_GH_SEARCH_FLAG (ai-config#2427).
 RX_SEARCH_VALUE = re.compile(
     r"(?:(?<![A-Za-z0-9-])--search(?:=|\s+)|"
     r"(?<![A-Za-z0-9-])-S(?:=|\s+))"
@@ -287,6 +292,7 @@ RX_SEARCH_VALUE = re.compile(
 RX_GLAB_ALL_FLAG = re.compile(
     r"(?:--all|(?<![A-Za-z0-9-])-A)\b(?:=(\S+))?"
 )
+# Long-form --search lookbehind: see RX_GH_SEARCH_FLAG (ai-config#2427).
 RX_GLAB_SEARCH_FLAG = re.compile(r"(?<![A-Za-z0-9-])--search\b")
 
 # Quoted spans in a list command's flags are search terms, not flags.

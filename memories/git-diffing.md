@@ -455,3 +455,34 @@ That is a strictly narrower, and strictly correct, test -- and it needs no extra
   the diff already carries both its added and deleted lines.
 
 (Measured 2026-08-27 on `Morrison-Lab/gha#700`: a round-1 adversarial review demonstrated the base-tree-membership bypass empirically, and the fix -- key the exemption on the diff's own deleted lines instead -- needed no extra git call, only a narrower test on data the checker already had.)
+
+## A two-revision tool's "compare `HEAD` with itself" is not a self-comparison while the tree is dirty
+
+The "Picking the diff range" section above is about choosing a range for `git diff`.
+This is the same distinction reaching a tool that takes revisions as **arguments** --- a parity checker, a benchmark harness, a migration verifier --- where the working tree is one of the two sides by default and nothing says so.
+
+Such a tool typically accepts `--base-rev` and resolves its other side to the current tree, so `--base-rev HEAD` reads as "compare `HEAD` against itself" and is not that.
+With uncommitted changes present it compares committed `HEAD` against the **working tree**, which is a real diff of exactly the size of your edits.
+The wrong reading is the plausible one: the run takes a while, produces divergences, and every number looks like a measurement rather than an artifact.
+
+It matters most when a **no-op** is the expected answer.
+A negative control for a two-revision comparison is normally "run it against identical revisions and confirm it reports zero", and that control is precisely what a dirty tree makes unreachable --- so a control that never once produced its own expected answer can be believed for an entire session, while CI, which always runs from a clean checkout, sees the true zero on its first attempt.
+[`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "A control's patch point drifts" section carries the case where that gap hid a dead control.
+
+Pass **both** revisions explicitly whenever the intent is a self-comparison, rather than naming one and letting the other default.
+Read the tool's own `--help` for the second flag rather than guessing its name: `scripts/check-verdict-scan-parity.py` calls it `--candidate-rev`, whose help reads, in full, "Compare a committed revision instead of the working tree.
+Use it to confirm the triage FLAGS a revision known to be fail-open, which is this tool's own negative control."
+Note what the first of those two sentences does and does not say --- it names the working tree as the alternative, and leaves you to infer that omitting the flag selects it.
+That inference is correct here, and reading a default off a help string is exactly the adjacent-artifact substitution this file warns about elsewhere, so confirm it in the source (`default=""`, then a branch on truthiness) rather than in the help.
+When a tool has no second flag at all, commit or stash first, and prefer designing one that names both sides over one that silently adopts the tree --- an implicit side cannot be audited from the command line anyone pastes into a PR.
+
+- **Do:** pass both revisions explicitly when the expected answer is "no difference", reading the second flag's name from the tool's `--help` rather than assuming it.
+- **Do:** check `git status --short` before believing a two-revision tool's output, the same way you would before believing a `git diff` range.
+- **Do:** give a tool of your own an explicit flag for each side, so the published command records what it compared.
+- **Don't:** read `--base-rev HEAD` as a self-comparison;
+  it is `HEAD`-vs-worktree unless the tree is clean.
+- **Don't:** treat a non-zero result from such a run as evidence the tool discriminates --- your own uncommitted edits produce one.
+
+(Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+Read from the source rather than the help: `--base-rev` carries `default="origin/main"`, and the other side is loaded from the working-tree copy of the checker unless `--candidate-rev` is non-empty.
+So `--base-rev HEAD` over a dirty tree is `HEAD`-vs-worktree.)

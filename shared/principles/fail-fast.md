@@ -889,6 +889,87 @@ written, and the reason is what points at the fix.**
 See [`fail-fast.cases.md`](fail-fast.cases.md), "Normalizing repairs the
 instrument and not the needle".
 
+## Where many consumers key on a shared buffer, filter the matches rather than editing the buffer
+
+The "Guarding an unsound pattern with a second pattern" section above says to replace an unsound instrument rather than guard it.
+This says what "replace" looks like when the unsoundness is not in one pattern but in the **representation** every pattern reads.
+
+The shape: a module normalizes an input into one buffer, then runs a dozen checks over it, and several of those checks are sensitive to the buffer's characters and offsets rather than only to its words --- an anchored negation window that must stay adjacent to what it negates, a sentence-boundary test, a markedness check, a tag whose presence is positional.
+Widening what the normalizer blanks then looks like a local change to one function and is not.
+Every consumer that measured the old buffer now measures a different one, and each breaks in its own way.
+
+The recognizable signal is that successive designs fail in **unrelated** ways.
+One design re-pairs delimiters across a live finding, the next shifts every downstream pair, the next lets an anchored negation window reach a finding it was never next to, the next destroys a findings-item tag.
+Read as bugs, that is four fixes.
+Read correctly, it is one fact restated four times: the text is load-bearing for consumers that never asked to be edited.
+Where a failure class is being enumerated a member at a time, stop patching members.
+
+The fix is to leave the buffer **byte-identical** and carry the new information alongside it --- a parallel mask of offsets, a set of ranges, a second array --- and have each consumer decide for itself whether a match it found falls inside.
+That makes the class unreachable rather than patched, and every consumer that did not opt in keeps its exact previous behaviour by construction.
+That byte-identity is the strongest form of parity available: not proven equal, but identical.
+
+It also usually expresses the actual intent better than the edit did.
+"Blank more text" was never the goal;
+"do not count a quoted phrase as a stated one" was, and a mask says that directly.
+Behaviour the blanking designs could not express then falls out for free --- a match that *straddles* the boundary is still a match, which is right, and no blanking design can represent it at all.
+
+- **Do:** ask what else reads a buffer before widening what writes it, and derive that list by grep rather than from memory.
+- **Do:** carry new information beside a shared buffer instead of inside it, and let each consumer apply it.
+- **Do:** treat "each attempt broke something different" as evidence about the representation, not as a list of bugs.
+- **Don't:** patch the members of a failure class one at a time when a representation change makes the class unreachable.
+- **Don't:** call a widening local because it edits one function;
+  its blast radius is every consumer of what that function returns.
+
+(Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+Four designs blanked more text, and between them broke six distinct downstream passes --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, and reviewer-identity extraction --- for nine fail-opens on a fail-closed instrument across five adversarial review rounds.
+The counts differ because the relation is not one-to-one: the fourth design alone broke several passes, and one broken pass can fail open on more than one shape.
+What the numbers share is that no two designs failed the *same* way, which is the signal the section is about.
+The design that shipped leaves the scan byte-identical to `origin/main` and returns a citation mask beside it.
+[#2525](https://github.com/Morrison-Lab/ai-config/issues/2525) tracks the two consumers that were deliberately left un-migrated, which the byte-identity guarantees behave exactly as before.)
+
+## Intersecting two over-claiming detectors moves every error into one direction
+
+The "Guarding an unsound pattern with a second pattern" section above forbids adding a precondition over the same stream.
+This is the composition it does not forbid, and the distinction is worth stating because the two look alike from a distance.
+
+A guard runs *after* an unsound filter and asks whether this particular case is one the filter gets wrong, so it inherits the ambiguity and fails silent.
+An **intersection** runs two detectors over the same input and keeps only what both claim.
+Nothing arbitrates, nothing is asked to detect its sibling's failures, and every disagreement resolves the same way by construction.
+
+What makes it sound is set containment rather than any claim about which way each detector errs.
+An intersection is a subset of both inputs, so it can only ever claim **less** than either --- it cannot invent a claim neither made.
+Every error the composition *introduces* therefore runs in one direction, under-claiming, and the condition the composition *adds* is that under-claiming is the safe direction for the consumer.
+State it that narrowly.
+It says nothing about the errors both inputs already shared, which survive the intersection untouched and are the subject of the paragraph below --- so an intersection bounds the damage its own construction can do and inherits whatever the pair was already wrong about.
+
+Two things follow, and the second is the one that is easy to get backwards.
+The intersection is **exact** when the two detectors' false positives are disjoint, since nothing false survives being claimed twice.
+It is merely **safe**, not exact, when they overlap --- a shape both detectors get wrong survives, which is the "two methods agreeing is not corroboration when both are narrow in the same way" trap one step along.
+So overlap costs you exactness and never costs you the direction, which is why the direction is the thing to check first.
+
+The worked case is a code-span scanner, and it is worth stating carefully because the two scans are wrong in the **same** direction, not opposite ones: both claim spans CommonMark does not have.
+What differs is *where* each invents them.
+A whole-body scan pairs stray delimiters across line boundaries, claiming a span the author never opened.
+A per-line scan can instead manufacture a span out of runs the whole-body scan already consumed into a span opened on the line above.
+Neither is a subset of the other, so neither can be dropped;
+their false positives largely do not coincide, which is what makes the intersection close to exact.
+And because an intersection only shrinks, the residue is unclaimed span rather than invented span --- in an instrument where an unmasked citation merely over-flags, exactly where the residue belongs.
+
+State the failure direction explicitly when you ship one.
+"Strictly safer than either" is a claim about which way the disagreements fall, and it is false for the same construction in an instrument whose safe direction is reversed.
+
+- **Do:** name the consumer's safe direction first, and intersect only when under-claiming is it --- that is the condition the composition adds.
+- **Do:** prefer an intersection over a guard when both are available --- it has no silent branch to fail open.
+- **Do:** ask whether the two detectors' false positives overlap, to know whether you are getting exactness or only safety.
+- **Don't:** require the detectors to err in *opposite* directions;
+  two detectors that both over-claim, as a per-line and a whole-body span scan both do, are the ordinary case this serves.
+- **Don't:** read an intersection as corroboration --- a shape both detectors get wrong survives being claimed twice.
+- **Don't:** carry "the intersection is safer" into an instrument whose safe direction is the opposite one;
+  the property belongs to the pair plus the consumer, not to the pair.
+
+(Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose citation mask is the intersection of a per-line and a whole-body CommonMark scan.
+Round 5's adversarial review could not falsify it: over 470,000 fuzzed bodies plus a 1,693,440-body sweep it found 0 scan-text differences from `origin/main`, 0 mask misalignments, and 0 divergences not attributable to a wholly-contained citation.)
+
 ## In review
 
 Flag error handling that hides failure --- swallowed exceptions, silent

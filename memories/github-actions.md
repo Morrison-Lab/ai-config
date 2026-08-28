@@ -188,11 +188,20 @@ The `@claude` bot's own behaviour lives in
   actions: none`) and no review ever posted. When wiring a caller stub for a gha reusable
   workflow, copy the `permissions:` block from the matching `examples/<name>.yml` verbatim
   rather than hand-picking keys, and re-diff against it when the stub drifts. (ai-config#224.)
-- **Detached HEAD on `pull_request` events.** `actions/checkout` without an explicit `ref`
-  on a PR event checks out a synthetic merge commit in detached HEAD — `git push` then
-  fails. Fix: pass `ref: ${{ github.head_ref }}` so the branch name is checked out, not the
-  merge commit SHA. Required for any reusable workflow that needs to `git push` from a PR
-  caller.
+- **Detached HEAD on `pull_request` events.**
+  `actions/checkout` without an explicit `ref` on a PR event checks out a synthetic merge commit in detached HEAD --- `git push` then fails.
+  Fix: pass `ref: ${{ github.head_ref }}` so the branch name is checked out, not the merge commit SHA.
+  Required for any reusable workflow that needs to `git push` from a PR caller.
+  **The reading consequence is separate and is the one with no error message.**
+  That synthetic commit is `refs/pull/<N>/merge`, the PR's head merged into the base.
+  It exists in no branch, its SHA appears in no `git log` of yours, and its ancestry includes commits `main` has that your branch does not.
+  So a job or a reviewer running `git merge-base --is-ancestor <main-commit> HEAD` inside that checkout gets **yes**, while the identical command on the PR branch gets **no** --- and both answers are correct about the artifact each one read.
+  The corpus already records `refs/pull/<N>/head`, which is the branch tip and behaves as you expect;
+  `/merge` is the one that does not, and only `/merge` is what a `pull_request` job checks out by default.
+  The trap is the reconciliation rather than the fact: reading a review's ancestry claim against your own branch makes the review look wrong, and "the reviewer is wrong about our topology" is a confident, publishable, false correction.
+  Ask which ref answered before calling either reading a defect, per [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s checkout-for-the-run shape.
+  Resolve it with `git rev-parse HEAD` inside the run (or `github.event.pull_request.head.sha`, which always names the branch tip) rather than by re-deriving ancestry locally and trusting whichever answer you got. (Measured 2026-08-28 on ai-config#2529: a review stated a `main` commit was an ancestor of the PR head and named a merge SHA absent from the branch;
+  both were true of `refs/pull/2529/merge` and false of the branch, and the branch-side check was one edit away from being published as a correction.)
 - **`always()` + optional upstream job needs an explicit result guard.** The pattern
   `if: ${{ always() && !cancelled() && needs.X.result == 'success' }}` keeps the job
   running when X is *skipped* (non-PR events), but also lets it run when X *fails* —

@@ -148,3 +148,52 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 - **Do:** catch `zoneinfo.ZoneInfoNotFoundError` when handling a missing time zone database.
 - **Don't:** assume `time.tzset()` exists, or that `zoneinfo.ZoneInfo("America/Los_Angeles")` succeeds out-of-the-box, on a Windows Python installation.
 - **Don't:** wrap a `ZoneInfo` call in `except ModuleNotFoundError`, or hard-code a fixed UTC offset for a DST-observing zone.
+
+## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
+
+`itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
+Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
+The structural claim holds whatever the corpus size: on `scripts/check-verdict-scan-parity.py` (shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below), `LEAD` is the outermost of seven `itertools.product` axes, so a prefix holds `LEAD[0]` fixed for the first 241,920 of 1,693,440 bodies.
+The **blind-prefix length** is the part that has to be measured, and the measurement on record was wrong: re-derived 2026-08-28, the negative control's first divergence sits at prefix index **485**, with 120 divergences inside the first 8,000.
+Those are figures about a *prefix*, so they say nothing about what a capped run does --- `--limit` strides, and at limit 500 the stride is 3,386, which never samples index 485.
+Measured separately, a strided run at that cap finds **125** divergences and prints `DISCRIMINATES`;
+the same 500 bodies taken as a prefix find 15.
+Quoting the prefix index as the reason the capped run works is the very prefix-versus-stride conflation this entry exists to prevent.
+An earlier reading of this entry said the first 8,000 were blind, and attributed that to figure decay --- the corpus having grown from 221,184 bodies to 1,693,440 under the same PR.
+Recovering the history shows the decay story is wrong.
+The claim was introduced by `936aea2`, the very commit that widened the corpus, so it never faced the smaller one.
+What produced it was the **dead negative control** that commit also carried: patching `strip_cited_finding_vocab` after the scans had moved to `strip_cited_finding_vocab_with_mask`.
+Measured at `936aea2` against base `936aea2^`, the dead control reports **0** divergences over the first 8,000 while the repaired control reports **120** over the identical corpus and revisions.
+So the blind reading was an artifact of a control patching code nothing called, which is the failure [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "A control's patch point drifts" section describes, not the widening failure it was filed under.
+The same stale sentence is still a source comment on `main`, tracked as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532). (For the record, the widening did happen and was substantial --- `FILLER_EXTRA` from 0 to 8 entries, `LEAD` from 4 to 7, `NEGATION` from 4 to 6, and a fourth template becoming a fifth --- it simply is not what made the figure wrong.)
+Re-derive a blind-prefix length before quoting one;
+quote the axis structure freely, since it does not decay.
+
+Striding fixes it, and the arithmetic has one trap.
+An integer step, `step = len(items) // limit`, is exactly `1` for every `limit` strictly above half the corpus, so the "stride" degenerates back to a prefix --- and that is the regime a generously-raised cap puts you in, which is why the naive form is likeliest to be wrong precisely when someone has tried to be careful.
+Measured on a 100-item list: `limit=51` gives an integer step of 1 and stops at index 50, while the float stride reaches index 98.
+Compute the step in floating point and round at each index instead:
+
+```python
+if limit is not None and limit < total:
+    step = total / limit
+    picked = (items[int(i * step)] for i in range(limit))
+```
+
+`total / limit` is a `float` and stays above 1 for every `limit < total`, so each index advances.
+`range(0, total, total // limit)` fails in the **opposite** direction rather than reproducing the prefix bug: for `total=100, limit=51` the step is `1`, so it yields all 100 indices and caps nothing at all.
+Only when `limit > total` does it fail loudly, the step being `0` and `range` raising `ValueError: range() arg 3 must not be zero`.
+So the integer-step trap has two distinct outcomes worth separating --- a slice stride degenerates to a prefix, while a `range` step degenerates to no cap --- and neither is the even spread the arithmetic was supposed to buy.
+
+A generator has no `len()`, so striding it requires either materializing it or making the generator itself accept the stride.
+Apply the cap *inside* the generator where you can, since materializing first spends the whole cost the cap was meant to avoid ([ai-config#2534](https://github.com/Morrison-Lab/ai-config/issues/2534)).
+Materializing is not free either, and "short strings" hides the cost: 1,693,440 of these bodies took about 1.5 s and raised peak RSS from 12 MB to 350 MB, measured 2026-08-28 on CPython 3.11 under Linux with nothing else in the process.
+Read that 337 MB as the step's own cost only because the baseline was measured beside it;
+peak RSS is process-wide, so a bare "peaked at N MB" attributes every other allocation in the run to whichever step you were watching. (A first reading of 5.9 s and 511 MB came from a run with `tracemalloc` enabled, which inflates both.)
+That is affordable for a bounded corpus and unbounded for a generator with no end, which is the asymmetry that decides which form to reach for --- but quote the number rather than calling it cheap, since half a gigabyte is a real constraint on a small runner.
+
+- **Do:** stride across a generated product space when capping it, computing the step as a float and indexing by `int(i * step)`.
+- **Do:** state in the run's own output which sampling mode produced the figures, so a capped number is never read as a swept one (the tool this entry is drawn from does not, tracked as [ai-config#2534](https://github.com/Morrison-Lab/ai-config/issues/2534)).
+- **Don't:** implement a `--limit` as `itertools.islice` over a nested product generator --- that fixes the slowest-varying component.
+- **Don't:** use `total // limit` as a stride;
+  it is 1 for every limit above half the corpus, which is a prefix by another name.

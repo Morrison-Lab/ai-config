@@ -240,6 +240,34 @@ That is [`learn-from-review-findings`](learn-from-review-findings.md)'s converge
 A dispatched reviewer makes that concrete, because the finding now has an author who is not you: give each one Address, Rebut, or Defer-to-a-tracked-issue per [`ard`](../../skills/ard/SKILL.md), in writing, exactly as for a finding from the PR's own reviewer.
 "I know why that is fine" is a Rebut, and a Rebut is something you would be willing to post.
 
+## Review the instrument too, not only the change it verifies
+
+The section above says a dispatched reviewer's findings are findings.
+This says what to put in front of it, and the answer is wider than the change: **the verification artifacts are part of the diff and get reviewed as such.**
+
+The reason is not symmetry.
+A change is guarded by the suite and by the instrument, so a defect in it has two independent detectors.
+A defect in the *instrument* has none --- the suite does not test the parity checker, the parity checker does not check itself, and a broken instrument's characteristic output is a reassuring number rather than an error.
+That inverts the intuition that tooling is the low-risk part of a diff: it is the part with the fewest detectors, and therefore the part where an independent reader is worth the most.
+
+The corollary is that a green suite is not a reason to shorten the round.
+A suite reports that the assertions written so far pass, which is silent about an assertion that cannot fail, a control patching dead code, and a metric over the wrong quantity --- three defects a reader finds by reading and no run finds at all.
+
+So brief the reviewer with the whole diff, naming the verification files explicitly rather than describing them as scaffolding, and ask specifically: what result would this instrument have to produce for the change to be abandoned?
+An instrument with no such result is a finding on its own terms, per [`verify-the-right-artifact`](verify-the-right-artifact.md)'s transformation-for-conclusion section.
+
+- **Do:** include tests, controls, harnesses, and parity checkers in the diff the reviewer sees, and name them in the brief.
+- **Do:** ask what output would falsify the instrument, and treat "none" as a finding rather than as reassurance.
+- **Do:** keep running rounds while findings keep landing;
+  a round that finds something is evidence the next one will too.
+- **Don't:** describe the verification files as scaffolding, or scope the review to "the actual change" --- that excludes the least-guarded code in the diff.
+- **Don't:** read a green suite as a reason to stop early;
+  the defects this section is about are invisible to it by construction.
+
+(Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+Five adversarial rounds each found real defects against a fully green suite, and three of the five found them in the verification tooling rather than in the change: a parity metric that could not fail, a negative control patching a function that had moved off the execution path, and an assertion comparing a function against itself.
+The last of those had let a previously-rejected design pass 299 tests.)
+
 ## The posted fallback comment is the reviewer's report, not an author composite
 
 When the self-review is posted as a PR comment, the comment body **is**

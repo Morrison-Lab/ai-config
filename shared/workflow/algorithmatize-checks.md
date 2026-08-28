@@ -333,6 +333,40 @@ The section above says to test a guard against the incident that prompted it.
 - **Don't:** call an instrument trustworthy on a control that skipped its
   weakest step.
 
+**A control's patch point drifts, and the drift is invisible in every configuration you are likely to run it in.**
+
+The rule above is about where a control *enters*.
+This is about the entry point silently ceasing to be one.
+A control that neuters the instrument --- replacing a veto with a never-match, patching a function to a no-op --- names the function it patches, and a later refactor can move the real work to a sibling.
+The patch then applies to code nothing calls.
+Nothing errors, because the name still resolves and the patch still succeeds.
+
+What makes this survivable long enough to ship is that the control keeps returning a healthy number.
+A control comparing two revisions reports a large divergence whenever those revisions genuinely differ, whether or not the neutering did anything --- so every local run over a real change looks exactly like a working control.
+It reads zero only when the two revisions are *identical*, which is the self-comparison case a dirty working tree never produces and a clean CI checkout produces on every run.
+So the configuration that exposes the defect is the one a local session structurally cannot reach, and CI is the first thing to see it.
+
+This is wiring rot rather than the blindness [`fail-fast`](../principles/fail-fast.md)'s fifth cause describes.
+There the control is correctly attached and the subject's own fallback absorbs the failures;
+here nothing absorbs anything, because the control is attached to code no longer on the path.
+The distinction matters for the remedy: a fallback wants its bucket measured, while a detached control wants its target re-derived from the call the instrument actually makes.
+
+The generalization is the part worth carrying: **a control validated only in a configuration where it cannot fail is indistinguishable from one that works.**
+Run every control at least once in the configuration where its own expected answer is the boring one --- identical inputs, an empty diff, a no-op change --- and confirm it says so.
+
+- **Do:** derive a control's patch target from the call the instrument actually makes, rather than from a function name you remember it making.
+- **Do:** run the control once against identical revisions and confirm it reports zero, before trusting any non-zero it reports.
+- **Do:** re-run every control after a refactor that renames or splits a function, treating the rename as a change to the control.
+- **Don't:** read a healthy-looking divergence count as evidence the control fired --- a genuine difference in the inputs produces the same number either way.
+- **Don't:** validate a control only in the configuration your working tree happens to be in.
+
+(Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+The negative control patched `strip_cited_finding_vocab` after the scans it guards had moved to `strip_cited_finding_vocab_with_mask`.
+Local runs kept reporting a plausible divergence;
+CI, which compares a clean checkout against itself, was what caught it.
+Re-pointed at the function the scans actually call, the control fires as it should: measured 2026-08-28, it produces 120 divergences within the first 8,000 generated bodies, the first at index 485.
+That is what a control catching something looks like, and it is the reading the dead one had been imitating.)
+
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
 The section above ends where the control finally catches something.

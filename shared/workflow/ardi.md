@@ -836,6 +836,44 @@ claim ends up arguing against the fix that produced the change.
 See [`ardi.cases.md`](ardi.cases.md),
 "A trust-gate fix that revealed a tool-name mismatch behind it".
 
+**A third cell: a symptom that stops reproducing AFTER you applied a remedy is not evidence the remedy worked.**
+
+The two bullets above cover the case where you changed nothing and the symptom vanished, and the case where you changed something and the symptom stayed.
+This is the remaining one, and it is the only one of the three that ends in a green check --- which is why it is the one that gets reported.
+
+A pass following your change is consistent with the change having fixed it.
+It is equally consistent with an intermittent failure that did not fire this time, with something else having moved in the base, and with the failing condition never being reached on this run.
+Applying a plausible remedy and observing success is not a controlled test, because no run of the unchanged head exists to compare against.
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) states the complementary half, and its wording is the discriminator: a retry is a genuine negative control "because nothing changed between the two runs".
+Change something and you have spent that control.
+
+Three things make this harder to catch than either neighbour.
+
+**The remedy is usually correct to apply.**
+Porting a fix that already exists on `main` is what [`sync-with-main`](sync-with-main.md) asks for, so nothing about the action is a mistake.
+The causal claim then inherits the action's correctness and is never examined on its own, which is the near-miss: right action, unchecked story, and no moment at which the two come apart.
+
+**Green terminates inquiry.**
+A red check invites investigation and a green one closes the question, so the wrong story survives in exactly the place least likely to be revisited.
+
+**The refuting datum is usually free.**
+A timeout failure carries its own duration, which is in the job metadata whether or not anyone reads it.
+
+The test is one question, asked before the claim is written: **name the observation that would differ if your change were the cause, and go and look for it.**
+For a raised timeout that is a duration falling between the old limit and the new one, so a passing run that finishes inside the OLD limit never reached the raise.
+For a widened pattern it is an input matching the new alternative and not the old.
+For an added dependency it is the code path that requires it.
+Where the passing run does not show that observation, you have a green check and no evidence, and the honest report says the check passed rather than that your change fixed it.
+
+- **Do:** name what the passing run would have to show if your change were the cause, and read that field before reporting causation.
+- **Do:** report the pass as "the check passed" until that observation is in hand, and say separately that the remedy is worth keeping on its own merits.
+- **Do:** compare a timeout's passing duration against the OLD limit --- a run finishing inside it proves the raise was never exercised.
+- **Don't:** read a correctly-applied remedy as licensing the claim that it worked;
+  the action being right is what carries the claim past review unexamined.
+- **Don't:** treat a single pass as a controlled test --- changing something is precisely what removes the negative control a bare retry would have given.
+
+See [`ardi.cases.md`](ardi.cases.md), "A green check credited to a timeout raise that never ran".
+
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**

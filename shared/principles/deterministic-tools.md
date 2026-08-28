@@ -267,7 +267,7 @@ Replacing that with a **list of tag names** feels like a different kind of thing
 It was still parsing.
 The parse had moved from **grammar** to **vocabulary**, and the vocabulary belonged to the format's author rather than to the checker.
 The shipped harness emitted or stripped fifteen tag names inside user content;
-the list held four, and intersected them in one.
+the list held four, and intersected them in two.
 A teammate agent's message and an editor selection appended to the user's own prompt both certified clean.
 
 The tell is that the new instrument's correctness now depends on a set **someone else maintains** and does not publish to you.

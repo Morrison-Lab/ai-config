@@ -1,8 +1,9 @@
 # Claude Code transcript records
 
 What is on disk under `~/.claude/projects/*.jsonl`, for anything that reads a transcript --- a hook via `transcript_path`, or a tool given `--root`.
-Measured 2026-08-28 against 28 transcripts (8,825 records) on CLI 2.1.250.
-Every count here is a reading, not a constant; re-derive rather than cite.
+Every count below comes from **one** reading, 2026-08-28T21:14:06Z, on CLI 2.1.250: 29 transcripts, 9,465 records, 2,770 of them user-role.
+They are readings rather than constants --- the corpus grows while the measuring session appends --- so re-derive rather than cite.
+Taking them at different moments is the mistake this entry was first written with: three figures from two epochs, all labelled "the measured root".
 
 ## `message.role == "user"` is a transport role, not an authorship claim
 
@@ -32,7 +33,7 @@ print(c)
 PY
 ```
 
-On the measured root: **2,270 of 2,339** user-role records carried no `origin` key at all, 2 were `human`, 64 `task-notification`, 3 `coordinator`.
+At the reading above: **2,675 of 2,770** user-role records carried no `origin` key at all, 2 were `human`, 90 `task-notification`, 3 `coordinator`.
 
 So the label is absent from essentially every genuine turn, and treating its absence as a rejection discards the corpus.
 Two further traps, both from the shipped binary rather than from a transcript:
@@ -54,11 +55,16 @@ Reading only `message` reports "no record contains it" over text the user typed.
 | `attachment` | `attachment.prompt` / `content` / `text`, and `content` is not always a string |
 | **`tool_result`** | `content`, **not** `text` --- a block inside a `message` record |
 
-A prompt exists as `queue-operation` before it exists as `message`;
-measured across 75 enqueue-to-message pairs, the gap ran from 6 ms to 8m19s, so a session ending between them leaves the sentence only in the first shape.
-
 **The `tool_result` case is the one to remember.**
-There were 2,451 such blocks in the measured root, every one inside a `role: "user"` record, and an `AskUserQuestion` answer exists in **no other shape** --- so the records carrying the user's own *decisions* are exactly the ones a `text`-only reader cannot see.
+There were **2,613** such blocks at the reading above, every one inside a `role: "user"` record, and an `AskUserQuestion` answer exists in **no other shape** --- so the records carrying the user's own *decisions* are exactly the ones a `text`-only reader cannot see.
+This case has nothing to do with timing, and it is the strongest reason to read past `message`.
+
+The `queue-operation` window is real, much narrower than it first looks, and getting it wrong is instructive.
+A prompt is written at enqueue and becomes a `message` record at dequeue, so a session ending between the two leaves it only in the first shape.
+Of 85 enqueue-to-message pairs at the reading above, **82 carry harness envelopes rather than user prose**;
+the 3 that carry prose closed in 0.1, 0.2 and 0.4 seconds.
+An earlier version of this entry quoted the range across all 85 --- up to 8m19s --- as the size of that window, which measured the harness's own traffic and presented it as the user's.
+That is the transport-role conflation the section above forbids, committed while writing the section that forbids it.
 
 Do not enumerate the shapes in a checker.
 The list is the format author's, not yours, and it decays silently;

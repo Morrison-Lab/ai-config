@@ -226,14 +226,31 @@ Neither can be deleted by editing the constant alone.
 
 A **malformed mutant** --- one that leaves the file unparseable --- produces no failures, because the suite never runs.
 Counting `FAIL` lines then reports it as a survivor, and the natural response is to go write a test for a hole that does not exist.
-Check the interpreter's exit status before counting, and treat anything outside `{0, 1}` as "mutant not applied".
+
+**The exit status does not discriminate**, which is worth stating because it is the first remedy that comes to mind and it is the one this passage originally prescribed.
+A suite that dies importing an unparseable module exits **1**, and so does a suite with a genuine failure --- so "treat anything outside `{0, 1}` as not applied" is a detector that cannot fire in the case it was written for.
+It was wrong here for a full round, inside the section about detectors that cannot fire.
+
+Key on the **pass count** instead, because that is the quantity a malformed mutant cannot produce:
+
+| | exit | `FAIL` lines | passes |
+|---|---|---|---|
+| baseline | 0 | 0 | N |
+| mutant killed | 1 | 1 or more | fewer than N |
+| mutant **survives** | 0 | 0 | N |
+| mutant **malformed** | 1 | 0 | none reported at all |
+
+A survivor reproduces the baseline's pass count;
+a malformed mutant reports no summary line, because the suite never reached one.
+Record the baseline count before the run and require every mutant to reproduce it or fail --- anything else is "not applied", and should be re-applied rather than counted.
 
 A **skip counted as a pass** hides a weakened run.
 A case inert under some condition --- a permission test as root, a platform-specific path --- recorded via `check(name, True)` makes a suite that skipped it and a suite that ran it print the same total, so the difference between a full run and a partial one is invisible in the one number anybody reads.
 Report skips in their own counter and exclude them from the pass count.
 
 - **Do:** write the members as literals in the test, and assert separately that the constant contains them.
-- **Do:** check a mutation run's exit status before counting failures.
+- **Do:** compare each mutation run's PASS count against the baseline's, and treat a run that reports no count at all as "mutant not applied".
+- **Don't:** discriminate on exit status --- a malformed mutant and a real failure both exit 1, so it cannot separate them.
 - **Do:** count skips separately, so a weakened run and a full one differ in the totals.
 - **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
 - **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.

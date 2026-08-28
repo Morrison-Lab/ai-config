@@ -112,10 +112,17 @@ def _flatten(label: str, value, depth: int = 0) -> Iterator[Tuple[str, str]]:
 def texts(record: dict) -> Iterator[Tuple[str, str]]:
     """(shape, text) for every piece of prose a record can carry.
 
-    Four shapes, because a prompt exists in more than one of them and can exist
-    in only the others: `queue-operation` is written at enqueue, `message` at
-    dequeue, and a session ending between the two leaves the sentence on disk
-    in a form a message-only reader cannot see.
+    Deliberately not "the N shapes": every count written here has been wrong
+    within a round, because the transcript format is not mine and a shape is
+    found rather than enumerated. `_flatten` is the structural half -- a nested
+    payload is walked, so a shape nested inside one already read needs no code
+    change to be reached.
+
+    What is known: a prompt can exist in one shape and not another.
+    `queue-operation` is written at enqueue and `message` at dequeue, so a
+    session ending between them leaves the sentence where a message-only reader
+    cannot see it; and an `AskUserQuestion` answer exists only inside a
+    `tool_result` block, whose payload is under `content` rather than `text`.
     """
     kind = record.get("type")
     message = record.get("message")

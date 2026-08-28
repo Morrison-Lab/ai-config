@@ -206,10 +206,10 @@ Sanity-checking a *surprising* verdict is the fourth case's remedy, and it canno
 
 The false premise lives in the incremental section --- "What changed since the last review", or whatever the reviewer calls it.
 Whatever produces that section, the range it names is a **claim** rather than a derivation you can check --- why the claim went wrong is not established, and this incident says nothing about the reviewer's internals.
-A wrong one licenses a shortened round: naming one commit where the range holds two, quoting a `git diff --stat` that omits a source file, and concluding "no substantive logic changes" before returning Ready for merge.
-The one behaviour change in the round then goes unexamined, under a verdict that correctly names the current head.
+A wrong one licenses a **shortened** round --- shortened in what it accounts for, which is all you can observe: naming one commit where the range holds two, quoting a `git diff --stat` that omits a source file, and concluding "no substantive logic changes" before returning Ready for merge.
+The one behaviour change in the round is then unaccounted for, under a verdict that correctly names the current head.
 
-No automated check catches it --- the range comparison below does, which is why it has to be run by hand.
+No check in this repository catches it as of 2026-08-28 --- the range comparison below does, which is why it has to be run by hand.
 [`fully-clean.md`](fully-clean.md)'s whole family of SHA checks is satisfied --- the verdict is dated, clean, and stamped with the head it reviewed --- and `scripts/check-pr-fully-clean.py` reported the PR fully clean, correctly by its own rules as of 2026-08-28.
 The defect is in the verdict's account of *what it read*, which no SHA test can reach.
 The section that exists to spare a re-review from re-reading everything is exactly the section whose error costs the most.
@@ -227,11 +227,12 @@ it does not establish what the reviewer read, since a summary can omit a file it
 What it costs you is the ability to tell --- coverage becomes unproven rather than demonstrably short --- and an unproven range is not one to accept a clean verdict on.
 
 - **Do:** derive the incremental range yourself and compare it against the review's own account, on every round after the first.
-- **Do:** re-dispatch when they disagree, and say on the PR what the review missed.
-- **Do:** send the unread range to a *different* reviewer rather than re-running the one that shortened the round --- on 2026-08-28 a re-run against the unchanged head restated the same account and deferred to it, while a cross-vendor pass at that head returned the findings.
+- **Do:** re-dispatch when they disagree, and say on the PR which commits the review did not account for.
+- **Do:** send the unaccounted-for range to a *different* reviewer rather than re-running the one that shortened the round --- on 2026-08-28 a re-run against the unchanged head restated the same account and deferred to it, while a cross-vendor pass at that head returned the findings.
   [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section is the standing rule;
   this is one more situation that calls for it.
-- **Don't:** read a clean re-approval as covering the round --- an incremental round's coverage is bounded by the range it believed it had.
+- **Don't:** push a commit so the next round has a range it will accept --- that changes what gets reviewed instead of getting the unaccounted-for range reviewed.
+- **Don't:** read a clean re-approval as covering the round --- an incremental round's coverage is bounded by the range it accounted for.
 - **Don't:** reach for the fourth case's surprise test here.
   This verdict is unsurprising by construction, which is why it needs a mechanical check instead.
 

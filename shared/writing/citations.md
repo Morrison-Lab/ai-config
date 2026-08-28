@@ -404,18 +404,21 @@ python3 scripts/check-user-quote.py "the sentence you are about to quote" --show
 **The classifier is what carries the check, not the search**, and that is why this is a script rather than a grep.
 `message.role == "user"` is a **transport** role, not an authorship claim.
 The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, inter-agent coordinator messages, and --- for a subagent --- the dispatch brief the assistant wrote.
-Matching one of those and calling it a hit is the adjacent-artifact substitution: a copy of the claim rather than the source, arriving with a verification's authority.
+Matching one of those and calling it a hit is the adjacent-artifact substitution [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) names: a copy of the claim rather than the source, arriving with a verification's authority.
 
 So the outcome per record is three-way rather than two-way, and the third value is the load-bearing one.
-The harness labels a typed turn `origin.kind == "human"`, which is the strongest signal available and is still weaker than it sounds:
-it records how a message entered the session rather than that someone typed it, it is absent entirely on some paths, and a genuine turn is demoted to `unclassified` on others.
-So a record carrying no such label is **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
+The harness labels a typed turn `origin.kind == "human"`, which is the strongest signal available and is still weaker than it sounds.
+Read out of the shipped CLI 2.1.250 rather than inferred from a transcript --- a transcript shows only which values happened to occur on one machine --- it rewrites a user record's origin to `unclassified` when the kind is `human` or `auto-continuation`, and its own human test is `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
+So a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
+A record carrying no usable label is therefore **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
 That distinction is not fastidiousness.
 An earlier version of this check classified on the exclusions alone, and an assistant-written dispatch brief passed all of them, so the tool certified the assistant's own prose as the user's words.
-The version after that classified per *record*, and a human-labelled record carrying an injected second block certified that block the same way --- so the verdict is now per block, and a record's verdict is a ceiling rather than an answer.
+The version after that classified per *record*, and a human-labelled record carrying an injected second block certified that block the same way.
+The version after *that* moved to blocks and still certified an envelope appended mid-block, since it only tested what a block began with.
+So the phrase is now looked for in a block's non-envelope regions, and a well-formed envelope's content is not the user's wherever it sits.
 
 The exit codes keep apart two things that are easy to conflate:
-a phrase absent from the human-labelled turns (`1`), and a space in which no such turn was ever found (`2` --- no transcript root, an unreadable file, or no labelled turns at all).
+a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing root, an unreadable file or directory, an empty phrase, or a crash).
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
 `--allow-unattributed` accepts a candidate at a fourth code, `3`, for the same reason:
 it readmits exactly the failure above, so a caller reading exit codes must not see it as `0`.
@@ -475,7 +478,8 @@ A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
 The script finds **no human turn** for either sentence.
-It reports **2** human-labelled turns in the whole transcript root, over 23 files and roughly 7,200 records --- the record counts grow while the measuring session is still appending, so the reproducible figure is the two, not the total.
+It reports **2** quotable human regions in the whole transcript root.
+The file and record totals are not quoted here: both grow while the measuring session appends, files included, since each dispatched subagent adds a transcript.
 `--show-excluded` places the replacement --- "This is the last correction round: fix the five, push, report the head" --- in an inter-agent coordinator message, and finds the original in no user-role record at all: it was only ever mine, so it is not reproduced.
 The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
 each passed its own local suite, and what refuted each was executing something.)

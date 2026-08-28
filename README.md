@@ -300,12 +300,10 @@ Decides whether a sentence you are about to attribute to the user was ever typed
 python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
 ```
 
-Exit `0` found in a block the harness labels human, `1` absent from every such block, `2` no such block was available to search --- a missing root, an unreadable file, an empty phrase, a crash, or a transcript carrying no labels.
-Only that last cause is answerable by `--allow-unattributed`, which accepts an unlabelled match at exit `3`;
-that readmits the failure the tool exists to prevent, since an assistant-written dispatch brief is unattributed, so treat exit `3` as a lead rather than a source.
+Exit `0` found, `1` absent, `2` nothing was available to search, and `3` found only in a record the harness never labelled human, with `--allow-unattributed`.
 Pass `--root` on an agent whose transcripts live elsewhere.
 
-[`shared/writing/citations.md`](shared/writing/citations.md) carries why the classification is three-way rather than two-way, and why a bare grep over the same file is worse than no check.
+[`shared/writing/citations.md`](shared/writing/citations.md) is the statement of record: why `message.role == "user"` is not an authorship claim, why exit `2` must not collapse into exit `1`, and what exit `3` readmits.
 
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind

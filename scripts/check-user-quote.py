@@ -9,34 +9,50 @@ this is a classifier rather than a grep.  What follows is what the code does.
 three ways rather than two:
 
   HUMAN         `origin.kind == "human"`, the harness's own label
-  EXCLUDED      a flag (`isMeta`, `isCompactSummary`, `isSidechain`,
-                `verifiedSlackHumanTurn`), a non-external `userType`, a
-                tool-result carrier, an empty block, an anchored harness
-                envelope, or a named non-human `origin.kind`
-  UNATTRIBUTED  no `origin` at all, or `origin.kind == "unclassified"`
+  EXCLUDED      a flag, a non-external `userType`, a named non-human
+                `origin.kind`, or a transcript marker on an unlabelled record
+  UNATTRIBUTED  no `origin`, `origin.kind == "unclassified"`, or a kind this
+                table has not seen
 
-UNATTRIBUTED covers two cases, and the second is why it cannot simply be
-excluded.  A record may carry no `origin` at all -- the CLI itself only
-*presumes* human there -- and a record the harness has demoted carries
-`origin.kind == "unclassified"`, which a fork, relay, or resume path produces
-from a genuinely human turn.  Excluding either would answer "the user never
-said it" about a sentence the user typed.  So both are candidates, reported and
-never certified, and `--allow-unattributed` accepts them at exit 3.
+Sources for the harness behaviour below, read out of the shipped CLI 2.1.250
+binary rather than inferred from a transcript, since a transcript can only show
+which values happened to occur on one machine:
 
-Classification is per BLOCK, not per record.  A human-labelled record can carry
-an injected second block, and filing that block's match under the record's
-verdict is what certifies harness prose as the user's words -- measured
-2026-08-28, on this file's own test fixture.  The envelope test therefore runs
-against whichever block matched, start-anchored so a turn quoting an envelope
-tag stays a turn.
+  demotion   `if (n.type === "user" && (s == null || s.kind == null ||
+              s.kind === "human" || s.kind === "auto-continuation"))
+              n.origin = {kind: "unclassified"}`
+  human test `O0(o.origin) && o.verifiedSlackHumanTurn !== true`
 
-Exit 0 found in a human-labelled block; 1 absent; 2 no such block was
-available to search -- a missing root, an unreadable file, an empty phrase, an
-unexpected exception, or a transcript carrying no labels; 3 found only in an
-unattributed block, with `--allow-unattributed` passed.  Per
+The demotion is why UNATTRIBUTED cannot simply be excluded: a genuinely human
+turn arrives as `unclassified` on the paths that rewrite it.  Excluding it
+would answer "the user never said it" about a sentence the user typed.  The
+harness's own human test is why `verifiedSlackHumanTurn` is excluded here: a
+record so marked is stamped human and relayed, so it is somebody's typed turn
+and not necessarily this user's.
+
+Classification is per record; matching is per non-envelope REGION of a block.
+A human-labelled record can carry injected text, and can carry it mid-block
+rather than at the start -- so well-formed envelopes are cut out of a block
+before the phrase is looked for, and a phrase found only inside one is not the
+user's.
+
+A closing tag is required, so a turn writing ABOUT a tag stays quotable.  The
+one exception is a block that OPENS with an unclosed opener, which is read as a
+truncated injection and yields nothing: that denies a quotation a user could
+conceivably have typed, and the alternative is certifying harness prose, which
+is the failure this tool exists to prevent.
+
+Exit 0 found in a quotable human region; 1 absent; 2 no such region was
+available to search -- a missing root, an unreadable file or directory, an
+empty phrase, a crash, or a transcript carrying no labels; 3 found only in an
+unattributed region, with `--allow-unattributed` passed.  Per
 `shared/principles/fail-fast.md`, exit 2 is kept distinct from exit 1 so that a
 degraded read can never be reported as an absence, and exit 3 from exit 0 so a
 scripted caller cannot mistake the weaker reading for a certified one.
+
+Known limit: a phrase spanning two blocks of one record is not found, because
+the blocks are never concatenated. It reports absent, which is the safe
+direction.
 """
 from __future__ import annotations
 
@@ -46,17 +62,27 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
-# Harness envelopes delivered as user-role records. Matched against the START
-# of the first text block only: a turn that merely quotes one of these tags
-# (this file's own tests do) must stay a turn, for the same reason
-# hooks/no-misattributed-quote.py exempts a message reporting a misquote.
-ENVELOPE_PREFIXES = (
-    "<task-notification>",
-    "<system-reminder>",
-    "<wake ",
-    "<command-name>",
+# Structural harness envelopes. Their CONTENT is never the user's, wherever in
+# a block it appears -- an injected reminder appended to a genuine turn is the
+# case a start-anchored test misses.
+ENVELOPE_TAGS = ("task-notification", "system-reminder", "wake", "command-name")
+# A CLOSING tag is required. An unclosed opener is far more likely to be a user
+# writing about a tag than a harness injection, which is always well-formed, and
+# swallowing to end-of-block there denies a genuine quotation. The truncated-
+# injection case is covered separately: a block that STARTS with an unclosed
+# opener is treated as an envelope in full.
+_ENVELOPE_RX = re.compile(
+    r"<(" + "|".join(ENVELOPE_TAGS) + r")\b.*?</\1\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+_OPENER_RX = re.compile(r"<(" + "|".join(ENVELOPE_TAGS) + r")\b", re.IGNORECASE)
+
+# Prose markers that open a harness-written record. Applied ONLY to a record
+# the harness did not label human: they are ordinary English, so a real turn
+# can begin with one, and excluding it there would deny a true quotation.
+TRANSCRIPT_PREFIXES = (
     "This session is being continued",
     "Caveat: The messages below were generated",
     "The coordinator sent a message while you were working",
@@ -66,14 +92,11 @@ FLAG_EXCLUSIONS = (
     ("isCompactSummary", "compaction summary"),
     ("isMeta", "harness injection"),
     ("isSidechain", "subagent transcript"),
-    # Stamped origin.kind == "human" by the harness, but relayed from a shared
-    # channel -- so it is somebody's typed turn and not necessarily this user's.
     ("verifiedSlackHumanTurn", "relayed channel turn, possibly another person"),
 )
 
 # origin.kind values the harness uses for something other than a typed turn.
-# "unclassified" is deliberately absent: the CLI demotes a human turn to it on
-# fork, relay and resume paths, so excluding it would deny a real quotation.
+# "unclassified" is deliberately absent -- see the demotion source above.
 NON_HUMAN_ORIGINS = (
     "channel", "peer", "coordinator", "observer", "observer-activity",
     "auto-continuation", "task-notification",
@@ -96,14 +119,37 @@ def default_root() -> Path:
 
 
 def text_blocks(message: dict) -> List[str]:
-    """Each prose block separately, so classify_block can judge the one that matched."""
+    """Each prose block separately, as a str.
+
+    A non-str `text` field is dropped rather than returned: it would otherwise
+    reach `.strip()` and abort the whole scan for every query against the root.
+    """
     content = message.get("content")
     if isinstance(content, str):
         return [content]
     if not isinstance(content, list):
         return []
-    return [b.get("text") or "" for b in content
-            if isinstance(b, dict) and b.get("type") == "text"]
+    out = []
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "text":
+            continue
+        text = block.get("text")
+        out.append(text if isinstance(text, str) else "")
+    return out
+
+
+def _regions(block: str) -> List[str]:
+    """Non-envelope regions of a block, in order."""
+    if _OPENER_RX.match(block.lstrip()):
+        # Opens with an envelope tag: harness prose, closed or truncated.
+        remainder = _ENVELOPE_RX.sub("", block)
+        return [remainder] if remainder.strip() and not _OPENER_RX.match(remainder.lstrip()) else []
+    out, last = [], 0
+    for match in _ENVELOPE_RX.finditer(block):
+        out.append(block[last:match.start()])
+        last = match.end()
+    out.append(block[last:])
+    return [r for r in out if r.strip()]
 
 
 def classify_record(record: dict) -> Tuple[str, str]:
@@ -117,13 +163,6 @@ def classify_record(record: dict) -> Tuple[str, str]:
     user_type = record.get("userType")
     if user_type is not None and user_type != "external":
         return EXCLUDED, f"userType={user_type}"
-    content = message.get("content")
-    if isinstance(content, list) and any(
-        isinstance(b, dict) and b.get("type") == "tool_result" for b in content
-    ):
-        return EXCLUDED, "tool result"
-    if not [b for b in text_blocks(message) if b.strip()]:
-        return EXCLUDED, "no prose"
 
     origin = record.get("origin")
     kind = origin.get("kind") if isinstance(origin, dict) else None
@@ -131,24 +170,22 @@ def classify_record(record: dict) -> Tuple[str, str]:
         return HUMAN, ""
     if kind in NON_HUMAN_ORIGINS:
         return EXCLUDED, f"origin.kind={kind}"
-    # Absent, "unclassified", or a value this table has not seen.
+
+    # Unlabelled or demoted. Only here do the English prose markers apply.
+    for block in text_blocks(message):
+        stripped = block.lstrip()
+        for prefix in TRANSCRIPT_PREFIXES:
+            if stripped.startswith(prefix):
+                return EXCLUDED, "harness transcript marker"
+        break
     return UNATTRIBUTED, f"origin.kind={kind}" if kind else "no origin.kind label"
 
 
-def classify_block(record_kind: str, block: str) -> Tuple[str, str]:
-    """Per-block verdict.
-
-    A human-labelled record can carry an injected block, so the record's verdict
-    is a ceiling rather than an answer: the envelope test runs against the block
-    that actually matched.
-    """
-    stripped = block.lstrip()
-    for prefix in ENVELOPE_PREFIXES:
-        if stripped.startswith(prefix):
-            return EXCLUDED, "harness envelope"
-    if not block.strip():
-        return EXCLUDED, "empty block"
-    return record_kind, ""
+def quotable(message: dict) -> Iterable[str]:
+    """Every region of every block that could carry the user's own words."""
+    for block in text_blocks(message):
+        for region in _regions(block):
+            yield region
 
 
 class Scan:
@@ -156,7 +193,7 @@ class Scan:
         self.files = 0
         self.records = 0
         self.user_records = 0
-        self.human = 0
+        self.human = 0            # quotable human REGIONS, not records
         self.unattributed = 0
         self.unparseable = 0
         self.unreadable: List[str] = []
@@ -165,17 +202,35 @@ class Scan:
         self.near_misses: List[Tuple[str, str, str]] = []
 
 
+def _walk(root: Path, result: Scan) -> List[Path]:
+    """Every *.jsonl under root, recording directories that could not be read.
+
+    `Path.rglob` swallows a permission error from `scandir`, so an unreadable
+    project directory would silently shrink the searched space and be reported
+    as an absence.
+    """
+    found: List[Path] = []
+
+    def onerror(exc: OSError) -> None:
+        result.unreadable.append(f"{getattr(exc, 'filename', root)}: {exc.strerror or exc}")
+
+    for dirpath, _dirnames, filenames in os.walk(root, onerror=onerror):
+        for name in filenames:
+            if name.endswith(".jsonl"):
+                found.append(Path(dirpath) / name)
+    return sorted(found)
+
+
 def scan(root: Path, needle: str, show_excluded: bool) -> Scan:
     result = Scan()
     target = norm(needle)
-    for path in sorted(root.rglob("*.jsonl")):
+    for path in _walk(root, result):
         result.files += 1
         try:
             handle = path.open(encoding="utf-8", errors="replace")
         except OSError as exc:
             # Never swallowed into an absence: an unreadable file shrinks the
-            # searched space, and rglob's ordering means the failure can precede
-            # the file holding a genuine hit.
+            # searched space, and a hit may have been in it.
             result.unreadable.append(f"{path.name}: {exc.strerror or exc}")
             continue
         try:
@@ -204,24 +259,35 @@ def _scan_line(line: str, name: str, target: str, show_excluded: bool, result: S
     if not isinstance(message, dict) or message.get("role") != "user":
         return
     result.user_records += 1
-    record_kind, record_reason = classify_record(record)
-    if record_kind == HUMAN:
-        result.human += 1
-    elif record_kind == UNATTRIBUTED:
-        result.unattributed += 1
+    kind, reason = classify_record(record)
+    regions = list(quotable(message))
+    # Counted per region, so a human-labelled record whose every block is an
+    # envelope contributes nothing searchable -- otherwise "could not search"
+    # is reported as "the user never said it".
+    if kind == HUMAN:
+        result.human += len(regions)
+    elif kind == UNATTRIBUTED:
+        result.unattributed += len(regions)
     if not target:
         return
-    for block in text_blocks(message):
-        if not isinstance(block, str) or target not in norm(block):
-            continue
-        kind, block_reason = classify_block(record_kind, block)
-        text = block.strip()
-        if kind == HUMAN:
-            result.hits.append((name, text))
-        elif kind == UNATTRIBUTED:
-            result.uncertified.append((name, text))
+    matched = next((r for r in regions if target in norm(r)), None)
+    if matched is None:
+        if show_excluded and kind != EXCLUDED:
+            # It matched nothing quotable; say so only if it matched at all.
+            whole = " ".join(text_blocks(message))
+            if target in norm(whole):
+                result.near_misses.append((name, "inside a harness envelope", whole.strip()[:160]))
         elif show_excluded:
-            result.near_misses.append((name, block_reason or record_reason, text[:160]))
+            whole = " ".join(text_blocks(message))
+            if target in norm(whole):
+                result.near_misses.append((name, reason, whole.strip()[:160]))
+        return
+    if kind == HUMAN:
+        result.hits.append((name, matched.strip()))
+    elif kind == UNATTRIBUTED:
+        result.uncertified.append((name, matched.strip()))
+    elif show_excluded:
+        result.near_misses.append((name, reason, matched.strip()[:160]))
 
 
 def status(result: Scan, allow_unattributed: bool) -> str:
@@ -237,19 +303,40 @@ def status(result: Scan, allow_unattributed: bool) -> str:
     return "absent"
 
 
+def _payload(outcome: str, root: Path, result: Scan, reason: str = "") -> dict:
+    """One schema for every branch, including the ones that could not search."""
+    body = {
+        "status": outcome,
+        "root": str(root),
+        "files": result.files,
+        "records": result.records,
+        "user_records": result.user_records,
+        "human_regions": result.human,
+        "unattributed_regions": result.unattributed,
+        "unparseable_lines": result.unparseable,
+        "unreadable": result.unreadable,
+        "hits": [{"file": f, "text": t} for f, t in result.hits],
+        "unattributed_matches": [{"file": f, "text": t} for f, t in result.uncertified],
+        "near_misses": [{"file": f, "excluded_as": r, "text": t} for f, r, t in result.near_misses],
+    }
+    if reason:
+        body["reason"] = reason
+    return body
+
+
 def report(result: Scan, root: Path, allow_unattributed: bool) -> None:
     # The search space prints first and unconditionally: a zero below it means
     # nothing until a reader can see what was examined to produce it.
     print(f"Searched {result.files} transcript file(s) under {root}")
     print(f"  {result.records} records, {result.user_records} user-role, "
-          f"{result.human} human-labelled, {result.unattributed} unattributed, "
+          f"{result.human} quotable human region(s), {result.unattributed} unattributed, "
           f"{result.unparseable} unparseable line(s)")
     for problem in result.unreadable:
         print(f"  UNREADABLE {problem}")
     for name, text in result.hits:
         print(f"\nHUMAN TURN in {name}:\n  {text}")
     for name, text in result.uncertified:
-        label = "UNATTRIBUTED MATCH" if not allow_unattributed else "UNATTRIBUTED MATCH (accepted)"
+        label = "UNATTRIBUTED MATCH (accepted)" if allow_unattributed else "UNATTRIBUTED MATCH"
         print(f"\n{label} in {name}:\n  {text}")
     for name, reason, text in result.near_misses:
         print(f"\nEXCLUDED ({reason}) in {name}:\n  {text}")
@@ -261,32 +348,11 @@ def report(result: Scan, root: Path, allow_unattributed: bool) -> None:
         if result.unreadable:
             print("\nPart of the space could not be read, so an absence here is not established.")
         else:
-            print("\nNo human-labelled turns were found at all -- this is an unsearched "
+            print("\nNo quotable human regions were found at all -- this is an unsearched "
                   "space, not an absence. Pass --root, or --allow-unattributed to fall "
-                  "back on the weaker heuristic.")
+                  "back on the weaker reading.")
     elif outcome == "absent":
-        print(f"\nNot present in any of {result.human} human-labelled turn(s). Do not quote it.")
-
-
-def _payload(outcome: str, root: Path, result: Scan, reason: str = "") -> dict:
-    """One schema for every branch, including the ones that could not search."""
-    body = {
-        "status": outcome,
-        "root": str(root),
-        "files": result.files,
-        "records": result.records,
-        "user_records": result.user_records,
-        "human_turns": result.human,
-        "unattributed_records": result.unattributed,
-        "unparseable_lines": result.unparseable,
-        "unreadable_files": result.unreadable,
-        "hits": [{"file": f, "text": t} for f, t in result.hits],
-        "unattributed_matches": [{"file": f, "text": t} for f, t in result.uncertified],
-        "near_misses": [{"file": f, "excluded_as": r, "text": t} for f, r, t in result.near_misses],
-    }
-    if reason:
-        body["reason"] = reason
-    return body
+        print(f"\nNot present in any of {result.human} quotable human region(s). Do not quote it.")
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -295,9 +361,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--root", help="transcript directory "
                         "(default: $CLAUDE_CONFIG_DIR/projects, else ~/.claude/projects)")
     parser.add_argument("--show-excluded", action="store_true",
-                        help="also report matches inside excluded records, naming why each was excluded")
+                        help="also report matches outside quotable regions, naming why each was excluded")
     parser.add_argument("--allow-unattributed", action="store_true",
-                        help="accept a match in an unattributed block, exiting 3 rather "
+                        help="accept a match in an unattributed region, exiting 3 rather "
                              "than 0. This readmits the failure the tool exists to "
                              "prevent -- an assistant-written dispatch brief is "
                              "unattributed -- so treat exit 3 as a lead, not a source.")
@@ -321,9 +387,6 @@ def main(argv: Optional[List[str]] = None) -> int:
                        "or set CLAUDE_CONFIG_DIR. On an agent that keeps no transcripts the "
                        "source genuinely is unavailable.")
             if args.as_json:
-                # Same keys as every other branch, on stdout: a caller piping to
-                # jq must not hit a parse error on the one branch that means
-                # "I could not look".
                 print(json.dumps(_payload("unsearchable", root, Scan(), reason=message), indent=2))
             else:
                 print(message, file=sys.stderr)
@@ -333,8 +396,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         result = scan(root, args.phrase, args.show_excluded)
     except Exception as exc:  # noqa: BLE001 -- mapped to exit 2, never to 1
         # Python's default status for an uncaught exception is 1, which this
-        # tool documents as "absent". A crash is a search that did not happen,
-        # so it exits 2 and says what failed rather than answering the question.
+        # tool documents as "absent". A crash is a search that did not happen.
         message = (f"check-user-quote failed before it could answer: "
                    f"{type(exc).__name__}: {exc}")
         if args.as_json:

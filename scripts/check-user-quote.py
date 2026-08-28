@@ -25,13 +25,22 @@ that returns "this is the user's" is a test that will eventually be wrong in
 the one direction that matters.
 
 So the verdict is the reader's. This prints the candidates and the facts about
-each -- record shape, role, `origin.kind`, flags, session -- and stops.
+each -- record shape and role, `origin.kind`, flags, `userType` -- with an
+excerpt centred on the match, and stops. `--json` adds the session id.
 
-It also reads FOUR record shapes, not one. A user's prompt is written to
-`queue-operation` at enqueue and only becomes a `message` record at dequeue
-(measured 380 ms apart), and `last-prompt` and `attachment` carry it too. An
-earlier revision read `message` alone and so reported "Do not quote it" over
-sentences the transcript held in another shape.
+It reads every prose-bearing shape it can find, because reading one is how the
+mirror failure happens -- reporting "no record contains it" over text the user
+produced. A prompt is written to `queue-operation` at enqueue and only becomes a
+`message` record at dequeue; across 28 transcripts on 2026-08-28 those pairs ran
+6 ms to 8m19s apart, so the window in which only the first shape exists is
+minutes wide. `last-prompt` and `attachment` carry prompts too.
+
+The sharpest case is a `tool_result` block, whose payload sits under `content`
+rather than `text`. There were 2,451 in one root, every one inside a
+`role: "user"` record -- and an `AskUserQuestion` answer, which is where this
+corpus routes the user's DECISIONS, exists in no other shape. Skipping it meant
+reporting an absence over exactly the sentences most tempting to quote as
+authorization.
 
 Exit 0 candidates found and printed; 1 none found anywhere; 2 the search was
 degraded or impossible -- a missing or unresolvable root, an unreadable file or
@@ -58,8 +67,22 @@ PROVENANCE_FLAGS = ("isMeta", "isCompactSummary", "isSidechain",
                     "verifiedSlackHumanTurn", "toolUseResult")
 
 
+# A transcript carries what the terminal wrote; a reviewer types what this
+# corpus's house style requires. `ascii-punctuation-in-source.md` mandates `---`
+# in tracked prose while the transcript holds an em-dash, so without this fold
+# the commonest search a reviewer runs is a guaranteed false absence.
+_PUNCT_FOLD = str.maketrans({
+    "\u2014": "-", "\u2013": "-", "\u2012": "-", "\u2212": "-",
+    "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'",
+    "\u201c": '"', "\u201d": '"', "\u201e": '"', "\u00ab": '"', "\u00bb": '"',
+    "\u00a0": " ", "\u202f": " ", "\u2009": " ",
+})
+
+
 def norm(s: str) -> str:
-    """Whitespace and inline markup collapsed, per this corpus's substring test."""
+    """Whitespace, inline markup and Unicode punctuation folded."""
+    s = s.translate(_PUNCT_FOLD).replace("\u2026", "...")
+    s = re.sub(r"-{2,}", "-", s)
     return re.sub(r"[\s`*_]+", " ", s).strip().lower()
 
 
@@ -67,6 +90,23 @@ def default_root() -> Path:
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     base = Path(configured).expanduser() if configured else Path.home() / ".claude"
     return base / "projects"
+
+
+def _flatten(label: str, value, depth: int = 0) -> Iterator[Tuple[str, str]]:
+    """Every string reachable from a nested payload, bounded against cycles."""
+    if depth > 6:
+        return
+    if isinstance(value, str):
+        if value.strip():
+            yield label, value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if key in ("type", "tool_use_id", "id", "uuid"):
+                continue
+            yield from _flatten(label, item, depth + 1)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _flatten(label, item, depth + 1)
 
 
 def texts(record: dict) -> Iterator[Tuple[str, str]]:
@@ -91,16 +131,25 @@ def texts(record: dict) -> Iterator[Tuple[str, str]]:
                 text = block.get("text")
                 if isinstance(text, str):
                     yield f"message/{role}", text
+                # A tool_result carries its payload under `content`, not `text`.
+                # 2,451 of them in one root, every one in a role:"user" record --
+                # and an AskUserQuestion answer, which is where this corpus routes
+                # the user's decisions, exists ONLY in this shape. Skipping it
+                # reported "no record contains it" over the decisions most
+                # tempting to quote as authorization.
+                if block.get("type") == "tool_result":
+                    yield from _flatten(f"message/{role}/tool_result", block.get("content"))
     if kind == "queue-operation" and isinstance(record.get("content"), str):
         yield "queue-operation", record["content"]
     if kind == "last-prompt" and isinstance(record.get("lastPrompt"), str):
         yield "last-prompt", record["lastPrompt"]
     attachment = record.get("attachment")
     if isinstance(attachment, dict):
+        label = f"attachment/{attachment.get('type', '?')}"
         for key in ("prompt", "content", "text"):
-            value = attachment.get(key)
-            if isinstance(value, str):
-                yield f"attachment/{attachment.get('type', '?')}", value
+            # Not str-only: an attached file's `content` is a dict and a
+            # task_reminder's is a list, and both were silently skipped.
+            yield from _flatten(label, attachment.get(key))
 
 
 def provenance(record: dict) -> Dict[str, str]:
@@ -120,23 +169,35 @@ def provenance(record: dict) -> Dict[str, str]:
 # record first. `last-prompt` is a rolling pointer rewritten every turn, so one
 # prompt appears in scores of records; identical texts are collapsed with a
 # count rather than printed again.
-SHAPE_RANK = {"message/user": 0, "queue-operation": 1, "last-prompt": 2}
+SHAPE_RANK = {
+    "message/user": 0,
+    "message/user/tool_result": 1,   # where an AskUserQuestion answer lives
+    "queue-operation": 2,
+    "last-prompt": 3,
+}
 
 
-def _rank(candidate: dict) -> Tuple[int, int]:
+def _rank(candidate: dict) -> Tuple[int, int, int]:
     shape = candidate["shape"]
     base = SHAPE_RANK.get(shape, 4 if shape.startswith("attachment/") else 5)
-    # The harness's own label is a fact worth surfacing early. It is still only
-    # a label -- the CLI rewrites it on some paths and stamps relayed messages
-    # with it on others -- so it orders the list and decides nothing.
-    return (base, 0 if candidate["origin.kind"] == "human" else 1)
+    # Both tiebreaks are facts about the record, and both order the list rather
+    # than deciding anything. The harness's own label is the strongest signal
+    # available and still only a signal; a flagged record is one a reader will
+    # almost always set aside, so it goes last rather than being hidden.
+    return (base,
+            0 if candidate["origin.kind"] == "human" else 1,
+            0 if candidate["flags"] == "(none)" else 1)
 
 
 def collapse(candidates: List[dict]) -> List[dict]:
     """One entry per distinct (shape, text), carrying how many records held it."""
     seen: Dict[Tuple[str, str], dict] = {}
     for c in candidates:
-        key = (c["shape"], norm(c["text"]))
+        # Provenance is part of the key. Merging on (shape, text) alone kept the
+        # FIRST record's facts and discarded the rest, so a human-labelled
+        # record absorbed into an isMeta twin was shown as isMeta -- the tool's
+        # entire product, silently wrong, with "(x2 records)" as the only hint.
+        key = (c["shape"], norm(c["text"]), c["origin.kind"], c["flags"], c["userType"])
         if key in seen:
             seen[key]["copies"] += 1
             # Track every file, so "(x2 records)" cannot be misread as two
@@ -169,7 +230,22 @@ def _walk(root: Path, result: Scan) -> List[Path]:
     def onerror(exc: OSError) -> None:
         result.unreadable.append(f"{getattr(exc, 'filename', root)}: {exc.strerror or exc}")
 
-    for dirpath, _dirnames, filenames in os.walk(root, onerror=onerror):
+    # followlinks=True: a symlinked project directory raises no error, so
+    # os.walk's default silently skipped it, `unreadable` stayed empty, and the
+    # run reported an ABSENCE over a store it never entered. Guarded against
+    # cycles by inode, since following links can otherwise loop forever.
+    seen: set = set()
+    for dirpath, dirnames, filenames in os.walk(root, onerror=onerror, followlinks=True):
+        try:
+            marker = os.stat(dirpath).st_ino, os.stat(dirpath).st_dev
+        except OSError as exc:
+            result.unreadable.append(f"{dirpath}: {exc.strerror or exc}")
+            dirnames[:] = []
+            continue
+        if marker in seen:
+            dirnames[:] = []
+            continue
+        seen.add(marker)
         found.extend(Path(dirpath) / n for n in filenames if n.endswith(".jsonl"))
     return sorted(found)
 
@@ -224,6 +300,11 @@ def status(result: Scan) -> str:
 
 def _payload(outcome: str, root: Path, result: Scan, reason: str = "") -> dict:
     body = {
+        # First key, and it ships on every branch: the human path prints this
+        # sentence and the JSON path did not, so a consumer got an ordered
+        # candidate list with the human-labelled record at [0] and nothing
+        # saying the ordering is presentation rather than a verdict.
+        "asserts": "a record contains the phrase; authorship is NOT decided by this tool",
         "status": outcome,
         "root": str(root),
         "files": result.files,
@@ -239,18 +320,45 @@ def _payload(outcome: str, root: Path, result: Scan, reason: str = "") -> dict:
     return body
 
 
-def report(result: Scan, root: Path, limit: int) -> None:
+def _excerpt(text: str, target: str, span: int = 5) -> List[Tuple[str, str]]:
+    """Lines around the match, not the first few.
+
+    A long turn's opening lines routinely do not contain the phrase, and the
+    tool's whole claim is that the reader judges the record -- which they cannot
+    do if the sentence is never shown. Elision is marked, so a truncated excerpt
+    cannot read as the whole record.
+    """
+    lines = text.splitlines() or [text]
+    hit = next((i for i, line in enumerate(lines) if target in norm(line)), None)
+    if hit is None:                      # the match spans a line break
+        lo, hi = 0, min(len(lines), span * 2)
+    else:
+        lo = max(0, hit - span // 2)
+        hi = min(len(lines), lo + span)
+    out = [(str(i + 1), lines[i]) for i in range(lo, hi)]
+    if lo > 0:
+        out.insert(0, ("", f"... {lo} earlier line(s)"))
+    if hi < len(lines):
+        out.append(("", f"... {len(lines) - hi} more line(s); --json for the full text"))
+    return out
+
+
+def report(result: Scan, root: Path, limit: int, target: str) -> None:
     # The search space prints first and unconditionally: a zero below it means
     # nothing until a reader can see what was examined to produce it.
     print(f"Searched {result.files} transcript file(s) under {root}")
-    print(f"  {result.records} records, {result.texts} text field(s) across four record shapes, "
-          f"{result.unparseable} unparseable line(s)")
+    # Not "across four record shapes": that asserted coverage in the same breath
+    # as the count, so a zero beneath it read as an exhaustive zero. What the
+    # run actually matched is derived and listed instead.
+    shapes = ", ".join(sorted({c["shape"] for c in result.candidates})) or "-"
+    print(f"  {result.records} records, {result.texts} text field(s), "
+          f"{result.unparseable} unparseable line(s); shapes matched: {shapes}")
     for problem in result.unreadable:
         print(f"  UNREADABLE {problem}")
 
     distinct = collapse(result.candidates)
     shown = distinct[:limit]
-    if not shown:
+    if not distinct:
         print("\nNo record contains the phrase.")
     else:
         print(f"\n{len(distinct)} distinct text(s) in {len(result.candidates)} record(s) "
@@ -262,8 +370,8 @@ def report(result: Scan, root: Path, limit: int) -> None:
         copies = f"  (x{c['copies']} records)" if c["copies"] > 1 else ""
         print(f"  [{i}] {where}  shape={c['shape']}{copies}")
         print(f"      origin.kind={c['origin.kind']}  flags={c['flags']}  userType={c['userType']}")
-        for chunk in c["text"].splitlines()[:6]:
-            print(f"      > {chunk[:150]}")
+        for line_no, chunk in _excerpt(c["text"], target):
+            print(f"      {line_no:>4} > {chunk[:150]}")
         print()
 
     # Said on every run, including the empty one: the absence of a candidate is
@@ -296,16 +404,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "(default: $CLAUDE_CONFIG_DIR/projects, else ~/.claude/projects)")
     parser.add_argument("--limit", type=int, default=10,
                         help="maximum candidates to print (default 10; --json prints all)")
+    # A non-positive limit printed "No record contains the phrase." over a full
+    # result set, which is the one sentence this tool must never print falsely.
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="emit the result as JSON, with the same counts")
     args = parser.parse_args(argv)
+
+    if args.limit < 1:
+        parser.error("--limit must be at least 1")
 
     if not norm(args.phrase):
         # A usage error, never an absence: an unset shell variable expanding to
         # "" must not answer "no record contains it".
         parser.error("phrase is empty after normalization; nothing to search for")
 
-    root = Path(".")
+    root = Path(args.root) if args.root else Path("(unresolved)")
     try:
         if args.root:
             root = Path(args.root).expanduser()
@@ -328,7 +441,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.as_json:
             print(json.dumps(_payload(outcome, root, result), indent=2))
         else:
-            report(result, root, args.limit)
+            report(result, root, args.limit, norm(args.phrase))
         return {"found": 0, "absent": 1, "degraded": 2}[outcome]
     except SystemExit:
         raise

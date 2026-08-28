@@ -301,13 +301,12 @@ python3 scripts/check-user-quote.py "the sentence you are about to quote"
 ```
 
 **It does not decide who wrote the phrase**, and that is the design rather than a gap.
-Ten earlier revisions tried to, and each certified harness- or assistant-authored text as the user's own words: `message.role == "user"` is a transport role, and the harness's text is not lexically identifiable --- it arrives escaped, namespaced, split across blocks, or with no tag at all.
 
 Exit `0` candidates found and printed, `1` none found in any record, `2` the search was degraded or impossible.
 `1` and `2` are kept apart so a search that did not happen is never reported as an absence.
 Pass `--root` on an agent whose transcripts live elsewhere.
 
-[`shared/writing/citations.md`](shared/writing/citations.md) carries the argument and the eleven fail-opens behind it.
+[`shared/writing/citations.md`](shared/writing/citations.md) carries the argument, and the eleven certification fail-opens that produced it.
 
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind

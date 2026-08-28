@@ -406,7 +406,7 @@ This repository already knows: as of 2026-08-28, **29** non-test hooks reference
 grep -l transcript_path hooks/*.py | grep -v /test- | wc -l
 ```
 
-How many of those 29 go on to open the file is a question a one-line grep does not settle --- several reach it through a helper --- so the number is not quoted here.
+How many of those 29 go on to open the transcript is a question a one-line grep does not settle, since several hooks reach the file through a helper, so that second figure is not quoted here.
 So the source is fetchable, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
 
 [`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
@@ -429,9 +429,14 @@ The eleventh finding is what settled it: the harness's text **is not lexically i
 It can arrive with no `<` in it at all.
 So a test returning *this is the user's* is a test that will eventually be wrong in the one direction that matters, and no amount of narrowing changes that --- which is the general lesson, and the reason this section describes a reporter rather than a checker.
 
-Two smaller things the rewrite also fixed, both worth having:
-it reads **four** record shapes rather than one, because a prompt is written to `queue-operation` at enqueue and only becomes a `message` record at dequeue, so a message-only reader answered "the user never said it" about sentences the transcript held;
-and identical texts are collapsed with a count, since `last-prompt` is a rolling pointer that repeats one prompt across scores of records.
+The mirror failure is the half that is easy to forget, and it took its own round to surface.
+Reading one record shape means reporting "no record contains it" over text the user produced, and a prompt lives in several: written to `queue-operation` at enqueue, becoming a `message` record at dequeue between 6 ms and eight minutes later, and carried by `last-prompt` and `attachment` besides.
+The sharpest is a `tool_result` block, whose payload sits under `content` rather than `text`.
+There were 2,451 in one root, every one inside a `role: "user"` record --- and an `AskUserQuestion` answer, which is where this corpus routes the user's **decisions**, exists in no other shape.
+Skipping it meant reporting an absence over precisely the sentences most tempting to quote as authorization.
+
+So the run reports which shapes it matched rather than asserting a number of shapes covered, since a count of shapes read is a completeness claim and the list of shapes matched is an observation.
+Identical texts are collapsed, keyed on provenance as well as content --- merging on text alone showed a human-labelled record's harness twin's flags, which is the tool's whole product, silently wrong.
 
 The exit codes keep apart a phrase found in no record (`1`) and a search that was degraded or impossible (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash).
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
@@ -492,10 +497,12 @@ It stated a criterion for merging on a light review verdict, which is the direct
 A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
-Running the script on the replacement --- "This is the last correction round: fix the five, push, report the head" --- returns records, and every one of them is flagged: a subagent transcript, a coordinator message, a compaction summary.
-None is a typed turn, which is a judgment the reader makes from the provenance rather than one the tool announces.
-The clause I fabricated appears in no record at all except my own later writing about it, so it is not reproduced here.
-The figures are readings rather than constants --- records and files grow while the measuring session appends --- so re-run it rather than citing a number.
+Running the script on the replacement --- "This is the last correction round: fix the five, push, report the head" --- returned 35 distinct texts across 38 records when this was written.
+**Not one carries `origin.kind == "human"`**, which is the fact that settles it;
+nine carry no flag at all, so "they were all flagged" would have been the convenient summary and a false one.
+The unflagged ones are `queue-operation` and `attachment/queued_command` records --- the shape a user's *own* queued command uses --- carrying task-notification text, which is exactly why the reader is shown the provenance rather than a verdict.
+The clause I fabricated appears in no record except my own later writing about it, so it is not reproduced here.
+Every figure in this paragraph is a reading rather than a constant, and the categorical claims are the ones to re-derive rather than trust: an earlier version of this sentence asserted "every one of them is flagged", which running the command refutes.
 The first two drafts of this section asserted the opposite premise, and ten subsequent revisions each shipped a check that certified something the user had not written;
 every one passed its own local suite, and what refuted every one was executing it.)
 

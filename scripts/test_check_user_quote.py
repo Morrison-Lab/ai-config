@@ -79,7 +79,7 @@ def run(root, phrase, *args):
 def main() -> int:
     print("Testing check-user-quote.py...")
 
-    # -- COVERAGE: all four record shapes -----------------------------------
+    # -- COVERAGE: every prose-bearing shape found so far --------------------
     shapes = {
         "message/user": user("SENTINEL_MSG here", human=True),
         "queue-operation": {"type": "queue-operation", "operation": "enqueue",
@@ -111,6 +111,12 @@ def main() -> int:
     check("a non-str text block is skipped rather than crashing the scan",
           list(cuq.texts({"message": {"role": "user",
                                       "content": [{"type": "text", "text": {"n": 1}}]}})) == [])
+    # The assertion above holds even if the list branch never runs at all, which
+    # is how deleting the whole reader survived. This one cannot.
+    check("a real text block inside a content LIST is read",
+          list(cuq.texts({"message": {"role": "user", "content": [
+              {"type": "text", "text": "first"}, {"type": "text", "text": "second"}]}}))
+          == [("message/user", "first"), ("message/user", "second")])
 
     # -- HONESTY: provenance is derived, never asserted ---------------------
     facts = cuq.provenance(user("x", human=True, isSidechain=True))
@@ -118,7 +124,14 @@ def main() -> int:
     check("...and the flags that qualify it", "isSidechain" in facts["flags"])
     check("an absent origin is reported as absent, not guessed",
           cuq.provenance(user("x"))["origin.kind"] == "(absent)")
-    for flag in cuq.PROVENANCE_FLAGS:
+    check("PROVENANCE_FLAGS is exactly the expected set",
+          tuple(cuq.PROVENANCE_FLAGS) == ("isMeta", "isCompactSummary", "isSidechain",
+                                          "verifiedSlackHumanTurn", "toolUseResult"))
+    # Named, not iterated: a loop over the constant deletes its own cases, so
+    # dropping isMeta -- the flag that marks harness-injected records, and the
+    # most decision-relevant one there is -- left the suite fully green.
+    for flag in ("isMeta", "isCompactSummary", "isSidechain",
+                 "verifiedSlackHumanTurn", "toolUseResult"):
         check(f"{flag} is surfaced", flag in cuq.provenance(user("x", **{flag: True}))["flags"])
 
     # The eleven shapes that defeated the ten classifier revisions. Every one
@@ -143,8 +156,24 @@ def main() -> int:
                                 for i, text in enumerate(injections.values())])
         for i, label in enumerate(injections):
             code, out = run(root, f"SENTINEL_{i}")
-            check(f"{label}: the record is shown, not judged",
-                  code == 0 and "does not decide who wrote anything" in out)
+            # "Shown" and "not judged" are asserted separately. The disclaimer
+            # prints unconditionally, so pairing them let eleven tests reduce to
+            # "exit 0" while asserting nothing about what the reader is told.
+            check(f"{label}: the record is shown", code == 0 and "a.jsonl" in out)
+            check(f"{label}: its provenance is shown, which is the 'not judged' half",
+                  "origin.kind=human" in out and "userType=external" in out)
+
+    # Mutating the exit map's "absent" entry to 0 passed the entire suite: every
+    # "absent" assertion was really a degraded case exiting 2, and the one
+    # genuine-absence call discarded the return code.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user("a perfectly readable turn", human=True)])
+        code, out = run(root, "a phrase that is genuinely nowhere")
+        check("a genuine absence over a clean, readable root exits 1", code == 1)
+        check("...and says so", "No record contains the phrase." in out)
+        check("...and --json agrees",
+              json.loads(run(root, "a phrase that is genuinely nowhere", "--json")[1])["status"]
+              == "absent")
 
     check("the disclaimer is printed even when nothing is found",
           "does not decide who wrote anything" in run(
@@ -166,8 +195,17 @@ def main() -> int:
     check("a human-labelled user message sorts first, so evidence leads",
           collapsed[0]["shape"] == "message/user")
     check("an assistant message sorts after a user one",
-          cuq._rank({"shape": "message/assistant", "origin.kind": "(absent)"})
-          > cuq._rank({"shape": "message/user", "origin.kind": "(absent)"}))
+          cuq._rank({"shape": "message/assistant", "origin.kind": "(absent)", "flags": "(none)"})
+          > cuq._rank({"shape": "message/user", "origin.kind": "(absent)", "flags": "(none)"}))
+    # Same shape both sides, so only the tiebreak can decide it. The previous
+    # fixture pitted message/user against last-prompt, which SHAPE_RANK settles
+    # on its own -- so removing the tiebreak entirely survived.
+    check("within one shape, the human-labelled record sorts first",
+          cuq._rank({"shape": "message/user", "origin.kind": "human", "flags": "(none)"})
+          < cuq._rank({"shape": "message/user", "origin.kind": "(absent)", "flags": "(none)"}))
+    check("within one shape and label, a flagged record sorts last",
+          cuq._rank({"shape": "message/user", "origin.kind": "human", "flags": "isMeta"})
+          > cuq._rank({"shape": "message/user", "origin.kind": "human", "flags": "(none)"}))
 
     # A text repeated across FILES: the count was right and the file shown was
     # only the first, so "(x2 records)" could be read as two copies in it.
@@ -196,6 +234,105 @@ def main() -> int:
         check("...and says there may be more, not that an absence is unestablished",
               "further records" in out and "absence here is not established" not in out)
 
+    # -- the shape that carries the user's decisions -------------------------
+    # An AskUserQuestion answer exists ONLY as a tool_result block, whose
+    # payload is under `content`, not `text`. 2,451 of them in one root, all in
+    # role:"user" records, and every one was invisible.
+    askq = {"message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "t1",
+         "content": 'Your questions have been answered: "Which?"="SENTINEL_DECISION".'}]},
+        "userType": "external"}
+    check("a tool_result payload is read",
+          any("SENTINEL_DECISION" in v for _, v in cuq.texts(askq)))
+    check("...and is labelled as a tool_result, not as a typed turn",
+          all(s.endswith("/tool_result") for s, _ in cuq.texts(askq)))
+    check("a nested tool_result payload is reached",
+          any("SENTINEL_NESTED_TR" in v for _, v in cuq.texts(
+              {"message": {"role": "user", "content": [
+                  {"type": "tool_result", "content": [{"type": "text",
+                                                       "text": "SENTINEL_NESTED_TR"}]}]}})))
+    check("a non-str attachment payload is reached too",
+          any("SENTINEL_ATTACH_DICT" in v for _, v in cuq.texts(
+              {"type": "attachment",
+               "attachment": {"type": "file", "content": {"body": "SENTINEL_ATTACH_DICT"}}})))
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [askq])
+        code, out = run(root, "SENTINEL_DECISION")
+        check("an AskUserQuestion answer is found end to end", code == 0)
+        check("...and the shape is named so the reader can weigh it",
+              "tool_result" in out)
+
+    # -- punctuation folding -------------------------------------------------
+    # `ascii-punctuation-in-source.md` requires --- in tracked prose while the
+    # transcript holds an em-dash, so the commonest search a reviewer runs was a
+    # guaranteed false absence.
+    check("an em-dash and --- normalize alike",
+          cuq.norm("ship it --- now") == cuq.norm(f"ship it {chr(0x2014)} now"))
+    check("curly and straight quotes normalize alike",
+          cuq.norm(f"it{chr(0x2019)}s fine") == cuq.norm("it's fine"))
+    check("an ellipsis character and ... normalize alike",
+          cuq.norm(f"wait{chr(0x2026)}") == cuq.norm("wait..."))
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user(f"ship it {chr(0x2014)} but only after review", human=True)])
+        check("searching with --- finds an em-dash in the transcript",
+              run(root, "ship it --- but only after review")[0] == 0)
+
+    # -- collapse must not merge records with different provenance ------------
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [
+            user("SENTINEL_COLL same text", isMeta=True),
+            user("SENTINEL_COLL same text", human=True)])
+        code, out = run(root, "SENTINEL_COLL same text")
+        check("identical texts with DIFFERENT provenance stay separate",
+              "2 distinct text(s)" in out)
+        check("...and the human-labelled one is not hidden behind the isMeta twin",
+              "origin.kind=human" in out and "isMeta" in out)
+
+    # -- a symlinked project directory is descended, not silently skipped -----
+    with tempfile.TemporaryDirectory() as root:
+        elsewhere = Path(root) / "elsewhere"
+        write(root, "elsewhere/a.jsonl", [user("SENTINEL_SYMLINK typed here", human=True)])
+        (Path(root) / "visible").mkdir()
+        (Path(root) / "visible" / "proj").symlink_to(elsewhere, target_is_directory=True)
+        code, _ = run(str(Path(root) / "visible"), "SENTINEL_SYMLINK typed here")
+        check("a symlinked project directory is followed, not reported absent", code == 0)
+
+    # -- the excerpt shows the match ------------------------------------------
+    body = "\n".join([f"line {i}" for i in range(1, 30)]
+                      + ["SENTINEL_DEEP the actual sentence"] + ["tail"] * 5)
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user(body, human=True)])
+        code, out = run(root, "SENTINEL_DEEP the actual sentence")
+        check("a match deep in a long turn is shown, not truncated away",
+              "SENTINEL_DEEP the actual sentence" in out.split("origin.kind")[1])
+        check("...and the elision is marked so the excerpt cannot read as the whole record",
+              "earlier line(s)" in out and "more line(s)" in out)
+
+    # -- the machine-facing path carries the disclaimer too -------------------
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user("a real turn", human=True)])
+        payload = json.loads(run(root, "a real turn", "--json")[1])
+        check("--json asserts what it does NOT decide",
+              "authorship is NOT decided" in payload.get("asserts", ""))
+        code, out = run(root, "x", "--limit", "0")
+        check("a non-positive --limit is a usage error, not a false absence",
+              code == 2 and "No record contains the phrase." not in out)
+
+    # The CLI guard above blocks the only route to a truncated-to-empty list, so
+    # report()'s own logic is pinned directly: the absence line must be driven
+    # off what was FOUND, never off what was shown.
+    import io, contextlib
+    probe = cuq.Scan()
+    probe.files = probe.records = probe.texts = 1
+    probe.candidates = [{"file": "a.jsonl", "shape": "message/user", "text": "t",
+                         "origin.kind": "human", "flags": "(none)",
+                         "userType": "external", "session": "s"}]
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cuq.report(probe, Path("/tmp"), 0, "t")
+    check("report() never prints an absence while candidates exist",
+          "No record contains the phrase." not in buf.getvalue())
+
     # -- HONESTY: a degraded read is never an absence -----------------------
     with tempfile.TemporaryDirectory() as root:
         path = Path(root) / "torn.jsonl"
@@ -213,7 +350,7 @@ def main() -> int:
         check("an unreadable file makes the run degraded, not absent", code == 2)
         check("...and names it", "UNREADABLE" in out)
 
-    if os.geteuid() != 0:
+    if getattr(os, "geteuid", lambda: 1)() != 0:
         with tempfile.TemporaryDirectory() as root:
             write(root, "top.jsonl", [user("a real turn", human=True)])
             hidden = Path(root) / "hidden"
@@ -291,6 +428,16 @@ def main() -> int:
         write(root, "proj/session/subagents/agent-1.jsonl", [user("SENTINEL_NESTED")])
         code, out = run(root, "SENTINEL_NESTED")
         check("nested subagent transcripts are reached", code == 0 and "agent-1.jsonl" in out)
+
+    # The tool's entire product is the provenance beside a record. Deleting the
+    # line that prints it survived the suite.
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user("SENTINEL_PROV here", human=True, isSidechain=True)])
+        code, out = run(root, "SENTINEL_PROV here")
+        check("the report prints origin.kind", "origin.kind=human" in out)
+        check("the report prints flags", "flags=isSidechain" in out)
+        check("the report prints userType", "userType=external" in out)
+        check("the report prints the search space it examined", "records," in out)
 
     check("norm collapses whitespace and inline markup", cuq.norm("A  `b`  **c**") == "a b c")
     check("norm is not degenerate", cuq.norm("hello") == "hello")

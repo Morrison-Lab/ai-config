@@ -1050,6 +1050,21 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
             ":(-\u2013\u2014 \t").strip()
         if content:
             lead = [content]
+    elif trailing:
+        # No separator at all. A bare trailer is decoration only when it
+        # LEADS WITH A FUNCTION WORD ("on the diff content", "and notes")
+        # -- an enumeration of DECORATIONS, so an unrecognized shape
+        # fails toward flagging, unlike the separator enumeration whose
+        # unknowns failed toward swallowing (fourth #2488-round finding:
+        # "## Findings the diff has a null pointer bug" was discarded).
+        # A clause-shaped trailer is content and is tested like any
+        # section line.
+        first_word = re.match(r"[A-Za-z]+", trailing)
+        if not first_word or first_word.group(0).lower() not in (
+            "on", "and", "in", "of", "for", "about", "regarding",
+            "from", "with", "per", "vs", "versus",
+        ):
+            lead = [trailing]
     section_start = heading_line_end + 1
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
     section = scan_body[section_start:section_start + next_heading.start()] \

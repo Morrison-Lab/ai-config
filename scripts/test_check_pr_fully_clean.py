@@ -1888,6 +1888,18 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings \u2014 none\n")
           is None)
+    # Fourth #2488-round pass: a bare space-separated finding on the
+    # heading line has no separator at all, so the gate now enumerates
+    # DECORATIONS (function-word leads) and fails unknown shapes toward
+    # flagging.
+    check("a bare clause-shaped heading trailer is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings the diff has a null pointer bug\n\nNone.\n")
+          is not None)
+    check("another bare clause-shaped trailer stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings crash breaks on null input\n\nNone.\n")
+          is not None)
     check("wordy decorative Findings suffixes still resolve empty bodies",
           all(checker._unresolved_finding_pattern(
                   f"## Findings{suffix}\n\nNone.\n") is None

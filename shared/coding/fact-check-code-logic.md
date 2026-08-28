@@ -195,6 +195,53 @@ Where a git read is available, assert both ways --- once against the base revisi
 A previously-rejected design reintroduced deliberately passed all 299 tests.
 Rewritten against the base revision, and again against a literal, the assertion fails on that design and the suite reached 303.)
 
+### A test whose cases are GENERATED from the constant deletes its own coverage
+
+The subsection below covers a test *gated on* a production constant, which degrades to a skip.
+This is its sibling and it is quieter, because it degrades to nothing at all: the loop that generates the cases reads the same constant the cases pin.
+
+```python
+for kind in prod.NON_HUMAN_ORIGINS:            # generates one case per entry
+    check(f"{kind} is excluded", classify({"origin": {"kind": kind}}) == EXCLUDED)
+```
+
+Empty the constant and the loop runs zero times.
+The suite reports every remaining check passing, the totals barely move, and nothing is skipped --- so unlike the gated form, there is not even a `skipped` line to misread.
+Measured: emptying that tuple left the suite fully green while every coordinator-relayed record became certifiable.
+
+It is easy to write because it reads as the DRY form, and easy to miss in review for the same reason: a hand-written list beside a constant looks like duplication, and the duplication is the point.
+Name the members in the test, then assert the constant contains them:
+
+```python
+for kind in ("channel", "peer", "coordinator"):     # literal, not derived
+    check(f"{kind} is excluded", classify(...) == EXCLUDED)
+    check(f"{kind} is in NON_HUMAN_ORIGINS", kind in prod.NON_HUMAN_ORIGINS)
+```
+
+The first assertion tests the behaviour;
+the second tests that production still carries the entry.
+Neither can be deleted by editing the constant alone.
+
+**Two mutation-testing hazards travel with this**, both of which make a survivor and a kill look alike.
+
+A **malformed mutant** --- one that leaves the file unparseable --- produces no failures, because the suite never runs.
+Counting `FAIL` lines then reports it as a survivor, and the natural response is to go write a test for a hole that does not exist.
+Check the interpreter's exit status before counting, and treat anything outside `{0, 1}` as "mutant not applied".
+
+A **skip counted as a pass** hides a weakened run.
+A case inert under some condition --- a permission test as root, a platform-specific path --- recorded via `check(name, True)` makes a suite that skipped it and a suite that ran it print the same total, so the difference between a full run and a partial one is invisible in the one number anybody reads.
+Report skips in their own counter and exclude them from the pass count.
+
+- **Do:** write the members as literals in the test, and assert separately that the constant contains them.
+- **Do:** check a mutation run's exit status before counting failures.
+- **Do:** count skips separately, so a weakened run and a full one differ in the totals.
+- **Don't:** generate a test's cases from the value under test --- the DRY form is the defective one here.
+- **Don't:** record a skip with `check(..., True)`; that is a pass asserting nothing.
+
+(Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), where it occurred **twice in one file** against two different constants, the second after the first had been fixed --- which is why it is written down rather than noted.
+A third instance in the same suite iterated the flag list, so dropping the flag that marks harness-injected records stayed green.
+The malformed-mutant hazard was hit in the same session while checking these very fixes.)
+
 ### A test gated on a production constant loses coverage when that constant moves
 
 Everything above concerns an assertion that cannot fail **today**.
@@ -1026,3 +1073,34 @@ The alternation listing all twelve was in the deleted lines the whole time.
   The cases it is silent about are the ones nobody will look for.
 - **Don't:** read a passing suite as covering the difference.
   The suite was written against the old behaviour's *intent* rather than its edges, so a dropped case usually has no test until you write one.
+
+**A generalization loses properties of the matching FORM, which the case list does not contain.**
+The section above says to derive the old mechanism's coverage from its own source, and that where the replaced code is a pattern, "that pattern is the enumeration: a regex's alternations, a table's keys, a dispatch dict's entries".
+That instruction is right and it is not sufficient, because the second occurrence lost something the enumeration never held.
+
+Replacing a four-name alternation with a structural regex is the case:
+
+```
+<(task-notification|system-reminder|wake|command-name)\b     the old one
+<[A-Za-z][A-Za-z0-9_-]*(?:\s[^>]*)?>                         the new one
+```
+
+Every one of the four names still matches, so enumerating them --- exactly as prescribed --- reports full coverage.
+What went missing is the `\b`: the old form matched on a word boundary and so needed no closing `>`, while the new one requires one.
+A truncated opener stopped being recognized, and the resulting fail-open was found by a reviewer rather than by the coverage check.
+
+The asymmetry is worth naming.
+An enumeration's **entries** are visible in the deleted lines, so the prescribed check finds them.
+Its **form** --- an anchor, a flag, a boundary, a greediness, a case sensitivity --- is a property of how the entries are matched, and it survives no entry-by-entry comparison, because each entry passes.
+A generalization is exactly the change most likely to alter the form while preserving every entry, so the two directions of scrutiny are complementary rather than redundant.
+
+Read the two patterns side by side and ask what the old one accepted that the new one does not, rather than which of its cases the new one still covers.
+The question is answerable by execution: run both over a corpus that includes malformed and truncated inputs, and diff the accepted sets, per Pattern 15's base-parity rule in [`mistake-patterns`](../../memories/mistake-patterns.md).
+
+- **Do:** diff the old and new patterns for anchors, boundaries, flags and greediness, not only for the cases they enumerate.
+- **Do:** feed both the malformed inputs, since a form difference shows on inputs no entry describes.
+- **Don't:** read "every old entry still matches" as coverage --- that is the check a generalization passes by construction.
+
+(Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539).
+The generalization was itself the fix for a prior fail-open, and it shipped with the four names checked and the boundary unexamined.
+It became the tenth certification fail-open of that PR, and the reviewer's reproducer was one line: a tag opener with no closing bracket anywhere in the block.)

@@ -19,6 +19,32 @@ session, apply it to every available AI-agent configuration and shared
 automation surface. Do not treat the currently speaking agent as an implicit
 scope restriction.
 
+## Gate external repository communication on membership
+
+Before sending any outward communication to a repository,
+positively verify that the user is a member of that specific repository.
+Communication includes PRs/MRs, issues, comments, reviews, review requests,
+discussions, messages sent by bots or workflows under the user's authority,
+and indirect actions that notify or mutate the repository,
+such as mentions, cross-reference backlinks, and transfers.
+
+Unless membership in the specific repository is positively verified,
+get explicit approval that names the repository and the specific communication
+before sending it.
+This includes both unknown membership and verified non-membership.
+Drafting locally while approval is pending is allowed.
+Membership or approval does not override
+a stricter repository contribution or AI-agent policy.
+
+Do not infer membership from a public repository, prior contributions, a fork,
+organization membership, technical write access, available credentials,
+collaborator access elsewhere, or the ability to post.
+`/daytb`, `away`, default-to-action rules,
+and standing authorization to open PRs or file issues
+do not grant permission to communicate with a non-member repository.
+This gate takes precedence
+over automatic filing, PR-opening, review, and follow-up rules.
+
 ## No empty promises
 
 A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again", "that is owed by me" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
@@ -39,6 +65,16 @@ The implication runs one way: a timer fires once and dies, so it cannot keep a s
 
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
+
+## Resume every non-clean pause
+
+Whenever work remains at a pause, arm a timer or equivalent wake mechanism that
+will resume the next concrete step.
+Report what will fire and its clock time.
+Use an active background monitor or durable scheduled trigger if the harness has
+no reliable timer.
+A verified clean stopping point needs no timer because no work remains to resume.
+Do not substitute a promise to return for a mechanism that will actually fire.
 
 ## Interpret instructions broadly and maximize safe progress
 

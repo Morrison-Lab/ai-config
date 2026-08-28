@@ -173,7 +173,7 @@ def _load_hook_module():
     back to nothing.
 
     The whole module is returned rather than just parse_report, because the
-    persona path must blank fences in the HOOK'S dialect (its `_blank_fences`)
+    persona path must blank quoted regions in the HOOK'S dialect (its `_blank_quoted_regions`)
     before comment-stripping and qualification-scanning -- mixing this
     script's CommonMark `strip_fences` with the hook's laxer fence regex left
     a gap where a pseudo-closed fence hid a qualified verdict line from the

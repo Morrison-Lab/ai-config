@@ -176,24 +176,35 @@ Generic Actions-authoring material stays there.
 
   (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)
 
-- **`lint-markdown.yml`'s `fail: false` covers markdownlint ONLY, not its three companion checks --- so a workflow configured warn-only still fails the build.**
+- **`lint-markdown.yml`'s `fail: false` does NOT make the job advisory --- two of its three companion checks default to failing.**
 
-  `lint-markdown` runs four things: markdownlint itself, a list-item merge-splice check, a fenced-code-block length check, and a GFM table-split check.
-  The `fail` input gates the first.
-  The other three read `fail-on-item-splices`, `fail-on-long-code-blocks`, and `fail-on-table-splits`, each defaulting to **true**.
+  `lint-markdown` runs four things, and `fail` gates only the first.
+  Measured against the `@v2` tag consumers pin, 2026-08-27:
+
+  | check | input | default |
+  |---|---|---|
+  | markdownlint | `fail` | `true` |
+  | list-item merge splices | `fail-on-item-splices` | `true` |
+  | GFM table splits | `fail-on-table-splits` | `true` |
+  | fenced-code-block length | `fail-on-long-code-blocks` | `false` |
+
+  So adopting the workflow warn-only, to work down a pre-existing backlog, does not buy a green check.
+  Set `fail-on-item-splices` and `fail-on-table-splits` explicitly when that is the intent.
 
   This reads as a contradiction from the PR page, which is what makes it cost a round.
-  The caller says `fail: false`, the check goes red, and the natural conclusion is that the input was ignored or the pin is wrong.
-  Neither is true: a different check inside the same job failed, and the job's conclusion comes from whichever step failed rather than from the one whose name is on the caller.
+  The caller says `fail: false`, the check goes red, and the two hypotheses that present themselves --- a wrong pin, an ignored input --- are both wrong.
+  A different check inside the same job failed, and the job's conclusion comes from whichever step failed rather than from the one whose name is on the caller.
+  [`fully-clean`](../shared/workflow/fully-clean.md) already describes that shape for a green guard step beside a red job.
 
-  The same shape holds for `lint-yaml.yml`, whose `fail` gates yamllint while `fail-on-long-scripts` gates its long-`run:`-block companion.
+  **`lint-yaml.yml` splits the same way and does not bite**, which is the comparison that makes the rule checkable rather than merely memorable.
+  Its `fail` gates yamllint while `fail-on-long-scripts` gates the long-`run:`-block companion --- and that one defaults to `false`, so `fail: false` there really is warn-only.
+  The split existing tells you nothing; only the defaults do.
 
-  Adopting the workflow warn-only, to work down a pre-existing backlog, therefore does **not** buy a green check.
-  Set the companion toggles explicitly when that is the intent.
-
-  - **Do:** read a composite's full step list before concluding that one input makes the whole job advisory.
-  - **Do:** set `fail-on-item-splices`, `fail-on-long-code-blocks`, and `fail-on-table-splits` explicitly when adopting `lint-markdown` warn-only.
+  - **Do:** read each companion input's own default before calling a multi-check workflow advisory.
+  - **Do:** set `fail-on-item-splices` and `fail-on-table-splits` explicitly when adopting `lint-markdown` warn-only.
   - **Don't:** read `fail: false` plus a red check as evidence the input was ignored or the tag is wrong.
-  - **Don't:** assume one `fail` input generalizes across a multi-check composite --- `check-typos` and `check-new-line-breaks` really do have a single one, which is what makes the generalization tempting.
+  - **Don't:** generalize from `lint-yaml` to `lint-markdown`, or from one companion to the next --- the defaults differ within a single workflow.
 
-  (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.)
+  (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.
+  The first draft of this entry claimed all three companions default to `true`;
+  the review caught it, and the table above is read off `@v2` directly.)

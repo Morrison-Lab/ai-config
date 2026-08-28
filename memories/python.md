@@ -148,3 +148,33 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 - **Do:** catch `zoneinfo.ZoneInfoNotFoundError` when handling a missing time zone database.
 - **Don't:** assume `time.tzset()` exists, or that `zoneinfo.ZoneInfo("America/Los_Angeles")` succeeds out-of-the-box, on a Windows Python installation.
 - **Don't:** wrap a `ZoneInfo` call in `except ModuleNotFoundError`, or hard-code a fixed UTC offset for a DST-observing zone.
+
+## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
+
+`itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
+Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
+Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py` ([ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515)): the first 8,000 generated bodies all carried one leading fragment, and a run capped there contained no instance of the shape the tool's negative control detects --- so the capped run reported itself blind while the uncapped 1,693,440-body sweep found the shape immediately.
+
+Striding fixes it, and the arithmetic has one trap.
+An integer step, `step = len(items) // limit`, is exactly `1` for every `limit` strictly above half the corpus, so the "stride" degenerates back to a prefix --- and that is the regime a generously-raised cap puts you in, which is why the naive form is likeliest to be wrong precisely when someone has tried to be careful.
+Measured on a 100-item list: `limit=51` gives an integer step of 1 and stops at index 50, while the float stride reaches index 98.
+Compute the step in floating point and round at each index instead:
+
+```python
+if limit is not None and limit < total:
+    step = total / limit
+    picked = (items[int(i * step)] for i in range(limit))
+```
+
+`total / limit` is a `float` and stays above 1 for every `limit < total`, so each index advances.
+`range(0, total, total // limit)` reproduces the same bug, and fails loudly rather than silently only in the one case where `limit > total`: the step is then `0` and `range` raises `ValueError: range() arg 3 must not be zero`.
+
+A generator has no `len()`, so striding it requires either materializing it (fine for a bounded corpus) or making the generator itself accept the stride.
+Materializing 1.7M short strings is cheap;
+materializing an unbounded generator is not, and that asymmetry is what decides which form to reach for.
+
+- **Do:** stride across a generated product space when capping it, computing the step as a float and indexing by `int(i * step)`.
+- **Do:** state in the run's own output which sampling mode produced the figures, so a capped number is never read as a swept one.
+- **Don't:** implement a `--limit` as `itertools.islice` over a nested product generator --- that fixes the slowest-varying component.
+- **Don't:** use `total // limit` as a stride;
+  it is 1 for every limit above half the corpus, which is a prefix by another name.

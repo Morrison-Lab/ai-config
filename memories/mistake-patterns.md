@@ -278,6 +278,12 @@ A clean automated review from every available provider evaluating the current HE
   override-drops-token test and #2419's veto tests, both caught in
   unposted local pre-push review rounds rather than on those PRs'
   records.)
+- **2nd occurrence of the class, 2026-08-28** (ai-config#2449 / PR #2515, after #2419 above), and the near-miss this entry did not previously name: the base-parity proof WAS built, and was constructed over the wrong quantity.
+  It compared what the two revisions *blanked* --- asking whether every extra-blanked character lay inside a code span the change exists to blank --- which cannot return non-zero for any implementation of that shape, because the extra-blanked set is the span set.
+  It reported 0 while two real fail-opens were live, and was silent by construction about the passes running downstream of the blanking, where both lived.
+  A parity proof is over ACCEPTANCE SETS --- which bodies each revision calls clean --- never over the transformation.
+  The replacement instrument, `scripts/check-verdict-scan-parity.py`, demonstrates its own discrimination against the four designs rejected on that branch (3,924 / 108 / 270 / non-zero off-axis, and 0 for the shipped design) rather than asserting it.
+  Canonical rule for the general shape: [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s "what a change TRANSFORMS, standing in for what it CONCLUDES".
 
 ## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
 - **Mistake**: When the `adversarial-reviewer` subagent type is unregistered
@@ -339,6 +345,12 @@ A clean automated review from every available provider evaluating the current HE
 - **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
   Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
   Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.
+- **2nd occurrence, 2026-08-28** (ai-config#2449 / PR #2515, after #2409 above), on the same module and with a second resolution direction worth adding: where each refuted design breaks a *different* consumer, the measurement to run is over the REPRESENTATION rather than over the failing input.
+  Four designs widened what `strip_cited_finding_vocab` blanked, and each broke a different downstream pass --- anchored negation windows, a markedness check, a sentence-boundary gate, a findings-item tag, a bare-marker guard, reviewer-identity extraction --- for nine fail-opens on a fail-closed instrument across five adversarial rounds.
+  Unrelated breakages are not four bugs;
+  they are one fact restated four times, namely that a dozen character-and-offset-sensitive consumers read the buffer being edited.
+  The design that shipped leaves the scan byte-identical and carries a parallel citation mask, making the class unreachable rather than patched member by member, and giving parity by identity rather than by proof.
+  Canonical rule: [`fail-fast.md`](../shared/principles/fail-fast.md)'s "Where many consumers key on a shared buffer, filter the matches rather than editing the buffer".
 
 ## Pattern 19: A "Needs More Work" Loop Can Have Two Independent Mechanisms, and Fixing One Leaves the Other
 - **Mistake**: Treating a stuck "Needs more work" verdict as one bug --- a review conditioning its verdict on its own run's in-flight sibling checks --- and re-dispatching review rounds expecting one of them to converge, when a second, independent mechanism also reproduces the block: a review deferring to `scripts/check-pr-fully-clean.py`'s exit status, which itself only reports the PREVIOUS round's status-conditioned verdict, so each new round inherits the prior round's hedge.

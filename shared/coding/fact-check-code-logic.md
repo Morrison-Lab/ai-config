@@ -160,6 +160,41 @@ Read that evidence rather than accepting its presence: a quoted run that
 exits cleanly is the vacuous-control shape above, not a proof, so the
 failing output has to look *different* from the passing output.
 
+### An assertion whose two sides trace back to one call
+
+This section's opening covers an assertion that cannot fail because its input is empty, and its first subsection covers a control the code under test undoes.
+This is the third shape, and it is the only one that stays vacuous no matter what you feed it: the two sides of the comparison are the **same value**, reached under two names.
+It is a property of the assertion's own shape, which is what separates it from [`fail-fast`](../principles/fail-fast.md)'s fifth cause of a vacuous zero --- there the assertion is fine and the subject's designed fallback is what cannot be separated from success.
+
+It arrives through aliasing rather than through carelessness.
+A function is refactored so the old name becomes a thin wrapper --- `f(x)` is now defined as `g(x)[0]` --- and a test that computed `scan` from the shipped path then asserts `scan == f(probe)`.
+Read aloud, that is "the scan matches what the pre-change function produced", which is a real and valuable invariant.
+Executed, it is `g(probe)[0] == g(probe)[0]`.
+The wrapper is what hides it: at the call site the two names look like two implementations, and only the wrapper's one-line body says otherwise.
+
+It is worse than the empty-collection shape because nothing about the test looks degenerate.
+It has a non-trivial input, it exercises the real code, it takes time to run, and it appears in coverage.
+A reintroduced design that had already been rejected on this branch changed behaviour on hundreds of bodies and passed the whole suite with this assertion watching it.
+
+**The tell is syntactic, so look for it rather than reasoning about it:** an assertion in which both operands, expanded through every wrapper and alias, bottom out in one call with one argument.
+Expand the wrappers on paper before trusting the assertion.
+
+**The fix is to name the other side independently of the code under test.**
+Pin the expected value against something the change cannot move: the base revision's own output (read from git, not from the current module), or a literal captured before the change.
+Where a git read is available, assert both ways --- once against the base revision and once against a hard-coded expectation with no git dependency, so the invariant still runs in a shallow checkout where the base revision is absent.
+
+- **Do:** expand every wrapper on both sides of an equality assertion and confirm the two sides can be produced by different code.
+- **Do:** pin one side to a value obtained outside the module under test --- a base-revision read or a captured literal.
+- **Do:** assert a git-dependent invariant a second way with no git dependency, so it does not silently skip in a shallow checkout.
+- **Don't:** treat a wrapper and its delegate as two implementations;
+  a one-line delegation makes them one.
+- **Don't:** accept a suite's green as evidence an invariant holds until you have seen that invariant fail against a design it should reject.
+
+(Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+`strip_cited_finding_vocab(x)` had become `strip_cited_finding_vocab_with_mask(x)[0]`, and the scan-identity test compared the shipped scan against `strip_cited_finding_vocab(probe)` --- the same call.
+A previously-rejected design reintroduced deliberately passed all 299 tests.
+Rewritten against the base revision, and again against a literal, the assertion fails on that design and the suite reached 303.)
+
 ### A test gated on a production constant loses coverage when that constant moves
 
 Everything above concerns an assertion that cannot fail **today**.

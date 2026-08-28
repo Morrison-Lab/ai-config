@@ -73,7 +73,8 @@ def main() -> int:
     # These pin both answers so it cannot rot into one.
     import importlib.util as _ilu
     sys.path.insert(0, str(REPO / "scripts" / "lib"))
-    base_mod = parity.load_rev("origin/main", "smoke_base")
+    # The working tree, not origin/main: a shallow or single-branch CI checkout
+    # has no origin/main, and this assertion does not need one.
     spec_new = _ilu.spec_from_file_location(
         "smoke_new", REPO / "scripts" / "check-pr-fully-clean.py"
     )
@@ -91,12 +92,12 @@ def main() -> int:
         f"The phrase {BT}{BT}a {BT}x{BT} Needs more work{BT}{BT} is quoted.\n"
     )
     check(
-        "widening_is_on_axis says False when nothing was blanked (case B)",
-        not parity.widening_is_on_axis(base_mod, new_mod, off_axis_body),
+        "widening_is_on_axis says False when the filter suppressed nothing",
+        not parity.widening_is_on_axis(new_mod, off_axis_body),
     )
     check(
-        "widening_is_on_axis says True for a phrase blanked from inside a span",
-        parity.widening_is_on_axis(base_mod, new_mod, on_axis_body),
+        "widening_is_on_axis says True for a phrase suppressed from a span",
+        parity.widening_is_on_axis(new_mod, on_axis_body),
     )
 
     print(f"\n{passes} passed, {failures} failed")

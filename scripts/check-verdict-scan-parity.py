@@ -60,10 +60,18 @@ def load_module(path: Path, name: str):
 
 def load_rev(rev: str, name: str = "base_checker"):
     """Materialize `rev`'s copy of the checker and import it."""
-    src = subprocess.run(
+    result = subprocess.run(
         ["git", "show", f"{rev}:scripts/check-pr-fully-clean.py"],
-        cwd=REPO, capture_output=True, text=True, check=True,
-    ).stdout
+        cwd=REPO, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"cannot read scripts/check-pr-fully-clean.py at '{rev}': "
+            f"{result.stderr.strip()}\n"
+            "A shallow or single-branch checkout will not have origin/main; "
+            "fetch it, or pass --base-rev with a revision this clone has."
+        )
+    src = result.stdout
     tmp = Path(tempfile.mkdtemp()) / "base_checker.py"
     tmp.write_text(src)
     return load_module(tmp, name)
@@ -170,7 +178,7 @@ def ignored_matches(new, body):
     return suppressed
 
 
-def widening_is_on_axis(base, new, body) -> bool:
+def widening_is_on_axis(new, body) -> bool:
     """True when a widening is explained by the citation filter alone.
 
     Two ways to fail, and the first is the one every earlier design tripped:
@@ -262,12 +270,23 @@ def main(argv=None):
     # divergences. A zero from a detector that never fires is indistinguishable
     # from a zero from a change that never widens.
     import re as _re
-    real_strip = new.strip_cited_finding_vocab
-    new.strip_cited_finding_vocab = lambda t: _re.sub(r"`[\s\S]*`", " ", t)
+
+    # Patch the function the finding scans actually call. An earlier version
+    # patched strip_cited_finding_vocab, which the mask refactor took off that
+    # path -- so the control silently measured nothing and reported a healthy
+    # number only because the two revisions differed anyway. CI caught it; a
+    # local run did not, because locally the revisions were never identical.
+    real_strip = new.strip_cited_finding_vocab_with_mask
+
+    def _greedy(text):
+        stripped = _re.sub(r"`[\s\S]*`", " ", text)
+        return stripped, bytearray(len(stripped))
+
+    new.strip_cited_finding_vocab_with_mask = _greedy
     control = sum(
         1 for _, body in corpus if classify(base, body) != classify(new, body)
     )
-    new.strip_cited_finding_vocab = real_strip
+    new.strip_cited_finding_vocab_with_mask = real_strip
 
     print(f"base revision      : {args.base_rev}")
     print(f"bodies examined    : {len(corpus)} "
@@ -275,8 +294,8 @@ def main(argv=None):
           f"{sum(1 for o, _ in corpus if o == 'generated')} generated)")
     print(f"negative control   : {control} divergences -> "
           f"{'DISCRIMINATES' if control else 'BLIND, do not trust this run'}")
-    on_axis = [w for w in widened if widening_is_on_axis(base, new, w[3])]
-    off_axis = [w for w in widened if not widening_is_on_axis(base, new, w[3])]
+    on_axis = [w for w in widened if widening_is_on_axis(new, w[3])]
+    off_axis = [w for w in widened if not widening_is_on_axis(new, w[3])]
 
     scan_note = (
         "  <== the change edits the scan; every downstream pass is exposed"

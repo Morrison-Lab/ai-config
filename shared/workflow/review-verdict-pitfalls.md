@@ -229,6 +229,20 @@ A round that reviewed fewer files than the range holds reviewed less than it cla
 - **Don't:** reach for the fourth case's surprise test here.
   This verdict is unsurprising by construction, which is why it needs a mechanical check instead.
 
+**The failure is bounded to rounds the reviewer believes are empty, so do not generalize it into distrust of the reviewer.**
+The rule above says to re-dispatch on a disagreement, which invites the wrong conclusion that a reviewer caught shortening one round has stopped being worth reading.
+Measured across four rounds on the same PR, it had not: the two rounds carrying real new content were the most thorough of the four --- the last one fetched roxygen2's own source to check a wrap format the diff depended on, and hand-traced a backslash-escaping change through R's replacement semantics --- while the shortened round and the re-dispatch that inherited its premise were the two where the reviewer believed nothing substantive had changed.
+
+That is the useful shape, because it says what to do rather than only what to doubt.
+A round whose range is genuinely new gets read on its merits.
+A round the reviewer describes as trivial is the one to check the range on, and re-dispatching it is cheap only because a real commit is what makes the next round work.
+Re-dispatching against the **same** head does not help: with nothing new in the range, the fresh round reaches the same believed-empty conclusion and defers to the round you were trying to replace.
+
+- **Do:** read a round covering new content on its merits, whatever an earlier round got wrong.
+- **Do:** land the fix first when a shortened round left something unreviewed, so the next round has a real range to read.
+- **Don't:** re-dispatch against an unchanged head expecting a different answer.
+- **Don't:** carry one shortened round forward as a standing verdict on the reviewer.
+
 (Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125): the round named `118c22d9` as the only commit since `453a3252`, where `git log --oneline 453a325..118c22d` returns two and `git diff --stat` names `R/rd_source_files.R` alongside the test file the review quoted.
 The unreviewed commit loosened two regexes in a parser.
 Reported to the workflow's own repo as [Morrison-Lab/gha#709](https://github.com/Morrison-Lab/gha/issues/709), which weighs deriving the range in `gather-context` against treating a "nothing substantive changed" claim as requiring the full review anyway.)

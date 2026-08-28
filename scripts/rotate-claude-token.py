@@ -212,7 +212,11 @@ def org_secret_info(org: str, secret: str) -> tuple[str, str] | None:
             ]
         )
     except GhError as exc:
-        if "404" in str(exc):
+        # Match gh's own phrasing ("gh: Not Found (HTTP 404)") rather than a
+        # bare "404", which could appear inside an unrelated error's text
+        # (a timestamp, a rate-limit epoch) and silently misread a real
+        # failure as user-not-org absence.
+        if "HTTP 404" in str(exc):
             return None
         raise
     for line in out.splitlines():
@@ -235,6 +239,8 @@ def find_org_targets(
     """
     targets: list[tuple[str, str, str]] = []
     errors: list[tuple[str, str]] = []
+    # Serial rather than pooled, unlike find_targets: the owners list is a
+    # handful of logins, not hundreds of repos, so a pool buys nothing.
     for owner in owners:
         try:
             info = org_secret_info(owner, secret)
@@ -269,18 +275,19 @@ def rotate_org(
     already had: the API default is `private`, which reaches no repo (see
     ai-config#2361), so relying on the default would silently narrow an
     `all` secret in the act of rotating it. A `selected` secret keeps its
-    repo list by reading it back and passing it through, and refuses to
-    write if that list cannot be read -- writing `selected` with no repos
-    would detach the secret from every repo it serves.
+    repo list by reading it back and passing it through; an unreadable list
+    raises out of `org_selected_repos` before the write, and a
+    successfully-read but EMPTY list is refused, because writing `selected`
+    with no repos would keep the secret detached from every repo.
     """
     args = ["secret", "set", secret, "--org", org, "--visibility", visibility]
     if visibility == "selected":
         selected = org_selected_repos(org, secret)
         if not selected:
             raise GhError(
-                f"{secret} on org {org} has visibility=selected but its "
-                "repo list could not be read; refusing to write a selected "
-                "secret with no repos"
+                f"{secret} on org {org} has visibility=selected with zero "
+                "selected repositories; refusing to rotate a secret no "
+                "workflow can read (an unreadable list raises earlier)"
             )
         args.extend(["--repos", ",".join(selected)])
     gh(args, stdin=token)
@@ -439,9 +446,12 @@ def main() -> None:
 
     # The two scopes are reported separately, so an org-level rotation is
     # never silently counted as covering a repo that still overrides it.
-    print(f"Orgs carrying {args.secret} at org level: {len(org_targets)}")
-    for org, updated_at, visibility in org_targets:
-        print(f"  {org:<44} updated={updated_at} visibility={visibility}")
+    # Gated on `owners` like the "Owners swept" line above: under --repos the
+    # org sweep never ran, and printing "0" would read as a checked result.
+    if owners:
+        print(f"Orgs carrying {args.secret} at org level: {len(org_targets)}")
+        for org, updated_at, visibility in org_targets:
+            print(f"  {org:<44} updated={updated_at} visibility={visibility}")
     print(f"Repos carrying {args.secret}: {len(targets)}")
     for repo, updated_at in targets:
         print(f"  {repo:<44} updated={updated_at}")

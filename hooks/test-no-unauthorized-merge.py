@@ -405,16 +405,26 @@ def verdict(cmd: str, env: dict = None, extra: dict = None) -> str:
 
 
 wrong = 0
+checks = 0
+
+
+def check(ok):
+    """Record one assertion outcome. `ok` is True when the verdict was correct."""
+    global wrong, checks
+    checks += 1
+    wrong += not ok
+
+
 print("should BLOCK:")
 for cmd, desc in BLOCK:
     v = verdict(cmd)
-    wrong += (v != "BLOCK")
+    check(v == "BLOCK")
     print(f"  {v:<6} {desc}")
 
 print("\nshould ALLOW:")
 for cmd, desc in ALLOW:
     v = verdict(cmd)
-    wrong += (v != "allow")
+    check(v == "allow")
     print(f"  {v:<6} {desc}")
 
 # Test active MWC grant integration and session isolation with sanitized session IDs.
@@ -453,13 +463,13 @@ try:
     # Session A (sanitized) has MWC enabled -> allowed
     env_a = dict(os.environ, AI_SESSION_ID=session_a)
     v_a = verdict("gh pr merge 411 --squash", env=env_a)
-    wrong += (v_a != "allow")
+    check(v_a == "allow")
     print(f"  {v_a:<6} active MWC grant for sanitized session A")
 
     # Session B (sanitized) does NOT have MWC enabled -> blocked (cross-session isolation)
     env_b = dict(os.environ, AI_SESSION_ID=session_b)
     v_b = verdict("gh pr merge 411 --squash", env=env_b)
-    wrong += (v_b != "BLOCK")
+    check(v_b == "BLOCK")
     print(f"  {v_b:<6} cross-session isolation for sanitized session B")
 
     # ai-config#1279 defect 1: the hook process inherits NEITHER AI_SESSION_ID
@@ -471,12 +481,12 @@ try:
                 if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
     v_pay = verdict("gh pr merge 411 --squash", env=env_bare,
                     extra={"session_id": session_a})
-    wrong += (v_pay != "allow")
+    check(v_pay == "allow")
     print(f"  {v_pay:<6} MWC grant honoured from the payload session_id (no env var)")
 
     v_pay_alt = verdict("gh pr merge 411 --squash", env=env_bare,
                         extra={"conversation_id": session_a})
-    wrong += (v_pay_alt != "allow")
+    check(v_pay_alt == "allow")
     print(f"  {v_pay_alt:<6} MWC grant honoured from payload conversation_id")
 
     # Same, via the transcript filename stem, for a harness that omits the
@@ -485,25 +495,25 @@ try:
     # sanitize(), and no filename can carry those back.
     v_tr = verdict("gh pr merge 411 --squash", env=env_bare,
                    extra={"transcript_path": f"/tmp/projects/x/{session_c}.jsonl"})
-    wrong += (v_tr != "allow")
+    check(v_tr == "allow")
     print(f"  {v_tr:<6} MWC grant honoured from the transcript_path stem")
 
     # Cross-session isolation must survive the new resolution path: session B
     # holds no grant, so a payload naming B is still blocked.
     v_pay_b = verdict("gh pr merge 411 --squash", env=env_bare,
                       extra={"session_id": session_b})
-    wrong += (v_pay_b != "BLOCK")
+    check(v_pay_b == "BLOCK")
     print(f"  {v_pay_b:<6} payload session_id for ungranted session B still blocks")
 
     # No identity at all -> no grant can be resolved -> block (fails closed).
     v_none = verdict("gh pr merge 411 --squash", env=env_bare)
-    wrong += (v_none != "BLOCK")
+    check(v_none == "BLOCK")
     print(f"  {v_none:<6} no session identity anywhere still blocks")
 
     # Disable MWC for Session A -> must block immediately
     ai_session("disable-mwc", "--id", session_a)
     v_a_revoked = verdict("gh pr merge 411 --squash", env=env_a)
-    wrong += (v_a_revoked != "BLOCK")
+    check(v_a_revoked == "BLOCK")
     print(f"  {v_a_revoked:<6} revoked MWC grant blocks for session A")
 finally:
     ai_session("release", "--id", session_a)
@@ -623,8 +633,8 @@ def quoted_spans(n):
     return " ".join(f'echo "field {i}"' for i in range(n))
 
 
-wrong += (not report_growth("chained substitutions", chained_substitutions))
-wrong += (not report_growth("quoted spans", quoted_spans))
+check(report_growth("chained substitutions", chained_substitutions))
+check(report_growth("quoted spans", quoted_spans))
 
 
 # Negative control. A ratio test that never fires is indistinguishable from a
@@ -652,7 +662,7 @@ def quadratic_scan(text):
 _control_growth, _, _ = growth_of(
     lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=quadratic_scan)
 _control_ok = _control_growth > SCAN_GROWTH_BOUND
-wrong += (not _control_ok)
+check(_control_ok)
 print(f"  {'allow' if _control_ok else 'WRONG':<6} "
       f"negative control: a quadratic scan grew {_control_growth:.1f}x, "
       f"past the {SCAN_GROWTH_BOUND:g}x bound")
@@ -667,7 +677,7 @@ _txt = 'bash -c "gh pr merge 411"'
 # pass either way -- masking is length-preserving by construction.
 _short = _guard.mask_inert_quotes(_txt, "too short")
 _ok = ("pr merge" in _short) and len(_short) == len(_txt)
-wrong += (not _ok)
+check(_ok)
 print(f"  {'allow' if _ok else 'WRONG':<6} "
       f"a mismatched-length executor subject falls back instead of indexing")
 
@@ -706,15 +716,15 @@ MCP_ALLOW = [
 print("\nMCP should BLOCK:")
 for tool_name, tool_input, desc in MCP_BLOCK:
     v = verdict_mcp(tool_name, tool_input)
-    wrong += (v != "BLOCK")
+    check(v == "BLOCK")
     print(f"  {v:<6} {desc}")
 
 print("\nMCP should ALLOW:")
 for tool_name, tool_input, desc in MCP_ALLOW:
     v = verdict_mcp(tool_name, tool_input)
-    wrong += (v != "allow")
+    check(v == "allow")
     print(f"  {v:<6} {desc}")
 
-total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 12
+total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

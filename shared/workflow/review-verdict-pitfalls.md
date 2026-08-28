@@ -1298,6 +1298,8 @@ if they differ, expect to spend another.
   re-running.
 - **Don't:** report a PR ready on a "blocked" verdict, however self-referential
   its reason.
+- **Don't:** treat the block as a standing state to wait out; nothing further
+  will happen to it on its own.
 
 **The re-run remedy above did not always converge, so the reviewer's own
 prompt now closes the loop at the source.**
@@ -1318,8 +1320,6 @@ it cites, and never merge on a block.
 What changes is the expectation --- a status-conditioned block from a
 reviewer running that addendum is now a misfire worth reporting, not a
 correct round to wait out.
-- **Don't:** treat the block as a standing state to wait out; nothing further
-  will happen to it on its own.
 
 (Measured 2026-08-20 on
 [ai-config#1744](https://github.com/Morrison-Lab/ai-config/pull/1744).

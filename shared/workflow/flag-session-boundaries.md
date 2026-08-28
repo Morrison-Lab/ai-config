@@ -13,6 +13,21 @@ ALWAYS include an explicit `**Stopping Point**` declaration.
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
 (User corrections / directives, 2026-08-17, 2026-08-18.)
 
+**Arm resumption before every non-clean pause.**
+Whenever work remains at a pause, create a timer or equivalent wake mechanism
+that will resume the next concrete step before ending the turn.
+Report what will fire and its clock time.
+Use an active background monitor or a durable scheduled trigger when the harness
+does not provide a reliable timer.
+A verified clean stopping point needs no timer because no work remains to resume.
+This requirement depends on session state, not on whether a human-facing
+stopping-point declaration is emitted.
+
+- **Do:** arm and report a resumption mechanism before every non-clean pause.
+- **Do:** omit the timer after a verified clean stopping point.
+- **Don't:** end at a non-clean stopping point with only a promise to return.
+- **Don't:** create a pointless timer after the work has reached a clean stop.
+
 **The declaration is for a human reading a recap, so it does not apply where the last message is consumed by a machine instead.**
 The rigid interpretation of the rule says the last separate message MUST be the declaration.
 A CI harness that posts an agent's reply to a PR or issue thread typically takes the **last assistant message** and posts that.

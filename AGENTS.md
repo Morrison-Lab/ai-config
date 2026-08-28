@@ -40,6 +40,16 @@ The implication runs one way: a timer fires once and dies, so it cannot keep a s
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
 
+## Resume every non-clean pause
+
+Whenever work remains at a pause, arm a timer or equivalent wake mechanism that
+will resume the next concrete step.
+Report what will fire and its clock time.
+Use an active background monitor or durable scheduled trigger if the harness has
+no reliable timer.
+A verified clean stopping point needs no timer because no work remains to resume.
+Do not substitute a promise to return for a mechanism that will actually fire.
+
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its

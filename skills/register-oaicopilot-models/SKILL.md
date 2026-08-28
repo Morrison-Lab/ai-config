@@ -78,21 +78,24 @@ Read the two relevant keys: `oaicopilot.baseUrl` (global default endpoint) and
 `oaicopilot.models` (the array of registered model entries; each has at
 least `id` and `owned_by`).
 
-A sanitized reference schema (endpoint templated as `<workspace-url>`, no
-secrets) lives alongside this skill in
-[`models-template.jsonc`](models-template.jsonc), one representative entry
-per model family. Use it as the per-family schema to copy from in Step 2, and
-to seed `oaicopilot.models` on a fresh machine (swap in your workspace URL).
+A sanitized reference schema (endpoint templated as `<workspace-url>`, no secrets) lives alongside this skill in [`models-template.jsonc`](models-template.jsonc), one representative entry per model family.
+Use it as the per-family schema to copy from in Step 2, and to seed `oaicopilot.models` on a fresh machine (swap in your workspace URL).
+For Databricks entries, its operational limits follow WAI's [`tbl-databricks-oaicopilot-defaults`](https://github.com/Morrison-Lab/wai/blob/main/chapters/ai-tools/byok-vscode-databricks.qmd#tbl-databricks-oaicopilot-defaults), verified against Databricks' pay-per-token limits on 2026-08-26.
+These values are deliberately smaller than some models' provider maximum context windows.
+Check the current Databricks [`supported-models` catalog](https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models) separately for model-specific API requirements;
+on 2026-08-26 it required the Responses API for GPT-5.5 and GPT-5.3 Codex.
 
 ## Step 1: Diff requested models against what's already registered
 
 The model **name** the user hands you (e.g. from a served-endpoint list)
 maps to the `id` field by this extension's convention:
 `id == owned_by-prefixed served-model name`
-(`databricks-claude-opus-5`, `databricks-gemini-3-7-flash`, etc.). The
+(`databricks-claude-opus-5`, `databricks-gemini-3-7-flash`, etc.).
+The
 served-endpoint list usually already carries that prefix, so the handed-in
 name and the `id` are typically the same string, but confirm the prefix is
-present rather than assuming it. Extract the existing `id`s and set-subtract:
+present rather than assuming it.
+Extract the existing `id`s and set-subtract:
 
 ```bash
 python3 -c "
@@ -116,24 +119,42 @@ Compare against the requested list. Report which are already present
 
 ## Step 2: Infer each new entry's parameters from its closest sibling
 
-Never invent parameters from scratch. For each missing model, find the
-**closest already-configured sibling**: same family prefix (same
-`gpt-5.x`/`claude`/`gemini`/`llama` line) and, ideally, the most recent
-version within that line, then copy its schema verbatim except for `id` (and
-`family`, if the extension's `family` convention encodes the version, e.g.
-`gpt-5.4` vs `gpt-5.4-mini`). Carry over unchanged:
+Never invent parameters from scratch.
+For each missing model, first classify its provider and quota tier, then find the **closest already-configured sibling**: same family prefix (same `gpt-5.x`/`claude`/`gemini`/`llama` line) and, ideally, the most recent version within that line, then copy its schema verbatim except for `id` (and `family`, if the extension's `family` convention encodes the version, e.g. `gpt-5.4` vs `gpt-5.4-mini`).
+Carry over unchanged when the sibling has the same provider and quota tier:
 
-- `baseUrl` / `apiMode` (per-provider, essentially never changes)
+- `baseUrl` (per-provider, essentially never changes)
 - `context_length`, `max_tokens` or `max_completion_tokens`
+- `delay` from the quota tier (omit it only when that tier's delay is 0 ms)
 - `vision`
 - `reasoning_effort` (GPT-family reasoning models only)
 - `owned_by`
+
+Derive `apiMode` from the provider's current catalog for the exact model;
+it is not provider-wide.
+For Databricks, use `openai-responses` whenever the catalog says the model requires the Responses API, and `openai` otherwise.
+
+For Databricks pay-per-token endpoints, use the current WAI table linked in Step 0 rather than copying a provider-maximum window from a model card or a sibling in another tier.
+As verified on 2026-08-26, the operational groups are:
+
+- GPT-5.6 Sol/Terra/Luna: 400,000 context, 16,000 output, no delay (omit the `delay` field).
+- Claude, GPT-5.5 through GPT-5, and Gemini: 64,000 context, 16,000 output, and 15,000 ms delay.
+- Inkling: 64,000 context, 8,192 output, and 15,000 ms delay.
+- GPT OSS: 131,072 context, 25,000 output, no delay (omit `delay`).
+- Llama 4, Llama 3, and Gemma 3: 128,000 context, 8,192 output, no delay (omit `delay`).
+
+OAICopilot advertises input capacity as `context_length - max_tokens`.
+Therefore, the 64,000/16,000 default exposes about 48,000 input tokens and can be too small for a large agent harness's system prompt.
+If that happens, reduce loaded tools/instructions or raise `context_length` only after checking the workspace's actual quota tier or provisioned-throughput capacity.
+Record the departure as an intentional local override;
+do not silently replace the quota-aware default with the model's full provider window.
 
 Do not duplicate single-instance flags from the sibling (e.g. `useForCommitGeneration: true` --- at most one model across the entire configuration should carry this flag).
 
 If a requested model has **no sibling at all** (a genuinely new model line,
 e.g. a first-of-its-kind name), say so explicitly rather than guessing
-silently. Use the most structurally-similar existing entry as a starting
+silently.
+Use the most structurally-similar existing entry as a starting
 point (matching `vision`/`apiMode` conventions for that provider) and flag in
 your final report that its `context_length`/`max_tokens` are placeholders the
 user should confirm against the provider's actual model card.
@@ -142,9 +163,11 @@ user should confirm against the provider's actual model card.
 
 Add only the missing entries to the end of the `oaicopilot.models` array,
 via whatever file-edit tool this environment provides (the `Edit` tool, or
-the assistant's edit-a-string tool). Anchor on the **last existing array
+the assistant's edit-a-string tool).
+Anchor on the **last existing array
 element plus the closing `]`**, and match the file's existing indentation
-exactly. Never reorder, reformat, or rewrite entries that already exist: a
+exactly.
+Never reorder, reformat, or rewrite entries that already exist: a
 diff that touches unrelated array elements makes the change harder to review
 and risks losing a hand-tuned parameter.
 
@@ -222,6 +245,7 @@ case). Tell the user they may need to reopen the Copilot Chat model picker
 ## Anti-patterns
 
 - Guessing parameters from scratch instead of copying a sibling's schema.
+- Copying a provider-maximum context window into a quota-limited Databricks workspace without first applying the operational tier from WAI's table.
 - Reformatting or reordering existing `oaicopilot.models` entries while adding
   new ones.
 - Assuming the served-entity name already carries the `owned_by-` prefix

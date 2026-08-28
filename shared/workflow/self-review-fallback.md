@@ -129,26 +129,99 @@ and [`memories/cursor.md`](../../memories/cursor.md).
   add an ARD ledger.
 - **Don't:** paraphrase a missing reviewer body as Ready for merge.
 
-**Self-review is the immediate fallback so the PR never stalls --
-but declaring the PR clean still requires an external verdict whenever one is reachable.**
-Don't wait to self-review: post it right away, same as above.
-But also check, the same round, whether a *different* configured reviewer is reachable
-(e.g. Copilot code review, if the repo/org has it) --
-not just whether the `@claude` bot specifically produced a verdict,
-since the two can fail independently (one quota-exhausted, the other working fine, or vice versa) --
-and request it in parallel with posting the self-review, not after.
-Re-check reachability every round:
-a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
-can become reachable mid-session.
+**A fallback review has to be *admitted* before its verdict is even read, and
+the admission turns on where the agent marker sits.**
+`scripts/check-pr-fully-clean.py` does **not** apply these as a pipeline, and
+describing them as one is what makes the mechanics hard to predict.
+Admission comes first and gates everything.
+What follows it is two *independent* readings of the admitted pool, neither
+feeding the other.
+
+**Admission** decides whether a comment enters the pool at all.
+There are two admission paths, and a fallback review takes the **comment**
+one: `gh pr comment` posts an issue comment, not a formal review object, so
+the branch that governs is the issue-comment block in
+`check-pr-fully-clean.py` (around `:1256-1291`), not the `("review", ...)`
+append that follows it.
+Both paths apply the same identity rule, which is why the distinction rarely
+matters for behaviour and always matters for reading the code.
+
+Cite `_reviewer_identity()` by name rather than by line when checking this:
+three consecutive review rounds on this passage produced a wrong line number,
+and a citation that drifts is worse than none, since it sends a reader to a
+branch that looks close enough to confirm the claim.
+
+That function reads only the **first and last non-blank line** of the body.
+A marker anywhere between them resolves to the poster's own login, the comment
+is not admitted as an agent's review, and nothing else about it is ever
+consulted.
+
+Then, over everything admitted:
+
+- **The verdict check reads the whole history, not the current commit**
+  (`check_latest_verdict(all_items, ...)`, `:1325`).
+  `classify_verdict()` reads the phrase `Verdict: Clean` on one line; a
+  `### Verdict` heading whose word sits on the next line returns `unreadable`.
+  This runs over *every* admitted item regardless of which commit it
+  evaluated, and the code says why: a not-clean verdict at an earlier commit
+  stands until a later clean from the **same** reviewer supersedes it.
+- **The head match narrows to comments evaluating the commit under test**
+  (`:1334`), answering the separate question of whether anything has reviewed
+  this head at all.
+  The body must quote the commit.
+  Git's default abbreviation is enough: the matcher tests `sha[:7]` as a
+  substring, so a 7-character `--short` SHA matches, as does the full 40.
+
+The independence is the part with consequences, and it is the opposite of what
+a pipeline model predicts.
+A stale not-clean verdict from an *earlier* commit still blocks, because the
+verdict check never sees the head filter.
+So pushing a fix does not clear a previous round's verdict; only a later clean
+from that same reviewer does.
+
+Neither admission nor verdict form announces itself.
+An unadmitted comment produces `No review comment has been posted evaluating
+HEAD SHA <sha> yet`, which reads as *nothing was posted* rather than as *what
+you posted did not count*.
+An unparsed verdict surfaces only as a `NOTE: ... has a format the verdict
+classifier cannot read` line, which is deliberately **non-blocking** --- so it
+prints among the notes rather than among the findings.
+
+- **Do:** open or close the comment with the agent's own marker line, so the
+  first or last line resolves to an agent.
+- **Do:** write `### Verdict: Clean` on one line.
+- **Do:** read a `NOTE:` about an unreadable review as being about *your own*
+  fallback, since a bot's report is already in the parsed form.
+- **Don't:** bury the marker mid-body under a heading of your own --- that is
+  the failure that reports as "nothing was posted".
+
+(Measured on `ucdavis/bcs`#745, 2026-08-27.
+The first fallback opened with a `## Self-review fallback` heading of its own
+and was never admitted, though it quoted the commit correctly at seven
+characters.
+The second opened with the marker, was admitted, and then failed on the split
+verdict heading instead.
+Six fallback reviews across that sweep used the split form; reposting them
+inline moved every PR from `0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean`, with no change to any review's content.)
+
+**Execute the sequential multi-provider review loop on all PRs.**
+You must execute the sequential multi-provider review loop defined in `shared/workflow/adversarial-self-review.md`.
+
+Pin all available providers (e.g., Cursor, OpenCode, Codex, Copilot, Claude, and the local `adversarial-reviewer` subagent).
+Query them sequentially, one at a time.
+Do not request them in parallel.
+Re-check reachability at the start of every cycle:
+A reviewer that was ineligible/quota-exhausted a few pushes ago can become reachable mid-session and must be included in the next pinned quorum.
 Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
-confirm a genuine all-clear review is posted at the current head from an external reviewer, if one is reachable --
-a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
-doesn't satisfy this once an external verdict is obtainable.
-Merging autonomously under `mwc` (merge-when-confident) unconditionally requires an automated clean Claude review verdict evaluating the HEAD commit;
-a fallback self-review allows iteration and unblocks PR progress, but NEVER authorizes autonomous merge under MWC.
+confirm a genuine all-clear review is posted at the current head from all reachable providers.
+Your inferred clean state from CI and threads does not satisfy this requirement.
+Merging autonomously under `mwc` (merge-when-confident) unconditionally requires automated clean external review verdicts evaluating the HEAD commit.
+A fallback self-review allows iteration and unblocks PR progress.
+However, it NEVER authorizes autonomous merge under MWC.
 
 **Weight two reviewers' agreement by whether they share a vendor, and prefer a cross-vendor second reviewer over a second run of the same one.**
-The section above says to check whether a *different* configured reviewer is reachable, and treats every second reviewer as interchangeable.
+When pinning a quorum of available providers, do not treat every second reviewer as interchangeable.
 They are not.
 Two reviewers built on the same vendor's models share their training and so share their blind spots, which means a defect both of them pass over is one neither was ever likely to catch.
 Their agreement therefore measures the shared blind spot rather than the diff.
@@ -332,6 +405,39 @@ The tell is a diff that *quotes no source* for a behavioural claim.
 
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
 
+
+**While the workflow reviewer is down, the fallback is a full iterate loop of FRESH clean-slate subagent rounds -- run automatically, one per round, until a clean verdict at the current head.**
+The sections above establish that a single dispatched self-review unblocks the round.
+They leave two gaps this section closes, both from a user directive
+(2026-08-26: "do that automatically when the GHA reviews aren't working",
+issued after twice having to ask by hand for another round on ucdavis/bcs#736).
+
+**One review is not the loop.**
+A working workflow reviewer re-reviews every push until it is satisfied;
+a fallback that reviews once and then only verifies its own fixes has quietly
+downgraded ARDI to a single round.
+So after addressing a fallback round's findings and pushing, dispatch the
+next round at the new head without being asked, and keep going until a round
+returns a clean verdict at the head being shipped.
+
+**Each round is a fresh clean-slate reviewer, not a verification pass.**
+Brief the new subagent with the diff and the standards only --- never with the
+prior rounds' findings or dispositions.
+A verifier handed the old finding list confirms the fixes and stops;
+fresh eyes re-derive the whole diff and find what every earlier round missed.
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"Verification passes returned Clean while fresh rounds kept finding defects".
+A verification pass still has its narrow place --- confirming a specific
+fix landed before reporting a round addressed --- but it never substitutes
+for the next fresh round.
+
+- **Do:** dispatch the next fresh round automatically after each
+  address-and-push, while the workflow reviewer cannot produce a verdict.
+- **Do:** brief each round with diff and standards only, so it re-derives
+  rather than confirms.
+- **Don't:** stop after one fallback review plus verification passes ---
+  that is one round wearing the loop's name.
+- **Don't:** hand a new round the previous rounds' findings.
 
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**

@@ -88,6 +88,10 @@ the author-dispatched cross-model, cross-harness reviewer's
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
+A split --- one all-clear and another not-clean, nits included --- is not
+100% all-clear, and `mwc` does not authorize merging it
+(ai-config#2274).
+ARD every item from every review, then request fresh reviews.
 If no qualifying reviewer is reachable, the merge waits ---
 "blocked on reviewer availability" is the honest status ---
 and arming an auto-merge while waiting is
@@ -145,7 +149,7 @@ that is the CLI-fallback case above.
 Morrison-Lab/ai-config's Cursor adapter skips
 `no-push-without-self-review.py` until
 [#2241](https://github.com/Morrison-Lab/ai-config/issues/2241),
-so `ALLOW_UNREVIEWED_PUSH=1` is inert on that adapter path
+so `ALLOW_UNREVIEWED_PUSH=1` is inert for the adapter
 under any reviewer
 (see [`memories/cursor.md`](../../memories/cursor.md)).
 Call `parse_report()` from the worktree's `hooks/no-push-without-self-review.py`
@@ -296,10 +300,51 @@ The other cases have no guard and are prose rules here.
   gate defined under "Cross-model and cross-harness reviews are required
   for merging, and the harness list is concrete" above.
 - **Do:** re-dispatch after fixing findings, so the clean verdict describes the tree you are shipping.
+  Do not report a HEAD as reviewed until a dispatched review of **that** SHA has returned.
+  If a fix already moved HEAD, re-dispatch on the current SHA before the next status report.
+  (ai-config#2277, 2026-08-26: addressed two wording nits on `92c65d5c` and reported without a review of that SHA until asked.)
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
+
+## A verdict phrase separated from its heading by a line break is no verdict
+
+`VERDICT_LINE` matches `Verdict[ \t]*:` and the phrase on the **same line**, optionally heading-prefixed (`### Verdict: Ready for merge`).
+It does not match a heading naming the section with the phrase on the line that follows it:
+
+```
+## Verdict
+
+Ready for merge
+
+Reviewed-Commit: <sha>
+```
+
+`parse_report` returns no verdict for a report shaped that way, and `read_latest_review` then keeps whichever verdict it last successfully parsed from an **earlier** dispatch in the same transcript --- so a later, clean, correctly-formatted review can be invisible while an older `needs_work` review from before it stands as "the latest."
+The refusal then reads "The latest adversarial self-review returned a blocking verdict," which is true about the parsed history and false about what the session actually did.
+It is easy to misdiagnose as the transcript lagging a same-turn dispatch --- a plausible-sounding mechanical explanation that was never actually verified, and that ai-config#2444 was originally filed on before this parsing gap was found instead.
+
+[`.claude/agents/adversarial-reviewer.md`](../../.claude/agents/adversarial-reviewer.md) already specifies the one-line form for its own persona.
+The gap is any other brief that asks something to act as an adversarial reviewer --- a same-vendor fallback subagent, a CLI dispatch, a hand-written prompt --- without repeating that requirement.
+
+- **Do:** put `Verdict: <phrase>` literally on one line in every review brief you compose, whatever is dispatching it --- `### Verdict: Ready for merge`, never a heading with the phrase on its own following line.
+- **Do:** when a guard refuses a push on a verdict you believe is clean, run the guard's own reader (`read_latest_review`/`parse_report`) over the live transcript and print what it parsed per admitted result, before attributing the refusal to a cause like transcript lag.
+- **Don't:** treat a heading form (`## Verdict` with the phrase on the next line) as equivalent to the required one-line form --- it parses as no verdict at all.
+- **Don't:** file or accept a "the transcript lags the current turn" diagnosis for a refused push without first executing the parser against the actual transcript;
+  the two failures produce an identical refusal message.
+
+(ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
+The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
+
+**A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
+`read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
+Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;
+pushing branch A afterward compares its shipped commit `X` against the held `Y`, fails the SHA match, and refuses citing an unreviewed commit --- even though branch A's own review was genuinely clean.
+
+- **Do:** review and push one branch before dispatching a review for a second branch in the same session, when driving more than one branch's push through this guard.
+- **Don't:** read that refusal as a defect in branch A's review;
+  the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 
@@ -348,3 +393,44 @@ waiting for?".
 Five commits were sitting unpushed behind a self-imposed review queue while
 the branch's conflict with `main` had to be re-resolved twice.
 The honest answer to the question was "nothing".)
+
+## Query all available providers sequentially
+
+When obtaining adversarial reviews,
+you need a clean verdict from **every** available provider.
+You must define the initial pinned quorum by performing an exhaustive discovery/availability check across all known providers (e.g., Cursor, OpenCode, Codex, Copilot, Claude, and the local `adversarial-reviewer` subagent).
+Every provider found reachable at the start of the cycle must be included in the pinned quorum.
+Any exclusion of a known provider must be recorded explicitly with its reason (e.g., quota blocked, CLI offline).
+Do not stop after one provider returns clean.
+Query them sequentially, one at a time.
+Once one provider gives a clean review,
+move on to the next one.
+If any provider rejects the diff with findings,
+you must address the feedback.
+When you make fixes,
+**do not hold the branch**:
+push the verified fixes immediately.
+Pushing the new commit naturally restarts the sequential query process against the new HEAD from the first provider.
+When requesting review on the new push,
+proactively carry forward any previously accepted rebuttals from earlier providers into your initial review request.
+This ensures providers do not redundantly re-raise settled non-code issues on the new diff.
+You must submit your rebuttal to the provider and request a new review.
+This allows them to post a clean verdict at HEAD
+that supersedes their previous findings.
+Only after the provider posts a new clean verdict
+may you continue to the next provider in the quorum.
+Continue this iterative loop of review, fix, and push
+until the current HEAD receives clean verdicts from the entire pinned quorum.
+
+The set of required providers must be pinned at the start of the review cycle.
+If a pinned provider drops offline or experiences transient operational failures (e.g. 500 errors, rate limits), you must wait and retry.
+Alternatively, request explicit user permission to drop it from the quorum.
+If the quorum size is zero at the start of the cycle, or drops to zero at any point during the cycle, you must fail closed and wait until at least one becomes reachable.
+This applies if, for example, all external providers and the local fallback self-review subagent are offline or fail.
+Alternatively, request explicit user permission to proceed.
+Do not bypass the review gate.
+If any provider (or combination of providers) creates an unbounded loop ---
+whether through irreconcilably contradictory requirements,
+self-contradictory oscillation,
+or endless non-contradictory goalpost-moving ---
+halt the review process and escalate to the user for a tie-breaking decision.

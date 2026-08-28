@@ -1,5 +1,5 @@
 "Fully clean" is the terminal state the ARDI review loop drives toward.
-A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py <pr-number>`):
+A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>`):
 
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in
@@ -46,6 +46,11 @@ Worked-example case records for the rules below live in
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**
+   GraphQL `statusCheckRollup` is the same kind of short surface for a
+   *progress* report --- not enough for a terminal "fully clean" /
+   "ready to merge" claim.
+   That claim needs `scripts/check-pr-fully-clean.py`
+   (ai-config#2277, 2026-08-26).
 
    **`--paginate` is load-bearing, not tidiness.**
 
@@ -75,6 +80,45 @@ Worked-example case records for the rules below live in
 
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A `check_suite.completed` wake at a superseded head".
+
+   **A polling loop needs the same negative control a sweep does, because an
+   EMPTY check list satisfies "nothing is pending" exactly as well as a
+   finished one.**
+   The rules above that concern the check list each found one that came back
+   **short**; this is the case where it comes back **empty**, which none of
+   them reaches.
+   "Not yet started" and "finished successfully" produce an identical reading,
+   which is [`fail-fast`](../principles/fail-fast.md)'s
+   pass-path-equals-failure-path shape failing in the dangerous direction ---
+   it reports a PR ready.
+   [`batch-merge-and-resolve`](batch-merge-and-resolve.md) states the
+   governing rule for a **sweep**, and a sweep and a poll do not resemble each
+   other from the inside --- one feels like a measurement, the other like
+   waiting --- so that rule loads and matches nothing here.
+
+   A non-empty population is necessary and **not sufficient**, because the
+   population grows while the poll runs.
+   Measured on the corrected run: the total went 13, then 16, 17, 18 across
+   two minutes, as later workflows registered their checks.
+   So a threshold only rules out the empty case, and a poller that happened to
+   observe zero pending at total 13 would have exited before five further
+   checks existed.
+   Require the terminal reading to repeat --- zero pending **and** an
+   unchanged total across two consecutive polls --- and print the total each
+   tick, so growth is visible rather than inferred.
+
+   - **Do:** require a non-empty population before reading zero-pending as
+     done, and report how many check runs were examined.
+   - **Do:** confirm the total is unchanged since the previous poll, since the
+     population grows as workflows register.
+   - **Don't:** arm a poller assuming the push already created the checks ---
+     a draft-to-ready transition creates them on a separate event, so a
+     poller armed at push time can run entirely inside a zero-check window.
+   - **Don't:** treat a single zero-pending reading as terminal, however large
+     the population was when you took it.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A poller exited on an empty check list".
 
    **A check-run NAME is not unique across workflows, so a name alone does not
    identify which check passed.**
@@ -119,13 +163,14 @@ Worked-example case records for the rules below live in
    Reporting the regression fixed on that row would have cited an unrelated
    workflow.)
 
-   **Every subsection above explains a check list that is short for a per-PR
-   reason, and a platform outage produces the same shape for a reason none of
-   them can reach.**
+   **Every subsection above explains a per-PR failure in reading the check
+   state --- a short or empty list, a lagging status surface, an ambiguous
+   name --- and a platform outage produces the same shape for a reason none
+   of them can reach.**
 
    **A job's conclusion is set by whichever step failed, which need not be the step whose verdict you read.**
-   Every rule above is about an enumeration that came back short.
-   This one is the opposite case: the enumeration is complete and terminal, and the answer you read came from the wrong member of it.
+   Most rules above concern an enumeration that came back incomplete.
+   This one's enumeration is complete and terminal, and the answer you read came from the wrong member of it.
    A workflow can carry a guard step that decides what a run *meant* --- a review guard classifying an outcome, a summarizer, a status resolver --- and that step can conclude "this is fine", write its output, and end `success`, while the job is red because an earlier step failed without `continue-on-error`.
    Reading the guard's own log line then reports the opposite of the check.
    So when a red job's log carries a green verdict, do not treat it as a contradiction to explain: enumerate the steps and find the one whose conclusion is `failure`.
@@ -166,7 +211,8 @@ Worked-example case records for the rules below live in
    The push run was read first and taken as the verdict.
    The PR run was the one carrying four real findings.)
 
-2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
+   A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
 
 **Criterion 2's test is the absence of findings, not the presence of a verdict
 line saying so.**
@@ -179,19 +225,17 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
-**Final approval comes from Claude where Claude is reachable.**
-Another agent's clean verdict clears CI's review gate; it does not clear
-criterion 2 on its own.
+**Final approval requires a clean verdict from every available provider in the pinned quorum.**
+A single agent's clean verdict does not clear criterion 2 on its own;
+it must be joined by a clean verdict from the rest of the quorum.
 
-This is a directive rather than a derivation, so treat it as a standing
-preference and not as a claim about any agent's general competence.
-What it settles is which verdict a PR is reported **ready** on.
+This is a directive rather than a derivation, so treat it as a standing preference.
+What it settles is when a PR is reported **ready** for merge.
 
-The reason it needs stating is that the two are indistinguishable from the PR
-page.
-Every agent posts the same shape --- a summary, some analysis, a positive
-closing line --- so a findings-free report reads as approval whichever agent
-produced it, and the review-gate check goes green either way.
+The reason it needs stating is that multiple verdicts are indistinguishable from a single one to the CI review gate.
+Every agent posts the same shape --- a summary, some analysis, a positive closing line.
+So a findings-free report from just one agent turns the review-gate check green,
+even while other providers' reviews are pending or blocked.
 
 Two failure modes make the preference concrete, and both have recurred:
 
@@ -204,37 +248,51 @@ Two failure modes make the preference concrete, and both have recurred:
   Not a difference of opinion about a nit --- a checkable factual error, at the
   same commit, that the clean verdict passed over.
 
-So when Claude is reachable, its verdict is the one to report on:
+So when the pinned quorum is reachable, their verdicts are the ones to report on:
 
-- **Do:** dispatch a Claude review and wait for its verdict before reporting a
-  PR ready, whatever another agent has already said.
-- **Do:** name which agent produced the verdict you are reporting, so "clean"
-  is attributable rather than anonymous.
-- **Do:** treat another agent's findings as real findings --- this ranks whose
-  *approval* is final, not whose objections count.
-- **Don't:** report a PR ready on a non-Claude clean verdict while Claude is
-  reachable, however thorough that report reads.
-- **Don't:** read a green review-gate check as settling this; the gate does not
-  know which agent answered, and on a selector-based setup the agent is chosen
-  at random.
+- **Do:** dispatch reviews to the quorum and wait for all verdicts before reporting a PR ready,
+  whatever one agent has already said.
+- **Do:** name which agents produced the verdicts you are reporting,
+  so "clean" is attributable rather than anonymous.
+- **Do:** treat any agent's findings as real findings ---
+  every provider's objections count.
+- **Don't:** report a PR ready on a single clean verdict while the quorum is still reachable and pending,
+  however thorough that report reads.
+- **Don't:** read a green review-gate check as settling this;
+  the gate does not know how many agents answered,
+  only that one did.
+
+**A disagreement among reviews vetoes merge, including under `mwc`.**
+Criterion 2 is every reviewer's latest verdict, not the globally last comment.
+If one review is all-clear and another raises blocking issues, nits, minor
+items, or any other flagged heading, the findings win.
+ARD every item from every review, then request fresh reviews.
+A later all-clear from a different reviewer does not supersede a standing
+not-clean; only a later clean from the same reviewer does
+(the ordinary ARDI iterate path).
+`check-pr-fully-clean.py` encodes the per-reviewer scan
+(ai-config#2274).
+
+- **Do:** ARD the union of findings from every review, then request a fresh
+  round from the reviewers that spoke.
+- **Don't:** merge on one reviewer's all-clear while another still has a
+  standing not-clean, even with `mwc` active.
 
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a
 cross-vendor split is a prompt to check the item yourself.
 That section weighs corroboration; this one names whose approval is terminal.
-They compose --- a cross-vendor reviewer is still worth chasing, and its clean
-verdict still is not the one a PR is reported ready on while Claude is
+They compose --- a cross-vendor reviewer is always required, and every clean
+verdict is necessary before a PR is reported ready while the quorum is
 reachable.
 
-Where Claude is genuinely unreachable --- quota-skipped, a stub with no stated
+Where a quorum provider is genuinely unreachable --- quota-skipped, a stub with no stated
 verdict, or not configured --- fall back per
 [`self-review-fallback`](self-review-fallback.md), which already governs that
 case.
-Another agent's clean verdict is worth more than nothing there, and it is still
-not Claude's; say which one you have.
 Note that merging autonomously under `mwc` (merge-when-confident) strictly requires
-a genuine clean automated Claude review verdict evaluating the HEAD commit;
+genuine clean automated review verdicts from the reachable quorum evaluating the HEAD commit;
 a fallback self-review or reviewer skip notice allows the ARDI iteration loop to proceed,
 but NEVER satisfies the MWC autonomous merge gate.
 
@@ -540,6 +598,77 @@ read above exists to preserve.
 - **Don't:** treat the refusal as a PR problem, or spend a round diagnosing it;
   the absence of `gh` is the whole cause.
 
+**The mirror case is worse: a review job running the checker on the PR it is
+reviewing gets an answer, and the answer is always not-clean.**
+The section above is the checker declining to answer, which is loud and exits
+`2`.
+This one exits **`1`** --- a verdict --- and it is wrong every time.
+
+A review job querying its own PR's check state observes itself as
+`in_progress`, and the checker requires that a completed automated review exist
+on the current head.
+The reviewer is the thing that would produce that review, so the predicate is
+unsatisfiable by construction: it cannot authorize itself in advance, at any
+round, on any PR, however clean the diff.
+
+The failure is quiet in the way the `gh` case is not.
+Exit `2` announces itself as a non-answer; exit `1` is indistinguishable from a
+real finding, and it reaches the PR as a withheld verdict that blocks merge
+under [`mwc`](../../.claude/skills/mwc/SKILL.md)'s Scope Limit --- on a PR the
+same review just declared sound.
+
+**It also poisons the rounds after it.**
+Re-triggering does not clear it, which is the natural first remedy and the
+wrong one: once a `Needs more work` comment exists for that head, the next
+round's verdict scan reads a standing not-clean and the loop cannot converge.
+Each attempt costs another paid review.
+
+The discrimination to make is between two different claims:
+
+- *"The diff is sound, and I cannot observe my own completion"* --- a statement
+  about the **instrument**, which belongs in the report.
+- *"This needs more work"* --- a statement about the **diff**, which is the
+  verdict field and the thing that blocks.
+
+Routing the first into the second is the defect.
+It is the same conflation
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names elsewhere: an
+inability to measure is being reported as a measurement.
+
+- **Do:** state the instrument's status in the report, and keep the verdict a
+  judgment about the diff.
+- **Do:** exclude the calling run when a reviewer evaluates its own PR, or say
+  the check was not applicable rather than running it.
+- **Don't:** put "cannot determine cleanliness" in the verdict field --- it
+  blocks merge and reads as a finding to everyone who does not read the
+  reasoning.
+- **Don't:** re-trigger to clear it; the standing not-clean comment makes the
+  next round worse rather than better.
+
+(Measured 2026-08-27 on
+[ai-config#2442](https://github.com/Morrison-Lab/ai-config/pull/2442).
+Three rounds found one hyperlink nit, one citation-order nit, then nothing.
+The instrument reported not-clean in all three, naming
+`review / claude-review` (itself) among the pending checks --- and the verdict
+field carried that into a block in **two** of them.
+The third round said so explicitly: "not due to any content defect", "no
+further content changes are needed on my end".
+CI was 10/10 green and `require-review` passed.
+The three rounds cost $4.60 between them, and the PR merged only on an explicit
+user decision to treat the verdict as non-blocking.
+
+The round that did **not** block is the most useful of the three.
+It is the same reviewer, on the same PR, reaching the same instrument result
+and keeping it out of the verdict field: it returned `Ready for merge` and put
+the caveat in a note beneath it.
+So the discrimination this entry asks for is achievable rather than merely
+desirable, and the two rounds that blocked were not forced to by anything about
+the instrument.
+That round is also the reason to state the split precisely: the first draft of
+this record said all three blocked, and review caught it --- an unverified count
+in prose, inside an entry about an unverified count.
+Tracked as [ai-config#2441](https://github.com/Morrison-Lab/ai-config/issues/2441).)
+
 (Measured 2026-08-19 on a remote session driving
 [ai-config#1673](https://github.com/Morrison-Lab/ai-config/pull/1673).
 Tracked as
@@ -608,6 +737,45 @@ Reading the formal-review loop and generalizing its author check to comments is 
   the SHA test is what excluded it.
 
 See [`fully-clean.rationale.md`](fully-clean.rationale.md) for both mechanisms, and [`fully-clean.cases.md`](fully-clean.cases.md), "A skip notice exits the checker clean over an empty verdict scan".
+
+**A classifier written to EXCLUDE driver-status comments from the verdict scan is itself a matcher, and its negative guards protect only the dialect they were written against.**
+The section above is a comment wrongly *admitted*;
+this is the mirror, a comment wrongly *dropped*.
+A driver-ledger classifier recognizes a session's own status comment (claim wording, an ARD disposition table, a self-imposed hold like "hold off ...") from broad English markers, then protects genuine reviews with negative guards -- a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, a `**Claude finished` marker -- that must all be absent before the exclusion applies.
+Every one of those guards is keyed on Claude's and Cursor's own report structure.
+A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until X is added" emits none of that structure: the broad marker matches, every guard abstains, and the finding is dropped from the verdict scan entirely -- reported FULLY CLEAN.
+This is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently in this checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had.
+
+**Inverting the gate to a POSITIVE signature was tried next, and refuted the same day, which is the more useful half of the lesson.**
+The candidate signature was the agent-disclosure marker, on the premise that every driver comment carries it and no reviewer report emits it.
+Neither half holds.
+[`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH that marker, so a genuine not-clean review carries it too, and gating on it dropped that review instead.
+And [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so even the first half is a convention this corpus asks for rather than a property a gate can rely on.
+Both attempts failed the same way.
+Every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item -- and a positive signature is not safer than a negative one merely for being positive.
+A third design stopped dropping anything.
+It blanked the single shape that actually caused the misread --- a prior round's verdict quoted in a bare parenthetical after a cited SHA --- inside `strip_cited_finding_vocab` instead.
+It was refuted too, on a body where the parenthetical IS the live verdict and the explanation follows it outside the blanked span.
+Nothing shipped in the checker: all three were reverted.
+The fix went to [`ard`](../../skills/ard/SKILL.md)'s summary step instead (#2448) --- a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it, and the instrument gains no new fail-open surface.
+
+- **Do:** prefer fixing the input at the author's end over teaching the checker to guess -- three checker-side designs were refuted here, and a pair of backticks was not.
+- **Do:** derive, by execution, which line of a body actually produced the verdict, before building a classifier for the parts you assume did.
+- **Do:** confirm a proposed signature's population against every producer the checker sees, and treat "no reviewer emits this" as a claim to check against the corpus rather than a premise.
+- **Do:** read a driver-comment classifier's guard list as a dialect list, and ask what a differently-formatted reviewer's report looks like against it.
+- **Don't:** protect an over-broad exclusion marker with negative guards keyed on one producer's output format -- they abstain on every other producer, which is exactly where the marker is most wrong.
+- **Don't:** read a positive gate as inherently safer than a negative one -- both were tried here, and both dropped a real reviewer's finding.
+- **Don't:** trust a driver-comment classifier's `0 dropped` (or silence) as evidence nothing was excluded;
+  the failure here produces no error, just a lower "examined N items" count.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "A driver-comment classifier drops a Copilot finding it has no guard for".
+
+**Dropping an item from the verdict scan is a distinct fail-open route from misreading one that IS scanned, and it leaves no trace in the output at all.**
+Every case in this file up to here is about an item that entered the scan and was then misread -- a stale SHA, a truncated body, a wrong author filter.
+A dropped item never enters the scan, so the "examined N items" line the checker prints simply reads one lower, which is indistinguishable from a PR that genuinely received one fewer review comment.
+
+- **Do:** when a verdict scan reports fewer items than the PR thread has comments, ask what was dropped and why, not just what the scanned items said.
+- **Don't:** read a clean scan, however many items it examined, as evidence every review comment on the thread was considered.
 
 **A verdict comment quotes verdict phrases, so a phrase search identifies
 nothing --- and it misreads in both directions at once.**
@@ -699,8 +867,13 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+`mergeStateStatus: CLEAN` means conflict-free plus passing commit status (GitHub's `mergeable` field), not merge-ready.
+A PR without a clean review verdict on the latest commit is not merge-ready.
+
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
-- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking mergeability/merge-conflict state.
+- **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
+- **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
+- **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."
 
 **Re-check version parity in that same sweep, not only conflict-freedom.**
 

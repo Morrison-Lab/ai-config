@@ -7,7 +7,7 @@ generic Actions-authoring material.
 Triggering a review, and what becomes of the reply it writes, live in
 [`claude-review-dispatch.md`](claude-review-dispatch.md).
 
-## @claude CI action (d-morrison/gha `claude.yml`)
+## @claude CI action (Morrison-Lab/gha `claude.yml`)
 - The reusable `claude.yml@v1` agent workflow restores config files (`CLAUDE.md`,
   `.claude/**`) to `origin/main` during its run (`restoreConfigFromBase`), so a
   PR can't rewrite the reviewer's own instructions. With `eager-pr: true` +
@@ -24,7 +24,7 @@ Triggering a review, and what becomes of the reply it writes, live in
   deletions in the PR.
   Verified on ai-config#41: once the fix landed, the gut stopped recurring (the
   config-edit payload stayed on the branch across later bot runs). Was tracked as
-  d-morrison/gha#39.
+  Morrison-Lab/gha#39.
 - If a repo pins an **older** gha tag (pre-fix), the workaround still applies. The
   symptom was `claude[bot]` "auto-commit residual @claude session changes" commits
   that reverted only config paths. Restore the section
@@ -85,7 +85,7 @@ Triggering a review, and what becomes of the reply it writes, live in
   person was ever working it. Before treating that as a collision worth investigating,
   check the commit author: `Claude <noreply@anthropic.com>` committing without a
   matching claim from an actual second session is this false-positive-trigger pattern,
-  not a real parallel-session conflict. (Hit on d-morrison/gha#225: the self-review
+  not a real parallel-session conflict. (Hit on Morrison-Lab/gha#225: the self-review
   comment's own reference to the failed `@claude` review job triggered a real agent
   run, which found and fixed a stale `CLAUDE.md` trigger-type claim before the PR
   merged.)
@@ -186,7 +186,7 @@ Triggering a review, and what becomes of the reply it writes, live in
     `review / require-review`) to their branch protection required-checks.
     Fix: wait for quota reset (or auth fix), then re-trigger. No need to push a commit.
     ⚠️ **Verify the consumed guard actually warns — don't assume the fix is live.**
-    Observed 2026-06 on sparta#207 (consuming `d-morrison/gha@v1`) AND in `dem-extra1/gha`'s
+    Observed 2026-06 on sparta#207 (consuming `Morrison-Lab/gha@v1`) AND in `dem-extra1/gha`'s
     own `claude-code-review.yml`: the guard still `exit 1`d on `is_error=true` (RED check, no
     `[!WARNING]` comment) — gha#102's exit-0 behavior was not yet on the consumed `@v1` pin
     there. Read the actual guard code on the pin you consume rather than trusting this note.
@@ -248,7 +248,8 @@ Triggering a review, and what becomes of the reply it writes, live in
   API error. The reusable `claude-code-review.yml` now accepts a **`show-full-output`** input
   (default false; added in dem-extra1/gha#1) that passes through to the action's
   `show_full_output` — flip it to print the raw error in the job log. The live consumer pin
-  `d-morrison/gha@v1` may not carry it yet, so check the tag. You CANNOT side-channel the
+  `Morrison-Lab/gha@v1` may not carry it yet, so check the tag.
+  You CANNOT side-channel the
   error from a throwaway workflow on a feature branch: `claude-code-action` rejects `push`
   events (`Unsupported event type: push`) and refuses to run unless the workflow file is
   byte-identical to the default-branch copy (`Workflow validation failed … must … match the
@@ -282,6 +283,34 @@ Triggering a review, and what becomes of the reply it writes, live in
   cleanly both times it recurred (rme#706, #976) — so a subsequent normal
   push can clear it too; try `workflow_dispatch` if you have the permission
   and a normal push isn't an option (e.g. no new commit to make).
+- **A bot-sender push never triggers the ai-config review workflow ---
+  every `review /` job skips,
+  and the run still reads `completed/success`.**
+  Measured 2026-08-27 on ai-config#2340:
+  four pushes by the Cursor cloud agent
+  each produced a "Claude Code Review" run
+  whose `gather-context` succeeded
+  and whose `review / *` jobs all skipped,
+  because the callee (`Morrison-Lab/gha/claude-code-review.yml@v2`)
+  gates its jobs on `github.event.sender.type != 'Bot'`
+  (drafts and fork heads are filtered by the same `if:`).
+  Nothing in the PR announces it:
+  the head sits "unreviewed" while the runs list looks green.
+  The same `if:` admits `workflow_dispatch` at the job level,
+  so on a same-repo, non-Dependabot PR the fix is one dispatch:
+  `gh workflow run claude-review.yml -R Morrison-Lab/ai-config -f pr_number=<N>`
+  --- which produced a real verdict on the same head
+  the push-triggered runs had skipped.
+  (A dispatched run still passes through the callee's `dispatch-guard` step,
+  which blocks fork and Dependabot PRs precisely because
+  dispatch bypasses the payload gate.)
+  - **Do:** on a PR whose recent heads were pushed by a bot
+    (Cursor, @claude's own sync),
+    read the review run's *job* conclusions
+    before concluding a review ran;
+    dispatch `claude-review.yml` for the head.
+  - **Don't:** read a green "Claude Code Review" run on a bot-pushed head
+    as a review having happened --- `success` there is the skip path.
 - **Write accurate `workflow_dispatch` comments when adapting the upstream
   `claude-code-review.yml` template.** The upstream template says "workflow_dispatch is
   fired by claude.yml" — but that's only true when the repo's `claude.yml` actually
@@ -316,7 +345,7 @@ Triggering a review, and what becomes of the reply it writes, live in
   standalone copy must add it. Fixed for rme in #945.
 - **Consumer repos may carry a standalone `claude-code-review.yml` that has drifted
   from the gha reusable one — check gha first when debugging CI/infra bugs.** Not
-  every consumer calls `uses: d-morrison/gha/.github/workflows/claude-code-review.yml@v1`;
+  every consumer calls `uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v1`;
   some (rme, pre-#948) kept a hand-maintained fork that missed fixes gha already
   had — that drift is how the `allowed_bots` bug reached rme. When debugging a
   CI/infra bug in a consumer repo, compare against the canonical gha `@v1` version;
@@ -515,7 +544,8 @@ not block `claude-review`.)
   regardless of `--disallowedTools`.** The action's TypeScript sets the `ALLOWED_TOOLS`
   env var at runtime, injecting `Bash(git add:*)`, `Bash(git commit:*)`,
   `Bash(git rm:*)`, and `git-push.sh`. The `--disallowedTools` CLI flag cannot
-  override an env var set by the same process. Evidence: `d-morrison/gha` PR #134,
+  override an env var set by the same process.
+  Evidence: `Morrison-Lab/gha` PR #134,
   where a supposedly read-only `claude-code-review` run pushed commit `02af72b` to
   UCD-SERG/serodynamics PR #175. Upstream fix tracked in
   `anthropics/claude-code-action#1415` (draft PR #1433).
@@ -560,7 +590,7 @@ not block `claude-review`.)
   denial messages. This is how a "stub review" traced back to the model
   fanning its own review out across background `Agent` calls and ending its turn
   on "waiting for background agents" — a mechanism the summary object alone
-  can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
+  can't show (`Morrison-Lab/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
   A second, usually simpler route to the same detail is a re-run with the
   reusable workflow's `show-full-output` input turned on, which surfaces
   denied tool calls directly in the job log — see
@@ -595,7 +625,12 @@ not block `claude-review`.)
   The one addition: when citing a count, name the job id, not just the PR,
   because different attempts on the same PR can carry materially different
   counts. (2026-08-20.)
-- **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
+- **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.**
+  `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments.
+  If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading.
+  This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review.
+  Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text.
+  Filed with full evidence as `Morrison-Lab/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
 - **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
   never produced at all, so its absence is not an access problem.**
   `claude-code-review.yml@v1` has no `Resolve and upload execution file path`
@@ -870,7 +905,7 @@ which is that section's point: a short run corroborates a credential hypothesis
 you already hold on other grounds, and never produces one.
 
 Three of the four are on `UCD-SERG/ucd-serg.github.io` and one is on
-`d-morrison/qwt`, so the band is the thing they share rather than the repo.
+`Morrison-Lab/qwt`, so the band is the thing they share rather than the repo.
 Saying otherwise would be the grouping-by-symptom overreach that same section
 warns about, in the entry invoking its authority.
 
@@ -937,3 +972,42 @@ Two Copilot reviews on that PR restated the premise without objection.
 Fixed in #91.
 A single query for a `claude` comment on any earlier PR would have caught it at any
 point in the preceding month.)
+
+## `claude-code-action`'s `Task`/`Agent` tool is not gated behind `--allowedTools`
+
+Split out of [`github.md`](github.md) (ai-config#2267 / #694 pattern).
+
+`claude --allowedTools` is documented as "Comma or space-separated list
+of tool names to allow" -- read naturally, that implies anything not
+listed gets denied in unattended CI, where nobody can approve a
+permission prompt.
+**Verified false for `Task`**: `claude -p "..." --allowedTools
+"Bash(echo hi:*)"` (deliberately excluding `Task`) let a real `Task`
+subagent call through with `permission_denials: []`, identical to
+running with `Task` explicitly listed.
+Confirmed on the raw CLI directly, not inferred from
+`claude-code-action`'s own wrapping behavior.
+
+So a `claude-code-action` review job that stubs -- real turns and cost
+logged, `is_error: false`, but no verdict ever posted -- is **not**
+explained by "the plugin's `Task` calls were denied" just because `Task`
+is absent from the job's `claude_args --allowedTools`.
+Look for a different denied tool instead.
+`Morrison-Lab/gha`'s `run-claude-review-attempt` composite action
+documents the actual repeat offender at length: the
+`code-review@claude-code-plugins` command's own declared `allowed-tools`
+frontmatter names `Bash(gh pr list:*)`, `Bash(gh issue view:*)`,
+`Bash(gh issue list:*)`, and `Bash(gh search:*)` alongside
+`view`/`diff`/`comment` -- omit any of those and the plugin's 4 parallel
+sub-agents rack up denials across their fan-out.
+
+(Morrison-Lab/wai#49/#50, 2026-08-08: diagnosed a stub review as a
+missing `Task` grant, patched it, then verified empirically that the
+patch was a no-op.
+The real fix was migrating to gha's canonical reusable workflow, which
+grants the plugin's actual declared tool list and -- more robustly --
+denies `gh pr comment` to the agent entirely, having the workflow post
+the review from the agent's final message instead.
+See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
+"A stale, un-migrated local copy is the least reliable place to fix a
+bug" for the broader lesson.)

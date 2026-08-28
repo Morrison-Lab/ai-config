@@ -15,7 +15,7 @@ class of change no longer needs a repo-wide clip sweep.)
 
 ## "Turning an extension point on by default: add a toggle"
 
-(d-morrison/gha#321, 2026-07-27: `claude.yml` and `claude-code-review.yml`
+(Morrison-Lab/gha#321, 2026-07-27: `claude.yml` and `claude-code-review.yml`
 gained opt-in `plugin-marketplaces` / `plugins` inputs, then needed one plugin
 installed by default.
 Flipping those defaults would have meant a consumer adding their own
@@ -25,7 +25,7 @@ A `use-ai-config` boolean composed with both instead.)
 
 ## "Default a useful feature on" --- the clause-break check
 
-(d-morrison/gha#336, 2026-07-28: a new clause-break check for
+(Morrison-Lab/gha#336, 2026-07-28: a new clause-break check for
 `check-new-line-breaks` was proposed opt-in, on the strength of a real noise
 measurement -- but the measurement that justified caution was for a *blanket
 punctuation* rule flagging 50.5% of already-conforming lines, while the check

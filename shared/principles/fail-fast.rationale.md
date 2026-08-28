@@ -1462,7 +1462,7 @@ The unifying statement is worth carrying past this procedure.
 **Whether a change landed is decided by looking for the change.**
 Ancestry, hashes, and subjects are all facts about commit *identity*, which a squash merge replaces by design --- and each fails toward "not merged" while the work is present, so all three mislead in the alarming direction.
 Verify a merge, and diagnose a divergence, with `git show <ref>:<path> | grep` for a string only that change introduced.
-[`memories/git.md`](../../memories/git.md) carries the ancestry half of this and the per-repo merge-strategy facts.
+[`memories/git-branches.md`](../../memories/git-branches.md) carries the ancestry half of this, and [`memories/git.md`](../../memories/git.md) carries the per-repo merge-strategy facts.
 
 **That content check is itself line-oriented, so in a semantic-line-break
 corpus it produces the same alarming-direction false negative it was

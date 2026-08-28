@@ -115,11 +115,28 @@ Nothing about the reading announces that it could not see everything.
 The rule directly above this one had been loaded into context, and the reporting error happened anyway, on a check whose failures had been *watched* three times earlier in that same session.
 Having seen the check red, the author reported a green count that did not contain it and did not notice the absence.
 
-That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md) describes: a rule is consulted at read time and broken at composition time, so re-reading it does not reach the moment it breaks.
-The remedy was the hook `hooks/no-incomplete-check-enumeration.py`, which fires on the decidable condition --- a terminal clean claim, a `gh pr checks` reading, and no complete enumeration since the last push.
+That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md) describes:
+a rule is consulted at read time and broken at composition time,
+so re-reading it does not reach the moment it breaks.
+The remedy was the hook `hooks/no-incomplete-check-enumeration.py`,
+which fires on the decidable condition ---
+a terminal clean claim,
+a partial reading (`gh pr checks` or `statusCheckRollup`),
+and no complete enumeration since the last push.
 
-- **Do:** take a clean verdict from `check-pr-fully-clean.py` or a paginated `commits/<sha>/check-runs` read.
-- **Don't:** report a PR clean from `gh pr checks` counts, however current the reading is --- currency and completeness are different properties, and only one of them has a hook watching it.
+- **Do:** take a fully-clean verdict from `check-pr-fully-clean.py`.
+  A paginated `commits/<sha>/check-runs` read covers the check-run half only
+  (progress reports / criterion 1); it does not authorize a terminal claim.
+- **Don't:** report a PR clean from `gh pr checks` counts,
+  however current the reading is ---
+  currency and completeness are different properties,
+  and only one of them has a hook watching it.
+- **Don't:** treat GraphQL `statusCheckRollup` as enough for a terminal claim either
+  (ai-config#2277, 2026-08-26:
+  a "Ready for merge" claim rested on the rollup;
+  the rollup matched the endpoint 8==8;
+  `check-pr-fully-clean.py` exited 1 for missing automated review;
+  the hook now matches both partial surfaces).
 
 ## Criterion 2's verdict-vs-findings disagreement rate, measured
 
@@ -343,7 +360,8 @@ Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting revi
 
 ## The reviewer posting its own tool invocation instead of the review body
 
-(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+(`UCD-SERG/serocalculator#392`, 2026-07-25;
+filed as [`Morrison-Lab/gha#312`](https://github.com/Morrison-Lab/gha/issues/312), which proposes unwrapping the pattern before posting.)
 
 ## A false-positive injection-detector block that reproduces every round
 
@@ -446,7 +464,7 @@ agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
 Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
 and then failed
 `Command failed: git fetch origin --depth=20 pull/77/head:main`.
-`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`Morrison-Lab/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
 
@@ -763,6 +781,15 @@ Only reading the bodies separates them.
 The fix landed in `8cf34dce` and Claude's next round at that head returned
 `Ready for merge`, having re-verified both cited source facts itself.)
 
+Merging on Antigravity's LGTM while Claude's `Needs more work` still stood
+is forbidden either way: the standing not-clean vetoes merge, `mwc` included.
+On this PR the not-clean was last, so the old global-latest scan already
+failed it.
+The #2274 hole is the reverse order --- an earlier not-clean, then a later
+all-clear from a different reviewer --- which that scan missed.
+ARD the union, then request fresh reviews.
+`check-pr-fully-clean.py` now fails that per-reviewer split too.
+
 ## Three PRs reported clean by grepping the checker's own output
 
 (`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16.
@@ -996,6 +1023,53 @@ The admitted one bore no verdict because its verdict phrase sits inside a code s
 The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
 Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)
 
+## A driver-comment classifier drops a Copilot finding it has no guard for
+
+(Morrison-Lab/ai-config#2409 / #2429 / #2430, 2026-08-27.
+`check-pr-fully-clean.py`'s verdict scan, on branch `fix/2409-driver-comments`, added a driver-ledger classifier so that a driving session's own status comments --- claim wording, an ARD disposition table, a self-imposed hold like "Do not merge.
+Blocked on review of `<sha>`" --- would stop being admitted as standing reviewer verdicts, per #2409.
+The classifier matches broad English markers (`hold off`, `back off`, a markdown table row carrying `Disposition`) and then abstains from excluding a comment when the comment also carries one of three NEGATIVE guards: a `### Verdict` heading, a `Reviewed-Commit:` fingerprint, or a `**Claude finished` marker.
+
+Every one of those three guards is keyed on Claude's or Cursor's own report format.
+A Copilot review comment carrying a real, blocking finding phrased as "hold off on merging until the null check is added" emits none of that structure -- Copilot's report has no `### Verdict` heading, no `Reviewed-Commit:` line, and no `**Claude finished` marker.
+So the broad `hold off` marker matches, all three guards abstain, the comment is classified as a driver's own ledger, and it is dropped from the verdict scan before `classify_verdict()` ever sees it.
+The PR reports FULLY CLEAN with a genuine not-clean finding sitting unexamined on the thread.
+
+Reproduced by executing the classifier logic against `origin/main` directly (not read, not reasoned about): with the driver-ledger exclusion bypassed, the same Copilot comment correctly vetoes the PR.
+With it active, the comment is dropped and the checker exits 0.
+
+The general shape is [`fail-fast`](../principles/fail-fast.md)'s "Guarding an unsound pattern with a second pattern, rather than replacing it" and "A guard's discharge fires on positive success, not the absence of failure" sections, arrived at independently inside this one checker: negative guards defending an over-broad matcher inherit exactly the ambiguity the matcher already had, and they inherit it silently, because nobody tests a guard the way they eyeball a matcher's positive output.
+Inverting the gate was the obvious next move, and it was tried and refuted within hours.
+The candidate positive signature was the agent-disclosure marker, on the premise that every driver comment carries it per [`disclose-agent-authorship`](disclose-agent-authorship.md) and no reviewer report emits it.
+Neither half survives.
+The second fails outright: [`self-review-fallback`](self-review-fallback.md) requires a dispatched or cross-vendor review to be published verbatim WITH the marker appended, so a genuine not-clean review carries it as well, and a marker gate dropped that review exactly as the negative guards dropped Copilot's.
+The first is weaker than it reads, too: [`disclose-agent-authorship`](disclose-agent-authorship.md) exempts a comment posted under a genuine bot identity, so "every driver comment carries it" is a convention this corpus asks for rather than a property a gate can rely on.
+Both designs failed for one reason: every discriminator available in a comment body is one some real reviewer also emits, so no body-shape test can safely decide to DROP an item.
+
+A third design was then built and refuted in turn, which is what settles the shape of the answer.
+Executing `classify_verdict` over the #2341 comment's parts showed that neither the `Disposition` table nor the self-imposed hold produces a verdict at all.
+The sole not-clean signal was the header's parenthetical citation of the round being disposed of, ``Addressed GitHub Claude of `9508454e` (Needs more work)``.
+Both earlier classifiers had therefore been built to detect the parts that never mattered.
+So the third design stopped dropping anything and instead blanked that citation inside `strip_cited_finding_vocab`, gated on the sentence opening with an ARD disposition verb AND the parenthetical holding nothing but the verdict phrase.
+An adversarial round refuted it too: it blanked the live verdict in "Addressed the null-check nit in `9508454e` (Needs more work): the fix introduced a new NoneType dereference at foo.py:42", where the parenthetical IS this comment's verdict and the explanation sits outside the blanked span.
+
+**Nothing shipped in the checker.**
+All three designs were reverted, and `scripts/check-pr-fully-clean.py` is unchanged.
+The fix went to [`ard`](../../skills/ard/SKILL.md)'s summary-comment step instead, as #2448: a disposition comment backticks any verdict phrase it quotes, so the code-span rule #1202 already established neutralizes it.
+That adds no new fail-open surface to the instrument at all, and when an author forgets, the PR reads not-clean --- the recoverable direction, on their own PR.
+The guard that would catch a forgotten backtick at authoring time is #2443.
+
+A second, smaller finding rode along: the driver-ledger classifier's own guard-test fixtures were hand-written from what each guard reads, and both omitted the disclosure marker that the two REAL driver comments the fix was built from (GitHub comment ids 5430672892 and 5430978306 on ai-config#2341) both carry.
+Once a positive marker gate is added, a "this guard alone protects this fixture" test built that way passes through the new gate instead of through the guard it was named for, which is [`fixtures-are-not-evidence`](fixtures-are-not-evidence.md)'s "A regression fixture must contain something the bug would destroy" section one layer further in: the fixture is not too thin to reach the *bug*, it is too thin to reach the *guard*.
+A per-guard neutering/mutation harness --- disabling one guard branch at a time and confirming at least one test fails specifically because that branch is gone --- is what surfaces which test protects which guard, per [`algorithmatize-checks`](algorithmatize-checks.md)'s mutation-outcome catalogue.
+
+Neither finding was fixed in THIS session --- `scripts/check-pr-fully-clean.py` and its test file were owned by another session on `fix/2409-driver-comments` at the time, so both were filed as #2430.
+That session's work is where the refutations above come from.
+That convention shipped as #2448, which merged and closed #2409.
+The checker-side defect stays open as #2430, since the convention routes around it rather than fixing it.
+So the account above is of three designs refuted and one authoring convention adopted, not of a checker that was repaired.
+This documentation pass is tracked as #2429.)
+
 ## A review wake carried one finding out of five
 
 (`Morrison-Lab/gha#571`, 2026-08-21/22.
@@ -1040,3 +1114,155 @@ The second wake named the live head, and still arrived inside that window.
 What the wake's body says about its own scope is not reproduced here, because it lives only in that session's transcript and no later reader can check it.
 What is checkable is the pair of fields above: the event's `head_sha`, and a check-runs read on the PR's actual head.
 Compare the first, then run the second.)
+
+## A poller exited on an empty check list
+
+Measured 2026-08-26 on
+[wai#120](https://github.com/Morrison-Lab/wai/pull/120).
+
+A background poller watching the PR head reported:
+
+```
+wai#120 CHECKS COMPLETE after 30s
+--- reviews ---
+0
+```
+
+with no conclusion lines between the two headings, because the check-runs
+list was empty.
+The terminal condition was:
+
+```bash
+pend=$(gh api ".../check-runs" --jq '[.check_runs[]|select(.status!="completed")]|length')
+if [ "$pend" = "0" ]; then   # true before any check exists
+```
+
+Workflow runs for that head were created at `22:06:42Z`.
+The poller had exited at about `22:03:30Z`.
+It had been armed immediately after `git push`, while the PR was still a
+draft, and the checks were created by the later `ready_for_review`
+transition --- so it ran entirely inside a window where the head legitimately
+carried zero checks, and read that as completion.
+
+The corrected form asserts the population and prints what it examined:
+
+```bash
+[ "${total:-0}" -ge "$EXPECTED_MIN" ] && [ "$pend" = "0" ]
+```
+
+Re-armed that way, the same head reported its real state.
+
+The corrected poller then exposed a second hole in the same loop.
+Its per-tick trace was:
+
+```
+t=150s total=13 pending=1
+t=180s total=13 pending=1
+t=210s total=16 pending=2
+t=240s total=17 pending=2
+t=270s total=18 pending=1
+```
+
+The population is not fixed.
+It grew from 13 to 18 while the poll ran, as later workflows registered their
+checks.
+A non-empty-population guard therefore rules out the empty case and nothing
+else: had `pending` reached 0 at `t=180s`, the loop would have exited
+satisfied, with 13 checks examined and five not yet created.
+
+The guard that closes it is repetition rather than a larger threshold ---
+zero pending **and** an unchanged total across two consecutive polls.
+Printing the total each tick is what made the growth visible; a loop that
+reports only its exit condition cannot show it.
+
+## Required-checks arithmetic reported three PRs ready over a red review check
+
+(`ucdavis/bcs` #745/#746/#748, 2026-08-27.)
+
+The repository's review job was failing on every open PR at once, on a
+credential fault rather than on anything in any diff.
+Every other check passed, and the failing one was absent from the branch
+ruleset's `required_status_checks`, read off the API rather than assumed:
+
+```
+["docs-check","version-check / version-check","docs",
+ "ubuntu-latest (release)","macos-latest (release)","windows-latest (release)"]
+```
+
+From that list plus a green rollup for each required entry, three PRs were
+reported ready to merge.
+Rule 1 of [`fully-clean.md`](fully-clean.md) already says "not just the
+required checks", so nothing new had to be learned for this to have been
+avoided.
+
+What the arithmetic establishes is that **branch protection would permit the
+merge**, which is a fact about the forge's gate rather than about the PR.
+The requiredness list is a live, quotable API artifact, so deriving the wrong
+answer from it arrives with evidence attached --- which is what separates this
+from an eyeballed "looks green".
+[`memories/gh-cli.md`](../../memories/gh-cli.md) records the inverse error on
+the same repository, a red check wrongly *dismissed* as non-required; the two
+are the same conflation run in opposite directions.
+
+`scripts/check-pr-fully-clean.py` settles it, exiting 1 on all three.
+
+**The second finding then changed wording as the PR state changed, and the
+change is the instructive part.**
+
+Before any fallback review was *admitted*, the script reported:
+
+```
+  - No review comment has been posted evaluating HEAD SHA a72741ec yet
+```
+
+A fallback review existed when that printed, and it quoted the commit
+correctly --- the matcher tests `sha[:7]`, so a default `git --short`
+abbreviation matches.
+It was never admitted: `_reviewer_identity()` reads only the **first and last
+non-blank line**, that comment opened with a `## Self-review fallback`
+heading of its own, and a marker buried below the first line resolves to the
+poster's login rather than to an agent.
+An unadmitted comment cannot become a matching item whatever SHA it carries,
+so the finding reads *nothing was posted* when the truth is *what you posted
+did not count*.
+
+A later fallback opened with the marker and was admitted.
+The finding then became a different branch (headers elided):
+
+```
+  verdict scan: examined 2 dated automated review item(s), 0 bore a verdict, latest = NONE
+...
+  - NOTE: Review from Claude (2026-08-27T09:15:56Z) has a format the verdict classifier cannot read -- not treated as 'no review'
+...
+  - No valid clean review found for HEAD SHA a72741ec.
+```
+
+The tempting reading of that second state is that a self-review posted under
+the author's own login was filtered out for being the author's.
+That is wrong, and checking rather than assuming is what shows it: this
+comment *was* admitted and was quorum-eligible, because the admission test
+accepts an `OWNER` or `MEMBER` comment whose first or last line resolves to
+an agent, and these were `MEMBER` comments opening with the agent's marker.
+
+It failed on **format**.
+`classify_verdict()` reads `Verdict: Clean` on one line and returns
+`unreadable` for a `### Verdict` heading whose word sits on the next ---
+`unreadable` rather than empty, and that distinction is what produces the
+`NOTE:` line at all.
+The same split heading without a marker returns nothing and prints no note.
+
+So the outage was real, and on top of it every fallback verdict written to
+stand in for the bot failed one of two silent gates.
+The only sign was a `NOTE:` line the script emits **non-blocking by
+design**.
+
+[`self-review-fallback.md`](self-review-fallback.md) carries the three
+requirements as rules.
+
+Reposting the same verdicts in the parsed form settled it: the scan went from
+`0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean; per-reviewer: Claude=clean`, and the
+`No valid clean review found` finding cleared on every PR, leaving only the
+red review check the outage itself causes.
+Nothing about any review changed --- only a colon and a line break --- which
+is the measure of how quietly this fails.

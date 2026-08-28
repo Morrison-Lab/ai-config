@@ -5,7 +5,7 @@ topically; this stays a separate satellite file for two consumer-side
 findings rather than a merge into that file.
 Both were hit migrating a hand-rolled
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
-`Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).
+`Morrison-Lab/gha`'s reusable versions (`Morrison-Lab/qwt#135`).
 
 ## A permissions-mismatch startup_failure is invisible outside a browser
 
@@ -18,8 +18,8 @@ under-permissioned job is `if:`-skipped, and the sibling trap where an
 rather than inheriting anything -- both ending in the same "copy the
 `permissions:` block from the matching `examples/<name>.yml` verbatim"
 remedy this file would otherwise just repeat. Hit the identical shape again
-migrating `d-morrison/qwt`'s `claude-code-review.yml` caller (`issues: read`
-where the nested `claude-review` job needs `issues: write`; `d-morrison/qwt#135`),
+migrating `Morrison-Lab/qwt`'s `claude-code-review.yml` caller (`issues: read`
+where the nested `claude-review` job needs `issues: write`; `Morrison-Lab/qwt#135`),
 and confirmed a gap that section doesn't cover: **how you actually see the
 error.**
 
@@ -50,7 +50,7 @@ completes with `startup_failure` and an empty `jobs` array.
   `get_check_runs` or `get_job_logs`. `WebFetch` on the run's `html_url`
   reliably surfaced the Annotations text verbatim -- "The nested job
   'claude-review' is requesting 'actions: read', but is only allowed
-  'actions: none'." -- confirming this isn't `d-morrison/qwt`-specific and
+  'actions: none'." -- confirming this isn't `Morrison-Lab/qwt`-specific and
   that a plain `WebFetch` (not just a dedicated `get_page_text` browser
   tool) is sufficient to read it. (Morrison-Lab/psw#43/#44, 2026-08-10.)
   This exact `actions: read` gap -- same four granted permissions, same
@@ -58,9 +58,45 @@ completes with `startup_failure` and an empty `jobs` array.
   in `ai-config` itself rather than a downstream consumer
   ([`github-actions.md`](github-actions.md), ai-config#224).
   So this is the third occurrence, not the second, and "not
-  `d-morrison/qwt`-specific" above undersells it -- the gap recurs
+  `Morrison-Lab/qwt`-specific" above undersells it -- the gap recurs
   independently of which repo is calling `Morrison-Lab/gha`, ai-config's
   own repo included.
+
+## A mention-triggered caller's startup_failure is invisible to everything, not just to the CLI
+
+The section above answers "how do I read this error".
+This answers the prior question nobody asks, because on every case recorded above somebody was already looking: a red check on a PR sent them there.
+
+A `startup_failure` creates zero jobs and therefore zero check runs.
+On a `pull_request`-triggered caller that still surfaces, since the PR's check list is short one expected entry and the run sits at the top of `gh run list`.
+On a caller triggered by `issue_comment`, `issues`, `pull_request_review`, or `pull_request_review_comment` --- which is every `claude.yml` stub --- it surfaces nowhere.
+There is no PR to be short an entry, no check run to go red, and no notification.
+The agent simply never answers, which is indistinguishable from quota, from a trusted-author gate declining, or from nobody having mentioned it.
+
+Measured 2026-08-27 on `UCD-SERG/shigella`: nine consecutive `Claude Code` runs concluded `startup_failure` between 2026-08-24 11:42 and 2026-08-27 18:20 Pacific, and the first anyone knew of it was a run URL pasted into a session by hand.
+The cause was the `ANTHROPIC_API_KEY`-at-`@v1` secret mismatch [`gha-reusable-workflows.md`](gha-reusable-workflows.md) already records --- so the corpus could diagnose it in one read, and nothing in the corpus was going to make anyone look.
+
+Worse, the interim change read as a fix.
+The consumer repointed both callers from `d-morrison/gha` to `Morrison-Lab/gha` during those three days, which is a real improvement and left the tag pin untouched, so the tenth failure looked exactly like the first.
+
+The check is one command, and it belongs immediately after merging any PR that touches a mention-triggered caller:
+
+```bash
+gh run list -R <owner>/<repo> --workflow claude.yml --limit 5 \
+  --json databaseId,conclusion,createdAt \
+  --jq '.[] | "\(.databaseId) \(.conclusion) \(.createdAt)"'
+```
+
+A column of `startup_failure` is the whole diagnosis.
+Diff the caller's `secrets:` and `with:` keys against the callee **at the pinned tag** from there --- cheaper than the Annotations-panel route above, and sufficient for the secret and input cases.
+
+- **Do:** list the workflow's own recent runs after merging a change to a mention-triggered caller, since no check list will report it.
+- **Do:** read a silent agent as a possible `startup_failure` rather than as quota or a gate.
+- **Don't:** treat repointing an owner, sliding a tag, or any other improvement to the caller as evidence the caller now starts --- only a green run is.
+- **Don't:** expect `gh pr checks`, a PR's check list, or a notification to carry this;
+  all three are structurally blind to it.
+
+(Tracked as [ai-config#2473](https://github.com/Morrison-Lab/ai-config/issues/2473).)
 
 ## A caller-level `concurrency:` group with the same name as a nested job's own group deadlocks the run
 

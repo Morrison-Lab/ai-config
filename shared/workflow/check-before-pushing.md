@@ -78,7 +78,7 @@ Use both, always:
 git push --force-with-lease --force-if-includes
 ```
 
-**The `stale info` failure is not a reason to force, and reaching for one there is the specific reflex [`memories/git.md`](../../memories/git.md) exists to stop.**
+**The `stale info` failure is not a reason to force, and reaching for one there is the specific reflex [`memories/git-branches.md`](../../memories/git-branches.md) exists to stop.**
 After a squash-merge with auto-delete removes the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race with another session.
 It is not one, and that file says so in as many words: the lease is unsatisfiable rather than violated, "`--force` is unnecessary, and there is nothing to race".
 One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch.

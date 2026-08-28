@@ -1,5 +1,18 @@
 # Local tools & CLIs
 
+## Available subscriptions & model providers
+
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active
+subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
+OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+than duplicating the table here.
+That includes the OpenRouter activation mechanics
+(the `~/.config/opencode/opencode.jsonc` provider entry
+and the `OPENROUTER_API_KEY` variable) ---
+see delegation.md's bolded "A fourth destination" passage, not a copy here.
+One fact specific to this machine's configuration, not covered there:
+- Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
+
 ## Cursor
 
 See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior
@@ -24,7 +37,8 @@ codex plugin add <plugin>@<new-name> --json
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
 This sequence preserves the source repository while replacing only its stale local registration.
 
-(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
+(2026-08-08: `Morrison-Lab/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`;
+`upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
 
 ## Julia in Claude Code cloud / web sessions
 - To install Julia, prefer downloading the official binary tarball from
@@ -154,6 +168,22 @@ It passed every check and garbled on GitHub; the reviewer traced the delimiter
 matching and supplied a verified double-backtick fix, applied as `4b30781`.
 The irony that the example *about* a backtick pitfall hit a different backtick
 pitfall is the reason it is worth its own entry.)
+
+**The consumption-side mirror: a regex that blanks "code spans" to strip cited text needs to match a run of N backticks closed by a run of exactly N, not just a single pair.**
+Everything above is the authoring rule --- widen the delimiter when the quoted text contains a backtick.
+A classifier reading that same span back has the opposite failure mode: a naive single-backtick-pair pattern matches the *inner* pair inside a correctly-authored double-backtick span and leaves the *outer* content exposed, rather than failing to parse it.
+A double-backticked citation of a phrase that itself contains a backtick --- the CommonMark-correct form once the quoted text needs one --- blanks only the inner pair under that pattern, so the cited phrase's own vocabulary stays live in the stripped output.
+This is the general form: "wrap it in backticks" is under-specified guidance for a tool author unless it also says which delimiter run the consuming regex actually handles, because the multi-backtick form is not an edge case --- CommonMark makes it mandatory the moment the quoted text contains a backtick, which is routine when quoting code, SHAs, or another code span.
+
+- **Do:** state which backtick-run length a code-span-matching regex accepts when documenting a "wrap it in backticks" convention for something a tool will parse.
+- **Do:** match a pattern like ``(`+)(?:(?!\1).)*?\1`` (longest run first) rather than a fixed single-backtick pattern, when the regex must handle CommonMark's full code span grammar.
+- **Don't:** assume a single-backtick-pair regex handles every code span a human author might write --- CommonMark requires the wider form whenever the quoted text contains a backtick.
+
+(ai-config#2449, 2026-08-27: `strip_cited_finding_vocab` in `scripts/check-pr-fully-clean.py` blanked only single-backtick spans;
+a reviewer's correctly double-backticked citation of a SHA left a not-clean-looking phrase live in the stripped text, and a clean `Ready for merge` verdict read as NOT clean.
+Fail-safe direction --- it under-blanks rather than over-blanks --- but it still cost a full round to diagnose.
+Fix tracked in that issue rather than applied here;
+this entry is the transferable authoring lesson, not the checker patch.)
 
 ## Office Open XML (.docx / .xlsx) — editing committed content
 - `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive
@@ -387,34 +417,38 @@ On a Windows console defaulting to cp1252, a Python script that prints a Unicode
 UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
 ```
 
-Two of this repo's checks do exactly that, and `PYTHONIOENCODING=utf-8` fixes both:
+`PYTHONIOENCODING=utf-8` is a caller-side workaround for scripts that still print the glyph:
 
 ```sh
 PYTHONIOENCODING=utf-8 python3 scripts/check-links.py
 PYTHONIOENCODING=utf-8 python3 scripts/check-vendored-drift.py
 ```
 
-**The failure lands on the success path, which is what makes it worth a note rather than a shrug.**
-Both scripts print their check mark only after finding nothing wrong, so the crash happens *because* the check passed.
-The script exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
+**The failure lands on the success path, which is what makes it a broken check rather than a verdict.**
+The script prints the check mark only after finding nothing wrong, so the crash happens *because* the check passed.
+The process exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
 Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links across 463 markdown files.`, then died on `print("\u2713 no broken relative links")` with rc=1.
-Under `PYTHONIOENCODING=utf-8` the same invocation printed the check mark and exited 0.
-`check-vendored-drift.py` behaves identically.
+The same shape was still present on `scripts/check-hook-output-shape.py` as of 2026-08-26 (ai-config#2038): an all-green run under `PYTHONIOENCODING=cp1252` exited 1 on the success line.
 
-The corpus already learned this once and never wrote it down: `scripts/validate-skills.py` opens `main()` with `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`, while `scripts/check-pr-fully-clean.py` prints a bare `\u2713` with no such guard.
-Setting the environment variable is the portable way to cover every script at once without touching any of them.
+The per-script fix is ASCII on that line (`OK: ...`), matching [`ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
+`sys.stdout.reconfigure(encoding="utf-8", errors="replace")` is a second option some scripts already use (`validate-skills.py`, `check-links.py` since #2169);
+it still depends on the stream supporting `reconfigure`.
+ASCII cannot fail the encoding.
+Issue [#2080](https://github.com/Morrison-Lab/ai-config/issues/2080) tracks the remaining `check-links.py` glyph (ballot-X on the failure path, check mark on success).
 
 Distinct from the `LC_ALL=C.UTF-8` material in [`fail-fast`](../shared/principles/fail-fast.md) and `memories/debugging.md`, which is an **input**-side problem --- `grep -P` failing to *match* a non-ASCII pattern under a non-UTF-8 locale.
 This one is **output**-side, in the interpreter, on a string the script already holds.
 Different layer, different fix; do not reach for one when you have the other.
 
-- **Do:** set `PYTHONIOENCODING=utf-8` when running a repo Python check from a Windows shell.
+- **Do:** print ASCII on a script's own success or failure line, so a cp1252 stdout cannot turn a green run into exit 1 (ai-config#2038).
+- **Do:** set `PYTHONIOENCODING=utf-8` when running a remaining glyph-printing check from a Windows shell.
 - **Do:** read the traceback's last line before believing a red check --- a `UnicodeEncodeError` on a `print` says nothing about what the check found.
 - **Don't:** treat a nonzero exit from these scripts as a finding, or start hunting for the broken link or the drifted vendored file it never reported.
-- **Don't:** "fix" it by deleting the check mark from the script.
-  The glyph is fine everywhere else, and the environment variable is the portable remedy.
+- **Don't:** leave a Unicode check mark on a success `print` and rely on the caller to set `PYTHONIOENCODING` --- that is a workaround, not a fix.
 
-(2026-08-06, verified both ways on this machine while running the pre-push checks for `Morrison-Lab/ai-config#1224`.)
+(2026-08-06, verified both ways while running the pre-push checks for `Morrison-Lab/ai-config#1224`.
+ASCII-on-the-success-line adopted 2026-08-26 for #2038;
+the 2026-08-06 wording had treated deleting the glyph as the wrong fix.)
 
 opencode's Bash tool on this box has its own failure mode and workaround;
 see [`opencode-bash-windows.md`](opencode-bash-windows.md).
@@ -450,7 +484,7 @@ preview is still worth reading before passing `--write`.
 
 The contrast that motivated the fix: its CI counterpart,
 `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+[`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha), was diff-scoped by
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
 
@@ -804,6 +838,15 @@ For semantic line breaks that is
 Reaching for a hand-rolled substitute when a real one is one path away is the
 error underneath whatever the regex got wrong, per
 [`deterministic-tools`](../shared/principles/deterministic-tools.md).
+
+**Run it only against committed state --- it is diff-scoped against `<base>...HEAD`.**
+The false-clean-on-an-uncommitted-tree trap and its commit-first remedy are already recorded twice:
+in [`memories/git-diffing.md`](git-diffing.md)'s `check-new-line-breaks` entry,
+and in [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s dirty-tree section,
+which carries the precise mechanism (line numbers from `<base>...HEAD`, line content from the working tree),
+the occurrence record,
+and the tracked guard (ai-config#2382).
+This pointer is deliberately not a third statement of the rule.
 
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**

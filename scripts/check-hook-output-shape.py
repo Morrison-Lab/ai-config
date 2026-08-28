@@ -50,10 +50,11 @@ def parse_string_constants(source_code: str) -> tuple[set[str], str | None]:
 
     strings = set()
     for node in ast.walk(tree):
+        # ast.Constant covers string literals on Python 3.8+.
+        # ast.Str was deprecated in 3.8 and removed in 3.14; visiting it
+        # emits DeprecationWarning on 3.12/3.13 (ai-config#2038).
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             strings.add(node.value)
-        elif hasattr(ast, "Str") and isinstance(node, getattr(ast, "Str")):
-            strings.add(node.s)
     return strings, None
 
 
@@ -194,7 +195,7 @@ def main() -> int:
         return CHECK_FAIL_EXIT
 
     print(
-        f"✓ Checked {len(registered)} registered hook(s) and their test suites: "
+        f"OK: Checked {len(registered)} registered hook(s) and their test suites: "
         "all warn-only hooks emit systemMessage and tests inspect payload shape."
     )
     return SUCCESS_EXIT

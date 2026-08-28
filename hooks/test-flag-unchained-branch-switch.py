@@ -143,7 +143,7 @@ with open(HOOK, encoding="utf-8") as handle:
 
 def verdict(hook_path, payload):
     proc = subprocess.run(
-        ["python3", hook_path],
+        [sys.executable, hook_path],
         input=json.dumps(payload),
         capture_output=True, text=True,
     )

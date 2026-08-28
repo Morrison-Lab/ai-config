@@ -325,7 +325,7 @@ PR merged (`gh pr list --head <branch> --state merged`) before `git branch -D`.
 so a `-D` here is far less consequential than it looks: GitHub retains
 `refs/pull/N/head` permanently, and it still resolves once the branch is gone
 (`git fetch origin refs/pull/<N>/head`).
-See `memories/git.md`, "GitHub keeps `refs/pull/N/head` forever".
+See `memories/git-branches.md`, "GitHub keeps `refs/pull/N/head` forever".
 The exception is the one that matters --- a branch **never pushed** has no such
 ref, which is why an unpushed worktree branch still needs confirmation.
 

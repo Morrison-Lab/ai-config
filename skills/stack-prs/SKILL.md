@@ -170,7 +170,7 @@ branch.
 **Do not rely on it.**
 In practice `gh pr merge <base-N> --delete-branch` can **close** the dependent
 PR instead of retargeting it, which
-[`memories/git.md`](../../memories/git.md) records from a separate incident a
+[`memories/git-branches.md`](../../memories/git-branches.md) records from a separate incident a
 month earlier.
 So run `gh pr list --base <base-branch>` before merging, and omit
 `--delete-branch` whenever it returns anything.

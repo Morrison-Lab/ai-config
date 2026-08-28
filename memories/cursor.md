@@ -42,6 +42,9 @@ hid it, and work continued on the main checkout.)
 
 ## Cursor plugin, `~/.cursor/skills`, and `~/.claude/skills` are alternatives
 
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer links `~/.claude/skills`, `~/.cursor/skills`, or `~/.cursor/rules` at all --- the Cursor plugin is now the only supported route for Cursor.
+Read the rest of this section as describing a machine installed before that change.
+
 A live Cursor plugin (`~/.cursor/plugins/local/ai-config` or
 `~/.cursor/plugins/cache/<org>/ai-config`) **or** `~/.claude/skills`
 already serving this repo is a skip, not a second install.
@@ -107,15 +110,17 @@ The dispatch this corpus requires is foreground
 Measured 2026-08-25 PDT on a Cursor Cloud Grok conductor in this repo:
 that conductor's `Task` schema listed `run_in_background`
 and did not list `isolation`.
-`flag-unassigned-worktree.py` emits a warning on every such dispatch
-because the Cursor adapter maps `Task` to `Agent`
+The Cursor adapter maps `Task` to `Agent`
 when `subagent_type` is not explore/plan/shell
 ([`.cursor/hooks/adapt-claude-hooks.py`](../.cursor/hooks/adapt-claude-hooks.py)),
-and [`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py)'s
-`READ_ONLY` set is Explore/Plan.
-Deciding the child needs no worktree is fine;
-the schema has no `isolation` field to mark that decision.
-Tracked as [#2276](https://github.com/Morrison-Lab/ai-config/issues/2276).
+and the schema has no `isolation` field to mark
+a deliberate no-worktree decision.
+[`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py)'s
+`READ_ONLY` set now includes `adversarial-reviewer`
+(ai-config#2276), so a self-review dispatch no longer warns;
+other write-capable `Task` dispatches still do,
+and deciding such a child needs no worktree is fine ---
+the warning is the unmarkable decision's cost on this route.
 
 Commit first.
 A review of uncommitted work names a commit that does not exist yet
@@ -139,6 +144,14 @@ cursor-cloud `batch-fetch-details`
 with `bcIds: [<cloudAgentBcId>]` and `includeTranscripts: true`.
 That transcript is the admissible source for `parse_report()`
 and the HEAD fingerprint check.
+`scripts/cursor-self-review-check.py` is the interim instrument for
+both halves --- `verdict --transcript <file> --expect-head <sha>` runs
+the messages-list decode, the role filter, the heading check, and
+`parse_report()` with the fingerprint comparison, and
+`gates --recorded-head <sha> --recorded-branch <name> -C <checkout>`
+runs the git-decidable refusal gates below --- so none of it is
+re-derived by hand (ai-config#2299, #2310; retired when #2241 restores
+the hook).
 The dry-run tip check and the source-ref check take no input
 from the transcript:
 they come from the same-argv
@@ -176,6 +189,17 @@ without filtering `role == assistant`
 grades the brief when the child produced no report.
 A decoder that skips a later non-empty assistant text
 grades a draft when the child errored after quoting the shape.
+A last assistant message that restates the brief's required shape
+(a plan or an apology that reproduces those four headings)
+is not a report; refuse it.
+The role filter does not exclude it.
+The heading check still passes.
+`parse_report`'s fingerprint regex refuses a placeholder
+(`REVIEWED_COMMIT` requires 7-40 hex characters,
+so a literal placeholder yields no fingerprint and gate 3 refuses).
+A restatement that already carries a real HEAD-matching sha
+is not closed by that regex
+([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).
 The recovered transcript file is the instrument.
 A decoder reads `transcript.json` whose path contains
 the `cloudAgentBcId`, writes that last non-empty assistant `text`
@@ -390,10 +414,9 @@ Settings existing is not the measurement that it fired.
 The prefix stays inert for the adapter either way.
 On a desktop session, do not pair the project adapter
 with native Claude hooks (leave one path enabled).
-On Cursor Cloud both can be present:
-the adapter skip is the Cursor path,
-and a native deny of the unprefixed push is the
-observable that the native runner fired.
+On Cursor Cloud, do not treat
+both-present as a Cloud defect to clear by deleting settings
+until the native runner's firing is measured.
 
 If Claude Code's native guard is also running ---
 desktop third-party Claude hooks, or a Claude Code process on the
@@ -424,7 +447,7 @@ This is a Read-Do checklist.
 Item 1's pre-dispatch recording must precede the dispatch,
 or item 4 has nothing to compare against.
 Gate 3 consumes the tuple gate 2 produces.
-Reordering 5 with 6 does not change the answer.
+Item 6 consumes the dry-run output item 5 produces.
 Details in the procedure above.
 Pause points:
 before the `Task` dispatch (item 1's first half),
@@ -463,6 +486,11 @@ Say in the reply that the carve-out was used.
    A real report from the wrong dispatch also fails this gate.
    Skipping a later non-empty assistant text
    to reach an earlier matching one also fails this gate.
+   A last assistant message that restates the brief's
+   required shape is not a report; refuse it.
+   The heading check and `parse_report` do not refuse a
+   restatement that already carries a real HEAD-matching sha
+   ([#2343](https://github.com/Morrison-Lab/ai-config/issues/2343)).
    Carve-out: skip (no report to parse;
    do not refuse for lack of a verdict).
 3. Confirm the verdict is `clean` and the fingerprint
@@ -578,8 +606,10 @@ is the instruction to use this route.
   `no-push-without-self-review` deny of the unprefixed push.
   On a desktop session, do not pair the project adapter
   with native Claude hooks.
-  On Cursor Cloud both can be present
-  (see the pairing rule in the procedure above).
+  On Cursor Cloud, do not treat adapter plus
+  `~/.claude/settings.json` as a Cloud defect
+  to clear by deleting that settings file
+  until the native runner's firing is measured.
   If the dispatch errored, produced no report,
   or produced a report whose fingerprint cannot be recovered
   (including a stale-registered persona),
@@ -726,4 +756,17 @@ leading to silent timeouts in automated tools.
 Do not remove this flag in the name of tighter sandboxing for automated review scripts.
 
 (Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
+
+## Auto-review push blocks are not a stop
+
+Cursor Auto-review may refuse `git push` / `gh pr comment` until a smart-mode
+approval card is shown.
+That is a client gate, not a missing user grant.
+Standing permission already covers push and PR updates
+(`AGENTS.md` "Default to action"; preferences "always push and PR").
+
+- **Do:** retry the push/comment with the approval path the client requires,
+  or ask once for that card when the harness cannot show it --- then push.
+- **Don't:** end the turn with commits ahead of origin and
+  "say if you want those pushed" (ai-config#2277, 2026-08-26).
 

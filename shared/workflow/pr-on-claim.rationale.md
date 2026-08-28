@@ -99,7 +99,7 @@ It is not proportionate here, because the thing this new hook would prevent is a
 A repository ruleset can carry a `copilot_code_review` rule with
 `review_on_push: true` (and optionally `review_draft_pull_requests: true`),
 which re-requests Copilot on every push with no explicit request from anyone
---- see [`memories/github.md`](../../memories/github.md)'s "Required checks are
+--- see [`memories/gh-cli.md`](../../memories/gh-cli.md)'s "Required checks are
 not the only thing a ruleset carries" section for how to read that off a
 repo's rulesets.
 When that applies, an explicit request lands while Copilot is already a
@@ -146,8 +146,8 @@ An empty pending list hands it to nobody, because it has established nothing eit
 Note also that a refusal body is itself proof the request **arrived**, which is the cleanest available disproof of "blocked".
 
 Read the ruleset anyway --- it is one cheap call, and on a repo that does carry the rule it explains the disappearance outright --- but read it for what it can actually tell you.
-`ucdavis/bcs` is the known example, per [`memories/github.md`](../../memories/github.md): ruleset `19248641` returns `{"review_on_push":true,"review_draft_pull_requests":true}`.
-The effective-rules endpoint covers organization-level rulesets alongside the repository's own, in a single call, which the per-ruleset loop in [`memories/github.md`](../../memories/github.md) does not (that file's own note on org-level rulesets says why):
+`ucdavis/bcs` is the known example, per [`memories/gh-cli.md`](../../memories/gh-cli.md): ruleset `19248641` returns `{"review_on_push":true,"review_draft_pull_requests":true}`.
+The effective-rules endpoint covers organization-level rulesets alongside the repository's own, in a single call, which the per-ruleset loop in [`memories/gh-cli.md`](../../memories/gh-cli.md) does not (that file's own note on org-level rulesets says why):
 
 ```bash
 gh api "repos/<owner>/<repo>/rules/branches/<branch>" \
@@ -335,8 +335,8 @@ grep -nE 'draft|if:' /tmp/rw/.github/workflows/<called-workflow>.yml
 ```
 
 An out-of-scope repo still clones, since the git proxy serves anonymous public
-reads --- see [`memories/github.md`](../../memories/github.md)'s ladder, which
-covers the same fallback for ref lookups.
+reads --- see [`memories/github-remote-sessions.md`](../../memories/github-remote-sessions.md)'s
+ladder, which covers the same fallback for ref lookups.
 
 **Working several issues in one session? Verify you actually switched branches
 before writing the second issue's code.** The `git checkout -b <type>/<slug>

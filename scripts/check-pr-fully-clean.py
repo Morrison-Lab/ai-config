@@ -37,6 +37,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
@@ -1128,9 +1129,74 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     return None
 
 
+_LEDGER_HOLD_PHRASE = re.compile(
+    r"(?i)\bblocked on review of\b|\bdo not merge\b")
+_LEDGER_TABLE_ROW = re.compile(r"(?im)^\|.*\bDisposition\b.*\|\s*$")
+_CLAIM_TTL = timedelta(hours=2)
+
+
+def _is_expired_driver_ledger(
+    body: str,
+    author: str,
+    when: str,
+    last_seen_by_author: Dict[str, str],
+    now: Optional[datetime] = None,
+) -> bool:
+    """True for a dead driving session's status ledger, never for a review.
+
+    A pre-#2448 driver-session disposition comment ("Do not merge. Blocked
+    on review of <sha>" plus a Disposition table) posted under an
+    exclusive-login bot stands as that reviewer's latest not-clean verdict
+    forever, because only the same login can supersede it and the session
+    behind it is gone -- the undischargeable state ai-config#2482 records,
+    which blocked #2341 outright. Per #2430's fail-open analysis, the gate
+    is a POSITIVE signature of the ledger class, all parts required:
+
+      1. an EXCLUSIVE_BOT_IDENTITY author (a driving session's own login;
+         shared logins never qualify),
+      2. a markdown table with a Disposition column (the ARD ledger shape),
+      3. a hold phrase ("Blocked on review of" / "Do not merge"),
+      4. and the login's claim has EXPIRED per claim-pr's 2-hour rule:
+         no item from that login on the thread within the last 2 hours.
+
+    A real review carries none of 2-3, and a LIVE driving session fails 4,
+    so anything short of the full signature stays a verdict -- admitting a
+    comment is the recoverable direction, dropping one is not.
+
+    Accepted residual: Cursor's driving persona and its Bugbot reviewer
+    share one login, so a genuine review that VERBATIM restates a ledger
+    (Disposition table plus hold phrase) from a session idle >2h would be
+    excluded too. No such review has been observed -- the shapes differ
+    by construction -- so the residual is carried as documented risk
+    rather than mitigated. (The caller's commit-activity fold addresses
+    the separate problem of an ACTIVE driver appearing idle; it cannot
+    help here, since a reviewer never pushes.)
+    """
+    login = str(author or "").lower()
+    if login not in EXCLUSIVE_BOT_IDENTITY:
+        return False
+    if not _LEDGER_TABLE_ROW.search(body or ""):
+        return False
+    if not _LEDGER_HOLD_PHRASE.search(body or ""):
+        return False
+    last = last_seen_by_author.get(login, when)
+    try:
+        last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+        if last_dt.tzinfo is None:
+            # A parseable but zone-naive timestamp would raise TypeError
+            # against the aware `now`; read it as UTC instead of crashing.
+            last_dt = last_dt.replace(tzinfo=timezone.utc)
+        now = now or datetime.now(timezone.utc)
+        return (now - last_dt) > _CLAIM_TTL
+    except (ValueError, TypeError):
+        # An unreadable timestamp fails toward keeping the verdict.
+        return False
+
+
 def check_latest_verdict(
     all_items: List[tuple],
     approved_authors: Optional[set] = None,
+    commit_activity: Optional[Dict[str, str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -1175,12 +1241,33 @@ def check_latest_verdict(
     n_with_verdict = 0
     unreadable_items = []
     per_reviewer: Dict[str, Tuple[str, str, str]] = {}
+    # Latest activity per author, for the expired-ledger test (#2482):
+    # a login active on the thread within the claim TTL is a live driver.
+    # Comment/review items AND commit authorship both count -- claim-pr's
+    # rule is push-or-comment, and a driver mid-implementation may push
+    # for hours without posting (review finding, 2026-08-28).
+    last_seen_by_author: Dict[str, str] = {}
+    for item in dated:
+        author = str(item[5] if len(item) > 5 else "").lower()
+        if author and item[1] > last_seen_by_author.get(author, ""):
+            last_seen_by_author[author] = item[1]
+    for login, when_c in (commit_activity or {}).items():
+        login = login.lower()
+        if when_c > last_seen_by_author.get(login, ""):
+            last_seen_by_author[login] = when_c
+
+    expired_ledgers = []
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
         verdict = classify_verdict(body, state)
         identity = _reviewer_identity(body, author)
         finding_pat = _unresolved_finding_pattern(body)
+        if (verdict == "not-clean" or finding_pat) and \
+                _is_expired_driver_ledger(
+                    body, author, when, last_seen_by_author):
+            expired_ledgers.append((when, identity))
+            continue
         # Findings win over unreadable: a known-agent body with ## Nits and no
         # classifiable verdict line is a standing not-clean, not a NOTE.
         if verdict == "not-clean" or finding_pat:
@@ -1208,6 +1295,12 @@ def check_latest_verdict(
         f"{per_suffix}"
     )
 
+    ledger_notes = [
+        f"NOTE: expired driver ledger from {identity} ({when}) excluded "
+        "from the verdict scan (ai-config#2482); its findings were "
+        "dispositioned in that comment itself"
+        for when, identity in expired_ledgers
+    ]
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
@@ -1215,7 +1308,7 @@ def check_latest_verdict(
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"
-        ]
+        ] + ledger_notes
 
     # Global latest is clean (or NONE), but another reviewer's latest may
     # still be not-clean -- the #2274 hole: a later all-clear from a
@@ -1243,6 +1336,7 @@ def check_latest_verdict(
             f"NOTE: Review from {agent} ({when}) has a format the verdict "
             "classifier cannot read -- not treated as 'no review'"
         )
+    issues.extend(ledger_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -1269,6 +1363,31 @@ def _is_structured_review_body(body: str) -> bool:
         return False
     return bool(re.search(
         r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
+
+
+def _commit_activity(pr) -> Dict[str, str]:
+    """Latest committedDate per author login (and lowercased author name).
+
+    Names are included beside logins because a bot session's commits can
+    carry an author name ("Cursor Agent") whose login differs from the
+    comment-posting one; counting either as activity errs toward keeping
+    a driver's hold standing, the safe direction.
+    """
+    activity: Dict[str, str] = {}
+    for commit in (getattr(pr, "_data", {}) or {}).get("commits") or []:
+        when = commit.get("committedDate") or ""
+        for a in commit.get("authors") or []:
+            for key in (a.get("login") or "", a.get("name") or ""):
+                key = key.lower()
+                if key and when > activity.get(key, ""):
+                    activity[key] = when
+    # An exclusive login also matches by substring of the author NAME
+    # ("cursor" in "cursor agent"), so a rename cannot hide the activity.
+    for login in EXCLUSIVE_BOT_IDENTITY:
+        for key, when in list(activity.items()):
+            if login in key and when > activity.get(login, ""):
+                activity[login] = when
+    return activity
 
 
 def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
@@ -1384,6 +1503,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             author for author, state in author_latest_state.items()
             if state == "APPROVED"
         },
+        commit_activity=_commit_activity(pr),
     )
     issues.extend(verdict_issues)
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: `git reset --hard` about to discard tracked, uncommitted
-work that has nothing to do with the reset itself.
+"""PreToolUse guard: `git reset --hard`, `git checkout <path>`, or
+`git restore <path>` about to discard tracked, uncommitted work that has
+nothing to do with the command itself.
 
 ## The incident
 
@@ -45,25 +46,51 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
 ## The match condition
 
   M1  the tool is `Bash` and `tool_input.command` parses into simple commands
-  M2  one of those simple commands is `git reset`, after skipping leading
-      env-var assignments and lead words (`sudo`, `time`, `command`, `exec`,
-      `nohup`, `env`, `!`)
-  M3  its arguments include the literal token `--hard` (a boolean flag; git
-      accepts no `<ref>` pathspec form together with `--hard` at all, so no
-      scoping logic is needed -- a `--hard` reset always targets the whole
-      tracked working tree)
-  M4  `git status --porcelain` reports at least one entry that is NOT
-      untracked (`??`) -- i.e. at least one tracked file has a staged or
-      unstaged change relative to HEAD, which `--hard` will discard
-      regardless of which ref it resets to, since an uncommitted edit was
-      never captured by any commit in the first place
+  M2  one of those simple commands is `git reset`, `git checkout`, or
+      `git restore`, after skipping leading env-var assignments and lead
+      words (`sudo`, `time`, `command`, `exec`, `nohup`, `env`, `!`)
+  M3  for `git reset`: its arguments include the literal token `--hard` (a
+      boolean flag; git accepts no `<ref>` pathspec form together with
+      `--hard` at all, so no scoping logic is needed -- a `--hard` reset
+      always targets the whole tracked working tree)
+  M3' for `git checkout`/`git restore`: the invocation resolves to at least
+      one PATHSPEC (see "Ref-vs-path disambiguation" below) and, for
+      `restore`, is not `--staged` without `--worktree` (that combination
+      only rewrites the index, never the working tree)
+  M4  `git status --porcelain`, scoped to the whole tree for `reset --hard`
+      or to the resolved pathspecs for `checkout`/`restore`, reports at
+      least one entry that is NOT untracked (`??`) -- i.e. at least one
+      tracked file in scope has a staged or unstaged change relative to
+      HEAD, which the command will discard
 
-Untracked files are deliberately out of scope: `reset --hard` does not touch
-them (that is `git clean`'s job), so an untracked scratch file sitting in
-the tree is not itself at risk from this command.
+## Ref-vs-path disambiguation
 
-Fails OPEN on any parse trouble, on `git status` failing or timing out, and
-outside a git repository.
+`git checkout <arg>` is ambiguous on its face: `<arg>` may be a ref (branch,
+tag, SHA, `HEAD`, `-` for "previous branch") -- a safe switch, since git
+itself refuses one that would clobber local changes -- or a pathspec, which
+this hook exists to catch. Mirroring git's own tie-break (a name that is
+both a ref and a path resolves as the REF) is the reliable way to tell them
+apart, so each bare positional argument is tested with
+`git rev-parse --quiet --verify <arg>^{commit}`; only an argument that
+demonstrably does NOT resolve as a commit-ish counts as a pathspec.
+A `--` separator sidesteps the question entirely -- everything after it is
+unambiguously a pathspec, per `git checkout`'s own syntax (`git checkout
+[<ref>] [--] <pathspec>...`). `git restore`'s positional operands are always
+pathspecs (its ref comes from `-s`/`--source`, never positionally), so no
+resolution is needed there.
+
+Untracked files are deliberately out of scope for all three commands: none
+of `reset --hard`, `checkout <path>`, or `restore <path>` can discard a file
+git is not already tracking (that is `git clean`'s job), so an untracked
+scratch file sitting in the tree is not itself at risk.
+
+The flag lists below are a best-effort read of `git checkout`/`git
+restore`'s documented options, not an exhaustive reimplementation of git's
+argument parser. An unrecognized `-`-prefixed token is skipped rather than
+risking a false pathspec read from its value.
+
+Fails OPEN on any parse trouble, on `git status`/`git rev-parse` failing or
+timing out, and outside a git repository.
 """
 import json
 import re
@@ -110,8 +137,100 @@ def _simple_commands(cmd):
     return cmds
 
 
+# Boolean (no separate value) flags shared or specific to checkout/restore.
+CHECKOUT_RESTORE_BOOL_FLAGS = {
+    "-q", "--quiet", "-f", "--force", "-m", "--merge", "-p", "--patch",
+    "--progress", "--no-progress", "--overlay", "--no-overlay",
+    "--recurse-submodules", "--no-recurse-submodules",
+    "--pathspec-file-nul", "--ignore-unmerged", "--ours", "--theirs",
+    "--track", "-t",
+    # checkout-only
+    "--overwrite-ignore", "--no-overwrite-ignore", "--ignore-other-worktrees",
+    "--ignore-skip-worktree-bits", "--guess", "--no-guess", "--detach", "-l",
+}
+# Flags that consume the NEXT token as a value (checked, per subcommand).
+CHECKOUT_VALUE_FLAGS = {"-b", "-B", "--orphan"}
+RESTORE_VALUE_FLAGS = {"-s", "--source"}
+
+
+def _checkout_restore_targets(subcommand, args):
+    """Positional targets of a `checkout`/`restore` invocation's ARGS (the
+    tokens after `git checkout`/`git restore`).
+
+    Returns (pre, post, saw_sep, staged_no_worktree). `pre` is every
+    non-flag token before a `--` separator (or all of them, if none);
+    `post` is every token after one. `staged_no_worktree` (restore only) is
+    whether `--staged` appeared without `--worktree` -- that combination
+    only rewrites the index, so it carries no risk to the working tree.
+    """
+    value_flags = (CHECKOUT_VALUE_FLAGS if subcommand == "checkout"
+                   else RESTORE_VALUE_FLAGS)
+    pre, post = [], []
+    saw_sep = saw_staged = saw_worktree = False
+    i = 0
+    while i < len(args):
+        tok = args[i]
+        if saw_sep:
+            post.append(tok)
+            i += 1
+            continue
+        if tok == "--":
+            saw_sep = True
+            i += 1
+            continue
+        if tok in ("-S", "--staged"):
+            saw_staged = True
+            i += 1
+            continue
+        if tok in ("-W", "--worktree"):
+            saw_worktree = True
+            i += 1
+            continue
+        if tok in CHECKOUT_RESTORE_BOOL_FLAGS:
+            i += 1
+            continue
+        if tok in value_flags:
+            i += 2
+            continue
+        if tok.startswith("-") and tok != "-":
+            i += 1  # an unrecognized flag -- see the module docstring
+            continue
+        pre.append(tok)
+        i += 1
+    staged_no_worktree = (subcommand == "restore" and saw_staged
+                           and not saw_worktree)
+    return pre, post, saw_sep, staged_no_worktree
+
+
+def _resolves_as_ref(arg):
+    """Whether `arg` names a commit-ish (branch, tag, SHA, `HEAD`, ...) in
+    this repo. None if git could not even be asked (missing, timeout) --
+    the caller treats that the same as "yes, a ref", the same fail-open
+    direction `_tracked_changes` takes on an unreachable git."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--quiet", "--verify", f"{arg}^{{commit}}"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.returncode == 0
+
+
+def _looks_like_path(arg):
+    """True only when `arg` demonstrably does NOT resolve as a ref -- the
+    one case git itself (and this hook) reads as a pathspec rather than a
+    branch switch."""
+    return _resolves_as_ref(arg) is False
+
+
 def offending(command):
-    """The matched `git reset --hard ...` segment in `command`, or None."""
+    """The matched destructive-discard invocation in `command`, or None.
+
+    Returns (kind, segment, paths). `kind` is "reset-hard" (paths is None
+    -- the whole tracked tree is in scope) or "checkout"/"restore" (paths
+    is the resolved pathspec list that invocation would revert).
+    """
     cmds = _simple_commands(command)
     if cmds is None:
         return None
@@ -121,23 +240,47 @@ def offending(command):
                                   or argv[i] in LEAD_WORDS):
             i += 1
         rest = argv[i:]
-        if len(rest) < 2 or rest[0] != "git" or rest[1] != "reset":
+        if len(rest) < 2 or rest[0] != "git":
             continue
-        if "--hard" not in rest[2:]:
+        sub = rest[1]
+        if sub == "reset":
+            if "--hard" not in rest[2:]:
+                continue
+            return "reset-hard", " ".join(argv), None
+        if sub not in ("checkout", "restore"):
             continue
-        return " ".join(argv)
+        pre, post, saw_sep, staged_no_worktree = _checkout_restore_targets(
+            sub, rest[2:])
+        if staged_no_worktree:
+            continue
+        if sub == "restore":
+            paths = pre + post
+        elif saw_sep:
+            paths = post
+        elif not pre:
+            paths = []
+        elif pre[0] == "-":
+            paths = pre[1:]
+        elif len(pre) == 1:
+            paths = pre if _looks_like_path(pre[0]) else []
+        else:
+            paths = pre if _looks_like_path(pre[0]) else pre[1:]
+        if not paths:
+            continue
+        return sub, " ".join(argv), paths
     return None
 
 
-def _tracked_changes():
-    """Every path from `git status --porcelain=v1 -z` that is NOT untracked
-    -- i.e. has a staged or unstaged change to a tracked file -- or None if
-    `git status` cannot be run (not a repo, git missing, timeout)."""
+def _tracked_changes(paths=None):
+    """Every path from `git status --porcelain=v1 -z`, optionally scoped to
+    `paths`, that is NOT untracked -- i.e. has a staged or unstaged change
+    to a tracked file -- or None if `git status` cannot be run (not a repo,
+    git missing, timeout)."""
     try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain=v1", "-z"],
-            capture_output=True, text=True, timeout=5,
-        )
+        cmd = ["git", "status", "--porcelain=v1", "-z"]
+        if paths:
+            cmd += ["--", *paths]
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     if out.returncode != 0:
@@ -160,7 +303,7 @@ def _tracked_changes():
     return changed
 
 
-NOTE = (
+NOTE_RESET_HARD = (
     "This `git reset --hard` will discard {count} tracked file(s) with "
     "uncommitted changes -- staged or unstaged -- that have nothing "
     "necessarily to do with why this reset is being run:\n\n"
@@ -176,6 +319,22 @@ NOTE = (
     "`git stash -u` them first. If a destructive experiment does not need "
     "the current working tree at all, run it in a scratch clone or a "
     "throwaway `git worktree add --detach` instead."
+)
+
+NOTE_PATH_DISCARD = (
+    "This `git {subcommand}` will discard {count} tracked file(s) with "
+    "uncommitted changes -- staged or unstaged -- that have nothing "
+    "necessarily to do with why this is being run:\n\n"
+    "  command:  {segment}\n"
+    "  would be discarded:\n{files}\n\n"
+    "`git checkout <path>` / `git restore <path>` revert the named path(s) "
+    "to the INDEX, not to 'the state before whatever I was just doing' -- "
+    "any edit made since the last `git add` is destroyed, silently, with "
+    "no output and exit 0. On 2026-08-21 this destroyed a comment written "
+    "after the last `git add`, while reverting an unrelated deliberate "
+    "test mutation.\n\n"
+    "If these changes are not meant to be discarded, commit or "
+    "`git stash -u` them first."
 )
 
 
@@ -195,16 +354,17 @@ def main() -> int:
         return 0
 
     try:
-        segment = offending(command)
+        match = offending(command)
     except Exception as exc:  # fail open on any parse trouble
         print(f"flag-reset-hard-uncommitted-work: could not parse command "
               f"({exc})", file=sys.stderr)
         return 0
 
-    if segment is None:
+    if match is None:
         return 0
+    kind, segment, paths = match
 
-    changed = _tracked_changes()
+    changed = _tracked_changes(paths)
     if not changed:
         return 0  # None (git unreachable) or empty (clean tree) -- fail open
 
@@ -213,17 +373,23 @@ def main() -> int:
     if len(changed) > len(shown):
         files += f"\n    ... and {len(changed) - len(shown)} more"
 
+    if kind == "reset-hard":
+        note = NOTE_RESET_HARD.format(
+            count=len(changed), segment=segment, files=files)
+        summary = (f"`git reset --hard` will discard {len(changed)} "
+                   "tracked file(s) with uncommitted changes.")
+    else:
+        note = NOTE_PATH_DISCARD.format(
+            subcommand=kind, count=len(changed), segment=segment, files=files)
+        summary = (f"`git {kind}` will discard {len(changed)} tracked "
+                   "file(s) with uncommitted changes.")
+
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": NOTE.format(
-                count=len(changed), segment=segment, files=files,
-            ),
+            "additionalContext": note,
         },
-        "systemMessage": (
-            f"`git reset --hard` will discard {len(changed)} tracked "
-            "file(s) with uncommitted changes."
-        ),
+        "systemMessage": summary,
     }))
     return 0
 

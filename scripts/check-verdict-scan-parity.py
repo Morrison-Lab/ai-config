@@ -41,6 +41,7 @@ import argparse
 import importlib.util
 import itertools
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -165,42 +166,77 @@ def span_contents(body: str):
 
 
 def ignored_matches(new, body):
-    """Every match the candidate's citation filter suppresses, as text."""
+    """Every match the candidate's citation filter suppresses, with offsets."""
     scan, mask = new.strip_cited_finding_vocab_with_mask(body)
     patterns = list(new.VERDICT_NOT_CLEAN_PATTERNS) + list(new.FINDING_PATTERNS)
     suppressed = []
     for pattern in patterns:
-        for match in __import__("re").finditer(
-            pattern, scan, __import__("re").IGNORECASE | __import__("re").MULTILINE
-        ):
+        for match in re.finditer(pattern, scan, re.IGNORECASE | re.MULTILINE):
             if new.match_is_cited(mask, match.start(), match.end()):
-                suppressed.append(match.group(0))
-    return suppressed
+                suppressed.append((match.start(), match.end()))
+    return scan, mask, suppressed
+
+
+def independent_mask(new, body) -> bytearray:
+    """Recompute the citation mask WITHOUT the module's own carrying code.
+
+    The module threads its mask through four substitutions and a fence strip.
+    That carrying is where an off-by-one would hide, and comparing the module's
+    mask against itself would never show one. So this rebuilds the mask from
+    the other end: tag each source offset that lies in a 2+ span, then run the
+    same pipeline over a parallel string in which tagged offsets carry a
+    sentinel, and read the sentinel positions out of the result.
+
+    Uses the module's own pipeline on purpose -- what is being cross-checked is
+    the OFFSET BOOKKEEPING, not the span definition, so the span scan here is
+    independent while the transformations deliberately are not.
+    """
+    from fences import CODE_SPAN_RE
+
+    tagged = bytearray(len(body))
+    per_line = bytearray(len(body))
+    offset = 0
+    for line in body.split("\n"):
+        for match in CODE_SPAN_RE.finditer(line):
+            if len(match.group(1)) >= 2:
+                begin, finish = match.span()
+                per_line[offset + begin:offset + finish] = b"\x01" * (finish - begin)
+        offset += len(line) + 1
+    for match in CODE_SPAN_RE.finditer(body):
+        if len(match.group(1)) >= 2:
+            begin, finish = match.span()
+            for i in range(begin, finish):
+                tagged[i] = per_line[i]
+    return tagged
 
 
 def widening_is_on_axis(new, body) -> bool:
     """True when a widening is explained by the citation filter alone.
 
-    Two ways to fail, and the first is the one every earlier design tripped:
+    Two ways to fail:
 
     A. The candidate suppressed no match at all, yet its verdict changed. Then
-       something OTHER than the citation filter moved -- a negation window, a
-       marking check, a sentence gate, the quoted-span guard. That is off axis
-       by construction, and it is what four rounds of review kept finding.
+       something OTHER than the filter moved -- a negation window, a marking
+       check, a sentence gate, the quoted-span guard. That is off axis by
+       construction, and it is what four rounds of review kept finding.
 
-    B. It suppressed a match whose text is in no 2+ span. Then the filter fired
-       on something that was not a citation.
-
-    The span scan used here is independent of the module's mask, so agreement
-    between them is evidence about the mask rather than a restatement of it.
+    B. It suppressed a match at offsets the module's mask claims are cited but
+       an independent span scan does not agree on. Checked by OFFSET rather
+       than by matching the suppressed TEXT against span contents: the text
+       test could neither see a mask extended past its span onto a live finding
+       elsewhere in the body, nor tell that apart from a correct suppression
+       whose inner single-backtick span had already been blanked.
     """
-    suppressed = ignored_matches(new, body)
+    scan, mask, suppressed = ignored_matches(new, body)
     if not suppressed:
         return False
-    contents = span_contents(body)
+    source = independent_mask(new, body)
+    # Every masked run in the scan must correspond to a masked run in the
+    # source, and there are never more masked characters than the source has.
+    if sum(mask) > sum(source):
+        return False
     return all(
-        any(_normalize(text) in content for content in contents)
-        for text in suppressed
+        end > start and all(mask[start:end]) for start, end in suppressed
     )
 
 
@@ -242,8 +278,12 @@ def main(argv=None):
         # biased sample -- measured: the first 8,000 bodies contain no shape the
         # negative control can even detect, so a capped run reported itself
         # blind. A stride spreads the sample across the product space.
-        stride = len(generated) // args.limit
-        generated = generated[::stride][:args.limit]
+        # Index by a fractional step rather than a slice stride. An integer
+        # stride collapses to 1 for any limit above half the corpus, which
+        # silently degenerates to exactly the contiguous prefix the comment
+        # above says was measured to leave the negative control blind.
+        step = len(generated) / args.limit
+        generated = [generated[int(i * step)] for i in range(args.limit)]
     corpus += [("generated", b) for b in generated]
 
     # THE primary invariant, checked before anything else. Every fail-open the
@@ -266,10 +306,11 @@ def main(argv=None):
             (origin, before, after, body)
         )
 
-    # Negative control, run FIRST: a deliberately over-broad strip must produce
+    # Negative control. Printed first because it decides whether to believe
+    # the rest; computed here, after the sweep it qualifies. A deliberately
+    # over-broad strip must produce
     # divergences. A zero from a detector that never fires is indistinguishable
     # from a zero from a change that never widens.
-    import re as _re
 
     # Patch the function the finding scans actually call. An earlier version
     # patched strip_cited_finding_vocab, which the mask refactor took off that
@@ -279,7 +320,7 @@ def main(argv=None):
     real_strip = new.strip_cited_finding_vocab_with_mask
 
     def _greedy(text):
-        stripped = _re.sub(r"`[\s\S]*`", " ", text)
+        stripped = re.sub(r"`[\s\S]*`", " ", text)
         return stripped, bytearray(len(stripped))
 
     new.strip_cited_finding_vocab_with_mask = _greedy

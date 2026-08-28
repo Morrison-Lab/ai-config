@@ -41,11 +41,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import (  # noqa: E402
-    CODE_SPAN_RE,
-    find_fence_spans,
-    strip_fences,
-)
+from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -525,7 +521,8 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 
 
 # origin/main's own inline-span pattern, reused verbatim. The scan text this
-# module produces is byte-identical to origin/main's; see _scan_with_mask.
+# module produces is byte-identical to origin/main's; see
+# strip_cited_finding_vocab_with_mask.
 _BASE_INLINE_SPAN = re.compile(r"`[^`\n]*`")
 
 
@@ -533,26 +530,90 @@ _STRAIGHT_QUOTE_SPAN = re.compile(r'"[^"\n]*"')
 _CURLY_QUOTE_SPAN = re.compile("\u201c[^\u201d\\n]*\u201d")
 
 
+# Longest line this will scan for code spans. CODE_SPAN_RE restarts a lazy
+# scan at every unpairable backtick run, so cost is quadratic in line length on
+# a line of many unclosed runs: measured 674 ms at 34 KB against 1 ms for the
+# base pass, versus 8 ms at GitHub's 65,536-character comment cap for a
+# realistic multi-line body. Over the cap, a line is left UNMASKED, so nothing
+# is suppressed on it and the checker behaves exactly as origin/main does --
+# the over-flagging direction, which is the safe one.
+_MAX_MASKED_LINE = 4096
+
+
 def _citation_mask(text: str) -> bytearray:
     """Mark every offset lying inside a closed code span of 2+ backticks.
 
-    Per line, because ``CODE_SPAN_RE`` bounds a span by a blank line rather than
-    by a line ending, and over a whole body it would pair stray backticks on
-    adjacent lines across whatever sits between them.
+    The INTERSECTION of a per-line scan and a whole-body scan, which is
+    strictly safer than either alone because each over-reaches where the other
+    does not.
+
+    A whole-body scan over-reaches downward: ``CODE_SPAN_RE`` bounds a span by a
+    blank line rather than by a line ending, so a stray backtick on one line
+    pairs with a stray backtick on the next and marks the finding between them.
+
+    A per-line scan over-reaches upward, which is less obvious. It can
+    MANUFACTURE a span CommonMark does not have, by pairing two runs on one line
+    that CommonMark has already consumed into a span opened on the line above:
+
+        A stray `` opener sits on this line.
+        ``Needs more work`` on scripts/a.py is my actual verdict.
+
+    CommonMark pairs line 3's run with the FIRST run on line 4, so
+    ``Needs more work`` is literal prose and not a citation at all. A per-line
+    scan sees a tidy span on line 4 and marks it, and the finding is suppressed.
+    Measured: ``origin/main`` not-clean, per-line-only HEAD clean.
+
+    Taking only offsets both scans agree on suppresses a match solely when it
+    sits in a span under both readings. Everything either scan claims alone is
+    left unmarked, which merely over-flags -- the safe direction
+    (``shared/workflow/fully-clean.md``).
     """
-    mask = bytearray(len(text))
+    per_line = bytearray(len(text))
     offset = 0
+    oversized = []
     for line in text.split("\n"):
-        for match in CODE_SPAN_RE.finditer(line):
-            if len(match.group(1)) >= 2:
-                begin, finish = match.span()
-                mask[offset + begin:offset + finish] = b"\x01" * (finish - begin)
+        if len(line) > _MAX_MASKED_LINE:
+            oversized.append((offset, offset + len(line)))
+        else:
+            for match in CODE_SPAN_RE.finditer(line):
+                if len(match.group(1)) >= 2:
+                    begin, finish = match.span()
+                    per_line[offset + begin:offset + finish] = (
+                        b"\x01" * (finish - begin)
+                    )
         offset += len(line) + 1
+
+    # Blank oversized lines to same-length filler before the whole-body scan
+    # too, or the quadratic cost simply moves there. Offsets are preserved, and
+    # losing a whole-body span that crosses such a line only masks LESS.
+    scannable = text
+    if oversized:
+        chars = list(text)
+        for begin, finish in oversized:
+            chars[begin:finish] = " " * (finish - begin)
+        scannable = "".join(chars)
+
+    whole = bytearray(len(text))
+    for match in CODE_SPAN_RE.finditer(scannable):
+        if len(match.group(1)) >= 2:
+            begin, finish = match.span()
+            whole[begin:finish] = b"\x01" * (finish - begin)
+
+    mask = bytearray(a & b for a, b in zip(per_line, whole))
+    for begin, finish in oversized:
+        mask[begin:finish] = b"\x00" * (finish - begin)
     return mask
 
 
-def _sub_with_mask(pattern, repl, text: str, mask: bytearray):
-    """``re.sub`` that carries the mask along, so offsets stay aligned.
+def _sub_with_mask(
+    pattern, repl, text: str, mask: bytearray
+) -> Tuple[str, bytearray]:
+    """Like ``re.sub``, but carrying the mask along so offsets stay aligned.
+
+    A string ``repl`` is inserted LITERALLY, not expanded as a template, so
+    ``r"[\\1]"`` stays those four characters rather than becoming the first
+    group. Today's callers pass ``" "`` or a callable, and no expansion is
+    wanted; the difference is named so a later caller does not assume it.
 
     A replaced region takes mask 1 only when the WHOLE matched region was
     masked; a partly-cited match is not a citation. A ``repl`` callable that
@@ -579,7 +640,9 @@ def _sub_with_mask(pattern, repl, text: str, mask: bytearray):
     return "".join(out), out_mask
 
 
-def _strip_fences_with_mask(text: str, mask: bytearray):
+def _strip_fences_with_mask(
+    text: str, mask: bytearray
+) -> Tuple[str, bytearray]:
     """``strip_fences(text, replacement=" ")``, carrying the mask along."""
     lines = text.split("\n")
     fenced, _, orphans = find_fence_spans(text)
@@ -613,7 +676,7 @@ def match_is_cited(mask: bytearray, start: int, end: int) -> bool:
     return end > start and all(mask[start:end])
 
 
-def strip_cited_finding_vocab_with_mask(text: str):
+def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     """Blank out spans where finding-indicator vocabulary appears as a *citation*
     rather than as a raised finding, so ``finding_patterns`` keys on genuine
     findings.
@@ -741,14 +804,35 @@ def strip_cited_finding_vocab_with_mask(text: str):
           (Needs more work) `` matches the real comment (id 5430978306)
           verbatim, confirmed via direct API fetch.
 
-    ``origin/main`` matches the two INNER single-backtick pairs around the SHA
-    and leaves ``(Needs more work)`` exposed, so a Ready-for-merge review reads
-    NOT clean. The outer spaces are optional padding: the quoted content neither
-    starts nor ends with a backtick, so the no-spaces form is fixed identically.
+    ``origin/main``'s pattern finds THREE matches on that line, not two: the
+    inner pair around the SHA, plus each outer double-backtick delimiter
+    consumed as an empty span. Consuming the delimiters is the whole mechanism
+    -- it is what leaves ``(Needs more work)`` exposed between them, so a
+    Ready-for-merge review reads NOT clean. The outer spaces are optional
+    padding: the quoted content neither starts nor ends with a backtick, so the
+    no-spaces form is fixed identically.
 
-    Fixing that removes ONE of the two not-clean signals #2449 measured on
-    #2431. The other, ``No blocking findings`` matching the bare-rejection
-    alternation, is ai-config#2452 and is untouched here.
+    That body stays not-clean after this fix, for a different reason: the bullet
+    list under its ``## Findings`` heading vetoes
+    ``_findings_section_resolves_empty``, so ``_unresolved_finding_pattern``
+    still returns the findings-heading pattern.
+
+    ai-config#2452 is a SEPARATE comment on the same PR, not a second signal on
+    this body. Measured on ``origin/main``, the two sentences behave
+    differently, which is worth recording because they read alike:
+
+        No blocking findings.                              -> matched, then
+                                                              exempted by
+                                                              NOT_CLEAN_NEGATION_PREFIX
+        No other findings, blocking or otherwise, remain
+        open.                                              -> matched, NOT
+                                                              exempted
+
+    Only the second is #2452. The negation prefix looks back 25 characters, so
+    it clears the ``No`` immediately before ``blocking`` and not the one five
+    words away. Whether the second then counts still depends on whether its
+    position is marked, which is why it needs the surrounding comment to
+    reproduce and does not fire from the bare sentence alone.
     """
     def _blank_quote(m: "re.Match") -> str:
         # Preserve a quoted span carrying a bold finding label; blanking it could

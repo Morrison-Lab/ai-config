@@ -2887,29 +2887,90 @@ def main() -> int:
         checker.classify_verdict(single_span_citation) == "clean",
     )
 
-    # THE load-bearing invariant. Every fail-open the four earlier designs
-    # produced was a downstream pass seeing text origin/main would not have
-    # produced: a moved negation window, an unmarked bare rejection, a
-    # swallowed sentence boundary, a destroyed findings-item tag, a defeated
-    # ** guard, a changed reviewer identity. Holding the scan byte-identical
-    # retires that entire class rather than patching its members.
+    # THE load-bearing invariant, checked against origin/main's ACTUAL
+    # function rather than against this module's own. An earlier version of
+    # this block compared `scan` to `strip_cited_finding_vocab(probe)`, which
+    # is defined as `strip_cited_finding_vocab_with_mask(probe)[0]` -- so it
+    # compared f(x)[0] with f(x)[0] and asserted nothing. Reintroducing one of
+    # the four rejected designs changed the scan on hundreds of bodies and
+    # still passed the whole suite.
+    # Stated two ways, because each catches what the other cannot.
+    #
+    # (a) Directly, with no git dependency, so it also runs in a shallow CI
+    #     checkout: the cited phrase must still be PRESENT in the scan and
+    #     merely masked. Any design that blanks the span fails this.
+    SPAN_PROBES = (
+        ("Cited as @@a @x@ (Needs more work) @y@ @@ above.", "(Needs more work)"),
+        ("The phrase @@Changes requested@@ is quoted.", "Changes requested"),
+        ("See @@**Location:** a.py:1@@ in the template.", "**Location:** a.py:1"),
+    )
+    for probe, phrase in SPAN_PROBES:
+        probe = probe.replace("@", B)
+        scan, mask = checker.strip_cited_finding_vocab_with_mask(probe)
+        start = scan.find(phrase)
+        check(
+            f"cited text survives in the scan and is masked, not blanked: {phrase!r}",
+            start != -1
+            and len(mask) == len(scan)
+            and checker.match_is_cited(mask, start, start + len(phrase)),
+        )
+
+    # (b) By comparison with the function as it stood before this change, over
+    #     probes chosen to hit every downstream consumer a blanking design
+    #     broke. An earlier version of this block compared
+    #     `strip_cited_finding_vocab(probe)` against itself -- it is defined as
+    #     `strip_cited_finding_vocab_with_mask(probe)[0]` -- so it asserted
+    #     nothing, and a reintroduced rejected design passed the whole suite.
+    import subprocess as _sp
+    import tempfile as _tf
+
+    _repo = Path(__file__).resolve().parent.parent
+    _base_src = None
+    for _rev in ("origin/main", "HEAD~40", "HEAD~20", "HEAD~10"):
+        _got = _sp.run(
+            ["git", "show", f"{_rev}:scripts/check-pr-fully-clean.py"],
+            cwd=_repo, capture_output=True, text=True,
+        )
+        if _got.returncode == 0:
+            _base_src = _got.stdout
+            break
+    if _base_src is not None:
+        _tmp = Path(_tf.mkdtemp()) / "base_checker.py"
+        _tmp.write_text(_base_src)
+        _bspec = importlib.util.spec_from_file_location("base_checker", _tmp)
+        _base = importlib.util.module_from_spec(_bspec)
+        _bspec.loader.exec_module(_base)
+        identical = True
+        for probe in (
+            "Cited as @@a @x@ (Needs more work) @y@ @@ above.",
+            "A stray @@@ opener in @a.md; Needs more work in @b.md@.",
+            "@@-@@ Rejected",
+            "The previously-blocking bug in @@a.py@@ is still there; nothing fixed.",
+            "Needs @@more@@ work on the guard.",
+            'Says "the @@**Location:**@@ marker" but Needs more work.',
+            '"@@"@@ Needs more work "',
+            "Needs more work in a.py.",
+            "A stray @@ opener here.\n@@Needs more work@@ is my verdict.",
+            "```\n@@Needs more work@@\n```\nAll good.",
+        ):
+            probe = probe.replace("@", B)
+            if (checker.strip_cited_finding_vocab(probe)
+                    != _base.strip_cited_finding_vocab(probe)):
+                identical = False
+        check(
+            "scan text is byte-identical to the pre-change function (#2449)",
+            identical,
+        )
+    # No else-branch failure: a checkout too shallow to reach any prior
+    # revision cannot run (b), and (a) already asserts the invariant there.
+
     for label, probe in (
         ("a 2+ span", "Cited as @@a @x@ (Needs more work) @y@ @@ above."),
-        ("an unclosed 2+ run", "A stray @@@ opener in @a.md; Needs more work in @b.md@."),
-        ("a marker-only span", "@@-@@ Rejected"),
-        ("a dotted path in a span", "The previously-blocking bug in @@a.py@@ is still there; nothing fixed."),
-        ("a straddling phrase", "Needs @@more@@ work on the guard."),
-        ("a bold label in a span", 'Says "the @@**Location:**@@ marker" but Needs more work.'),
-        ("a quote inside a span", '"@@"@@ Needs more work "'),
         ("no spans at all", "Needs more work in a.py."),
     ):
         probe = probe.replace("@", B)
         scan, mask = checker.strip_cited_finding_vocab_with_mask(probe)
-        check(
-            f"scan text is unchanged by this fix, and mask aligns: {label}",
-            scan == checker.strip_cited_finding_vocab(probe)
-            and len(mask) == len(scan),
-        )
+        check(f"mask length tracks scan length: {label}", len(mask) == len(scan))
 
     # Containment is the discriminator: a phrase wholly inside a span is a
     # citation, one that straddles the boundary is the author's own words.
@@ -2927,6 +2988,51 @@ def main() -> int:
     check(
         "a finding phrase wholly inside a 2+ span does not count (#2449)",
         checker.classify_verdict(contained) == "clean",
+    )
+
+    # The filter guards THREE match loops, and two of them had no test at all:
+    # deleting the guard in classify_verdict's clean loop, or in
+    # _unresolved_finding_pattern, left the suite green. Both are reachable and
+    # both change behaviour, so each gets its own body and its own control
+    # (memories/mistake-patterns.md Pattern 15).
+    quoted_clean_verdict = (
+        "The reviewer wrote @@Verdict: Ready for merge@@ in the template.\n"
+    ).replace("@", B)
+    check(
+        "a quoted clean verdict does not count as stating one (#2449)",
+        checker.classify_verdict(quoted_clean_verdict) == "",
+    )
+
+    quoted_finding_label = (
+        "## Verdict: Ready for merge\n\n"
+        "The template line @@**Location:** a.py:1@@ is quoted.\n"
+    ).replace("@", B)
+    check(
+        "a quoted finding label is not an unresolved finding (#2449)",
+        checker._unresolved_finding_pattern(quoted_finding_label) is None,
+    )
+
+    # An oversized line is left unmasked, so the checker behaves exactly as
+    # origin/main does on it -- over-flagging, the safe direction. Guarded
+    # because the alternative (masking it) is the fail-open direction, and
+    # because the bound exists for a measured quadratic cost.
+    over = (
+        "## Verdict: Ready for merge\n\n"
+        + "x" * (checker._MAX_MASKED_LINE + 1)
+        + " @@Needs more work@@\n"
+    ).replace("@", B)
+    under = (
+        "## Verdict: Ready for merge\n\n"
+        + "x" * (checker._MAX_MASKED_LINE - 40)
+        + " @@Needs more work@@\n"
+    ).replace("@", B)
+    check(
+        "a line over the mask bound is not masked, so it still counts (#2449)",
+        checker.classify_verdict(over) == "not-clean",
+    )
+    check(
+        "the same line under the bound is masked (the bound discriminates)",
+        checker.classify_verdict(under) == "clean",
     )
 
     # match_is_cited is the whole filter, so it is tested directly.
@@ -2954,6 +3060,21 @@ def main() -> int:
     check(
         "control: disabling it does NOT change the straddling case (isolates)",
         neutered_straddle == "not-clean",
+    )
+    _real_filter2 = checker.match_is_cited
+    try:
+        checker.match_is_cited = lambda mask, start, end: False
+        neutered_clean_loop = checker.classify_verdict(quoted_clean_verdict)
+        neutered_finding = checker._unresolved_finding_pattern(quoted_finding_label)
+    finally:
+        checker.match_is_cited = _real_filter2
+    check(
+        "control: the clean loop's guard discriminates (#2449)",
+        neutered_clean_loop == "clean",
+    )
+    check(
+        "control: _unresolved_finding_pattern's guard discriminates (#2449)",
+        neutered_finding is not None,
     )
 
     print(f"\n{passes} passed, {failures} failed")

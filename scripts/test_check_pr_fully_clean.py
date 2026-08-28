@@ -456,6 +456,65 @@ def main() -> int:
         (not nh_ok) and any("NOT clean" in i for i in nh_issues),
     )
 
+    # ai-config#2482: an EXPIRED driver ledger from an exclusive-login bot
+    # stops standing as that reviewer's verdict; anything short of the full
+    # positive signature (exclusive login + Disposition table + hold phrase
+    # + >2h idle) stays a verdict.
+    ledger_body = (
+        "Addressed GitHub Claude of `9508454e` (Needs more work). "
+        "Pushed `8af4edc9`.\n\n"
+        "| # | Tag | Disposition |\n|---|---|---|\n"
+        "| 1 conflated cases | **Address** | Recreate rule is MERGED only. |\n\n"
+        "Do not merge. Blocked on review of `8af4edc9`.\n"
+    )
+    stale = "2026-08-26T20:52:56Z"
+    ledger_items = [
+        ("comment", stale, ledger_body, "", "", "cursor"),
+        ("comment", "2026-08-26T21:15:09Z",
+         "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n",
+         "", "", "github-actions"),
+    ]
+    lv_ok, lv_issues = checker.check_latest_verdict(ledger_items)
+    check(
+        "an expired exclusive-login driver ledger is excluded, with a NOTE",
+        lv_ok and any("expired driver ledger" in i for i in lv_issues),
+    )
+    shared_items = [("comment", stale, ledger_body, "", "", "github-actions")]
+    sv_ok, _ = checker.check_latest_verdict(shared_items)
+    check(
+        "the same ledger under a shared login stays a verdict",
+        not sv_ok,
+    )
+    check(
+        "a cursor item without the ledger shape stays a verdict",
+        not checker.check_latest_verdict(
+            [("comment", stale,
+              "### Verdict\n**Needs more work** -- real finding.\n",
+              "", "", "cursor")])[0],
+    )
+    from datetime import datetime, timezone, timedelta
+    fresh_now = datetime.fromisoformat(stale.replace("Z", "+00:00")) \
+        + timedelta(minutes=30)
+    check(
+        "a ledger from a login active within 2h stays a verdict",
+        checker._is_expired_driver_ledger(
+            ledger_body, "cursor", stale, {"cursor": stale}, now=fresh_now)
+        is False,
+    )
+    check(
+        "a zone-naive timestamp is read as UTC rather than crashing",
+        checker._is_expired_driver_ledger(
+            ledger_body, "cursor", "2026-08-26T20:52:56",
+            {"cursor": "2026-08-26T20:52:56"}) is True,
+    )
+    check(
+        "commit activity keeps a quietly-pushing driver's ledger standing",
+        not checker.check_latest_verdict(
+            ledger_items[:1],
+            commit_activity={"cursor": datetime.now(timezone.utc)
+                             .strftime("%Y-%m-%dT%H:%M:%SZ")})[0],
+    )
+
     # Regression (PR #2180 round 10): non-HEAD unmarked prose rejection under ### Verdict
     non_head_prose_round1 = {
         "createdAt": "2026-08-05T00:00:00Z",

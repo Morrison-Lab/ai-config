@@ -389,3 +389,69 @@ known slash-named branch appears in its output before trusting a total.
 star reported 17 of 34 `origin/**` refs and hid all five open PRs' branches.
 Caught only because the open-PR column came back empty against a known count of
 five.)
+
+## `git grep` has no `-x` / `--line-regexp` -- do whole-line matching in the consuming code
+
+`grep` supports `-x`/`--line-regexp` (match only lines the whole pattern covers).
+`git grep` does not carry that flag forward, even though it accepts most of `grep`'s other switches and reads like a drop-in replacement scoped to a tree.
+
+Measured 2026-08-27 on git 2.50.1 (macOS):
+
+```bash
+git grep -x 'some literal line'
+# error: unknown switch `x'
+# usage: git grep [<options>] [-e] <pattern> [<rev>...] [[--] <path>...]
+# (exit 129)
+```
+
+For whole-line matching against a tree (not the working directory), get the matching lines out with `git grep -h -F -f <patterns-file> <tree>` and do the exact comparison in the consuming code instead of in the git invocation -- `-h` suppresses the filename prefix so each output line is the matched line verbatim, `-F` treats the patterns as fixed strings, and `-f` reads them from a file (one per line).
+Exit code 0 means at least one match, 1 means none, anything else is a real error -- the usual three-way read, not a two-way one.
+
+- **Do:** treat `git grep` as `grep` minus `-x`, and move whole-line comparison into the caller.
+- **Do:** read `git grep`'s exit code as three-valued (0 / 1 / error), the same as any other grep-family tool.
+- **Don't:** assume every `grep` flag that isn't obviously working-tree-only survived into `git grep` -- check `git grep -h` rather than porting a command by analogy.
+
+## Commit a fix before mutation-testing it -- `git checkout -- <file>` restores to HEAD, not to your fix
+
+The diff-scoped no-op section above says to commit before running a diff-scoped check, because the check reads the wrong population otherwise.
+This is the same commit-first discipline for a different, more destructive reason: the restore step after a mutation test discards whatever is uncommitted, fix included.
+
+The mutation-testing workflow this corpus already documents in [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md) is edit the checker to inject a fault, confirm it is caught, then undo the edit and confirm a clean run passes.
+That last "undo the edit" step is usually a `git checkout -- <file>`, and `git checkout -- <path>` restores the path from the index/HEAD, not from "however it looked a minute ago" -- it does not know or care that the pre-mutation state was itself uncommitted work rather than a committed baseline.
+
+So mutation-testing an uncommitted fix and then running `git checkout -- <file>` to remove the mutation reverts straight past the fix to whatever HEAD held before it existed.
+The fix is gone, not stashed, not reachable through the reflog (a working-tree edit that was never staged or committed leaves no object at all).
+
+The safe order is: commit the fix first, apply the mutation on top, confirm it is caught, then `git checkout -- <file>` (or `git restore <file>`) to drop the mutation -- which now restores to the commit carrying the fix, because that is what HEAD points at.
+
+- **Do:** commit the fix, then mutate, then restore with `git checkout --` (or `git restore`) -- in that order, every time.
+- **Do:** treat any uncommitted state as gone the moment a restore command runs against its path, regardless of how recently it was written.
+- **Don't:** mutation-test a fix before committing it -- the restore step cannot distinguish "revert my mutation" from "revert my fix" once both are uncommitted.
+- **Don't:** assume `git checkout -- <file>` is reversible for uncommitted content;
+  there is no object to recover it from.
+
+(Measured 2026-08-27 in `Morrison-Lab/gha`: a working `check-new-line-breaks` implementation was mutation-tested before being committed, and the restore step's `git checkout -- <file>` reverted to pre-fix HEAD, wiping the implementation.
+It had to be re-applied from the session transcript rather than recovered from git.
+This exact failure recurred while drafting this entry: the drafting session ran `git checkout -- <file>` to test the semantic-line-breaks reformatter's default scope, wiping its own uncommitted additions described here and requiring a redo.)
+
+## A "moved content" exemption keyed on base-tree membership is a bypass -- key it on the same diff's deleted lines
+
+A diff-scoped checker that wants to exempt genuinely relocated content (a paragraph moved from one file to another, a function moved between modules) needs some test for "this new line is not new content, it just moved here".
+The tempting test is membership: does this exact text already exist somewhere in the base tree?
+If yes, treat it as moved and skip it.
+
+That test is an exploitable bypass, not a moved-content detector.
+"Exists verbatim anywhere in the base tree" is satisfied by any new line that happens to duplicate untouched content elsewhere in the repo -- by coincidence (two files independently containing the same boilerplate sentence), or deliberately (an author who wants a new line exempted copies it from somewhere else in the tree first).
+Neither case is a move.
+The base tree is not scoped to this diff at all, so the exemption's population is "everything that has ever existed", which is not what "moved" means.
+
+True move semantics require the text to leave one place and arrive at another in the *same* diff: the exact text must also appear among that diff's own **deleted** lines, not merely exist somewhere in the base tree.
+That is a strictly narrower, and strictly correct, test -- and it needs no extra git call beyond the diff the checker already has, since a unified diff already carries its own added and deleted lines together.
+
+- **Do:** key a moved-content exemption on "this added line's text also appears in this same diff's deleted lines," never on "this text exists somewhere in the base tree."
+- **Do:** treat the base-tree-membership test as a population question, the same way [`algorithmatize-checks`'s exclusion-clause section](../shared/workflow/algorithmatize-checks.md) treats an exclusion clause's population -- ask what else satisfies the test besides the case it was written for.
+- **Don't:** ship a "moved" exemption without a case that exercises the bypass directly: a new line that duplicates unrelated, untouched content elsewhere in the tree, which must NOT be exempted.
+- **Don't:** assume the narrower, correct form costs an extra pass over the tree;
+  the diff already carries both its added and deleted lines.
+
+(Measured 2026-08-27 on `Morrison-Lab/gha#700`: a round-1 adversarial review demonstrated the base-tree-membership bypass empirically, and the fix -- key the exemption on the diff's own deleted lines instead -- needed no extra git call, only a narrower test on data the checker already had.)

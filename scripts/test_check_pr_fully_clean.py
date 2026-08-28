@@ -1867,6 +1867,27 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings - missing null check\n")
           is not None)
+    # Second #2488-round pass: the separator may appear ANYWHERE in the
+    # trailer, in Unicode dash or parenthetical form -- a position-zero
+    # ASCII gate left these three swallows.
+    check("an em-dash one-line finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings \u2014 crash() is missing a null check"
+              "\n\nNone.\n")
+          is not None)
+    check("a parenthetical one-line finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings (crash() is missing a null check)\n\nNone.\n")
+          is not None)
+    check("a descriptive prefix before a colon-led finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content: crash() missing"
+              "\n\nNone.\n")
+          is not None)
+    check("an em-dash resolving phrase on the heading line exempts",
+          checker._unresolved_finding_pattern(
+              "## Findings \u2014 none\n")
+          is None)
     check("recognized Findings heading suffixes still resolve empty bodies",
           all(checker._unresolved_finding_pattern(
                   f"## Findings{suffix}\n\nNone.\n") is None

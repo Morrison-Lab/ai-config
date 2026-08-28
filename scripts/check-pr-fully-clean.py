@@ -1029,17 +1029,23 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     if heading_line_end == -1:
         return False
     # Trailing text on the heading line is decoration ("on the diff
-    # content", "(blocking)") -- EXCEPT when a colon or dash introduces it,
-    # which is how a one-line finding gets written onto the heading itself
-    # ("## Findings: crash() is missing a null check"). Discarding that
-    # unconditionally swallowed such a finding (the #2488 review round), so
-    # punctuation-led trailing text is prepended as the section's first
-    # content line instead: a resolving phrase there still exempts, and
-    # anything else re-flags, the safe direction.
+    # content", "and notes") only until a separator appears -- a colon,
+    # dash (ASCII or Unicode), or opening paren ANYWHERE in the trailer
+    # starts content, which is how a one-line finding gets written onto
+    # the heading itself ("## Findings: crash() is missing a null check",
+    # "## Findings on the diff content: crash() ...", an em-dash form).
+    # Discarding such trailers wholesale swallowed the finding (#2488 and
+    # #2459 review rounds; a position-zero ASCII-only gate left three
+    # bypasses). Content is prepended as the section's first line: a
+    # resolving phrase there still exempts, anything else re-flags. A
+    # purely decorative parenthetical ("(blocking)") lands on the flag
+    # side -- the recoverable direction.
     trailing = scan_body[match_end:heading_line_end].strip()
     lead: list[str] = []
-    if trailing[:1] in (":", "-"):
-        content = trailing.lstrip(":-").strip()
+    sep = re.search(r"[:(\-\u2013\u2014]", trailing)
+    if sep:
+        content = trailing[sep.start():].lstrip(
+            ":(-\u2013\u2014 \t").strip()
         if content:
             lead = [content]
     section_start = heading_line_end + 1

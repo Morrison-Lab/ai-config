@@ -996,7 +996,7 @@ _SECTION_FINDING_ITEM = re.compile(
 
 
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
-    """True when the findings section starting at *match_end* opens with a
+    """True when the findings section (on the lines after the heading containing *match_end*) opens with a
     whole-line no-findings statement and carries no finding-shaped content
     after it.
 

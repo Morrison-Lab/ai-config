@@ -208,3 +208,30 @@ Generic Actions-authoring material stays there.
   (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.
   The first draft of this entry claimed all three companions default to `true`;
   the review caught it, and the table above is read off `@v2` directly.)
+
+- **An input a caller does not pass is not "off" --- it carries the callee's default, and several of gha's default to `true`.**
+
+  A caller stub is mostly commented-out inputs, so reading one and finding no `use-ai-config:` line invites the conclusion that the feature is not in effect.
+  It is the opposite conclusion the file supports: an omitted input means *the default applies*, and `use-ai-config` defaults to `true` in both `claude.yml` and `claude-code-review.yml` at `@v2`.
+
+  Measured 2026-08-28.
+  A session filed [UCD-SERG/shigella#36](https://github.com/UCD-SERG/shigella/issues/36) claiming the reviewer there "works from whatever prose the repo happens to carry" because neither caller passed the input.
+  The shared `ai-config` corpus had been loading on every run all along.
+  Two PRs then shipped against that premise ([#36](https://github.com/UCD-SERG/shigella/pull/38) and a duplicate), and the change is a behavioural no-op --- worth having, since it records intent and survives a default moving, but not the fix the issue described.
+
+  **The recurrence is the part to notice.**
+  This is the second entry in this file from the same session and the same file, both from assuming a default instead of reading one --- the other being `lint-markdown`'s companion toggles directly above.
+  That session had opened `@v2`'s `claude-code-review.yml` three times that evening, for the `ANTHROPIC_API_KEY` secret and for the companion defaults, and never scrolled to this input.
+  So the failure is not "I lacked the file";
+  it is asking the file only the question already in mind.
+
+  One command answers it for a whole caller, and costs less than the round trip of being wrong:
+
+  ```bash
+  git show v2:.github/workflows/<name>.yml | grep -B1 -A6 '^      [a-z-]*:$' | grep -E '^      [a-z-]+:|default:'
+  ```
+
+  - **Do:** read the callee's defaults at the pinned tag before claiming an unpassed input is inactive.
+  - **Do:** dump every input's default at once when a caller is under review, rather than looking up the one input you came for.
+  - **Don't:** read an absent or commented-out input as a disabled feature.
+  - **Don't:** describe a caller-side pin of an already-defaulted input as enabling something --- it records intent, which is a different and smaller claim.

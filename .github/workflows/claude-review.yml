@@ -81,13 +81,16 @@ jobs:
         When your prose QUOTES verdict or finding vocabulary -- a prior
         round's "Needs more work", the words blocking, rejected, or
         actionable findings used descriptively, a phrase you are
-        discussing rather than declaring -- wrap it in backticks. The
-        repo's fully-clean instrument scans review comments for those
-        phrases and cannot tell an unbackticked quotation from a standing
-        verdict, so a clean review narrating the round it resolved
-        re-blocks its own PR (ai-config#2497, measured on #2479 and
-        #2493). Backticked spans are exempt from the scan. Your OWN
-        verdict line stays unbackticked.
+        discussing rather than declaring -- wrap it in a SINGLE pair of
+        backticks (`phrase`). Not a double pair: the instrument blanks
+        single-backtick spans only, so a double-backticked quotation
+        stays live in the scan and re-blocks the PR anyway
+        (ai-config#2449). The repo's fully-clean instrument scans review
+        comments for those phrases and cannot tell an unbackticked
+        quotation from a standing verdict, so a clean review narrating
+        the round it resolved re-blocks its own PR (ai-config#2497,
+        measured on #2479 and #2493). Your OWN verdict line stays
+        unbackticked.
 
         ## Prior review context
 

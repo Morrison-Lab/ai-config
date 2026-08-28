@@ -1141,7 +1141,7 @@ def _is_expired_driver_ledger(
     when: str,
     last_seen_by_author: Dict[str, str],
     now: Optional[datetime] = None,
-) -> bool:  # noqa: D401 -- see the docstring's residual note
+) -> bool:
     """True for a dead driving session's status ledger, never for a review.
 
     A pre-#2448 driver-session disposition comment ("Do not merge. Blocked
@@ -1166,10 +1166,11 @@ def _is_expired_driver_ledger(
     Accepted residual: Cursor's driving persona and its Bugbot reviewer
     share one login, so a genuine review that VERBATIM restates a ledger
     (Disposition table plus hold phrase) from a session idle >2h would be
-    excluded too. No such review has been observed (the shapes differ by
-    construction), and the caller folds COMMIT activity into
-    `last_seen_by_author` so a quietly-pushing driver still counts as
-    live.
+    excluded too. No such review has been observed -- the shapes differ
+    by construction -- so the residual is carried as documented risk
+    rather than mitigated. (The caller's commit-activity fold addresses
+    the separate problem of an ACTIVE driver appearing idle; it cannot
+    help here, since a reviewer never pushes.)
     """
     login = str(author or "").lower()
     if login not in EXCLUSIVE_BOT_IDENTITY:

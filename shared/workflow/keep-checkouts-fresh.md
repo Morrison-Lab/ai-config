@@ -11,7 +11,8 @@ In every session --- at session start, and again periodically during long sessio
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer install.**
-   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so there is nothing to freshness-check there.
+   Claude Code and Cursor no longer read this repo's `skills/`/`commands/` as a symlinked copy under `~/.claude` at all --- they install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*), so the served copy needs no freshness check.
+   That is a claim about what is **served**, and not about what is **left over**.
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.
@@ -19,8 +20,8 @@ In every session --- at session start, and again periodically during long sessio
 
    **Detecting it is harder than the other three, and this file does not yet have a reliable test.**
    Those three are paths no client creates, so finding one is the finding.
-   `~/.claude/skills` is a standard client location, holding a user's own personal skills and an account-level `synced/` bucket the client populates --- which on this machine carries 45 directories whose names match this repo's, none of them a leftover.
-   So neither presence nor a name match settles it, and a wrong answer is expensive in one direction: deleting that directory takes the user's own skills with it, and ~30 call sites across `skills/` reference `~/.claude/skills/...` paths directly.
+   `~/.claude/skills` is a standard client location, holding a user's own personal skills and an account-level `synced/` bucket the client populates --- on the machine measured 2026-08-28 that bucket carried 45 directories whose names match this repo's skills, none of them a leftover.
+   So neither presence nor a name match settles it, and a wrong answer is expensive in one direction: deleting that directory takes the user's own skills with it, and this corpus references `~/.claude/skills/...` paths directly in 31 places (`grep -rn '~/\.claude/skills/' --include=*.md skills/ shared/ memories/`, 2026-08-28), which the plugin install does not provide ([#2530](https://github.com/Morrison-Lab/ai-config/issues/2530)).
    Treat a doubled listing as the symptom, investigate by hand, and see [#2528](https://github.com/Morrison-Lab/ai-config/issues/2528) for making this an instrument.
 
    - **Do:** include `skills/` when sweeping `~/.claude` for leftovers.

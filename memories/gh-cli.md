@@ -89,6 +89,13 @@
   binary would otherwise read as a verdict rather than an environment failure.
   `command -v gh` discriminates the three in one read, and it is worth
   running before diagnosing anything else about the script.
+  When it reports no executable in a local session, inspect the package
+  manager prefix before treating `gh` as absent; on Apple Silicon macOS,
+  Homebrew normally installs it under `/opt/homebrew/bin`.
+  Repair the current shell's `PATH` from the package manager's shell setup
+  (for Homebrew, `eval "$(/opt/homebrew/bin/brew shellenv)"`).
+  If `gh` remains absent after that check, install it before falling back to
+  another interface: `brew install gh` on macOS with Homebrew.
 
   What makes this worth recording rather than filing under "the CLI is
   missing" is **which** sessions it hits.
@@ -114,9 +121,15 @@
   - **Do:** run `command -v gh` before diagnosing a `check-pr-fully-clean.py`
     failure, so a missing binary, a blocked GraphQL call, and a rate limit are
     separated in one read.
+  - **Do:** repair a local session's package-manager `PATH`, then install the
+    required CLI when no executable is installed.
   - **Do:** report the script as **unavailable** in the status summary, naming
     the MCP checks run in its place, so a reader can tell a hand verification
     from an instrument's verdict.
+  - **Don't:** stop after one shell reports a missing command when the local
+    package manager may already provide it outside that shell's `PATH`.
+  - **Don't:** use an MCP fallback in place of a locally installable required
+    CLI without first repairing or installing the CLI.
   - **Don't:** read the script's absence as licence to skip criteria 1 and 2
     --- the criteria are the requirement, and the script is one way of
     reaching them.

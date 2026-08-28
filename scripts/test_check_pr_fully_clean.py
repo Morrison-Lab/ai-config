@@ -1900,6 +1900,23 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings crash breaks on null input\n\nNone.\n")
           is not None)
+    # Fifth #2488-round pass: a function-word LEAD alone is not
+    # decoration -- the trailer must also be short and free of
+    # finding-signal vocabulary.
+    check("a function-word-led finding clause with signal vocab flags",
+          checker._unresolved_finding_pattern(
+              "## Findings regarding null pointer dereference"
+              "\n\nNone.\n")
+          is not None)
+    check("a long function-word-led finding clause flags",
+          checker._unresolved_finding_pattern(
+              "## Findings on the return value ordering being swapped"
+              "\n\nNone.\n")
+          is not None)
+    check("a signal word beyond the lead still flags",
+          checker._unresolved_finding_pattern(
+              "## Findings for real this time it is broken\n\nNone.\n")
+          is not None)
     check("wordy decorative Findings suffixes still resolve empty bodies",
           all(checker._unresolved_finding_pattern(
                   f"## Findings{suffix}\n\nNone.\n") is None

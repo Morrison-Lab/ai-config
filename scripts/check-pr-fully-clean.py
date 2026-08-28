@@ -1051,19 +1051,35 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
         if content:
             lead = [content]
     elif trailing:
-        # No separator at all. A bare trailer is decoration only when it
-        # LEADS WITH A FUNCTION WORD ("on the diff content", "and notes")
-        # -- an enumeration of DECORATIONS, so an unrecognized shape
-        # fails toward flagging, unlike the separator enumeration whose
-        # unknowns failed toward swallowing (fourth #2488-round finding:
-        # "## Findings the diff has a null pointer bug" was discarded).
-        # A clause-shaped trailer is content and is tested like any
-        # section line.
+        # No separator at all. A bare trailer is decoration only when ALL
+        # THREE hold: it leads with a function word ("on the diff
+        # content", "and notes"), it is short (a real finding clause
+        # carries more words), and it contains no finding-signal
+        # vocabulary -- an enumeration of DECORATIONS with two extra
+        # gates, so an unrecognized shape fails toward flagging (fourth
+        # and fifth #2488-round findings: "## Findings the diff has a
+        # null pointer bug" was discarded by the separator gate, and
+        # "## Findings regarding null pointer dereference" by a
+        # first-word-only gate). The residual -- a short, signal-free,
+        # function-word-led finding clause -- is tracked with the
+        # structural question in the follow-up issue this comment's
+        # rounds filed.
         first_word = re.match(r"[A-Za-z]+", trailing)
-        if not first_word or first_word.group(0).lower() not in (
-            "on", "and", "in", "of", "for", "about", "regarding",
-            "from", "with", "per", "vs", "versus",
-        ):
+        is_decoration = (
+            first_word is not None
+            and first_word.group(0).lower() in (
+                "on", "and", "in", "of", "for", "about", "regarding",
+                "from", "with", "per", "vs", "versus",
+            )
+            and len(trailing.split()) <= 5
+            and not re.search(
+                r"(?i)\b(?:crash|fail|error|missing|null|bug|broken|"
+                r"defect|wrong|incorrect|vulnerab|leak|race|overflow|"
+                r"regress|corrupt)",
+                trailing,
+            )
+        )
+        if not is_decoration:
             lead = [trailing]
     section_start = heading_line_end + 1
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])

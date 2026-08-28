@@ -363,7 +363,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `flag-uncited-rebuttal.py` | `PreToolUse` (Bash) | warns, never blocks, when a PR/issue comment about to be posted disputes a finding whose most recently fetched citation named an external URL that no earlier `WebFetch`/`WebSearch` in the transcript touched -- ai-config#2070's wrong rebuttal, retracted two rounds later once the URL was finally fetched |
 | `require-agent-disclosure.py` | `PreToolUse` (Bash, mcp__github__.*) | warns, never blocks, on a `gh`/`glab` command or MCP call that posts a forge comment without the agent-disclosure marker -- such a comment carries the account holder's own login and reads as `type: User`, indistinguishable from one they typed. Three verdicts, not one: the marker is missing, the body is somewhere the check cannot read (`--body-file`, `--editor`, `$BODY`) so it says so rather than accusing, or the body discloses with the robot emoji, which `check-pr-fully-clean.py` matches as a review-body marker |
 | `flag-uncounted-comment-claims.py` | `PreToolUse` (Bash) | warns, never blocks, on a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post an unverified count (`grep -c`/`wc -l`-shaped discharge) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo (ai-config#2377's sparta file-list incident) |
-| `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed (not registered -- see ai-config#2282) |
+| `warn-stale-issue-edit.py` | `PreToolUse` (Write, Edit, NotebookEdit) | warns, never blocks, when an issue-driven `Write`/`Edit` has no fresh VIEW_ISSUE and remote/default-branch check after the request that named the issue, or when the latest view shows the issue closed (not registered -- see ai-config#2390) |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -446,6 +446,12 @@ fires.
 A hook that is deliberately documented-but-inert says **not registered** in its
 own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
 asserted rather than merely true.
+A mapped tracker that has closed, or that does not exist, fails the check,
+so a closed activation issue cannot keep a hook silently inert
+([#2302](https://github.com/Morrison-Lab/ai-config/issues/2302)).
+When the issue cannot be fetched (offline, timeout, or rate limit), the
+check prints `SKIP` and does not fail --- that skip is the documented
+offline path, not a silent pass.
 
 The Claude Code plugin (`.claude-plugin/plugin.json`, `source: "./"`) is the supported path for the full catalog: its loader auto-discovers [`hooks/hooks.json`](hooks/hooks.json) at the plugin root and registers every hook it names, no separate step needed.
 

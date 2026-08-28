@@ -222,56 +222,37 @@ Re-running it to ask of each fallback whether the file actually carried a proven
 ### A named regression test is checked against its rule, not against a commit
 
 The causes above are about a check that cannot see a failure.
-This is about the check you wrote *to* see one, and the control you ran to
-prove it works.
+This is about the check you wrote *to* see one, and the control you ran to prove it works.
 
-The natural control is a commit: put the previous version of the changed files
-back, confirm the new test goes red, restore.
-That is a real control and it answers a different question than the test's name
-does.
+The natural control is a commit: put the previous version of the changed files back, confirm the new test goes red, restore.
+That is a real control and it answers a different question than the test's name does.
 It establishes that the round changed behaviour the test can see.
-It cannot establish that the test guards **the rule it is named for**, because
-anything else in the same commit will carry it --- and a commit answering a
-review finding usually changes more than one thing.
+It cannot establish that the test guards **the rule it is named for**, because anything else in the same commit will carry it --- and a commit answering a review finding usually changes more than one thing.
 
-So probe the rule instead: remove the specific rule the test is named for, run
-that test, confirm it fails, put the rule back.
-It costs one edit, and no cheaper check distinguishes a regression test from
-a fixture that happens to pass.
+So probe the rule instead: remove the specific rule the test is named for, run that test, confirm it fails, put the rule back.
+It costs one edit, and it makes a distinction the commit-level control cannot: that control passed both versions of the test described below.
 
-Measured 2026-08-28 on
-[d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125).
-A test named for a `?`/`#` exclusion in a URL pattern was found vacuous by a
-reviewer: its fixture differed from the pattern on an unrelated axis, so the
-exclusion was never what protected it.
+Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125).
+A test named for a `?`/`#` exclusion in a URL pattern was found vacuous by a reviewer: its fixture differed from the pattern on an unrelated axis, so the exclusion was never what protected it.
 The repair was **still** vacuous, for a second reason.
 Both versions satisfied the commit-level control that session was running.
 Removing the exclusion and watching the test go red is what finally settled it.
 
-- **Do:** delete the rule a test is named for, and confirm that test alone
-  fails.
-- **Don't:** read "fails against the previous commit" as "guards this rule" ---
-  a commit that fixes several things satisfies the first without the second.
+- **Do:** delete the rule a test is named for, and confirm that test alone fails.
+- **Don't:** read "fails against the previous commit" as "guards this rule" --- a commit that fixes several things satisfies the first without the second.
 
-### A real-world verification covers the configurations that system uses
+### A real-world verification covers the configurations that the system uses
 
-Running the real thing is the strongest evidence available for the paths it
-takes, and says nothing about the paths it does not.
-That is easy to miss precisely because the subject is real rather than a
-fixture, so the usual suspicion does not fire.
+Running the real thing is the strongest evidence available for the paths it takes, and says nothing about the paths it does not.
+That is easy to miss precisely because the subject is real rather than a fixture, so the usual suspicion does not fire.
 
-Measured on the same PR: every round re-rendered an actual package's
-documentation site as verification, and every round passed.
-It passed straight through a defect that left the rewrite inert on any site
-setting an explicit `issue-url`, because that package sets none.
+Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125): every round re-rendered an actual package's documentation site as verification, and every round passed.
+It passed straight through a defect that left the rewrite inert on any site setting an explicit `issue-url`, because that package sets none.
 
-Name the configuration axes the real subject holds fixed, and treat those as
-unexercised rather than as covered.
+Name the configuration axes the real subject holds fixed, and treat those as unexercised rather than as covered.
 
-- **Do:** state which settings the real subject happens to use, when reporting
-  a real-world run as evidence.
-- **Don't:** read a real run's success as coverage of a configuration it never
-  had.
+- **Do:** state which settings the real subject happens to use, when reporting a real-world run as evidence.
+- **Don't:** read a real run's success as coverage of a configuration it never had.
 
 ### The narration can be the unfalsifiable part, while the check is fine
 

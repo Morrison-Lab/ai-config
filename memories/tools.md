@@ -1037,6 +1037,10 @@ attribute a per-step outcome" failure in
 (Morrison-Lab/ai-config#1042, 2026-08-03: both surfaced while building
 `hooks/no-unreviewed-pr.py`'s shell-command parser during its review.)
 
+**Post-token filtering loses quote provenance.**
+Once POSIX `shlex` has produced argv, quoted literals such as `'>'` are indistinguishable from real redirection operators.
+Strip shell syntax from the raw command with a quote-aware scan before tokenization, rather than deleting operator-shaped argv afterward. (Morrison-Lab/ai-config#2477 review, 2026-08-27.)
+
 ## Two awk gotchas when an awk program is embedded in a single-quoted shell string
 
 Many of our shell scripts pass an awk program as a **single-quoted** bash string

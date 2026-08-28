@@ -400,6 +400,87 @@ def _depth_segments(command: str):
     return [(d, t.strip()) for d, t in segs if t.strip()]
 
 
+def _blank_shell_redirections(command: str) -> str:
+    """Blank unquoted shell redirections while preserving quoted arguments."""
+    chars = list(command)
+    i, n = 0, len(command)
+    in_single = in_double = escaped = False
+    while i < n:
+        c = command[i]
+        if escaped:
+            escaped = False
+            i += 1
+            continue
+        if c == "\\" and not in_single:
+            escaped = True
+            i += 1
+            continue
+        if c == "'" and not in_double:
+            in_single = not in_single
+            i += 1
+            continue
+        if c == '"' and not in_single:
+            in_double = not in_double
+            i += 1
+            continue
+        if in_single or in_double:
+            i += 1
+            continue
+
+        start = i
+        if c.isdigit() and (i == 0 or command[i - 1].isspace()
+                            or command[i - 1] in ";|&()"):
+            while i < n and command[i].isdigit():
+                i += 1
+            if i >= n or command[i] not in "<>":
+                i = start + 1
+                continue
+        elif c not in "<>" and not (c == "&" and i + 1 < n
+                                      and command[i + 1] == ">"):
+            i += 1
+            continue
+
+        # A herestring's operator and target are both shell syntax; blank
+        # them like any redirection (checked before "<<", its prefix).
+        if command[i:i + 3] == "<<<":
+            i += 3
+        # Leave heredocs to the sibling's existing body-aware
+        # preprocessing.
+        elif command[i:i + 2] == "<<":
+            i += 2
+            continue
+
+        # Redirections are shell syntax, not git argv (ai-config#2477).
+        # Three-character forms first: a fixed two-character window left
+        # the third character to be absorbed as a bogus one-character
+        # target, letting the real target leak into git argv (#2494
+        # review round: &>>, <>, <<<).
+        elif command[i:i + 3] == "&>>":
+            i += 3
+        elif command[i:i + 2] in (">>", ">&", "<&", "&>", "<>", ">|"):
+            i += 2
+        else:
+            i += 1
+        while i < n and command[i].isspace():
+            i += 1
+        quoted = None
+        while i < n:
+            if quoted:
+                if command[i] == quoted:
+                    quoted = None
+                elif command[i] == "\\" and quoted == '"' and i + 1 < n:
+                    i += 1
+            elif command[i] in "'\"":
+                quoted = command[i]
+            elif command[i].isspace() or command[i] in ";|&()":
+                break
+            elif command[i] == "\\" and i + 1 < n:
+                i += 1
+            i += 1
+        chars[start:i] = " " * (i - start)
+    return "".join(chars)
+
+
 def _hints_by_position(command: str) -> list[str | None]:
     """One directory hint per push, in order, or [] when structure is unclear.
 
@@ -556,6 +637,7 @@ def iter_pushes(command: str):
     # keep in sync, so there is nothing left here for a future change to miss.
     command = re.sub(r"\\\r?\n", " ", command)
     command = _posixize_windows_paths(command)
+    command = _blank_shell_redirections(command)
     cmds = _SIBLING._simple_commands(command)
     if not cmds:
         return

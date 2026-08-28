@@ -41,7 +41,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import CODE_SPAN_RE, strip_fences  # noqa: E402
+from fences import (  # noqa: E402
+    CODE_SPAN_RE,
+    find_fence_spans,
+    strip_fences,
+)
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -520,118 +524,96 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
-# origin/main's own inline-span pattern. It is applied to the UNMODIFIED line
-# and its match offsets are used positionally, which is what actually preserves
-# the base's pairing -- reusing the pattern alone does not, see
-# _strip_inline_code_spans.
+# origin/main's own inline-span pattern, reused verbatim. The scan text this
+# module produces is byte-identical to origin/main's; see _scan_with_mask.
 _BASE_INLINE_SPAN = re.compile(r"`[^`\n]*`")
 
 
-# Fill character for the region this function blanks BEYOND origin/main's own
-# spans. Not a space: the negation prefix and suffix checks in classify_verdict
-# are anchored and skip whitespace, so a space-filled region lets a negator
-# reach a finding it was never adjacent to. Not a word character either, so it
-# joins no token and forms no vocabulary. `~` in particular is safe here because
-# strip_fences has already run, so a tilde can no longer be read as a fence.
-_CITATION_FILLER = "~"
+_STRAIGHT_QUOTE_SPAN = re.compile(r'"[^"\n]*"')
+_CURLY_QUOTE_SPAN = re.compile("\u201c[^\u201d\\n]*\u201d")
 
 
-def _blank_line_spans(line: str) -> str:
-    r"""Blank one line's inline code spans, at any delimiter run length.
+def _citation_mask(text: str) -> bytearray:
+    """Mark every offset lying inside a closed code span of 2+ backticks.
 
-    Produces ``origin/main``'s output with additional characters replaced by
-    spaces, and NOTHING else -- same length, same offsets, same everything the
-    downstream passes measure. Three properties get that, and each was forced by
-    a fail-open found in review of an earlier version of this fix.
-
-    **Both span sets are matched against the unmodified line.** ``origin/main``
-    pairs backticks strictly consecutively, so any edit before its pattern runs
-    can shift every downstream pair. Blanking multi-delimiter spans first and
-    then applying the base pattern to the result flips the parity of everything
-    after a span whose interior holds an ODD number of backticks. CommonMark's
-    idiom for a literal backtick, ``` `` ` `` ```, is exactly that shape:
-
-        ``a`b`` ` Needs more work `` tail
-
-    ``Needs more work`` is in no code span there; ``origin/main`` says
-    not-clean and the sequential version said clean.
-
-    **The extra region keeps its width and is filled with a non-word,
-    non-space character.** ``classify_verdict`` measures its negation windows in
-    characters -- 25 before a match, 60 after -- and those negations are
-    anchored, so they skip whitespace but stop at anything else. Collapsing a
-    span to one space drags a negator into range across a finding that sits in
-    no code span at all, and filling it with spaces still lets the anchor run
-    straight through:
-
-        Needs more work ``on the `--fix` guard``: none elsewhere.
-        No ``--fix flag here`` Needs more work in scripts/x.py.
-
-    ``origin/main`` reads both not-clean. A collapsing version reads both clean,
-    and so does a width-preserving version filled with spaces -- width alone is
-    not enough, because it is the anchor and not the distance that decides.
-    ``_CITATION_FILLER`` is therefore an opaque barrier: it occupies the same
-    width, matches no finding vocabulary, and stops an anchored negation exactly
-    as the cited words did. Only ``origin/main``'s OWN spans collapse to a
-    single space, exactly as it does.
-
-    **Asterisks are preserved.** ``_blank_quote`` below keeps a double-quoted
-    span that carries a ``**`` finding label, because blanking one could hide an
-    incidentally-quoted real finding. When the only ``**`` sits inside a code
-    span, blanking it defeats that guard and the whole quoted span goes,
-    carrying a finding that was outside the span:
-
-        The body says "the ``**Location:**`` marker is optional, but Needs
-        more work on the guard".
-
-    Keeping the asterisks leaves the guard able to fire. It cannot create a
-    false finding: no finding pattern matches bare ``**`` with its words
-    blanked, and every effect runs toward blanking LESS.
-
-    Two limits a later reader should know, both failing safe:
-
-    - Spans are bounded to one line, because ``CODE_SPAN_RE`` bounds a span by a
-      blank line and would otherwise pair stray backticks on adjacent lines
-      across the finding between them. A citation wrapped onto a second line by
-      ``shared/writing/semantic-line-breaks.md`` is therefore still not blanked,
-      so #2449 persists for that shape. It over-flags, which is the safe
-      direction, but it is a coverage limit and not only a safety property.
-    - ``CODE_SPAN_RE.finditer`` retries each failing opener, so a line of
-      ascending backtick runs costs roughly O(n^1.5): about 1.5 s at GitHub's
-      65,536-character comment limit, against 5 ms for the base pass. A
-      realistic 30 KB body costs about 8.5 ms.
+    Per line, because ``CODE_SPAN_RE`` bounds a span by a blank line rather than
+    by a line ending, and over a whole body it would pair stray backticks on
+    adjacent lines across whatever sits between them.
     """
-    base_ranges = [m.span() for m in _BASE_INLINE_SPAN.finditer(line)]
-    covered = bytearray(len(line))
-    for match in CODE_SPAN_RE.finditer(line):
-        if len(match.group(1)) >= 2:
-            start, end = match.span()
-            covered[start:end] = b"\x01" * (end - start)
+    mask = bytearray(len(text))
+    offset = 0
+    for line in text.split("\n"):
+        for match in CODE_SPAN_RE.finditer(line):
+            if len(match.group(1)) >= 2:
+                begin, finish = match.span()
+                mask[offset + begin:offset + finish] = b"\x01" * (finish - begin)
+        offset += len(line) + 1
+    return mask
 
+
+def _sub_with_mask(pattern, repl, text: str, mask: bytearray):
+    """``re.sub`` that carries the mask along, so offsets stay aligned.
+
+    A replaced region takes mask 1 only when the WHOLE matched region was
+    masked; a partly-cited match is not a citation. A ``repl`` callable that
+    returns the match unchanged keeps that region's mask, which is what lets
+    ``_blank_quote``'s preserve path survive.
+    """
     out: List[str] = []
-    index = 0
-    next_base = 0
-    while index < len(line):
-        if next_base < len(base_ranges) and index == base_ranges[next_base][0]:
-            # origin/main's own span: one space, exactly as it substitutes.
+    out_mask = bytearray()
+    prev = 0
+    for match in pattern.finditer(text):
+        begin, finish = match.span()
+        out.append(text[prev:begin])
+        out_mask += mask[prev:begin]
+        replacement = repl(match) if callable(repl) else repl
+        if replacement == match.group(0):
+            out_mask += mask[begin:finish]
+        else:
+            fill = 1 if finish > begin and all(mask[begin:finish]) else 0
+            out_mask += bytes([fill]) * len(replacement)
+        out.append(replacement)
+        prev = finish
+    out.append(text[prev:])
+    out_mask += mask[prev:]
+    return "".join(out), out_mask
+
+
+def _strip_fences_with_mask(text: str, mask: bytearray):
+    """``strip_fences(text, replacement=" ")``, carrying the mask along."""
+    lines = text.split("\n")
+    fenced, _, orphans = find_fence_spans(text)
+    to_strip = fenced | orphans
+    out: List[str] = []
+    out_mask = bytearray()
+    offset = 0
+    for index, line in enumerate(lines):
+        if index in to_strip:
             out.append(" ")
-            index = base_ranges[next_base][1]
-            next_base += 1
-            continue
-        char = line[index]
-        if covered[index] and char != "*":
-            char = _CITATION_FILLER
-        out.append(char)
-        index += 1
-    return "".join(out)
+            out_mask += bytes([0])
+        else:
+            out.append(line)
+            out_mask += mask[offset:offset + len(line)]
+        if index != len(lines) - 1:
+            out.append("\n")
+            out_mask += bytes([0])
+        offset += len(line) + 1
+    return "".join(out), out_mask
 
 
-def _strip_inline_code_spans(text: str) -> str:
-    """Blank inline code spans line by line (see ``_blank_line_spans``)."""
-    return "\n".join(_blank_line_spans(line) for line in text.split("\n"))
+def match_is_cited(mask: bytearray, start: int, end: int) -> bool:
+    """True when a match lies WHOLLY inside cited text.
+
+    Containment is the whole discriminator. A phrase that straddles a span
+    boundary -- ``Needs ``more`` work``, whose verdict words are the author's
+    own and only whose emphasis is quoted -- is not a citation, and every
+    earlier attempt at this fix lost exactly that case by blanking text instead
+    of filtering matches.
+    """
+    return end > start and all(mask[start:end])
 
 
-def strip_cited_finding_vocab(text: str) -> str:
+def strip_cited_finding_vocab_with_mask(text: str):
     """Blank out spans where finding-indicator vocabulary appears as a *citation*
     rather than as a raised finding, so ``finding_patterns`` keys on genuine
     findings.
@@ -715,13 +697,42 @@ def strip_cited_finding_vocab(text: str) -> str:
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
 
-    Inline spans are blanked by ``_strip_inline_code_spans`` (see its own
-    docstring for why both span sets are matched against the unmodified line).
-    What matters here is only that a code span delimited by a run of two or more
-    backticks now counts as citation, where before only a single-backtick span
-    did -- the multi-backtick form being the only way CommonMark lets a span
-    quote text that itself contains a backtick, which is what a review of this
-    corpus does constantly.
+    Returns ``(scan, mask)``. The scan is byte-identical to what
+    ``origin/main`` produces -- this function deliberately blanks NOTHING extra.
+    The mask marks which offsets came from inside a code span delimited by a run
+    of two or more backticks, and ``match_is_cited`` lets the finding scans
+    ignore a match lying wholly inside one.
+
+    That split is the entire design, and it was arrived at the hard way. A code
+    span of 2+ backticks is a citation just as a single-backtick span is -- the
+    longer run being the only way CommonMark lets a span quote text that itself
+    contains a backtick, which is what a review of this corpus does constantly.
+    The obvious fix is to blank those spans too. Four successive attempts to do
+    that each broke a different downstream pass, because much of this module
+    measures the scan in characters and offsets rather than reading it:
+
+    - collapsing a span to one space moved ``classify_verdict``'s anchored
+      negation windows, so a negator reached a finding it was never next to;
+    - filling it to width with a non-word character unmarked a bare rejection
+      that ``_is_marked_or_in_verdict_section`` had accepted, swallowed the
+      sentence boundary ``RESOLVED_BLOCKING_SUFFIX`` stops at, destroyed the
+      item tag ``_findings_section_resolves_empty`` vetoes on, and split
+      ``Needs `` `` `` `` more `` `` `` `` work`` so the phrase stopped matching;
+    - blanking the span at all removed a ``"`` the quote pass paired on and a
+      ``**`` that ``_blank_quote`` preserves a span for, and could change which
+      identity ``_reviewer_identity`` reads.
+
+    Every one of those was fail-open on a fail-closed instrument. They are not a
+    list of bugs to patch individually: they are what happens when the text a
+    dozen character-sensitive checks consume is edited underneath them. Leaving
+    the text alone retires the whole class, and the mask expresses the actual
+    intent, which was never "blank more" but "do not count a quoted phrase as a
+    stated one".
+
+    Containment is the discriminator, and it falls out of the mask for free.
+    ``Needs `` `` `` `` more `` `` `` `` work`` is the author's own verdict with
+    one word emphasized, so the match straddles the span and still counts; a
+    phrase wholly inside the span is a citation and does not.
 
     The line this was measured on is from the ``claude-review`` verdict comment
     on #2431 (ai-config#2449, 2026-08-27), verbatim:
@@ -730,31 +741,14 @@ def strip_cited_finding_vocab(text: str) -> str:
           (Needs more work) `` matches the real comment (id 5430978306)
           verbatim, confirmed via direct API fetch.
 
-    The old pattern matched the two INNER single-backtick pairs around the SHA
-    and left ``(Needs more work)`` exposed, so a Ready-for-merge review read NOT
-    clean. The outer spaces are optional padding, not load-bearing: the quoted
-    content neither starts nor ends with a backtick, so removing them still
-    leaves a run of two closed by a run of two, and the no-spaces form is fixed
-    identically. (An earlier draft of this docstring claimed otherwise. A run of
-    three only arises when the content itself begins or ends with a backtick,
-    and that form CommonMark leaves unspanned.)
+    ``origin/main`` matches the two INNER single-backtick pairs around the SHA
+    and leaves ``(Needs more work)`` exposed, so a Ready-for-merge review reads
+    NOT clean. The outer spaces are optional padding: the quoted content neither
+    starts nor ends with a backtick, so the no-spaces form is fixed identically.
 
     Fixing that removes ONE of the two not-clean signals #2449 measured on
     #2431. The other, ``No blocking findings`` matching the bare-rejection
     alternation, is ai-config#2452 and is untouched here.
-
-    ONE knock-on is accepted rather than prevented. Blanking a multi-delimiter
-    span removes any ``"`` inside it, so the double-quote pass below can pair
-    two quotes the base kept apart:
-
-        "``"`` Needs more work "
-
-    ``origin/main`` reads that not-clean; this version reads it clean. The
-    justification is that CommonMark makes the middle quote part of a code
-    span, so it is not quote punctuation, and what remains is an ordinary
-    double-quoted span -- which this function has blanked as citation since
-    #1202. No body in the measured corpus, real or generated, reaches this
-    shape other than the constructed one.
     """
     def _blank_quote(m: "re.Match") -> str:
         # Preserve a quoted span carrying a bold finding label; blanking it could
@@ -777,23 +771,34 @@ def strip_cited_finding_vocab(text: str) -> str:
         r"|has\s+(?:since\s+)?been\s+(?:fixed|addressed|resolved)"
         r"|no\s+longer\s+applies)"
     )
-    text = re.sub(
+    _SHA_CITATION = re.compile(
         r"\*\*[^*\n]+\*\*"
         r"(?=[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`"
         r"\)?[^.!?\n]{0,40}\b" + RESOLUTION_WORDING + r"\b)"
         r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
-        " ",
-        text,
-        flags=re.IGNORECASE,
+        re.IGNORECASE,
     )
+    text = _SHA_CITATION.sub(" ", text)
+    mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
-    text = strip_fences(text, replacement=" ")
-    # Inline code spans, within a line (see docstring for why per-line).
-    text = _strip_inline_code_spans(text)
+    text, mask = _strip_fences_with_mask(text, mask)
+    # Inline code spans, within a line.
+    text, mask = _sub_with_mask(_BASE_INLINE_SPAN, " ", text, mask)
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
-    text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
-    text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)
-    return text
+    text, mask = _sub_with_mask(_STRAIGHT_QUOTE_SPAN, _blank_quote, text, mask)
+    text, mask = _sub_with_mask(_CURLY_QUOTE_SPAN, _blank_quote, text, mask)
+    return text, mask
+
+
+
+def strip_cited_finding_vocab(text: str) -> str:
+    """The scan text alone, byte-identical to ``origin/main``'s.
+
+    Kept as the public entry point because several callers only ever wanted
+    the text. The mask is what the finding scans need, and they call
+    ``strip_cited_finding_vocab_with_mask``.
+    """
+    return strip_cited_finding_vocab_with_mask(text)[0]
 
 
 # The bare rejection alternation appears in three lists that must stay
@@ -1097,10 +1102,14 @@ def classify_verdict(body: str, state: str = "") -> str:
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
-    scan = strip_cited_finding_vocab(body)
+    scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if match_is_cited(cited, match.start(), match.end()):
+                # Wholly inside a 2+ backtick code span: the reviewer quoted
+                # this phrase, they did not state it (ai-config#2449).
+                continue
             if pat in BARE_NOT_CLEAN_PATTERNS:
                 if not _is_marked_or_in_verdict_section(scan, match.start()):
                     continue
@@ -1119,6 +1128,8 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if match_is_cited(cited, match.start(), match.end()):
+                continue
             # Position and negation are about how the phrase is INTRODUCED, so
             # they apply only to a bare phrase -- a `Verdict:` label is itself
             # the marking, and it already excludes a preceding negation by
@@ -1245,9 +1256,11 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     real items is a finding even when ``classify_verdict`` returns clean
     because the same body also says Ready for merge (#2274).
     """
-    scan_body = strip_cited_finding_vocab(body)
+    scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
+            if match_is_cited(cited, match.start(), match.end()):
+                continue
             if pat in BARE_NOT_CLEAN_PATTERNS:
                 if not _is_marked_or_in_verdict_section(scan_body, match.start()):
                     continue

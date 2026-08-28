@@ -49,12 +49,17 @@ def main() -> int:
     check("no change is NOT a widening",
           not parity.is_widening(("clean", False), ("clean", False)))
 
-    # Comparing a revision against itself must find nothing, and must still
+    # Comparing a revision against ITSELF must find nothing, and must still
     # report a live negative control -- a zero from a blind detector and a zero
     # from a genuinely unchanged candidate look identical without it.
+    #
+    # --candidate-rev is passed explicitly rather than defaulting to the working
+    # tree: with uncommitted changes present, "--base-rev HEAD" alone compares
+    # HEAD against the working tree, which is a real diff and not a self-check.
+    # That is exactly how this assertion failed when it was first written.
     result = subprocess.run(
         [sys.executable, str(REPO / "scripts" / "check-verdict-scan-parity.py"),
-         "--base-rev", "HEAD", "--limit", "400"],
+         "--base-rev", "HEAD", "--candidate-rev", "HEAD", "--limit", "400"],
         cwd=REPO, capture_output=True, text=True,
     )
     out = result.stdout
@@ -62,6 +67,37 @@ def main() -> int:
         "WIDENED  (base rejected, candidate accepts) : 0" in out))
     check("self-comparison still discriminates", "DISCRIMINATES" in out)
     check("self-comparison exits 0", result.returncode == 0)
+
+    # widening_is_on_axis is the function that produces the "0 off axis"
+    # headline, and the suite would pass unchanged if it were `return True`.
+    # These pin both answers so it cannot rot into one.
+    import importlib.util as _ilu
+    sys.path.insert(0, str(REPO / "scripts" / "lib"))
+    base_mod = parity.load_rev("origin/main", "smoke_base")
+    spec_new = _ilu.spec_from_file_location(
+        "smoke_new", REPO / "scripts" / "check-pr-fully-clean.py"
+    )
+    new_mod = _ilu.module_from_spec(spec_new)
+    spec_new.loader.exec_module(new_mod)
+
+    BT = chr(96)
+    off_axis_body = (
+        "## Verdict\n"
+        f"The previously-blocking defect in {BT}{BT}scripts/a.py{BT}{BT} "
+        "is still there; nothing fixed.\n"
+    )
+    on_axis_body = (
+        "## Verdict: Ready for merge\n\n"
+        f"The phrase {BT}{BT}a {BT}x{BT} Needs more work{BT}{BT} is quoted.\n"
+    )
+    check(
+        "widening_is_on_axis says False when nothing was blanked (case B)",
+        not parity.widening_is_on_axis(base_mod, new_mod, off_axis_body),
+    )
+    check(
+        "widening_is_on_axis says True for a phrase blanked from inside a span",
+        parity.widening_is_on_axis(base_mod, new_mod, on_axis_body),
+    )
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

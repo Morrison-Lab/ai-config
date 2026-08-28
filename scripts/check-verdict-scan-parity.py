@@ -77,20 +77,28 @@ DELIMS = ["", BT, BT * 2, BT * 3]
 FILLER = ["a.py", "x", f"a {BT}b", f"a {BT}{BT}b", f" {BT} ", ""]
 VOCAB = ["Needs more work", "Changes requested", "Blocking", "Rejected",
          "**[Defect]** Needs more work", "**Location:** a.py:1"]
-NEGATION = ["", ": none elsewhere.", " No other findings.", " none blocking."]
-LEAD = ["", "No ", 'The body says "', "## Nits "]
+NEGATION = ["", ": none elsewhere.", " No other findings.", " none blocking.",
+            " is still there; nothing fixed.", " remains open."]
+LEAD = ["", "No ", 'The body says "', "## Nits ", "The previously-blocking ",
+        "> ", "## "]
+# Marker-only span contents. BARE_CLEAN_MARKED accepts [ \t] and [#>*_+-], so a
+# span holding only one of those decides whether a bare rejection counts as
+# marked -- a shape the first version of this corpus could not generate at all,
+# which is why its "0 off axis" was a coverage statement rather than a result.
+FILLER_EXTRA = ["-", "#", ">", "_", "+", "a.py:10", "**Location:**", "[Defect]"]
 
 
 def generated_bodies():
     seen = set()
     for lead, d1, f1, v, d2, f2, neg in itertools.product(
-        LEAD, DELIMS, FILLER, VOCAB, DELIMS, FILLER, NEGATION
+        LEAD, DELIMS, FILLER + FILLER_EXTRA, VOCAB, DELIMS, FILLER, NEGATION
     ):
         core = f"{lead}{d1}{f1} {v} {d2}{f2}{neg}"
         for template in (
             "## Verdict: Ready for merge\n\n{core}\n",
             "## Verdict: Ready for merge\n\nReviewed-Commit: abc1234\n\n{core}\n",
             "Verdict: Ready for merge\n\n{core}\n\n### Findings\n\nNone.\n",
+            "## Verdict: Ready for merge\n\n## Findings\n\nNone.\n{core}\n",
             "## Verdict: Ready for merge\n\nSee {a}\n{b} here.\n",
         ):
             body = (
@@ -109,7 +117,12 @@ def classify(module, body):
     )
 
 
-RANK = {"not-clean": 2, "": 1, "clean": 0}
+# classify_verdict returns four values, not three: "unreadable" is what a body
+# from a known agent in an unparsed format yields. Omitting it raised KeyError
+# on exactly the input this tool is meant to be run on -- a --corpus of real
+# review comments. It ranks with "" : neither states a verdict, and neither is
+# an acceptance.
+RANK = {"not-clean": 2, "unreadable": 1, "": 1, "clean": 0}
 
 
 def is_widening(base_verdict, new_verdict):
@@ -120,72 +133,67 @@ def is_widening(base_verdict, new_verdict):
     )
 
 
-VOCAB_RE = __import__("re").compile(
-    r"Needs\s+more\s+work|Changes\s+requested|Blocking|Rejected|Unapproved"
-    r"|Actionable\s+findings|\*\*Location:\*\*",
-    __import__("re").IGNORECASE,
-)
+def _normalize(text: str) -> str:
+    """Collapse whitespace, so a scan whose inner spans were blanked still
+    compares against the original span content it came from."""
+    return " ".join(text.split()).lower()
+
+
+def span_contents(body: str):
+    """Contents of every closed 2+ backtick code span, scanned independently.
+
+    Deliberately NOT the module's own mask. The point of the triage is to check
+    the mask machinery -- the fence handling, and the offset carried through
+    four substitutions -- against a computation that shares none of it.
+    """
+    from fences import CODE_SPAN_RE
+    contents = []
+    for line in body.split("\n"):
+        for match in CODE_SPAN_RE.finditer(line):
+            run = len(match.group(1))
+            if run >= 2:
+                contents.append(_normalize(match.group(0)[run:-run]))
+    return contents
+
+
+def ignored_matches(new, body):
+    """Every match the candidate's citation filter suppresses, as text."""
+    scan, mask = new.strip_cited_finding_vocab_with_mask(body)
+    patterns = list(new.VERDICT_NOT_CLEAN_PATTERNS) + list(new.FINDING_PATTERNS)
+    suppressed = []
+    for pattern in patterns:
+        for match in __import__("re").finditer(
+            pattern, scan, __import__("re").IGNORECASE | __import__("re").MULTILINE
+        ):
+            if new.match_is_cited(mask, match.start(), match.end()):
+                suppressed.append(match.group(0))
+    return suppressed
 
 
 def widening_is_on_axis(base, new, body) -> bool:
-    """True when a widening is explained by span blanking alone.
+    """True when a widening is explained by the citation filter alone.
 
-    Applied to members of the acceptance-set diff, and precise about WHICH
-    occurrence mattered, which the first version of this triage was not: keying
-    on "any finding phrase anywhere sits outside a span" flagged thousands of
-    bodies whose flip had nothing to do with the phrase it found.
+    Two ways to fail, and the first is the one every earlier design tripped:
 
-    Two cases, and only one of them can be justified by this change:
+    A. The candidate suppressed no match at all, yet its verdict changed. Then
+       something OTHER than the citation filter moved -- a negation window, a
+       marking check, a sentence gate, the quoted-span guard. That is off axis
+       by construction, and it is what four rounds of review kept finding.
 
-    A. The phrase disappeared from the candidate's scan. That is blanking, and
-       it is on axis exactly when the phrase sat inside a closed 2+ code span in
-       the text the reviewer wrote -- i.e. it really was a citation.
+    B. It suppressed a match whose text is in no 2+ span. Then the filter fired
+       on something that was not a citation.
 
-    B. The phrase is still in the candidate's scan and the verdict flipped
-       anyway. Then a FILTER changed, not the blanking: a negation window, a
-       marking check, the quoted-span guard. This change is only ever supposed
-       to blank citations, so every case B is off axis by construction and wants
-       a human's eye. Both fail-opens found in review of ai-config#2515 were
-       case B or a blanking whose phrase was never in a span.
+    The span scan used here is independent of the module's mask, so agreement
+    between them is evidence about the mask rather than a restatement of it.
     """
-    from collections import Counter
-
-    from fences import CODE_SPAN_RE
-
-    base_counts = Counter(
-        m.group(0).lower()
-        for m in VOCAB_RE.finditer(base.strip_cited_finding_vocab(body))
+    suppressed = ignored_matches(new, body)
+    if not suppressed:
+        return False
+    contents = span_contents(body)
+    return all(
+        any(_normalize(text) in content for content in contents)
+        for text in suppressed
     )
-    new_counts = Counter(
-        m.group(0).lower()
-        for m in VOCAB_RE.finditer(new.strip_cited_finding_vocab(body))
-    )
-    # Counts, not sets: one line can carry the same phrase twice, once cited
-    # inside a span and once live outside it, and a set comparison reports the
-    # phrase as still present and calls a legitimate blanking a filter move.
-    lost = {
-        phrase: base_counts[phrase] - new_counts.get(phrase, 0)
-        for phrase in base_counts
-        if base_counts[phrase] > new_counts.get(phrase, 0)
-    }
-    if not lost:
-        return False  # case B: nothing was blanked, so a filter moved
-
-    in_span = Counter()
-    for line in body.split("\n"):
-        spans = [
-            m.span() for m in CODE_SPAN_RE.finditer(line)
-            if len(m.group(1)) >= 2
-        ]
-        for occurrence in VOCAB_RE.finditer(line):
-            if any(
-                start <= occurrence.start() and occurrence.end() <= end
-                for start, end in spans
-            ):
-                in_span[occurrence.group(0).lower()] += 1
-    # Every phrase that stopped being counted must be covered by that many
-    # occurrences which really were inside a span.
-    return all(in_span[phrase] >= count for phrase, count in lost.items())
 
 
 def main(argv=None):
@@ -219,10 +227,27 @@ def main(argv=None):
     for path in args.corpus:
         for record in json.loads(Path(path).read_text()):
             corpus.append(("real", record["body"]))
-    generated = generated_bodies()
-    if args.limit:
-        generated = itertools.islice(generated, args.limit)
+    generated = list(generated_bodies())
+    if args.limit and args.limit < len(generated):
+        # Strided, not a prefix. The generator varies its last fragment fastest,
+        # so a contiguous head shares one leading fragment throughout and is a
+        # biased sample -- measured: the first 8,000 bodies contain no shape the
+        # negative control can even detect, so a capped run reported itself
+        # blind. A stride spreads the sample across the product space.
+        stride = len(generated) // args.limit
+        generated = generated[::stride][:args.limit]
     corpus += [("generated", b) for b in generated]
+
+    # THE primary invariant, checked before anything else. Every fail-open the
+    # four rejected designs produced was a downstream pass reading text
+    # origin/main would not have produced. If the scan is byte-identical, that
+    # entire class is unreachable, and the acceptance diff below is then
+    # attributable to the citation filter alone.
+    scan_mismatches = [
+        body for _, body in corpus
+        if new.strip_cited_finding_vocab(body)
+        != base.strip_cited_finding_vocab(body)
+    ]
 
     widened, narrowed = [], []
     for origin, body in corpus:
@@ -253,6 +278,12 @@ def main(argv=None):
     on_axis = [w for w in widened if widening_is_on_axis(base, new, w[3])]
     off_axis = [w for w in widened if not widening_is_on_axis(base, new, w[3])]
 
+    scan_note = (
+        "  <== the change edits the scan; every downstream pass is exposed"
+        if scan_mismatches else ""
+    )
+    print(f"scan identity      : {len(scan_mismatches)} bodies whose scan text "
+          f"differs from {args.base_rev}'s{scan_note}")
     print(f"WIDENED  (base rejected, candidate accepts) : {len(widened)}")
     print(f"   on axis  (every finding phrase inside a 2+ span) : {len(on_axis)}")
     print(f"   OFF AXIS (a finding phrase outside every span)   : {len(off_axis)}")
@@ -261,7 +292,7 @@ def main(argv=None):
         print(f"  ! [{origin}] {before} -> {after}\n      {body[:200]!r}")
     if len(off_axis) > args.max_report:
         print(f"  ... {len(off_axis) - args.max_report} more off-axis")
-    return 1 if off_axis or not control else 0
+    return 1 if off_axis or scan_mismatches or not control else 0
 
 
 if __name__ == "__main__":

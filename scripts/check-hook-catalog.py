@@ -83,7 +83,6 @@ KNOWN_UNREGISTERED = {
     # after its authoring PR merges. Tracker is the open activation issue
     # (#2390), not the closed authoring issue (#2282) -- this file's own
     # closed-tracker check fails on a closed mapping.
-    "warn-stale-issue-edit.py": 2390,
 }
 
 # Public repo (measured 2026-08-26); unauthenticated GET works. A token is

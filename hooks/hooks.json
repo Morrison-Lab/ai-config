@@ -533,6 +533,55 @@
             "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks.",
+            "_note_matcher_shape": [
+              "Bound as three single-tool groups rather than one `Write|Edit|NotebookEdit`",
+              "matcher. check-hook-catalog.py compares README's stated matcher against the",
+              "binding by exact string, and its README row regex is [A-Za-z0-9_.*, -]+,",
+              "which cannot express an alternation -- so the catalog's own vocabulary for",
+              "a multi-tool binding is separate groups, which registered() joins as",
+              "\"Write, Edit, NotebookEdit\". A single regex matcher would bind correctly",
+              "and fail the catalog check.",
+              "",
+              "The hook re-checks tool_name against its own WRITE_TOOLS set on entry, so",
+              "the matcher is a cheap prefilter rather than the only gate: the Cursor",
+              "names StrReplace/EditNotebook are handled there, not here."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          }
+        ]
       }
     ],
     "Stop": [

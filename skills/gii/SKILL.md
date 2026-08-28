@@ -202,6 +202,20 @@ What the loop still does, in every mode:
   next rather than halting; stop only if no independent issues remain (per the
   stopping conditions above)
 
+## Single-branch-scoped sessions cap a wave at one PR
+
+Some web/remote sessions are scoped so the agent proxy allows pushing **only** to the harness-assigned branch --- see [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)'s "Exception" section.
+The stacking mechanics in step (c) above assume a fresh branch is available per issue;
+under that exception it is not, since a push to any branch other than the assigned one is rejected outright and stacking a second issue's branch off the first would need one.
+
+Detect this from the harness's own session instructions (a "Develop on branch `<name>`" directive with no mention of creating additional branches), not from a failed push --- discovering the restriction via a rejected push means the issue's implementation work already happened for nothing.
+When it applies, treat the wave boundary in step (d) as reached after the **first** issue's PR goes clean, not after the configured max: report the single-PR wave as done, name the constraint, and stop rather than attempting to grab a second issue that has nowhere to land.
+
+- **Do:** check for a single-branch harness restriction before starting the loop, and cap the wave at one issue when it applies.
+- **Do:** name the constraint in the final report rather than silently stopping after one issue with no explanation.
+- **Don't:** discover the restriction by attempting a second issue's branch and hitting a rejected push.
+- **Don't:** ask the user whether to continue --- report the one-PR wave as the session's natural stopping point, per the wave-boundary handling above.
+
 ## Anti-patterns
 
 - ❌ Stacking more than 3–4 MRs deep without asking (merge conflicts compound)

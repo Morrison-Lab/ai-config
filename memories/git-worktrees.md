@@ -518,6 +518,54 @@ reported 51 check runs complete and none failing, for a PR whose head was
 `d877f6d`.
 Re-running it against the real head returned 32.)
 
+### A third failure mode: switching that checkout's BRANCH
+
+The two modes above are about your own work going somewhere unintended --- a
+commit on the wrong branch, a query about the wrong commit.
+There is a third, and it damages somebody else instead: `git checkout <branch>`
+run against the main checkout moves **that checkout's** branch, and in a
+multi-session setup the main checkout is routinely where a *peer* session is
+working.
+
+It is the quietest of the three.
+A stray commit leaves a commit, and a stray query leaves a number you can
+re-derive.
+A branch switch leaves nothing on the branch you were on --- the other
+session's next command simply operates on a tree it did not choose, and reads
+as though it had.
+It also passes every check the other two teach: no file changed, `git status`
+is clean, and the command reported success.
+
+The trigger is post-merge tidying, which is exactly when the reflex to run
+`git branch -d` fires and exactly when a `cd <repo-root>` prefix looks
+harmless.
+`git branch -D` then refuses with `cannot delete branch 'X' used by worktree`,
+and [`flag-session-boundaries`](../shared/workflow/flag-session-boundaries.md)
+already warns not to read that refusal as evidence of a live worktree --- but
+the natural next move, checking out something else so the delete can proceed,
+is the mistake itself.
+
+Recovery is one command and costs nothing **if you notice**: read
+`git branch --show-current` before switching, and put it back.
+Noticing is the whole difficulty.
+
+- **Do:** read the target checkout's current branch before switching it, and
+  restore it afterwards if it was not yours.
+- **Do:** delete a merged branch with `git -C <path> branch -D`, or from the
+  worktree after moving that worktree off it --- never by switching a checkout
+  you do not own.
+- **Don't:** switch the main checkout's branch to clear a `used by worktree`
+  refusal; move the *worktree* instead, which is the checkout you own.
+
+(`Morrison-Lab/gha#719`, 2026-08-28: post-merge cleanup ran
+`cd <repo-root> && git checkout <worktree-branch>`, which moved the main
+checkout off a peer session's branch and succeeded silently.
+Caught only because the following `git branch -D` named the worktree in its
+refusal.
+The same session then edited a file in that checkout twice more, and hit its
+uncommitted-changes guard on a third attempt --- so the section above describes
+a mistake that recurs within one session even after being recognized.)
+
 ## A repo script run from a worktree can measure the MAIN checkout, because it resolves paths relative to itself
 
 The section above is about a `cd` that sends *you* to the wrong checkout.

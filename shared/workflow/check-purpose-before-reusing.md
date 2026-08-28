@@ -331,6 +331,62 @@ A bare present-tense count would therefore have been true when written and
 false on merge, which is this section's own subject arriving one artifact
 early: the sentence stayed put while the file underneath it moved.)
 
+## Replacing a text scan with a structural walk drops whatever the text scan reached incidentally
+
+Every section above is about reuse: a template, a helper, a claim, carried
+somewhere it does not fit.
+This is the inverse move --- a **replacement** --- and it inverts the check
+along with it.
+There the purpose is what fails to transfer while the structure fits.
+Here the purpose transfers exactly, the new implementation is better on every
+case anyone names, and what fails to transfer is the old one's **reach**.
+
+The shape is a regex, a glob, or a `grep` giving way to something that parses.
+Parsing is the right call: it is precise where the scan was approximate, and
+it stops matching things that merely look like matches.
+But a text scan's population is *whatever the pattern happened to hit*, and
+that set is written down nowhere.
+It is not in the code, which contains only the pattern.
+It is not in the tests, which cover the cases someone thought of.
+So the new walk is checked against the old one's **purpose**, which it serves
+perfectly, and never against its **extent** --- and the difference is silent by
+construction, because the dropped population is definitionally the one nobody
+enumerated.
+
+It is worse than an ordinary regression on two counts.
+The replacement reads as a strict improvement, so it attracts less scrutiny
+than an equal-power rewrite would.
+And the loss is invisible to the tests written *for* the replacement, since
+those are derived from the new design.
+
+The check is one question, asked before the old code is deleted rather than
+after: **what did the old pattern match that I have not thought about?**
+Answer it by running the old pattern and reading its output, not by reasoning
+about it.
+A line-anchored `^\s*token:` is described in one clause and matches several
+unrelated constructs, and enumerating them takes one command.
+
+- **Do:** run the pattern being retired and read every line it matched, before
+  deleting it.
+- **Do:** write a test for each construct the old form reached that the new
+  design did not set out to cover --- those are the regressions, and nothing
+  else will catch them.
+- **Don't:** treat "the new implementation is strictly more precise" as
+  evidence it is at least as complete; precision and reach are different axes
+  and a parser trades one for the other by default.
+- **Don't:** derive the replacement's test set from the replacement's own
+  design, which is what makes the loss unobservable.
+
+(`Morrison-Lab/gha#719`, 2026-08-28, twice in one diff.
+A `^\s*token:` regex was replaced by a walk over parsed steps, which dropped
+job-level `with:`/`secrets:` blocks the regex had covered incidentally --- a
+reusable-workflow caller passes values through those, and no walk over `steps`
+reaches them.
+Separately, a `^\s*uses:` regex was replaced, and there the audit had to be
+checked against *both* step spellings rather than the one the regex saw.
+Both were found by an external reviewer; neither was visible to the new
+suite's own cases.)
+
 ## In review
 
 Flag a diff that introduces a structure closely mirroring an existing one

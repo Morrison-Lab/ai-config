@@ -345,10 +345,10 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: Measured 2026-08-27/28 on ai-config#2313 (five consecutive stuck rounds) and #2341.
   CI reached a fully green state on both and the loop still reproduced, because loop (b) reads the checker's exit rather than the checks themselves --- so the loop survives CI completing.
   A steering PR comment quoting the reviewer's own "no content defect" words back to it did not break the loop either;
-  only a prompt-level fix (a "Verdict semantics" addendum to `claude-review.yml`, PR #2486) closed it.
-  Tracked as [ai-config#2475](https://github.com/Morrison-Lab/ai-config/issues/2475).
+  only a prompt-level fix (a "Verdict semantics" addendum to `claude-review.yml`, shipped in PR #2486, merged) closed it.
+  Tracked as [ai-config#2475](https://github.com/Morrison-Lab/ai-config/issues/2475), which #2486 closed.
   Pattern 20 below is a second, independent stuck-verdict mechanism from the same PR (#2341) --- the two do not share a fix.
-- **Canonical Rule**: [`review-verdict-pitfalls.md`](../shared/workflow/review-verdict-pitfalls.md)'s reconciliation paragraph (added on PR #2486) and [`fully-clean.md`](../shared/workflow/fully-clean.md)'s three-way exit-status read.
+- **Canonical Rule**: [`review-verdict-pitfalls.md`](../shared/workflow/review-verdict-pitfalls.md)'s reconciliation paragraph (shipped in PR #2486, merged) and [`fully-clean.md`](../shared/workflow/fully-clean.md)'s three-way exit-status read.
 - **Fix**: When a "Needs more work" verdict recurs across rounds with no new content finding, check whether it cites (a) its own run's in-flight sibling checks or (b) the checker's exit status before assuming a re-run will converge --- loop (b) does not resolve on its own even once CI is fully green.
   A steering comment restating the reviewer's own words is not a reliable fix for either loop;
   the actual fix has to change what future rounds are told to condition on.
@@ -403,7 +403,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-27/28, ai-config#2371 / PR #2478: the first fix for point 4 printed "found in NO scope --- neither org-level nor any repo copy" on the `--repos`-only code path, where the org-level sweep never ran.
   The reviewer reproduced the false claim directly.
 - **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) (a guard's pass path must not be reachable by its failure path, applied here to a message's claimed scope rather than to a boolean outcome).
-  Pattern 23 above and [`github-actions-secrets.md`](github-actions-secrets.md)'s #2371 entry carry the same underlying issue/PR (#2371 / PR #2478) this pattern was found on.
+  This pattern was found on #2371 / PR #2478, the same issue as Pattern 23 above;
+  [`github-actions-secrets.md`](github-actions-secrets.md) carries the root-cause bug tracked as #2371 (it predates PR #2478 and does not cite it).
 - **Fix**: When adding an error/exit branch, enumerate the flag combinations that can reach it and word the message to name only what was actually examined on that path.
   Never reuse a full-sweep message on a narrowed path.
 - **Algorithmatizable?**

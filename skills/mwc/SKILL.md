@@ -63,10 +63,16 @@ Derive the age rather than judging it, per [`algorithmatize-checks`](../../share
 
 ```bash
 gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
-  | jq -r '[.[] | select(.body | test("\\*\\*Claude finished"))] | last | .created_at'
+  | jq -s -r '[.[][] | select(.body | test("\\*\\*Claude finished"))] | last | .created_at'
 ```
 
 against `date -u +%Y-%m-%dT%H:%M:%SZ`.
+
+The `-s` and the double flatten are both load-bearing, and their absence is invisible on any PR small enough to test on.
+`--paginate` emits **one array per page** rather than one combined array, so without `-s` the filter runs once per page and prints one timestamp per page.
+A PR under 100 comments has a single page and gives the right answer either way;
+a longer one prints several timestamps into a step that expects exactly one, which is the shape that silently produces a wrong comparison rather than an error.
+The same pattern is already written correctly in `CLAUDE.md`'s review-verdict query, and matching it is the point.
 Run `check-pr-fully-clean.py` first regardless: the threshold is a *second* condition, never a substitute for the clean reading, and an old not-clean PR is exactly as unmergeable as a new one.
 
 ### Warn the peer before you merge, and give it five minutes to object

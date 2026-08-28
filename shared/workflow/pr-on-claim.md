@@ -141,9 +141,22 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 See [`pr-on-claim.cases.md`](pr-on-claim.cases.md),
 "A redaction PR must not get an AI reviewer".
 
-**Don't mark ready within seconds of the final push --- the two review runs race
-and the WRONG one can get cancelled.** On repos whose review workflow runs on
-`pull_request` (`synchronize`, `ready_for_review`) with `concurrency:
+**Don't mark ready within seconds of the final push --- the two review runs race and the WRONG one can get cancelled.**
+On repos whose review workflow runs on `pull_request` (`synchronize`, `ready_for_review`) with `concurrency: cancel-in-progress`, a push followed immediately by `gh pr ready` fires two runs a second apart, and the cancellation can land on the newer one, leaving the current head with a cancelled review job and a red require-review check while an older, nominally-stale run posts the real verdict.
+See [`pr-on-claim.rationale.md`](pr-on-claim.rationale.md) for the full mechanism and the recovery command.
+
+**The race has a second, sharper failure direction, and it is worse than a cancellation: no `ready_for_review` run at all.**
+A cancelled run at least leaves a check to read and a run to re-run.
+This direction leaves nothing --- no cancelled run, no red check, just an event GitHub never fired.
+Measured on `Morrison-Lab/gha#702`, 2026-08-28: `git push` and `gh pr ready` issued in the same shell invocation, roughly 3 seconds apart, produced only the push's `pull_request`/`synchronize` run --- which correctly skipped, since the PR was still draft in its own event payload --- and no `ready_for_review` run whatsoever, confirmed by listing every run of the caller workflow in the window (`gh run list --workflow=<caller>.yml`), not by reading a single run's conclusion.
+The PR sat CI-green and comment-free, which reads from the thread exactly like "review pending" rather than like anything broken.
+The same push-then-ready sequence with roughly 30 seconds between the two commands, on `Morrison-Lab/gha#704` the same hour, produced both runs, with the `ready_for_review` one reviewing normally.
+Recovery: dispatch the review workflow directly with the PR number (`gh workflow run <caller>.yml -f pr_number=<N>`), since re-mentioning the bot has nothing to react to when no run exists.
+
+- **Do:** leave a deliberate gap of tens of seconds, not one or two, between the final push and `gh pr ready`.
+- **Do:** confirm a `ready_for_review` run actually exists (`gh run list --workflow=<caller>.yml`) before waiting on its review, rather than trusting green CI and silence to mean review-in-flight.
+- **Don't:** read a green-CI, comment-free PR as "review pending" without checking that a run exists for the ready event --- an absent run and a slow one look identical from the thread.
+- **Don't:** assume a several-second gap is safe because an earlier incident used one too --- gha#702's roughly-3-second gap dropped the run entirely, while gha#704's roughly-30-second gap produced both runs cleanly.
 
 **Check whether the race can even arise before paying for that wait --- on
 many repos it cannot, and the check is one field.**

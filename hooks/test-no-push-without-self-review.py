@@ -325,6 +325,10 @@ CASES = [
      "a <> operator and its target are both blanked"),
     ("git push origin main <<< somevar", reviewed(), False,
      "a herestring operator and its word are both blanked"),
+    ("git push origin main >| clobber.txt", reviewed(), False,
+     "a noclobber-override >| operator and its target are both blanked"),
+    ("git push origin main 0<&-", reviewed(), False,
+     "an input-fd duplication <& is blanked, symmetric with >&"),
     (f"git -C {REPO} push origin main feature", reviewed(), True,
      "one unreviewed ref among several blocks the whole push"),
 

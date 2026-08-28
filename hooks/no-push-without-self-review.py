@@ -457,7 +457,7 @@ def _blank_shell_redirections(command: str) -> str:
         # review round: &>>, <>, <<<).
         elif command[i:i + 3] == "&>>":
             i += 3
-        elif command[i:i + 2] in (">>", ">&", "&>", "<>"):
+        elif command[i:i + 2] in (">>", ">&", "<&", "&>", "<>", ">|"):
             i += 2
         else:
             i += 1

@@ -527,89 +527,108 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 _BASE_INLINE_SPAN = re.compile(r"`[^`\n]*`")
 
 
-def _blank_ranges(line: str, ranges: List[Tuple[int, int]]) -> str:
-    """Replace each half-open range with a single space, merging overlaps.
+# Fill character for the region this function blanks BEYOND origin/main's own
+# spans. Not a space: the negation prefix and suffix checks in classify_verdict
+# are anchored and skip whitespace, so a space-filled region lets a negator
+# reach a finding it was never adjacent to. Not a word character either, so it
+# joins no token and forms no vocabulary. `~` in particular is safe here because
+# strip_fences has already run, so a tilde can no longer be read as a fence.
+_CITATION_FILLER = "~"
 
-    One space per merged range, matching what ``re.sub(pattern, " ", line)``
-    produces for non-overlapping matches, so a line whose ranges all come from
-    ``_BASE_INLINE_SPAN`` is blanked byte-identically to the base.
+
+def _blank_line_spans(line: str) -> str:
+    r"""Blank one line's inline code spans, at any delimiter run length.
+
+    Produces ``origin/main``'s output with additional characters replaced by
+    spaces, and NOTHING else -- same length, same offsets, same everything the
+    downstream passes measure. Three properties get that, and each was forced by
+    a fail-open found in review of an earlier version of this fix.
+
+    **Both span sets are matched against the unmodified line.** ``origin/main``
+    pairs backticks strictly consecutively, so any edit before its pattern runs
+    can shift every downstream pair. Blanking multi-delimiter spans first and
+    then applying the base pattern to the result flips the parity of everything
+    after a span whose interior holds an ODD number of backticks. CommonMark's
+    idiom for a literal backtick, ``` `` ` `` ```, is exactly that shape:
+
+        ``a`b`` ` Needs more work `` tail
+
+    ``Needs more work`` is in no code span there; ``origin/main`` says
+    not-clean and the sequential version said clean.
+
+    **The extra region keeps its width and is filled with a non-word,
+    non-space character.** ``classify_verdict`` measures its negation windows in
+    characters -- 25 before a match, 60 after -- and those negations are
+    anchored, so they skip whitespace but stop at anything else. Collapsing a
+    span to one space drags a negator into range across a finding that sits in
+    no code span at all, and filling it with spaces still lets the anchor run
+    straight through:
+
+        Needs more work ``on the `--fix` guard``: none elsewhere.
+        No ``--fix flag here`` Needs more work in scripts/x.py.
+
+    ``origin/main`` reads both not-clean. A collapsing version reads both clean,
+    and so does a width-preserving version filled with spaces -- width alone is
+    not enough, because it is the anchor and not the distance that decides.
+    ``_CITATION_FILLER`` is therefore an opaque barrier: it occupies the same
+    width, matches no finding vocabulary, and stops an anchored negation exactly
+    as the cited words did. Only ``origin/main``'s OWN spans collapse to a
+    single space, exactly as it does.
+
+    **Asterisks are preserved.** ``_blank_quote`` below keeps a double-quoted
+    span that carries a ``**`` finding label, because blanking one could hide an
+    incidentally-quoted real finding. When the only ``**`` sits inside a code
+    span, blanking it defeats that guard and the whole quoted span goes,
+    carrying a finding that was outside the span:
+
+        The body says "the ``**Location:**`` marker is optional, but Needs
+        more work on the guard".
+
+    Keeping the asterisks leaves the guard able to fire. It cannot create a
+    false finding: no finding pattern matches bare ``**`` with its words
+    blanked, and every effect runs toward blanking LESS.
+
+    Two limits a later reader should know, both failing safe:
+
+    - Spans are bounded to one line, because ``CODE_SPAN_RE`` bounds a span by a
+      blank line and would otherwise pair stray backticks on adjacent lines
+      across the finding between them. A citation wrapped onto a second line by
+      ``shared/writing/semantic-line-breaks.md`` is therefore still not blanked,
+      so #2449 persists for that shape. It over-flags, which is the safe
+      direction, but it is a coverage limit and not only a safety property.
+    - ``CODE_SPAN_RE.finditer`` retries each failing opener, so a line of
+      ascending backtick runs costs roughly O(n^1.5): about 1.5 s at GitHub's
+      65,536-character comment limit, against 5 ms for the base pass. A
+      realistic 30 KB body costs about 8.5 ms.
     """
-    if not ranges:
-        return line
-    merged: List[List[int]] = []
-    for start, end in sorted(ranges):
-        # Strictly less-than: two ABUTTING ranges stay separate, because the
-        # base emits one space per match and merging them would emit one space
-        # for two -- shifting every downstream offset the prefix and suffix
-        # windows in classify_verdict are measured in. `a``b` is two abutting
-        # base matches and must stay two blanks.
-        if merged and start < merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], end)
-        else:
-            merged.append([start, end])
+    base_ranges = [m.span() for m in _BASE_INLINE_SPAN.finditer(line)]
+    covered = bytearray(len(line))
+    for match in CODE_SPAN_RE.finditer(line):
+        if len(match.group(1)) >= 2:
+            start, end = match.span()
+            covered[start:end] = b"\x01" * (end - start)
+
     out: List[str] = []
-    prev = 0
-    for start, end in merged:
-        out.append(line[prev:start])
-        out.append(" ")
-        prev = end
-    out.append(line[prev:])
+    index = 0
+    next_base = 0
+    while index < len(line):
+        if next_base < len(base_ranges) and index == base_ranges[next_base][0]:
+            # origin/main's own span: one space, exactly as it substitutes.
+            out.append(" ")
+            index = base_ranges[next_base][1]
+            next_base += 1
+            continue
+        char = line[index]
+        if covered[index] and char != "*":
+            char = _CITATION_FILLER
+        out.append(char)
+        index += 1
     return "".join(out)
 
 
 def _strip_inline_code_spans(text: str) -> str:
-    r"""Blank inline code spans, within a line, at any delimiter run length.
-
-    Both span sets are matched against the SAME unmodified line and blanked
-    together by offset. That is the whole design, and the reason is that
-    ``origin/main`` pairs backticks strictly consecutively -- (1,2), (3,4),
-    (5,6) -- so ANY edit to the line before its pattern runs can shift every
-    downstream pair.
-
-    An earlier version of this fix ran the two as sequential passes: blank the
-    multi-delimiter spans, then apply the base pattern to what was left. That
-    reuses the base's regex, which is not the same as preserving the base's
-    behaviour, because the regex is only half of it and the input is the other
-    half. Removing a span whose interior holds an ODD number of backticks flips
-    the parity of everything after it, and text ``origin/main`` left exposed
-    becomes blanked. The idiom ``` `` ` `` ``` -- CommonMark's way of writing a
-    literal backtick, and present throughout this corpus -- has exactly one
-    interior backtick, so it is not a corner case:
-
-        ``a`b`` ` Needs more work `` tail
-
-    ``Needs more work`` sits in no code span there (the trailing run of two
-    cannot close the lone backtick before it), ``origin/main`` reports
-    not-clean, and the sequential version reported clean. Matching both sets
-    against the original line and taking the union of their offsets cannot do
-    that: the base's own matches are exactly the matches it would have made
-    alone, whatever else is on the line.
-
-    So the two span sets are:
-
-    1. ``_BASE_INLINE_SPAN``, ``origin/main``'s pattern, matched on the
-       unmodified line. Its offsets reproduce the base blanking exactly.
-    2. ``lib.fences.CODE_SPAN_RE``, gated to a delimiter run of two or more.
-       This is the one axis the function widens. A run of 2+ is the only way
-       CommonMark lets a span quote text that itself contains a backtick, which
-       is what a review of this corpus does constantly, so before this the
-       commonest citation form in these reviews was not recognized at all.
-
-    Both are applied per line, so no span straddles a newline. ``CODE_SPAN_RE``
-    bounds a span by a blank line rather than by a line ending, and run over a
-    whole body it pairs stray backticks on adjacent lines across the finding
-    between them.
-    """
-    out = []
-    for line in text.split("\n"):
-        ranges = [m.span() for m in _BASE_INLINE_SPAN.finditer(line)]
-        ranges += [
-            m.span()
-            for m in CODE_SPAN_RE.finditer(line)
-            if len(m.group(1)) >= 2
-        ]
-        out.append(_blank_ranges(line, ranges))
-    return "\n".join(out)
+    """Blank inline code spans line by line (see ``_blank_line_spans``)."""
+    return "\n".join(_blank_line_spans(line) for line in text.split("\n"))
 
 
 def strip_cited_finding_vocab(text: str) -> str:
@@ -713,10 +732,12 @@ def strip_cited_finding_vocab(text: str) -> str:
 
     The old pattern matched the two INNER single-backtick pairs around the SHA
     and left ``(Needs more work)`` exposed, so a Ready-for-merge review read NOT
-    clean. Note the spaces inside the outer run of two: without them a run of
-    three would abut the inner content, could not close a run of two, and
-    CommonMark would leave the whole thing unspanned -- a variant this change
-    does not affect.
+    clean. The outer spaces are optional padding, not load-bearing: the quoted
+    content neither starts nor ends with a backtick, so removing them still
+    leaves a run of two closed by a run of two, and the no-spaces form is fixed
+    identically. (An earlier draft of this docstring claimed otherwise. A run of
+    three only arises when the content itself begins or ends with a backtick,
+    and that form CommonMark leaves unspanned.)
 
     Fixing that removes ONE of the two not-clean signals #2449 measured on
     #2431. The other, ``No blocking findings`` matching the bare-rejection

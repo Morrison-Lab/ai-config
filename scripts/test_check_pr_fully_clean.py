@@ -2929,6 +2929,25 @@ def main() -> int:
         "The pattern @@a\nNeeds more work in b.py\nis wrong@@.\n"
     ).replace("@", B)
 
+    # (d) Collapsing or space-filling a 2+ span lets classify_verdict's anchored
+    #     negation windows reach a finding that sits in no code span at all.
+    negation_suffix_reach = (
+        "## Verdict: Ready for merge\n\n"
+        "Needs more work @@on the @--fix@ guard@@: none elsewhere.\n"
+    ).replace("@", B)
+    negation_prefix_reach = (
+        "## Verdict: Ready for merge\n\n"
+        "No @@--fix flag here@@ Needs more work in scripts/x.py.\n"
+    ).replace("@", B)
+    # (e) _blank_quote keeps a quoted span carrying a ** finding label. When the
+    #     only ** sits inside a 2+ span, blanking it defeats that guard and the
+    #     whole quoted span goes, taking a finding that was outside the span.
+    bold_label_inside_span = (
+        "## Verdict: Ready for merge\n\n"
+        'The PR body says "the @@**Location:**@@ marker is optional, but '
+        'Needs more work on the guard".\n'
+    ).replace("@", B)
+
     for label, body in (
         ("an unclosed multi-backtick run does not re-pair lone backticks", stray_run_same_line),
         ("a bold-labelled finding survives an unclosed multi-backtick run", stray_run_bold_label),
@@ -2936,6 +2955,9 @@ def main() -> int:
         ("the same parity shift in realistic prose", parity_shift_prose),
         ("stray backticks on adjacent lines do not pair", stray_backticks_across_lines),
         ("a 2+ span cannot straddle a newline", multiline_span_across_finding),
+        ("an anchored negation cannot reach across a blanked span", negation_suffix_reach),
+        ("the same, on the prefix side", negation_prefix_reach),
+        ("a ** label inside a span still protects its quoted span", bold_label_inside_span),
     ):
         check(f"live finding survives: {label} (#2449)",
               checker.classify_verdict(body) == "not-clean")
@@ -2965,11 +2987,8 @@ def main() -> int:
         return "\n".join(out)
 
     def _whole_body(text: str) -> str:
-        """(c) the same union, but not bounded per line."""
-        ranges = [m.span() for m in checker._BASE_INLINE_SPAN.finditer(text)]
-        ranges += [m.span() for m in _SPAN_RE.finditer(text)
-                   if len(m.group(1)) >= 2]
-        return checker._blank_ranges(text, ranges)
+        """(c) the same blanking, but not bounded per line."""
+        return checker._blank_line_spans(text)
 
     def _under(variant, body):
         checker._strip_inline_code_spans = variant
@@ -3004,6 +3023,56 @@ def main() -> int:
         _under(
             lambda text: _SPAN_RE.sub(" ", text), stray_backticks_across_lines
         ) != "not-clean",
+    )
+    def _space_filled(text: str) -> str:
+        """(e) the same blanking, but the extra region filled with spaces.
+
+        The negation checks in classify_verdict are anchored, so they skip
+        whitespace and stop at anything else. A space-filled region lets a
+        negator reach a finding it was never adjacent to, even at identical
+        width.
+        """
+        out = []
+        for line in text.split("\n"):
+            blanked = checker._blank_line_spans(line)
+            out.append("".join(
+                " " if c == checker._CITATION_FILLER else c for c in blanked
+            ))
+        return "\n".join(out)
+
+    def _no_asterisk_keep(text: str) -> str:
+        """(f) the same blanking, but asterisks blanked along with the rest."""
+        out = []
+        for line in text.split("\n"):
+            blanked = checker._blank_line_spans(line)
+            base_spans = [m.span() for m in checker._BASE_INLINE_SPAN.finditer(line)]
+            covered = bytearray(len(line))
+            for m in _SPAN_RE.finditer(line):
+                if len(m.group(1)) >= 2:
+                    for i in range(*m.span()):
+                        covered[i] = 1
+            chars, index, nb = [], 0, 0
+            while index < len(line):
+                if nb < len(base_spans) and index == base_spans[nb][0]:
+                    chars.append(" ")
+                    index = base_spans[nb][1]
+                    nb += 1
+                    continue
+                chars.append(
+                    checker._CITATION_FILLER if covered[index] else line[index]
+                )
+                index += 1
+            out.append("".join(chars))
+        return "\n".join(out)
+
+    check(
+        "control (e): filling the extra region with spaces flips its own guards",
+        _under(_space_filled, negation_suffix_reach) != "not-clean"
+        and _under(_space_filled, negation_prefix_reach) != "not-clean",
+    )
+    check(
+        "control (f): blanking asterisks too flips the quoted-label guard",
+        _under(_no_asterisk_keep, bold_label_inside_span) != "not-clean",
     )
     check(
         "control (c) does NOT flip the same-line guards (isolates one branch)",

@@ -2865,10 +2865,11 @@ def main() -> int:
     # A single-backtick pattern matches only the INNER pairs of a
     # double-backtick span and leaves the outer content exposed, so a
     # Ready-for-merge verdict quoting a phrase that itself contains a backtick
-    # read NOT clean. Blanking now runs through lib.fences.strip_code_spans.
+    # read NOT clean. _strip_inline_code_spans now blanks a span at any
+    # delimiter run length.
     double_span_citation = (
-        "Verdict: Ready for merge\n\n"
-        "Cited as @@a @x@ (Needs more work) @y@ @@ above.\n"
+        "## Verdict: Ready for merge\n\n"
+        "Cited as @@a @x@ **(Needs more work)** @y@ @@ above.\n"
     ).replace("@", B)
     check(
         "double-backtick citation of finding vocabulary is blanked (#2449)",
@@ -2884,11 +2885,37 @@ def main() -> int:
         checker.classify_verdict(single_span_citation) == "clean",
     )
 
-    # The guard on the fix's own fail-open direction. strip_code_spans bounds a
-    # span by a BLANK line, so applied to the whole body it pairs a stray
-    # backtick on one line with a stray backtick on the next and blanks the live
-    # finding between them. The checker applies it per line for exactly this
-    # reason; missing a not-clean is the dangerous direction (fully-clean.md).
+    # The guards on the fix's own fail-open direction. Blanking with the
+    # CommonMark scanner UNGATED -- letting it own single-backtick pairing too
+    # -- loses live findings the base pattern kept, because the scanner refuses
+    # to let a run of 2+ close a run of 1. An unclosed multi-backtick run
+    # elsewhere then pairs two lone backticks across the finding between them.
+    # Both bodies are a review OF this corpus, which is where the shape occurs.
+    stray_run_same_line = (
+        "## Verdict: Ready for merge\n\n"
+        "A stray @@@ opener in @docs/a.md means the block never closes; "
+        "Needs more work in @docs/b.md@.\n"
+    ).replace("@", B)
+    check(
+        "an unclosed multi-backtick run does not re-pair lone backticks across "
+        "a live finding (#2449)",
+        checker.classify_verdict(stray_run_same_line) == "not-clean",
+    )
+
+    stray_run_bold_label = (
+        "## Verdict: Ready for merge\n\nReviewed-Commit: abc1234\n\n"
+        "The helper @@@ is fine, but @scripts/check-links.py still uses the "
+        "hand-rolled pattern; **[Defect]** Needs more work in "
+        "@scripts/check-stale-records.py@.\n"
+    ).replace("@", B)
+    check(
+        "a bold-labelled finding survives an unclosed multi-backtick run (#2449)",
+        checker.classify_verdict(stray_run_bold_label) == "not-clean",
+    )
+
+    # Cross-line direction: the scanner bounds a span by a BLANK line, so run
+    # over a whole body it pairs stray backticks on ADJACENT lines. Hence the
+    # per-line application.
     stray_backticks_across_lines = (
         "Verdict: Ready for merge\n\n"
         "Fix @a.py now.\nNeeds more work in @b.py@.\n"
@@ -2898,23 +2925,40 @@ def main() -> int:
         checker.classify_verdict(stray_backticks_across_lines) == "not-clean",
     )
 
-    # Neutering control for the test directly above: replace the per-line
-    # application with a whole-body one and confirm the finding is then LOST.
-    # A guard test that still passes under the neutered branch guards nothing
-    # (memories/mistake-patterns.md Pattern 15).
+    # Neutering controls. A guard test that still passes with its guarded
+    # branch removed guards nothing (memories/mistake-patterns.md Pattern 15),
+    # so each of the three guards above is re-run against the variant it exists
+    # to rule out, and must FLIP.
     from fences import strip_code_spans as _strip_spans
 
     _real_helper = checker._strip_inline_code_spans
-    try:
-        checker._strip_inline_code_spans = (
-            lambda text: _strip_spans(text, replacement=" ")
+
+    def _ungated_per_line(text: str) -> str:
+        """The scanner owning single-backtick pairing too (drops the gate)."""
+        return "\n".join(
+            _strip_spans(line, replacement=" ") for line in text.split("\n")
         )
-        neutered = checker.classify_verdict(stray_backticks_across_lines)
-    finally:
-        checker._strip_inline_code_spans = _real_helper
+
+    def _whole_body(text: str) -> str:
+        """The scanner run over the whole body (drops the per-line bound)."""
+        return _strip_spans(text, replacement=" ")
+
+    def _under(variant, body):
+        checker._strip_inline_code_spans = variant
+        try:
+            return checker.classify_verdict(body)
+        finally:
+            checker._strip_inline_code_spans = _real_helper
+
     check(
-        "neutering the per-line bound flips the cross-line guard (discriminates)",
-        neutered != "not-clean",
+        "dropping the delimiter-length gate flips the same-line guards "
+        "(they discriminate)",
+        _under(_ungated_per_line, stray_run_same_line) != "not-clean"
+        and _under(_ungated_per_line, stray_run_bold_label) != "not-clean",
+    )
+    check(
+        "dropping the per-line bound flips the cross-line guard (discriminates)",
+        _under(_whole_body, stray_backticks_across_lines) != "not-clean",
     )
 
     print(f"\n{passes} passed, {failures} failed")

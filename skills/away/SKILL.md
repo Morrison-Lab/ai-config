@@ -37,7 +37,7 @@ information or authorization only the user holds.
 - Any similar standing grant to stop blocking on the user for the rest of
   the session
 
-Distinguish from [`daytb`](../daytb/SKILL.md), or a one-off "just proceed" on a single pending question --- `daytb` covers ONE decision and expires immediately;
+Distinguish from [`daytb`](../daytb/SKILL.md), or a one-off "just proceed" on a single pending question --- `daytb` covers one decision and its same-task follow-ons, expiring with that task;
 `away` is a session-scoped mode for everything still to come.
 
 ## Scope and limits

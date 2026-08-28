@@ -407,16 +407,18 @@ The same role carries harness continuations, stop-hook output, injected skill bo
 Matching one of those and calling it a hit is the adjacent-artifact substitution: a copy of the claim rather than the source, arriving with a verification's authority.
 
 So the outcome per record is three-way rather than two-way, and the third value is the load-bearing one.
-The harness labels a genuinely typed turn `origin.kind == "human"`, which is authoritative in both directions when present.
-A record that survives every exclusion but carries no such label is **unattributed** --- a candidate, never evidence.
+The harness labels a typed turn `origin.kind == "human"`, which is the strongest signal available and is still weaker than it sounds:
+it records how a message entered the session rather than that someone typed it, it is absent entirely on some paths, and a genuine turn is demoted to `unclassified` on others.
+So a record carrying no such label is **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
 That distinction is not fastidiousness.
 An earlier version of this check classified on the exclusions alone, and an assistant-written dispatch brief passed all of them, so the tool certified the assistant's own prose as the user's words.
-The exclusion list is hand-maintained against one snapshot of the transcript format;
-the label is not.
+The version after that classified per *record*, and a human-labelled record carrying an injected second block certified that block the same way --- so the verdict is now per block, and a record's verdict is a ceiling rather than an answer.
 
 The exit codes keep apart two things that are easy to conflate:
 a phrase absent from the human-labelled turns (`1`), and a space in which no such turn was ever found (`2` --- no transcript root, an unreadable file, or no labelled turns at all).
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
+`--allow-unattributed` accepts a candidate at a fourth code, `3`, for the same reason:
+it readmits exactly the failure above, so a caller reading exit codes must not see it as `0`.
 Every run prints what it examined, so a zero is never mistaken for a detector that never engaged.
 
 Two things make the quotation marks worse than an ordinary misremembering.
@@ -457,11 +459,14 @@ If you do put the user's words in quotation marks in a PR comment, that is the c
   The harness never called it a human turn, and a compaction summary, a subagent brief, and an injected skill body are all assistant prose wearing a user-role field.
 - **Don't:** read exit `2` as an absence.
   It says the space was never searched, and reporting it as "never said" is the substitution one level up.
+- **Don't:** run it again with `--allow-unattributed` and report exit `3` as the user's words.
+  That is this section's own near-miss: the flag makes the instrument agree with you, and an assistant-written dispatch brief is precisely what it readmits.
 - **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
   That is a copy of the claim, and it is the move that most looks like compliance.
 
 The Claude Code paths above are specific to that harness.
-On another agent, `--root` takes a transcript directory; where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
+On another agent, `--root` takes a transcript directory;
+where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
 
 (2026-08-28, [ai-config#2538](https://github.com/Morrison-Lab/ai-config/issues/2538).
 Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I put a sentence of my own inside quotation marks and attributed it to the user.
@@ -470,13 +475,13 @@ A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
 The script finds **no human turn** for either sentence, over 22 files and 6,927 records carrying 2,057 user-role records and 2 human-labelled turns.
-`--show-excluded` places the replacement in an inter-agent coordinator message and finds the original in no user-role record at all --- it was only ever mine.
+`--show-excluded` places the replacement --- "This is the last correction round: fix the five, push, report the head" --- in an inter-agent coordinator message, and finds the original in no user-role record at all: it was only ever mine, so it is not reproduced.
 The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
 each passed its own local suite, and what refuted each was executing something.)
 
 ## A permalink that resolves can still cite the wrong content
 
-The metadata-versus-content split two sections above has a link-checking
+The paraphrase-only section's metadata-versus-content split has a link-checking
 form, and there the false signal is stronger: an HTTP `200` feels like
 verification.
 It is not.

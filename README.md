@@ -300,7 +300,9 @@ Decides whether a sentence you are about to attribute to the user was ever typed
 python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
 ```
 
-Exit `0` found in a turn the harness labels human, `1` absent from every such turn, `2` no such turn was found to search (no transcript root, an unreadable file, or an unlabelled transcript --- `--allow-unattributed` falls back on the weaker heuristic).
+Exit `0` found in a block the harness labels human, `1` absent from every such block, `2` no such block was available to search --- a missing root, an unreadable file, an empty phrase, a crash, or a transcript carrying no labels.
+Only that last cause is answerable by `--allow-unattributed`, which accepts an unlabelled match at exit `3`;
+that readmits the failure the tool exists to prevent, since an assistant-written dispatch brief is unattributed, so treat exit `3` as a lead rather than a source.
 Pass `--root` on an agent whose transcripts live elsewhere.
 
 [`shared/writing/citations.md`](shared/writing/citations.md) carries why the classification is three-way rather than two-way, and why a bare grep over the same file is worse than no check.

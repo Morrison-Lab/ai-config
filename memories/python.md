@@ -237,3 +237,21 @@ That is the explicit, bounded, observable fallback that fragment asks for rather
 - **Do:** harden the output stream, so a value the console cannot encode does not destroy an answer already computed.
 - **Don't:** leave exit 1 meaning both "the answer is no" and "there is no answer".
 - **Don't:** read a bare `except Exception` as automatically wrong --- it is wrong when it hides the failure, not when it classifies it.
+
+## `-W` reaches only the interpreter it is given to; a spawned child starts with a fresh filter
+
+A `python3 -W error::SyntaxWarning script.py` flag governs the warnings filter of *that one process*.
+It does not survive into a child `python` process the script itself spawns via `subprocess.run`/`Popen` --- the child starts with its own default filter, unaware the parent was ever given a flag at all.
+Only environment variables cross that boundary: `PYTHONWARNINGS` (same `action::category` syntax as `-W`) is read by every interpreter that inherits the environment, parent and child alike.
+
+The trap is specific to a **test harness that spawns its subject as a subprocess** rather than importing it in-process.
+Applying `-W` only to the outer runner passes silently on exactly the case the flag exists to catch, because the warning fires inside the un-flagged grandchild and never becomes an error there.
+The failure is invisible from the outside: the outer process still exits 0, and nothing in its own output distinguishes "no warning occurred" from "a warning occurred where nobody was listening".
+
+- **Do:** set `PYTHONWARNINGS` in the subprocess environment (`env=dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")`) when the goal is for a spawned child to inherit the same warnings-as-errors behavior as its parent.
+- **Do:** verify the propagation empirically --- inject the exact defect class into a subject invoked the same way production invokes it, and confirm the harness actually fails --- rather than trusting that a flag which works on the outer process must also reach an inner one.
+- **Don't:** assume `-W` on the outer interpreter secures anything a subprocess it spawns does.
+
+(Morrison-Lab/ai-config#1969/#2568, 2026-08-28: a fix adding `-W error::SyntaxWarning` to `scripts/test_hooks.py`'s suite runner passed review's own empirical check --- 46/46 suites still green --- because the corpus was already clean of warnings, which proved nothing about whether the mechanism would catch a *new* one.
+Caught in review by injecting an invalid escape sequence into a hook whose test spawns it via `subprocess.run([sys.executable, HOOK], ...)` (36 of 46 suites use this pattern, versus 22 that import in-process): the suite still reported 19/19 correct, exit 0.
+Fixed by switching to `PYTHONWARNINGS`, and reproducing the same injection to confirm the fixed suite now fails.)

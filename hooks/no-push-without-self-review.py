@@ -1063,7 +1063,19 @@ def _blank_fences(text: str) -> tuple[str, bool]:
 
 
 def _blank_html_comments(text: str) -> tuple[str, bool]:
-    """Blank HTML comments, preserving offsets and reporting truncation."""
+    """Blank HTML comments, preserving offsets and reporting truncation.
+
+    Same contract as _blank_fences above, for the same parser: comment
+    spans become equal-shape whitespace (newlines kept, so offsets and
+    line numbers survive), and an unterminated ``<!--`` reports True so
+    the caller fails closed instead of reading whatever follows as live
+    text. A nested ``<!--`` does not restart the span -- the comment ends
+    at the FIRST ``-->``, matching how HTML and CommonMark parse it, so
+    the blanked region is exactly what a renderer would hide. Runs after
+    _blank_fences in parse_report, which keeps a comment opener quoted
+    inside a fence from reading as an unterminated comment
+    (ai-config#2413).
+    """
     out = list(text)
     start = 0
     while (open_at := text.find("<!--", start)) != -1:
@@ -1096,6 +1108,11 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     blanked, unclosed = _blank_fences(text)
     if unclosed:
         return None, None
+    # HTML comments are blanked for the same reason, second: a
+    # commented-out "Verdict:" line sat at line start and was read as the
+    # report's last verdict (ai-config#2413). Fences first, so an opener
+    # quoted inside a fence is already blanked and cannot read as an
+    # unterminated comment.
     blanked, unclosed = _blank_html_comments(blanked)
     if unclosed:
         return None, None

@@ -220,18 +220,12 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         return False, False, "Unbalanced or unterminated markdown code fence detected."
 
     # A commented-out `Verdict:` line sits at line start and would otherwise
-    # be taken as the report's last verdict. Replace comment spans with
-    # equal-shape whitespace rather than deleting them: deletion can
-    # juxtapose surviving characters into a fence marker that never existed
-    # in the raw text, and parse_report's own re-blanking would then hide a
-    # later verdict line behind the synthesized fence.
-    stripped = re.sub(
-        r"<!--.*?-->",
-        lambda m: re.sub(r"[^\n]", " ", m.group(0)),
-        blanked,
-        flags=re.DOTALL,
-    )
-    if "<!--" in stripped:
+    # be taken as the report's last verdict. Reuse the hook's own
+    # offset-preserving blanking (added with it in ai-config#2413) for the
+    # same reason _blank_fences is reused above: one implementation, one
+    # dialect, nothing to drift.
+    stripped, unclosed = hook._blank_html_comments(blanked)
+    if unclosed:
         return False, False, "Unterminated HTML comment detected."
 
     # Invariant: _blank_fences blanks delimiter lines too, so a successful

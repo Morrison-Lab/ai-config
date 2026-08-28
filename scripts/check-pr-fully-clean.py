@@ -874,7 +874,6 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     return text, mask
 
 
-
 def strip_cited_finding_vocab(text: str) -> str:
     """The scan text alone, byte-identical to ``origin/main``'s.
 

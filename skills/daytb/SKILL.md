@@ -19,10 +19,13 @@ pick the option you would have recommended, act on it, and say what you picked.
 
 ## Scope
 
-- **One decision, task-scoped**: covers the question in front of you, plus the follow-ons the same task raises (Procedure step 1), and expires with that task --- never with the session.
-- **Does not accumulate**: repeated `daytb` keywords do not accumulate into a session grant.
-- **Session-scoped sibling**: [`away`](../away/SKILL.md) is the session-wide grant (revoked by [`back`](../back/SKILL.md));
-  a later, unrelated decision is a fresh question for `daytb`.
+One decision, task-scoped:
+the question in front of you plus the follow-ons the same task raises,
+expiring with that task --- never with the session ---
+and repeated `daytb` keywords do not accumulate into a session grant.
+The sections below carry the full boundaries;
+[`away`](../away/SKILL.md) is the session-wide sibling,
+revoked by [`back`](../back/SKILL.md).
 
 ## When this fires
 

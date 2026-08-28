@@ -201,13 +201,53 @@ Filed upstream as `ucdavis/bcs#619` and `#620`.)
 
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.
 
+**The fourth case has a variant that hides better, because the false premise is not about the PR at all --- it is about which commits the round was reviewing.**
+Sanity-checking a *surprising* verdict is the fourth case's remedy, and it cannot fire here: this verdict is the least surprising thing on the page, a clean re-approval of a round that changed almost nothing.
+
+The false premise lives in the incremental section --- "What changed since the last review", or whatever the reviewer calls it.
+Whatever produces that section, the range it names is a **claim** rather than a derivation you can check --- why the claim went wrong is not established, and this incident says nothing about the reviewer's internals.
+A wrong one licenses a **shortened** round --- shortened in what it accounts for, which is all you can observe: naming one commit where the range holds two, quoting a `git diff --stat` that omits a source file, and concluding "no substantive logic changes" before returning Ready for merge.
+The one behaviour change in the round is then unaccounted for, under a verdict that correctly names the current head.
+
+No check in this repository catches it as of 2026-08-28 --- the range comparison below does, which is why it has to be run by hand.
+[`fully-clean.md`](fully-clean.md)'s whole family of SHA checks is satisfied --- the verdict is dated, clean, and stamped with the head it reviewed --- and `scripts/check-pr-fully-clean.py` reported the PR fully clean, correctly by its own rules as of 2026-08-28.
+The defect is in the verdict's account of *what it read*, which no SHA test can reach.
+The section that exists to spare a re-review from re-reading everything is exactly the section whose error costs the most.
+
+The check is mechanical and takes one command, so run it rather than judging:
+
+```bash
+git log --oneline <reviewed-in-previous-round>..<head>
+git diff --stat <reviewed-in-previous-round> <head>
+```
+
+Compare that against the commits and files the review says it looked at.
+A disagreement proves the account is wrong;
+it does not establish what the reviewer read, since a summary can omit a file it inspected.
+What it costs you is the ability to tell --- coverage becomes unproven rather than demonstrably short --- and an unproven range is not one to accept a clean verdict on.
+
+- **Do:** derive the incremental range yourself and compare it against the review's own account, on every round after the first.
+- **Do:** re-dispatch when they disagree, and say on the PR which commits the review did not account for.
+- **Do:** send the unaccounted-for range to a *different* reviewer rather than re-running the one that shortened the round --- on 2026-08-28 a re-run against the unchanged head restated the same account and deferred to it, while a cross-vendor pass at that head returned the findings.
+  [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section is the standing rule;
+  this is one more situation that calls for it.
+- **Don't:** push a commit so the next round has a range it will accept --- that changes what gets reviewed instead of getting the unaccounted-for range reviewed.
+- **Don't:** read a clean re-approval as covering the round --- an incremental round's coverage is bounded by the range it accounted for.
+- **Don't:** reach for the fourth case's surprise test here.
+  This verdict is unsurprising by construction, which is why it needs a mechanical check instead.
+
+(Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125): the round named `118c22d9` as the only commit since `453a3252`, where `git log --oneline 453a325..118c22d` returns two and `git diff --stat` names `R/rd_source_files.R` alongside the test file the review quoted.
+The unreviewed commit loosened two regexes in a parser.
+Reported to the workflow's own repo as [Morrison-Lab/gha#709](https://github.com/Morrison-Lab/gha/issues/709), which weighs deriving the range in `gather-context` against treating a "nothing substantive changed" claim as requiring the full review anyway.)
+
 **A fifth case, and the one that decides what "reachable" means in criterion 2 of [`fully-clean.md`](fully-clean.md): an external reviewer can decline to review at all, posting a refusal in the shape of a review.**
 Unlike the four cases above --- all of which are a review that ran and produced something misleading --- this is a reviewer that never ran, and says so in a `COMMENTED` review whose whole body is the refusal (e.g. Copilot's *"unable to review this pull request because the user who requested the review has reached their quota limit"*).
 Three consequences for driving a PR to fully clean:
 
 - **A refusing reviewer is not "reachable,"** so criterion 2's external-verdict requirement falls to whichever external reviewer *is* working.
   Don't stall a PR waiting for a reviewer that is refusing --- but don't quietly downgrade to self-review either while another external reviewer is answering normally.
-- **Reviewers fail independently.** One can be quota-dead while another reviews the same head normally, so check each one rather than generalizing from the first refusal.
+- **Reviewers fail independently.**
+  One can be quota-dead while another reviews the same head normally, so check each one rather than generalizing from the first refusal.
 - **Keep re-requesting each round anyway.** A quota resets on its own schedule, so a reviewer that refused a few pushes ago can come back mid-session --- which is exactly what criterion 2's "re-check availability right before declaring clean" is for.
   Say so explicitly when reporting a PR ready: name which reviewer's verdict the clean call rests on, and which one never weighed in at this head.
 

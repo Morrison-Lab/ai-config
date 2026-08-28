@@ -192,6 +192,33 @@ correct conclusion drawn from a premise nobody had tested.
 - **Don't:** treat matching numbers on re-measurement as retroactive evidence
   that the first measurement was pointed at the right tree.
 
+### A fifth cause: the subject's own fallback absorbs what the check looks for
+
+The four causes above all leave the check examining the wrong thing --- a check that broke, an empty input, a selection stage that collapsed, or the wrong subject.
+This one leaves the check examining exactly the right population, running exactly as designed, and still unable to report a failure --- because the function under test has a **designed fallback**, and a wrong answer exits through it looking like a right one.
+
+It is the pass-path-equals-failure-path shape this file names elsewhere, moved one level out: there the defect is a handler that swallows an error, here the handler is correct and the *sweep validating it* inherits the blindness.
+That inheritance is what makes it hard to see.
+The fallback was a deliberate design decision, usually a good one, so nothing about it reads as a place failures could hide.
+
+The tell is a sweep whose only assertion is that every answer is **well-formed**.
+A path that exists, a name that parses, a value in range: each is a property the fallback satisfies by construction, so the assertion cannot separate "resolved correctly" from "failed and fell back".
+
+The remedy is to measure the fallback bucket rather than the answer set.
+For every input that took the fallback, ask against **independent evidence** --- the input's own text, not the function's output --- whether it should have.
+Report the bucket sizes alongside the failure count: an empty bucket is not itself a defect, but it means this run supplied no evidence that the two paths are distinguishable, so something else has to.
+
+Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125), on a parser for roxygen2's `% Please edit documentation in R/foo.R` comment that falls back to the `.Rd` file when no such comment is found.
+The first sweep --- 2821 topics across 83 packages checked out on one machine --- reported 2608 answered from the comment, 213 answered by the fallback, and **zero** paths that do not exist.
+That reads as a clean bill of health.
+Those counts came from a throwaway script over local checkouts, so they are not reproducible from this repository --- what transfers is the shape of the mistake rather than the figures.
+Re-running it to ask of each fallback whether the file actually carried a provenance comment found one that did: a filename long enough that roxygen2's 80-character wrap left nothing after `in` on the first line, which the matcher required.
+
+- **Do:** classify the fallback bucket against the input's own evidence, and report its size beside the failure count.
+- **Do:** state, in the sweep's own output, how many inputs took the fallback, so the bucket is a number somebody can question rather than an unreported branch.
+- **Don't:** read "every answer is well-formed" as "every answer is right" when a fallback can produce a well-formed wrong one.
+- **Don't:** report a zero from a sweep whose buckets were never shown to discriminate.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

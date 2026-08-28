@@ -211,22 +211,16 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
 
     hook = _load_hook_module()
 
-    # One fence dialect end to end: blank fences with the HOOK's own
-    # _blank_fences first, then strip HTML comments, then parse and guard
-    # over that same text. Blanking first also keeps a comment opener quoted
-    # inside a fence from reading as an unterminated comment.
-    blanked, unclosed = hook._blank_fences(report)
-    if unclosed:
-        return False, False, "Unbalanced or unterminated markdown code fence detected."
-
-    # A commented-out `Verdict:` line sits at line start and would otherwise
-    # be taken as the report's last verdict. Reuse the hook's own
-    # offset-preserving blanking (added with it in ai-config#2413) for the
-    # same reason _blank_fences is reused above: one implementation, one
-    # dialect, nothing to drift.
-    stripped, unclosed = hook._blank_html_comments(blanked)
-    if unclosed:
-        return False, False, "Unterminated HTML comment detected."
+    # One dialect end to end: blank fenced code and HTML comments with the
+    # HOOK's own interleaving-aware scanner (ai-config#2413, hardened in
+    # the #2479 review rounds), then parse and guard over that same text --
+    # one implementation, one dialect, nothing to drift.
+    stripped, unresolved = hook._blank_quoted_regions(report)
+    if unresolved:
+        return False, False, (
+            "Unresolvable quoted region (unclosed fence or HTML comment) "
+            "detected."
+        )
 
     # Invariant: _blank_fences blanks delimiter lines too, so a successful
     # blank pass leaves zero FENCE-matching lines, and space-substitution

@@ -1087,17 +1087,70 @@ def _blank_html_comments(text: str) -> tuple[str, bool]:
         if close_at == -1:
             return "".join(out), True
         start = blank_to
-    blanked = "".join(out)
-    # A surviving live closer means an opener this pass never saw -- the
-    # fence/comment straddle: a fence swallows the "<!--" (fences are
-    # blanked first), leaving the comment interior and its "-->" as live
-    # text, so a spoofed verdict "hidden" in the comment would decide the
-    # report (ai-config#2479 review round, extending #2413). A prose arrow
-    # written as "-->" outside any fence hits this too and fails closed --
-    # the recoverable direction, at the cost of a re-dispatched review.
-    if "-->" in blanked:
-        return blanked, True
-    return blanked, False
+    return "".join(out), False
+
+
+def _blank_quoted_regions(text: str) -> tuple[str, bool]:
+    """Blank fenced code AND HTML comments in one render-faithful pass.
+
+    Two sequential linear passes cannot be correct in both directions: with
+    fences first, a fence that swallows a comment's opener leaves the
+    comment interior live (a spoofed verdict "hidden" there decides the
+    report), and a fence that swallows only the true closer makes the
+    comment pass pair the opener with a later decoy arrow, exposing
+    whatever follows the decoy (both measured in the #2479 review rounds).
+    Comments first fails the mirror cases. CommonMark resolves the
+    ambiguity by ORDER: whichever construct opens first swallows the
+    other's markers until its own closer, so this scanner walks the text
+    once and enters whichever region begins next -- a fence per FENCE's
+    dialect (closing only on a same-character, at-least-as-long marker,
+    per _blank_fences' nesting rationale), or a comment at ``<!--``
+    (closing only at the first literal ``-->``, fence markers inside
+    swallowed, matching how a renderer treats an open comment). The
+    blanked region is then exactly what a renderer hides, and any live
+    verdict line is one a reader of the rendered report would see.
+
+    An unclosed fence or comment at end of text reports True, and
+    parse_report fails the report closed, same as _blank_fences alone
+    always did. Offsets are preserved throughout.
+    """
+    out = list(text)
+    n = len(text)
+
+    def blank(a: int, b: int) -> None:
+        for i in range(a, b):
+            if out[i] != "\n":
+                out[i] = " "
+
+    pos = 0
+    while pos < n:
+        fence = FENCE.search(text, pos)
+        comment_at = text.find("<!--", pos)
+        if fence is None and comment_at == -1:
+            break
+        if comment_at == -1 or (fence is not None
+                                and fence.start() < comment_at):
+            open_char = fence.group(1)[0]
+            open_len = len(fence.group(1))
+            close = None
+            for m in FENCE.finditer(text, fence.end()):
+                marker = m.group(1)
+                if marker[0] == open_char and len(marker) >= open_len:
+                    close = m
+                    break
+            if close is None:
+                blank(fence.start(), n)
+                return "".join(out), True
+            blank(fence.start(), close.end())
+            pos = close.end()
+        else:
+            close_at = text.find("-->", comment_at + 4)
+            if close_at == -1:
+                blank(comment_at, n)
+                return "".join(out), True
+            blank(comment_at, close_at + 3)
+            pos = close_at + 3
+    return "".join(out), False
 
 
 def parse_report(text: str) -> tuple[str | None, str | None]:
@@ -1115,16 +1168,14 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     # first and stood in for the report's real one, which named the older
     # commit actually reviewed -- so the push of an unreviewed commit was
     # allowed by the very comparison this guard is built around.
-    blanked, unclosed = _blank_fences(text)
-    if unclosed:
-        return None, None
-    # HTML comments are blanked for the same reason, second: a
-    # commented-out "Verdict:" line sat at line start and was read as the
-    # report's last verdict (ai-config#2413). Fences first, so an opener
-    # quoted inside a fence is already blanked and cannot read as an
-    # unterminated comment.
-    blanked, unclosed = _blank_html_comments(blanked)
-    if unclosed:
+    # Fences and HTML comments are blanked in ONE interleaving-aware pass:
+    # a commented-out "Verdict:" line must not decide the report
+    # (ai-config#2413), and neither may a spoofed verdict exposed by a
+    # fence/comment straddle in either direction (#2479 review rounds) --
+    # see _blank_quoted_regions for why two sequential passes cannot be
+    # correct.
+    blanked, unresolved = _blank_quoted_regions(text)
+    if unresolved:
         return None, None
     matches = list(VERDICT_LINE.finditer(blanked))
     if not matches:

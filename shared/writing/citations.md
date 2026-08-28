@@ -385,76 +385,86 @@ lists, so the citations *were* checked --- just not for this.
 The reviewer that flagged it named the reason precisely:
 "this claim is about the paper's findings, not its metadata".)
 
-## Quoting the user is the one citation with no artifact to check
+## The user's own words are on disk, so quoting them is checkable
 
-The quote-fidelity instruments above all need a source you can fetch.
-The normalized substring test at the top of this file runs a quotation against a fetched source.
-The permalink rule reads the file at a pinned SHA.
-The paraphrase-only section's remedy is to paste the sentence you are relying on.
+The instruments above assume the source is a file, a commit, or a page.
+A sentence attributed to the user in conversation feels like none of those, so the natural conclusion is that no check applies and the quotation has to be trusted.
 
-A **conversation turn is not fetchable.**
-It is not in the corpus, not at a URL, and not in any commit.
-So none of those three can run on a sentence attributed to the user, however carefully you would like to check it.
+That conclusion is false, and it is the whole of this failure.
+Claude Code writes every turn, the user's included, to a JSONL transcript on disk under `~/.claude/projects/`.
+This repository already knows that: `grep -ln transcript_path hooks/*.py` returns 55 hooks that parse it.
+So the source is fetchable, the file's substring test applies unchanged, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
 
-One rule above does still engage, and it is the one that governs here.
-"Match the claim's strength to what was actually verified" applies to a remembered sentence exactly as it applies to a fetched one.
-The answer it gives is blunt: you verified nothing, so quotation marks are the overclaim.
-This section is that rule's sharpest case rather than a gap beside it.
+The check is one command.
 
-What *is* missing is a mechanical detector.
-A second reader who holds the same conversation can catch the fabrication, and in the case below one did.
-But that reader has to be looking, and the person best placed to refute the quote --- the one it is attributed to --- is the least likely to go back and re-read their own message.
+```bash
+TRANSCRIPT=$(ls -t ~/.claude/projects/*/*.jsonl | head -1)
+python3 - "$TRANSCRIPT" "the sentence you are about to quote" <<'PY'
+import json, sys
+
+path, needle = sys.argv[1], sys.argv[2]
+for line in open(path, encoding="utf-8", errors="replace"):
+    rec = json.loads(line)
+    msg = rec.get("message") or {}
+    if msg.get("role") != "user":
+        continue
+    body = msg.get("content")
+    if not isinstance(body, str):
+        body = " ".join(p.get("text", "") for p in body if isinstance(p, dict))
+    summarized = rec.get("isCompactSummary") or body.lstrip().startswith(
+        "This session is being continued"
+    )
+    if needle in body:
+        print("SUMMARY" if summarized else "TURN", repr(body[:90]))
+PY
+```
+
+**The filter is the part that carries the check, not the search.**
+A compaction summary is a user-role record too, and its content is a restatement written by the assistant.
+A match inside one is the adjacent-artifact substitution: a copy of the claim rather than the source, so a bare grep for the string reports a hit and settles nothing.
+Only a `TURN` line is evidence.
 
 Two things make the quotation marks worse than an ordinary misremembering.
 
 **They are the construction that tells a reader not to check.**
 A paraphrase invites verification.
-A quote asserts that verification already happened, which is why reaching for them is most tempting where they are least supportable.
+A quote asserts that verification already happened, which is why reaching for quotation marks is most tempting where they are least supportable.
 
-**In the one case recorded here, the invented clause granted something.**
-It supplied prior approval for a decision I was already moving toward.
-Whether that direction holds across instances is not established by a single case.
-This file's own rule on generalizing from instances you hold says to withdraw such a claim rather than prop it up.
-What the single case does support is a cheap ordering heuristic.
-Check a remembered quote hardest when it authorizes something, since that is the reading you have the least incentive to test.
-The shape is adjacent to [`no-empty-promises`](../workflow/no-empty-promises.md)'s, and the extension is mine rather than that fragment's.
-It names a promise as "costless to produce, invisible to every instrument, and indistinguishable from having done something".
-An invented authorization is costless and invisible in the same way, and points at the past instead of the future.
+**A correction to a fabricated quote can itself carry one, and accepting it feels like diligence.**
+Being told you misquoted someone produces an immediate impulse to publish the real sentence, and the replacement arrives from the same kind of recollection as the original.
+So run the command on the correction too, before repeating it.
 
-**So reproduce the user's words only when you can point at the message they are in.**
-Otherwise say what you understood, in your own voice, unquoted, and marked as your reading: "as I understood it", "my reading was".
-That sentence is checkable in the only way this situation allows, since the user can disagree with a reading in a way a quotation forecloses.
-
-This is not a new remedy, and saying so is the boundary against the section above rather than a restatement of it.
-That section already provides the un-quotable branch:
+The remedy is the neighbouring section's, reached by a different route.
+That section already carries the un-quotable branch:
 
 > When you cannot find a sentence to quote, that is the finding: make the argument in your own voice and cite the source for what it does supply.
 
-What it assumes is that you *looked* and came up empty.
-Here there was never anything to look at, so the sentence you would have quoted has to be reconstructed from memory.
-A reconstruction reads as a quote from the inside, which the looked-and-failed case never does.
+What differs here is only which branch you land on.
+There, you looked and came up empty.
+Here the sentence is very likely present, so the honest default is to run the command and quote the `TURN` it returns.
+Fall back to your own voice, marked as your reading --- "as I understood it" --- when it returns nothing.
 
-One carve-out.
-`CLAUDE.md`'s "Post in-chat feedback to the PR" tells you to paraphrase rather than quote the user, in the user's own voice, under the disclosure marker.
-That already complies: it is unquoted, and the marker names the voice.
-The hedge this section asks for is for restating the user's words *back to them*, not for relaying their feedback to a PR thread.
+`CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception to this.
+Its paraphrase is unquoted, so nothing there needs the transcript at all;
+the `_Posted by Claude Code (AI agent)_` marker names the poster rather than the voice, and does not license a quotation.
+If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the command, since the one person who could refute the attribution is not reading the thread.
 
-- **Do:** point at the message before putting the user's words in quotation marks.
-- **Do:** state your reading unquoted and attributed to yourself when you cannot.
-- **Do:** check a remembered quote hardest when it authorizes something you were about to do.
-- **Don't:** put quotation marks around a reconstruction, however confident the recollection.
-- **Don't:** point at an issue or a PR body you wrote afterwards from the same memory and treat it as the message.
-  That is a copy of the claim rather than the source, and it is the move that most looks like compliance.
-- **Don't:** read "it is only chat, not an artifact" as making it minor;
-  the absence of an artifact removes the checks, it does not lower the stakes.
+- **Do:** run the transcript command before putting the user's words in quotation marks, and quote the `TURN` it returns.
+- **Do:** run it again on a correction that supplies the "real" sentence.
+- **Do:** state your reading unquoted and attributed to yourself when the command returns nothing.
+- **Don't:** treat a `SUMMARY` hit as the message --- it is the assistant's restatement, which is the artifact substitution rather than the source.
+- **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
+  That is a copy of the claim, and it is the move that most looks like compliance.
+- **Don't:** conclude that a conversation cannot be checked;
+  the transcript is on disk, and 55 hooks in this repository read it.
 
 (2026-08-28, [ai-config#2538](https://github.com/Morrison-Lab/ai-config/issues/2538).
-Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I wrote a sentence of my own inside quotation marks and attributed it to the user.
-It stated a criterion for merging on a light review verdict.
-Their message had given an instruction about one correction round and set no merge criterion at all.
-A subagent reviewing the same PR caught it.
-The quoted clause is not reproduced here, and neither is theirs: both would be reconstructions, which is the thing the section forbids.
-Nothing in this record is measured, and the section explains why nothing about it can be.)
+Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I put a sentence of my own inside quotation marks and attributed it to the user.
+It stated a criterion for merging on a light review verdict, which is the direction I was already moving.
+A review pass flagged it and supplied what it gave as the user's actual message, and I repeated that into the issue and into the first draft of this section without checking either.
+A second review pointed out that the transcript exists.
+Running the command above returned **0** `TURN` hits and **1** `SUMMARY` hit across the only session file, against 486 user-role records --- so neither my clause nor the replacement was ever a user turn, and the session's genuine typed turns numbered four.
+Both sentences are omitted here because the command refutes them, not because they could not be checked.)
 
 ## A permalink that resolves can still cite the wrong content
 

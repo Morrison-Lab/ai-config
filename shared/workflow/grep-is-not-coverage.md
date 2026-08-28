@@ -519,6 +519,52 @@ $ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
 Identical to the mutant, so the 85 is the path and not the change.
 Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
 
+## An identifier search is evidence about the identifier, not about the thing it names
+
+Every section above searches a corpus of prose for an idea, and the action a wrong null licenses there is authoring a duplicate.
+The same defect reaches a search over a tree of code and assets, where the question is whether an entity is still used and the action a wrong null licenses is **deleting it**.
+
+The mechanism is that such an entity carries two names at once.
+It has a canonical identifier --- a citation key, a symbol, a package name, a route --- and it has a describable identity: an author and a title, a function's own words, a vendored directory, a constructed URL.
+A region of the tree can reference it entirely by the second, and a region that references nothing by identifier will return zero for **every** identifier you could type, whether or not the entity is used there.
+So the null is not weak evidence.
+It is guaranteed over that region, the same way a default-branch grep is guaranteed over content that lives only in an open PR.
+
+**Widening the identifier query cannot fix it, which is the near-miss to name.**
+The natural response to a doubt is to run the same search again over more paths, or with a looser pattern, or after a fetch.
+Each of those is a real improvement to a query that was going to return zero regardless, so each returns zero, and the repetition reads as convergence.
+The query is not wrong.
+It is about the wrong population.
+
+**The remedy is a negative control over the search space, not a better query.**
+Before reading a zero over some subtree as absence, confirm that the subtree contains at least one reference of the form you searched for.
+Where it contains none, that subtree is unsearched rather than clean.
+This is the same discipline [`batch-merge-and-resolve`](batch-merge-and-resolve.md) requires of a conflict sweep --- a zero matrix and a detector that never ran look identical --- applied to the region rather than to the instrument.
+Then search the entity's attributes, which is the query the identifier search cannot substitute for: a surname, a title fragment, the string a config passes where an import would have named the symbol.
+
+**Re-deriving a premise you distrust is what makes this land.**
+Checking an old claim before acting on it is the corpus's own advice, so running the check supplies the sensation of having verified it.
+The failure here was not skipping verification.
+It was verifying thoroughly over a search space where the answer could only come out one way.
+
+- **Do:** name which reference *form* a null covers, since an entity referenced by attribute is invisible to every search for its identifier.
+- **Do:** run the negative control on each subtree --- confirm it holds at least one reference of the searched-for form --- and read a subtree holding none as unsearched.
+- **Do:** derive a second query from the entity's own attributes before concluding it is unreferenced.
+- **Don't:** read a zero over an identifier as evidence that the thing it names is unused.
+- **Don't:** answer a doubt by re-running the identifier query over more paths or a looser pattern --- a search blind by construction returns the same zero however far it is widened.
+- **Don't:** count having re-derived a stale premise as having derived it correctly;
+  the second run inherits the first run's search space.
+
+The same shape covers a symbol a config names as a string rather than importing, a file reached through a variable path, a dependency vendored rather than declared, and an endpoint called through a constructed URL.
+[`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md)'s "Do not predict the branch name either" is the adjacent case and a weaker one: there the identifier is a **guess** that may happen to be right, whereas here the identifier is correct and still cannot appear.
+
+(`ucdavis/bcs#514`, 2026-08-28: the issue reported the bibliography entry `klein2003survival` as cited nowhere and proposed deleting it, on the evidence of a grep for `@klein2003survival` across `vignettes/`, `R/`, `man/`, and `inst/docs/`.
+The premise was re-derived a month later with `git grep -n klein2003survival` over the whole tree, which returned four hits and no citation, and the deletion was implemented and committed on the strength of it.
+`inst/analyses/results/_sec-km.qmd` relies on that work twice in author-year prose, at line 4 for the Kaplan-Meier product-limit estimator and at line 53 for a section-level claim about Nelson-Aalen equivalence.
+The whole-tree grep was wider than the issue's and just as blind: that subtree contains no Pandoc citations at all, and the file including it declares no `bibliography`, so no `@key` could have appeared there.
+`grep -rniE 'moeschberger|Techniques for Censored'` finds it immediately.
+An adversarial-reviewer subagent, dispatched before the push, caught the deletion.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

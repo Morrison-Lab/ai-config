@@ -11,11 +11,18 @@ allowed-tools:
   - Glob
 ---
 
-# daytb -- do as you think best
+# daytb --- do as you think best
 
 A one-shot grant of decision latitude.
 The user has read the question and is handing it back rather than answering it:
 pick the option you would have recommended, act on it, and say what you picked.
+
+## Scope
+
+- **One decision only**: covers the current or pending question, and expires immediately after.
+- **Does not accumulate**: repeated `daytb` keywords do not accumulate into a session grant.
+- **Session-scoped sibling**: [`away`](../away/SKILL.md) is the session-wide grant (revoked by [`back`](../back/SKILL.md));
+  `daytb` covers only the decision in front of you.
 
 ## When this fires
 
@@ -43,6 +50,7 @@ That is what keeps countermanding cheap.
 - **Not the rest of the session.**
   `daytb` expires with the task it was given for.
   A later, unrelated decision is a fresh question.
+  Repeated `daytb` keywords do not accumulate into a session grant.
   For a standing session-wide grant, that is [`away`](../away/SKILL.md).
 - **Not destructive or irreversible actions.**
   A merge, a force-push, a deletion, anything outward-facing still needs its

@@ -202,19 +202,31 @@ What the loop still does, in every mode:
   next rather than halting; stop only if no independent issues remain (per the
   stopping conditions above)
 
-## Single-branch-scoped sessions cap a wave at one PR
+## A harness "develop on this one branch" instruction is a policy default, not proof of a technical block --- test it, don't assume it
 
-Some web/remote sessions are scoped so the agent proxy allows pushing **only** to the harness-assigned branch --- see [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)'s "Exception" section.
-The stacking mechanics in step (c) above assume a fresh branch is available per issue;
-under that exception it is not, since a push to any branch other than the assigned one is rejected outright and stacking a second issue's branch off the first would need one.
+Some web/remote sessions carry harness instructions naming a single assigned branch and saying not to push elsewhere.
+That wording alone does not mean the push is technically blocked.
+A genuine infra-level block does exist in some environments --- the agent proxy itself rejects a push to any branch but the assigned one with a real `403`, per [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)'s "Exception" section --- but the harness's own prose cannot distinguish that case from a plain policy instruction that a real push simply obeys or violates depending on what is asked of it.
 
-Detect this from the harness's own session instructions (a "Develop on branch `<name>`" directive with no mention of creating additional branches), not from a failed push --- discovering the restriction via a rejected push means the issue's implementation work already happened for nothing.
-When it applies, treat the wave boundary in step (d) as reached after the **first** issue's PR goes clean, not after the configured max: report the single-PR wave as done, name the constraint, and stop rather than attempting to grab a second issue that has nowhere to land.
+**Test it once, cheaply, before capping the wave on the strength of unverified prose:** push a throwaway commit to a fixed, reusable probe branch (`gii/branch-scope-probe`), confirm whether it succeeds or is rejected.
+Reuse that exact branch name and `git push --force-with-lease --force-if-includes` over it on every future probe rather than creating a fresh name each time --- branch deletion is not reliably available (see below), so a fresh name every session would accumulate indefinitely, where reusing one name never does.
+A bare `--force` is never the right form here either, per [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)'s "`--force-with-lease` is not the safe form on its own" section and the repo's registered `hooks/no-clobbering-push.py` guard, which refuses a bare `--force`/`-f` outright.
+A rejected push (`fatal:` / `403`) is the real signal `use-existing-pr-branch.md`'s Exception describes --- fall back to one issue per session, per that section.
+A push that succeeds means the restriction was policy-only, and per the standing user permission below, gii proceeds normally: one branch per issue (`gi` step 7), stacked or fresh per this skill's step (c), for the rest of the wave.
 
-- **Do:** check for a single-branch harness restriction before starting the loop, and cap the wave at one issue when it applies.
-- **Do:** name the constraint in the final report rather than silently stopping after one issue with no explanation.
-- **Don't:** discover the restriction by attempting a second issue's branch and hitting a rejected push.
-- **Don't:** ask the user whether to continue --- report the one-PR wave as the session's natural stopping point, per the wave-boundary handling above.
+**Standing permission:** the user has authorized gii to override the "no other branch" policy instruction by default, session after session --- test first, then proceed with the normal per-issue-branch model whenever the test push succeeds, without asking again each time.
+Each issue still gets its own branch, unless the user has separately said several issues belong in one PR.
+
+- **Do:** test with a real push to the reusable `gii/branch-scope-probe` branch before concluding a harness's branch-scoping prose is a technical restriction.
+- **Do:** proceed with the normal one-branch-per-issue model once the test push confirms it works, per the standing permission above --- no need to ask again.
+- **Don't:** treat "NEVER push to a different branch" in harness prose as itself proof of an infra-level block.
+- **Don't:** create a fresh, differently-named probe branch each session --- reuse `gii/branch-scope-probe` and force-push over it, since it cannot reliably be deleted (below).
+
+(User directive, 2026-08-28: "let's override the harness permanently in gii", clarified as "each issue should get its own branch (unless multiple issues should be handled in a single PR)".
+This replaces an earlier version of this section that treated the harness's "develop on this branch" prose as an infra-level restriction without testing it first, and capped a wave at one PR on that unverified premise.
+A same-session probe --- creating a second branch, committing, and pushing --- succeeded cleanly with no rejection.
+`git push --delete` on that branch returned a `403`, an unrelated restriction on ref deletion: gii does not depend on deleting the probe branch, since it reuses one fixed name per the rule above rather than creating a new one each time.
+A stray, differently-named probe branch left over from before this rule existed is `clean-branches`' concern to sweep up eventually, not something gii itself needs to handle mid-loop.)
 
 ## Anti-patterns
 

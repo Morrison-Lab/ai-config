@@ -409,6 +409,45 @@ check(
 )
 
 
+# --- main(): empty estate is an error (#2371 point 4) ------------------
+
+# A sweep that finds the secret in NO scope exits 1, so a broken discovery
+# (or a vanished estate) cannot pass for a healthy no-op. Run main() with a
+# FakeGh that answers every discovery call and carries no matching secret
+# anywhere.
+
+with_gh(
+    OrgFakeGh(
+        {
+            # Most-specific keys first: FakeGh matches by substring in
+            # insertion order, and "acme" is a substring of every other
+            # acme-flavored key.
+            "/orgs/acme/actions/secrets": org_secrets_payload(),
+            "acme/one": secrets_payload("OTHER", "t0"),
+            "/user/orgs": "acme\n",
+            "/user": "octocat\n",
+            "octocat": json.dumps([]),
+            "acme": json.dumps(
+                [{"nameWithOwner": "acme/one", "viewerPermission": "ADMIN"}]
+            ),
+        },
+        missing_for={"octocat"},
+    )
+)
+_argv = sys.argv
+sys.argv = ["rotate-claude-token.py"]
+try:
+    rct.main()
+    empty_estate_code = 0
+except SystemExit as exc:
+    empty_estate_code = exc.code
+finally:
+    sys.argv = _argv
+check(
+    "main() exits 1 when the secret is found in no scope",
+    empty_estate_code == 1,
+)
+
 # --- read_token --------------------------------------------------------
 
 real_stdin = sys.stdin

@@ -1173,3 +1173,94 @@ zero pending **and** an unchanged total across two consecutive polls.
 Printing the total each tick is what made the growth visible; a loop that
 reports only its exit condition cannot show it.
 
+## Required-checks arithmetic reported three PRs ready over a red review check
+
+(`ucdavis/bcs` #745/#746/#748, 2026-08-27.)
+
+The repository's review job was failing on every open PR at once, on a
+credential fault rather than on anything in any diff.
+Every other check passed, and the failing one was absent from the branch
+ruleset's `required_status_checks`, read off the API rather than assumed:
+
+```
+["docs-check","version-check / version-check","docs",
+ "ubuntu-latest (release)","macos-latest (release)","windows-latest (release)"]
+```
+
+From that list plus a green rollup for each required entry, three PRs were
+reported ready to merge.
+Rule 1 of [`fully-clean.md`](fully-clean.md) already says "not just the
+required checks", so nothing new had to be learned for this to have been
+avoided.
+
+What the arithmetic establishes is that **branch protection would permit the
+merge**, which is a fact about the forge's gate rather than about the PR.
+The requiredness list is a live, quotable API artifact, so deriving the wrong
+answer from it arrives with evidence attached --- which is what separates this
+from an eyeballed "looks green".
+[`memories/gh-cli.md`](../../memories/gh-cli.md) records the inverse error on
+the same repository, a red check wrongly *dismissed* as non-required; the two
+are the same conflation run in opposite directions.
+
+`scripts/check-pr-fully-clean.py` settles it, exiting 1 on all three.
+
+**The second finding then changed wording as the PR state changed, and the
+change is the instructive part.**
+
+Before any fallback review was *admitted*, the script reported:
+
+```
+  - No review comment has been posted evaluating HEAD SHA a72741ec yet
+```
+
+A fallback review existed when that printed, and it quoted the commit
+correctly --- the matcher tests `sha[:7]`, so a default `git --short`
+abbreviation matches.
+It was never admitted: `_reviewer_identity()` reads only the **first and last
+non-blank line**, that comment opened with a `## Self-review fallback`
+heading of its own, and a marker buried below the first line resolves to the
+poster's login rather than to an agent.
+An unadmitted comment cannot become a matching item whatever SHA it carries,
+so the finding reads *nothing was posted* when the truth is *what you posted
+did not count*.
+
+A later fallback opened with the marker and was admitted.
+The finding then became a different branch (headers elided):
+
+```
+  verdict scan: examined 2 dated automated review item(s), 0 bore a verdict, latest = NONE
+...
+  - NOTE: Review from Claude (2026-08-27T09:15:56Z) has a format the verdict classifier cannot read -- not treated as 'no review'
+...
+  - No valid clean review found for HEAD SHA a72741ec.
+```
+
+The tempting reading of that second state is that a self-review posted under
+the author's own login was filtered out for being the author's.
+That is wrong, and checking rather than assuming is what shows it: this
+comment *was* admitted and was quorum-eligible, because the admission test
+accepts an `OWNER` or `MEMBER` comment whose first or last line resolves to
+an agent, and these were `MEMBER` comments opening with the agent's marker.
+
+It failed on **format**.
+`classify_verdict()` reads `Verdict: Clean` on one line and returns
+`unreadable` for a `### Verdict` heading whose word sits on the next ---
+`unreadable` rather than empty, and that distinction is what produces the
+`NOTE:` line at all.
+The same split heading without a marker returns nothing and prints no note.
+
+So the outage was real, and on top of it every fallback verdict written to
+stand in for the bot failed one of two silent gates.
+The only sign was a `NOTE:` line the script emits **non-blocking by
+design**.
+
+[`self-review-fallback.md`](self-review-fallback.md) carries the three
+requirements as rules.
+
+Reposting the same verdicts in the parsed form settled it: the scan went from
+`0 bore a verdict, latest = NONE` to
+`1 bore a verdict, latest = clean; per-reviewer: Claude=clean`, and the
+`No valid clean review found` finding cleared on every PR, leaving only the
+red review check the outage itself causes.
+Nothing about any review changed --- only a colon and a line break --- which
+is the measure of how quietly this fails.

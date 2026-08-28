@@ -42,6 +42,69 @@ without asking confirmation before every merge.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 
+## Another session's PR: clean, and clean for twenty minutes
+
+Every rule above settles *when* a PR may be merged.
+None of them settles *whose*.
+
+That gap has a real case behind it.
+A session driving its own PRs finds a peer's sitting instrument-clean --- sometimes one that directly unblocks its own work --- and by the letter of the repo grant, merging it is allowed.
+It is still the wrong default, because a peer may have further commits planned, and merging out from under a live session destroys work it was about to push.
+
+**A peer's PR may be merged once it has been ready to merge for more than twenty minutes** (maintainer directive, 2026-08-27).
+
+The interval is what does the work here, and it is doing something specific rather than being a polite pause.
+A session actively driving a PR pushes again within a few minutes of a clean verdict, so twenty minutes of quiet distinguishes *waiting on a human* from *mid-round* --- which is the only thing you actually need to know, and the one thing you cannot ask the peer for reliably.
+
+**Start the clock at the clean verdict on the current head**, not at the PR's `updatedAt`, which any comment bumps, and not at the head's commit time, which precedes the review.
+A push resets it: a new head means a new verdict, so a PR that was clean for an hour is freshly clean the moment it moves.
+
+Derive the age rather than judging it, per [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md):
+
+```bash
+gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+  | jq -s -r '[.[][] | select(.body | test("\\*\\*Claude finished"))] | last | .created_at'
+```
+
+against `date -u +%Y-%m-%dT%H:%M:%SZ`.
+
+The `-s` and the double flatten are both load-bearing, and their absence is invisible on any PR small enough to test on.
+`--paginate` emits **one array per page** rather than one combined array, so without `-s` the filter runs once per page and prints one timestamp per page.
+A PR under 100 comments has a single page and gives the right answer either way;
+a longer one prints several timestamps into a step that expects exactly one, which is the shape that silently produces a wrong comparison rather than an error.
+The same pattern is already written correctly in `CLAUDE.md`'s review-verdict query, and matching it is the point.
+Run `check-pr-fully-clean.py` first regardless: the threshold is a *second* condition, never a substitute for the clean reading, and an old not-clean PR is exactly as unmergeable as a new one.
+
+### Warn the peer before you merge, and give it five minutes to object
+
+The twenty-minute threshold is an *inference* about whether a session is still working.
+It is a good one and it is still a guess, so it gets a cheap confirmation step rather than being trusted alone.
+
+**Ask the session directly when you can reach it.**
+`ListAgents` shows in-process subagents, teammates, and peer sessions, and `SendMessage` reaches any of them by name.
+A direct answer settles the question outright and costs one round trip, so it beats any inference from timestamps.
+
+**When you cannot reach it, post a comment on the PR saying you intend to merge, then wait five more minutes** before doing so.
+That is the asynchronous equivalent: it gives the owning session a place to say *hold off* on a surface it is already watching, since a session driving a PR reads its comments.
+Say what you are merging and why, so the objection can be specific.
+
+The five minutes run *after* the comment, not concurrently with the twenty --- the point is to leave a window the peer could actually notice, and a warning posted at minute nineteen has given nobody anything.
+
+- **Do:** merge a peer's PR that has been instrument-clean for over twenty minutes, and say in your report whose PR it was and how old the verdict was.
+- **Do:** measure the verdict's age, and state the two timestamps you compared.
+- **Do:** message the owning session directly when `ListAgents` reaches it, rather than falling straight to the comment-and-wait.
+- **Do:** post the warning comment and wait a further five minutes when you cannot reach the session, and honour a hold-off reply.
+- **Don't:** merge a peer's PR that just went clean, however much it unblocks you --- that is precisely when the temptation is strongest and the peer most likely still working.
+- **Don't:** read the PR's `updatedAt` as the readiness time;
+  a comment of your own can bump it, which makes a stale PR look fresh and a fresh one look older than it is.
+- **Don't:** count the warning window inside the twenty minutes, or skip it because the PR has been quiet for hours --- the whole cost is five minutes, and it is paid once.
+
+(ai-config#2460.
+Measured 2026-08-27: a session driving #2433 and #2447 found #2448 --- a peer's PR fixing the very artifact blocking #2447 --- at exit 0, five minutes after its clean verdict.
+It held, and the peer then pushed a further commit fourteen minutes later before merging the PR itself.
+So the counterfactual is not hypothetical: merging at the five-minute mark would have discarded a commit that did not yet exist, and nothing about the PR at that moment distinguished it from one that was finished.
+That is the whole argument for the interval, and for the warning step on top of it.)
+
 ## The standing per-repository grant
 
 One repository carries the grant **standing**, with no session step at all:

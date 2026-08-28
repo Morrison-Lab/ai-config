@@ -1678,6 +1678,13 @@ recurred immediately in a `jq` filter reading a PR review body.)
   A disagreement among reviews is not fully clean: any standing not-clean
   --- nits included --- vetoes merge even with `mwc` active
   (ai-config#2274).
+- **Another session's PR needs a second condition: clean, and clean for more than twenty minutes --- then warned.**
+  Every other rule here settles *when* a PR may be merged;
+  this one settles *whose*.
+  A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
+  Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
+  The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
+  [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

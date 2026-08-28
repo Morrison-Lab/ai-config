@@ -1,5 +1,16 @@
 # Local tools & CLIs
 
+## GitKraken `git_add`: an empty file list stages everything
+
+- **Do:** pass an explicit non-empty `files` list to
+  `mcp_gitkraken_cli_git_add`, then verify `git diff --cached --stat` before
+  committing.
+- **Don't:** call `mcp_gitkraken_cli_git_add` with `files: []` as a no-op or
+  status check; the tool treats an empty or omitted list as `git add` for all
+  files and can stage generated artifacts.
+- Observed 2026-08-27 in `matt.contracts`: `files: []` staged `Rplots.pdf` and
+  the full `_quarto/` render tree. They were unstaged before commit or push.
+
 ## Available subscriptions & model providers
 
 [`memories/delegation.md`](delegation.md) is the canonical catalog of active

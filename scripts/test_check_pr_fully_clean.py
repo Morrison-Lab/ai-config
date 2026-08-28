@@ -1852,8 +1852,20 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings on the diff content\n\n1. A real finding\n")
           is not None)
-    check("trailing ': none' on a Findings heading is not section body",
+    # #2488 review round: colon/dash-led trailing text is the section's
+    # first content line (a one-line finding written on the heading must
+    # not be swallowed); bare descriptive trailing stays decoration.
+    check("a colon-led resolving phrase on the heading line exempts",
           checker._unresolved_finding_pattern("## Findings: none\n")
+          is None)
+    check("a colon-led one-line finding on the heading line is NOT "
+          "swallowed by a stray resolving body",
+          checker._unresolved_finding_pattern(
+              "## Findings: `crash()` is missing a null check\n\nNone.\n")
+          is not None)
+    check("a dash-led one-line finding on the heading line stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings - missing null check\n")
           is not None)
     check("recognized Findings heading suffixes still resolve empty bodies",
           all(checker._unresolved_finding_pattern(

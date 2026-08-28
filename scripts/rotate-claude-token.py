@@ -44,6 +44,9 @@ checked for an org-level secret, and the per-repo sweep still runs because a
 repo-level override remains legitimate for a repo that should spend a
 different account's quota. The two scopes are reported separately, so an org
 rotation is never silently counted as covering a repo that still overrides it.
+A fully-discovered estate that carries the secret in NO scope is a hard
+error (exit 1), not a quiet no-op: that reading is indistinguishable from a
+broken sweep, which is how the org-level move was missed (#2371).
 `--repos` bypasses discovery entirely (org sweep included), so naming a repo
 that lacks the secret just drops it from the run, the same as any other repo
 without the secret.

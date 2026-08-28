@@ -23,6 +23,12 @@ alwaysApply: true
 - Promising the mechanism itself in the future tense ("I'll add a guard for this") is the same empty promise one level down.
 - When no mechanism is worth building, drop the promise and state the plain fact instead. See `shared/workflow/no-empty-promises.md`.
 
+## Resume every non-clean pause
+- Whenever work remains at a pause, arm a timer or equivalent wake mechanism that resumes the next concrete step, and report what will fire and its clock time.
+- Use an active background monitor or durable scheduled trigger when no reliable timer is available.
+- A verified clean stopping point needs no timer because no work remains to resume.
+- Do not pause with only a promise to return, and do not create a pointless timer after a clean stop.
+
 ## Strict Merge Control Policy
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
 - Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.

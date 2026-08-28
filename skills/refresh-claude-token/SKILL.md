@@ -58,22 +58,21 @@ or provisioning the secret into a repo that has never had it.
 
 That last one is a hard limit of the script, not a policy choice.
 
-`--repos` bypasses **repo discovery**, not **secret discovery**.
-`find_targets()` keeps a repo only when `secret_updated_at()` returns
-non-`None`,
-so a repo lacking the secret is dropped even when named explicitly,
-and `--apply` then reports `Nothing to rotate` without ever calling
-`rotate()`.
+`--repos` bypasses **discovery**, not **secret discovery** --- and since ai-config#2371 that includes the org-level sweep, so an explicit repo list never rotates the org secret.
+`find_targets()` keeps a repo only when `secret_updated_at()` returns non-`None`, so a repo lacking the secret is dropped even when named explicitly.
+On the default discovery path the script now checks each org for an **org-level** copy of the secret too (the estate's primary scope since ai-config#2360), rotates it with an explicit `--visibility` preserving what it had, and reports the two scopes separately.
+A fully-discovered estate carrying the secret in NO scope is a hard error (exit 1), not a quiet no-op --- that reading is indistinguishable from a broken sweep (#2371 point 4);
+the benign `Nothing to rotate in the named repos.` no-op remains only on the `--repos` path, where the caller deliberately narrowed the query.
 
 The script's docstring says the same, so provision with `gh secret set`
 directly instead:
 
 ```bash
 gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>   # SET_SECRET
+gh secret set CLAUDE_CODE_OAUTH_TOKEN --org <org> --visibility all   # SET_ORG_SECRET
 ```
 
-Do that deliberately, one repo at a time,
-since it decides which account's quota that repo spends.
+Do that deliberately, since it decides which account's quota that scope spends.
 
 For authoring or changing the workflows themselves,
 use `claude-agent-workflow` or `claude-review-workflow`.

@@ -567,6 +567,22 @@ check("glab issue list: repeated --search, LAST one clean, discharges",
           'glab issue list --all --search "is:open cp1252" '
           '--search "cp1252"'), True)
 
+# ---------------- embedded long-form --search substring, ai-config#2427
+
+check("gh issue list: embedded --search substring does not discharge",
+      hook.command_has_issue_dupe_check(
+          "gh issue list --state all --label needs--search stuff"), False)
+check("glab issue list: embedded --search substring does not discharge",
+      hook.command_has_issue_dupe_check(
+          "glab issue list --all --label needs--search stuff"), False)
+check("gh issue list: embedded substring does not consume genuine --search",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --label needs--search '
+          '--search "cp1252"'), True)
+check("gh issue list: plain long-form --search still discharges",
+      hook.command_has_issue_dupe_check(
+          'gh issue list --state all --search "foo"'), True)
+
 check("mcp search_issues query carrying is:open does not discharge",
       hook._mcp_is_issue_search("mcp__github__search_issues",
                                  {"query": "repo:o/r is:open cp1252"}),

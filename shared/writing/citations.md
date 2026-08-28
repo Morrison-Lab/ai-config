@@ -412,65 +412,30 @@ So the source is fetchable, and "it was only chat" is not a reason to skip the c
 [`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
 
 ```bash
-python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
+python3 scripts/check-user-quote.py "the sentence you are about to quote"
 ```
 
-**The classifier is what carries the check, not the search**, and that is why this is a script rather than a grep.
-`message.role == "user"` is a **transport** role, not an authorship claim.
-The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, inter-agent coordinator messages, and --- for a subagent --- the dispatch brief the assistant wrote.
-Matching one of those and calling it a hit is the adjacent-artifact substitution [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) names: a copy of the claim rather than the source, arriving with a verification's authority.
+**What the script does not do is the design, and it took ten revisions to arrive at.**
+It does not decide who wrote the phrase.
+It prints every record containing it, with that record's shape, `origin.kind`, flags and `userType`, and stops.
 
-So the outcome per record is three-way rather than two-way, and the third value is the load-bearing one.
-The harness labels a typed turn `origin.kind == "human"`, which is the strongest signal available and is still weaker than it sounds.
-Two independent reasons say so, and the observed one is the stronger.
-Of 2,339 user-role records in one machine's transcript root on 2026-08-28, **2,270 carry no `origin` key at all**;
-2 are `human`, 64 `task-notification`, 3 `coordinator`.
-So the label is absent from 97% of the corpus, and treating its absence as a rejection would discard almost everything.
-Separately, a sanitizer in the shipped CLI 2.1.250 rewrites a user record's origin to `unclassified` when the kind is `human` or `auto-continuation`, and one of the CLI's own human tests reads (de-minified) `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
-Whether records that sanitizer rewrites reach the on-disk transcript is not established --- the count above says they do not, here --- so the sanitizer argues the value is possible rather than showing it occurs.
-Both reasons point the same way: a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
-A record carrying no usable label is therefore **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
-That distinction is not fastidiousness.
-Five successive versions tried to identify *which part* of a record was the harness's.
-Exclusions alone certified a dispatch brief;
-the harness label fixed that and left a human-labelled record's injected second block;
-per-block fixed that and left an envelope appended mid-block;
-per-region fixed that and joined its leftovers across a cut;
-splitting properly fixed that and still leaked on a repeated opener, and on injected content that merely contained a literal closing tag.
-Each shipped, each passed its suite, and each was broken by a shape the last had not considered.
+The reason is that `message.role == "user"` is a **transport** role, not an authorship claim.
+The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, inter-agent coordinator messages, editor selections appended to the user's own prompt, another agent's `teammate-message`, and --- in a subagent's transcript --- the dispatch brief the assistant wrote.
 
-That is delimiter-matching over untrusted text with a regular expression, and the supply of shapes does not run out.
-So the question changed from *which part of this block is the harness's* to *is any of it*: a block carrying an opener is unquotable in full.
+Ten revisions tried to separate those from the user's own words, and every one of them certified harness or assistant prose at some point: classification on exclusions alone, then on the harness's `origin.kind` label, then per record, then per block, then per non-envelope region, then against a four-name tag list, then against a structural opener test.
+Each was broken in turn --- by an appended reminder, a mid-block one, leftovers joined across a cut, a repeated opener, a literal closing tag inside injected content, a fifteen-name vocabulary against a list of four, a truncated opener, an entity-escaped tag (`&lt;system-reminder&gt;`, which is what the harness itself writes when it neutralizes control tags), a namespaced one, and an envelope split across two blocks.
 
-The first attempt at that named four tags and claimed nothing was parsed.
-It was still parsing --- the parse had moved from **grammar** to **vocabulary**, and the vocabulary belongs to the harness rather than to the checker.
-The shipped CLI emits or strips at least fifteen tag names inside user content, and the four-name list intersected them in one;
-`teammate-message` carries another agent's words in a user-role record, and `ide_selection` carries editor content appended to the user's own prompt.
-Both certified at exit `0`.
-The test is structural now --- any tag-shaped opener --- which removes the enumeration rather than shortening it.
-Measured on one real transcript root, it denies **zero** human-labelled blocks.
+The eleventh finding is what settled it: the harness's text **is not lexically identifiable**.
+It can arrive with no `<` in it at all.
+So a test returning *this is the user's* is a test that will eventually be wrong in the one direction that matters, and no amount of narrowing changes that --- which is the general lesson, and the reason this section describes a reporter rather than a checker.
 
-The first structural version had a bug worth recording, because it is the shape a generalization tends to have.
-It required a closing `>`, which the four-name list it replaced had never needed --- that one matched on a word boundary --- so `<system-reminder never closes...` became quotable again.
-A generalization can silently drop a property the specific form supplied for free, and nothing about it reads as a loss;
-the removed enumeration is what one checks, and the removed *closure-free match* is not.
+Two smaller things the rewrite also fixed, both worth having:
+it reads **four** record shapes rather than one, because a prompt is written to `queue-operation` at enqueue and only becomes a `message` record at dequeue, so a message-only reader answered "the user never said it" about sentences the transcript held;
+and identical texts are collapsed with a count, since `last-prompt` is a rolling pointer that repeats one prompt across scores of records.
 
-The cost is real and worth stating: a turn written **about** a tag cannot be quoted from that block.
-The run exits `2` and says the phrase is present in a block it could not search, rather than reporting an absence --- and that holds in the default invocation, not only behind a flag, since a bare exit `1` is exactly the "the user never said it" claim the contract exists to prevent.
-
-The residual, rather than a claim of completeness:
-a phrase spanning two blocks of one record is not found;
-an unlabelled record is never certified, only offered;
-and the opener test is lexical, which cuts both ways.
-It denies a block that merely looks tagged (prose containing `if x <y then` is unquotable, reported as a denial rather than an absence), and it would miss injected text carrying no tag-shaped opener at all, were the harness ever to deliver some that way.
-
-The exit codes keep apart two things that are easy to conflate:
-a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash inside the scan).
-An unparseable line belongs on that list because a live session appends while the tool reads, so a torn final line is the normal state of a transcript rather than an anomaly.
+The exit codes keep apart a phrase found in no record (`1`) and a search that was degraded or impossible (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash).
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
-`--allow-unattributed` accepts a candidate at a fourth code, `3`, for the same reason:
-it readmits exactly the failure above, so a caller reading exit codes must not see it as `0`.
-Every run prints what it examined, so a zero is never mistaken for a detector that never engaged.
+Exit `0` asserts only that a record contains the phrase, which is the whole of what the tool now claims.
 
 Two things make the quotation marks worse than an ordinary misremembering.
 
@@ -494,24 +459,26 @@ That section already carries the un-quotable branch:
 > When you cannot find a sentence to quote, that is the finding: make the argument in your own voice and cite the source for what it does supply.
 
 What differs here is only that the source can be searched, so which branch you land on is a question with an answer rather than a judgment.
-Run the script.
-Quote the human turn it returns, and fall back to your own voice, marked as your reading --- "as I understood it" --- when it does not.
+Run the script and read what it returns.
+Quote a record you have read and judged to be the user's own typed turn;
+fall back to your own voice, marked as your reading --- "as I understood it" --- when no record is theirs, or when you cannot tell.
 
 `CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception.
 Its paraphrase is unquoted, so nothing there needs the transcript at all, and the required marker --- `_Posted by Claude Code (AI agent) --- not written by a human._` --- exists because such a comment is written in the user's voice under the user's login.
 It discloses the author; it does not license a quotation.
 If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the script, since the person who could refute the attribution may not be reading the thread.
 
-- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and quote the human turn it returns.
+- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and read the records it prints.
 - **Do:** run it again on a correction that supplies the "real" sentence.
-- **Do:** state your reading unquoted and attributed to yourself when it reports the phrase absent.
+- **Do:** state your reading unquoted and attributed to yourself when no record is the user's, or when you cannot tell which is.
 - **Do:** check a remembered quote hardest when it authorizes something you were about to do, which is the direction the one recorded case ran.
-- **Don't:** treat an unattributed match as the message.
-  The harness never called it a human turn, and a compaction summary, a subagent brief, and an injected skill body are all assistant prose wearing a user-role field.
+- **Don't:** read exit `0` as a verdict.
+  It says a record contains the phrase.
+  Which record, and who wrote it, is what the provenance beside it is for.
 - **Don't:** read exit `2` as an absence.
-  It says the space was never searched, and reporting it as "never said" is the substitution one level up.
-- **Don't:** run it again with `--allow-unattributed` and report exit `3` as the user's words.
-  That is this section's own near-miss: the flag makes the instrument agree with you, and an assistant-written dispatch brief is precisely what it readmits.
+  It says the search was degraded or never happened, and reporting that as "never said" is the substitution one level up.
+- **Don't:** take a record's `origin.kind` as settling authorship.
+  It is the harness's own label and the strongest signal available, and the CLI still rewrites it on some paths and stamps a relayed channel message with it on others.
 - **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
   That is a copy of the claim, and it is the move that most looks like compliance.
 
@@ -525,15 +492,12 @@ It stated a criterion for merging on a light review verdict, which is the direct
 A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
-The script finds **no human turn** for either sentence.
-It reported **2** quotable human regions in the whole transcript root, read on 2026-08-28.
-Every figure here is a reading rather than a constant --- records, files and human regions all grow while the measuring session appends --- so re-run it rather than citing the number.
-`--show-excluded` reports the replacement --- "This is the last correction round: fix the five, push, report the head" --- as `EXCLUDED (harness injection)` in a subagent's transcript.
-The record is an inter-agent coordinator message, but the tool tests its flags before its origin, so that is not the label it prints;
-the distinction matters here because a reader running the command should see what it says rather than what the record is.
-The original appears in no user-role record at all: it was only ever mine, so it is not reproduced.
-The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
-each passed its own local suite, and what refuted each was executing something.)
+Running the script on the replacement --- "This is the last correction round: fix the five, push, report the head" --- returns records, and every one of them is flagged: a subagent transcript, a coordinator message, a compaction summary.
+None is a typed turn, which is a judgment the reader makes from the provenance rather than one the tool announces.
+The clause I fabricated appears in no record at all except my own later writing about it, so it is not reproduced here.
+The figures are readings rather than constants --- records and files grow while the measuring session appends --- so re-run it rather than citing a number.
+The first two drafts of this section asserted the opposite premise, and ten subsequent revisions each shipped a check that certified something the user had not written;
+every one passed its own local suite, and what refuted every one was executing it.)
 
 ## A permalink that resolves can still cite the wrong content
 

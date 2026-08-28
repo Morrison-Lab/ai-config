@@ -294,16 +294,20 @@ Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown 
 
 ### Attributed quotes (`scripts/check-user-quote.py`)
 
-Decides whether a sentence you are about to attribute to the user was ever typed by the user, by searching the Claude Code JSONL transcript.
+Shows every transcript record containing a phrase you are about to attribute to the user, with its provenance --- record shape, `origin.kind`, flags, `userType` --- so you can read them and judge.
 
 ```sh
-python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
+python3 scripts/check-user-quote.py "the sentence you are about to quote"
 ```
 
-Exit `0` found, `1` absent from the blocks it reports having searched, `2` nothing was available to search --- including a phrase present only in a block it could not search --- and `3` found only in an unattributed block, with `--allow-unattributed`.
+**It does not decide who wrote the phrase**, and that is the design rather than a gap.
+Ten earlier revisions tried to, and each certified harness- or assistant-authored text as the user's own words: `message.role == "user"` is a transport role, and the harness's text is not lexically identifiable --- it arrives escaped, namespaced, split across blocks, or with no tag at all.
+
+Exit `0` candidates found and printed, `1` none found in any record, `2` the search was degraded or impossible.
+`1` and `2` are kept apart so a search that did not happen is never reported as an absence.
 Pass `--root` on an agent whose transcripts live elsewhere.
 
-[`shared/writing/citations.md`](shared/writing/citations.md) is the statement of record: why `message.role == "user"` is not an authorship claim, why exit `2` must not collapse into exit `1`, and what exit `3` readmits.
+[`shared/writing/citations.md`](shared/writing/citations.md) carries the argument and the eleven fail-opens behind it.
 
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind

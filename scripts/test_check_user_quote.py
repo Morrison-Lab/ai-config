@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """Tests for scripts/check-user-quote.py.
 
-The classifier's two failure directions are not symmetric: a false positive
-CERTIFIES a fabricated attribution, while a false negative only declines to
-certify a real quotation.  So the false-positive cases are the ones with named
-sentinels, and each is a case an earlier revision of the tool actually failed.
+The tool's contract changed after ten revisions and eleven certification
+fail-opens: it no longer decides who wrote a phrase. So these tests pin two
+things instead of a classifier.
 
-Fixture shapes were taken from the shipped CLI's own record handling (2.1.250)
-and from 24 real transcripts surveyed 2026-08-28.  Values the survey did not
-exhibit -- `unclassified`, `verifiedSlackHumanTurn`, and most of
-NON_HUMAN_ORIGINS -- come from the binary, not from the survey; see the
-module docstring for the two predicates quoted there.  Per
+  COVERAGE  every record shape that can carry a user's prompt is read. An
+            earlier revision read `message` alone and reported "Do not quote
+            it" over sentences the transcript held as `queue-operation`.
+  HONESTY   nothing in the output or the exit codes asserts authorship, a
+            degraded read never reports as an absence, and the provenance
+            printed beside a candidate is derived from the record.
+
+Fixture shapes were taken from 27 real transcripts surveyed 2026-08-28. Per
 `shared/workflow/fixtures-are-not-evidence.md` a fixture is evidence about the
-code that reads it and nothing more.
+code that reads it and nothing more -- which is part of why the tool no longer
+draws conclusions from shapes it recognizes.
 """
 import importlib.util
 import json
@@ -44,12 +47,7 @@ def check(name, condition):
 
 
 def skip(name, why):
-    """Reported and NOT counted.
-
-    A skip recorded as a pass makes a weakened run indistinguishable from a
-    full one by its totals alone -- measured: the permission case is inert as
-    root, and the suite printed the same count either way.
-    """
+    """Reported and NOT counted, so a weakened run and a full one differ in the totals."""
     global skipped
     print(f"SKIP: {name} ({why})")
     skipped += 1
@@ -74,277 +72,120 @@ def write(root, name, records):
 def run(root, phrase, *args):
     result = subprocess.run(
         [sys.executable, str(SCRIPT), phrase, "--root", str(root), *args],
-        capture_output=True, text=True,
-    )
+        capture_output=True, text=True)
     return result.returncode, result.stdout + result.stderr
 
 
 def main() -> int:
     print("Testing check-user-quote.py...")
 
-    # -- the origin label ---------------------------------------------------
-    check("origin.kind=human is a human record",
-          cuq.classify_record(user("merge it", human=True)) == (cuq.HUMAN, ""))
-    # Named explicitly rather than iterated over the constant: a loop reading
-    # `for kind in cuq.NON_HUMAN_ORIGINS` deletes its own cases when the
-    # constant is emptied, so the mutant survives. Measured -- with
-    # NON_HUMAN_ORIGINS = () the suite stayed green while every coordinator
-    # record became UNATTRIBUTED and --allow-unattributed certified one.
-    for kind in ("channel", "peer", "coordinator", "observer", "observer-activity",
-                 "auto-continuation", "task-notification"):
-        check(f"origin.kind={kind} is excluded by the label alone",
-              cuq.classify_record({"message": {"role": "user", "content": "x"},
-                                   "userType": "external",
-                                   "origin": {"kind": kind}})[0] == cuq.EXCLUDED)
-        check(f"...and {kind} is in NON_HUMAN_ORIGINS", kind in cuq.NON_HUMAN_ORIGINS)
-    # The shipped CLI demotes a human turn to "unclassified" on the paths that
-    # rewrite a record, so excluding it would deny a real quotation.
-    check("origin.kind=unclassified is unattributed, not excluded",
-          cuq.classify_record({"message": {"role": "user", "content": "x"},
-                               "userType": "external",
-                               "origin": {"kind": "unclassified"}})[0] == cuq.UNATTRIBUTED)
-    check("an unseen origin.kind is unattributed, not excluded",
-          cuq.classify_record({"message": {"role": "user", "content": "x"},
-                               "userType": "external",
-                               "origin": {"kind": "some-future-kind"}})[0] == cuq.UNATTRIBUTED)
-    # An assistant-written dispatch brief: isSidechain false, no isMeta,
-    # userType external. The fail-open the fourth review reproduced.
-    check("an unlabelled record is unattributed, NOT a turn",
-          cuq.classify_record(user("You are an adversarial reviewer"))[0] == cuq.UNATTRIBUTED)
-    # Matches the harness's own predicate: O0(origin) && verifiedSlackHumanTurn !== true.
-    check("a relayed channel turn is excluded even though it is labelled human",
-          cuq.classify_record(user("hello", human=True,
-                                   verifiedSlackHumanTurn=True))[0] == cuq.EXCLUDED)
-
-    # Named, not iterated over the constant: a loop over FLAG_EXCLUSIONS deletes
-    # its own cases when an entry is renamed, and the mutant survives.
-    for key in ("isCompactSummary", "isMeta", "isSidechain", "verifiedSlackHumanTurn"):
-        check(f"{key} is excluded", cuq.classify_record(user("x", **{key: True}))[0] == cuq.EXCLUDED)
-        check(f"...and {key} is in FLAG_EXCLUSIONS",
-              key in [k for k, _ in cuq.FLAG_EXCLUSIONS])
-    check("an assistant-role record is excluded",
-          cuq.classify_record({"message": {"role": "assistant", "content": "x"}})[0] == cuq.EXCLUDED)
-    check("a non-external userType is excluded",
-          cuq.classify_record({"message": {"role": "user", "content": "x"},
-                               "userType": "internal"})[0] == cuq.EXCLUDED)
-
-    # TRANSCRIPT_PREFIXES are ordinary English, so they apply ONLY where the
-    # harness withheld the human label. On a human-labelled turn they must not.
-    for prefix in ("This session is being continued",
-                   "Caveat: The messages below were generated",
-                   "The coordinator sent a message while you were working"):
-        check(f"prefix {prefix[:28]!r} excludes an UNLABELLED record",
-              cuq.classify_record(user(prefix + " and then some"))[0] == cuq.EXCLUDED)
-        check("...and does NOT exclude a human-labelled one",
-              cuq.classify_record(user(prefix + " and then some", human=True))[0] == cuq.HUMAN)
-        check("...and is in TRANSCRIPT_PREFIXES", prefix in cuq.TRANSCRIPT_PREFIXES)
-
-    # -- regions: all or nothing ------------------------------------------
-    check("a plain block is quotable whole",
-          cuq._regions("just some text") == ["just some text"])
-    check("an empty block yields nothing", cuq._regions("   ") == [])
-    # The opener test is structural, not a name list. The previous revision
-    # enumerated four names against a harness vocabulary of at least fifteen,
-    # and the four intersected it in one -- so teammate-message, ide_selection,
-    # local-command-stdout and command-message all certified at exit 0.
-    for tag in ("task-notification", "system-reminder", "wake", "command-name",
-                "teammate-message", "ide_selection", "local-command-stdout",
-                "command-message", "bash-stderr", "tick", "some-tag-invented-later"):
-        check(f"a block carrying <{tag}> is unquotable in full",
-              cuq._regions(f"genuine text <{tag}>INJECTED</{tag}> more genuine") == [])
-
-    # The five shapes that broke the five previous designs, in order. Each was
-    # a live exit-0 certification of harness prose when it was found.
-    for label, block in (
-        ("appended reminder", "ok do it\n<system-reminder>A</system-reminder>"),
-        ("mid-block reminder", "before <system-reminder>A</system-reminder> after"),
-        ("leading envelope", "<system-reminder>A</system-reminder>first<system-reminder>B</system-reminder>second"),
-        ("repeated opener", "<system-reminder>OUT <system-reminder>i</system-reminder> A</system-reminder>"),
-        ("literal closing tag inside", "<system-reminder>about the </system-reminder> tag, A</system-reminder>"),
-        ("truncated, not at the start", "sure go ahead <system-reminder>A truncated"),
-    ):
-        check(f"{label}: nothing quotable", cuq._regions(block) == [])
-    check("uppercase tags are caught too",
-          cuq._regions("x <SYSTEM-REMINDER>A</SYSTEM-REMINDER> y") == [])
-    check("a tag the list never knew is caught, which is the point",
-          cuq._regions("x <brand-new-harness-tag>A</brand-new-harness-tag> y") == [])
-    # A closing ">" must NOT be required. Requiring one was a regression: the
-    # four-name list it replaced matched on a word boundary and caught this for
-    # free, and a real injection can be cut mid-write.
-    check("an opener that never closes is still caught",
-          cuq._regions("please help <system-reminder never closes and no bracket follows") == [])
-    check("...including one at the very end of the block",
-          cuq._regions("please help <system-reminder") == [])
-    check("a self-closing opener is caught",
-          cuq._regions("x <tick/> y") == [])
-    # And the cost of a lexical test, asserted so it is not discovered later.
-    check("prose that merely looks like a tag is denied, which is the accepted cost",
-          cuq._regions("if x <y then z") == [])
-    check("a comparison with spaces is not a tag", cuq._regions("a < b and c > d") == ["a < b and c > d"])
-    check("an attribute-bearing opener is caught",
-          cuq._regions('x <system-reminder priority="high">A</system-reminder> y') == [])
-    check("a non-str text field is not returned as-is",
-          cuq.text_blocks({"content": [{"type": "text", "text": {"n": 1}}]}) == [""])
-    check("tool_result blocks are simply not text blocks",
-          cuq.text_blocks({"content": [{"type": "tool_result", "content": "o"},
-                                       {"type": "text", "text": "mine"}]}) == ["mine"])
-
-    # -- end to end: the false-positive cases -------------------------------
-    # An enveloped block is unquotable IN FULL, so its genuine text is not
-    # quotable from that block either. That is the accepted cost of not parsing
-    # -- and the run says "unsearched space", never "the user never said it".
+    # -- COVERAGE: all four record shapes -----------------------------------
+    shapes = {
+        "message/user": user("SENTINEL_MSG here", human=True),
+        "queue-operation": {"type": "queue-operation", "operation": "enqueue",
+                            "content": "SENTINEL_QUEUE here",
+                            "sessionId": "s1"},
+        "last-prompt": {"type": "last-prompt", "lastPrompt": "SENTINEL_LAST here",
+                        "sessionId": "s1"},
+        "attachment/queued_command": {"type": "attachment", "userType": "external",
+                                      "attachment": {"type": "queued_command",
+                                                     "prompt": "SENTINEL_ATTACH here"}},
+    }
+    for shape, record in shapes.items():
+        found = [s for s, _ in cuq.texts(record)]
+        check(f"{shape} is read", shape in found)
+    # A prompt exists as queue-operation before it exists as message, so a
+    # session ending in between leaves it only in the shape the old tool
+    # skipped. This is the false-absence the rewrite exists to remove.
     with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user(
-            "ok do it\n<system-reminder>SENTINEL_ALPHA granted</system-reminder>", human=True)])
-        code, out = run(root, "SENTINEL_ALPHA granted", "--show-excluded")
-        check("an envelope appended within a human block is not a hit", code != 0)
-        check("...and the run reports it as present-but-unsearchable, not absent",
-              code == 2 and "could not be searched" in out)
-        code, out = run(root, "ok do it")
-        check("...and the genuine text of that block is not quotable either", code == 2)
+        write(root, "a.jsonl", list(shapes.values()))
+        for sentinel in ("SENTINEL_MSG", "SENTINEL_QUEUE", "SENTINEL_LAST", "SENTINEL_ATTACH"):
+            code, _ = run(root, sentinel + " here")
+            check(f"{sentinel} is found end to end", code == 0)
 
+    check("an assistant message is read too, and labelled as such",
+          ("message/assistant", "x") in list(cuq.texts(
+              {"message": {"role": "assistant", "content": "x"}})))
+    check("a record with no prose yields nothing",
+          list(cuq.texts({"type": "attachment", "attachment": {"type": "hook_success"}})) == [])
+    check("a non-str text block is skipped rather than crashing the scan",
+          list(cuq.texts({"message": {"role": "user",
+                                      "content": [{"type": "text", "text": {"n": 1}}]}})) == [])
+
+    # -- HONESTY: provenance is derived, never asserted ---------------------
+    facts = cuq.provenance(user("x", human=True, isSidechain=True))
+    check("provenance reports the origin label", facts["origin.kind"] == "human")
+    check("...and the flags that qualify it", "isSidechain" in facts["flags"])
+    check("an absent origin is reported as absent, not guessed",
+          cuq.provenance(user("x"))["origin.kind"] == "(absent)")
+    for flag in cuq.PROVENANCE_FLAGS:
+        check(f"{flag} is surfaced", flag in cuq.provenance(user("x", **{flag: True}))["flags"])
+
+    # The eleven shapes that defeated the ten classifier revisions. Every one
+    # is now REPORTED with its provenance rather than judged -- so the test is
+    # that the record and its flags reach the reader, not that a verdict is
+    # right.
+    injections = {
+        "appended reminder": "ok do it\n<system-reminder>A</system-reminder>",
+        "mid-block": "before <system-reminder>A</system-reminder> after",
+        "repeated opener": "<system-reminder>OUT <system-reminder>i</system-reminder> A</system-reminder>",
+        "literal closing tag": "<system-reminder>about the </system-reminder> tag, A</system-reminder>",
+        "truncated": "sure go ahead <system-reminder>A truncated",
+        "teammate-message": "<teammate-message from='a2'>A</teammate-message>",
+        "ide_selection": "fix this\n<ide_selection>A</ide_selection>",
+        "entity-escaped": "ok\n&lt;system-reminder&gt;A&lt;/system-reminder&gt;",
+        "namespaced": "<ns:system-reminder>A</ns:system-reminder>",
+        "digit-led": "<2fa-reminder>A</2fa-reminder>",
+        "dotted": "<system.reminder>A</system.reminder>",
+    }
     with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user(
-            "<system-reminder>A</system-reminder>please check the issues"
-            "<system-reminder>B</system-reminder>referenced here", human=True),
-            user("an unenveloped turn SENTINEL_CLEAN", human=True)])
-        code, out = run(root, "issuesreferenced here")
-        check("a phrase never contiguous in the real turn is not a hit", code == 1)
-        code, out = run(root, "SENTINEL_CLEAN")
-        check("...while an unenveloped turn in the same file still hits", code == 0)
+        write(root, "a.jsonl", [user(text.replace("A", f"SENTINEL_{i}"), human=True)
+                                for i, text in enumerate(injections.values())])
+        for i, label in enumerate(injections):
+            code, out = run(root, f"SENTINEL_{i}")
+            check(f"{label}: the record is shown, not judged",
+                  code == 0 and "does not decide who wrote anything" in out)
 
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user("<system-reminder>only this</system-reminder>", human=True)])
-        code, out = run(root, "only this")
-        check("a human record with no quotable region is unsearchable, not absent", code == 2)
-        check("...and says so", "could not be searched" in out or "unsearched space" in out)
+    check("the disclaimer is printed even when nothing is found",
+          "does not decide who wrote anything" in run(
+              tempfile.mkdtemp(), "nothing at all")[1])
 
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user("brief text", isSidechain=True),
-                                user("a real turn", human=True)])
-        code, out = run(root, "brief text", "--show-excluded")
-        check("a subagent brief is not a hit", code == 1)
-        code, out = run(root, "brief text", "--allow-unattributed")
-        check("...and --allow-unattributed does not rescue an EXCLUDED record", code == 1)
+    # -- collapse and ordering ----------------------------------------------
+    raw = [
+        {"file": "f", "shape": "last-prompt", "text": "same", "origin.kind": "(absent)",
+         "flags": "(none)", "userType": "x", "session": "s"},
+        {"file": "f", "shape": "last-prompt", "text": "same", "origin.kind": "(absent)",
+         "flags": "(none)", "userType": "x", "session": "s"},
+        {"file": "f", "shape": "message/user", "text": "same", "origin.kind": "human",
+         "flags": "(none)", "userType": "x", "session": "s"},
+    ]
+    collapsed = cuq.collapse(raw)
+    check("identical texts in one shape collapse to a single entry", len(collapsed) == 2)
+    check("...carrying how many records held them",
+          any(c["copies"] == 2 for c in collapsed))
+    check("a human-labelled user message sorts first, so evidence leads",
+          collapsed[0]["shape"] == "message/user")
+    check("an assistant message sorts after a user one",
+          cuq._rank({"shape": "message/assistant", "origin.kind": "(absent)"})
+          > cuq._rank({"shape": "message/user", "origin.kind": "(absent)"}))
 
-    # -- end to end: the false-negative cases -------------------------------
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [
-            user("This session is being continued only if you agree, so SENTINEL_KILO", human=True),
-            user("why do <system-reminder> tags appear SENTINEL_MIKE here?", human=True),
-            {"message": {"role": "user", "content": [
-                {"type": "tool_result", "content": "out"},
-                {"type": "text", "text": "and also SENTINEL_HOTEL please"}]},
-             "userType": "external", "origin": {"kind": "human"}},
-        ])
-        for sentinel, why in (("SENTINEL_KILO", "a human turn opening with an English marker"),
-                              ("SENTINEL_HOTEL", "human text sharing a record with a tool_result")):
-            code, _ = run(root, sentinel)
-            check(f"{why} is still quotable", code == 0)
-        # The accepted cost, asserted rather than left implicit: a turn writing
-        # ABOUT a tag is not quotable from that block. Denying a real quotation
-        # is the safe direction; certifying harness prose is not.
-        code, out = run(root, "SENTINEL_MIKE", "--show-excluded")
-        check("a turn quoting a tag is NOT quotable", code != 0)
-        check("...and --show-excluded names the opener as the reason, "
-              "so the skip is visible rather than silent",
-              "tag-shaped opener" in out)
-
-    # -- the unattributed contract ------------------------------------------
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user("an unlabelled sentence"), user("a real turn", human=True)])
-        code, out = run(root, "an unlabelled sentence")
-        check("an unattributed match does not exit 0", code == 1)
-        check("...and is labelled as not evidence",
-              "UNATTRIBUTED MATCH" in out and "not evidence" in out)
-        code, out = run(root, "an unlabelled sentence", "--allow-unattributed")
-        check("--allow-unattributed exits 3, not 0", code == 3)
-        check("...and still prints the caution", "not evidence" in out)
-        code, out = run(root, "nothing matches this", "--json")
-        payload = json.loads(out)
-        check("--json reports counts on the absent branch",
-              payload["status"] == "absent" and payload["human_regions"] == 1
-              and "files" in payload and "records" in payload)
-
-    # -- the negative control, from both directions -------------------------
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "only-noise.jsonl", [user("injected", isMeta=True)])
-        code, out = run(root, "anything")
-        check("zero quotable human regions is unsearchable (exit 2)", code == 2)
-        check("...and says so rather than reporting an absence", "unsearched space" in out)
-        code, out = run(root, "anything", "--json")
-        check("--json reports counts on the unsearchable branch",
-              json.loads(out)["status"] == "unsearchable" and "files" in json.loads(out))
-
-    code = subprocess.run([sys.executable, str(SCRIPT), "x", "--root", "/nonexistent-xyz"],
-                          capture_output=True, text=True).returncode
-    check("a --root that is not a directory is a usage error, not an absence", code == 2)
-
-    # Root resolution can raise before the scan begins -- an unresolvable ~user,
-    # or Path.home() with HOME unset and no passwd entry. An uncaught exception
-    # exits 1, which this tool documents as "absent".
-    env = dict(os.environ, CLAUDE_CONFIG_DIR="~nosuchuser12345/x")
-    env.pop("HOME", None)
-    result = subprocess.run([sys.executable, str(SCRIPT), "hi"],
-                            capture_output=True, text=True, env=env)
-    check("a crash resolving the root exits 2, not 1", result.returncode == 2)
-    check("...and names what failed",
-          "could not resolve a transcript root" in result.stderr
-          or "No transcript root at" in result.stderr)
-
-    empty = subprocess.run([sys.executable, str(SCRIPT), "  **  "],
-                           capture_output=True, text=True)
-    check("an empty phrase is a usage error, not an absence",
-          empty.returncode == 2 and "empty after normalization" in empty.stderr)
-
-    with tempfile.TemporaryDirectory() as home:
-        env = dict(os.environ, HOME=home, CLAUDE_CONFIG_DIR=str(Path(home) / "nothing"))
-        result = subprocess.run([sys.executable, str(SCRIPT), "x", "--json"],
-                                capture_output=True, text=True, env=env)
-        payload = json.loads(result.stdout) if result.stdout.strip() else {}
-        check("--json on the missing-root branch exits 2 with the full schema on stdout",
-              result.returncode == 2 and payload.get("status") == "unsearchable"
-              and "files" in payload and "human_regions" in payload and "reason" in payload)
-
-    # -- degraded reads: none may become an absence -------------------------
+    # -- HONESTY: a degraded read is never an absence -----------------------
     with tempfile.TemporaryDirectory() as root:
         path = Path(root) / "torn.jsonl"
         with path.open("w", encoding="utf-8") as handle:
-            handle.write(json.dumps(user("first turn", human=True)) + "\n")
-            handle.write("{not json\n\n")
-            handle.write(json.dumps(user("merge it", human=True)) + "\n")
-        code, out = run(root, "merge it")
-        check("a torn line does not end the scan", code == 0)
-        check("unparseable lines are counted and reported", "1 unparseable line" in out)
-
-    # A torn line is the normal state of a transcript being appended to, and it
-    # shrinks the searched space exactly as an unreadable file does. Reporting
-    # an absence over it is the "I could not look" collapse the exit contract
-    # exists to prevent.
-    with tempfile.TemporaryDirectory() as root:
-        path = Path(root) / "live.jsonl"
-        with path.open("w", encoding="utf-8") as handle:
             handle.write(json.dumps(user("a good turn", human=True)) + "\n")
             handle.write('{"message": {"role": "user", "cont')
-        code, out = run(root, "a phrase that is genuinely absent")
-        check("an unparseable line makes the run unsearchable, not absent", code == 2)
+        code, out = run(root, "a phrase genuinely absent")
+        check("an unparseable line makes the run degraded, not absent", code == 2)
         check("...and says the space could not be read", "could not be read" in out)
-        code, out = run(root, "a phrase that is genuinely absent", "--json")
-        check("...and --json agrees", json.loads(out)["status"] == "unsearchable")
 
-    # A dangling symlink rather than a chmod, so the case holds when the suite
-    # runs as root -- where permission bits are not enforced and a chmod-based
-    # fixture would pass vacuously.
     with tempfile.TemporaryDirectory() as root:
         write(root, "ok.jsonl", [user("a real turn", human=True)])
         (Path(root) / "gone.jsonl").symlink_to(Path(root) / "nothing-here")
-        code, out = run(root, "phrase that is absent")
-        check("an unreadable file makes the run unsearchable, not absent", code == 2)
+        code, out = run(root, "a phrase genuinely absent")
+        check("an unreadable file makes the run degraded, not absent", code == 2)
         check("...and names it", "UNREADABLE" in out)
 
-    # os.walk with onerror, not rglob: rglob swallows a permission error from
-    # scandir, so an unreadable project directory would shrink the space
-    # silently and the run would report an absence.
     if os.geteuid() != 0:
         with tempfile.TemporaryDirectory() as root:
             write(root, "top.jsonl", [user("a real turn", human=True)])
@@ -352,95 +193,74 @@ def main() -> int:
             write(root, "hidden/x.jsonl", [user("SENTINEL_INSIDE", human=True)])
             hidden.chmod(0o000)
             try:
-                code, out = run(root, "SENTINEL_INSIDE")
-                check("an unreadable DIRECTORY is not swallowed into an absence", code == 2)
+                check("an unreadable DIRECTORY is not swallowed", run(root, "SENTINEL_INSIDE")[0] == 2)
             finally:
                 hidden.chmod(0o755)
     else:
         skip("unreadable directory", "running as root; permission bits do not apply")
 
-    # A crash is a search that did not happen. Python's default status for an
-    # uncaught exception is 1, which this tool documents as "absent".
+    code = subprocess.run([sys.executable, str(SCRIPT), "x", "--root", "/nonexistent-xyz"],
+                          capture_output=True, text=True).returncode
+    check("a --root that is not a directory is a usage error, not an absence", code == 2)
+
+    empty = subprocess.run([sys.executable, str(SCRIPT), "  **  "],
+                           capture_output=True, text=True)
+    check("an empty phrase is a usage error, not an absence",
+          empty.returncode == 2 and "empty after normalization" in empty.stderr)
+
+    env = dict(os.environ, CLAUDE_CONFIG_DIR="~nosuchuser12345/x")
+    env.pop("HOME", None)
+    result = subprocess.run([sys.executable, str(SCRIPT), "hi"],
+                            capture_output=True, text=True, env=env)
+    check("a crash resolving the root exits 2, not 1", result.returncode == 2)
+
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user("a real turn", human=True)])
         result = subprocess.run(
             [sys.executable, "-c",
              "import sys, importlib.util as i;"
              "s=i.spec_from_file_location('m',%r);m=i.module_from_spec(s);s.loader.exec_module(m);"
-             "m.text_blocks=lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom'));"
+             "m.texts=lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom'));"
              "sys.exit(m.main(['q','--root',%r]))" % (str(SCRIPT), root)],
             capture_output=True, text=True)
         check("an unexpected exception exits 2", result.returncode == 2)
         check("...and names what failed", "failed before it could answer" in result.stderr)
 
-    # -- nested transcripts --------------------------------------------------
+    # Found the record, then died printing it, and exited 1 -- "no record".
     with tempfile.TemporaryDirectory() as root:
-        write(root, "proj/session/subagents/agent-1.jsonl", [user("brief", isSidechain=True)])
-        write(root, "proj/top.jsonl", [user("a typed turn", human=True)])
-        code, out = run(root, "brief", "--show-excluded")
-        check("nested subagent transcripts are reached", "subagent transcript" in out)
-        check("...and do not count as a hit", code == 1)
-
-    # -- the boundary a denial must not cross --------------------------------
-    # A phrase present in a block nothing could search is a could-not-search,
-    # never an absence -- and that must hold in the DEFAULT invocation, not
-    # only under --show-excluded.
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [
-            user("please look at <system-reminder>x</system-reminder> "
-                 "and also SENTINEL_D1 do the thing", human=True),
-            user("a clean turn", human=True)])
-        code, out = run(root, "SENTINEL_D1")
-        check("a denial exits 2, not 1, with no flag passed", code == 2)
-        check("...and the default run says the phrase is present but unsearchable",
-              "could not be searched" in out and "not an absence" in out)
-        code, out = run(root, "SENTINEL_D1", "--json")
-        check("...and --json carries the denied count",
-              json.loads(out)["denied_blocks"] == 1
-              and json.loads(out)["status"] == "unsearchable")
-        code, out = run(root, "a phrase genuinely nowhere")
-        check("a real absence is still exit 1", code == 1)
-
-    # Blocks are never concatenated. The claim had no test; joining them in
-    # quotable() survived the whole suite.
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [{"message": {"role": "user", "content": [
-            {"type": "text", "text": "the issues"},
-            {"type": "text", "text": "referenced here"}]},
-            "userType": "external", "origin": {"kind": "human"}}])
-        code, out = run(root, "the issues referenced here")
-        check("a phrase spanning two blocks is not a hit", code != 0)
-        code, out = run(root, "the issues")
-        check("...while each block on its own still hits", code == 0)
-
-    # The CLI's human predicate carries toolUseResult === undefined. Enforced
-    # rather than assumed safe because such records happen to lack text blocks.
-    check("a tool-result carrier is excluded even when labelled human",
-          cuq.classify_record({"message": {"role": "user", "content": "x"},
-                               "userType": "external", "origin": {"kind": "human"},
-                               "toolUseResult": {"a": 1}})[0] == cuq.EXCLUDED)
-
-    # A marker in the second block, behind an empty first one.
-    check("the transcript-marker check reads every block, not the first",
-          cuq.classify_record({"message": {"role": "user", "content": [
-              {"type": "text", "text": ""},
-              {"type": "text", "text": "This session is being continued and so on"}]},
-              "userType": "external"})[0] == cuq.EXCLUDED)
-
-    # Found the hit, then died printing it, and exited 1 -- "absent".
-    with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user("merge it \u2014 now", human=True)])
+        write(root, "a.jsonl", [user("merge it — now", human=True)])
         env = dict(os.environ, LC_ALL="C", LANG="C", PYTHONUTF8="0")
         env.pop("PYTHONIOENCODING", None)
         result = subprocess.run([sys.executable, str(SCRIPT), "merge it", "--root", root],
                                 capture_output=True, text=True, env=env)
-        # Not merely "does not exit 1": without the hardening the crash handler
-        # catches it and returns 2, which is honest but wrong -- the hit WAS
-        # found. The answer must survive the console's encoding.
-        check("an unencodable character in a matched turn still reports the hit",
-              result.returncode == 0)
+        check("an unencodable character still reports the record", result.returncode == 0)
 
-    # -- norm(): asserted against the literal, not against itself ------------
+    # -- JSON carries the same counts on every branch ------------------------
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user("a real turn", human=True)])
+        payload = json.loads(run(root, "a real turn", "--json")[1])
+        check("--json reports the search space and the candidates",
+              payload["status"] == "found" and payload["files"] == 1
+              and payload["texts_examined"] >= 1 and len(payload["candidates"]) == 1)
+        payload = json.loads(run(root, "nothing here", "--json")[1])
+        check("--json on the absent branch keeps the same keys",
+              payload["status"] == "absent" and "texts_examined" in payload)
+
+    with tempfile.TemporaryDirectory() as home:
+        env = dict(os.environ, HOME=home, CLAUDE_CONFIG_DIR=str(Path(home) / "nothing"))
+        result = subprocess.run([sys.executable, str(SCRIPT), "x", "--json"],
+                                capture_output=True, text=True, env=env)
+        payload = json.loads(result.stdout) if result.stdout.strip() else {}
+        check("--json on the missing-root branch exits 2 with the full schema on stdout",
+              result.returncode == 2 and payload.get("status") == "degraded"
+              and "files" in payload and "reason" in payload)
+
+    # -- nested transcripts and norm ----------------------------------------
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "proj/session/subagents/agent-1.jsonl", [user("SENTINEL_NESTED")])
+        code, out = run(root, "SENTINEL_NESTED")
+        check("nested subagent transcripts are reached", code == 0 and "agent-1.jsonl" in out)
+
     check("norm collapses whitespace and inline markup", cuq.norm("A  `b`  **c**") == "a b c")
     check("norm is not degenerate", cuq.norm("hello") == "hello")
 

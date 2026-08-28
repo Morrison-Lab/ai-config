@@ -142,7 +142,7 @@ and a pull request opened on its premise.
   Specificity is inherited from the artifact that was read,
   not from the one the claim is about.
 
-## A working-directory checkout is a fifth shape, and it stays silent
+## A working-directory checkout is another shape, and it stays silent
 
 Shape 1 already names "a stale local checkout" among its examples, so this is a sharpening of that shape rather than a wholly new one.
 What it adds is the *tell*, which shape 1 leaves implicit: its remedy, go to the authoritative store, presumes you already suspect the copy, and that presumption is exactly what fails here.
@@ -264,8 +264,7 @@ See
 [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A stale install diagnosed from an mtime and an absence".
 
-**The interpreter's own defaults are a fifth adjacent artifact, and a failed
-reproduction is where they stand in for the code.**
+**The interpreter's own defaults are another adjacent artifact, and a failed reproduction is where they stand in for the code.**
 The four shapes above all substitute one *file* or *run* for another.
 This one substitutes the **environment** for the program, and it arrives
 disguised as diligence: you were told a defect exists, you tried to see it

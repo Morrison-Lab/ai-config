@@ -448,6 +448,23 @@ check(
     empty_estate_code == 1,
 )
 
+# Under --repos the org sweep never runs and the caller narrowed the query
+# deliberately, so an empty result stays the documented benign no-op.
+with_gh(FakeGh({"owner/lacks": secrets_payload("OTHER", "t0")}))
+_argv = sys.argv
+sys.argv = ["rotate-claude-token.py", "--repos", "owner/lacks"]
+try:
+    rct.main()
+    repos_empty_code = 0
+except SystemExit as exc:
+    repos_empty_code = exc.code or 0
+finally:
+    sys.argv = _argv
+check(
+    "main() under --repos exits 0 on an empty result (benign narrowing)",
+    repos_empty_code == 0,
+)
+
 # --- read_token --------------------------------------------------------
 
 real_stdin = sys.stdin

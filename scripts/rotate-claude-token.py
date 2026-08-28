@@ -457,21 +457,27 @@ def main() -> None:
         print(f"  {repo:<44} updated={updated_at}")
 
     if not targets and not org_targets:
-        # An empty estate is an ERROR, not a quiet success (#2371 point 4):
-        # the secret disappearing from every scope is exactly the topology
-        # change this script exists to notice, and "Nothing to rotate" was
-        # how a broken sweep passed for a healthy one when the estate moved
-        # to an org-level secret (fail-fast's pass-path-equals-failure-path
-        # shape). A genuinely secretless estate is not a state this tool
-        # should bless silently either way.
-        print(
-            f"\nERROR: {args.secret} was found in NO scope -- neither an "
-            "org-level secret nor any repo-level copy. Either the estate "
-            "is unprovisioned or discovery is looking in the wrong place; "
-            "both need a human, so this is an error rather than a no-op.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        if owners:
+            # An empty estate under FULL DISCOVERY is an ERROR, not a quiet
+            # success (#2371 point 4): the secret disappearing from every
+            # scope is exactly the topology change this script exists to
+            # notice, and "Nothing to rotate" was how a broken sweep passed
+            # for a healthy one when the estate moved to an org-level secret
+            # (fail-fast's pass-path-equals-failure-path shape).
+            print(
+                f"\nERROR: {args.secret} was found in NO scope -- neither "
+                "an org-level secret nor any repo-level copy. Either the "
+                "estate is unprovisioned or discovery is looking in the "
+                "wrong place; both need a human, so this is an error "
+                "rather than a no-op.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        # Under --repos the org sweep never ran and the caller deliberately
+        # narrowed the query, so an empty result is the documented benign
+        # narrowing (see the docstring), not the vanished-estate signal.
+        print("\nNothing to rotate in the named repos.")
+        sys.exit(1 if errors else 0)
 
     total = len(org_targets) + len(targets)
     if not args.apply:

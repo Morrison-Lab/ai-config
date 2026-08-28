@@ -77,7 +77,8 @@ Once every pre-existing PR/MR is clean, run the full [`gii`](../gii/SKILL.md)
 loop: grab the highest-priority open issue → check history → implement → open
 MR/PR → ARDI to clean → recurse. Stack MRs when a later issue depends on an
 earlier unmerged branch. Respect GII's stopping conditions (backlog empty, user
-stop, or the default 5-issue checkpoint — ask before continuing past it).
+stop, or the default 5-issue wave boundary — wrap up the open wave of PRs,
+then continue with the next wave without asking).
 
 > Each PR that GII opens in this phase is itself ARDI'd to clean, so it does
 > **not** need a second pass through Phase 1.
@@ -114,7 +115,8 @@ stacks on it.
 - If the trigger was ambiguous about whether to also burn down issues (e.g. a
   bare "clean up the PRs"), stop after Phase 1 and check in before starting
   Phase 2.
-- Honor GII's 5-issue checkpoint in Phase 2 (ask before continuing).
+- Honor GII's 5-issue wave boundary in Phase 2: wrap up the open wave of PRs,
+  then continue with the next wave without asking.
 - If a PR or issue is blocked or ambiguous, **bypass** it — surface it and move
   on to the next item rather than halting the sweep. Stop only when every
   remaining item depends on that blocked one, so no independent work is left
@@ -157,5 +159,5 @@ and [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 - ❌ Interleaving the two phases — finish all open PRs before grabbing issues.
 - ❌ Re-running Phase 1 on PRs that Phase 2 just opened (GII already ARDI'd them).
-- ❌ Running Phase 2 unbounded — keep GII's checkpoint.
+- ❌ Running Phase 2 unbounded — keep GII's wave boundary.
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.

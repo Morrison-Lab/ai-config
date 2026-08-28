@@ -251,6 +251,14 @@ so decide them rather than arguing (or capitulating) from recollection:
   and grepping the reviewer's proposed alternative wording in the same file
   often shows it appears zero times.
 
+**That instrument settles a QUOTE and cannot settle a DERIVED FIGURE.**
+A percentage, ratio, or total computed from quantities the source prints
+appears nowhere in its text, so an exact-substring check returns zero whether
+the attribution is sound or invented.
+Derive it before calling such a citation unsupported, per
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s "A derived
+figure is supported by a source that never prints it".
+
 **Then fix what the challenge was really pointing at.**
 A wrong finding can still mark a genuine weakness.
 One case worth checking: the quoted sentence lives in a

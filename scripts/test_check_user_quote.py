@@ -228,7 +228,11 @@ def main() -> int:
 
     # Found the record, then died printing it, and exited 1 -- "no record".
     with tempfile.TemporaryDirectory() as root:
-        write(root, "a.jsonl", [user("merge it — now", human=True)])
+        # The glyph is BUILT, not typed: `shared/coding/ascii-punctuation-in-source.md`
+        # forbids a literal em-dash in a tracked source file, string literals
+        # included, and CI's non-ASCII gate does not scan .py -- so nothing here
+        # would have caught it.
+        write(root, "a.jsonl", [user(f"merge it {chr(0x2014)} now", human=True)])
         env = dict(os.environ, LC_ALL="C", LANG="C", PYTHONUTF8="0")
         env.pop("PYTHONIOENCODING", None)
         result = subprocess.run([sys.executable, str(SCRIPT), "merge it", "--root", root],

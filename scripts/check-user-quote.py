@@ -139,8 +139,12 @@ def collapse(candidates: List[dict]) -> List[dict]:
         key = (c["shape"], norm(c["text"]))
         if key in seen:
             seen[key]["copies"] += 1
+            # Track every file, so "(x2 records)" cannot be misread as two
+            # copies in the one file named.
+            if c["file"] not in seen[key]["files"]:
+                seen[key]["files"].append(c["file"])
             continue
-        seen[key] = dict(c, copies=1)
+        seen[key] = dict(c, copies=1, files=[c["file"]])
     return sorted(seen.values(), key=_rank)
 
 
@@ -253,8 +257,10 @@ def report(result: Scan, root: Path, limit: int) -> None:
               f"contain the phrase"
               f"{f'; showing {limit}' if len(distinct) > limit else ''}:\n")
     for i, c in enumerate(shown, 1):
+        files = c.get("files", [c["file"]])
+        where = files[0] if len(files) == 1 else f"{files[0]} +{len(files) - 1} more file(s)"
         copies = f"  (x{c['copies']} records)" if c["copies"] > 1 else ""
-        print(f"  [{i}] {c['file']}  shape={c['shape']}{copies}")
+        print(f"  [{i}] {where}  shape={c['shape']}{copies}")
         print(f"      origin.kind={c['origin.kind']}  flags={c['flags']}  userType={c['userType']}")
         for chunk in c["text"].splitlines()[:6]:
             print(f"      > {chunk[:150]}")
@@ -267,7 +273,11 @@ def report(result: Scan, root: Path, limit: int) -> None:
           "the user's -- ten revisions tried. Read the\nrecords above and judge. "
           "See shared/writing/citations.md.")
     if status(result) == "degraded":
-        print("\nPart of the space could not be read, so an absence here is not established.")
+        if result.candidates:
+            print("\nPart of the space could not be read, so there may be further records "
+                  "beyond those above.")
+        else:
+            print("\nPart of the space could not be read, so an absence here is not established.")
 
 
 def main(argv: Optional[List[str]] = None) -> int:

@@ -173,7 +173,7 @@ def _load_hook_module():
     back to nothing.
 
     The whole module is returned rather than just parse_report, because the
-    persona path must blank fences in the HOOK'S dialect (its `_blank_fences`)
+    persona path must blank quoted regions in the HOOK'S dialect (its `_blank_quoted_regions`)
     before comment-stripping and qualification-scanning -- mixing this
     script's CommonMark `strip_fences` with the hook's laxer fence regex left
     a gap where a pseudo-closed fence hid a qualified verdict line from the
@@ -211,30 +211,18 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
 
     hook = _load_hook_module()
 
-    # One fence dialect end to end: blank fences with the HOOK's own
-    # _blank_fences first, then strip HTML comments, then parse and guard
-    # over that same text. Blanking first also keeps a comment opener quoted
-    # inside a fence from reading as an unterminated comment.
-    blanked, unclosed = hook._blank_fences(report)
-    if unclosed:
-        return False, False, "Unbalanced or unterminated markdown code fence detected."
+    # One dialect end to end: blank fenced code and HTML comments with the
+    # HOOK's own interleaving-aware scanner (ai-config#2413, hardened in
+    # the #2479 review rounds), then parse and guard over that same text --
+    # one implementation, one dialect, nothing to drift.
+    stripped, unresolved = hook._blank_quoted_regions(report)
+    if unresolved:
+        return False, False, (
+            "Unresolvable quoted region (unclosed fence or HTML comment) "
+            "detected."
+        )
 
-    # A commented-out `Verdict:` line sits at line start and would otherwise
-    # be taken as the report's last verdict. Replace comment spans with
-    # equal-shape whitespace rather than deleting them: deletion can
-    # juxtapose surviving characters into a fence marker that never existed
-    # in the raw text, and parse_report's own re-blanking would then hide a
-    # later verdict line behind the synthesized fence.
-    stripped = re.sub(
-        r"<!--.*?-->",
-        lambda m: re.sub(r"[^\n]", " ", m.group(0)),
-        blanked,
-        flags=re.DOTALL,
-    )
-    if "<!--" in stripped:
-        return False, False, "Unterminated HTML comment detected."
-
-    # Invariant: _blank_fences blanks delimiter lines too, so a successful
+    # Invariant: the scanner blanks delimiter lines too, so a successful
     # blank pass leaves zero FENCE-matching lines, and space-substitution
     # creates no backticks -- it can only promote a surviving run into fence
     # indentation (a comment ending at line start directly before a backtick

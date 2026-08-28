@@ -1030,57 +1030,21 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     heading_line_end = scan_body.find("\n", match_end)
     if heading_line_end == -1:
         return False
-    # Trailing text on the heading line is decoration ("on the diff
-    # content", "and notes") only until a separator appears -- a colon,
-    # dash (ASCII or Unicode), or opening paren ANYWHERE in the trailer
-    # starts content, which is how a one-line finding gets written onto
-    # the heading itself ("## Findings: crash() is missing a null check",
-    # "## Findings on the diff content: crash() ...", an em-dash form).
-    # Discarding such trailers wholesale swallowed the finding (#2488 and
-    # #2459 review rounds; a position-zero ASCII-only gate left three
-    # bypasses). Content is prepended as the section's first line: a
-    # resolving phrase there still exempts, anything else re-flags. A
-    # purely decorative parenthetical ("(blocking)") lands on the flag
-    # side -- the recoverable direction.
+    # Any trailing text on the heading line is CONTENT -- the section's
+    # first line, tested like any other (#2499 option (a), adopted on the
+    # sixth #2488 review round). Five rounds of classifying trailers as
+    # decoration each enumerated a finite set (finding signals, then
+    # separators, then decoration lead-words, then signal vocabulary) and
+    # each enumeration left a swallow bypass; promoting the whole trailer
+    # closes the class. A resolving phrase after a leading separator
+    # ("## Findings: none") still exempts; a decorative suffix
+    # ("## Findings on the diff content") now re-flags, the recoverable
+    # direction -- reviewer-side heading style is the systemic fix.
     trailing = scan_body[match_end:heading_line_end].strip()
     lead: list[str] = []
-    sep = re.search(r"[:(\-\u2013\u2014]", trailing)
-    if sep:
-        content = trailing[sep.start():].lstrip(
-            ":(-\u2013\u2014 \t").strip()
-        if content:
-            lead = [content]
-    elif trailing:
-        # No separator at all. A bare trailer is decoration only when ALL
-        # THREE hold: it leads with a function word ("on the diff
-        # content", "and notes"), it is short (a real finding clause
-        # carries more words), and it contains no finding-signal
-        # vocabulary -- an enumeration of DECORATIONS with two extra
-        # gates, so an unrecognized shape fails toward flagging (fourth
-        # and fifth #2488-round findings: "## Findings the diff has a
-        # null pointer bug" was discarded by the separator gate, and
-        # "## Findings regarding null pointer dereference" by a
-        # first-word-only gate). The residual -- a short, signal-free,
-        # function-word-led finding clause -- is tracked with the
-        # structural question in the follow-up issue this comment's
-        # rounds filed.
-        first_word = re.match(r"[A-Za-z]+", trailing)
-        is_decoration = (
-            first_word is not None
-            and first_word.group(0).lower() in (
-                "on", "and", "in", "of", "for", "about", "regarding",
-                "from", "with", "per", "vs", "versus",
-            )
-            and len(trailing.split()) <= 5
-            and not re.search(
-                r"(?i)\b(?:crash|fail|error|missing|null|bug|broken|"
-                r"defect|wrong|incorrect|vulnerab|leak|race|overflow|"
-                r"regress|corrupt)",
-                trailing,
-            )
-        )
-        if not is_decoration:
-            lead = [trailing]
+    content = trailing.lstrip(":(-\u2013\u2014 \t").strip()
+    if content:
+        lead = [content]
     section_start = heading_line_end + 1
     next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
     section = scan_body[section_start:section_start + next_heading.start()] \

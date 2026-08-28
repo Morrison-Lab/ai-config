@@ -1837,10 +1837,10 @@ def main() -> int:
           is None)
     # ai-config#2459: trailing heading text remains part of the heading line;
     # the empty-section scan begins with the first non-empty body line.
-    check("a descriptive Findings heading with an empty body resolves empty",
+    check("a descriptive Findings heading now re-flags (option (a))",
           checker._unresolved_finding_pattern(
               "## Findings on the diff content\n\nNone.\n")
-          is None)
+          is not None)
     check("a plain Findings heading with an empty body still resolves empty",
           checker._unresolved_finding_pattern("## Findings\n\nNone.\n")
           is None)
@@ -1917,9 +1917,12 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings for real this time it is broken\n\nNone.\n")
           is not None)
-    check("wordy decorative Findings suffixes still resolve empty bodies",
+    # #2499 option (a): ANY heading trailer is content, so decorative
+    # suffixes now re-flag -- the recoverable direction, after five
+    # rounds showed every decoration enumeration leaves a swallow.
+    check("decorative Findings suffixes re-flag under option (a)",
           all(checker._unresolved_finding_pattern(
-                  f"## Findings{suffix}\n\nNone.\n") is None
+                  f"## Findings{suffix}\n\nNone.\n") is not None
               for suffix in (" on the diff content", " and notes")))
     # A parenthetical suffix lands on the flag side since the second
     # #2488-round pass: a paren can carry a real finding, and the gate

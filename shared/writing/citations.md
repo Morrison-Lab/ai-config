@@ -474,7 +474,8 @@ It stated a criterion for merging on a light review verdict, which is the direct
 A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
-The script finds **no human turn** for either sentence, over 22 files and 6,927 records carrying 2,057 user-role records and 2 human-labelled turns.
+The script finds **no human turn** for either sentence.
+It reports **2** human-labelled turns in the whole transcript root, over 23 files and roughly 7,200 records --- the record counts grow while the measuring session is still appending, so the reproducible figure is the two, not the total.
 `--show-excluded` places the replacement --- "This is the last correction round: fix the five, push, report the head" --- in an inter-agent coordinator message, and finds the original in no user-role record at all: it was only ever mine, so it is not reproduced.
 The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
 each passed its own local suite, and what refuted each was executing something.)

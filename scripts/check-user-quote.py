@@ -2,35 +2,33 @@
 """Decide whether a phrase attributed to the user was ever typed by the user.
 
 The instrument for `shared/writing/citations.md`'s
-"The user's own words are on disk" section.  Every quote-fidelity check in
-that file needs a fetchable source, and a sentence attributed to the user in
-conversation looks like it has none -- so the check gets skipped, and a
-reconstruction goes out inside quotation marks.
+"The user's own words are on disk" section, which carries the argument for why
+this is a classifier rather than a grep.  What follows is what the code does.
 
-It has a source.  Claude Code writes every turn to a JSONL transcript, and 29
-hooks in this repository already parse one.  What makes the lookup non-trivial
-is that `message.role == "user"` is a TRANSPORT role rather than an authorship
-claim.  The same role carries harness continuations, stop-hook output, skill
-bodies, task notifications, tool results, compaction summaries, and -- inside a
-subagent's own transcript -- the brief the ASSISTANT wrote to dispatch it.
-Matching any of those and reporting a hit is the artifact substitution the
-section exists to reject, dressed up as a verification.
+`message.role == "user"` is a transport role, so a user-role record is sorted
+three ways rather than two:
 
-So the classifier, not the search, is what carries this check.  A record is a
-typed turn only when every exclusion below fails.
+  HUMAN         `origin.kind == "human"` -- the harness's own label,
+                authoritative in both directions when present
+  EXCLUDED      a flag (`isMeta`, `isCompactSummary`, `isSidechain`), a
+                non-external `userType`, a tool-result carrier, an empty body,
+                an anchored harness envelope, or any other `origin.kind`
+  UNATTRIBUTED  survives every exclusion and carries no label
 
-Two failures are deliberately kept distinct, per
-`shared/principles/fail-fast.md`:
+UNATTRIBUTED exists because the exclusion list is hand-maintained against one
+snapshot of the transcript format.  An assistant-written dispatch brief was
+measured passing all of it on 2026-08-28, so a match there is reported as a
+candidate and never as a hit unless `--allow-unattributed` is passed.
 
-  exit 1  searched successfully, no typed turn contains the phrase
-  exit 2  could not establish a search space at all -- no transcript root, no
-          files, or no typed turns anywhere in them
+Text blocks are searched separately rather than joined: an injected block
+riding on a genuine turn would otherwise become searchable through that turn's
+classification, and the envelope test is start-anchored so that a turn quoting
+an envelope tag stays a turn.
 
-Collapsing them is what turns "I could not look" into "the user never said
-it", which is the stronger claim and the wrong one.  A run therefore always
-reports what it examined (files, records, typed turns, unparseable lines)
-alongside what it found, so a zero is never mistaken for a detector that never
-engaged.
+Exit 0 found, 1 absent, 2 no human-labelled turn was available to search --
+including a missing root, an unreadable file, and an empty phrase.  Per
+`shared/principles/fail-fast.md` the last is kept distinct from the second so
+a degraded read cannot be reported as an absence.
 """
 from __future__ import annotations
 
@@ -40,11 +38,12 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
-# Harness envelopes delivered as user-role records.  Anchored at the start of
-# the stripped body: a message merely QUOTING one of these tags (this file's
-# own docs do) is still a typed turn.
+# Harness envelopes delivered as user-role records. Matched against the START
+# of the first text block only: a turn that merely quotes one of these tags
+# (this file's own tests do) must stay a turn, for the same reason
+# hooks/no-misattributed-quote.py exempts a message reporting a misquote.
 ENVELOPE_PREFIXES = (
     "<task-notification>",
     "<system-reminder>",
@@ -52,14 +51,18 @@ ENVELOPE_PREFIXES = (
     "<command-name>",
     "This session is being continued",
     "Caveat: The messages below were generated",
+    "The coordinator sent a message while you were working",
 )
 
-# Excluded because the body is the assistant's own prose, not the user's.
 FLAG_EXCLUSIONS = (
     ("isCompactSummary", "compaction summary"),
     ("isMeta", "harness injection"),
     ("isSidechain", "subagent transcript"),
 )
+
+HUMAN = "human"
+UNATTRIBUTED = "unattributed"
+EXCLUDED = "excluded"
 
 
 def norm(s: str) -> str:
@@ -67,50 +70,58 @@ def norm(s: str) -> str:
     return re.sub(r"[\s`*_]+", " ", s).strip().lower()
 
 
-def transcript_root(explicit: Optional[str]) -> Optional[Path]:
-    """Where Claude Code keeps transcripts, or None on an agent that has none."""
-    if explicit:
-        root = Path(explicit).expanduser()
-        return root if root.is_dir() else None
+def default_root() -> Path:
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     base = Path(configured).expanduser() if configured else Path.home() / ".claude"
-    root = base / "projects"
-    return root if root.is_dir() else None
+    return base / "projects"
 
 
-def record_text(message: dict) -> str:
-    """The record's prose, or "" when it carries no prose at all."""
+def text_blocks(message: dict) -> List[str]:
+    """Each prose block separately.
+
+    Deliberately NOT joined: an injected block riding on a genuine turn would
+    otherwise become searchable through that turn's own classification, and a
+    start-anchored envelope test cannot see a second block at all.
+    """
     content = message.get("content")
     if isinstance(content, str):
-        return content
+        return [content]
     if not isinstance(content, list):
-        return ""
-    parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
-    return " ".join(parts)
+        return []
+    return [b.get("text", "") for b in content
+            if isinstance(b, dict) and b.get("type") == "text"]
 
 
 def classify(record: dict) -> Tuple[str, str]:
-    """('typed', '') for a turn the user actually typed, else ('excluded', why)."""
+    """HUMAN, UNATTRIBUTED, or (EXCLUDED, why)."""
     message = record.get("message") or {}
     if message.get("role") != "user":
-        return "excluded", "not a user-role record"
+        return EXCLUDED, "not a user-role record"
     for key, reason in FLAG_EXCLUSIONS:
         if record.get(key):
-            return "excluded", reason
+            return EXCLUDED, reason
     user_type = record.get("userType")
     if user_type is not None and user_type != "external":
-        return "excluded", f"userType={user_type}"
+        return EXCLUDED, f"userType={user_type}"
     content = message.get("content")
-    if isinstance(content, list):
-        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-            return "excluded", "tool result"
-    body = record_text(message).strip()
-    if not body:
-        return "excluded", "no prose"
+    if isinstance(content, list) and any(
+        isinstance(b, dict) and b.get("type") == "tool_result" for b in content
+    ):
+        return EXCLUDED, "tool result"
+    blocks = [b for b in text_blocks(message) if b.strip()]
+    if not blocks:
+        return EXCLUDED, "no prose"
+    first = blocks[0].lstrip()
     for prefix in ENVELOPE_PREFIXES:
-        if body.startswith(prefix):
-            return "excluded", "harness envelope"
-    return "typed", ""
+        if first.startswith(prefix):
+            return EXCLUDED, "harness envelope"
+
+    origin = record.get("origin")
+    kind = origin.get("kind") if isinstance(origin, dict) else None
+    if kind is not None:
+        # Authoritative when present, in both directions.
+        return (HUMAN, "") if kind == "human" else (EXCLUDED, f"origin.kind={kind}")
+    return UNATTRIBUTED, "no origin.kind label"
 
 
 class Scan:
@@ -118,9 +129,12 @@ class Scan:
         self.files = 0
         self.records = 0
         self.user_records = 0
-        self.typed = 0
+        self.human = 0
+        self.unattributed = 0
         self.unparseable = 0
+        self.unreadable: List[str] = []
         self.hits: List[Tuple[str, str]] = []
+        self.uncertified: List[Tuple[str, str]] = []
         self.near_misses: List[Tuple[str, str, str]] = []
 
 
@@ -129,7 +143,15 @@ def scan(root: Path, needle: str, show_excluded: bool) -> Scan:
     target = norm(needle)
     for path in sorted(root.rglob("*.jsonl")):
         result.files += 1
-        with path.open(encoding="utf-8", errors="replace") as handle:
+        try:
+            handle = path.open(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            # Never swallowed into an absence: an unreadable file shrinks the
+            # searched space, and rglob's ordering means the crash can precede
+            # the file holding a genuine hit.
+            result.unreadable.append(f"{path.name}: {exc.strerror or exc}")
+            continue
+        with handle:
             for line in handle:
                 line = line.strip()
                 if not line:
@@ -138,9 +160,6 @@ def scan(root: Path, needle: str, show_excluded: bool) -> Scan:
                 try:
                     record = json.loads(line)
                 except json.JSONDecodeError:
-                    # Counted and reported rather than swallowed: a live session
-                    # appends while this reads, so a torn final line is expected.
-                    # Aborting here would end the scan and read as "not found".
                     result.unparseable += 1
                     continue
                 if not isinstance(record, dict):
@@ -151,70 +170,118 @@ def scan(root: Path, needle: str, show_excluded: bool) -> Scan:
                     continue
                 result.user_records += 1
                 kind, reason = classify(record)
-                body = record_text(message)
-                if kind == "typed":
-                    result.typed += 1
-                    if target and target in norm(body):
-                        result.hits.append((path.name, body.strip()))
-                elif show_excluded and target and target in norm(body):
-                    result.near_misses.append((path.name, reason, body.strip()[:120]))
+                if kind == HUMAN:
+                    result.human += 1
+                elif kind == UNATTRIBUTED:
+                    result.unattributed += 1
+                if not target:
+                    continue
+                matched = next((b for b in text_blocks(message) if target in norm(b)), None)
+                if matched is None:
+                    continue
+                if kind == HUMAN:
+                    result.hits.append((path.name, matched.strip()))
+                elif kind == UNATTRIBUTED:
+                    result.uncertified.append((path.name, matched.strip()))
+                elif show_excluded:
+                    result.near_misses.append((path.name, reason, matched.strip()[:160]))
     return result
+
+
+def status(result: Scan, allow_unattributed: bool) -> str:
+    if result.hits or (allow_unattributed and result.uncertified):
+        return "found"
+    searchable = result.human or (allow_unattributed and result.unattributed)
+    if not searchable or result.unreadable:
+        return "unsearchable"
+    return "absent"
+
+
+def report(result: Scan, root: Path, allow_unattributed: bool) -> None:
+    # The search space prints first and unconditionally: a zero below it means
+    # nothing until a reader can see what was examined to produce it.
+    print(f"Searched {result.files} transcript file(s) under {root}")
+    print(f"  {result.records} records, {result.user_records} user-role, "
+          f"{result.human} human-labelled, {result.unattributed} unattributed, "
+          f"{result.unparseable} unparseable line(s)")
+    for problem in result.unreadable:
+        print(f"  UNREADABLE {problem}")
+    for name, text in result.hits:
+        print(f"\nHUMAN TURN in {name}:\n  {text}")
+    for name, text in result.uncertified:
+        label = "UNATTRIBUTED MATCH" if not allow_unattributed else "UNATTRIBUTED MATCH (accepted)"
+        print(f"\n{label} in {name}:\n  {text}")
+    for name, reason, text in result.near_misses:
+        print(f"\nEXCLUDED ({reason}) in {name}:\n  {text}")
+    if result.uncertified and not allow_unattributed:
+        print("\nAn unattributed match carries no origin.kind label, so the harness never "
+              "called it a human turn. It is a candidate, not evidence. Do not quote it.")
+    if status(result, allow_unattributed) == "unsearchable":
+        if result.unreadable:
+            print("\nPart of the space could not be read, so an absence here is not established.")
+        else:
+            print("\nNo human-labelled turns were found at all -- this is an unsearched "
+                  "space, not an absence. Pass --root, or --allow-unattributed to fall "
+                  "back on the weaker heuristic.")
+    elif status(result, allow_unattributed) == "absent":
+        print(f"\nNot present in any of {result.human} human-labelled turn(s). Do not quote it.")
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("phrase", help="the sentence you are about to attribute to the user")
-    parser.add_argument("--root", help="transcript directory (default: $CLAUDE_CONFIG_DIR/projects or ~/.claude/projects)")
+    parser.add_argument("--root", help="transcript directory "
+                        "(default: $CLAUDE_CONFIG_DIR/projects, else ~/.claude/projects)")
     parser.add_argument("--show-excluded", action="store_true",
-                        help="also report matches inside excluded records, with the reason each was excluded")
-    parser.add_argument("--json", action="store_true", dest="as_json")
+                        help="also report matches inside excluded records, naming why each was excluded")
+    parser.add_argument("--allow-unattributed", action="store_true",
+                        help="accept a match in a record carrying no origin.kind label "
+                             "(a weaker heuristic; the output says so)")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="emit the result as JSON, with the same counts")
     args = parser.parse_args(argv)
 
-    root = transcript_root(args.root)
-    if root is None:
-        message = (
-            "No Claude Code transcript root found. This check needs one; on another "
-            "agent, or with transcripts elsewhere, pass --root."
-        )
-        print(json.dumps({"status": "unsearchable", "reason": message}) if args.as_json else message,
-              file=sys.stderr)
-        return 2
+    if not norm(args.phrase):
+        # A usage error, never an absence: an unset shell variable expanding to
+        # "" must not answer "the user never said it".
+        parser.error("phrase is empty after normalization; nothing to search for")
+
+    if args.root:
+        root = Path(args.root).expanduser()
+        if not root.is_dir():
+            parser.error(f"--root {args.root} is not a directory")
+    else:
+        root = default_root()
+        if not root.is_dir():
+            message = (f"No transcript root at {root}. This check needs one; pass --root, "
+                       "or set CLAUDE_CONFIG_DIR. On an agent that keeps no transcripts the "
+                       "source genuinely is unavailable.")
+            print(json.dumps({"status": "unsearchable", "reason": message})
+                  if args.as_json else message, file=sys.stderr)
+            return 2
 
     result = scan(root, args.phrase, args.show_excluded)
+    outcome = status(result, args.allow_unattributed)
 
     if args.as_json:
         print(json.dumps({
-            "status": "found" if result.hits else ("unsearchable" if result.typed == 0 else "absent"),
+            "status": outcome,
             "root": str(root),
             "files": result.files,
             "records": result.records,
             "user_records": result.user_records,
-            "typed_turns": result.typed,
+            "human_turns": result.human,
+            "unattributed_records": result.unattributed,
             "unparseable_lines": result.unparseable,
+            "unreadable_files": result.unreadable,
             "hits": [{"file": f, "text": t} for f, t in result.hits],
+            "unattributed_matches": [{"file": f, "text": t} for f, t in result.uncertified],
             "near_misses": [{"file": f, "excluded_as": r, "text": t} for f, r, t in result.near_misses],
         }, indent=2))
     else:
-        # The search space prints first and unconditionally: a zero below it is
-        # only meaningful once a reader can see what was examined to produce it.
-        print(f"Searched {result.files} transcript file(s) under {root}")
-        print(f"  {result.records} records, {result.user_records} user-role, "
-              f"{result.typed} typed turns, {result.unparseable} unparseable line(s)")
-        for name, text in result.hits:
-            print(f"\nTYPED TURN in {name}:\n  {text}")
-        for name, reason, text in result.near_misses:
-            print(f"\nEXCLUDED ({reason}) in {name}:\n  {text}")
-        if not result.hits:
-            if result.typed == 0:
-                print("\nNo typed turns found at all -- this is an unsearched space, not an absence.")
-            else:
-                print(f"\nNot present in any of {result.typed} typed turn(s). Do not quote it.")
-        if result.near_misses and not result.hits:
-            print("A match inside an excluded record is the assistant's own text, not the user's.")
+        report(result, root, args.allow_unattributed)
 
-    if result.typed == 0:
-        return 2
-    return 0 if result.hits else 1
+    return {"found": 0, "absent": 1, "unsearchable": 2}[outcome]
 
 
 if __name__ == "__main__":

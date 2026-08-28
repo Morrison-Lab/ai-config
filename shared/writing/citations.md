@@ -392,7 +392,7 @@ A sentence attributed to the user in conversation feels like none of those, so t
 
 That conclusion is false, and believing it is the whole of this failure.
 Claude Code writes every turn, the user's included, to a JSONL transcript under `~/.claude/projects/`.
-This repository already knows: 29 non-test hooks read `transcript_path`, 28 of which open the file.
+This repository already knows: as of 2026-08-28, 29 non-test hooks read `transcript_path` and 28 of those open the file.
 So the source is fetchable, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
 
 [`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
@@ -403,19 +403,33 @@ python3 scripts/check-user-quote.py "the sentence you are about to quote" --show
 
 **The classifier is what carries the check, not the search**, and that is why this is a script rather than a grep.
 `message.role == "user"` is a **transport** role, not an authorship claim.
-The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, and --- inside a subagent's transcript --- the dispatch brief the assistant wrote.
+The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, inter-agent coordinator messages, and --- for a subagent --- the dispatch brief the assistant wrote.
 Matching one of those and calling it a hit is the adjacent-artifact substitution: a copy of the claim rather than the source, arriving with a verification's authority.
-So a bare string search over the file is worse than no check, and the script reports each near miss with the reason it was excluded rather than hiding it.
 
-Its three exit codes keep apart two things that are easy to conflate: a phrase absent from the typed turns (`1`) and a search space that was never established (`2`, no transcript root, or no typed turns anywhere in it).
+So the outcome per record is three-way rather than two-way, and the third value is the load-bearing one.
+The harness labels a genuinely typed turn `origin.kind == "human"`, which is authoritative in both directions when present.
+A record that survives every exclusion but carries no such label is **unattributed** --- a candidate, never evidence.
+That distinction is not fastidiousness.
+An earlier version of this check classified on the exclusions alone, and an assistant-written dispatch brief passed all of them, so the tool certified the assistant's own prose as the user's words.
+The exclusion list is hand-maintained against one snapshot of the transcript format;
+the label is not.
+
+The exit codes keep apart two things that are easy to conflate:
+a phrase absent from the human-labelled turns (`1`), and a space in which no such turn was ever found (`2` --- no transcript root, an unreadable file, or no labelled turns at all).
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
-Every run prints what it examined --- files, records, typed turns, unparseable lines --- so a zero is never mistaken for a detector that never engaged.
+Every run prints what it examined, so a zero is never mistaken for a detector that never engaged.
 
 Two things make the quotation marks worse than an ordinary misremembering.
 
 **They are the construction that tells a reader not to check.**
 A paraphrase invites verification.
 A quote asserts that verification already happened, which is why reaching for quotation marks is most tempting where they are least supportable.
+
+This is the reverse of the ordering in the section above, and the two are consistent because the sources differ.
+There the source is a document, so a drifted quote still shows the reader the words and lets them disagree, while a paraphrase launders the source's authority into your voice.
+Here the source is a person who is not reading over your shoulder, so the quotation marks are the laundering:
+they report a verification against a transcript nobody consulted.
+Which form is safer depends on whether the reader can reach the source, and that is the axis to check before reusing either rule.
 
 **A correction to a fabricated quote can itself carry one, and accepting it feels like diligence.**
 Being told you misquoted someone produces an immediate impulse to publish the real sentence, and the replacement arrives from the same kind of recollection as the original.
@@ -428,25 +442,26 @@ That section already carries the un-quotable branch:
 
 What differs here is only that the source can be searched, so which branch you land on is a question with an answer rather than a judgment.
 Run the script.
-Quote the typed turn it returns, and fall back to your own voice, marked as your reading --- "as I understood it" --- when it returns nothing.
+Quote the human turn it returns, and fall back to your own voice, marked as your reading --- "as I understood it" --- when it does not.
 
 `CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception.
 Its paraphrase is unquoted, so nothing there needs the transcript at all, and the required marker --- `_Posted by Claude Code (AI agent) --- not written by a human._` --- exists because such a comment is written in the user's voice under the user's login.
 It discloses the author; it does not license a quotation.
 If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the script, since the person who could refute the attribution may not be reading the thread.
 
-- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and quote the typed turn it returns.
+- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and quote the human turn it returns.
 - **Do:** run it again on a correction that supplies the "real" sentence.
 - **Do:** state your reading unquoted and attributed to yourself when it reports the phrase absent.
-- **Don't:** treat a match inside an excluded record as the message --- a compaction summary, a subagent brief, and an injected skill body are all assistant prose wearing a user-role field.
+- **Do:** check a remembered quote hardest when it authorizes something you were about to do, which is the direction the one recorded case ran.
+- **Don't:** treat an unattributed match as the message.
+  The harness never called it a human turn, and a compaction summary, a subagent brief, and an injected skill body are all assistant prose wearing a user-role field.
 - **Don't:** read exit `2` as an absence.
   It says the space was never searched, and reporting it as "never said" is the substitution one level up.
 - **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
   That is a copy of the claim, and it is the move that most looks like compliance.
 
 The Claude Code paths above are specific to that harness.
-On another agent, `--root` takes a transcript directory;
-where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
+On another agent, `--root` takes a transcript directory; where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
 
 (2026-08-28, [ai-config#2538](https://github.com/Morrison-Lab/ai-config/issues/2538).
 Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I put a sentence of my own inside quotation marks and attributed it to the user.
@@ -454,15 +469,16 @@ It stated a criterion for merging on a light review verdict, which is the direct
 A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
-Running the script over 21 transcript files --- 6,671 records, 1,979 user-role, 3 typed turns, 0 unparseable lines --- returns **no hit** for either sentence, and `--show-excluded` places both matches in a compaction summary and a subagent's own transcript.
-Neither was a typed turn.
-The first two drafts of this section asserted the opposite premise, and each passed its own local checks;
-what refuted them was executing a command, which is why this section ships one.)
+The script finds **no human turn** for either sentence, over 22 files and 6,927 records carrying 2,057 user-role records and 2 human-labelled turns.
+`--show-excluded` places the replacement in an inter-agent coordinator message and finds the original in no user-role record at all --- it was only ever mine.
+The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
+each passed its own local suite, and what refuted each was executing something.)
 
 ## A permalink that resolves can still cite the wrong content
 
-The same metadata-versus-content split has a link-checking form, and there
-the false signal is stronger: an HTTP `200` feels like verification.
+The metadata-versus-content split two sections above has a link-checking
+form, and there the false signal is stronger: an HTTP `200` feels like
+verification.
 It is not.
 `200` proves only that *something* is served at that URL, never that what is
 served supports the claim the citation makes.

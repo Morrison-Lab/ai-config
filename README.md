@@ -294,19 +294,16 @@ Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown 
 
 ### Attributed quotes (`scripts/check-user-quote.py`)
 
-Decides whether a sentence you are about to attribute to the user was ever typed by the user.
-Claude Code writes every turn to a JSONL transcript, so the source is fetchable -- but `message.role == "user"` is a *transport* role, carrying harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, and a subagent's dispatch brief alongside genuine turns.
-A bare grep over the file matches those and reports a hit, which is worse than no check at all.
+Decides whether a sentence you are about to attribute to the user was ever typed by the user, by searching the Claude Code JSONL transcript.
 
 ```sh
 python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
 ```
 
-Exit `0` found in a typed turn, `1` absent from every typed turn, `2` the search space was never established (no transcript root, or no typed turns in it).
-The last two are kept apart deliberately: collapsing them turns "I could not look" into "the user never said it".
-Every run prints what it examined, so a zero is never mistaken for a detector that never engaged.
+Exit `0` found in a turn the harness labels human, `1` absent from every such turn, `2` no such turn was found to search (no transcript root, an unreadable file, or an unlabelled transcript --- `--allow-unattributed` falls back on the weaker heuristic).
 Pass `--root` on an agent whose transcripts live elsewhere.
-See [`shared/writing/citations.md`](shared/writing/citations.md).
+
+[`shared/writing/citations.md`](shared/writing/citations.md) carries why the classification is three-way rather than two-way, and why a bare grep over the same file is worse than no check.
 
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind

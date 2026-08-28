@@ -382,3 +382,31 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript scan.
 - **Fix**: Dispatch the round whose verdict you intend to push on in the FOREGROUND (`run_in_background: false`), not as a background task.
   If a background or resumed verdict is the only one available, push with `ALLOW_UNREVIEWED_PUSH=1` and state the reason (verdict landed via background notification, guard cannot see it) rather than re-diagnosing a stale-verdict refusal as a review-state regression.
+
+## Pattern 23: Implementing From a Truncated Issue-Body Read
+
+- **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
+  The slice is silent about what it dropped, so the brief inherits the truncation invisibly and the implementation ships only the requirements that survived the cut.
+- **Example**: 2026-08-27/28, ai-config#2371: a `.body[0:2200]` slice dropped the issue's point 4 ("empty estate must be an error").
+  The implementation shipped points 1-3;
+  a `Closes #2371` would have silently closed the issue without the self-described load-bearing requirement.
+  The bot review on PR #2478 caught the gap.
+- **Canonical Rule**: [`issue-first.md`](../shared/workflow/issue-first.md)'s splitting rule --- a `Closes #N` closes the whole issue including every item the diff never addressed --- applies with equal force to an item dropped by truncation as to one dropped by scope-splitting.
+- **Fix**: Read the full issue body (and its comments) before implementing;
+  a body slice is for triage only, never for briefing an implementation.
+- **Algorithmatizable?**
+  Borderline, and not yet built.
+  A hook could warn when a `.body[0:` (or equivalent) slice feeds a step that goes on to implement, but this is a single occurrence --- the third-occurrence bar in [`deterministic-tools.md`](../shared/principles/deterministic-tools.md) is not met, so this stays a judgment-class entry for now rather than a guard.
+
+## Pattern 24: An Error Message That Asserts Scope It Did Not Check
+
+- **Mistake**: Adding a terminal error/exit branch without re-deriving every caller path that reaches it, and reusing wording from a wider-scope branch that claims a check the current path never ran.
+  This is [`fail-fast.md`](../shared/principles/fail-fast.md)'s pass-path-equals-failure-path shape one level up: two different code paths converge on one message, and the message is true for only one of them.
+- **Example**: 2026-08-27/28, ai-config#2371 / PR #2478: the first fix for point 4 printed "found in NO scope --- neither org-level nor any repo copy" on the `--repos`-only code path, where the org-level sweep never ran.
+  The reviewer reproduced the false claim directly.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) (a guard's pass path must not be reachable by its failure path, applied here to a message's claimed scope rather than to a boolean outcome).
+- **Fix**: When adding an error/exit branch, enumerate the flag combinations that can reach it and word the message to name only what was actually examined on that path.
+  Never reuse a full-sweep message on a narrowed path.
+- **Algorithmatizable?**
+  No decidable condition established.
+  "Does this message's claimed scope match what this code path actually examined?" requires reading the branch's semantics, not a pattern match --- same class as `learn-from-review-findings.md`'s own "did the sweep cover the diff's own added lines?" example of a non-algorithmatizable finding.

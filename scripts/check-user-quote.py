@@ -59,6 +59,10 @@ Known limits, stated rather than left to be discovered:
     block.
   - `unparseable` is a root-wide latch: one torn line anywhere makes every
     absence report as could-not-search until it is repaired. Safe, and blunt.
+  - The opener test is lexical, so it denies a block that merely LOOKS like it
+    carries a tag -- prose containing `if x <y then` is unquotable. It is
+    reported as a denial rather than an absence, which is the whole point of
+    keeping those two exit codes apart.
 """
 from __future__ import annotations
 
@@ -87,7 +91,12 @@ from typing import Iterable, List, Optional, Tuple
 # transcript root, it denies zero human-labelled blocks and one unattributed
 # block (an assistant-written dispatch brief), so the recall it costs on real
 # data is nil while the name list it removes was already incomplete.
-_OPENER_RX = re.compile(r"<[A-Za-z][A-Za-z0-9_-]*(?:\s[^>]*)?>")
+# NO closing ">" is required. Requiring one was a regression introduced when
+# this test replaced a four-name list: the enumerated form matched on a word
+# boundary and so caught a truncated opener for free, while requiring closure
+# let `<system-reminder never closes...` through as quotable. A real injection
+# can be cut mid-write; the reader of a transcript is not owed well-formed XML.
+_OPENER_RX = re.compile(r"<[A-Za-z][A-Za-z0-9_-]*(?:[\s/>]|$)")
 
 # Prose markers that open a harness-written record. Applied ONLY to a record
 # the harness did not label human: they are ordinary English, so a real turn

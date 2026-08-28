@@ -450,13 +450,19 @@ Both certified at exit `0`.
 The test is structural now --- any tag-shaped opener --- which removes the enumeration rather than shortening it.
 Measured on one real transcript root, it denies **zero** human-labelled blocks.
 
+The first structural version had a bug worth recording, because it is the shape a generalization tends to have.
+It required a closing `>`, which the four-name list it replaced had never needed --- that one matched on a word boundary --- so `<system-reminder never closes...` became quotable again.
+A generalization can silently drop a property the specific form supplied for free, and nothing about it reads as a loss;
+the removed enumeration is what one checks, and the removed *closure-free match* is not.
+
 The cost is real and worth stating: a turn written **about** a tag cannot be quoted from that block.
 The run exits `2` and says the phrase is present in a block it could not search, rather than reporting an absence --- and that holds in the default invocation, not only behind a flag, since a bare exit `1` is exactly the "the user never said it" claim the contract exists to prevent.
 
 The residual, rather than a claim of completeness:
 a phrase spanning two blocks of one record is not found;
 an unlabelled record is never certified, only offered;
-and the opener test is lexical, so injected text carrying no tag-shaped opener at all --- were the harness ever to deliver some that way --- would not be caught.
+and the opener test is lexical, which cuts both ways.
+It denies a block that merely looks tagged (prose containing `if x <y then` is unquotable, reported as a denial rather than an absence), and it would miss injected text carrying no tag-shaped opener at all, were the harness ever to deliver some that way.
 
 The exit codes keep apart two things that are easy to conflate:
 a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash inside the scan).

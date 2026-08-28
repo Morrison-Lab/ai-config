@@ -168,6 +168,19 @@ def main() -> int:
           cuq._regions("x <SYSTEM-REMINDER>A</SYSTEM-REMINDER> y") == [])
     check("a tag the list never knew is caught, which is the point",
           cuq._regions("x <brand-new-harness-tag>A</brand-new-harness-tag> y") == [])
+    # A closing ">" must NOT be required. Requiring one was a regression: the
+    # four-name list it replaced matched on a word boundary and caught this for
+    # free, and a real injection can be cut mid-write.
+    check("an opener that never closes is still caught",
+          cuq._regions("please help <system-reminder never closes and no bracket follows") == [])
+    check("...including one at the very end of the block",
+          cuq._regions("please help <system-reminder") == [])
+    check("a self-closing opener is caught",
+          cuq._regions("x <tick/> y") == [])
+    # And the cost of a lexical test, asserted so it is not discovered later.
+    check("prose that merely looks like a tag is denied, which is the accepted cost",
+          cuq._regions("if x <y then z") == [])
+    check("a comparison with spaces is not a tag", cuq._regions("a < b and c > d") == ["a < b and c > d"])
     check("an attribute-bearing opener is caught",
           cuq._regions('x <system-reminder priority="high">A</system-reminder> y') == [])
     check("a non-str text field is not returned as-is",

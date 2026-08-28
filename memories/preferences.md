@@ -665,6 +665,14 @@
   A deadlock on ONE item does not stop the loop: escalate that item and keep driving the rest.
   That question fires on how many rounds have passed rather than on what the findings are worth, and it reads as diligence, which is why it goes unexamined.
   (Purged from the corpus in ai-config#1030 after ai-config#1029 ran six rounds producing 23 real findings, with rounds 2-6 each finding bugs in earlier rounds' own fixes; the loop stopped to ask twice under the old guard, both times the answer was to keep going, and the next round found four more real bugs. Rationale and case record in `skills/ardi/SKILL.md`, "Stopping conditions".)
+- **A `Needs work` verdict begins the repair step; it does not end the task.**
+  - **Do:** address each actionable finding, rerun the finding's verification,
+    push the repair, and obtain a fresh review before reporting the PR state.
+  - **Don't:** stop after summarizing a blocking review, or present its findings
+    as a blocker when the current session can repair them.
+  (User correction, 2026-08-27: HAC SAP PR #2 received an actionable local
+  adversarial review, and the session reported the verdict rather than repairing
+  it until the user asked whether work had stopped.)
 - **Every mistake owes a HOOK, not just a recorded learning.** When I get something wrong, ask whether a condition decidable from the transcript would have caught it, and write the hook if so.
   A prose rule is consulted at read time and broken at composition time, so re-reading it never reaches the moment it breaks --- every mistake in the 2026-08-02 session already had a rule covering it, and the rule is what failed.
   Model a message that is wrong to send on `hooks/no-offer-to-file.py` (a `Stop` block); model an obligation that follows a message which is right to send on `hooks/remind-ums-after-error.py` (a `UserPromptSubmit` injection).

@@ -222,7 +222,7 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             "detected."
         )
 
-    # Invariant: _blank_fences blanks delimiter lines too, so a successful
+    # Invariant: the scanner blanks delimiter lines too, so a successful
     # blank pass leaves zero FENCE-matching lines, and space-substitution
     # creates no backticks -- it can only promote a surviving run into fence
     # indentation (a comment ending at line start directly before a backtick

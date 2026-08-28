@@ -1012,88 +1012,6 @@ def _iter_blocks(record: dict):
             yield b
 
 
-def _blank_fences(text: str) -> tuple[str, bool]:
-    """Blank the contents of fenced code blocks, preserving offsets.
-
-    scripts/pre-push-review.py's persona path calls this by name (so its
-    qualification guard shares this parser's fence dialect); renaming it
-    breaks that consumer at call time.
-
-    A SCANNER rather than positional pairing. `zip(fences[0::2], fences[1::2])`
-    mis-pairs the moment fences nest -- an outer ````` ```` ````` wrapping an inner
-    ````` ``` ````` pairs (outer-open, inner-open) and (inner-close, outer-close),
-    leaving the quoted content between the inner fences UNBLANKED. That is the
-    ordinary shape whenever a reviewer quotes markdown that itself contains a
-    fence, which reviewing this repo requires, and it read a blocking verdict as
-    clean. An odd fence count mis-blanked in the other direction, wiping the
-    report's own closing verdict and letting an earlier one decide it.
-
-    So: a fence opens with three or more backticks or tildes, and closes only on
-    a line of the SAME character that is at least as long.
-
-    An unclosed fence is reported rather than merely blanked, and `parse_report`
-    treats such a report as stating no verdict at all. A report whose fencing
-    does not resolve is one whose structure cannot be read, and the safe answer
-    to "is this clean" is then no. It is also what makes a truncated report
-    fail, since truncation mid-block leaves exactly this state.
-
-    Offsets are preserved because `parse_report` searches for the fingerprint
-    forward from the verdict's own position.
-    """
-    out = list(text)
-    open_char: str | None = None
-    open_len = 0
-    blank_from = 0
-    for m in FENCE.finditer(text):
-        marker = m.group(1)
-        char, length = marker[0], len(marker)
-        if open_char is None:
-            open_char, open_len, blank_from = char, length, m.start()
-            continue
-        if (char == open_char and length >= open_len
-                and not text[m.end(1):m.end(0)].strip()):
-            # Bare closers only: an info string is legal on an opener, and
-            # a candidate with trailing non-whitespace text is content
-            # (#2479 review rounds).
-            for i in range(blank_from, m.end()):
-                if out[i] != "\n":
-                    out[i] = " "
-            open_char = None
-    if open_char is not None:
-        for i in range(blank_from, len(out)):
-            if out[i] != "\n":
-                out[i] = " "
-    return "".join(out), open_char is not None
-
-
-def _blank_html_comments(text: str) -> tuple[str, bool]:
-    """Blank HTML comments, preserving offsets and reporting truncation.
-
-    Same contract as _blank_fences above, for the same parser: comment
-    spans become equal-shape whitespace (newlines kept, so offsets and
-    line numbers survive), and an unterminated ``<!--`` -- or a stray live
-    ``-->`` whose opener a fence already swallowed -- reports True so the
-    caller fails closed instead of reading whatever follows as live text. A nested ``<!--`` does not restart the span -- the comment ends
-    at the FIRST ``-->``, matching how HTML and CommonMark parse it, so
-    the blanked region is exactly what a renderer would hide. Runs after
-    _blank_fences in parse_report, which keeps a comment opener quoted
-    inside a fence from reading as an unterminated comment
-    (ai-config#2413).
-    """
-    out = list(text)
-    start = 0
-    while (open_at := text.find("<!--", start)) != -1:
-        close_at = text.find("-->", open_at + 4)
-        blank_to = len(out) if close_at == -1 else close_at + 3
-        for i in range(open_at, blank_to):
-            if out[i] != "\n":
-                out[i] = " "
-        if close_at == -1:
-            return "".join(out), True
-        start = blank_to
-    return "".join(out), False
-
-
 def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     """Blank fenced code AND HTML comments in one render-faithful pass.
 
@@ -1107,16 +1025,19 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
     ambiguity by ORDER: whichever construct opens first swallows the
     other's markers until its own closer, so this scanner walks the text
     once and enters whichever region begins next -- a fence per FENCE's
-    dialect (closing only on a same-character, at-least-as-long marker,
-    per _blank_fences' nesting rationale), or a comment at ``<!--``
+    dialect (closing only on a same-character, at-least-as-long BARE
+    marker: positional pairing mis-pairs the moment fences nest, e.g. an
+    outer 4-tick fence quoting an inner 3-tick pair), or a comment at
+    ``<!--``
     (closing only at the first literal ``-->``, fence markers inside
     swallowed, matching how a renderer treats an open comment). The
     blanked region is then exactly what a renderer hides, and any live
     verdict line is one a reader of the rendered report would see.
 
     An unclosed fence or comment at end of text reports True, and
-    parse_report fails the report closed, same as _blank_fences alone
-    always did. Offsets are preserved throughout.
+    parse_report fails the report closed: a structure that cannot be
+    resolved is a verdict that cannot be read, and truncation mid-region
+    leaves exactly this state. Offsets are preserved throughout.
     """
     out = list(text)
     n = len(text)

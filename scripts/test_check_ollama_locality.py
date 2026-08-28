@@ -168,6 +168,17 @@ class TestCheckOllamaLocality(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("resolves off-machine", msg)
 
+    @patch("socket.getaddrinfo")
+    def test_scope_qualified_ipv6_resolved_address_refuses_cleanly(self, mock_getaddrinfo):
+        # A zone-qualified IPv6 address (e.g. a link-local address returned
+        # for a loopback hostname on some platforms) is not a member of
+        # LITERAL_LOOPBACK_ADDRESSES, so _is_literal_loopback_address must
+        # refuse it with a clean message rather than raising -- see #1712.
+        mock_getaddrinfo.return_value = [(10, 1, 6, "", ("fe80::1%lo0", 11434, 0, 0))]
+        ok, msg = checker.verify_locality("qwen2.5-coder:3b", self.valid_config)
+        self.assertFalse(ok)
+        self.assertIn("resolves off-machine", msg)
+
     @patch("urllib.request.OpenerDirector.open")
     @patch("socket.getaddrinfo")
     def test_daemon_status_unreachable_refuses_fail_closed(self, mock_getaddrinfo, mock_open):

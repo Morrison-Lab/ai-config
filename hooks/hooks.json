@@ -533,6 +533,75 @@
             "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks.",
+            "_note_matcher_shape": [
+              "Three single-tool groups rather than one `Write|Edit|NotebookEdit`",
+              "matcher, chosen under a documented ambiguity rather than despite one.",
+              "",
+              "memories/claude-code-hooks.md records that a matcher containing",
+              "characters OUTSIDE [A-Za-z0-9_- ,|] is evaluated as a JavaScript regex.",
+              "`|` is inside that set, so that note does not say which path a plain",
+              "name or an alternation takes, and nothing here establishes it.",
+              "",
+              "Two readings fail differently, and the shape is safe under any:",
+              "  - If matchers are regexes, `Edit` is unanchored and also matches",
+              "    NotebookEdit, so a NotebookEdit call fires this hook TWICE -- two",
+              "    identical additionalContext injections. Benign: the hook only ever",
+              "    adds context, so a duplicate costs tokens and nothing else.",
+              "  - If matchers are exact strings, `Write|Edit|NotebookEdit` matches no",
+              "    tool at all and the hook is silently inert -- which is the exact",
+              "    failure ai-config#2390 exists to end.",
+              "",
+              "A third reading -- the harness splitting a delimited matcher into a",
+              "name list -- would make the alternation work too. Three groups is",
+              "correct under all three and merely redundant under one, while the",
+              "alternation is dead under one, so it trades a benign duplicate for",
+              "the failure being fixed.",
+              "",
+              "check-hook-catalog.py's registered() also merges these three groups into",
+              "the single string \"Write, Edit, NotebookEdit\", so the catalog check",
+              "cannot see a double binding; ai-config#2535 tracks resolving the",
+              "ambiguity empirically and teaching the checker about it.",
+              "",
+              "The hook re-checks tool_name against its own WRITE_TOOLS set on entry,",
+              "so the matcher is a prefilter rather than the only gate: the Cursor",
+              "names StrReplace/EditNotebook are handled there, not here."
+            ]
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
+            "timeout": 10,
+            "script": "warn-stale-issue-edit.py",
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+          }
+        ]
       }
     ],
     "Stop": [

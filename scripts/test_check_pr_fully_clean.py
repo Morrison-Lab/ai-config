@@ -1758,6 +1758,16 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The previously blocking "
               "line-break failure is fixed and confirmed passing.\n", "")
           == "clean")
+    check("a bold resolved blocking mention is not an active finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously **blocking** "
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
+    check("a resolved blocking mention can cross a semantic line break",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking\n"
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
     check("a previously blocking failure that remains open stays a finding",
           checker._unresolved_finding_pattern(
               "### Verdict\nThe previously blocking line-break failure "

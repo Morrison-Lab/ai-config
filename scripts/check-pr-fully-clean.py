@@ -667,7 +667,7 @@ _BARE_REJECTION = (
 )
 
 RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?![.!?]).){0,120}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
+    r"^(?:(?![.!?])[\s\S]){0,120}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
     re.IGNORECASE,
 )
 UNRESOLVED_BLOCKING_SUFFIX = re.compile(
@@ -681,7 +681,7 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
         return False
-    prefix = scan[max(0, match.start() - 12):match.start()]
+    prefix = scan[max(0, match.start() - 14):match.start()]
     if not re.search(r"\bpreviously(?:[-\s]+|\s+\*{1,2})$", prefix, re.IGNORECASE):
         return False
     suffix = scan[match.end():match.end() + 160]

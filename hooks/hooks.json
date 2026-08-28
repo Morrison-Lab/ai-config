@@ -314,6 +314,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
+            "timeout": 25,
+            "script": "no-delete-branch-under-stacked-pr.py",
+            "why": "Measured on ucdavis/bcs 2026-08-27. Covers `gh pr close --delete-branch` as well as `gh pr merge`: both carry the same -d flag, and the branch deletion is the hazard rather than the merge. Merging #749 with --delete-branch removed the branch that was #750's base, and #750 went to CLOSED rather than being retargeted to main, while gh reported the merge as successful and said nothing about it. Retargeting is GitHub's DOCUMENTED behaviour for exactly this sequence and usually happens; why it failed here is not established, and this hook does not claim to know -- it warns that the flag MAY close a stacked child, which is the part that is certain. Recovery deadlocks: a closed PR cannot be retargeted, and cannot be reopened while its base branch is gone, so the only way out is to push the deleted branch back, reopen, retarget, then delete again -- possible only while a copy survives. WARNS, never blocks: the condition needs a network query, so blocking would fail closed whenever gh is unavailable, and the flag is the tidy habit on every unstacked merge. Silent when nothing is stacked, when the query fails or returns an unexpected shape, when gh is absent, when the command carries no -R or PR target, and when the delete flag is explicitly disabled (--delete-branch=false)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-clobbering-push.py\"",
             "timeout": 20,
             "script": "no-clobbering-push.py",

@@ -1266,3 +1266,49 @@ Reposting the same verdicts in the parsed form settled it: the scan went from
 red review check the outage itself causes.
 Nothing about any review changed --- only a colon and a line break --- which
 is the measure of how quietly this fails.
+
+## A passing job spawned three more checks
+
+Measured 2026-08-28 on
+[ucdavis/bcs#771](https://github.com/ucdavis/bcs/pull/771).
+
+`get_check_runs` reported `total_count: 27` for most of the run.
+The `update-snapshots` job completed **successfully** at `17:39:22Z`, and
+three matrix legs --- `macos-latest`, `ubuntu-latest`, and `windows-latest`,
+all `release` --- started at `17:39:25Z`, taking the total to 30.
+
+So the growth was caused by a job going green, three seconds earlier, rather
+than by the registration lag the section above measured.
+A merge taken on "27 of 27 green" would have merged with three checks not yet
+started.
+
+The two-poll rule stated above was not defeated here.
+The spawning job was itself in the check set, so it was pending throughout the
+stable stretch and a poll reading zero pending was not available --- an
+inference from the topology, since the per-tick pending counts were not
+recorded.
+That is the point of the entry rather than an exemption from it: the guard
+held by a property of where the spawner sat, not by anything it checked.
+
+`fully-clean.md`'s check-run-name entry already records these legs as gated on
+`needs: [matrix, update-snapshots]`, from the name-ambiguity angle.
+The gating and the late growth are the same fact read for two different
+purposes.
+
+## A preview comment read as a finished docs job
+
+Measured 2026-08-28 on the same PR, twice in one session, and corrected both
+times before anything was acted on.
+
+A `pr-preview-action` comment posted at `17:32Z` was read as evidence the
+`docs` job had finished.
+It had not: `docs` completed at `17:44:06Z`, and posted a **second** preview
+comment at `17:43Z` on the way.
+So the job outlived the first comment by twelve minutes and posted another
+before finishing.
+
+The coverage-report comment behaves the same way, arriving before
+`test-coverage` reports completion.
+
+Both inferences were wrong for one reason: the comment is written by a step,
+so it dates that step and nothing after it.

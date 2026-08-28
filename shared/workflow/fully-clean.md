@@ -120,6 +120,71 @@ Worked-example case records for the rules below live in
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A poller exited on an empty check list".
 
+   **The population also grows LATE, from a job PASSING rather than from
+   registration lag, so a total that has been stable for many polls is not
+   evidence the set is final.**
+   The paragraph above measured growth in the two minutes after a push, as
+   workflows registered --- 13 to 18 across t=150s to t=270s --- and that
+   shape invites reading the growth window as bounded by the push.
+   It is not.
+   A job gated on `needs:` creates its checks only when its dependency
+   **completes**, so a green job is a cause of new checks rather than one
+   fewer thing to wait for.
+
+   That inverts what a stable total means.
+   Under registration lag a stable total is at least weak evidence the set
+   has settled, because registration is contiguous with the push and then
+   stops.
+   Under a gated successor the total is stable *because* the spawning job has
+   not finished, so the stretch that looks most settled is the one
+   immediately preceding the growth.
+
+   The two-poll rule above held in the case below, and for a reason that does
+   not generalize: the spawning job sat inside the polled set and was itself
+   pending, so no poll could have read zero.
+   A spawner outside that set --- a job in another workflow, a
+   `workflow_run` trigger --- leaves the guard nothing to see.
+   So the reading that licenses a merge is one taken **at the merge
+   decision**, not a count carried forward, however many polls agreed on it.
+
+   - **Do:** re-read the check list at the moment of the merge decision, and
+     compare its total against the one the earlier polls agreed on.
+   - **Do:** read a job completing as a reason to expect new checks.
+   - **Don't:** read a long-stable total as evidence the set is final --- the
+     stable stretch is where a gated successor is still waiting to appear.
+   - **Don't:** generalize the two-poll rule's success here; it depended on
+     the spawner sitting inside the polled set.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A passing job spawned three more checks".
+
+   **A bot comment on the PR is not evidence that the job posting it has
+   finished, because a step writes that comment partway through the job.**
+   A preview-deployment comment, a coverage report, a benchmark table: each
+   is emitted mid-job, so its existence establishes that one step ran and
+   says nothing about the steps after it.
+   One job can post two such comments, minutes apart, and finish after both.
+
+   It is the comment rather than the check row that gets read this way for a
+   structural reason: the comment is the most visible thing the job produces
+   and it lands in the thread already open, while the check list has to be
+   fetched.
+   [`efficient-pr-babysitting`](efficient-pr-babysitting.md) compounds that by
+   telling you to work from CI's own report rather than re-deriving it, which
+   is right about the comment's **content** and silent about its **timing** ---
+   so trusting the content makes the timing inference feel already licensed.
+   This is
+   [`verify-the-right-artifact`](verify-the-right-artifact.md)'s
+   neighbour-for-the-target shape: a real artifact of the right job, read for
+   a property it does not carry.
+
+   - **Do:** take job completion from the check list, and read a bot comment
+     only for what it measured.
+   - **Don't:** date a job's completion from a comment that job posted.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md),
+   "A preview comment read as a finished docs job".
+
    **A check-run NAME is not unique across workflows, so a name alone does not
    identify which check passed.**
    Two workflows in one repo can each define a job with the same name, and

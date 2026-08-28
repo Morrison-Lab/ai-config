@@ -565,6 +565,84 @@ The whole-tree grep was wider than the issue's and just as blind: that subtree c
 `grep -rniE 'moeschberger|Techniques for Censored'` finds it immediately.
 An adversarial-reviewer subagent, dispatched before the push, caught the deletion.)
 
+## A derived figure is supported by a source that never prints it
+
+The section above searches for an entity under the wrong **name**, and its
+remedy is a better query --- the surname instead of the citation key, the
+title fragment instead of the symbol.
+This section is the case where **no** query reaches the answer, because the
+figure being checked was never in the source under any description.
+
+A source can print the **inputs** while the citing claim quotes an **output**
+computed from them: a normalization, a ratio, a sum, a percentage over counts,
+a unit conversion.
+Both are faithful to the source, and only one of them is searchable.
+So a text search returns zero whether the attribution is sound or fabricated,
+which makes the null not weak evidence but no evidence at all --- the same
+guaranteed-either-way shape as a default-branch grep for content that lives
+only in an open PR.
+
+**The remedy is arithmetic rather than a query, which is exactly what the
+section above cannot supply.**
+Its bullets each name a search: attributes instead of identifiers, a negative
+control confirming the subtree contains a reference of the form you searched
+for.
+Every one of them still returns zero here, because the negative control is
+satisfied --- the source is full of numbers --- and the number you want is not
+among them.
+Running that remedy correctly and completely leaves you where you started,
+with a second null that feels like corroboration.
+
+So before asserting a numeric claim is unsupported, ask what the source would
+have to print for the figure to be **derivable**, look for those quantities,
+and compute.
+
+**The stake is asymmetric, which is why this earns an extra step rather than a
+hedge.**
+Asserting misattribution is a public, hard-to-retract claim about someone
+else's work, and it lands on an author who then has to disprove it.
+The derivation is usually one arithmetic step and settles the question
+outright.
+
+- **Do:** ask which quantities would make the figure derivable, find those,
+  and compute, before calling a citation unsupported.
+- **Do:** record the derivation beside the claim, so the next reader is not
+  sent back to the same fruitless search.
+- **Don't:** read a text search's zero as evidence against a numeric claim ---
+  a derived figure appears in no source that reports only its inputs.
+- **Don't:** treat the attribute-search remedy above as covering this case; it
+  prescribes a better query, and no query reaches a number the source never
+  printed.
+
+(`ucdavis/bcs`, 2026-08-28: the second encounter with this shape in one
+session, and the first caught before it was published.
+`R/symptom_probs.R` attributes a calibration target to Gangnon et al. (2015)
+as "approximately 57% localized, 33% regional, 10% distant".
+A research pass searched the paper's text, found none of those percentages,
+and was about to file the citation as possibly misattributed.
+The paper reports **rates** rather than a distribution: Table 1's 2010
+"Without screening" column gives 129.7 localized, 74.3 regional, and 22.5
+distant per 100,000, which normalized over the three invasive stages is
+57.3 / 32.8 / 9.9.
+The attribution was correct throughout, and the search failed only because the
+package quotes a distribution the paper never computes.
+
+The first encounter, earlier the same session, was not caught: a `git grep`
+for a citation key returned nothing, and `ucdavis/bcs#514` asserted on that
+evidence that a bibliography entry was unused.
+That is the case the section above records, and the reason it exists --- so
+this is a rule firing, matching nothing, and the same failure recurring in a
+new surface hours later.
+
+No instrument is proposed.
+[`deterministic-tools`](../principles/deterministic-tools.md)'s bar is the
+**third** occurrence, and this is the second, so recurrence is established and
+building is not yet due.
+The stronger reason is that the check is not decidable from the claim's text:
+whether a figure is derivable requires arithmetic over an arbitrary source
+document, so no matcher over the assertion can see it --- the same conclusion
+the negative-existence section above reached about its own rejected guard.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

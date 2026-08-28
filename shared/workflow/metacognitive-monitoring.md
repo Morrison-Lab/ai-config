@@ -461,9 +461,20 @@ what belongs here is the reading, which is that a capped figure and a swept figu
 
 The blind-prefix **length** is a measurement, so it expires like any other, and re-deriving it before quoting it is the cheap part.
 The expensive part is not mistaking *why* such a figure went wrong.
-Widening a generator reorders it, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s "widening an instrument invalidates every figure it produced" applied to a sampling bound --- but a blind reading can equally come from a control that fired on nothing, and the two look identical from the figure alone.
-Establish which before citing either, since the remedies differ: re-derive for the first, repair the control's patch point for the second.
-The axis structure is what you can quote freely, since the outermost axis stays outermost.
+Widening a generator reorders it, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s "widening an instrument invalidates every figure it produced" applied to a sampling bound --- but a blind reading can equally come from a control that fired on nothing, and the two are indistinguishable from the figure alone.
+Two observables separate them, and both are cheap.
+
+**Compare when the claim entered against when the population changed.**
+A claim that entered *with* the widening never faced the smaller corpus, so decay is refuted outright rather than merely doubted --- one `git log -S` over the phrase settles it.
+Decay requires the figure to predate the change it supposedly decayed under.
+
+**Run the dead and the repaired control over the identical corpus and revisions.**
+Control-death is a property of the *patch point*, so it shows up with ordering held fixed;
+decay is a property of *ordering*, so it cannot.
+A divergence count that jumps when only the patched function name changes is control drift, whatever the corpus did.
+
+Reach for the second whenever a "blind" reading involves a control at all, since a dead control is the cheaper failure to have and the easier one to miss.
+The axis structure is what you can quote freely either way, since the outermost axis stays outermost.
 
 (Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515) and recorded here while preparing [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529).
 A "first 8,000 are blind" figure was first read as decay from #2515's own widening of that corpus, 221,184 bodies to 1,693,440.
@@ -475,6 +486,9 @@ Tracked for the source comment as [ai-config#2532](https://github.com/Morrison-L
 - **Do:** name what the sampled items share, before generalizing from their shared emptiness.
 - **Do:** ask how a capped sample was *taken*, and read a contiguous prefix over a nested product as a slice of the outer axis rather than a sample of the whole.
 - **Do:** re-derive a blind-prefix or coverage bound whenever the population it was measured against changes, and quote the axis structure rather than the bound when you cannot.
+- **Do:** date the claim against the change before blaming decay --- a figure that entered with the widening never faced the narrower population.
+- **Don't:** attribute a blind reading to decay without first re-running the control with its patch point corrected;
+  a control patching a function nothing calls reports the same blindness with the population untouched.
 - **Do:** raise the bound until the answer stops changing, or carry the window into the sentence.
 - **Do:** sample along a second axis --- one large item beside four small ones --- rather than adding a fifth of the same kind.
 - **Do:** scope the claim to what was measured, keeping "these four produced none" distinct from "none has ever".

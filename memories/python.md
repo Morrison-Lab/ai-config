@@ -154,7 +154,11 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
 Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
 The structural claim holds whatever the corpus size: on `scripts/check-verdict-scan-parity.py` (shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below), `LEAD` is the outermost of seven `itertools.product` axes, so a prefix holds `LEAD[0]` fixed for the first 241,920 of 1,693,440 bodies.
-The **blind-prefix length** is the part that has to be measured, and the measurement on record was wrong: re-derived 2026-08-28, the negative control's first divergence sits at prefix index **485**, with 120 divergences inside the first 8,000, so `--limit 500` already prints `DISCRIMINATES`.
+The **blind-prefix length** is the part that has to be measured, and the measurement on record was wrong: re-derived 2026-08-28, the negative control's first divergence sits at prefix index **485**, with 120 divergences inside the first 8,000.
+Those are figures about a *prefix*, so they say nothing about what a capped run does --- `--limit` strides, and at limit 500 the stride is 3,386, which never samples index 485.
+Measured separately, a strided run at that cap finds **125** divergences and prints `DISCRIMINATES`;
+the same 500 bodies taken as a prefix find 15.
+Quoting the prefix index as the reason the capped run works is the very prefix-versus-stride conflation this entry exists to prevent.
 An earlier reading of this entry said the first 8,000 were blind, and attributed that to figure decay --- the corpus having grown from 221,184 bodies to 1,693,440 under the same PR.
 Recovering the history shows the decay story is wrong.
 The claim was introduced by `936aea2`, the very commit that widened the corpus, so it never faced the smaller one.
@@ -183,7 +187,9 @@ So the integer-step trap has two distinct outcomes worth separating --- a slice 
 
 A generator has no `len()`, so striding it requires either materializing it or making the generator itself accept the stride.
 Apply the cap *inside* the generator where you can, since materializing first spends the whole cost the cap was meant to avoid ([ai-config#2534](https://github.com/Morrison-Lab/ai-config/issues/2534)).
-Materializing is not free either, and "short strings" hides the cost: 1,693,440 of these bodies took 5.9 s and peaked at 511 MB max RSS (328 MB by `tracemalloc`), measured 2026-08-28 on CPython 3.11 under Linux.
+Materializing is not free either, and "short strings" hides the cost: 1,693,440 of these bodies took about 1.5 s and raised peak RSS from 12 MB to 350 MB, measured 2026-08-28 on CPython 3.11 under Linux with nothing else in the process.
+Read that 337 MB as the step's own cost only because the baseline was measured beside it;
+peak RSS is process-wide, so a bare "peaked at N MB" attributes every other allocation in the run to whichever step you were watching. (A first reading of 5.9 s and 511 MB came from a run with `tracemalloc` enabled, which inflates both.)
 That is affordable for a bounded corpus and unbounded for a generator with no end, which is the asymmetry that decides which form to reach for --- but quote the number rather than calling it cheap, since half a gigabyte is a real constraint on a small runner.
 
 - **Do:** stride across a generated product space when capping it, computing the step as a float and indexing by `int(i * step)`.

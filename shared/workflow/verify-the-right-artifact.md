@@ -590,7 +590,7 @@ A proof that cannot fail is not a weak proof, it is an absent one wearing a numb
 (Measured 2026-08-28 on [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), fixing [#2449](https://github.com/Morrison-Lab/ai-config/issues/2449).
 The first parity instrument compared what `strip_cited_finding_vocab` blanked across two revisions and reported 0 extra characters outside a code span.
 The replacement, `scripts/check-verdict-scan-parity.py`, diffs what the two revisions conclude instead, triages each widening by offset, and runs a negative control first.
-Only half of its discrimination claim is reproducible, and the entry says which half.
+Only half of its discrimination claim is reproducible **from `main`**, and the entry says which half and how to reach the other.
 Running it against the shipped design reports 0, which any reader can re-run.
 The 3,924 / 108 / 270 / non-zero off-axis figures for the four rejected designs were recorded on that branch before #2515 was **squash-merged** as `07847b9`, so they are not reproducible from `main` --- which is the artifact a reader has.
 They are not lost, though, and the difference matters: GitHub retains `refs/pull/<N>/head`, so `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` restores the branch and all four designs (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) with it.

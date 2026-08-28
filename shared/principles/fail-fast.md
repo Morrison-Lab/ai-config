@@ -958,7 +958,7 @@ And because an intersection only shrinks, the residue is unclaimed span rather t
 State the failure direction explicitly when you ship one.
 "Strictly safer than either" is a claim about which way the disagreements fall, and it is false for the same construction in an instrument whose safe direction is reversed.
 
-- **Do:** name the consumer's safe direction first, and intersect only when under-claiming is it --- that is the whole soundness condition.
+- **Do:** name the consumer's safe direction first, and intersect only when under-claiming is it --- that is the condition the composition adds.
 - **Do:** prefer an intersection over a guard when both are available --- it has no silent branch to fail open.
 - **Do:** ask whether the two detectors' false positives overlap, to know whether you are getting exactness or only safety.
 - **Don't:** require the detectors to err in *opposite* directions;

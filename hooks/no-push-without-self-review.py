@@ -1067,9 +1067,9 @@ def _blank_html_comments(text: str) -> tuple[str, bool]:
 
     Same contract as _blank_fences above, for the same parser: comment
     spans become equal-shape whitespace (newlines kept, so offsets and
-    line numbers survive), and an unterminated ``<!--`` reports True so
-    the caller fails closed instead of reading whatever follows as live
-    text. A nested ``<!--`` does not restart the span -- the comment ends
+    line numbers survive), and an unterminated ``<!--`` -- or a stray live
+    ``-->`` whose opener a fence already swallowed -- reports True so the
+    caller fails closed instead of reading whatever follows as live text. A nested ``<!--`` does not restart the span -- the comment ends
     at the FIRST ``-->``, matching how HTML and CommonMark parse it, so
     the blanked region is exactly what a renderer would hide. Runs after
     _blank_fences in parse_report, which keeps a comment opener quoted
@@ -1087,7 +1087,17 @@ def _blank_html_comments(text: str) -> tuple[str, bool]:
         if close_at == -1:
             return "".join(out), True
         start = blank_to
-    return "".join(out), False
+    blanked = "".join(out)
+    # A surviving live closer means an opener this pass never saw -- the
+    # fence/comment straddle: a fence swallows the "<!--" (fences are
+    # blanked first), leaving the comment interior and its "-->" as live
+    # text, so a spoofed verdict "hidden" in the comment would decide the
+    # report (ai-config#2479 review round, extending #2413). A prose arrow
+    # written as "-->" outside any fence hits this too and fails closed --
+    # the recoverable direction, at the cost of a re-dispatched review.
+    if "-->" in blanked:
+        return blanked, True
+    return blanked, False
 
 
 def parse_report(text: str) -> tuple[str | None, str | None]:

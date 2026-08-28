@@ -253,5 +253,6 @@ The failure is invisible from the outside: the outer process still exits 0, and 
 - **Don't:** assume `-W` on the outer interpreter secures anything a subprocess it spawns does.
 
 (Morrison-Lab/ai-config#1969/#2568, 2026-08-28: a fix adding `-W error::SyntaxWarning` to `scripts/test_hooks.py`'s suite runner passed review's own empirical check --- 46/46 suites still green --- because the corpus was already clean of warnings, which proved nothing about whether the mechanism would catch a *new* one.
-Caught in review by injecting an invalid escape sequence into a hook whose test spawns it via `subprocess.run([sys.executable, HOOK], ...)` (36 of 46 suites use this pattern, versus 22 that import in-process): the suite still reported 19/19 correct, exit 0.
+Caught in review by injecting an invalid escape sequence into a hook whose test spawns it via `subprocess.run([sys.executable, HOOK], ...)` (36 of 46 suites use this pattern;
+the rest import their subject in-process, some using both): the suite still reported 19/19 correct, exit 0.
 Fixed by switching to `PYTHONWARNINGS`, and reproducing the same injection to confirm the fixed suite now fails.)

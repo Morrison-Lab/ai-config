@@ -123,6 +123,18 @@ codex exec -C <repo> -s read-only --skip-git-repo-check \
 - `-o <file>` captures the final message; `--output-schema <file>` forces JSON.
 - stdin `-` feeds a long prompt.
 
+**Redirect stdin, always --- `codex exec` waits on it, and says so once and then blocks.**
+The `-` form above does that by construction.
+The obvious alternative does not: `codex exec "<prompt>"` with the brief as a positional argument prints `Reading additional input from stdin...` and hangs until something kills it.
+
+Nothing about that reads as a failure.
+There is no error, no usage message, and no partial output, so a foreground call looks exactly like a long review that is still thinking --- which is the one thing a dispatched review legitimately does for minutes at a time.
+Measured 2026-08-28: a foreground call in that shape sat until a ten-minute tool timeout, having emitted that single line.
+
+- **Do:** feed the brief as `- < "$WORK/prompt_<id>.txt"`, per the block above.
+- **Do:** append `< /dev/null` when a short prompt really is passed positionally.
+- **Don't:** read silence from `codex exec` as work in progress before checking that its stdin was redirected.
+
 Verify these flags against your installed `codex-cli` version (`codex exec
 --help`) — flag names can shift between releases.
 

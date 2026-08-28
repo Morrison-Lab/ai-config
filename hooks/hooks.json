@@ -542,18 +542,36 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
-            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks.",
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks.",
             "_note_matcher_shape": [
-              "Bound as three single-tool groups rather than one `Write|Edit|NotebookEdit`",
-              "matcher. check-hook-catalog.py compares README's stated matcher against the",
-              "binding by exact string, and its README row regex is [A-Za-z0-9_.*, -]+,",
-              "which cannot express an alternation -- so the catalog's own vocabulary for",
-              "a multi-tool binding is separate groups, which registered() joins as",
-              "\"Write, Edit, NotebookEdit\". A single regex matcher would bind correctly",
-              "and fail the catalog check.",
+              "Three single-tool groups rather than one `Write|Edit|NotebookEdit`",
+              "matcher, chosen under a documented ambiguity rather than despite one.",
               "",
-              "The hook re-checks tool_name against its own WRITE_TOOLS set on entry, so",
-              "the matcher is a cheap prefilter rather than the only gate: the Cursor",
+              "memories/claude-code-hooks.md records that a matcher containing",
+              "characters OUTSIDE [A-Za-z0-9_- ,|] is evaluated as a JavaScript regex.",
+              "`|` is inside that set, so that note does not say which path a plain",
+              "name or an alternation takes, and nothing here establishes it.",
+              "",
+              "The two readings fail differently, and that decides the shape:",
+              "  - If matchers are regexes, `Edit` is unanchored and also matches",
+              "    NotebookEdit, so a NotebookEdit call fires this hook TWICE -- two",
+              "    identical additionalContext injections. Benign: the hook only ever",
+              "    adds context, so a duplicate costs tokens and nothing else.",
+              "  - If matchers are exact strings, `Write|Edit|NotebookEdit` matches no",
+              "    tool at all and the hook is silently inert -- which is the exact",
+              "    failure ai-config#2390 exists to end.",
+              "",
+              "Three groups is correct under both readings and merely redundant under",
+              "one. The alternation is correct under one and dead under the other, so",
+              "it trades a benign duplicate for the failure being fixed.",
+              "",
+              "check-hook-catalog.py's registered() also merges these three groups into",
+              "the single string \"Write, Edit, NotebookEdit\", so the catalog check",
+              "cannot see a double binding; ai-config#2535 tracks resolving the",
+              "ambiguity empirically and teaching the checker about it.",
+              "",
+              "The hook re-checks tool_name against its own WRITE_TOOLS set on entry,",
+              "so the matcher is a prefilter rather than the only gate: the Cursor",
               "names StrReplace/EditNotebook are handled there, not here."
             ]
           }
@@ -567,7 +585,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
-            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
           }
         ]
       },
@@ -579,7 +597,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-stale-issue-edit.py\"",
             "timeout": 10,
             "script": "warn-stale-issue-edit.py",
-            "why": "shared/workflow/check-history invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
+            "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
           }
         ]
       }

@@ -78,12 +78,7 @@ README = os.path.join(ROOT, "README.md")
 # since README's activation rule makes the hooks.json entry itself the
 # plugin-path activation, so it is registered by the follow-up after its
 # authoring PR merges.
-KNOWN_UNREGISTERED = {
-    # Authoring only: not yet in hooks.json, registered by the follow-up
-    # after its authoring PR merges. Tracker is the open activation issue
-    # (#2390), not the closed authoring issue (#2282) -- this file's own
-    # closed-tracker check fails on a closed mapping.
-}
+KNOWN_UNREGISTERED = {}
 
 # Public repo (measured 2026-08-26); unauthenticated GET works. A token is
 # used only when it is scoped to this repo: a fork `push` sets

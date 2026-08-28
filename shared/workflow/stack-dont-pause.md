@@ -35,7 +35,10 @@ when every remaining item (PR or issue) depends on it, so no independent work is
 left to move on to.
 
 So the loop stops only when the queue runs dry (or collapses to items all
-blocked on one stuck item), or a skill's own checkpoint fires (e.g. GII's
-5-issue pause) --- never because an item is blocked while independent work
-remains, and never merely because a finished PR is still waiting on a human
-merge.
+blocked on one stuck item) --- never because an item is blocked while
+independent work remains, and never merely because a finished PR is still
+waiting on a human merge.
+A skill's own boundary (e.g. GII's 5-issue wave boundary) is a hold on
+*new grabs* while the open wave wraps up, not a stop:
+the loop babysits the wave's PRs to completion and then continues
+automatically.

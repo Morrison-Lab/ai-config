@@ -319,6 +319,12 @@ CASES = [
     ("git push origin branch\\>name", reviewed(), True,
      "a backslash-escaped > is argv, not a redirection",
      "could not be resolved to a commit"),
+    ("git push origin main &>> out.txt", reviewed(), False,
+     "a three-character &>> operator and its target are both blanked"),
+    ("git push origin main <> swap.txt", reviewed(), False,
+     "a <> operator and its target are both blanked"),
+    ("git push origin main <<< somevar", reviewed(), False,
+     "a herestring operator and its word are both blanked"),
     (f"git -C {REPO} push origin main feature", reviewed(), True,
      "one unreviewed ref among several blocks the whole push"),
 

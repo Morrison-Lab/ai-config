@@ -440,13 +440,24 @@ def _blank_shell_redirections(command: str) -> str:
             i += 1
             continue
 
-        # Leave heredocs to the sibling's existing body-aware preprocessing.
-        if command[i:i + 2] == "<<":
+        # A herestring's operator and target are both shell syntax; blank
+        # them like any redirection (checked before "<<", its prefix).
+        if command[i:i + 3] == "<<<":
+            i += 3
+        # Leave heredocs to the sibling's existing body-aware
+        # preprocessing.
+        elif command[i:i + 2] == "<<":
             i += 2
             continue
 
         # Redirections are shell syntax, not git argv (ai-config#2477).
-        if command[i:i + 2] in (">>", ">&", "&>"):
+        # Three-character forms first: a fixed two-character window left
+        # the third character to be absorbed as a bogus one-character
+        # target, letting the real target leak into git argv (#2494
+        # review round: &>>, <>, <<<).
+        elif command[i:i + 3] == "&>>":
+            i += 3
+        elif command[i:i + 2] in (">>", ">&", "&>", "<>"):
             i += 2
         else:
             i += 1

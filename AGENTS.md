@@ -109,8 +109,9 @@ See `shared/workflow/restructure-for-efficiency.md`.
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
-2. **The consumer copies / symlinks.**
-   Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, and when needed `~/.cursor/rules` and `~/.cursor/skills`) contain up-to-date symlinks.
+2. **The consumer install.**
+   Claude Code and Cursor read this repo's skills as a native plugin, not a symlink install --- confirm the plugin is enabled and up to date instead of checking for symlinks.
+   Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's own `skills/` and `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
 
@@ -136,7 +137,8 @@ Never hand-edit generated files; CI fails on stale or drifted output.
 |---|---|---|
 | `skills/<name>/SKILL.md` | `codex-skills/**` wrappers | `python3 scripts/sync-codex-skill-wrappers.py` |
 | `tool-mappings.yml` | `tool-mappings.md` | same script |
-| upstream d-morrison/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| upstream Morrison-Lab/wai | `shared/vendored/**` copies | automatic `Sync from wai` workflow |
+| `Morrison-Lab/gha` `check-new-line-breaks.py` at the SHA `validate.yml` pins | `scripts/vendor/gha-check-new-line-breaks.py` | `python3 scripts/sync-nlb-checker.py` |
 
 After adding or editing a skill, regenerate the wrappers before pushing.
 
@@ -180,7 +182,7 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
   The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
   `--force-if-includes` (git 2.30+) closes that.
   Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git.md`).
+  A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git-branches.md`).
   `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
   State the reason when you use it.
 
@@ -347,6 +349,8 @@ below).
   - *Model Decision*: Injected dynamically based on task context.
   - *Manual*: Triggered via `@mention` or explicit command.
 - **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
+- **Hooks integration**: Configured via `plugins/ai-config/hooks.json` mapping Antigravity lifecycle events (`PreToolUse`, `Stop`, `PreInvocation`) to shared enforcement hooks via `plugins/ai-config/claude-hook-adapter.py`.
+  See [`memories/antigravity.md`](memories/antigravity.md).
 
 ## Default to action without asking
 
@@ -365,14 +369,45 @@ This grants no merge authority: the strict merge policy below still applies.
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
   Under `mwc`, a PR must be fully clean across CI and review (see
   [`fully-clean.md`](shared/workflow/fully-clean.md)).
-  A clean automated Claude review evaluating the current HEAD commit is strictly required for merging with `mwc`.
+  A clean automated review from every available provider evaluating the current HEAD commit is strictly required for merging with `mwc`.
   A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred
   before merge.
+  A disagreement among reviews is not fully clean: any reviewer's standing
+  not-clean --- nits included --- vetoes merge even with `mwc` active.
+  ARD every item from every review, then request fresh reviews
+  (ai-config#2274).
+- **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
+  GitHub's `mergeable` field is conflict existence (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`).
+  `mergeStateStatus: CLEAN` is conflict-free (GitHub `mergeable`) plus passing commit status, not a review verdict.
+  Only `DIRTY` / `CONFLICTING` means conflicts.
+  A PR whose latest commit has no authentic clean review is not merge-ready.
+  Report it as blocked on review, not as merge-ready.
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+
+## Always arm a persistent PR loop
+
+This applies in any repo, not only Morrison-Lab ones.
+When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running.
+Keep it running until the PR merges, closes, or the user says stop.
+A one-shot status poll is not babysitting.
+A PR-activity subscription is not a loop.
+PR-activity webhooks (`subscribe_pr_activity`) do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
+Subscribe when that tool exists, and re-arm a periodic check-in using whatever wake mechanism this session has.
+Claude Code: `/loop`, `send_later`, `CronCreate`, or a `schedule` timer.
+Another harness: its own scheduler or timer.
+A question like "are you monitoring that PR?" is a status check, not a reason to stay idle.
+Start the loop if it is not already running, then answer.
+
+Baking a self-merge directive into the loop/wakeup prompt is allowed only under a standing merge-when-confident (`mwc`) session grant.
+A one-off "merge this PR" instruction authorizes merging the current head once.
+It never licenses a later wake to self-merge a different head.
+
+- **Do:** arm a persistent loop in the same turn you open, push to, or take over a PR, and skip starting a second one if a loop is already running.
+- **Don't:** treat a subscription or a one-shot poll as watching, or refuse to start a loop because the latest message only asked about status.
 
 ## Request review and drive every started PR to clean
 

@@ -86,7 +86,7 @@ class TestBlocks(unittest.TestCase):
 
     def test_blocked_in_a_later_segment(self):
         """A guard that only reads the first word misses `cd x && <heavy>`."""
-        self.assert_blocked("cd /home/demorrison/Projects/bcs && " + HEAVY)
+        self.assert_blocked("cd /home/<user>/Projects/bcs && " + HEAVY)
 
     # -- the branch that must NOT fire --------------------------------------
     def test_allowed_on_a_compute_node(self):

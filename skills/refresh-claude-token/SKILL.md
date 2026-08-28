@@ -182,7 +182,7 @@ Pick one **non-draft** PR, record what already exists, then dispatch:
 First find the reviewer's login **in this repo**, rather than assuming it.
 It differs by repo:
 `Morrison-Lab/ai-config` posts as `claude`,
-while `d-morrison/gha` posts as `github-actions[bot]`.
+while `Morrison-Lab/gha` posts as `github-actions[bot]`.
 A hardcoded login matches nothing, which reads as "posted nothing":
 
 ```bash
@@ -212,7 +212,7 @@ accepts at most 1 arg(s), received 4
 
 This corpus already records that, in
 [`skills/ardi/SKILL.md`](../ardi/SKILL.md) and
-[`memories/github.md`](../../memories/github.md).
+[`memories/gh-cli.md`](../../memories/gh-cli.md).
 
 Once the run completes, evaluate it in **one** filter that names every
 outcome:

@@ -236,7 +236,7 @@ against a manual `gh pr checks` call showing the check had already resolved.)
 ## Wiring ai-config skills/memories into a consumer repo's `claude` bots
 
 `bootstrap.sh` only reaches local CLI sessions --- a consumer repo's
-`claude`/`claude-code-review` bots (running via `d-morrison/gha`'s reusable
+`claude`/`claude-code-review` bots (running via `Morrison-Lab/gha`'s reusable
 workflows and `anthropics/claude-code-action`) get nothing from it. The
 pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
 and `ucdavis/epi204#360`:
@@ -444,7 +444,7 @@ fine and the marketplace registers itself under its *new* declared name.
 The log then says both things on adjacent lines:
 
 ```
-Adding marketplace: https://github.com/d-morrison/ai-config.git
+Adding marketplace: https://github.com/Morrison-Lab/ai-config.git
 ✔ Successfully added marketplace: Morrison-Lab (declared in user settings)
 Installing plugin: ai-config@the repository owner
 ✘ Failed to install plugin "ai-config@the repository owner": Plugin "ai-config" not
@@ -881,8 +881,11 @@ suite — direct process verification via PowerShell resolved both.)
 
 ## A harness pass can replace `~/.claude` skill symlinks with stale copies AFTER `SessionStart`
 
-`bootstrap.sh` symlinks this repo into `~/.claude`, so a `git pull` normally
-refreshes what the Skill tool loads.
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `bootstrap.sh` no longer symlinks into `~/.claude`, `check-install.py` is deleted, and the `UserPromptSubmit` hook that ran it is removed.
+Keep this section as a record of the incident and its ordering lesson, and read its present-tense instructions as historical.
+
+`bootstrap.sh` symlinked this repo into `~/.claude`, so a `git pull` normally
+refreshed what the Skill tool loaded.
 In a web container a later provisioning pass can overwrite a subset of
 `~/.claude/skills/*` with real directories holding older content, and those
 copies then shadow the repo for the rest of the session.
@@ -1121,6 +1124,10 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
 
 ## `check-install.py --consumer-dir` retargets the Claude manifest, not one file
 
+**Historical as of the symlink-install removal ([ai-config#2229](https://github.com/Morrison-Lab/ai-config/pull/2229)):** `check-install.py`, `link_one_claude`, and `scripts/test_bootstrap_link_hints.py` (linked below) no longer exist --- `bootstrap.sh` does not symlink into consumer directories at all any more.
+This whole section describes a bug in, and the fix to, a mechanism that has since been removed;
+keep it only as a record of the incident.
+
 `--consumer-dir` retargets `collect()`, the whole Claude-shaped install
 list (`AGENTS.md`, `CLAUDE.md`, `skills/`, `commands/`, `memories/`, and
 the rest of that manifest).
@@ -1159,10 +1166,10 @@ A first-push review on
 one backup/link instruction.
 That sentence was false for shiva and misnamed the default.
 Addressed in `adffe825` and `848539b7`.
-[`scripts/test_bootstrap_link_hints.py`](../scripts/test_bootstrap_link_hints.py)
-is the instrument: it runs real `bootstrap.sh` against colliding paths
-and asserts the Claude-only `--fix` string does not leak into other
-consumers, and that comments do not regroup dotfiles with the default
+`scripts/test_bootstrap_link_hints.py` was the instrument (removed along
+with `check-install.py`): it ran real `bootstrap.sh` against colliding
+paths and asserted the Claude-only `--fix` string did not leak into other
+consumers, and that comments did not regroup dotfiles with the default
 inheriters.
 
 - **Do:** pass the `--fix` hint only on Claude `link_one` calls.
@@ -1178,3 +1185,47 @@ inheriters.
 (2026-08-26,
 [#2286](https://github.com/Morrison-Lab/ai-config/issues/2286) /
 [#2290](https://github.com/Morrison-Lab/ai-config/pull/2290).)
+
+## A blocked compound `cmd1 && cmd2` Bash call blocks BOTH halves, not just the flagged one
+
+A PreToolUse hook fires on the **whole** Bash invocation before any of
+it runs, not per `&&`-joined segment, so a commit-then-push call
+blocked by a push guard never ran the commit either.
+The trap: retrying with just the guard's override on a NEW call
+containing only the push pushes whatever HEAD already was, since the
+commit from the blocked call never happened.
+On an empty-commit branch claim this is silent -- `[new branch]`
+prints either way -- until a downstream symptom (`gh pr create`
+refusing "No commits between main and the branch") surfaces it.
+
+- **Do:** verify state (`git log -1`, `git status`) after any blocked
+  compound command, before assuming the unblocked half ran.
+- **Do:** re-run the FULL original command after fixing what the
+  guard flagged, rather than splicing an override onto one segment.
+- **Don't:** assume earlier stages executed just because a later one
+  is what the guard named.
+
+(2026-08-27, `Morrison-Lab/ai-config#2412`: an empty claim commit for
+a hook-registration PR silently never happened this way; caught only
+because `gh pr create` refused on a zero-commit diff.)
+
+## Nesting your own `&` inside a `run_in_background: true` Bash call reports "done" instantly, not when the backgrounded work finishes
+
+`command > file 2>&1 &` under `run_in_background: true`
+double-backgrounds: the tool waits for the SHELL to exit, and the
+trailing `&` makes that shell exit immediately having detached the
+real work -- so the notification and captured output land long before
+the command has produced more than its first few lines.
+Tell: a "completed, exit 0" notification whose output looks
+implausibly short, especially beside the SAME command minus the `&`
+still running minutes later with fuller output.
+
+- **Do:** pass a plain foreground command (no trailing `&`) under
+  `run_in_background: true` --- its own backgrounding is sufficient.
+- **Don't:** add your own `&`/`nohup`/`disown` on top --- the two
+  mechanisms race, and the tool's own notification wins, falsely.
+
+(2026-08-27, same session: `python3 -u scripts/test_hooks.py > log 2>&1
+&` reported complete in seconds with a 3-line log; the identical
+command without the trailing `&` ran to a real completion minutes
+later with the full ~45-suite output.)

@@ -445,6 +445,67 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 REDIRECTED = object()
 
 
+# POSIX shlex treats an unquoted backslash as an escape, so
+# `git -C C:\Users\foo\AppData\Local\Temp\npwsr-abc push origin main` parses as
+# `-C C:UsersfooAppDataLocalTempnpwsr-abc`. The guard then rev-parses `main` in
+# a directory that does not exist and reports that `main` could not be resolved
+# to a commit --- every allow-case in this hook's suite on Windows 11 /
+# Python 3.13 / Git Bash, measured against main at 47e49fd1 (ai-config#2037).
+# Recovering the original backslashes after shlex has eaten them is not
+# possible. Git accepts forward slashes on Windows, so rewriting the drive
+# path before the parse is the recovery. A POSIX path has no drive-letter
+# backslash run and is unchanged.
+#
+# The excluded-character class stops the match at any character a genuine
+# path segment cannot plausibly contain: whitespace, the other shell
+# separators already excluded, and --- added after ai-config#2325's review
+# round --- `#`, `(`, `)`, the two quote characters, a backtick, and `$`.
+# Without those five, the match ran through them: an escaped `\#` became an
+# unescaped `/#`, which turned the rest of the line into a shlex comment and
+# hid a real `git push --all` entirely; an escaped `\)` became a bare `)`,
+# which is one of `_simple_commands`'s punctuation_chars and split a chained
+# push in two, hiding the second; and with neither a quote character nor
+# whitespace excluded, a match starting inside a quoted path ran straight
+# through the closing quote into the next argument, turning an unrelated
+# `--\all` into `--/all` and degrading a refused indeterminate push into an
+# approved bare one. Verified against real bash (not just this module's own
+# shlex-based simulation) for all three: `bash -c 'git(){ ...; }; git -C
+# C:\a\)b push origin main'` executes a genuine, un-mangled push, and `git -C
+# 'C:\repo' push --\all origin` resolves to the argv `--all` on its own,
+# unquoted-backslash escaping already turning it into exactly that string
+# before this module ever sees the command.
+_WIN_PATH_CHARS = r"[^\s\\/;&|<>()#'\"`$]+"
+_WIN_DRIVE_PATH = re.compile(r"[A-Za-z]:(?:\\" + _WIN_PATH_CHARS + r")+")
+
+# A quoted span, single or double, matched so it can be skipped rather than
+# rewritten. Real bash (confirmed by execution, not just read) already keeps
+# a single-quoted backslash literal and a double-quoted one is only special
+# before `$` `` ` `` `"` `\` or a newline --- so a quoted Windows path never
+# had the backslash-eating bug this function exists to fix, and rewriting it
+# anyway makes the guard verify a directory bash never asked for: on POSIX,
+# `C:\repo` and `C:/repo` are two unrelated paths, not two spellings of one.
+_QUOTED_SPAN = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+
+
+def _posixize_windows_paths(command: str) -> str:
+    """Rewrite an UNQUOTED `C:\\Users\\...` to `C:/Users/...`.
+
+    Confined to text outside quotes; see `_QUOTED_SPAN` and `_WIN_DRIVE_PATH`
+    above for why both restrictions are load-bearing rather than tidiness.
+    """
+    def rewrite(segment: str) -> str:
+        return _WIN_DRIVE_PATH.sub(lambda m: m.group(0).replace("\\", "/"), segment)
+
+    out = []
+    pos = 0
+    for m in _QUOTED_SPAN.finditer(command):
+        out.append(rewrite(command[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(rewrite(command[pos:]))
+    return "".join(out)
+
+
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
@@ -476,9 +537,25 @@ def iter_pushes(command: str):
 
     `-C` is also CHAINED by git -- each is applied relative to the last -- so
     the first one is not the answer when several appear (ai-config#1977).
+
+    Windows drive paths are rewritten to forward slashes before either parser
+    runs, so `_simple_commands` and `_hints_by_position` see the same command.
     """
     if _SIBLING is None:
         return
+    # Join line-continuations BEFORE posixize. Otherwise a Windows CRLF
+    # continuation (`\` + `\r\n`) is swallowed into the drive path (`/` + CR),
+    # the leftover newline becomes `;`, and a real `git push` is no longer
+    # detected --- fail-open. Measured on this change: `git -C C:\Users\...\`
+    # plus CRLF plus `push origin main` yielded zero pushes after posixize
+    # and one push (mangled directory, fail-closed) without it. `\r` is also
+    # excluded from the path class so a stray CR cannot extend the match even
+    # if this join were skipped. The sibling's `_simple_commands` runs the
+    # identical `re.sub` again on its own copy of the command; that second
+    # pass is a no-op once this one has already run, not a second parser to
+    # keep in sync, so there is nothing left here for a future change to miss.
+    command = re.sub(r"\\\r?\n", " ", command)
+    command = _posixize_windows_paths(command)
     cmds = _SIBLING._simple_commands(command)
     if not cmds:
         return
@@ -937,6 +1014,10 @@ def _iter_blocks(record: dict):
 
 def _blank_fences(text: str) -> tuple[str, bool]:
     """Blank the contents of fenced code blocks, preserving offsets.
+
+    scripts/pre-push-review.py's persona path calls this by name (so its
+    qualification guard shares this parser's fence dialect); renaming it
+    breaks that consumer at call time.
 
     A SCANNER rather than positional pairing. `zip(fences[0::2], fences[1::2])`
     mis-pairs the moment fences nest -- an outer ````` ```` ````` wrapping an inner

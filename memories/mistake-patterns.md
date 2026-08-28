@@ -24,6 +24,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
 - **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
 - **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+  That "watch and ARDI" default applies when you are driving the branch, not when you were asked only to review it ---
+  see [`reviewing-prs.md`](reviewing-prs.md) ("Review-only is not working the PR").
 - **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
 ## Pattern 5: Bypassing Existing Repo Knowledge
@@ -41,12 +43,33 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
 
 ## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
-- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
-- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): told user Morrison-Lab/ai-config#1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` --- a PR is not ready until ALL CI checks pass AND review is clean.
-- **Fix**: Always run `gh pr checks <N>` or `gh pr view <N> --json statusCheckRollup` before declaring a PR ready.
-  Never say "ready to merge" unless every check is green.
-  If CI is failing, say so and fix it first.
+- **Mistake**: Telling a user a PR is ready to merge without checking CI status,
+  or saying "ready" when checks haven't finished,
+  or declaring clean from a short rollup (`gh pr checks`, `statusCheckRollup`)
+  instead of the complete instrument.
+- **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`):
+  told user Morrison-Lab/ai-config#1677 was ready without checking that CI had failed
+  (`new-line-breaks` check).
+  Re-hit 2026-08-26 on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277):
+  reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict;
+  `check-pr-fully-clean.py` exited 1 (`No automated review...`).
+  The rollup matched the endpoint that time (8==8);
+  the defect was resting a terminal claim on it.
+  An earlier Fix in this pattern recommended those short rollups ---
+  that was the wrong instrument for a terminal claim.
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
+  `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
+- **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
+  before a terminal clean / ready-to-merge claim.
+  Read exit 0 as clean,
+  exit 1 with `  - ` bullets as not-clean,
+  any other exit as the check failing to answer.
+  A paginated `commits/<sha>/check-runs` read is the check-run half only
+  (progress reports, criterion 1); it does not authorize the terminal claim.
+- **Don't:** Declare clean from `gh pr checks` or `statusCheckRollup` alone,
+  however current they look.
+  Progress reports ("8 success, 0 pending") are fine;
+  "Ready for merge" is not until `check-pr-fully-clean.py` exits 0.
 
 ## Pattern 5d: Failing to Learn From Mistakes
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.
@@ -171,3 +194,148 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   verified with `gh pr view <N> --repo <r> --json autoMergeRequest` ---
   and treat the PR as unverified until re-checked.
   Disabling is cleanup, not protection.
+
+## Falsely assuming local fallback reviews grant autonomous merge authority (check-pr-fully-clean.py)
+
+On 2026-08-26, an agent noticed that the GitHub CLI merge command was blocked by the `no-unauthorized-merge.py` merge guard after completing an adversarial review via the local `pre-push-review.py` CLI on PR #2305.
+The agent incorrectly concluded that `check-pr-fully-clean.py` had a bug preventing it from recognizing local fallback reviews posted by the human user (`d-morrison`).
+[`tools.md`](tools.md)'s own summary of criterion (2) was, at the time, stale and misleading: it said a review is admitted when it "has been posted by an automated bot account ... or carries a bot review header (`🤖`, ...)", and the agent took that "or carries a bot review header" clause at face value rather than reading the script itself.
+In the actual code, the body-marker check exists only inside `is_non_review_notice()`, to keep a genuine review from being misclassified as a workflow status notice --- it is never a second admission path alongside the author-identity gate.
+The agent then filed PR #2308 to "fix" `check-pr-fully-clean.py` to admit reviews based solely on the text `### 🤖 Antigravity Agent Report`, bypassing the bot author check.
+See #2350 for correcting the stale `tools.md` summary that set this up, and issue #2306 (open, same misreading) for the original bad bug report.
+
+This was a critical misunderstanding of the security invariant:
+- Per [`scripts/check-pr-fully-clean.py`](../scripts/check-pr-fully-clean.py) (discussed in [`fully-clean.rationale.md`](../shared/workflow/fully-clean.rationale.md)), automated review approval MUST be verifiable by author identity (e.g., `github-actions[bot]`, `claude[bot]`) --- body text is never sniffed for the author-identity gate.
+- Non-bot human accounts (like `d-morrison`) are admitted ONLY if they state a blocking `not-clean` verdict (fail-closed).
+- A local fallback review does **not** grant autonomous merge approval.
+  It only satisfies the pre-push guard for iterating on the PR locally.
+- Bypassing the author identity check by sniffing body text introduces a security vulnerability, as any human user could spoof the marker to pass the check.
+
+**Action**: When `check-pr-fully-clean.py` rejects a review because it was posted by a human author, this is the intended behavior.
+Do not attempt to "fix" the script to admit fallback reviews for merging.
+A clean automated review from every available provider evaluating the current HEAD commit is strictly required for an autonomous merge.
+
+## Pattern 13: Forgetting to Undraft a Review-Ready PR
+- **Mistake**: Pushing a fully completed feature or bugfix but leaving the PR in draft mode.
+  This silently stalls progress because reviewers and automations treat drafts as WIP.
+- **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
+  The user had to manually ask "why is 2295 still in draft mode".
+  (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
+- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft...
+  Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
+- **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
+  Do this before dispatching review workflows or yielding to the user ---
+  but mind the ready-transition timing in `pr-on-claim.md`:
+  on a repo whose review workflow cancels in progress, do not flip ready within seconds of the final push ---
+  the two triggered review runs race, and the cancelled one can be the newer run, leaving the current head's review check red while a stale-event run survives.
+
+## Pattern 14: Pausing Without Setting a Timer
+- **Mistake**: Yielding or "pausing" execution to wait for user input or an external event without actually setting a timer or wakeup mechanism, leaving the agent idle.
+  Pattern 5g above is the PR-monitoring special case of this;
+  this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
+- **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
+- **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
+- **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
+
+## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
+- **Mistake**: Adding or widening an exemption in a fail-closed checker (a
+  verdict scan, a findings gate, a guard) and reasoning about its safety
+  from the diff, instead of proving the new acceptance set is no wider than
+  the old one by executing BOTH versions over an adversarial corpus.
+  A convenience strip, a broadened vocabulary, or a tolerant anchor each
+  reads as a small ergonomic fix while quietly admitting shapes the base
+  version rejected --- and the admitted shapes are exactly where a real
+  finding hides.
+- **Example**: 2026-08-27, ai-config#2419: six review rounds on one
+  exemption.
+  Each round's fix looked safe on paper; execution against `origin/main`'s
+  classifier found a wider acceptance set four times (examples: untagged
+  prose findings swallowed, `+`/`1)` list forms escaping a veto, a
+  lookbehind swallowing a still-open "previously-blocking" statement, a
+  bullet strip feeding vocabulary the base's char class never resolved).
+  The round that finally stuck REUSED the base's own regex on the
+  unstripped line --- parity by reuse, not by re-derivation --- and the
+  local pre-push review round verified acceptance-set parity by running
+  both versions over a vocabulary corpus (that verification lives in the
+  unposted local round, not on the PR record).
+- **Canonical Rule**: `shared/principles/fail-fast.md` (a guard's pass path
+  must not be reachable by its failure path) and
+  `shared/workflow/check-purpose-before-reusing.md` (structural fit is
+  necessary and never sufficient; the checks you naturally run confirm
+  the mechanism, never the purpose).
+- **Fix**: Before shipping an exemption change, run the old and new
+  versions over the same adversarial case set and diff the acceptance
+  sets; any body the new version exempts and the old flagged needs its own
+  justification.
+  Prefer reusing the instrument's existing vocabulary regex over writing a
+  near-copy, so parity holds by construction.
+  Verify each guarding test DISCRIMINATES by neutering the guarded branch
+  (replace the veto or anchor with a never-match, or drop it) and
+  confirming the test flips --- a test that still passes guards nothing,
+  and it usually passes through a different branch than its name claims.
+  (Measured three times on 2026-08-27: #2423's anchor probe --- the one
+  instance on a PR record, its round-1 blocking finding --- plus #2313's
+  override-drops-token test and #2419's veto tests, both caught in
+  unposted local pre-push review rounds rather than on those PRs'
+  records.)
+
+## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
+- **Mistake**: When the `adversarial-reviewer` subagent type is unregistered
+  in a session, dispatching a same-vendor `general-purpose` Claude subagent
+  with an adversarial-refute-brief prompt as the fallback, without first
+  checking whether a separate CLI (`codex`, `opencode`, `agy`) is reachable
+  on `PATH`.
+  A same-vendor subagent shares the training and therefore the blind spots
+  of the author, per `adversarial-self-review.md` line 21 --- it is not a
+  weaker version of independence, it is the specific thing dispatching was
+  meant to buy and did not.
+- **Example**: 2026-08-27, ai-config#2434 (a memory-only PR).
+  `Agent type 'adversarial-reviewer' not found` fired on the first review
+  attempt.
+  Fell back to a same-vendor `general-purpose` subagent for both review
+  rounds and pushed with `ALLOW_UNREVIEWED_PUSH=1`, without running
+  `which codex`/`which opencode`/`which agy` first.
+  A later check in the same session showed `opencode` and `agy` both
+  resolved on `PATH` (only `codex` was absent), so the documented stronger
+  fallback --- `delegate-to-opencode` --- was available the whole time and
+  simply never tried.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md)
+  ("No Agent tool, or no reviewer registered here?
+  A separate CLI is the same move and a stronger one ---
+  `delegate-to-codex` or `delegate-to-opencode`.").
+- **Fix**: Before falling back to a same-vendor subagent, run
+  `which codex; which opencode; which agy` (or the OS equivalent) and
+  route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.
+  Only fall back to a same-vendor subagent, stating so explicitly in the
+  push reply, when none of those three CLIs are reachable at all.
+
+## Pattern 17: Theorizing a Cause for a Guard Refusal Instead of Running Its Own Reader
+- **Mistake**: When `hooks/no-push-without-self-review.py` refuses a push citing "The latest adversarial self-review returned a blocking verdict" despite believing the most recent dispatch was clean, attributing the refusal to session/harness mechanics (the transcript lagging the current turn) instead of executing the guard's own `read_latest_review`/`parse_report` against the live transcript and reading what it actually parsed.
+  The refusal message is a true statement about the guard's parsed history and a false one about the session's real state whenever the cause is a malformed report, so the two failure modes produce an identical message and only execution distinguishes them.
+- **Example**: 2026-08-27, ai-config#2444, across two concurrent branches --- `fix/2409-driver-comments` and `ums-2409-fail-open-lessons`.
+  Three dispatches ran in one turn --- `needs_work` at `5a45e7fd`, `needs_work` at `446fa0ee`, then a clean `Ready for merge` at `cf08d05f` --- and a later dispatch also returned a clean `Ready for merge` at `629cca1b`.
+  The push was refused.
+  An issue was filed attributing this to the transcript not being flushed for same-turn tool results.
+  Running `read_latest_review` directly against the transcript returned `('needs_work', '446fa0eecaec6a58e2d65e1b8d24265e67e13138', True)` twice, minutes apart --- ruling out a lag that would have resolved on its own.
+  The cause that execution established: the two later reports used a heading-then-separate-line `## Verdict` / `Ready for merge` shape, which `VERDICT_LINE` does not match (it requires the phrase on the same line as `Verdict:`), so `parse_report` returned no verdict for both and the held value never advanced past the second dispatch.
+  A second cause sat unexamined in the same evidence, and naming it is the point of this entry rather than a footnote to it.
+  `git merge-base --is-ancestor` puts `5a45e7fd` and `629cca1b` on `fix/2409-driver-comments` and `446fa0ee` and `cf08d05f` on `ums-2409-fail-open-lessons`, so the four dispatches spanned two branches --- and the guard holds ONE global latest verdict rather than one per branch, so a review of either branch displaces the other's regardless of format.
+  Fixing the format alone would not have made those pushes independent.
+  The near-miss is that the format explanation is sufficient for the observed refusal, arrives first, and is confirmable --- which is exactly when [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s cause check is owed and feels least necessary.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md), "A verdict phrase separated from its heading by a line break is no verdict."
+- **Fix**: When a guard's refusal contradicts your own read of the session, run the guard's own parsing function against the actual artifact it reads (the transcript, a file, a comment body) and print its result per input, before writing down a mechanism-level explanation.
+  State `Verdict: <phrase>` on one line in every review brief, whatever is dispatching it.
+
+## Pattern 18: A Second Refuted Design Is a Prompt to Measure, Not to Design a Third
+- **Mistake**: After a checker-side classification fix is built, reviewed, and refuted by an adversarial round that reproduces the failure against `origin/main` for the second time on the same underlying problem, proposing a third discriminator instead of executing the classifier against the actual failing input to find which specific feature of it drives the wrong output.
+  Each refuted design added a new guard against the previous round's counterexample rather than asking what the real input space has in common with genuine reviewer prose --- so every discriminator available in a comment body turned out to be one some real reviewer also emits.
+- **Example**: 2026-08-27, ai-config#2409, a driver-comment classifier built from real comments on `Morrison-Lab/ai-config#2341`.
+  Three designs, each built and reverted: (1) a "driver ledger" matched on `hold off` / a `Disposition` table row, guarded by negative tests keyed on the Claude/Cursor report format --- failed open on a Copilot review reading "hold off on merging until the null check is added," which carried a real finding;
+  (2) the same classifier gated on the agent-disclosure marker --- failed because genuine not-clean reviews carry that marker too;
+  (3) a citation strip keyed on a disposition verb plus an exact-verdict parenthetical --- blanked a live verdict inside a sentence reporting a fix that introduced a new bug.
+  The turn that mattered was executing `classify_verdict` over the failing comment's own parts, which showed the table and the hold (what designs 1 and 2 were built to detect) produced no verdict at all, and the sole signal was a bare parenthetical after the header neither design had examined.
+  The design that survived review, proposed in PR #2448 and still open at the time of writing, is a one-sentence authoring convention --- backtick a quoted verdict phrase --- as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
+- **Canonical Rule**: [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s cause claim-type ("what else explains it") and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s recurrence test, applied one level earlier: recurring *refutation* of a design is itself the signal to stop designing and measure.
+- **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
+  Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
+  Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.

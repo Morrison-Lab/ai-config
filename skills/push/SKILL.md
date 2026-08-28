@@ -202,7 +202,7 @@ git push --force-with-lease --force-if-includes
 `--force-if-includes` closes that by checking the remote-tracking tip against the local branch's reflog.
 It is an *ancillary* option, so it only does anything alongside a bare `--force-with-lease`.
 
-A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary and there is nothing to race.
+A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git-branches.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary and there is nothing to race.
 `git ls-remote --heads origin <branch>` settles it --- empty output means the next push *creates* the branch, so a plain push is the fix (or `git fetch --prune` and a retry).
 `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
 Say what the lease refused and why forcing is right when you use it.

@@ -536,7 +536,7 @@ lowercase, uppercase, backtick --- found all three behaved as written, and
 concluded every checkable assertion matched.
 An adversarial reviewer tested outside that list and found the gate's
 `classify_line` --- in `check-new-line-breaks/check-new-line-breaks.py` in a
-[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, not in this
+[`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) checkout, not in this
 repo --- returns `None` for a parenthesis or a digit opener, so an unbroken
 two-sentence line passes there.
 Reproduced independently against that script.

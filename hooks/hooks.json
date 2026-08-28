@@ -303,7 +303,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
+            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal; issue-first.md and report-mistakes-proactively.md require the same search before gh issue create. Both rules are consulted at read time while the omission happens at composition time. PR half measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Issue half measured on Morrison-Lab/ai-config 2026-08: one cp1252 decode crash had four open issues (#1984, #2040, #2048, #2049) before #2086 closed them. Issue discharge requires --state all --search (or gh search issues / MCP search_issues), not --state open, per check-open-prs-before-duplicating.md. Warns rather than blocks -- a duplicate is cheap to close and a blocked creation is expensive, since creating the PR or filing the issue is the act that makes work visible. Anchored on a command position with heredoc bodies stripped. Fails open. Tracked as #1748 (PR) and #2088 (issue)."
           },
           {
             "type": "command",
@@ -311,6 +311,13 @@
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
             "why": "shared/workflow/learn-from-review-findings.md, from ucdavis/bcs#679. Warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
+            "timeout": 25,
+            "script": "no-delete-branch-under-stacked-pr.py",
+            "why": "Measured on ucdavis/bcs 2026-08-27. Covers `gh pr close --delete-branch` as well as `gh pr merge`: both carry the same -d flag, and the branch deletion is the hazard rather than the merge. Merging #749 with --delete-branch removed the branch that was #750's base, and #750 went to CLOSED rather than being retargeted to main, while gh reported the merge as successful and said nothing about it. Retargeting is GitHub's DOCUMENTED behaviour for exactly this sequence and usually happens; why it failed here is not established, and this hook does not claim to know -- it warns that the flag MAY close a stacked child, which is the part that is certain. Recovery deadlocks: a closed PR cannot be retargeted, and cannot be reopened while its base branch is gone, so the only way out is to push the deleted branch back, reopen, retarget, then delete again -- possible only while a copy survives. WARNS, never blocks: the condition needs a network query, so blocking would fail closed whenever gh is unavailable, and the flag is the tidy habit on every unstacked merge. Silent when nothing is stacked, when the query fails or returns an unexpected shape, when gh is absent, when the command carries no -R or PR target, and when the delete flag is explicitly disabled (--delete-branch=false)."
           },
           {
             "type": "command",
@@ -426,6 +433,13 @@
               "vouching for an undisclosed sibling in a batched round, which",
               "shared/workflow/efficient-pr-babysitting.md actively encourages."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-uncounted-comment-claims.py\"",
+            "timeout": 10,
+            "script": "flag-uncounted-comment-claims.py",
+            "why": "ai-config#2377's sparta file-list incident (2026-08-26): a forge comment posted an enumerated file list recalled from memory rather than derived, and it was wrong. Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh api .../comments` body about to post asserts an unverified count (no `grep -c`/`wc -l`-shaped discharge nearby) or a hand-typed enumerated list of hyphenated identifiers with no deriving command beside it in the body or elsewhere in the same Bash call -- `remind-brief-premises.py`'s cardinality/enumeration heuristic extended past Agent/Task/SendMessage briefs to forge-comment bodies, since that hook's own PATH clause is anchored to this corpus and a comment can be about any repo."
           }
         ]
       },
@@ -509,7 +523,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
-            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request and CREATE_ISSUE to mcp__github__issue_write (method=create) (legacy mcp__github__create_issue still matched), and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           },
           {
             "type": "command",
@@ -550,7 +564,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-incomplete-check-enumeration.py\"",
             "timeout": 10,
             "script": "no-incomplete-check-enumeration.py",
-            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks, which omits check runs. Distinct from no-stale-pr-status.py, which asks whether a reading is current."
+            "why": "Blocks a reply declaring a PR clean when the only reading is gh pr checks or statusCheckRollup (short surfaces, not check-pr-fully-clean.py). Distinct from no-stale-pr-status.py, which asks whether a reading is current."
           },
           {
             "type": "command",

@@ -1,5 +1,18 @@
 # Local tools & CLIs
 
+## Available subscriptions & model providers
+
+[`memories/delegation.md`](delegation.md) is the canonical catalog of active
+subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
+OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+than duplicating the table here.
+That includes the OpenRouter activation mechanics
+(the `~/.config/opencode/opencode.jsonc` provider entry
+and the `OPENROUTER_API_KEY` variable) ---
+see delegation.md's bolded "A fourth destination" passage, not a copy here.
+One fact specific to this machine's configuration, not covered there:
+- Claude Code itself runs on a Claude Pro/Team subscription, not a metered API budget.
+
 ## Cursor
 
 See [`cursor.md`](cursor.md) for Cursor-specific agent and plugin behavior
@@ -24,7 +37,8 @@ codex plugin add <plugin>@<new-name> --json
 Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
 This sequence preserves the source repository while replacing only its stale local registration.
 
-(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
+(2026-08-08: `Morrison-Lab/ai-config` changed its manifest marketplace name from `the repository owner` to `Morrison-Lab`;
+`upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
 
 ## Julia in Claude Code cloud / web sessions
 - To install Julia, prefer downloading the official binary tarball from
@@ -154,6 +168,22 @@ It passed every check and garbled on GitHub; the reviewer traced the delimiter
 matching and supplied a verified double-backtick fix, applied as `4b30781`.
 The irony that the example *about* a backtick pitfall hit a different backtick
 pitfall is the reason it is worth its own entry.)
+
+**The consumption-side mirror: a regex that blanks "code spans" to strip cited text needs to match a run of N backticks closed by a run of exactly N, not just a single pair.**
+Everything above is the authoring rule --- widen the delimiter when the quoted text contains a backtick.
+A classifier reading that same span back has the opposite failure mode: a naive single-backtick-pair pattern matches the *inner* pair inside a correctly-authored double-backtick span and leaves the *outer* content exposed, rather than failing to parse it.
+A double-backticked citation of a phrase that itself contains a backtick --- the CommonMark-correct form once the quoted text needs one --- blanks only the inner pair under that pattern, so the cited phrase's own vocabulary stays live in the stripped output.
+This is the general form: "wrap it in backticks" is under-specified guidance for a tool author unless it also says which delimiter run the consuming regex actually handles, because the multi-backtick form is not an edge case --- CommonMark makes it mandatory the moment the quoted text contains a backtick, which is routine when quoting code, SHAs, or another code span.
+
+- **Do:** state which backtick-run length a code-span-matching regex accepts when documenting a "wrap it in backticks" convention for something a tool will parse.
+- **Do:** match a pattern like ``(`+)(?:(?!\1).)*?\1`` (longest run first) rather than a fixed single-backtick pattern, when the regex must handle CommonMark's full code span grammar.
+- **Don't:** assume a single-backtick-pair regex handles every code span a human author might write --- CommonMark requires the wider form whenever the quoted text contains a backtick.
+
+(ai-config#2449, 2026-08-27: `strip_cited_finding_vocab` in `scripts/check-pr-fully-clean.py` blanked only single-backtick spans;
+a reviewer's correctly double-backticked citation of a SHA left a not-clean-looking phrase live in the stripped text, and a clean `Ready for merge` verdict read as NOT clean.
+Fail-safe direction --- it under-blanks rather than over-blanks --- but it still cost a full round to diagnose.
+Fix tracked in that issue rather than applied here;
+this entry is the transferable authoring lesson, not the checker patch.)
 
 ## Office Open XML (.docx / .xlsx) — editing committed content
 - `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive
@@ -454,7 +484,7 @@ preview is still worth reading before passing `--write`.
 
 The contrast that motivated the fix: its CI counterpart,
 `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+[`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha), was diff-scoped by
 design from the start, so a corpus's pre-existing drift is never reflagged.
 The checker got that treatment years before the formatter did.
 
@@ -808,6 +838,15 @@ For semantic line breaks that is
 Reaching for a hand-rolled substitute when a real one is one path away is the
 error underneath whatever the regex got wrong, per
 [`deterministic-tools`](../shared/principles/deterministic-tools.md).
+
+**Run it only against committed state --- it is diff-scoped against `<base>...HEAD`.**
+The false-clean-on-an-uncommitted-tree trap and its commit-first remedy are already recorded twice:
+in [`memories/git-diffing.md`](git-diffing.md)'s `check-new-line-breaks` entry,
+and in [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)'s dirty-tree section,
+which carries the precise mechanism (line numbers from `<base>...HEAD`, line content from the working tree),
+the occurrence record,
+and the tracked guard (ai-config#2382).
+This pointer is deliberately not a third statement of the rule.
 
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**

@@ -848,6 +848,171 @@ class TestPrePushReview(unittest.TestCase):
         self.assertEqual(label, "Cursor Agent")
 
 
+    def test_persona_contract_clean_accepted(self):
+        # ai-config#2309: the adversarial-reviewer persona contract
+        # (Summary / Findings / Verdict / Reviewed-Commit) must be accepted
+        # via the hook's own parse_report(), not rejected as missing the
+        # local contract's sections.
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\n"
+            "One commit rewording a docstring.\n\n"
+            "### Findings\n"
+            "No actionable findings identified.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertTrue(is_clean, reason)
+        self.assertIn("persona", reason)
+
+    def test_persona_contract_needs_work(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\n"
+            "One commit.\n\n"
+            "### Findings\n"
+            "1. [Defect] scripts/x.py:1 -- broken.\n\n"
+            "### Verdict: Needs more work\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertFalse(is_clean, reason)
+
+    def test_persona_contract_sha_gates(self):
+        commit = "abc123def4567890"
+        base = (
+            "### Summary of Changes\n"
+            "One commit.\n\n"
+            "### Findings\n"
+            "None identified.\n\n"
+            "### Verdict: Ready for merge\n\n"
+        )
+        # Missing fingerprint entirely
+        is_valid, _, reason = reviewer.parse_review_verdict(base, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("fingerprint", reason.lower())
+        # Wrong fingerprint
+        wrong = base + "Reviewed-Commit: 9999999999999999\n"
+        is_valid, _, reason = reviewer.parse_review_verdict(wrong, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertIn("mismatch", reason.lower())
+
+    def test_persona_contract_does_not_shadow_local(self):
+        # A report carrying the LOCAL contract's four sections must still be
+        # parsed by the local path, including its stricter checks -- the
+        # persona fallback fires only when a local section is absent.
+        commit = "abc123def4567890"
+        local = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "A real, unresolved finding sits here.\n\n"
+            "### Observations\nNone.\n\n"
+            "### Verification Steps\n- ran tests\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(local, expected_commit_sha=commit)
+        # Local path rejects a clean verdict over a non-clean findings body.
+        self.assertFalse(is_valid)
+        self.assertNotIn("persona", reason)
+
+    def test_persona_hybrid_report_stays_on_strict_path(self):
+        # A report carrying ANY local-only section (here Critical Findings)
+        # plus persona headings must be graded by the strict local path --
+        # dropping one local section cannot buy the laxer parser.
+        commit = "abc123def4567890"
+        hybrid = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "[P0] blocking bug: data loss on save.\n\n"
+            "### Findings\n"
+            "None.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(hybrid, expected_commit_sha=commit)
+        self.assertFalse(is_clean, reason)
+        self.assertNotIn("persona", reason)
+
+    def test_persona_commented_out_verdict_not_parsed(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\n1. [Defect] broken.\n\n"
+            "### Verdict: Needs more work\n\n"
+            "<!--\nVerdict: Ready for merge\n-->\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, reason)
+        self.assertFalse(is_clean, reason)
+
+    def test_persona_trailing_qualification_rejected(self):
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\n1. [Defect] XYZ is broken.\n\n"
+            "### Verdict: Ready for merge -- after fixing XYZ\n\n"
+            f"Reviewed-Commit: {commit}\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_valid, reason)
+        self.assertIn("qualification", reason.lower())
+
+    def test_persona_comment_strip_cannot_synthesize_fences(self):
+        # Deleting comment spans could juxtapose backticks into a fence
+        # marker that never existed in the raw text, letting parse_report's
+        # internal re-blanking hide a later Needs-more-work line. The strip
+        # is offset-preserving, so the blocking verdict must survive.
+        commit = "abc123def4567890"
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n"
+            f"Reviewed-Commit: {commit}\n"
+            "``<!-- -->`\n"
+            "### Verdict: Needs more work\n"
+            "``<!-- -->`\n"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertFalse(is_clean, reason)
+
+    def test_persona_comment_strip_cannot_promote_indentation(self):
+        # Round-4 variant: a comment terminator at line start directly before
+        # a backtick/tilde run substitutes to <=3 spaces plus the run, which
+        # is inside FENCE's indent bound -- a fence synthesized from a line
+        # that matched nothing raw. Two such lines would pair inside
+        # parse_report's re-blank and hide the blocking verdict between them.
+        commit = "abc123def4567890"
+        for run in ("```", "~~~"):
+            report = (
+                "### Summary of Changes\nx\n\n"
+                "### Findings\nNone.\n\n"
+                "### Verdict: Ready for merge\n"
+                f"Reviewed-Commit: {commit}\n"
+                f"<!-- a\n-->{run}\n"
+                "### Verdict: Needs more work\n"
+                f"<!-- b\n-->{run}\n"
+            )
+            is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+            self.assertFalse(is_clean, f"{run}: {reason}")
+
+    def test_persona_contract_refusal_detected(self):
+        report = (
+            "### Summary of Changes\nx\n\n"
+            "### Findings\nNone.\n\n"
+            "### Verdict: Ready for merge\n\n"
+            "You have hit your weekly limit.\n"
+            "Reviewed-Commit: abc123def4567890\n"
+        )
+        is_valid, _, reason = reviewer.parse_review_verdict(report, expected_commit_sha="abc123def4567890")
+        self.assertFalse(is_valid)
+        self.assertIn("refusal", reason.lower())
+
     def test_verdict_negated_blockers_accepted(self):
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] prevents data loss.\n[INFO] No critical vulnerability was introduced.\n### Verification Steps\nNone"
         is_valid, is_clean, _ = reviewer.parse_review_verdict(report)

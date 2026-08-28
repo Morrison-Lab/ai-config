@@ -12,8 +12,11 @@ allowed-tools:
 
 # ARDI --- ARD + Iterate (single PR/MR)
 
-Drive one PR/MR to a clean review verdict by looping: read review → ARD every
-finding → push → post summary → re-request review → repeat until clean.
+Drive one PR/MR to a clean review verdict by looping: read every review → ARD every
+finding from every reviewer → push → post summary → re-request review from those
+reviewers → repeat until every reviewer's latest verdict is clean.
+A later all-clear from one reviewer does not clear another reviewer's standing
+not-clean, even with `mwc` active (ai-config#2274).
 
 ## Procedure
 
@@ -30,9 +33,13 @@ _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).
 (`COMMENT_PR` and the other bracketed tokens below are abstract operation tokens --- resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
-2. **Read the latest review.**
-Pull the most recent reviewer comment --- the `@claude` bot's, or a human's.
+2. **Read every review, not only the latest.**
+Pull the most recent reviewer comment --- the `@claude` bot's, or a human's ---
+and every other review that still has a standing verdict.
 Don't trust earlier cached verdicts --- actively poll until a review appears that references the commit you just pushed, then read **that** one.
+If one review is all-clear and another raises findings or nits, the findings
+win: ARD the union, then request fresh reviews.
+Do not merge on the all-clear, even with `mwc` (ai-config#2274).
 `gh pr checks` (`PR_CHECKS`) / `glab ci list` going green is about **CI state**, not the review verdict --- always parse the latest review *body* for findings.
 A user question about this PR that is not the word "status" still requires
 this fetch (see [`pr-status`](../pr-status/SKILL.md)).
@@ -51,13 +58,21 @@ sits unread.
    reach the filter, making a review with real findings look empty.
 
    - **GitHub:**
+     Filter on the body marker, not on an author login.
+     Do not take `| last` as the only review to ARD
+     (ai-config#2274).
+     Claude, Antigravity, and skip notices can all post as `github-actions[bot]`,
+     so a login filter silently drops a standing not-clean.
      ```bash
-     gh pr view <N> --json comments \
-       --jq '[.comments[] | select(.author.login | startswith("claude"))] | last | .body'   # READ_PR_COMMENTS
+     gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+       | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict|Antigravity Agent Report"; "i"))] | .[] | {created: .created_at, user: .user.login, body: .body}'   # READ_PR_COMMENTS
      ```
-     The reviewer's bot login varies by setup --- `gh pr view` reports it as `claude`, the REST API as `claude[bot]`, and some setups post as `github-actions[bot]`.
-     `startswith("claude")` matches across `gh pr view` and `gh api`; broaden it if your reviewer posts under another login, or you'll silently read `null` and false-pass.
-     **This command captures the *bot* review only** --- for a **human** reviewer (any login), gather comments with the `ard` skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API), which collects every reviewer's comments regardless of login.
+     Completed Claude runs start the body with `**Claude finished`.
+     Read every matching comment, not only the newest.
+     A later all-clear from a different reviewer does not clear another
+     reviewer's standing not-clean.
+     For a **human** reviewer (any login), also gather comments with the `ard`
+     skill's step 1 (`gh pr view <N> --comments` plus the inline-thread API).
 
      **Copilot code review doesn't post as a PR comment at all -- it's a
      formal GitHub review**, invisible to the command above. Request it
@@ -70,7 +85,7 @@ sits unread.
      review-link case above; the reviews list itself is `READ_PR_REVIEWS`)
      before treating it as an all-clear:
      `gh api`'s own `--jq` flag has no `--arg`/`--argjson` (see
-     [`memories/github.md`](../../memories/github.md)'s `gh api`/`jq` note) --
+     [`memories/gh-cli.md`](../../memories/gh-cli.md)'s `gh api`/`jq` note) --
      pipe the raw paginated output into standalone `jq -s` instead, which
      supports both:
      ```bash
@@ -115,15 +130,22 @@ sits unread.
    Re-applying fixes that are already in the tree wastes a round and muddies the diff.
    If *nothing* remains outstanding (every finding is already applied), don't push an empty commit --- skip to step 6 and re-request the review directly.
 
-    **If the reviewer explicitly skips or cannot produce a verdict** (for example, quota exhaustion, an outage, or a policy that prevents a reviewer from self-reviewing its own work), self-review immediately -- don't stall the PR waiting on it.
-    In the same round, also check whether a **different** configured external reviewer is available (e.g. Copilot code review, if the repo/org has it) and request it in parallel with posting the self-review, not after -- the two reviewers can fail independently, and self-review is a fallback for when *no* working external reviewer is reachable, never a substitute once one is.
-    **Dispatch the self-review; don't perform it.**
-    Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
-    The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-    Its brief covers what an inline pass would have done --- the current PR diff against its base, each changed call path and edge case, the focused tests and the relevant lint/documentation checks --- and you Address, Rebut, or Defer every finding it returns.
-    Note the skip in your ARD summary comment.
-    **Re-check reviewer availability every round, not just once** -- a reviewer that was unavailable a few pushes ago can become available mid-session.
-    A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved -- see [*The bar: "fully clean"*](#the-bar-fully-clean), which requires an external verdict at the current head whenever one is reachable, not just a self-review.
+   **Execute the sequential multi-provider review loop** defined in `shared/workflow/adversarial-self-review.md`.
+   You must pin all available providers (including external reviewers and the local `adversarial-reviewer` subagent).
+   You must query them sequentially, one at a time.
+   Do not request them in parallel.
+   **When the loop reaches the local self-review step, don't perform it.**
+   Hand the review to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only), briefed with the base ref, the paths, and the standards that apply --- never with your rationale for the change, which is what makes a reviewer agree with you.
+   The session that wrote the diff knows what it was meant to say, so an inline pass reads the artifact and recovers the intent: confirmation rather than review, and indistinguishable from the real thing in the output (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+   Its brief covers what an inline pass would have done.
+   This includes the current PR diff against its base, each changed call path and edge case, the focused tests, and the relevant lint/documentation checks.
+   You must Address, Rebut, or Defer every finding it returns.
+   If a provider skips or cannot produce a verdict (quota, offline), note the skip in your ARD summary comment.
+   **Re-check reviewer availability every round, not just once:**
+   A reviewer that was unavailable a few pushes ago can become available mid-session.
+   A skipped review is never a clean external verdict on its own and does not authorize marking the PR as approved.
+   See [*The bar: "fully clean"*](#the-bar-fully-clean).
+   It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
 3. **ARD every finding --- regardless of severity label.** "Not a blocker",
    "minor", "nit", "optional", "consider", "if you want" are for the user's
@@ -302,11 +324,13 @@ The loop ends only at **fully clean**, which means **both**:
    in progress (see *Fix broken CI/workflows too* above, and
    `shared/workflow/fully-clean.md` for the check-run-vs-workflow-run and
    API-casing gotchas).
-2. **The latest review is totally clean** --- zero flagged items under any heading.
+2. **Every reviewer's latest verdict is totally clean** --- zero flagged items under any heading.
    "Looks good" / "no findings" / "approved" with no follow-on bullets.
    Every item that wasn't directly **Addressed** is either **Deferred** to a tracked issue or **Rebutted with a rebuttal that actually convinced the reviewer** (they didn't re-raise it on the next round).
    A rebuttal the reviewer still disputes does **not** count as clean.
    Don't stop at "ready with one minor nit."
+   A later all-clear from one reviewer does not clear another reviewer's standing
+   not-clean, even with `mwc` (ai-config#2274).
    **That review must be a genuine posted verdict at the current head, from an external reviewer if one is reachable** -- check availability again right before declaring clean, not just at the round where self-review first started; an inferred "probably clean" from green CI and resolved threads does not satisfy this.
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and
@@ -321,12 +345,12 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND clean review comments for current HEAD SHA have been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.
-- [ ] Latest review has zero findings and no disputed rebuttals.
-- [ ] That review is a genuine posted verdict at the current head from an external reviewer, if one is reachable -- re-checked right before declaring clean, not just assumed from an earlier round's self-review.
+- [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
+- [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
 - [ ] Every inline review thread is resolved.
 - [ ] The only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply --- normally a top-level PR comment, not an inline thread).
@@ -349,7 +373,7 @@ Not a round count, not a sense that findings are getting smaller, not a judgment
 **Deadlock is per-item, and it does not stop the loop.**
 If you and the reviewer can't reach consensus on one finding (your rebuttal didn't convince them, and their re-raise didn't convince you), **escalate that item to a human reviewer** rather than looping on it or unilaterally overriding.
 Request `the repository owner` via the `request-pr-review` skill, `@`-mention them in a comment summarizing the impasse, and surface the open item to the user.
-The raw `gh pr edit <N> --add-reviewer d-morrison` form bypasses that skill and so does **not** inherit its `Lacaedemon/sparta` exception.
+The raw `gh pr edit <N> --add-reviewer <reviewer>` form bypasses that skill and so does **not** inherit its `Lacaedemon/sparta` exception.
 In sparta, escalate to the user in chat rather than requesting a reviewer at all.
 Then **keep driving the PR**: address every other finding, push, and request the next review.
 Only when *every* remaining item is an escalated deadlock does condition 2 above fire, and even then the loop resumes the moment the human rules.

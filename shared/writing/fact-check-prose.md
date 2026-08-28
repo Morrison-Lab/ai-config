@@ -88,6 +88,24 @@ so.
   `pr-preview/pr-<N>/`, with the direct URL posted in a sticky PR comment ---
   check that comment or the repo's own CLAUDE.md for the exact convention
   rather than assuming a layout.
+- **Displayed equations vs the implementation they cite.**
+  When the document says an equation is what the Stan, R, or JAGS
+  code, the R runner, or the simulator implements,
+  read that implementation.
+  A derivation that is algebraically fine but is not what those
+  programs do is still a finding: the filter, the mixture,
+  the defaults that produced the tables, and similar choices,
+  not only the algebra on the page.
+  (UCD-SERG/shigella#31, 2026-08-25:
+  `@eq-lpfilter` used the per-chain max of `lp__`.
+  Every R runner used the median.
+  `@eq-brt` wrote a truncated exponential.
+  The R likelihood mixed a uniform into that density.
+  `@eq-joint` and `@eq-shared` wrote `p(y | y_0^{(k)})` for the
+  never-infected branch.
+  The R likelihood used `y_f = 0` instead.
+  The R simulator evaluated a decay-only curve
+  while the design said to evaluate `@eq-curve`.)
 
 ## What to report
 
@@ -566,7 +584,8 @@ a page: a check that cannot separate "not fixed" from "not built yet" is not
 yet a check.
 
 The mechanics live elsewhere and are not repeated here.
-[`memories/github.md`](../../memories/github.md) covers reading the deployed
+[`memories/github-remote-sessions.md`](../../memories/github-remote-sessions.md)
+covers reading the deployed
 bytes off `gh-pages` when the served URL is blocked, and reading that branch's
 own commit log to see which build is actually deployed.
 [`check-rendered-refs`](../../skills/check-rendered-refs/SKILL.md) covers the

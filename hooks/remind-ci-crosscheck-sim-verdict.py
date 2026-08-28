@@ -166,7 +166,7 @@ def simple_commands(cmd):
 
 # Words that may precede the command itself, matching the sibling hooks'
 # `LEAD_WORDS`. Kept alongside ASSIGNMENT so `GH_PAGER=cat gh run view ...` --
-# the form `memories/github.md` mandates -- reaches the `gh` test below.
+# the form `memories/gh-cli.md` mandates -- reaches the `gh` test below.
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
               "nohup", "env"}
 

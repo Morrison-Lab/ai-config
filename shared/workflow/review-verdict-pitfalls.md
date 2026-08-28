@@ -1298,6 +1298,26 @@ if they differ, expect to spend another.
   re-running.
 - **Don't:** report a PR ready on a "blocked" verdict, however self-referential
   its reason.
+
+**The re-run remedy above did not always converge, so the reviewer's own
+prompt now closes the loop at the source.**
+Measured 2026-08-27/28 on ai-config#2472, #2313, and #2341: consecutive
+re-runs each read the previous round's status-conditioned block (directly, or
+through `check-pr-fully-clean.py`'s exit) and reproduced it, some over an
+explicit statement that no content defect existed --- so the cheap-another-round
+remedy can loop indefinitely rather than clear
+([ai-config#2475](https://github.com/Morrison-Lab/ai-config/issues/2475)).
+The fix is upstream of the reader: ai-config's `claude-review.yml`
+prompt-addendum now carries a **Verdict semantics** section telling the
+reviewer that the verdict judges content, that its own run's in-flight
+sibling checks and the checker's mid-run exit are the merge gate's business
+rather than the verdict's, and that a check that finished red or a real
+finding still blocks.
+Everything above stays true for the *reader* of a verdict: classify by what
+it cites, and never merge on a block.
+What changes is the expectation --- a status-conditioned block from a
+reviewer running that addendum is now a misfire worth reporting, not a
+correct round to wait out.
 - **Don't:** treat the block as a standing state to wait out; nothing further
   will happen to it on its own.
 

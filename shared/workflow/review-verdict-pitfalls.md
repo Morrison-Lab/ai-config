@@ -201,6 +201,38 @@ Filed upstream as `ucdavis/bcs#619` and `#620`.)
 
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.
 
+**The fourth case has a variant that hides better, because the false premise is not about the PR at all --- it is about which commits the round was reviewing.**
+Sanity-checking a *surprising* verdict is the fourth case's remedy, and it cannot fire here: this verdict is the least surprising thing on the page, a clean re-approval of a round that changed almost nothing.
+
+The false premise lives in the incremental section --- "What changed since the last review", or whatever the reviewer calls it.
+That section is **composed** rather than derived, so the range it names is a claim, and a wrong one licenses the reviewer to shorten the round: naming one commit where the range holds two, quoting a `git diff --stat` that omits a source file, and concluding "no substantive logic changes" before returning Ready for merge.
+The one behaviour change in the round then goes unexamined, under a verdict that correctly names the current head.
+
+Nothing downstream catches it.
+[`fully-clean.md`](fully-clean.md)'s whole family of SHA checks is satisfied --- the verdict is dated, clean, and stamped with the head it reviewed --- and `scripts/check-pr-fully-clean.py` reports the PR fully clean, correctly by its own rules.
+The defect is in the verdict's account of *what it read*, which no SHA test can reach.
+The section that exists to spare a re-review from re-reading everything is exactly the section whose error costs the most.
+
+The check is mechanical and takes one command, so run it rather than judging:
+
+```bash
+git log --oneline <reviewed-in-previous-round>..<head>
+git diff --stat <reviewed-in-previous-round> <head>
+```
+
+Compare that against the commits and files the review says it looked at.
+A round that reviewed fewer files than the range holds reviewed less than it claimed, whatever its verdict says, so re-dispatch rather than accepting it.
+
+- **Do:** derive the incremental range yourself and compare it against the review's own account, on every round after the first.
+- **Do:** re-dispatch when they disagree, and say on the PR what the review missed.
+- **Don't:** read a clean re-approval as covering the round --- an incremental round's coverage is bounded by the range it believed it had.
+- **Don't:** reach for the fourth case's surprise test here.
+  This verdict is unsurprising by construction, which is why it needs a mechanical check instead.
+
+(Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125): the round named `118c22d9` as the only commit since `453a3252`, where `git log --oneline 453a325..118c22d` returns two and `git diff --stat` names `R/rd_source_files.R` alongside the test file the review quoted.
+The unreviewed commit loosened two regexes in a parser.
+Reported to the workflow's own repo as [Morrison-Lab/gha#709](https://github.com/Morrison-Lab/gha/issues/709), which weighs deriving the range in `gather-context` against treating a "nothing substantive changed" claim as requiring the full review anyway.)
+
 **A fifth case, and the one that decides what "reachable" means in criterion 2 of [`fully-clean.md`](fully-clean.md): an external reviewer can decline to review at all, posting a refusal in the shape of a review.**
 Unlike the four cases above --- all of which are a review that ran and produced something misleading --- this is a reviewer that never ran, and says so in a `COMMENTED` review whose whole body is the refusal (e.g. Copilot's *"unable to review this pull request because the user who requested the review has reached their quota limit"*).
 Three consequences for driving a PR to fully clean:

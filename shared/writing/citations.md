@@ -393,10 +393,124 @@ lists, so the citations *were* checked --- just not for this.
 The reviewer that flagged it named the reason precisely:
 "this claim is about the paper's findings, not its metadata".)
 
+## The user's own words are on disk, so quoting them is checkable
+
+The instruments above assume the source is a file, a commit, or a page.
+A sentence attributed to the user in conversation feels like none of those, so the natural conclusion is that no check applies and the quotation has to be trusted.
+
+That conclusion is false, and believing it is the whole of this failure.
+Claude Code writes every turn, the user's included, to a JSONL transcript under `~/.claude/projects/`.
+This repository already knows: as of 2026-08-28, **29** non-test hooks reference it.
+
+```bash
+grep -l transcript_path hooks/*.py | grep -v /test- | wc -l
+```
+
+How many of those 29 go on to open the transcript is a question a one-line grep does not settle, since several hooks reach the file through a helper, so that second figure is not quoted here.
+So the source is fetchable, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
+
+[`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
+
+```bash
+python3 scripts/check-user-quote.py "the sentence you are about to quote"
+```
+
+**What the script does not do is the design, and it took ten revisions to arrive at.**
+It does not decide who wrote the phrase.
+It prints every record containing it, with that record's shape, `origin.kind`, flags and `userType`, and stops.
+
+The reason is that `message.role == "user"` is a **transport** role, not an authorship claim.
+The same role carries harness continuations, stop-hook output, injected skill bodies, task notifications, tool results, compaction summaries, inter-agent coordinator messages, editor selections appended to the user's own prompt, another agent's `teammate-message`, and --- in a subagent's transcript --- the dispatch brief the assistant wrote.
+
+Ten revisions tried to separate those from the user's own words, and every one of them certified harness or assistant prose at some point: classification on exclusions alone, then on the harness's `origin.kind` label, then per record, then per block, then per non-envelope region, then against a four-name tag list, then against a structural opener test.
+Each was broken in turn --- by an appended reminder, a mid-block one, leftovers joined across a cut, a repeated opener, a literal closing tag inside injected content, a fifteen-name vocabulary against a list of four, a truncated opener, an entity-escaped tag (`&lt;system-reminder&gt;`, which is what the harness itself writes when it neutralizes control tags), a namespaced one, and an envelope split across two blocks.
+
+The eleventh finding is what settled it: the harness's text **is not lexically identifiable**.
+It can arrive with no `<` in it at all.
+So a test returning *this is the user's* is a test that will eventually be wrong in the one direction that matters, and no amount of narrowing changes that --- which is the general lesson, and the reason this section describes a reporter rather than a checker.
+
+The mirror failure is the half that is easy to forget, and it took its own round to surface.
+Reading one record shape means reporting "no record contains it" over text the user produced, and a prompt lives in several: written to `queue-operation` at enqueue, becoming a `message` record at dequeue between 6 ms and eight minutes later, and carried by `last-prompt` and `attachment` besides.
+The sharpest is a `tool_result` block, whose payload sits under `content` rather than `text`.
+There were 2,451 in one root, every one inside a `role: "user"` record --- and an `AskUserQuestion` answer, which is where this corpus routes the user's **decisions**, exists in no other shape.
+Skipping it meant reporting an absence over precisely the sentences most tempting to quote as authorization.
+
+So the run reports which shapes it matched rather than asserting a number of shapes covered, since a count of shapes read is a completeness claim and the list of shapes matched is an observation.
+Identical texts are collapsed, keyed on provenance as well as content --- merging on text alone showed a human-labelled record's harness twin's flags, which is the tool's whole product, silently wrong.
+
+The exit codes keep apart a phrase found in no record (`1`) and a search that was degraded or impossible (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash).
+Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
+Exit `0` asserts only that a record contains the phrase, which is the whole of what the tool now claims.
+
+Two things make the quotation marks worse than an ordinary misremembering.
+
+**They are the construction that tells a reader not to check.**
+A paraphrase invites verification.
+A quote asserts that verification already happened, which is why reaching for quotation marks is most tempting where they are least supportable.
+
+This is the reverse of the ordering in the section above, and the two are consistent because the sources differ.
+There the source is a document, so a drifted quote still shows the reader the words and lets them disagree, while a paraphrase launders the source's authority into your voice.
+Here the source is a person who is not reading over your shoulder, so the quotation marks are the laundering:
+they report a verification against a transcript nobody consulted.
+Which form is safer depends on whether the reader can reach the source, and that is the axis to check before reusing either rule.
+
+**A correction to a fabricated quote can itself carry one, and accepting it feels like diligence.**
+Being told you misquoted someone produces an immediate impulse to publish the real sentence, and the replacement arrives from the same kind of recollection as the original.
+Run the check on the correction too, before repeating it.
+
+The remedy is the neighbouring section's, reached by a different route.
+That section already carries the un-quotable branch:
+
+> When you cannot find a sentence to quote, that is the finding: make the argument in your own voice and cite the source for what it does supply.
+
+What differs here is only that the source can be searched, so which branch you land on is a question with an answer rather than a judgment.
+Run the script and read what it returns.
+Quote a record you have read and judged to be the user's own typed turn;
+fall back to your own voice, marked as your reading --- "as I understood it" --- when no record is theirs, or when you cannot tell.
+
+`CLAUDE.md`'s "Post in-chat feedback to the PR" is not an exception.
+Its paraphrase is unquoted, so nothing there needs the transcript at all, and the required marker --- `_Posted by Claude Code (AI agent) --- not written by a human._` --- exists because such a comment is written in the user's voice under the user's login.
+It discloses the author; it does not license a quotation.
+If you do put the user's words in quotation marks in a PR comment, that is the case most in need of the script, since the person who could refute the attribution may not be reading the thread.
+
+- **Do:** run `scripts/check-user-quote.py` before putting the user's words in quotation marks, and read the records it prints.
+- **Do:** run it again on a correction that supplies the "real" sentence.
+- **Do:** state your reading unquoted and attributed to yourself when no record is the user's, or when you cannot tell which is.
+- **Do:** check a remembered quote hardest when it authorizes something you were about to do, which is the direction the one recorded case ran.
+- **Don't:** read exit `0` as a verdict.
+  It says a record contains the phrase.
+  Which record, and who wrote it, is what the provenance beside it is for.
+- **Don't:** read exit `2` as an absence.
+  It says the search was degraded or never happened, and reporting that as "never said" is the substitution one level up.
+- **Don't:** take a record's `origin.kind` as settling authorship.
+  It is the harness's own label and the strongest signal available, and the CLI still rewrites it on some paths and stamps a relayed channel message with it on others.
+- **Don't:** point at an issue or PR body you wrote afterwards from the same memory and call it the record.
+  That is a copy of the claim, and it is the move that most looks like compliance.
+
+The Claude Code paths above are specific to that harness.
+On another agent, `--root` takes a transcript directory;
+where no such directory exists, the source genuinely is unavailable and the neighbouring section's branch applies unchanged.
+
+(2026-08-28, [ai-config#2538](https://github.com/Morrison-Lab/ai-config/issues/2538).
+Driving [#2529](https://github.com/Morrison-Lab/ai-config/pull/2529) to a merge decision, I put a sentence of my own inside quotation marks and attributed it to the user.
+It stated a criterion for merging on a light review verdict, which is the direction I was already moving.
+A review pass flagged it and supplied what it gave as the user's actual message;
+I repeated that into the issue and into the first draft of this section without checking either.
+A second review pointed out that the transcript exists.
+Running the script on the replacement --- "This is the last correction round: fix the five, push, report the head" --- returned 35 distinct texts across 38 records when this was written.
+**Not one carries `origin.kind == "human"`**, which is the fact that settles it;
+nine carry no flag at all, so "they were all flagged" would have been the convenient summary and a false one.
+The unflagged ones are `queue-operation` and `attachment/queued_command` records --- the shape a user's *own* queued command uses --- carrying task-notification text, which is exactly why the reader is shown the provenance rather than a verdict.
+The clause I fabricated appears in no record except my own later writing about it, so it is not reproduced here.
+Every figure in this paragraph is a reading rather than a constant, and the categorical claims are the ones to re-derive rather than trust: an earlier version of this sentence asserted "every one of them is flagged", which running the command refutes.
+The first two drafts of this section asserted the opposite premise, and ten subsequent revisions each shipped a check that certified something the user had not written;
+every one passed its own local suite, and what refuted every one was executing it.)
+
 ## A permalink that resolves can still cite the wrong content
 
-The same metadata-versus-content split has a link-checking form, and there
-the false signal is stronger: an HTTP `200` feels like verification.
+The paraphrase-only section's metadata-versus-content split has a link-checking
+form, and there the false signal is stronger: an HTTP `200` feels like
+verification.
 It is not.
 `200` proves only that *something* is served at that URL, never that what is
 served supports the claim the citation makes.

@@ -469,14 +469,16 @@ It matters most when a **no-op** is the expected answer.
 A negative control for a two-revision comparison is normally "run it against identical revisions and confirm it reports zero", and that control is precisely what a dirty tree makes unreachable --- so a control that never once produced its own expected answer can be believed for an entire session, while CI, which always runs from a clean checkout, sees the true zero on its first attempt.
 [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "A control's patch point drifts" section carries the case where that gap hid a dead control.
 
-Pass **both** revisions explicitly whenever the intent is a self-comparison (`--base-rev HEAD --head-rev HEAD`, or the tool's equivalent), rather than naming one and letting the other default.
-When the tool has no second flag, commit or stash first, and prefer designing one that names both sides over one that silently adopts the tree --- an implicit side cannot be audited from the command line anyone pastes into a PR.
+Pass **both** revisions explicitly whenever the intent is a self-comparison, rather than naming one and letting the other default.
+Read the tool's own `--help` for the second flag rather than guessing its name: `scripts/check-verdict-scan-parity.py` calls it `--candidate-rev`, and its help text says outright that omitting it compares the working tree.
+When a tool has no second flag at all, commit or stash first, and prefer designing one that names both sides over one that silently adopts the tree --- an implicit side cannot be audited from the command line anyone pastes into a PR.
 
-- **Do:** pass both revisions explicitly when the expected answer is "no difference".
+- **Do:** pass both revisions explicitly when the expected answer is "no difference", reading the second flag's name from the tool's `--help` rather than assuming it.
 - **Do:** check `git status --short` before believing a two-revision tool's output, the same way you would before believing a `git diff` range.
 - **Do:** give a tool of your own an explicit flag for each side, so the published command records what it compared.
 - **Don't:** read `--base-rev HEAD` as a self-comparison;
   it is `HEAD`-vs-worktree unless the tree is clean.
 - **Don't:** treat a non-zero result from such a run as evidence the tool discriminates --- your own uncommitted edits produce one.
 
-(Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py` in [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).)
+(Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
+Its `--base-rev` defaults to `origin/main` and its other side is the working-tree copy of the checker unless `--candidate-rev` names a revision, so `--base-rev HEAD` over a dirty tree is `HEAD`-vs-worktree.)

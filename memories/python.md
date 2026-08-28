@@ -153,7 +153,7 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
 Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
-Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py` ([ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515)): the first 8,000 generated bodies all carried one leading fragment, and a run capped there contained no instance of the shape the tool's negative control detects --- so the capped run reported itself blind while the uncapped 1,693,440-body sweep found the shape immediately.
+Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below: the first 8,000 generated bodies all carried one leading fragment, and a run capped there contained no instance of the shape the tool's negative control detects --- so the capped run reported itself blind while the uncapped 1,693,440-body sweep found the shape immediately.
 
 Striding fixes it, and the arithmetic has one trap.
 An integer step, `step = len(items) // limit`, is exactly `1` for every `limit` strictly above half the corpus, so the "stride" degenerates back to a prefix --- and that is the regime a generously-raised cap puts you in, which is why the naive form is likeliest to be wrong precisely when someone has tried to be careful.

@@ -206,6 +206,135 @@ def other_subcommand_with_hard_token_case(path):
     return "git tag --hard"
 
 
+# ---------------------------------------------------- checkout/restore cases
+
+def checkout_bare_path_case(path):
+    """`git checkout <path>`, no `--`, and the path is not also a ref --
+    the ai-config#1862 incident shape: reverts to the index, silently."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout tracked.txt"
+
+
+def checkout_dashdash_path_case(path):
+    """`git checkout -- <path>` -- the explicit, unambiguous form."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -- tracked.txt"
+
+
+def checkout_dot_case(path):
+    """`git checkout .` -- the widest pathspec, deserving the loudest
+    warning."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout ."
+
+
+def restore_bare_path_case(path):
+    """`git restore <path>` with no `--staged` -- rewrites the working
+    tree, the same hazard as `checkout <path>`."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git restore tracked.txt"
+
+
+def checkout_ref_path_after_sep_case(path):
+    """`git checkout <ref> -- <path>` -- a real ref before `--`, but the
+    path after it is still discarded regardless of the ref's own safety."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout other -- tracked.txt"
+
+
+def checkout_ambiguous_path_wins_case(path):
+    """No branch shares the dirty file's name, so the sole positional
+    argument fails ref resolution and is read as a path -- must warn."""
+    _write(path, "shared")
+    _run(path, "add", "shared")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "shared", content="dirty\n")
+    return "git checkout shared"
+
+
+def checkout_ref_no_path_case(path):
+    """`git checkout <ref>`, no path -- a plain branch switch, and git
+    itself refuses one that would clobber local changes. Must NOT warn."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "branch", "other")
+    return "git checkout other"
+
+
+def checkout_ambiguous_ref_wins_case(path):
+    """A branch and a dirty tracked file share the SAME name, with no
+    `--`. Real git resolves the ref, not the path -- this hook must agree,
+    per its own stated disambiguation rule, or it would warn on a command
+    that never touches the file at all."""
+    _write(path, "shared")
+    _run(path, "add", "shared")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "shared", content="dirty\n")
+    _run(path, "branch", "shared")
+    return "git checkout shared"
+
+
+def restore_staged_only_case(path):
+    """`git restore --staged <path>` with no `--worktree` only rewrites
+    the index -- the working-tree file is untouched, so this must not
+    warn."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="staged\n")
+    _run(path, "add", "tracked.txt")
+    return "git restore --staged tracked.txt"
+
+
+def checkout_dash_case(path):
+    """`git checkout -` (previous branch) is a ref-shaped token, not a
+    path -- must not warn even on a dirty tree."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _run(path, "checkout", "-qb", "other")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -"
+
+
+def checkout_new_branch_case(path):
+    """`git checkout -b <new-branch>` creates and switches -- no path
+    argument at all, so this must not warn."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git checkout -b feature"
+
+
+def mv_subcommand_case(path):
+    """A different git subcommand (`mv`) carrying pathspec-shaped
+    arguments must not be routed through the checkout/restore pathspec
+    logic at all -- it is neither."""
+    _write(path, "tracked.txt")
+    _run(path, "add", "tracked.txt")
+    _run(path, "commit", "-qm", "init")
+    _write(path, "tracked.txt", content="dirty\n")
+    return "git mv tracked.txt renamed.txt"
+
+
 # ---------------------------------------------------------------- cases
 # (case_id, builder, description)
 
@@ -241,6 +370,41 @@ SHOULD_STAY_SILENT = [
     ("S7", other_subcommand_with_hard_token_case,
      "a different subcommand carrying a `--hard`-shaped token is not "
      "`reset --hard`"),
+]
+
+SHOULD_WARN += [
+    ("W7", checkout_bare_path_case,
+     "`git checkout <path>` (ai-config#1866 incident shape) -- the path "
+     "does not resolve as a ref"),
+    ("W8", checkout_dashdash_path_case,
+     "`git checkout -- <path>` -- the explicit form"),
+    ("W9", checkout_dot_case,
+     "`git checkout .` -- the widest pathspec"),
+    ("W10", restore_bare_path_case,
+     "`git restore <path>` with no `--staged` rewrites the working tree"),
+    ("W11", checkout_ref_path_after_sep_case,
+     "`git checkout <ref> -- <path>` -- the path after `--` is discarded "
+     "regardless of the ref"),
+    ("W12", checkout_ambiguous_path_wins_case,
+     "a positional argument that does not resolve as a ref is a path"),
+]
+
+SHOULD_STAY_SILENT += [
+    ("S8", checkout_ref_no_path_case,
+     "`git checkout <ref>` with no path -- a plain branch switch"),
+    ("S9", checkout_ambiguous_ref_wins_case,
+     "a branch and a dirty file share a name -- real git resolves the "
+     "ref, and this hook must agree"),
+    ("S10", restore_staged_only_case,
+     "`git restore --staged <path>` with no `--worktree` only touches "
+     "the index"),
+    ("S11", checkout_dash_case,
+     "`git checkout -` (previous branch) is a ref-shaped token"),
+    ("S12", checkout_new_branch_case,
+     "`git checkout -b <new-branch>` takes no path argument"),
+    ("S13", mv_subcommand_case,
+     "a different git subcommand (`mv`) carrying pathspec-shaped args is "
+     "not checkout/restore"),
 ]
 
 
@@ -319,18 +483,34 @@ MUTATIONS = {
           "        pass")],
         {"W6"},
     ),
-    "M2_subcommand": (
-        "only a `git reset` invocation matches, not another subcommand",
-        [('        if len(rest) < 2 or rest[0] != "git" or '
-          'rest[1] != "reset":\n            continue',
+    "M2_subcommand_gate": (
+        "only `checkout`/`restore` route through the pathspec logic, not "
+        "another subcommand carrying pathspec-shaped arguments",
+        [('        if sub not in ("checkout", "restore"):\n            '
+          "continue",
           "        pass")],
-        {"S7"},
+        {"S13"},
     ),
     "M3_hard_flag": (
         "the invocation must carry the literal `--hard` token",
-        [('        if "--hard" not in rest[2:]:\n            continue',
-          "        pass")],
+        [('            if "--hard" not in rest[2:]:\n                '
+          "continue",
+          "            pass")],
         {"S3"},
+    ),
+    "M3_staged_no_worktree": (
+        "`restore --staged` without `--worktree` only rewrites the "
+        "index and must not warn",
+        [("        if staged_no_worktree:\n            continue",
+          "        pass")],
+        {"S10"},
+    ),
+    "M_ref_resolution": (
+        "an argument that resolves as a ref must not be read as a "
+        "pathspec",
+        [("    return _resolves_as_ref(arg) is False",
+          "    return True")],
+        {"S9"},
     ),
     "M4_status_gate": (
         "only a status report with at least one non-untracked entry warns",

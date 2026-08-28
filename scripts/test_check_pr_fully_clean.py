@@ -1748,6 +1748,25 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
           == "not-clean")
+    check("a previously blocking failure explicitly fixed is not an active finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "line-break failure is fixed and confirmed passing.\n")
+          is None)
+    check("an explicit clean verdict survives a resolved blocking mention",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
+    check("a previously blocking failure that remains open stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nThe previously blocking line-break failure "
+              "remains open and must be fixed.\n")
+          is not None)
+    check("a previously blocking failure that is not fixed stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nThe previously blocking line-break failure is not fixed.\n")
+          is not None)
     check("_BARE_REJECTION still matches a bare 'merge-blocking' compound",
           bool(_re.search(checker._BARE_REJECTION, "Two merge-blocking issues remain.", _re.I)))
     check("_BARE_REJECTION still matches plain 'Blocking:'",

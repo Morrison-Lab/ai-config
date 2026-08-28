@@ -666,6 +666,30 @@ _BARE_REJECTION = (
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
 
+RESOLVED_BLOCKING_SUFFIX = re.compile(
+    r"^(?:(?![.!?]).){0,120}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
+    re.IGNORECASE,
+)
+UNRESOLVED_BLOCKING_SUFFIX = re.compile(
+    r"\b(?:not\s+(?:yet\s+)?(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|remain(?:s)?\s+(?:open|unresolved|unfixed|unaddressed))\b",
+    re.IGNORECASE,
+)
+
+
+def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
+    """True for a past blocking state explicitly resolved in the same sentence."""
+    if match.group(0).lower() != "blocking":
+        return False
+    prefix = scan[max(0, match.start() - 12):match.start()]
+    if not re.search(r"\bpreviously(?:[-\s]+|\s+\*{1,2})$", prefix, re.IGNORECASE):
+        return False
+    suffix = scan[match.end():match.end() + 160]
+    return (
+        RESOLVED_BLOCKING_SUFFIX.search(suffix) is not None
+        and UNRESOLVED_BLOCKING_SUFFIX.search(suffix) is None
+    )
+
 # The findings-heading pattern is likewise built once: the two list copies
 # below and the section-resolution wiring in _unresolved_finding_pattern
 # compare against this exact string, so a drifted copy would silently
@@ -930,6 +954,10 @@ def classify_verdict(body: str, state: str = "") -> str:
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
+            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
+                scan, match
+            ):
+                continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -1048,6 +1076,10 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                     continue
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
+            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
+                scan_body, match
+            ):
                 continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix

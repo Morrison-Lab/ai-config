@@ -21,27 +21,29 @@ scope restriction.
 
 ## Gate external repository communication on membership
 
-Before sending any outward communication to a repository, positively verify
-that the user is a member of that specific repository. Communication includes
-PRs/MRs, issues, comments, reviews, review requests, discussions, messages sent
-by bots or workflows under the user's authority, and indirect actions that
-notify or mutate the repository, such as mentions, cross-reference backlinks,
-and transfers.
+Before sending any outward communication to a repository,
+positively verify that the user is a member of that specific repository.
+Communication includes PRs/MRs, issues, comments, reviews, review requests,
+discussions, messages sent by bots or workflows under the user's authority,
+and indirect actions that notify or mutate the repository,
+such as mentions, cross-reference backlinks, and transfers.
 
-Unless membership in the specific repository is positively verified, get
-explicit approval that names the repository and the specific communication
-before sending it. This includes both unknown membership and verified
-non-membership. Drafting locally while approval is pending is allowed.
-Membership or approval does not override a stricter repository contribution or
-AI-agent policy.
+Unless membership in the specific repository is positively verified,
+get explicit approval that names the repository and the specific communication
+before sending it.
+This includes both unknown membership and verified non-membership.
+Drafting locally while approval is pending is allowed.
+Membership or approval does not override
+a stricter repository contribution or AI-agent policy.
 
 Do not infer membership from a public repository, prior contributions, a fork,
 organization membership, technical write access, available credentials,
-collaborator access elsewhere, or the ability to post. `/daytb`, `away`,
-default-to-action
-rules, and standing authorization to open PRs or file issues do not grant
-permission to communicate with a non-member repository. This gate takes
-precedence over automatic filing, PR-opening, review, and follow-up rules.
+collaborator access elsewhere, or the ability to post.
+`/daytb`, `away`, default-to-action rules,
+and standing authorization to open PRs or file issues
+do not grant permission to communicate with a non-member repository.
+This gate takes precedence
+over automatic filing, PR-opening, review, and follow-up rules.
 
 ## No empty promises
 

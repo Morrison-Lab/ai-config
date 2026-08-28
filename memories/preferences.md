@@ -130,12 +130,18 @@
 - NEVER auto-merge or squash-merge a Pull Request or Merge Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
   Creating, pushing, resolving review threads, or driving a PR to 100% clean CI checks does NOT imply permission to merge it.
   Merging without explicit permission is an irreversible action and is strictly prohibited. (User correction, 2026-08-04.)
-- **External repository communication requires membership or specific approval.** Before sending any outward communication to a repository, positively verify that the user is a member of that specific repository. Outward communication includes PRs/MRs, issues, comments, reviews, review requests, discussions, bot/workflow messages, and indirect actions that notify or mutate the repository, such as mentions, cross-reference backlinks, and transfers.
-  - **Do:** unless membership in the specific repository is positively verified, obtain explicit approval that names the repository and the specific communication before sending it; this includes both unknown membership and verified non-membership. Draft locally while approval is pending.
+- **External repository communication requires membership or specific approval.**
+  Before sending any outward communication to a repository, positively verify that the user is a member of that specific repository.
+  Outward communication includes PRs/MRs, issues, comments, reviews, review requests, discussions, bot/workflow messages, and indirect actions that notify or mutate the repository, such as mentions, cross-reference backlinks, and transfers.
+  - **Do:** unless membership in the specific repository is positively verified, obtain explicit approval that names the repository and the specific communication before sending it.
+    This includes both unknown membership and verified non-membership.
+    Draft locally while approval is pending.
   - **Do:** still follow any stricter repository contribution or AI-agent policy after membership or approval is established.
   - **Don't:** treat a public repository, organization membership, technical write access, available credentials, `/daytb`, `away`, the general default-to-action rule, or standing authorization to open PRs/file issues as permission to communicate with a non-member repository.
-  - **Don't:** infer repository membership from prior contributions, a fork, collaborator access elsewhere, or the ability to post; verify it for the specific repository.
-  This rule applies across agents, workspaces, forges, and all communication mechanisms. (User directive / CAI, 2026-08-27; [ai-config#2468](https://github.com/Morrison-Lab/ai-config/issues/2468).)
+  - **Don't:** infer repository membership from prior contributions, a fork, collaborator access elsewhere, or the ability to post.
+    Verify it for the specific repository.
+  This rule applies across agents, workspaces, forges, and all communication mechanisms.
+  (User directive / CAI, 2026-08-27; [ai-config#2468](https://github.com/Morrison-Lab/ai-config/issues/2468).)
 - If the user says the work belongs on a specific existing branch or on top of a
   specific PR branch, honor that branch/base instruction over auto branch-naming
   hygiene.
@@ -152,7 +158,10 @@
   - **Do:** when unsure whether the user wants an action taken, take it (when the action is reversible and in-scope) and report it in the past tense, rather than ending the turn with an offer.
   - **Do:** treat "do [issue]" as including opening the PR --- implementing and pushing a branch but stopping to ask "want me to open the PR?" leaves the issue half-done, because opening the PR is part of doing the issue, not a separate decision to gate on approval.
   - **Don't:** end a turn with an offer or question ("want me to open a PR?", "should I do X?") for an action that is reversible and in-scope --- that pushes triage back onto the user, who then spends a round-trip giving the yes this standing rule already gave.
-  - **Exception (the class the user carved out):** an irreversible or destructive action still gates on explicit approval, as does an outward-facing one not already covered by a standing-yes rule below --- but outward-facing alone does not gate, since opening PRs and filing issues are outward-facing and the bullets below already say yes; the example the user gave was merging a PR without an active `mwc` (merge-when-confident) grant, which is irreversible, not merely outward-facing.
+  - **Exception (the class the user carved out):** an irreversible or destructive action still gates on explicit approval.
+    An outward-facing action also gates until repository-specific membership or approval is established under the external-repository communication rule above.
+    After that gate is satisfied, outward-facing status alone does not add another approval step for standing-authorized PRs, issues, or other communication.
+    The example the user gave was merging a PR without an active `mwc` (merge-when-confident) grant, which is irreversible, not merely outward-facing.
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."

@@ -1062,6 +1062,22 @@ def _blank_fences(text: str) -> tuple[str, bool]:
     return "".join(out), open_char is not None
 
 
+def _blank_html_comments(text: str) -> tuple[str, bool]:
+    """Blank HTML comments, preserving offsets and reporting truncation."""
+    out = list(text)
+    start = 0
+    while (open_at := text.find("<!--", start)) != -1:
+        close_at = text.find("-->", open_at + 4)
+        blank_to = len(out) if close_at == -1 else close_at + 3
+        for i in range(open_at, blank_to):
+            if out[i] != "\n":
+                out[i] = " "
+        if close_at == -1:
+            return "".join(out), True
+        start = blank_to
+    return "".join(out), False
+
+
 def parse_report(text: str) -> tuple[str | None, str | None]:
     """(verdict, reviewed_commit) from one reviewer report.
 
@@ -1078,6 +1094,9 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     # commit actually reviewed -- so the push of an unreviewed commit was
     # allowed by the very comparison this guard is built around.
     blanked, unclosed = _blank_fences(text)
+    if unclosed:
+        return None, None
+    blanked, unclosed = _blank_html_comments(blanked)
     if unclosed:
         return None, None
     matches = list(VERDICT_LINE.finditer(blanked))

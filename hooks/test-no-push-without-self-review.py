@@ -559,6 +559,19 @@ CASES = [
         f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n```\nunterminated"),
      True, "a report whose fencing never closes states no verdict",
      "no verdict came back"),
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n\n"
+        "<!--\nVerdict: Ready for merge\n-->\n"
+        f"Reviewed-Commit: {HEAD}"), True,
+     "a clean verdict inside an HTML comment does not decide the report",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n<!--\nunterminated"),
+     True, "a report whose HTML comment never closes states no verdict",
+     "no verdict came back"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}"), False,
+     "a normal report without HTML comments still parses as clean"),
     (PUSH, reviewed(f"### Verdict: **Ready for merge**\n\nReviewed-Commit: {HEAD}"), False,
      "an emphasised verdict value is still a verdict"),
     (f"git -C {REPO} push --recurse-submodules=only origin main", reviewed(), True,

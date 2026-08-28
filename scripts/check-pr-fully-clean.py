@@ -1015,7 +1015,9 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     safe-direction re-flag (ai-config#2370's free-prose remainder). The
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
-    the same exposure the 60-char shortcut always had.
+    including finding prose packed onto the SAME physical line as the
+    resolving word, whether in the body or in a heading trailer -- the
+    same exposure the 60-char shortcut always had.
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The

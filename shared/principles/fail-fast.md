@@ -219,6 +219,49 @@ Re-running it to ask of each fallback whether the file actually carried a proven
 - **Don't:** read "every answer is well-formed" as "every answer is right" when a fallback can produce a well-formed wrong one.
 - **Don't:** report a zero from a sweep whose buckets were never shown to discriminate.
 
+### A named regression test is checked against its rule, not against a commit
+
+The causes above are about a check that cannot see a failure.
+This is about the check you wrote *to* see one, and the control you ran to
+prove it works.
+
+The natural control is a commit: put the previous version of the changed files
+back, confirm the new test goes red, restore.
+That is a real control and it answers a different question than the test's name
+does.
+It establishes that the round changed behaviour the test can see.
+It cannot establish that the test guards **the rule it is named for**, because
+anything else in the same commit will carry it --- and a commit answering a
+review finding usually changes more than one thing.
+
+So probe the rule instead: remove the specific rule the test is named for, run
+that test, confirm it fails, put the rule back.
+It costs one edit and it is the only thing that separates a regression test
+from a fixture that happens to pass.
+
+Measured 2026-08-28 on
+[d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125).
+A test named for a `?`/`#` exclusion in a URL pattern was found vacuous by a
+reviewer: its fixture differed from the pattern on an unrelated axis, so the
+exclusion was never what protected it.
+The repair was **still** vacuous, for a second reason, and passed the
+commit-level control both times.
+Removing the exclusion and watching the test go red is what finally settled it.
+
+A companion trap, from the same PR: a real-world end-to-end run is evidence
+only about the configurations that real system uses.
+Every round re-rendered an actual package's documentation site as verification,
+and it passed straight through a defect that broke every site setting an
+explicit `issue-url`, because that package sets none.
+Real is not the same as representative.
+
+- **Do:** delete the rule a test is named for, and confirm that test alone
+  fails.
+- **Do:** ask which configurations a real-world verification does not exercise,
+  before reading its success as coverage.
+- **Don't:** read "fails against the previous commit" as "guards this rule" ---
+  a commit that fixes several things satisfies the first without the second.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

@@ -281,3 +281,17 @@ interpolation), same as `--body-file` on the porcelain command.
 
 (Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
 the REST PATCH succeeded immediately on the same body file.)
+
+## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
+
+Observed 2026-08-27 (PT) on Morrison-Lab/ai-config: `gh pr merge` refused PR #2470 with "not up to date with the base branch" after `main` had advanced by several merges past its branch point, but succeeded minutes later on PR #2480, which was also behind `main` by one freshly-merged commit.
+Updating #2470's branch via `gh api -X PUT repos/<owner>/<repo>/pulls/<N>/update-branch` and getting one clean re-review cleared the block.
+
+The discriminator between the two cases is not established --- do not assume "several commits behind" is the trigger, since #2480 also merged while behind.
+It may be required-check staleness (a status check keyed to an older base SHA) rather than a strict branch-parity requirement, but this is unverified.
+[`gh-cli.md`](gh-cli.md)'s "Strict branch protection makes a clean PR queue merge serially" section, measured the same day in this same repo, is a plausible but unconfirmed explanation: under `required_status_checks.strict: true`, only whichever PR is next in the merge queue --- freshly updated against the current base --- merges immediately, while every other PR reads `BEHIND` again before its own turn even at a comparably small remove.
+That would fit #2480 succeeding (next in queue, just updated) against #2470 refusing (not yet updated) without needing a second mechanism, but this session did not verify the actual update order or confirm strict mode was the active setting, so it stays a candidate explanation rather than an established one.
+
+- **Do:** when `gh pr merge` refuses with "not up to date with the base branch," update the branch via the `update-branch` REST endpoint and get one fresh clean review before retrying, per `gh-cli.md`'s serial-queue section.
+- **Don't:** assume every PR behind `main` by any amount will hit this refusal --- it did not reproduce on a comparably stale PR the same day.
+- **Don't:** assume the queue-ordering explanation above is confirmed --- it fits the observation but was not independently verified.

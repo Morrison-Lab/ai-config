@@ -417,8 +417,8 @@ sweep, fold these local rows into the step-4 plan and present them together; if
 you're running the local pass on its own, present a standalone local plan here
 and wait for confirmation before deleting anything.
 
-A standing `daytb` (or `away`) grant lifts this confirm step for the safe cases --- deleting a merged local branch is one of the local-git housekeeping actions the grant explicitly covers (see [`daytb`](../daytb/SKILL.md)).
-The skill's own safety preconditions are unchanged, and anything carrying unmerged commits still asks.
+A standing [`daytb`](../daytb/SKILL.md) grant lifts this confirm step for the safe cases --- deleting a merged local branch is one of the local-git housekeeping actions that grant explicitly covers.
+The skill's own safety preconditions are unchanged, and anything carrying commits reachable from no remote still asks.
 
 ### 9. Report
 

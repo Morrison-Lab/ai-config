@@ -266,6 +266,15 @@ Fetch anything from the network yourself and embed it in the prompt.
 So ask for the structure in the prompt and validate it on return.
 Expect that validation to fail sometimes, because emitting strict JSON is one of the things small models are worst at.
 
+**Name every target file's literal path --- do not hand the delegate a glob and expect it to resolve one.**
+Measured 2026-08-28 on opencode CLI 1.18.15 (macOS), during a Morrison-Lab/gha#682 delegated multi-file R refactor: under `opencode/nemotron-3-ultra-free`, the agent's Glob tool returned zero matches for globs anchored under dot-prefixed directories --- `**/test-description-version.R` and `.github/workflows/scripts/tests/*.R` both came back empty even though the files existed.
+The model recovered only because the brief also carried the literal file paths, which it then reached via `find` and a direct `Read` instead.
+A brief that described the file set only by pattern, with no literal fallback, would have had nothing to recover with.
+
+- **Do:** enumerate every file the delegate must read or edit as a literal path in the brief, especially anything under `.github/` or another dot-prefixed directory.
+- **Do:** treat a zero-match Glob under a dotted path as an expected gap on this model rather than a bug to debug mid-dispatch.
+- **Don't:** describe a target file set to an opencode delegate by glob pattern alone and assume it will resolve --- a real, existing file under `.github/workflows/scripts/tests/` returned no matches on this model.
+
 ### 3. Run it
 
 **Pass `--agent plan` for a text-only dispatch --- the default agent stalled on exactly the prompt shape sidecar work sends.**
@@ -327,6 +336,20 @@ The failure is total rather than scoped to the offending model, so it looks like
 And it fires on `opencode models` too, so the command you would reach for to diagnose it fails the same way.
 
 The fix is to give every model that declares `limit.context` a `limit.output`, or to drop the `limit` block entirely --- as of 2026-08-19 the models in that file carrying no `limit` at all were unaffected.
+
+**A total, immediate hosted-free-tier failure is per-model availability, not a tier-wide outage --- retry the identical prompt on a different `opencode/*-free` id before escalating.**
+Measured 2026-08-28 on opencode CLI 1.18.15 (macOS), during a Morrison-Lab/gha#682 delegated multi-file R refactor: `opencode/deepseek-v4-flash-free` failed a dispatch with `UnknownError: "Unexpected server error. Check server logs for details."` (carrying an `err_...` reference), exit 1, before doing any work --- zero edits.
+Retrying the exact same prompt on `opencode/nemotron-3-ultra-free`, a different id on the same hosted-free tier, completed the task.
+
+This is a different failure from the config error above: it happens mid-dispatch on an otherwise-working config, and the fix is a same-tier model swap rather than an edit to `opencode.jsonc`.
+It is also distinct from the standing rule against retrying a failed local `ollama/*` run on the hosted tier --- that rule guards data-triggered work escalating out of the local tier, where the destination itself is restricted.
+This is a same-tier, cross-model retry with no such restriction in play.
+
+- **Do:** on a total, immediate `UnknownError` from one `opencode/*-free` model, retry the identical prompt on a different free-tier model id before falling back to a metered CLI.
+- **Do:** treat a per-model server error as availability noise for that model, not as proof the hosted-free tier itself is down.
+- **Don't:** read one free-tier model's `UnknownError` as exhausting the hosted-free tier --- a sibling free model completed the identical prompt immediately afterward.
+- **Don't:** conflate this with the ollama-to-hosted retry prohibition above --- that rule blocks escalating a restricted-data job out of the local tier;
+  this is a same-tier swap between two unrestricted hosted-free ids.
 
 ## Relationship to other skills
 

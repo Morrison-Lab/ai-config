@@ -342,3 +342,40 @@ I don't care if they run on this computer or in the cloud."
   Escalate that work to a capable tier up front;
   a failed cheap attempt plus a retry costs more than starting at the
   right tier once.
+
+## opencode free tier: a full authoring task, validated mechanically
+
+Measured 2026-08-28 on opencode CLI 1.18.15 (macOS),
+during a Morrison-Lab/gha#682 delegated multi-file R refactor.
+With a detailed brief --- exact file list, exact new-file content,
+per-file candidate paths, explicit constraints ---
+plus a cheap deterministic acceptance test available
+(four independent Rscript test suites),
+`opencode/nemotron-3-ultra-free` completed a five-file R
+test-harness refactor correctly on the first try:
+all four suites passed, no scope creep,
+and call-site argument updates were included unprompted.
+
+Two other measurements from the same session qualify how that
+success was reached, not whether it was real.
+The hosted free tier can fail total and immediately with an
+`UnknownError` before doing any work,
+and a different free-tier model recovered the identical prompt on
+retry --- see
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
+Troubleshooting section.
+And this model's Glob tool returned zero matches for real files
+under dot-prefixed directories,
+recovering only because the brief carried literal paths --- see that
+skill's step 2 ("Prepare the prompt").
+
+- **Do:** treat free-tier delegation of authoring work as feasible
+  when the acceptance test is mechanical ---
+  it is the deterministic validation step, not the model's own
+  confidence, that makes trusting the result safe.
+- **Do:** read this as one data point for one model id on one task,
+  not as a general claim about hosted-free-tier authoring capability.
+- **Don't:** delegate authoring work to a free-tier model with no
+  deterministic way to check the result ---
+  this success was confirmed by four independent test suites,
+  not by inspecting the diff.

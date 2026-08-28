@@ -4,6 +4,7 @@ on: [push, pull_request, workflow_dispatch]
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   validate:
@@ -152,8 +153,19 @@ jobs:
         # rather than being reconciled once. The dangerous direction is a
         # README row for an unregistered hook: an inert guard and a guard with
         # nothing to block look identical, since neither ever produces output.
+        # GITHUB_TOKEN is mapped so the closed-tracker fetch (ai-config#2302)
+        # is authenticated on this repo. contents:read alone is not Issues
+        # read, so /issues can 403 and force the documented SKIP path on
+        # every CI run. issues: read covers GET /repos/.../issues/{n},
+        # including a registration PR number (every pull request is an
+        # issue). Do not send a fork GITHUB_TOKEN to that repo --- the
+        # script drops the token when GITHUB_REPOSITORY is not this repo.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/check-hook-catalog.py
       - name: Run hook-catalog check tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)
         run: python3 scripts/check-hook-output-shape.py

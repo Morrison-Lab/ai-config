@@ -1050,7 +1050,11 @@ def _blank_fences(text: str) -> tuple[str, bool]:
         if open_char is None:
             open_char, open_len, blank_from = char, length, m.start()
             continue
-        if char == open_char and length >= open_len:
+        if (char == open_char and length >= open_len
+                and not text[m.end(1):m.end(0)].strip()):
+            # Bare closers only: an info string is legal on an opener, and
+            # a candidate with trailing non-whitespace text is content
+            # (#2479 review rounds).
             for i in range(blank_from, m.end()):
                 if out[i] != "\n":
                     out[i] = " "
@@ -1135,7 +1139,13 @@ def _blank_quoted_regions(text: str) -> tuple[str, bool]:
             close = None
             for m in FENCE.finditer(text, fence.end()):
                 marker = m.group(1)
-                if marker[0] == open_char and len(marker) >= open_len:
+                # A CLOSING fence is bare: CommonMark allows an info string
+                # after an OPENER only, so a candidate with non-whitespace
+                # trailing text is fenced content, not a closer -- reading
+                # it as one exposed everything after it as live text
+                # (#2479 review rounds).
+                if (marker[0] == open_char and len(marker) >= open_len
+                        and not text[m.end(1):m.end(0)].strip()):
                     close = m
                     break
             if close is None:

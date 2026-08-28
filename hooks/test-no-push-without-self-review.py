@@ -602,6 +602,21 @@ CASES = [
         "```\nexample: <!-- a full quoted comment -->\n```\n"), False,
      "a fully fence-quoted comment pair stays inert"),
     (PUSH, reviewed(
+        "### Verdict: Needs more work\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "```\n``` end-of-example\n"
+        "### Verdict: Ready for merge\n"
+        f"Reviewed-Commit: {HEAD}\n"), True,
+     "an annotated closing fence is content, so the fence never closes "
+     "and the exposed spoof fails closed (#2479 review rounds)",
+     "no verdict came back"),
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "```\ncode\n```   \nprose\n"), True,
+     "a closing fence followed only by whitespace still closes",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
         f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}"), False,
      "a normal report without HTML comments still parses as clean"),
     (PUSH, reviewed(f"### Verdict: **Ready for merge**\n\nReviewed-Commit: {HEAD}"), False,

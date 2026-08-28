@@ -130,6 +130,12 @@
 - NEVER auto-merge or squash-merge a Pull Request or Merge Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
   Creating, pushing, resolving review threads, or driving a PR to 100% clean CI checks does NOT imply permission to merge it.
   Merging without explicit permission is an irreversible action and is strictly prohibited. (User correction, 2026-08-04.)
+- **External repository communication requires membership or specific approval.** Before sending any outward communication to a repository, positively verify that the user is a member of that specific repository. Outward communication includes PRs/MRs, issues, comments, reviews, review requests, discussions, bot/workflow messages, and indirect actions that notify or mutate the repository, such as mentions, cross-reference backlinks, and transfers.
+  - **Do:** unless membership in the specific repository is positively verified, obtain explicit approval that names the repository and the specific communication before sending it; this includes both unknown membership and verified non-membership. Draft locally while approval is pending.
+  - **Do:** still follow any stricter repository contribution or AI-agent policy after membership or approval is established.
+  - **Don't:** treat a public repository, organization membership, technical write access, available credentials, `/daytb`, `away`, the general default-to-action rule, or standing authorization to open PRs/file issues as permission to communicate with a non-member repository.
+  - **Don't:** infer repository membership from prior contributions, a fork, collaborator access elsewhere, or the ability to post; verify it for the specific repository.
+  This rule applies across agents, workspaces, forges, and all communication mechanisms. (User directive / CAI, 2026-08-27; [ai-config#2468](https://github.com/Morrison-Lab/ai-config/issues/2468).)
 - If the user says the work belongs on a specific existing branch or on top of a
   specific PR branch, honor that branch/base instruction over auto branch-naming
   hygiene.

@@ -81,8 +81,36 @@ git push --force-with-lease --force-if-includes
 **The `stale info` failure is not a reason to force, and reaching for one there is the specific reflex [`memories/git-branches.md`](../../memories/git-branches.md) exists to stop.**
 After a squash-merge with auto-delete removes the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race with another session.
 It is not one, and that file says so in as many words: the lease is unsatisfiable rather than violated, "`--force` is unnecessary, and there is nothing to race".
-One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch, so a **plain push** is the fix, or `git fetch --prune` and a retry when you want the remote-tracking ref corrected too.
-That is consistent with the point above: where the remote ref does not exist, there is nothing for any force to overwrite.
+One read settles it --- `git ls-remote --heads origin <branch>` --- and empty output means the next push *creates* the branch.
+That create is safe only when no MERGED PR already owned this head.
+A squash-merge with auto-delete also leaves `ls-remote` empty.
+A `--dry-run` of `git push -u origin <branch>` then prints `* [new branch]`
+and often `Would set upstream of ...`, which is the recreate tell
+[`use-existing-pr-branch`](use-existing-pr-branch.md) names for a live push.
+Query `gh pr list --state all --head <branch>` before pushing
+(see [`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md)).
+If a listed PR is MERGED, do not recreate the deleted head;
+open a follow-up off `origin/<default-branch>`
+and cherry-pick orphaned commits onto that fresh branch
+(see [`use-existing-pr-branch`](use-existing-pr-branch.md)).
+A CLOSED-unmerged PR does not auto-delete its head;
+that case fires none of the recreate tells.
+An OPEN PR whose head is missing still wants a plain push.
+If there was no such PR, a **plain push** is the fix, or `git fetch --prune`
+and a retry when you want the remote-tracking ref corrected too.
+That is consistent with the point above: where the remote ref does not exist
+and no merged PR owned it, there is nothing for any force to overwrite.
+
+2nd occurrence of the recreate-from-empty-ls-remote failure, 2026-08-26 PDT,
+Cursor Cloud, [ai-config#2272](https://github.com/Morrison-Lab/ai-config/pull/2272):
+the Address dry-run printed `* [new branch]` and `Would set upstream of ...`
+after the squash-merge auto-deleted the head.
+`gh pr view` showed MERGED.
+A live push would have recreated the deleted branch.
+Prior record: [`use-existing-pr-branch`](use-existing-pr-branch.md)'s
+live-push tell.
+Morrison-Lab/ai-config#857 -> #872 is the *correct* same-name follow-up
+from new `main`, not a prior occurrence of this failure.
 
 So `ALLOW_FORCE_PUSH=1` is a deliberate escape valve for a case this rule did not foresee, not a shortcut for a known one.
 If you reach for it, say in the same breath what the lease refused and why forcing is right --- and if the answer is `stale info`, it is not.
@@ -174,7 +202,11 @@ The extra commit is squashed cleanly at PR merge, so history tidiness is preserv
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.
   (That is upstream `master`'s wording.
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
-- **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone, so a plain push is the fix.
+- **Don't:** answer a `stale info` refusal with a force --- that is the one refusal that means the remote branch is gone.
+- **Do:** when `ls-remote` is empty, query
+  `gh pr list --state all --head <branch>` before treating the next push as a first publish.
+  MERGED means do not recreate.
+- **Don't:** read empty `ls-remote` or a dry-run `* [new branch]` line as proof this is a new feature branch.
 - **Do:** re-read a file before editing it whenever a checkout, pull, or
   reset has happened since your last read of it.
 - **Don't:** claim a fix in changelog or prose text that the pushed patch

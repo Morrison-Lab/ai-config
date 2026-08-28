@@ -847,7 +847,11 @@ An earlier fetch is a measurement of a moment that has passed, and it expires ex
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
 Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone, so a plain push is the fix.
+A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
+Query `gh pr list --state all --head <branch>` before a plain push.
+MERGED means auto-delete, not a first publish: do not recreate
+(see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
+Otherwise a plain push is the fix.
 `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
 `hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
 

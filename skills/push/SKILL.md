@@ -203,7 +203,12 @@ git push --force-with-lease --force-if-includes
 It is an *ancillary* option, so it only does anything alongside a bare `--force-with-lease`.
 
 A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git-branches.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary and there is nothing to race.
-`git ls-remote --heads origin <branch>` settles it --- empty output means the next push *creates* the branch, so a plain push is the fix (or `git fetch --prune` and a retry).
+`git ls-remote --heads origin <branch>` settles existence --- empty output means the next push *creates* the branch.
+Query `gh pr list --state all --head <branch>` first:
+MERGED means auto-delete, not a first publish, so do not recreate
+(see [`use-existing-pr-branch`](../../shared/workflow/use-existing-pr-branch.md)
+and [`check-before-pushing`](../../shared/workflow/check-before-pushing.md)).
+Otherwise a plain push is the fix (or `git fetch --prune` and a retry).
 `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
 Say what the lease refused and why forcing is right when you use it.
 

@@ -195,9 +195,10 @@ Each reading expires immediately: run the command fresh for every recap rather t
 
 When a code change affects analysis outputs or their interpretation, summarize
 the changed results in the PR description and state how the change affects the
-conclusions. Give material before-and-after values when they make the effect
-easier to judge. State explicitly when the conclusions do not change if that
-fact matters to review.
+conclusions.
+Give material before-and-after values when they make the effect easier to judge.
+State explicitly when the conclusions do not change if that fact matters to
+review.
 
 - **Do:** connect implementation changes to their effects on analysis results
   and conclusions when those effects are relevant.

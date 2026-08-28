@@ -38,9 +38,9 @@ For anything that requests a change, choose among the first three (Acknowledge i
    The same testing discipline applies when the claim is about the **PR's own state or metadata** rather than code behavior — which footer/URL convention a given post uses, whether a file matches `main`, whether a check still exists — not just runnable code. Fetch the actual PR data (the API call, not memory) before Addressing or Rebutting. (Seen on ai-config#688: a review claimed a memory bullet's cited attribution-footer text was wrong, reasoning from the PR's own body — but the PR *body* and a *reply comment* get their footer through two different code paths that don't match. Fetching both directly via the API before responding showed the bullet was right and the reviewer had compared the wrong artifact; rebutted with that evidence instead of either implementing the suggested fix or dismissing the finding unchecked.)
 3. **Defer** — only when the fix genuinely expands scope. Never defer just because a fix is "minor" — minor fixes get Addressed.
 
-**"Recorded as a known limitation" is not a fourth option --- it is a Rebut, and it owes a Rebut's evidence.**
+**Recording a finding as a known limitation, to close it without changing anything, is a Rebut --- and it owes a Rebut's evidence.**
 Writing the finding into a code comment closes it without fixing it, reads as rigour, and leaves nothing red.
-It is the disposition most likely to be wrong, because the claim it rests on --- *no rule could decide this* --- is the one nobody asks you to support.
+The claim it rests on --- *no rule could decide this* --- is one nobody asks you to support, unlike the claims in a posted rebuttal.
 Before recording a limitation, name the mechanism that makes the input undecidable, and check it against the format's own generator rather than against how the input looks.
 If the generator cannot emit the shape you are excusing, it is decidable and the disposition is Address.
 
@@ -50,8 +50,8 @@ If the generator cannot emit the shape you are excusing, it is decidable and the
 (Measured on d-morrison/altdoc#125, 2026-08-28.
 A parser input was documented as one of several inherent ambiguities.
 roxygen2 joins its file list with `", "` and wraps at spaces, so the shape being excused --- a continuation line beginning with a comma --- is one that format cannot produce.
-Four characters of regex rejected it.
-The claim had survived four rounds inside a comment that read as careful.)
+One added predicate rejected it.
+The claim had survived several review rounds inside a comment that read as careful.)
 
 > **"You deleted/removed X" findings — check for branch-behind-main first.** When
 > a reviewer says the PR removed something you don't recall touching, run

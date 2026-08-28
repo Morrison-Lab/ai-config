@@ -1748,6 +1748,35 @@ def main() -> int:
           checker.classify_verdict(
               "### Verdict\nNits below, plus the previously blocking crash which is NOT fixed.\n", "")
           == "not-clean")
+    check("a previously blocking failure explicitly fixed is not an active finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "line-break failure is fixed and confirmed passing.\n")
+          is None)
+    check("an explicit clean verdict survives a resolved blocking mention",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking "
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
+    check("a bold resolved blocking mention is not an active finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously **blocking** "
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
+    check("a resolved blocking mention can cross a semantic line break",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The previously blocking\n"
+              "line-break failure is fixed and confirmed passing.\n", "")
+          == "clean")
+    check("a previously blocking failure that remains open stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nThe previously blocking line-break failure "
+              "remains open and must be fixed.\n")
+          is not None)
+    check("a previously blocking failure that is not fixed stays a finding",
+          checker._unresolved_finding_pattern(
+              "### Verdict\nThe previously blocking line-break failure is not fixed.\n")
+          is not None)
     check("_BARE_REJECTION still matches a bare 'merge-blocking' compound",
           bool(_re.search(checker._BARE_REJECTION, "Two merge-blocking issues remain.", _re.I)))
     check("_BARE_REJECTION still matches plain 'Blocking:'",
@@ -1835,6 +1864,104 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings\n\n- None.\n\n### Verdict: Ready for merge\n")
           is None)
+    # ai-config#2459: trailing heading text remains part of the heading line;
+    # the empty-section scan begins with the first non-empty body line.
+    check("a descriptive Findings heading now re-flags (option (a))",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content\n\nNone.\n")
+          is not None)
+    check("a plain Findings heading with an empty body still resolves empty",
+          checker._unresolved_finding_pattern("## Findings\n\nNone.\n")
+          is None)
+    check("a plain Findings heading with a real item stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings\n\n1. A real finding\n")
+          is not None)
+    check("a descriptive Findings heading with a real item stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content\n\n1. A real finding\n")
+          is not None)
+    # #2488 review round: colon/dash-led trailing text is the section's
+    # first content line (a one-line finding written on the heading must
+    # not be swallowed); bare descriptive trailing stays decoration.
+    check("a colon-led resolving phrase on the heading line exempts",
+          checker._unresolved_finding_pattern("## Findings: none\n")
+          is None)
+    check("a colon-led one-line finding on the heading line is NOT "
+          "swallowed by a stray resolving body",
+          checker._unresolved_finding_pattern(
+              "## Findings: `crash()` is missing a null check\n\nNone.\n")
+          is not None)
+    check("a dash-led one-line finding on the heading line stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings - missing null check\n")
+          is not None)
+    # Second #2488-round pass: the separator may appear ANYWHERE in the
+    # trailer, in Unicode dash or parenthetical form -- a position-zero
+    # ASCII gate left these three swallows.
+    check("an em-dash one-line finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings \u2014 crash() is missing a null check"
+              "\n\nNone.\n")
+          is not None)
+    check("a parenthetical one-line finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings (crash() is missing a null check)\n\nNone.\n")
+          is not None)
+    check("a descriptive prefix before a colon-led finding is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content: crash() missing"
+              "\n\nNone.\n")
+          is not None)
+    check("an em-dash resolving phrase on the heading line exempts",
+          checker._unresolved_finding_pattern(
+              "## Findings \u2014 none\n")
+          is None)
+    # Fourth #2488-round pass: a bare space-separated finding on the
+    # heading line has no separator at all, so the gate now enumerates
+    # DECORATIONS (function-word leads) and fails unknown shapes toward
+    # flagging.
+    check("a bare clause-shaped heading trailer is not swallowed",
+          checker._unresolved_finding_pattern(
+              "## Findings the diff has a null pointer bug\n\nNone.\n")
+          is not None)
+    check("another bare clause-shaped trailer stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings crash breaks on null input\n\nNone.\n")
+          is not None)
+    # Fifth #2488-round pass: a function-word LEAD alone is not
+    # decoration -- the trailer must also be short and free of
+    # finding-signal vocabulary.
+    check("a function-word-led finding clause with signal vocab flags",
+          checker._unresolved_finding_pattern(
+              "## Findings regarding null pointer dereference"
+              "\n\nNone.\n")
+          is not None)
+    check("a long function-word-led finding clause flags",
+          checker._unresolved_finding_pattern(
+              "## Findings on the return value ordering being swapped"
+              "\n\nNone.\n")
+          is not None)
+    check("a signal word beyond the lead still flags",
+          checker._unresolved_finding_pattern(
+              "## Findings for real this time it is broken\n\nNone.\n")
+          is not None)
+    # #2499 option (a): ANY heading trailer is content, so decorative
+    # suffixes now re-flag -- the recoverable direction, after five
+    # rounds showed every decoration enumeration leaves a swallow.
+    check("decorative Findings suffixes re-flag under option (a)",
+          all(checker._unresolved_finding_pattern(
+                  f"## Findings{suffix}\n\nNone.\n") is not None
+              for suffix in (" on the diff content", " and notes")))
+    # A parenthetical suffix lands on the flag side since the second
+    # #2488-round pass: a paren can carry a real finding, and the gate
+    # cannot tell "(blocking)" from "(crash() is missing a null check)"
+    # without swallowing the latter -- over-flagging is the recoverable
+    # direction.
+    check("a parenthetical Findings suffix re-flags (safe direction)",
+          checker._unresolved_finding_pattern(
+              "## Findings (blocking)\n\nNone.\n")
+          is not None)
     check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
           checker._unresolved_finding_pattern(
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
@@ -2676,4 +2803,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -666,6 +666,30 @@ _BARE_REJECTION = (
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
 
+RESOLVED_BLOCKING_SUFFIX = re.compile(
+    r"^(?:(?![.!?])[\s\S]){0,120}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
+    re.IGNORECASE,
+)
+UNRESOLVED_BLOCKING_SUFFIX = re.compile(
+    r"\b(?:not\s+(?:yet\s+)?(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|remain(?:s)?\s+(?:open|unresolved|unfixed|unaddressed))\b",
+    re.IGNORECASE,
+)
+
+
+def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
+    """True for a past blocking state explicitly resolved in the same sentence."""
+    if match.group(0).lower() != "blocking":
+        return False
+    prefix = scan[max(0, match.start() - 14):match.start()]
+    if not re.search(r"\bpreviously(?:[-\s]+|\s+\*{1,2})$", prefix, re.IGNORECASE):
+        return False
+    suffix = scan[match.end():match.end() + 160]
+    return (
+        RESOLVED_BLOCKING_SUFFIX.search(suffix) is not None
+        and UNRESOLVED_BLOCKING_SUFFIX.search(suffix) is None
+    )
+
 # The findings-heading pattern is likewise built once: the two list copies
 # below and the section-resolution wiring in _unresolved_finding_pattern
 # compare against this exact string, so a drifted copy would silently
@@ -930,6 +954,10 @@ def classify_verdict(body: str, state: str = "") -> str:
             prefix = scan[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 continue
+            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
+                scan, match
+            ):
+                continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -996,14 +1024,17 @@ _SECTION_FINDING_ITEM = re.compile(
 
 
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
-    """True when the findings section starting at *match_end* opens with a
+    """True when the findings section (on the lines after the heading containing *match_end*) opens with a
     whole-line no-findings statement and carries no finding-shaped content
     after it.
 
-    The section runs to the next heading or end of body. The FIRST
-    non-empty line must match the NOT_CLEAN_NEGATION_SUFFIX allowlist --
-    the same trigger the old 60-char suffix shortcut keyed on, made
-    line-anchored -- and everything after it must clear the item veto.
+    Text after ``Findings`` on the matched heading line is still part of the
+    heading, not the section body, so scanning starts on the following line
+    (ai-config#2459). The section runs from there to the next heading or end
+    of body. The FIRST non-empty line must match the
+    NOT_CLEAN_NEGATION_SUFFIX allowlist -- the same trigger the old 60-char
+    suffix shortcut keyed on, made line-anchored -- and everything after it
+    must clear the item veto.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -1012,7 +1043,9 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     safe-direction re-flag (ai-config#2370's free-prose remainder). The
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
-    the same exposure the 60-char shortcut always had.
+    including finding prose packed onto the SAME physical line as the
+    resolving word, whether in the body or in a heading trailer -- the
+    same exposure the 60-char shortcut always had.
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The
@@ -1022,10 +1055,29 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     ones it rejected (`* No new issues.`, `1. None.`) -- exact vocabulary
     parity by reuse rather than by a re-derived strip.
     """
-    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
-    section = scan_body[match_end:match_end + next_heading.start()] \
-        if next_heading else scan_body[match_end:]
-    lines = [ln for ln in section.splitlines() if ln.strip()]
+    heading_line_end = scan_body.find("\n", match_end)
+    if heading_line_end == -1:
+        return False
+    # Any trailing text on the heading line is CONTENT -- the section's
+    # first line, tested like any other (#2499 option (a), adopted on the
+    # sixth #2488 review round). Five rounds of classifying trailers as
+    # decoration each enumerated a finite set (finding signals, then
+    # separators, then decoration lead-words, then signal vocabulary) and
+    # each enumeration left a swallow bypass; promoting the whole trailer
+    # closes the class. A resolving phrase after a leading separator
+    # ("## Findings: none") still exempts; a decorative suffix
+    # ("## Findings on the diff content") now re-flags, the recoverable
+    # direction -- reviewer-side heading style is the systemic fix.
+    trailing = scan_body[match_end:heading_line_end].strip()
+    lead: list[str] = []
+    content = trailing.lstrip(":(-\u2013\u2014 \t").strip()
+    if content:
+        lead = [content]
+    section_start = heading_line_end + 1
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
+    section = scan_body[section_start:section_start + next_heading.start()] \
+        if next_heading else scan_body[section_start:]
+    lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
     if not NOT_CLEAN_NEGATION_SUFFIX.search(lines[0]):
@@ -1048,6 +1100,10 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                     continue
             prefix = scan_body[max(0, match.start() - 25):match.start()]
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
+            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
+                scan_body, match
+            ):
                 continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix

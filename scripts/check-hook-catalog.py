@@ -23,16 +23,29 @@ rather than in anyone's periodic reading. The drift grew by one entry in the ten
 days between #1206 being filed and being fixed, which is the argument for
 gating it rather than only reconciling it once.
 
-This checks three things:
+This checks four things:
 
   1. Every hook registered in `hooks.json` has a README row.
   2. Every hook with a README row is registered in `hooks.json`, unless it is in
      `KNOWN_UNREGISTERED` -- and an allowlisted hook's row must SAY it is not
      registered, so the table never reads as an active guard.
   3. For a hook in both, README's stated event and matcher match the binding.
+  4. Every `KNOWN_UNREGISTERED` tracker is still open. A closed mapped issue is
+     how a hook stays silently inert with a README row that still names a
+     follow-up that will never happen (ai-config#1717 stayed allowlisted after
+     it closed, until #2275 / #2294). Fail, do not warn.
 
 Check 3 is what stops the table drifting in a way the set comparison cannot see:
 a row can name every hook correctly and still tell a reader the wrong event.
+
+When a tracker cannot be fetched (offline, timeout, or rate limit), this check
+prints `SKIP` and does not fail. That skip is the documented offline path, not
+a silent pass: the line is visible, and tests assert it. A 404/410 is not a
+skip -- a missing tracker is the same class of defect as a closed one. Fixture
+tests inject states via `HOOK_CATALOG_ISSUE_STATES` (a JSON object of
+`{issue: state}`, or the token `unfetchable`) so those cases never hit the
+network. A separate live case fetches; the urllib 404 path is locked with a
+stub, not by a live GET that can skip.
 
 Hard-gating rather than advisory. Unlike a file-length threshold, nothing here
 is a judgment call -- the two sets either match or they do not.
@@ -45,6 +58,8 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS_JSON = os.path.join(ROOT, "hooks", "hooks.json")
@@ -65,9 +80,25 @@ README = os.path.join(ROOT, "README.md")
 # authoring PR merges.
 KNOWN_UNREGISTERED = {
     # Authoring only: not yet in hooks.json, registered by the follow-up
-    # after its authoring PR merges.
-    "warn-stale-issue-edit.py": 2282,
+    # after its authoring PR merges. Tracker is the open activation issue
+    # (#2390), not the closed authoring issue (#2282) -- this file's own
+    # closed-tracker check fails on a closed mapping.
+    "warn-stale-issue-edit.py": 2390,
 }
+
+# Public repo (measured 2026-08-26); unauthenticated GET works. A token is
+# used only when it is scoped to this repo: a fork `push` sets
+# GITHUB_REPOSITORY to the fork, and that GITHUB_TOKEN 404s an existing
+# issue on Morrison-Lab/ai-config (GitHub REST troubleshooting, "404 Not
+# Found for an existing resource", measured against the 2026-08-26 docs).
+# Override the issues repo via HOOK_CATALOG_REPO only in tests; the host
+# is always api.github.com.
+DEFAULT_REPO = "Morrison-Lab/ai-config"
+ISSUE_STATES_ENV = "HOOK_CATALOG_ISSUE_STATES"
+UNFETCHABLE_TOKENS = frozenset({"", "unfetchable", "skip"})
+VALID_ISSUE_STATES = frozenset({"open", "closed", "missing"})
+GONE_HTTP = frozenset({404, 410})
+API_TIMEOUT_SEC = 10
 
 # The README row of an allowlisted hook must contain this, so the table states
 # the hook is inert rather than describing it as an active guard.
@@ -141,6 +172,144 @@ def documented():
     return out
 
 
+def _injected_states():
+    """Parse HOOK_CATALOG_ISSUE_STATES, or None to fetch live.
+
+    A JSON object maps issue number -> `open`/`closed`/`missing`. The tokens
+    `unfetchable` / `skip` / empty string mean every tracker is unfetchable
+    (the documented offline path, and the fixture-test default). Invalid JSON
+    fails the check rather than skipping: a malformed injection is a test bug,
+    not an offline run.
+    """
+    raw = os.environ.get(ISSUE_STATES_ENV)
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    if stripped.lower() in UNFETCHABLE_TOKENS:
+        return {}
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        sys.exit(f"FAIL: {ISSUE_STATES_ENV} is not valid JSON: {exc}")
+    if not isinstance(data, dict):
+        sys.exit(f"FAIL: {ISSUE_STATES_ENV} must be a JSON object of "
+                 f"issue-number -> state")
+    out = {}
+    for key, value in data.items():
+        state = str(value).lower()
+        if state not in VALID_ISSUE_STATES:
+            sys.exit(f"FAIL: {ISSUE_STATES_ENV} has invalid state {value!r} "
+                     f"for #{key}")
+        out[str(key)] = state
+    return out
+
+
+def _token_for_default_repo():
+    """Return a bearer token only when it is scoped to DEFAULT_REPO.
+
+    GITHUB_TOKEN is installation-scoped to github.repository. A fork `push`
+    sets GITHUB_REPOSITORY to the fork; attaching that token to a request
+    for Morrison-Lab/ai-config 404s an existing issue. Treating that 404 as
+    `missing` would fail the catalog on an open tracker. When
+    GITHUB_REPOSITORY is unset (local pre-commit), a present token is used.
+
+    A HOOK_CATALOG_REPO override redirects the request to another repo, so
+    no token is attached then either -- this gate checks scope against
+    DEFAULT_REPO only, and the token must not ride along to a repo the gate
+    never examined.
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return None
+    override = os.environ.get("HOOK_CATALOG_REPO", "").strip()
+    if override and override.lower() != DEFAULT_REPO.lower():
+        return None
+    here = os.environ.get("GITHUB_REPOSITORY", "")
+    if here and here.lower() != DEFAULT_REPO.lower():
+        return None
+    return token
+
+
+def fetch_issue_state(number):
+    """Return `open`, `closed`, or `missing`, or None when unfetchable.
+
+    `missing` is HTTP 404/410: the tracker does not exist, which is the
+    same class of defect as a closed issue. Network failures, timeouts, and
+    rate limits return None so the caller can SKIP.
+    """
+    injected = _injected_states()
+    if injected is not None:
+        return injected.get(str(number))
+
+    repo = os.environ.get("HOOK_CATALOG_REPO", "").strip() or DEFAULT_REPO
+    url = f"https://api.github.com/repos/{repo}/issues/{int(number)}"
+    headers = {
+        "User-Agent": "ai-config-check-hook-catalog",
+        "Accept": "application/vnd.github+json",
+    }
+    token = _token_for_default_repo()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=API_TIMEOUT_SEC) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        code = getattr(exc, "code", None)
+        try:
+            exc.close()
+        except OSError:
+            pass
+        if code in GONE_HTTP:
+            return "missing"
+        return None
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    state = str(payload.get("state", "")).lower()
+    if state in ("open", "closed"):
+        return state
+    return None
+
+
+def check_tracker_states():
+    """Fail when an allowlisted hook's mapped issue is closed or missing.
+
+    Returns the extra failure count. A fetch failure prints SKIP and does
+    not count as a failure -- that skip is the documented offline path.
+    HTTP 404/410 is not a fetch failure; it is a vanished tracker.
+    """
+    failures = 0
+    for script, number in sorted(KNOWN_UNREGISTERED.items()):
+        state = fetch_issue_state(number)
+        if state is None:
+            print(f"SKIP: could not fetch ai-config#{number} for {script}; "
+                  "not failing the closed-tracker check (offline path; set "
+                  f"{ISSUE_STATES_ENV} to inject a state)")
+            continue
+        if state == "open":
+            continue
+        if state == "closed":
+            print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+                  f"ai-config#{number}, which is closed, so a closed tracker "
+                  "is keeping the hook silently inert; register the hook, "
+                  "or retarget the allowlist at an open issue")
+            failures += 1
+            continue
+        if state == "missing":
+            print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+                  f"ai-config#{number}, which does not exist, so a vanished "
+                  "tracker is keeping the hook silently inert; register the "
+                  "hook, or retarget the allowlist at an open issue")
+            failures += 1
+            continue
+        print(f"FAIL: {script} is in KNOWN_UNREGISTERED mapped to "
+              f"ai-config#{number} with unexpected state {state!r}")
+        failures += 1
+    return failures
+
+
 def check(reg, doc):
     """Compare the two catalogs. Returns the failure count."""
     failures = 0
@@ -198,6 +367,7 @@ def main() -> int:
     reg = registered()
     doc = documented()
     failures = check(reg, doc)
+    failures += check_tracker_states()
 
     print(f"\n{len(reg)} hooks registered in hooks.json; {len(doc)} documented "
           f"in README ({len(KNOWN_UNREGISTERED)} known unregistered); "

@@ -220,6 +220,251 @@ except rct.GhError:
     absent_raised = True
 check("rotate raises when the secret is absent after the write", absent_raised)
 
+# --- org_secret_info / find_org_targets --------------------------------
+
+
+def org_secrets_payload(*entries):
+    """NDJSON entries for the org secrets endpoint, with visibility."""
+    return "".join(
+        json.dumps({"name": n, "updated_at": t, "visibility": v}) + "\n"
+        for n, t, v in entries
+    )
+
+
+class OrgFakeGh(FakeGh):
+    """FakeGh that also raises a 404 for owners named in `missing_for`."""
+
+    def __init__(self, answers=None, fail_for=None, missing_for=None):
+        super().__init__(answers, fail_for)
+        self.missing_for = missing_for or set()
+
+    def __call__(self, args, stdin=None):
+        for owner in self.missing_for:
+            if any(f"/orgs/{owner}/" in arg for arg in args):
+                self.calls.append({"args": list(args), "stdin": stdin})
+                raise rct.GhError("HTTP 404: Not Found")
+        return super().__call__(args, stdin)
+
+
+with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("OTHER", "t0", "all"),
+                ("CLAUDE_CODE_OAUTH_TOKEN", "2026-08-26T00:00:00Z", "all"),
+            )
+        }
+    )
+)
+check(
+    "org_secret_info returns (updated_at, visibility) when present",
+    rct.org_secret_info("acme", "CLAUDE_CODE_OAUTH_TOKEN")
+    == ("2026-08-26T00:00:00Z", "all"),
+)
+
+with_gh(OrgFakeGh(missing_for={"octocat"}))
+check(
+    "org_secret_info treats a 404 (a user, not an org) as absence",
+    rct.org_secret_info("octocat", "CLAUDE_CODE_OAUTH_TOKEN") is None,
+)
+
+with_gh(OrgFakeGh(fail_for={"/orgs/locked/"}))
+try:
+    rct.org_secret_info("locked", "CLAUDE_CODE_OAUTH_TOKEN")
+    forbidden_raised = False
+except rct.GhError:
+    forbidden_raised = True
+check(
+    "org_secret_info raises on a non-404 error rather than reporting absence",
+    forbidden_raised,
+)
+
+with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("CLAUDE_CODE_OAUTH_TOKEN", "2026-08-26T00:00:00Z", "all")
+            ),
+            "/orgs/empty/actions/secrets": org_secrets_payload(),
+        },
+        fail_for={"/orgs/locked/"},
+        missing_for={"octocat"},
+    )
+)
+org_targets, org_errors = rct.find_org_targets(
+    ["octocat", "acme", "empty", "locked"], "CLAUDE_CODE_OAUTH_TOKEN"
+)
+check(
+    "find_org_targets keeps only orgs carrying the secret",
+    org_targets == [("acme", "2026-08-26T00:00:00Z", "all")],
+)
+check(
+    "find_org_targets reports an unreadable org as an error, not a miss",
+    [owner for owner, _ in org_errors] == ["locked"],
+)
+check(
+    "a user login and a secretless org are neither targets nor errors",
+    all(
+        owner not in ("octocat", "empty")
+        for owner, *_ in org_targets + org_errors
+    ),
+)
+
+# --- rotate_org --------------------------------------------------------
+
+fake = with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-27T09:00:00Z", "all")
+            )
+        }
+    )
+)
+check(
+    "rotate_org returns the new timestamp when updated_at advances",
+    rct.rotate_org("acme", "TOK", "s3cret", "2026-08-26T00:00:00Z", "all")
+    == "2026-08-27T09:00:00Z",
+)
+org_set_calls = [c for c in fake.calls if c["args"][0] == "secret"]
+check(
+    "rotate_org writes with the org form and an explicit visibility",
+    len(org_set_calls) == 1
+    and "--org" in org_set_calls[0]["args"]
+    and org_set_calls[0]["args"][org_set_calls[0]["args"].index("--org") + 1]
+    == "acme"
+    and "--visibility" in org_set_calls[0]["args"]
+    and org_set_calls[0]["args"][
+        org_set_calls[0]["args"].index("--visibility") + 1
+    ]
+    == "all",
+)
+check(
+    "rotate_org sends the token on stdin, never in argv",
+    org_set_calls[0]["stdin"] == "s3cret"
+    and all(
+        "s3cret" not in arg for call in fake.calls for arg in call["args"]
+    ),
+)
+
+with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-26T00:00:00Z", "all")
+            )
+        }
+    )
+)
+try:
+    rct.rotate_org("acme", "TOK", "s3cret", "2026-08-26T00:00:00Z", "all")
+    org_unchanged_raised = False
+except rct.GhError:
+    org_unchanged_raised = True
+check("rotate_org raises when updated_at does not change", org_unchanged_raised)
+
+# A `selected` secret keeps its repo list. The repositories endpoint is the
+# more specific key, so it is listed first: FakeGh matches by substring in
+# insertion order, and the plain secrets-endpoint key is a substring of the
+# repositories URL.
+fake = with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets/TOK/repositories": (
+                "acme/one\nacme/two\n"
+            ),
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-27T09:00:00Z", "selected")
+            ),
+        }
+    )
+)
+rct.rotate_org("acme", "TOK", "s3cret", "2026-08-26T00:00:00Z", "selected")
+org_set_calls = [c for c in fake.calls if c["args"][0] == "secret"]
+check(
+    "rotate_org passes a selected secret's repo list through",
+    "--repos" in org_set_calls[0]["args"]
+    and org_set_calls[0]["args"][org_set_calls[0]["args"].index("--repos") + 1]
+    == "acme/one,acme/two",
+)
+
+with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets/TOK/repositories": "",
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-27T09:00:00Z", "selected")
+            ),
+        }
+    )
+)
+try:
+    rct.rotate_org("acme", "TOK", "s3cret", "2026-08-26T00:00:00Z", "selected")
+    empty_selected_raised = False
+except rct.GhError:
+    empty_selected_raised = True
+check(
+    "rotate_org refuses to write a selected secret with no readable repos",
+    empty_selected_raised,
+)
+
+
+# --- main(): empty estate is an error (#2371 point 4) ------------------
+
+# A sweep that finds the secret in NO scope exits 1, so a broken discovery
+# (or a vanished estate) cannot pass for a healthy no-op. Run main() with a
+# FakeGh that answers every discovery call and carries no matching secret
+# anywhere.
+
+with_gh(
+    OrgFakeGh(
+        {
+            # Most-specific keys first: FakeGh matches by substring in
+            # insertion order, and "acme" is a substring of every other
+            # acme-flavored key.
+            "/orgs/acme/actions/secrets": org_secrets_payload(),
+            "acme/one": secrets_payload("OTHER", "t0"),
+            "/user/orgs": "acme\n",
+            "/user": "octocat\n",
+            "octocat": json.dumps([]),
+            "acme": json.dumps(
+                [{"nameWithOwner": "acme/one", "viewerPermission": "ADMIN"}]
+            ),
+        },
+        missing_for={"octocat"},
+    )
+)
+_argv = sys.argv
+sys.argv = ["rotate-claude-token.py"]
+try:
+    rct.main()
+    empty_estate_code = 0
+except SystemExit as exc:
+    empty_estate_code = exc.code
+finally:
+    sys.argv = _argv
+check(
+    "main() exits 1 when the secret is found in no scope",
+    empty_estate_code == 1,
+)
+
+# Under --repos the org sweep never runs and the caller narrowed the query
+# deliberately, so an empty result stays the documented benign no-op.
+with_gh(FakeGh({"owner/lacks": secrets_payload("OTHER", "t0")}))
+_argv = sys.argv
+sys.argv = ["rotate-claude-token.py", "--repos", "owner/lacks"]
+try:
+    rct.main()
+    repos_empty_code = 0
+except SystemExit as exc:
+    repos_empty_code = exc.code or 0
+finally:
+    sys.argv = _argv
+check(
+    "main() under --repos exits 0 on an empty result (benign narrowing)",
+    repos_empty_code == 0,
+)
+
 # --- read_token --------------------------------------------------------
 
 real_stdin = sys.stdin

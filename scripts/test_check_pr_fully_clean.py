@@ -30,6 +30,11 @@ HARDCODED = "Morrison-Lab/ai-config"
 passes = 0
 failures = 0
 
+# Backtick, built rather than typed: a doubled-backslash/backtick literal is
+# not reliably preserved across every tool transport this repo is edited
+# through (see CLAUDE.md, "Tool transport collapses doubled backslashes").
+B = chr(96)
+
 
 class CmdRecorder:
     """Stand in for run_cmd, recording every argv it is handed.
@@ -2855,6 +2860,62 @@ def main() -> int:
         q3_ok, q3_issues = checker.check_review_comments("2256", "sha123", TEST_REPO, quorum=2)
     check("a cursor-authored clean review counts toward quorum",
           q3_ok and len(q3_issues) == 0)
+
+    # --- ai-config#2449: multi-backtick code spans are citation, too ---------
+    # A single-backtick pattern matches only the INNER pairs of a
+    # double-backtick span and leaves the outer content exposed, so a
+    # Ready-for-merge verdict quoting a phrase that itself contains a backtick
+    # read NOT clean. Blanking now runs through lib.fences.strip_code_spans.
+    double_span_citation = (
+        "Verdict: Ready for merge\n\n"
+        "Cited as @@a @x@ (Needs more work) @y@ @@ above.\n"
+    ).replace("@", B)
+    check(
+        "double-backtick citation of finding vocabulary is blanked (#2449)",
+        checker.classify_verdict(double_span_citation) == "clean"
+        and checker._unresolved_finding_pattern(double_span_citation) is None,
+    )
+
+    single_span_citation = (
+        "Verdict: Ready for merge\n\nCited as @Needs more work@ above.\n"
+    ).replace("@", B)
+    check(
+        "single-backtick citation stays blanked (#1202 regression guard)",
+        checker.classify_verdict(single_span_citation) == "clean",
+    )
+
+    # The guard on the fix's own fail-open direction. strip_code_spans bounds a
+    # span by a BLANK line, so applied to the whole body it pairs a stray
+    # backtick on one line with a stray backtick on the next and blanks the live
+    # finding between them. The checker applies it per line for exactly this
+    # reason; missing a not-clean is the dangerous direction (fully-clean.md).
+    stray_backticks_across_lines = (
+        "Verdict: Ready for merge\n\n"
+        "Fix @a.py now.\nNeeds more work in @b.py@.\n"
+    ).replace("@", B)
+    check(
+        "a live finding between stray backticks on adjacent lines survives (#2449)",
+        checker.classify_verdict(stray_backticks_across_lines) == "not-clean",
+    )
+
+    # Neutering control for the test directly above: replace the per-line
+    # application with a whole-body one and confirm the finding is then LOST.
+    # A guard test that still passes under the neutered branch guards nothing
+    # (memories/mistake-patterns.md Pattern 15).
+    from fences import strip_code_spans as _strip_spans
+
+    _real_helper = checker._strip_inline_code_spans
+    try:
+        checker._strip_inline_code_spans = (
+            lambda text: _strip_spans(text, replacement=" ")
+        )
+        neutered = checker.classify_verdict(stray_backticks_across_lines)
+    finally:
+        checker._strip_inline_code_spans = _real_helper
+    check(
+        "neutering the per-line bound flips the cross-line guard (discriminates)",
+        neutered != "not-clean",
+    )
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

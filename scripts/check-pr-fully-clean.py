@@ -41,7 +41,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
-from fences import strip_fences  # noqa: E402
+from fences import strip_code_spans, strip_fences  # noqa: E402
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -520,6 +520,21 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
+def _strip_inline_code_spans(text: str) -> str:
+    """Blank inline code spans, bounding each span to a single line.
+
+    Delegates the span scan itself to ``lib.fences.strip_code_spans`` -- the
+    CommonMark-compliant scanner shared with ``check-links.py`` and
+    ``check-stale-records.py`` since #1658 -- so a run of two or more backtick
+    delimiters is recognized, and applies it line by line so a span cannot
+    straddle a newline. ``strip_cited_finding_vocab``'s docstring carries the
+    reasoning for that bound; it is a named function so a test can neuter it.
+    """
+    return "\n".join(
+        strip_code_spans(line, replacement=" ") for line in text.split("\n")
+    )
+
+
 def strip_cited_finding_vocab(text: str) -> str:
     """Blank out spans where finding-indicator vocabulary appears as a *citation*
     rather than as a raised finding, so ``finding_patterns`` keys on genuine
@@ -603,6 +618,34 @@ def strip_cited_finding_vocab(text: str) -> str:
 
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
+
+    Inline spans are blanked by ``lib.fences.strip_code_spans`` rather than by a
+    local pattern. A hand-rolled ```[^`\n]*``` matches only a SINGLE-backtick
+    span, and CommonMark's multi-backtick form is not a stylistic variant: a run
+    of two or more delimiters is the only way to quote text that itself contains
+    a backtick, which is what a review of this corpus does constantly. Against
+    ``a `x` **(Needs more work)** `y```` the single-backtick pattern matched the
+    INNER pairs and left the outer content exposed, so a Ready-for-merge verdict
+    on #2431 read NOT clean (ai-config#2449, measured 2026-08-27). The shared
+    helper is the same CommonMark scanner ``check-links.py`` and
+    ``check-stale-records.py`` already use (#1658), so parity holds by reuse
+    rather than by re-derivation.
+
+    The helper is applied LINE BY LINE rather than to the whole body, which is
+    the one place this deliberately departs from CommonMark. The helper bounds a
+    span by a blank line, so run whole it would also pair a stray backtick on
+    one line with a stray backtick on the next and blank everything between --
+    and a measured corpus case shows that swallowing a live finding:
+
+        Fix `a.py now.
+        Needs more work in `b.py`.
+
+    Blanking MORE is the fail-open direction ``fully-clean.md`` warns about, so
+    the per-line application keeps the span bound the local pattern already had
+    and widens ONLY along the delimiter-length axis this fix is about. The
+    change still carries an acceptance-set parity proof over an adversarial
+    corpus rather than a diff-read argument (``memories/mistake-patterns.md``
+    Pattern 15).
     """
     def _blank_quote(m: "re.Match") -> str:
         # Preserve a quoted span carrying a bold finding label; blanking it could
@@ -636,8 +679,8 @@ def strip_cited_finding_vocab(text: str) -> str:
     )
     # Fenced code blocks first, spanning lines.
     text = strip_fences(text, replacement=" ")
-    # Inline code spans (`...`), within a line.
-    text = re.sub(r"`[^`\n]*`", " ", text)
+    # Inline code spans, within a line (see docstring for why per-line).
+    text = _strip_inline_code_spans(text)
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
     text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
     text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)

@@ -281,3 +281,29 @@ interpolation), same as `--body-file` on the porcelain command.
 
 (Measured 2026-08-23 on Morrison-Lab/ai-config#1976, gh in a local Windows session;
 the REST PATCH succeeded immediately on the same body file.)
+
+## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
+
+Observed 2026-08-27 (PT) on Morrison-Lab/ai-config: `gh pr merge` refused PR #2470 with "not up to date with the base branch" after `main` had advanced by several merges past its branch point, but succeeded minutes later on PR #2480, which was also behind `main` by one freshly-merged commit.
+Updating #2470's branch via `gh api -X PUT repos/<owner>/<repo>/pulls/<N>/update-branch` and getting one clean re-review cleared the block.
+
+The discriminator between the two cases is not established --- do not assume "several commits behind" is the trigger, since #2480 also merged while behind.
+It may be required-check staleness (a status check keyed to an older base SHA) rather than a strict branch-parity requirement, but this is unverified.
+[`gh-cli.md`](gh-cli.md)'s "Strict branch protection makes a clean PR queue merge serially" section, measured the same day in this same repo, is a plausible but unconfirmed explanation: under `required_status_checks.strict: true`, only whichever PR is next in the merge queue --- freshly updated against the current base --- merges immediately, while every other PR reads `BEHIND` again before its own turn even at a comparably small remove.
+That would fit #2480 succeeding (next in queue, just updated) against #2470 refusing (not yet updated) without needing a second mechanism, but this session did not verify the actual update order or confirm strict mode was the active setting, so it stays a candidate explanation rather than an established one.
+
+- **Do:** when `gh pr merge` refuses with "not up to date with the base branch," update the branch via the `update-branch` REST endpoint and get one fresh clean review before retrying, per `gh-cli.md`'s serial-queue section.
+- **Don't:** assume every PR behind `main` by any amount will hit this refusal --- it did not reproduce on a comparably stale PR the same day.
+- **Don't:** assume the queue-ordering explanation above is confirmed --- it fits the observation but was not independently verified.
+
+**Re-measured 2026-08-27/28 PT, wider: 13 merges landed in roughly four hours across several concurrent sessions**, so the base advances every few minutes rather than occasionally.
+Under that cadence every PR needs its own update-branch -> fresh review round -> immediate-merge cycle, because a clean verdict goes stale within one merge interval on a base moving this fast --- merge the instant a checker read comes back clean **against the post-update head**, rather than batching several updates or waiting for a second confirmation.
+
+**Pin any poller to the head `update-branch` actually produced, not to "whatever the next `gh pr view` call happens to report."**
+A poller keyed only on the fully-clean checker's exit status, with no head-SHA pin, raced its own `update-branch` call: it returned a clean verdict that belonged to the *pre-update* head, moments after `update-branch` had already superseded that head, and reported the PR clean on a commit that was no longer the head at all.
+Capture the SHA `update-branch` produces (or re-read `head.sha` / `headRefOid` immediately after the call) and pass that SHA into the checker or poller explicitly, rather than letting it re-resolve "the current head" on its own moments later.
+
+- **Do:** read the head SHA off the `update-branch` response (or an immediate follow-up `gh pr view --json headRefOid`) and pin every subsequent poll to that SHA.
+- **Do:** merge the moment a pinned-head read comes back clean --- on a base advancing this fast, waiting for a second confirmation only buys the base another chance to move again first.
+- **Don't:** key a poller on exit status alone with no head pin --- an unpinned poll can return a stale head's "clean" verdict after `update-branch` has already superseded it.
+- **Don't:** batch-update several PRs before merging any of them (per `gh-cli.md`'s "Strict branch protection makes a clean PR queue merge serially" section) --- the pinning fix here does not relax that serialization requirement.

@@ -175,3 +175,63 @@ Generic Actions-authoring material stays there.
   - **Don't:** infer the dependency mechanism from the reusable workflow's `inputs:` block --- the composite decides it.
 
   (Measured 2026-08-24 migrating [d-morrison/macros#83](https://github.com/d-morrison/macros/pull/83), a Quarto site with no `renv.lock` and no `DESCRIPTION` whose `macros-table.qmd` needs `knitr`, `rmarkdown`, and `DT`.)
+
+- **`lint-markdown.yml`'s `fail: false` does NOT make the job advisory --- two of its three companion checks default to failing.**
+
+  `lint-markdown` runs four things, and `fail` gates only the first.
+  Measured against the `@v2` tag consumers pin, 2026-08-27:
+
+  | check | input | default |
+  |---|---|---|
+  | markdownlint | `fail` | `true` |
+  | list-item merge splices | `fail-on-item-splices` | `true` |
+  | GFM table splits | `fail-on-table-splits` | `true` |
+  | fenced-code-block length | `fail-on-long-code-blocks` | `false` |
+
+  So adopting the workflow warn-only, to work down a pre-existing backlog, does not buy a green check.
+  Set `fail-on-item-splices` and `fail-on-table-splits` explicitly when that is the intent.
+
+  This reads as a contradiction from the PR page, which is what makes it cost a round.
+  The caller says `fail: false`, the check goes red, and the two hypotheses that present themselves --- a wrong pin, an ignored input --- are both wrong.
+  A different check inside the same job failed, and the job's conclusion comes from whichever step failed rather than from the one whose name is on the caller.
+  [`fully-clean`](../shared/workflow/fully-clean.md) already describes that shape for a green guard step beside a red job.
+
+  **`lint-yaml.yml` splits the same way and does not bite**, which is the comparison that makes the rule checkable rather than merely memorable.
+  Its `fail` gates yamllint while `fail-on-long-scripts` gates the long-`run:`-block companion --- and that one defaults to `false`, so `fail: false` there really is warn-only.
+  The split existing tells you nothing; only the defaults do.
+
+  - **Do:** read each companion input's own default before calling a multi-check workflow advisory.
+  - **Do:** set `fail-on-item-splices` and `fail-on-table-splits` explicitly when adopting `lint-markdown` warn-only.
+  - **Don't:** read `fail: false` plus a red check as evidence the input was ignored or the tag is wrong.
+  - **Don't:** generalize from `lint-yaml` to `lint-markdown`, or from one companion to the next --- the defaults differ within a single workflow.
+
+  (Measured 2026-08-27 on [UCD-SERG/shigella#37](https://github.com/UCD-SERG/shigella/pull/37), whose `lint-markdown` caller was added at `fail: false` in [#33](https://github.com/UCD-SERG/shigella/pull/33) and still went red on six list-item splices.
+  The first draft of this entry claimed all three companions default to `true`;
+  the review caught it, and the table above is read off `@v2` directly.)
+
+- **An input a caller does not pass is not "off" --- it carries the callee's default, and several of gha's default to `true`.**
+
+  A caller stub is mostly commented-out inputs, so reading one and finding no `use-ai-config:` line invites the conclusion that the feature is not in effect.
+  It is the opposite conclusion the file supports: an omitted input means *the default applies*, and `use-ai-config` defaults to `true` in both `claude.yml` and `claude-code-review.yml` at `@v2`.
+
+  Measured 2026-08-28.
+  A session filed [UCD-SERG/shigella#36](https://github.com/UCD-SERG/shigella/issues/36) claiming the reviewer there "works from whatever prose the repo happens to carry" because neither caller passed the input.
+  The shared `ai-config` corpus had been loading on every run all along.
+  [#38](https://github.com/UCD-SERG/shigella/pull/38) then shipped against that premise, and the change it makes is a behavioural no-op --- worth having, since it records intent and survives a default moving, but not the fix the issue described.
+
+  **The recurrence is the part to notice.**
+  This is the second entry in this memory file from one session, both from assuming a default instead of reading one in the same `@v2` workflow file --- the other being `lint-markdown`'s companion toggles directly above.
+  That session had opened `@v2`'s `claude-code-review.yml` three times that evening, for the `ANTHROPIC_API_KEY` secret and for the companion defaults, and never scrolled to this input.
+  So the failure is not "I lacked the file";
+  it is asking the file only the question already in mind.
+
+  One command answers it for a whole caller, and costs less than the round trip of being wrong:
+
+  ```bash
+  git show v2:.github/workflows/<name>.yml | grep -B1 -A6 '^      [a-z-]*:$' | grep -E '^      [a-z-]+:|default:'
+  ```
+
+  - **Do:** read the callee's defaults at the pinned tag before claiming an unpassed input is inactive.
+  - **Do:** dump every input's default at once when a caller is under review, rather than looking up the one input you came for.
+  - **Don't:** read an absent or commented-out input as a disabled feature.
+  - **Don't:** describe a caller-side pin of an already-defaulted input as enabling something --- it records intent, which is a different and smaller claim.

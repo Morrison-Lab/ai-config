@@ -12,10 +12,15 @@ the way this particular check could silently pass forever -- a README whose
 table shape changed would otherwise make every set comparison compare nothing.
 """
 import importlib.util
+import io
+import json
+import os
 import subprocess
 import sys
 import tempfile
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).parent / "check-hook-catalog.py"
 ROOT = Path(__file__).parent.parent
@@ -109,10 +114,21 @@ def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
     return root
 
 
-def run(root):
+def run(root, issue_states="unfetchable"):
+    """Run the copied check. Fixture tests default to unfetchable trackers
+    so they never hit the network and never depend on live issue state.
+    Pass issue_states=None to fetch live (the real-repo case).
+    """
+    env = os.environ.copy()
+    if issue_states is None:
+        env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    elif isinstance(issue_states, str):
+        env["HOOK_CATALOG_ISSUE_STATES"] = issue_states
+    else:
+        env["HOOK_CATALOG_ISSUE_STATES"] = json.dumps(issue_states)
     proc = subprocess.run(
         [sys.executable, str(Path(root) / "scripts" / "check-hook-catalog.py")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=env)
     return proc.returncode, proc.stdout + proc.stderr
 
 
@@ -122,10 +138,11 @@ ALLOW_ROWS = [(s, "PreToolUse", "Bash", f"**not registered ([#{issue}](u))** ---
               for s, issue in sorted(_catalog.KNOWN_UNREGISTERED.items())]
 
 
-def case(name, entries, rows, want_fail, needle=None, heading=None, allowlisted=None):
+def case(name, entries, rows, want_fail, needle=None, heading=None,
+         allowlisted=None, issue_states="unfetchable"):
     with tempfile.TemporaryDirectory() as td:
         root = make_repo(td, entries, rows, heading, allowlisted)
-        rc, out = run(root)
+        rc, out = run(root, issue_states=issue_states)
     ok = (rc != 0) if want_fail else (rc == 0)
     if ok and needle:
         ok = needle in out
@@ -192,6 +209,161 @@ case("allowlisted hook with no README row fails",
      [("a.py", "Stop", "", "blocks x"), test_allow_rows[1]],
      want_fail=True, needle="has no README row", allowlisted=test_allow)
 
+# --- closed-tracker gate (ai-config#2302) ---------------------------------
+# Synthetic allowlist, so these run even after production KNOWN_UNREGISTERED
+# empties. Injected states, so they never hit the network.
+case("open tracker passes",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=False, allowlisted=test_allow, issue_states={"9999": "open"})
+
+case("closed tracker fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="which is closed",
+     allowlisted=test_allow, issue_states={"9999": "closed"})
+
+case("missing tracker fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="which does not exist",
+     allowlisted=test_allow, issue_states={"9999": "missing"})
+
+case("unfetchable tracker skips rather than failing",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=False, needle="SKIP: could not fetch",
+     allowlisted=test_allow, issue_states="unfetchable")
+
+case("invalid HOOK_CATALOG_ISSUE_STATES JSON fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="not valid JSON",
+     allowlisted=test_allow, issue_states="{nope")
+
+case("invalid injected tracker state fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="invalid state",
+     allowlisted=test_allow, issue_states={"9999": "wobbly"})
+
+case("injected tracker states must be an object",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x")] + test_allow_rows,
+     want_fail=True, needle="must be a JSON object",
+     allowlisted=test_allow, issue_states="[]")
+
+# urllib 404/410 must return `missing`, not None. A live GET of issue 9999
+# cannot lock that: both a 404-as-skip regression and a real offline miss
+# print `SKIP: could not fetch` and would skip() to rc=0. Stub urlopen so
+# the mapping cannot skip-pass.
+def _http_error(code):
+    return urllib.error.HTTPError(
+        "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1",
+        code, "err", None, io.BytesIO(b""))
+
+
+class _OpenBody:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read(self):
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def _fetch_with_urlopen(side_effect, extra_env=None):
+    saved = {
+        key: os.environ.get(key)
+        for key in ("HOOK_CATALOG_ISSUE_STATES", "HOOK_CATALOG_REPO",
+                    "GITHUB_REPOSITORY", "GITHUB_TOKEN", "GH_TOKEN")
+    }
+    os.environ.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    os.environ.pop("HOOK_CATALOG_REPO", None)
+    os.environ.pop("GITHUB_REPOSITORY", None)
+    os.environ.pop("GITHUB_TOKEN", None)
+    os.environ.pop("GH_TOKEN", None)
+    if extra_env:
+        os.environ.update(extra_env)
+    try:
+        with patch.object(_catalog.urllib.request, "urlopen",
+                          side_effect=side_effect):
+            return _catalog.fetch_issue_state(1)
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+check("urllib 404 is missing, not skip",
+      _fetch_with_urlopen(_http_error(404)) == "missing")
+check("urllib 410 is missing, not skip",
+      _fetch_with_urlopen(_http_error(410)) == "missing")
+check("urllib 403 is unfetchable skip",
+      _fetch_with_urlopen(_http_error(403)) is None)
+check("urllib 200 open is open",
+      _fetch_with_urlopen(lambda *a, **k: _OpenBody(b'{"state":"open"}'))
+      == "open")
+check("urllib 200 closed is closed",
+      _fetch_with_urlopen(lambda *a, **k: _OpenBody(b'{"state":"closed"}'))
+      == "closed")
+
+seen_urls = []
+seen_auth = []
+
+
+def _auth_header(request):
+    return request.headers.get("Authorization") or request.headers.get("authorization")
+
+
+def _capture_open(request, timeout=None):
+    seen_urls.append(request.full_url)
+    seen_auth.append(_auth_header(request))
+    return _OpenBody(b'{"state":"open"}')
+
+
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_REPOSITORY": "some-fork/ai-config",
+                               "GITHUB_TOKEN": "fork-token"})
+check("fork GITHUB_REPOSITORY does not redirect the issues repo",
+      seen_urls == [
+          "https://api.github.com/repos/Morrison-Lab/ai-config/issues/1"
+      ])
+check("fork GITHUB_TOKEN is not sent to DEFAULT_REPO",
+      seen_auth == [None])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
+                               "GITHUB_TOKEN": "home-token"})
+check("same-repo GITHUB_TOKEN is sent",
+      seen_auth == ["Bearer home-token"])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"GITHUB_TOKEN": "local-token"})
+check("local token is sent when GITHUB_REPOSITORY is unset",
+      seen_auth == ["Bearer local-token"])
+
+seen_urls.clear()
+seen_auth.clear()
+_fetch_with_urlopen(_capture_open,
+                    extra_env={"HOOK_CATALOG_REPO": "other/repo",
+                               "GITHUB_TOKEN": "local-token"})
+check("HOOK_CATALOG_REPO override drops the token",
+      seen_auth == [None])
+check("HOOK_CATALOG_REPO override redirects the issues repo",
+      seen_urls == ["https://api.github.com/repos/other/repo/issues/1"])
+
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",
      [("a.py", "Stop", "")],
@@ -211,11 +383,39 @@ with tempfile.TemporaryDirectory() as td:
           rc != 0 and "parsed 0 hook rows" in out)
 
 # --- the live corpus: a holding-constant regression guard -----------------
+# Catalog shape is checked offline so a network SKIP cannot masquerade as a
+# consistent catalog. Tracker freshness is a separate live fetch: a closed or
+# missing production tracker fails; an offline miss is a visible skip(), not
+# a PASS. Drop a leaked HOOK_CATALOG_ISSUE_STATES so the parent environment
+# cannot skip the live fetch.
+offline_env = os.environ.copy()
+offline_env["HOOK_CATALOG_ISSUE_STATES"] = "unfetchable"
 proc = subprocess.run([sys.executable, str(SCRIPT)],
-                      capture_output=True, text=True, cwd=str(ROOT))
+                      capture_output=True, text=True, cwd=str(ROOT),
+                      env=offline_env)
 check("the real repo's catalog is consistent", proc.returncode == 0)
 if proc.returncode != 0:
     print(proc.stdout + proc.stderr)
+
+if ALLOWLISTED:
+    live_env = os.environ.copy()
+    live_env.pop("HOOK_CATALOG_ISSUE_STATES", None)
+    live_env.pop("HOOK_CATALOG_REPO", None)
+    proc = subprocess.run([sys.executable, str(SCRIPT)],
+                          capture_output=True, text=True, cwd=str(ROOT),
+                          env=live_env)
+    out = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        check("the real repo's trackers are open", False)
+        print(out)
+    elif "SKIP: could not fetch" in out:
+        skip("the real repo's trackers are open",
+             "issue state could not be fetched")
+    else:
+        check("the real repo's trackers are open", True)
+else:
+    skip("the real repo's trackers are open",
+         "KNOWN_UNREGISTERED is empty")
 
 print(f"\n{passes} passed, {failures} failed, {skipped} skipped "
       f"({len(ALLOWLISTED)} hook(s) in KNOWN_UNREGISTERED)")

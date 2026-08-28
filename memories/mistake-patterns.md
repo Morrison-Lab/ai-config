@@ -334,8 +334,79 @@ A clean automated review from every available provider evaluating the current HE
   (2) the same classifier gated on the agent-disclosure marker --- failed because genuine not-clean reviews carry that marker too;
   (3) a citation strip keyed on a disposition verb plus an exact-verdict parenthetical --- blanked a live verdict inside a sentence reporting a fix that introduced a new bug.
   The turn that mattered was executing `classify_verdict` over the failing comment's own parts, which showed the table and the hold (what designs 1 and 2 were built to detect) produced no verdict at all, and the sole signal was a bare parenthetical after the header neither design had examined.
-  The design that survived review, proposed in PR #2448 and still open at the time of writing, is a one-sentence authoring convention --- backtick a quoted verdict phrase --- as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
+  The design that survived review --- shipped as #2448, which merged and closed #2409 --- is a one-sentence authoring convention --- backtick a quoted verdict phrase --- as a 37-line addition to `ard`'s summary-comment step, with zero checker code change.
 - **Canonical Rule**: [`metacognitive-monitoring.md`](../shared/workflow/metacognitive-monitoring.md)'s cause claim-type ("what else explains it") and [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s recurrence test, applied one level earlier: recurring *refutation* of a design is itself the signal to stop designing and measure.
 - **Fix**: After the second refutation of the same classification problem, stop proposing new discriminators.
   Execute the classifier (or the equivalent instrument) over the actual failing input's constituent parts and read which feature produces the output, before writing a third design.
   Consider whether the fix belongs at the author's end (a convention change) rather than in the instrument at all --- the instrument's own vocabulary can already handle a correctly-written input.
+
+## Pattern 19: A "Needs More Work" Loop Can Have Two Independent Mechanisms, and Fixing One Leaves the Other
+- **Mistake**: Treating a stuck "Needs more work" verdict as one bug --- a review conditioning its verdict on its own run's in-flight sibling checks --- and re-dispatching review rounds expecting one of them to converge, when a second, independent mechanism also reproduces the block: a review deferring to `scripts/check-pr-fully-clean.py`'s exit status, which itself only reports the PREVIOUS round's status-conditioned verdict, so each new round inherits the prior round's hedge.
+- **Example**: Measured 2026-08-27/28 on ai-config#2313 (five consecutive stuck rounds) and #2341.
+  CI reached a fully green state on both and the loop still reproduced, because loop (b) reads the checker's exit rather than the checks themselves --- so the loop survives CI completing.
+  A steering PR comment quoting the reviewer's own "no content defect" words back to it did not break the loop either;
+  only a prompt-level fix (a "Verdict semantics" addendum to `claude-review.yml`, shipped in PR #2486, merged) closed it.
+  Tracked as [ai-config#2475](https://github.com/Morrison-Lab/ai-config/issues/2475), which #2486 closed.
+  Pattern 20 below is a second, independent stuck-verdict mechanism from the same PR (#2341) --- the two do not share a fix.
+- **Canonical Rule**: [`review-verdict-pitfalls.md`](../shared/workflow/review-verdict-pitfalls.md)'s reconciliation paragraph (shipped in PR #2486, merged) and [`fully-clean.md`](../shared/workflow/fully-clean.md)'s three-way exit-status read.
+- **Fix**: When a "Needs more work" verdict recurs across rounds with no new content finding, check whether it cites (a) its own run's in-flight sibling checks or (b) the checker's exit status before assuming a re-run will converge --- loop (b) does not resolve on its own even once CI is fully green.
+  A steering comment restating the reviewer's own words is not a reliable fix for either loop;
+  the actual fix has to change what future rounds are told to condition on.
+
+## Pattern 20: An Exclusive-Login Bot's Pre-Convention Verdict Can Become Permanently Unsupersedable
+- **Mistake**: Assuming a driver-session's disposition-ledger comment ("Do not merge.
+  Blocked on review of X") posted by an exclusive-login bot identity will eventually be superseded by a later clean review from the same tool, when the checker's per-reviewer latest-verdict rule keys that identity EXCLUSIVELY to one login and no reachable local process can post under it.
+  Pattern 19 above is a distinct, unrelated stuck-verdict mechanism on the same PR (#2341);
+  the two were diagnosed separately and neither fix clears the other.
+- **Example**: 2026-08-26, ai-config#2341: a Cursor cloud driving session (not a reviewer) posted a disposition ledger ending "Do not merge.
+  Blocked on review of 8af4edc9" with an unbackticked "(Needs more work)" quote in its first line.
+  `check-pr-fully-clean.py`'s `EXCLUSIVE_BOT_IDENTITY` rule (#2274) admits it as Cursor's standing not-clean verdict and will only accept a comment from the `cursor` login to supersede it.
+  That session's claim expired and it is gone;
+  the `cursor-agent` CLI posts under the user's own login, bucketed separately, so no reachable process can ever supersede the ledger.
+  Tracked as [ai-config#2482](https://github.com/Morrison-Lab/ai-config/issues/2482).
+- **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md)'s per-reviewer latest-verdict rule (Criterion 2, `EXCLUSIVE_BOT_IDENTITY`).
+- **Fix**: When a not-clean verdict belongs to an exclusive-login bot whose posting session is gone, do not dispatch further same-tool or cross-vendor reviews expecting supersession --- escalate to a human immediately (per `fully-clean.md`'s deadlock rule), citing #2482.
+
+## Pattern 21: A Piped or Redirected `git push` Is Parsed as a Commit-ish by the Self-Review Guard
+- **Mistake**: Appending `2>&1 | tail -3` (or any redirection/pipe) to a `git push` command in a repo guarded by `hooks/no-push-without-self-review.py`, then reading the guard's "`2` could not be resolved to a commit" refusal as a real review-state problem and re-dispatching a review that already exists.
+- **Example**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
+  The identical push with the redirection/pipe stripped succeeded immediately against an existing clean verdict.
+- **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not the resolved push arguments.
+- **Fix**: Run a bare `git push origin <branch>` with no `2>&1`, no pipe, and no trailing redirection in a guarded repo.
+  Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target).
+
+## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to the Push Guard
+- **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when `hooks/no-push-without-self-review.py` only scans the FOREGROUND transcript for verdicts and never sees a report that arrived as a background task notification.
+- **Example**: 2026-08-27, ai-config#2483: a fresh "Ready for merge / Reviewed-Commit: 6d1e7ace..." report arrived via a task notification, and the very next push of that exact commit was refused with "The clean verdict is for commit 0825a859..." --- a stale earlier verdict --- forcing an `ALLOW_UNREVIEWED_PUSH` override for a genuinely reviewed head.
+- **Canonical Rule**: [`adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md) (dispatch to a separate subagent) plus [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py)'s transcript scan.
+- **Fix**: Dispatch the round whose verdict you intend to push on in the FOREGROUND (`run_in_background: false`), not as a background task.
+  If a background or resumed verdict is the only one available, push with `ALLOW_UNREVIEWED_PUSH=1` and state the reason (verdict landed via background notification, guard cannot see it) rather than re-diagnosing a stale-verdict refusal as a review-state regression.
+
+## Pattern 23: Implementing From a Truncated Issue-Body Read
+- **Mistake**: Briefing an implementer (a subagent, or yourself) from a sliced issue body --- e.g. `gh issue view --jq '.body[0:2200]'` --- instead of the full body and its comments.
+  The slice is silent about what it dropped, so the brief inherits the truncation invisibly and the implementation ships only the requirements that survived the cut.
+- **Example**: 2026-08-27/28, ai-config#2371: a `.body[0:2200]` slice dropped the issue's point 4 ("empty estate must be an error").
+  The implementation shipped points 1-3;
+  a `Closes #2371` would have silently closed the issue without the self-described load-bearing requirement.
+  The bot review on PR #2478 caught the gap.
+- **Canonical Rule**: [`issue-first.md`](../shared/workflow/issue-first.md)'s splitting rule --- a `Closes #N` closes the whole issue including every item the diff never addressed --- applies with equal force to an item dropped by truncation as to one dropped by scope-splitting.
+  [`github-actions-secrets.md`](github-actions-secrets.md)'s "Changing a secret's scope breaks tooling keyed on the old topology" section carries the root-cause bug (#2371) this pattern and Pattern 24 below were both fixing.
+- **Fix**: Read the full issue body (and its comments) before implementing;
+  a body slice is for triage only, never for briefing an implementation.
+- **Algorithmatizable?**
+  Borderline, and not yet built.
+  A hook could warn when a `.body[0:` (or equivalent) slice feeds a step that goes on to implement, but this is a single occurrence --- the third-occurrence bar in [`deterministic-tools.md`](../shared/principles/deterministic-tools.md) is not met, so this stays a judgment-class entry for now rather than a guard.
+
+## Pattern 24: An Error Message That Asserts Scope It Did Not Check
+- **Mistake**: Adding a terminal error/exit branch without re-deriving every caller path that reaches it, and reusing wording from a wider-scope branch that claims a check the current path never ran.
+  This is [`fail-fast.md`](../shared/principles/fail-fast.md)'s pass-path-equals-failure-path shape one level up: two different code paths converge on one message, and the message is true for only one of them.
+- **Example**: 2026-08-27/28, ai-config#2371 / PR #2478: the first fix for point 4 printed "found in NO scope --- neither org-level nor any repo copy" on the `--repos`-only code path, where the org-level sweep never ran.
+  The reviewer reproduced the false claim directly.
+- **Canonical Rule**: [`fail-fast.md`](../shared/principles/fail-fast.md) (a guard's pass path must not be reachable by its failure path, applied here to a message's claimed scope rather than to a boolean outcome).
+  This pattern was found on #2371 / PR #2478, the same issue as Pattern 23 above;
+  [`github-actions-secrets.md`](github-actions-secrets.md) carries the root-cause bug tracked as #2371 (it predates PR #2478 and does not cite it).
+- **Fix**: When adding an error/exit branch, enumerate the flag combinations that can reach it and word the message to name only what was actually examined on that path.
+  Never reuse a full-sweep message on a narrowed path.
+- **Algorithmatizable?**
+  No decidable condition established.
+  "Does this message's claimed scope match what this code path actually examined?" requires reading the branch's semantics, not a pattern match --- same class as `learn-from-review-findings.md`'s own "did the sweep cover the diff's own added lines?" example of a non-algorithmatizable finding.

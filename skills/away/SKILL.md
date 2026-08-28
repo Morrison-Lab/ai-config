@@ -37,9 +37,8 @@ information or authorization only the user holds.
 - Any similar standing grant to stop blocking on the user for the rest of
   the session
 
-Distinguish from a one-off "just proceed" on a single pending question —
-that resolves the one question in front of you; `away` is a standing mode
-for everything still to come.
+Distinguish from [`daytb`](../daytb/SKILL.md), or a one-off "just proceed" on a single pending question --- `daytb` covers one decision and its same-task follow-ons, expiring with that task;
+`away` is a session-scoped mode for everything still to come.
 
 ## Scope and limits
 
@@ -123,8 +122,7 @@ for everything still to come.
 
 ## Relationship to other skills
 
-- **`daytb`** -- the per-decision sibling, and the one most easily confused
-  with this.
+- **[`daytb`](../daytb/SKILL.md)** -- the per-decision sibling, and the one most easily confused with this.
   `away` presumes the user is *gone*, so it suppresses questions for the whole
   session, keeps a decision log, and is revoked by `back`.
   `daytb` presumes the user is *here* and simply declining to adjudicate one

@@ -1,5 +1,17 @@
 # Local tools & CLIs
 
+## GitKraken `git_add`: an empty file list stages everything
+
+- **Do:** pass an explicit non-empty `files` list to
+  `mcp_gitkraken_cli_git_add`, then verify `git diff --cached --stat` before
+  committing.
+- **Don't:** call `mcp_gitkraken_cli_git_add` with `files: []` as a no-op or
+  status check; the tool treats an empty or omitted list as `git add` for all
+  files and can stage generated artifacts.
+- Observed 2026-08-27 in `matt.contracts`: `files: []` staged `Rplots.pdf` and
+  the full `_quarto/` render tree.
+  They were unstaged before commit or push.
+
 ## Available subscriptions & model providers
 
 [`memories/delegation.md`](delegation.md) is the canonical catalog of active
@@ -1024,6 +1036,10 @@ attribute a per-step outcome" failure in
 [`fail-fast`](../shared/principles/fail-fast.md).
 (Morrison-Lab/ai-config#1042, 2026-08-03: both surfaced while building
 `hooks/no-unreviewed-pr.py`'s shell-command parser during its review.)
+
+**Post-token filtering loses quote provenance.**
+Once POSIX `shlex` has produced argv, quoted literals such as `'>'` are indistinguishable from real redirection operators.
+Strip shell syntax from the raw command with a quote-aware scan before tokenization, rather than deleting operator-shaped argv afterward. (Morrison-Lab/ai-config#2477 review, 2026-08-27.)
 
 ## Two awk gotchas when an awk program is embedded in a single-quoted shell string
 

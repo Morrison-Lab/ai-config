@@ -300,6 +300,9 @@ Proceed? (or pick specific worktrees)
 No silent removals. Wait for confirmation; "just go" / "do it" → proceed with
 all proposed removals.
 
+A standing [`daytb`](../daytb/SKILL.md) grant lifts this confirm step for the safe cases --- removing a stale worktree is one of the local-git housekeeping actions that grant explicitly covers.
+The skill's own safety preconditions are unchanged, and anything carrying commits reachable from no remote still asks.
+
 ### 5. Remove dead worktrees
 
 ```bash

@@ -60,6 +60,38 @@ jobs:
         prose problem. Keep flagging real prose issues: ambiguity, grammar that
         changes meaning, factual errors, or missing words.
 
+        ## Verdict semantics
+
+        Your verdict is a judgment about the DIFF'S CONTENT. Never condition
+        it on your own review run's in-flight sibling checks, and never defer
+        it to `scripts/check-pr-fully-clean.py`'s exit status: that instrument
+        cannot read clean while the review it gates (this run) is still
+        executing, and a prior round's status-conditioned "Needs more work"
+        is not a content finding for you to inherit. Conditioning on either
+        produces the permanent `Needs more work` loop tracked as
+        ai-config#2475, where every re-run reproduces the blocker it is
+        waiting out. So: if the diff has no content defects and no check has
+        actually FAILED, say **Ready for merge** -- checks that are merely
+        queued or in progress alongside you are the merge gate's business,
+        not the verdict's. A check that finished red, or a real content
+        finding, still blocks as always.
+
+        ## Quoting convention
+
+        When your prose QUOTES verdict or finding vocabulary -- a prior
+        round's "Needs more work", the words blocking, rejected, or
+        actionable findings used descriptively, a phrase you are
+        discussing rather than declaring -- wrap it in a SINGLE pair of
+        backticks (`phrase`). Not a double pair: the instrument blanks
+        single-backtick spans only, so a double-backticked quotation
+        stays live in the scan and re-blocks the PR anyway
+        (ai-config#2449). The repo's fully-clean instrument scans review
+        comments for those phrases and cannot tell an unbackticked
+        quotation from a standing verdict, so a clean review narrating
+        the round it resolved re-blocks its own PR (ai-config#2497,
+        measured on #2479 and #2493). Your OWN verdict line stays
+        unbackticked.
+
         ## Prior review context
 
         The comments below are the last few reviews you (claude[bot]) posted on this PR.

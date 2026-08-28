@@ -757,6 +757,16 @@ Do not remove this flag in the name of tighter sandboxing for automated review s
 
 (Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
 
+## `cursor-agent --trust` can be denied outright by the Claude Code auto-mode classifier
+
+In a Claude Code auto-mode session, the permission classifier can deny a `cursor-agent --trust ...` Bash call outright, before it ever reaches the non-interactive hang the section above documents.
+When that happens, the recipe above is unavailable for that session --- plan for the fallback (the review cannot be dispatched via local `cursor-agent` that session) rather than retrying the same command.
+
+- **Do:** treat a classifier denial of `cursor-agent --trust` as "not available this session" and move to another reviewer route (a different CLI, or a same-vendor subagent per `adversarial-self-review.md`).
+- **Don't:** retry `cursor-agent --trust` expecting the denial to lift, or read it as the interactive-hang failure mode documented above.
+
+(Measured 2026-08-27, GIA sweep session on Morrison-Lab/ai-config.)
+
 ## Auto-review push blocks are not a stop
 
 Cursor Auto-review may refuse `git push` / `gh pr comment` until a smart-mode

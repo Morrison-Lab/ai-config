@@ -197,3 +197,43 @@ That is affordable for a bounded corpus and unbounded for a generator with no en
 - **Don't:** implement a `--limit` as `itertools.islice` over a nested product generator --- that fixes the slowest-varying component.
 - **Don't:** use `total // limit` as a stride;
   it is 1 for every limit above half the corpus, which is a prefix by another name.
+
+## An uncaught exception exits 1, which is a lie in any tool where 1 means something
+
+Python's default status for an uncaught exception is **1**.
+That is harmless in a script whose only other status is 0, and actively dangerous the moment a tool assigns 1 a meaning --- "absent", "not found", "no match", "clean" --- because a crash then reports that meaning.
+
+The failure is not the crash.
+It is that the crash is indistinguishable from a successful negative answer, so a caller branching on the exit code acts on a conclusion the tool never reached.
+
+```python
+try:
+    result = scan(root, needle)
+    ...
+    return {"found": 0, "absent": 1, "degraded": 2}[outcome]
+except Exception as exc:          # noqa: BLE001 -- mapped to 2, never to 1
+    print(f"failed before it could answer: {type(exc).__name__}: {exc}",
+          file=sys.stderr)
+    return 2
+```
+
+**Guard the whole body, not the part you think can raise.**
+Three sites are easy to leave outside it, and each was measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539):
+
+- **Argument and root resolution**, which runs before the work.
+  `CLAUDE_CONFIG_DIR='~nosuchuser/x'` made `Path.expanduser()` raise, and the tool exited 1 --- "no record contains it".
+- **The reporting itself**, which runs after.
+  Under `LC_ALL=C`, printing a matched record containing an em-dash raised `UnicodeEncodeError`: the tool **found** the record, then died showing it, and exited 1.
+  Reconfigure the stream rather than only catching this: `sys.stdout.reconfigure(errors="replace")`, wrapped in its own `try` since it is absent on a replaced stream.
+- **`__doc__` under `-OO`**, which strips docstrings, so `argparse.ArgumentParser(description=__doc__.splitlines()[0])` raises `AttributeError` on `None`.
+  Use `(__doc__ or "fallback")`.
+
+A broad `except Exception` is normally a [`fail-fast`](../shared/principles/fail-fast.md) violation.
+It is the correct construct here precisely because it is not silent: it maps to a status that means *the work did not happen*, and it prints what failed.
+That is the explicit, bounded, observable fallback that fragment asks for rather than the swallowing it forbids.
+
+- **Do:** reserve a distinct status for "could not answer", and map every unexpected exception to it.
+- **Do:** wrap argument resolution and output, not only the computation.
+- **Do:** harden the output stream, so a value the console cannot encode does not destroy an answer already computed.
+- **Don't:** leave exit 1 meaning both "the answer is no" and "there is no answer".
+- **Don't:** read a bare `except Exception` as automatically wrong --- it is wrong when it hides the failure, not when it classifies it.

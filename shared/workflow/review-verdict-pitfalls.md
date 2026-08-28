@@ -229,19 +229,21 @@ A round that reviewed fewer files than the range holds reviewed less than it cla
 - **Don't:** reach for the fourth case's surprise test here.
   This verdict is unsurprising by construction, which is why it needs a mechanical check instead.
 
-**The failure is bounded to rounds the reviewer believes are empty, so do not generalize it into distrust of the reviewer.**
-The rule above says to re-dispatch on a disagreement, which invites the wrong conclusion that a reviewer caught shortening one round has stopped being worth reading.
-Measured across four rounds on the same PR, it had not: the two rounds carrying real new content were the most thorough of the four --- the last one fetched roxygen2's own source to check a wrap format the diff depended on, and hand-traced a backslash-escaping change through R's replacement semantics --- while the shortened round and the re-dispatch that inherited its premise were the two where the reviewer believed nothing substantive had changed.
+**The recovery from a shortened round is a DIFFERENT reviewer at the same head, not a re-run of the same one.**
+The rule above says to re-dispatch when the derived range and the review's account of it disagree, and leaves open which reviewer.
+Re-running the one that shortened the round is the reflex, and it reproduced the miss: on 2026-08-28 a `workflow_dispatch` re-run against the unchanged head restated the previous round's account of the range and deferred to it, so the second attempt cost a run and added no coverage.
+A cross-vendor reviewer at that same unchanged head returned five findings on the code the shortened round had skipped, four of which were real and were fixed.
+One PR, so read this as what a same-reviewer re-run did once rather than as a property of re-running.
 
-That is the useful shape, because it says what to do rather than only what to doubt.
-A round whose range is genuinely new gets read on its merits.
-A round the reviewer describes as trivial is the one to check the range on, and re-dispatching it is cheap only because a real commit is what makes the next round work.
-Re-dispatching against the **same** head does not help: with nothing new in the range, the fresh round reaches the same believed-empty conclusion and defers to the round you were trying to replace.
+Note what this does **not** license.
+A shortened round establishes missing **coverage**, not a defect --- nothing is yet known to be wrong --- so the answer is to get the range read, never to manufacture a commit so the next round has a range it will accept.
+[`self-review-fallback`](self-review-fallback.md)'s cross-vendor section already says a second reviewer should be a different vendor and that same-vendor agreement measures a shared blind spot;
+the addition here is that a *shortened* round is one of the situations calling for it, since the premise that shortened it is the thing another run of the same reviewer is most likely to inherit.
 
-- **Do:** read a round covering new content on its merits, whatever an earlier round got wrong.
-- **Do:** land the fix first when a shortened round left something unreviewed, so the next round has a real range to read.
-- **Don't:** re-dispatch against an unchanged head expecting a different answer.
-- **Don't:** carry one shortened round forward as a standing verdict on the reviewer.
+- **Do:** dispatch a different reviewer at the unchanged head when a round shortened itself.
+- **Do:** name, in the PR thread, which commits the shortened round did not read, so the next reviewer's scope is stated rather than inferred.
+- **Don't:** re-dispatch the same reviewer at an unchanged head as the whole of the recovery.
+- **Don't:** push a commit in order to give the next round a range it will accept --- that changes what gets reviewed rather than getting the skipped range reviewed.
 
 (Measured 2026-08-28 on [d-morrison/altdoc#125](https://github.com/d-morrison/altdoc/pull/125): the round named `118c22d9` as the only commit since `453a3252`, where `git log --oneline 453a325..118c22d` returns two and `git diff --stat` names `R/rd_source_files.R` alongside the test file the review quoted.
 The unreviewed commit loosened two regexes in a parser.

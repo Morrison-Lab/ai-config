@@ -392,7 +392,13 @@ A sentence attributed to the user in conversation feels like none of those, so t
 
 That conclusion is false, and believing it is the whole of this failure.
 Claude Code writes every turn, the user's included, to a JSONL transcript under `~/.claude/projects/`.
-This repository already knows: as of 2026-08-28, 29 non-test hooks read `transcript_path` and 28 of those open the file.
+This repository already knows: as of 2026-08-28, **29** non-test hooks reference it.
+
+```bash
+grep -l transcript_path hooks/*.py | grep -v /test- | wc -l
+```
+
+How many of those 29 go on to open the file is a question a one-line grep does not settle --- several reach it through a helper --- so the number is not quoted here.
 So the source is fetchable, and "it was only chat" is not a reason to skip the check but the belief that makes skipping it feel reasonable.
 
 [`scripts/check-user-quote.py`](../../scripts/check-user-quote.py) runs it.
@@ -408,20 +414,36 @@ Matching one of those and calling it a hit is the adjacent-artifact substitution
 
 So the outcome per record is three-way rather than two-way, and the third value is the load-bearing one.
 The harness labels a typed turn `origin.kind == "human"`, which is the strongest signal available and is still weaker than it sounds.
-Read out of the shipped CLI 2.1.250 rather than inferred from a transcript --- a transcript shows only which values happened to occur on one machine --- it rewrites a user record's origin to `unclassified` when the kind is `human` or `auto-continuation`, and its own human test is `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
-So a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
+Two independent reasons say so, and the observed one is the stronger.
+Of 2,339 user-role records in one machine's transcript root on 2026-08-28, **2,270 carry no `origin` key at all**;
+2 are `human`, 64 `task-notification`, 3 `coordinator`.
+So the label is absent from 97% of the corpus, and treating its absence as a rejection would discard almost everything.
+Separately, a sanitizer in the shipped CLI 2.1.250 rewrites a user record's origin to `unclassified` when the kind is `human` or `auto-continuation`, and one of the CLI's own human tests reads (de-minified) `O0(o.origin) && o.verifiedSlackHumanTurn !== true`.
+Whether records that sanitizer rewrites reach the on-disk transcript is not established --- the count above says they do not, here --- so it argues the value is possible rather than showing it occurs.
+Both readings point the same way: a genuine turn can arrive unlabelled, and a labelled one can be somebody else's message relayed from a channel.
 A record carrying no usable label is therefore **unattributed** --- a candidate, never evidence --- rather than a rejection, since rejecting it would deny a quotation the user really did make.
 That distinction is not fastidiousness.
-An earlier version of this check classified on the exclusions alone, and an assistant-written dispatch brief passed all of them, so the tool certified the assistant's own prose as the user's words.
-The version after that classified per *record*, and a human-labelled record carrying an injected second block certified that block the same way.
-The version after *that* moved to blocks and still certified an envelope appended mid-block, since it only tested what a block began with.
-The version after *that* cut envelopes out correctly and then joined the leftovers, so two fragments of a real turn that merely abut once an injection is removed became a matchable span --- a sentence the user never typed, certified as theirs.
-So the phrase is now looked for in a block's non-envelope regions, kept separate, and a well-formed envelope's content is not the user's wherever it sits.
-Five successive revisions, each certifying at a finer granularity than the last;
-the pattern is worth stating plainly, since every one of them looked complete from the inside.
+Five successive versions tried to identify *which part* of a record was the harness's.
+Exclusions alone certified a dispatch brief;
+the harness label fixed that and left a human-labelled record's injected second block;
+per-block fixed that and left an envelope appended mid-block;
+per-region fixed that and joined its leftovers across a cut;
+splitting properly fixed that and still leaked on a repeated opener, and on injected content that merely contained a literal closing tag.
+Each shipped, each passed its suite, and each was broken by a shape the last had not considered.
+
+That is delimiter-matching over untrusted text with a regular expression, and the supply of shapes does not run out.
+So the question changed from *which part of this block is the harness's* to *is any of it*:
+a block carrying any envelope opener is now unquotable in full, and nothing is parsed.
+The cost is real and worth stating --- a turn written **about** a tag cannot be quoted from that block --- and the run says so rather than reporting an absence.
+
+The residual, rather than a claim of completeness:
+a phrase spanning two blocks of one record is not found;
+an unlabelled record is never certified, only offered;
+and the opener list is a fixed set, so a tag the harness adds later is invisible until it is added here.
 
 The exit codes keep apart two things that are easy to conflate:
-a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing root, an unreadable file or directory, an empty phrase, or a crash).
+a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing or unresolvable root, an unreadable file or directory, an unparseable line, an empty phrase, or a crash inside the scan).
+An unparseable line belongs on that list because a live session appends while the tool reads, so a torn final line is the normal state of a transcript rather than an anomaly.
 Collapsing them turns "I could not look" into "the user never said it", which is the stronger claim and the wrong one.
 `--allow-unattributed` accepts a candidate at a fourth code, `3`, for the same reason:
 it readmits exactly the failure above, so a caller reading exit codes must not see it as `0`.
@@ -481,9 +503,12 @@ A review pass flagged it and supplied what it gave as the user's actual message;
 I repeated that into the issue and into the first draft of this section without checking either.
 A second review pointed out that the transcript exists.
 The script finds **no human turn** for either sentence.
-It reports **2** quotable human regions in the whole transcript root.
-The file and record totals are not quoted here: both grow while the measuring session appends, files included, since each dispatched subagent adds a transcript.
-`--show-excluded` places the replacement --- "This is the last correction round: fix the five, push, report the head" --- in an inter-agent coordinator message, and finds the original in no user-role record at all: it was only ever mine, so it is not reproduced.
+It reported **2** quotable human regions in the whole transcript root, read on 2026-08-28.
+Every figure here is a reading rather than a constant --- records, files and human regions all grow while the measuring session appends --- so re-run it rather than citing the number.
+`--show-excluded` reports the replacement --- "This is the last correction round: fix the five, push, report the head" --- as `EXCLUDED (harness injection)` in a subagent's transcript.
+The record is an inter-agent coordinator message, but the tool tests its flags before its origin, so that is not the label it prints;
+the distinction matters here because a reader running the command should see what it says rather than what the record is.
+The original appears in no user-role record at all: it was only ever mine, so it is not reproduced.
 The first two drafts of this section asserted the opposite premise, and a third shipped a check that would have certified a dispatch brief;
 each passed its own local suite, and what refuted each was executing something.)
 

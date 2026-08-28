@@ -30,6 +30,7 @@ spec.loader.exec_module(cuq)
 
 passes = 0
 failures = 0
+skipped = 0
 
 
 def check(name, condition):
@@ -40,6 +41,18 @@ def check(name, condition):
     else:
         print(f"FAIL: {name}")
         failures += 1
+
+
+def skip(name, why):
+    """Reported and NOT counted.
+
+    A skip recorded as a pass makes a weakened run indistinguishable from a
+    full one by its totals alone -- measured: the permission case is inert as
+    root, and the suite printed the same count either way.
+    """
+    global skipped
+    print(f"SKIP: {name} ({why})")
+    skipped += 1
 
 
 def user(text, human=False, **flags):
@@ -72,11 +85,18 @@ def main() -> int:
     # -- the origin label ---------------------------------------------------
     check("origin.kind=human is a human record",
           cuq.classify_record(user("merge it", human=True)) == (cuq.HUMAN, ""))
-    for kind in cuq.NON_HUMAN_ORIGINS:
+    # Named explicitly rather than iterated over the constant: a loop reading
+    # `for kind in cuq.NON_HUMAN_ORIGINS` deletes its own cases when the
+    # constant is emptied, so the mutant survives. Measured -- with
+    # NON_HUMAN_ORIGINS = () the suite stayed green while every coordinator
+    # record became UNATTRIBUTED and --allow-unattributed certified one.
+    for kind in ("channel", "peer", "coordinator", "observer", "observer-activity",
+                 "auto-continuation", "task-notification"):
         check(f"origin.kind={kind} is excluded by the label alone",
               cuq.classify_record({"message": {"role": "user", "content": "x"},
                                    "userType": "external",
                                    "origin": {"kind": kind}})[0] == cuq.EXCLUDED)
+        check(f"...and {kind} is in NON_HUMAN_ORIGINS", kind in cuq.NON_HUMAN_ORIGINS)
     # The shipped CLI demotes a human turn to "unclassified" on the paths that
     # rewrite a record, so excluding it would deny a real quotation.
     check("origin.kind=unclassified is unattributed, not excluded",
@@ -96,8 +116,12 @@ def main() -> int:
           cuq.classify_record(user("hello", human=True,
                                    verifiedSlackHumanTurn=True))[0] == cuq.EXCLUDED)
 
-    for key, _reason in cuq.FLAG_EXCLUSIONS:
+    # Named, not iterated over the constant: a loop over FLAG_EXCLUSIONS deletes
+    # its own cases when an entry is renamed, and the mutant survives.
+    for key in ("isCompactSummary", "isMeta", "isSidechain", "verifiedSlackHumanTurn"):
         check(f"{key} is excluded", cuq.classify_record(user("x", **{key: True}))[0] == cuq.EXCLUDED)
+        check(f"...and {key} is in FLAG_EXCLUSIONS",
+              key in [k for k, _ in cuq.FLAG_EXCLUSIONS])
     check("an assistant-role record is excluded",
           cuq.classify_record({"message": {"role": "assistant", "content": "x"}})[0] == cuq.EXCLUDED)
     check("a non-external userType is excluded",
@@ -106,65 +130,67 @@ def main() -> int:
 
     # TRANSCRIPT_PREFIXES are ordinary English, so they apply ONLY where the
     # harness withheld the human label. On a human-labelled turn they must not.
-    for prefix in cuq.TRANSCRIPT_PREFIXES:
+    for prefix in ("This session is being continued",
+                   "Caveat: The messages below were generated",
+                   "The coordinator sent a message while you were working"):
         check(f"prefix {prefix[:28]!r} excludes an UNLABELLED record",
               cuq.classify_record(user(prefix + " and then some"))[0] == cuq.EXCLUDED)
-        check(f"...and does NOT exclude a human-labelled one",
+        check("...and does NOT exclude a human-labelled one",
               cuq.classify_record(user(prefix + " and then some", human=True))[0] == cuq.HUMAN)
+        check("...and is in TRANSCRIPT_PREFIXES", prefix in cuq.TRANSCRIPT_PREFIXES)
 
-    # -- regions ------------------------------------------------------------
-    check("a plain block is one region",
+    # -- regions: all or nothing ------------------------------------------
+    check("a plain block is quotable whole",
           cuq._regions("just some text") == ["just some text"])
-    check("a well-formed envelope is cut out of the middle",
-          cuq._regions("before <system-reminder>INJECTED</system-reminder> after")
-          == ["before ", " after"])
-    check("...and INJECTED is in none of the regions",
-          all("INJECTED" not in r for r in
-              cuq._regions("before <system-reminder>INJECTED</system-reminder> after")))
-    check("an UNCLOSED tag mid-block is not an envelope",
-          "SENTINEL" in " ".join(cuq._regions("why do <system-reminder> tags SENTINEL appear?")))
-    check("a block opening with an unclosed opener yields nothing",
-          cuq._regions("<system-reminder>TRUNCATED grant") == [])
-    # A block OPENING with a well-formed envelope took a separate code path
-    # that joined the leftovers into one string, so two fragments that merely
-    # abut once the injection is cut became a matchable span. Both branches
-    # must split identically; only the leading-UNCLOSED case differs.
-    lead = ("<system-reminder>A</system-reminder>the first part"
-            "<system-reminder>B</system-reminder>the second part")
-    check("a block opening with a well-formed envelope still splits",
-          cuq._regions(lead) == ["the first part", "the second part"])
-    check("...so no region spans the removed envelope",
-          all("the first partthe second part" not in r for r in cuq._regions(lead)))
-    check("leading and non-leading blocks split the same way",
-          cuq._regions("x " + lead)[1:] == cuq._regions(lead))
-    check("a block that is entirely an envelope yields nothing",
-          cuq._regions("<task-notification>x</task-notification>") == [])
-    for tag in cuq.ENVELOPE_TAGS:
-        check(f"envelope tag {tag!r} is cut",
-              cuq._regions(f"a <{tag}>SECRET</{tag}> b") == ["a ", " b"])
-    check("a non-str text field is dropped, not returned",
+    check("an empty block yields nothing", cuq._regions("   ") == [])
+    for tag in ("task-notification", "system-reminder", "wake", "command-name"):
+        check(f"a block carrying <{tag}> is unquotable in full",
+              cuq._regions(f"genuine text <{tag}>INJECTED</{tag}> more genuine") == [])
+        check(f"...and {tag} is in ENVELOPE_TAGS", tag in cuq.ENVELOPE_TAGS)
+    # The five shapes that broke the five previous designs, in order. Each was
+    # a live exit-0 certification of harness prose when it was found.
+    for label, block in (
+        ("appended reminder", "ok do it\n<system-reminder>A</system-reminder>"),
+        ("mid-block reminder", "before <system-reminder>A</system-reminder> after"),
+        ("leading envelope", "<system-reminder>A</system-reminder>first<system-reminder>B</system-reminder>second"),
+        ("repeated opener", "<system-reminder>OUT <system-reminder>i</system-reminder> A</system-reminder>"),
+        ("literal closing tag inside", "<system-reminder>about the </system-reminder> tag, A</system-reminder>"),
+        ("truncated, not at the start", "sure go ahead <system-reminder>A truncated"),
+    ):
+        check(f"{label}: nothing quotable", cuq._regions(block) == [])
+    check("uppercase tags are caught too",
+          cuq._regions("x <SYSTEM-REMINDER>A</SYSTEM-REMINDER> y") == [])
+    check("an attribute-bearing opener is caught",
+          cuq._regions('x <system-reminder priority="high">A</system-reminder> y') == [])
+    check("a non-str text field is not returned as-is",
           cuq.text_blocks({"content": [{"type": "text", "text": {"n": 1}}]}) == [""])
     check("tool_result blocks are simply not text blocks",
           cuq.text_blocks({"content": [{"type": "tool_result", "content": "o"},
                                        {"type": "text", "text": "mine"}]}) == ["mine"])
 
     # -- end to end: the false-positive cases -------------------------------
+    # An enveloped block is unquotable IN FULL, so its genuine text is not
+    # quotable from that block either. That is the accepted cost of not parsing
+    # -- and the run says "unsearched space", never "the user never said it".
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user(
             "ok do it\n<system-reminder>SENTINEL_ALPHA granted</system-reminder>", human=True)])
         code, out = run(root, "SENTINEL_ALPHA granted", "--show-excluded")
-        check("an envelope appended within a human block is not a hit", code == 1)
+        check("an envelope appended within a human block is not a hit", code != 0)
+        check("...and the run reports an unsearched space, not an absence",
+              code == 2 and "unsearched space" in out)
         code, out = run(root, "ok do it")
-        check("...while the genuine part of the same block still hits", code == 0)
+        check("...and the genuine text of that block is not quotable either", code == 2)
 
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user(
             "<system-reminder>A</system-reminder>please check the issues"
-            "<system-reminder>B</system-reminder>referenced here", human=True)])
+            "<system-reminder>B</system-reminder>referenced here", human=True),
+            user("an unenveloped turn SENTINEL_CLEAN", human=True)])
         code, out = run(root, "issuesreferenced here")
-        check("a phrase spanning a removed envelope is not a hit", code == 1)
-        code, out = run(root, "please check the issues")
-        check("...while a contiguous fragment of the same block still hits", code == 0)
+        check("a phrase never contiguous in the real turn is not a hit", code == 1)
+        code, out = run(root, "SENTINEL_CLEAN")
+        check("...while an unenveloped turn in the same file still hits", code == 0)
 
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user("<system-reminder>only this</system-reminder>", human=True)])
@@ -191,10 +217,17 @@ def main() -> int:
              "userType": "external", "origin": {"kind": "human"}},
         ])
         for sentinel, why in (("SENTINEL_KILO", "a human turn opening with an English marker"),
-                              ("SENTINEL_MIKE", "a human turn quoting an unclosed tag mid-block"),
                               ("SENTINEL_HOTEL", "human text sharing a record with a tool_result")):
             code, _ = run(root, sentinel)
             check(f"{why} is still quotable", code == 0)
+        # The accepted cost, asserted rather than left implicit: a turn writing
+        # ABOUT a tag is not quotable from that block. Denying a real quotation
+        # is the safe direction; certifying harness prose is not.
+        code, out = run(root, "SENTINEL_MIKE", "--show-excluded")
+        check("a turn quoting a tag is NOT quotable", code != 0)
+        check("...and --show-excluded names the envelope as the reason, "
+              "so the skip is visible rather than silent",
+              "block carries a harness envelope tag" in out)
 
     # -- the unattributed contract ------------------------------------------
     with tempfile.TemporaryDirectory() as root:
@@ -226,6 +259,18 @@ def main() -> int:
                           capture_output=True, text=True).returncode
     check("a --root that is not a directory is a usage error, not an absence", code == 2)
 
+    # Root resolution can raise before the scan begins -- an unresolvable ~user,
+    # or Path.home() with HOME unset and no passwd entry. An uncaught exception
+    # exits 1, which this tool documents as "absent".
+    env = dict(os.environ, CLAUDE_CONFIG_DIR="~nosuchuser12345/x")
+    env.pop("HOME", None)
+    result = subprocess.run([sys.executable, str(SCRIPT), "hi"],
+                            capture_output=True, text=True, env=env)
+    check("a crash resolving the root exits 2, not 1", result.returncode == 2)
+    check("...and names what failed",
+          "could not resolve a transcript root" in result.stderr
+          or "No transcript root at" in result.stderr)
+
     empty = subprocess.run([sys.executable, str(SCRIPT), "  **  "],
                            capture_output=True, text=True)
     check("an empty phrase is a usage error, not an absence",
@@ -250,6 +295,21 @@ def main() -> int:
         code, out = run(root, "merge it")
         check("a torn line does not end the scan", code == 0)
         check("unparseable lines are counted and reported", "1 unparseable line" in out)
+
+    # A torn line is the normal state of a transcript being appended to, and it
+    # shrinks the searched space exactly as an unreadable file does. Reporting
+    # an absence over it is the "I could not look" collapse the exit contract
+    # exists to prevent.
+    with tempfile.TemporaryDirectory() as root:
+        path = Path(root) / "live.jsonl"
+        with path.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(user("a good turn", human=True)) + "\n")
+            handle.write('{"message": {"role": "user", "cont')
+        code, out = run(root, "a phrase that is genuinely absent")
+        check("an unparseable line makes the run unsearchable, not absent", code == 2)
+        check("...and says the space could not be read", "could not be read" in out)
+        code, out = run(root, "a phrase that is genuinely absent", "--json")
+        check("...and --json agrees", json.loads(out)["status"] == "unsearchable")
 
     # A dangling symlink rather than a chmod, so the case holds when the suite
     # runs as root -- where permission bits are not enforced and a chmod-based
@@ -276,7 +336,7 @@ def main() -> int:
             finally:
                 hidden.chmod(0o755)
     else:
-        check("(skipped: running as root, permission bits do not apply)", True)
+        skip("unreadable directory", "running as root; permission bits do not apply")
 
     # A crash is a search that did not happen. Python's default status for an
     # uncaught exception is 1, which this tool documents as "absent".
@@ -304,7 +364,7 @@ def main() -> int:
     check("norm collapses whitespace and inline markup", cuq.norm("A  `b`  **c**") == "a b c")
     check("norm is not degenerate", cuq.norm("hello") == "hello")
 
-    print(f"\n{passes} passed, {failures} failed")
+    print(f"\n{passes} passed, {failures} failed, {skipped} skipped")
     return 1 if failures else 0
 
 

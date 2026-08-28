@@ -300,7 +300,7 @@ Decides whether a sentence you are about to attribute to the user was ever typed
 python3 scripts/check-user-quote.py "the sentence you are about to quote" --show-excluded
 ```
 
-Exit `0` found, `1` absent, `2` nothing was available to search, and `3` found only in a record the harness never labelled human, with `--allow-unattributed`.
+Exit `0` found, `1` absent from the regions it reports having searched, `2` nothing was available to search, and `3` found only in an unattributed region, with `--allow-unattributed`.
 Pass `--root` on an agent whose transcripts live elsewhere.
 
 [`shared/writing/citations.md`](shared/writing/citations.md) is the statement of record: why `message.role == "user"` is not an authorship claim, why exit `2` must not collapse into exit `1`, and what exit `3` readmits.

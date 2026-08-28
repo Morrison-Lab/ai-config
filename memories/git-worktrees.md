@@ -964,49 +964,25 @@ orchestrator had supplied it.)
 
 ## Switching a shared worktree's branch under a live dispatched reviewer breaks its reads
 
-The section above is about the orchestrator writing into an agent's own,
-separate worktree.
-This is the case one door down: the orchestrator's **own** worktree, shared
-with a dispatched read-only reviewer subagent that is mid-review of it, and
-the orchestrator switches that worktree's checked-out branch to go address a
-*different* PR's finding while the review is still running.
+The section above is about the orchestrator writing into an agent's own, separate worktree.
+This is the case one door down: the orchestrator's **own** worktree, shared with a dispatched read-only reviewer subagent that is mid-review of it, and the orchestrator switches that worktree's checked-out branch to go address a *different* PR's finding while the review is still running.
 
-"Read-only" describes what the reviewer is permitted to do to the tree, not
-what the tree is permitted to do to the reviewer.
-A `git checkout <other-branch>` in the shared directory changes every file
-the reviewer might read next, mid-flight, with no notice to the reviewer at
-all -- the same worktree, the same paths, different content underneath them.
-The reviewer did not open a stale file, and it did not race the orchestrator
-for a lock; the ground it was standing on moved.
+"Read-only" describes what the reviewer is permitted to do to the tree, not what the tree is permitted to do to the reviewer.
+A `git checkout <other-branch>` in the shared directory changes every file the reviewer might read next, mid-flight, with no notice to the reviewer at all -- the same worktree, the same paths, different content underneath them.
+The reviewer did not open a stale file, and it did not race the orchestrator for a lock;
+the ground it was standing on moved.
 
-The failure is not silent here, which is what makes it recoverable rather
-than merely a near-miss: the reviewer noticed its reads no longer matched
-what it expected to be reviewing and fell back to `git show
-<pinned-sha>:<path>` reads, which are immune to a later checkout because they
-resolve a path against a fixed commit rather than the working tree.
-A reviewer that does not notice -- one that trusts a plain file read over a
-long review -- would silently review a mix of two branches with no error at
-all.
+The failure is not silent here, which is what makes it recoverable rather than merely a near-miss: the reviewer noticed its reads no longer matched what it expected to be reviewing and fell back to `git show <pinned-sha>:<path>` reads, which are immune to a later checkout because they resolve a path against a fixed commit rather than the working tree.
+A reviewer that does not notice -- one that trusts a plain file read over a long review -- would silently review a mix of two branches with no error at all.
 
-- **Do:** brief every reviewer of a shared worktree with the exact commit SHA
-  it is reviewing, and instruct it to read via `git show <sha>:<path>`
-  (or an equivalent pinned read) rather than plain file reads, so a later
-  checkout in the same directory cannot move its ground.
-- **Do:** hold branch switches in a worktree until every dispatched reader
-  of it has reported back, when a pinned-read briefing is not practical.
-- **Don't:** treat a read-only subagent as immune to the orchestrator's own
-  checkout churn -- read-only protects the tree from the agent, not the
-  agent from the tree.
+- **Do:** brief every reviewer of a shared worktree with the exact commit SHA it is reviewing, and instruct it to read via `git show <sha>:<path>` (or an equivalent pinned read) rather than plain file reads, so a later checkout in the same directory cannot move its ground.
+- **Do:** hold branch switches in a worktree until every dispatched reader of it has reported back, when a pinned-read briefing is not practical.
+- **Don't:** treat a read-only subagent as immune to the orchestrator's own checkout churn -- read-only protects the tree from the agent, not the agent from the tree.
 - **Don't:** assume a reviewer will notice and recover the way this one did;
-  build the pinned read into the brief rather than relying on the reviewer
-  to catch a moving target.
+  build the pinned read into the brief rather than relying on the reviewer to catch a moving target.
 
-(Measured 2026-08-27, `Morrison-Lab/gha`: the orchestrating session ran `git
-checkout <other-branch>` in its own worktree to address a different PR's
-review finding while a dispatched read-only reviewer subagent was mid-review
-of the previous branch in that same directory.
-The reviewer noticed the tree had changed mid-flight and fell back to
-`git show <pinned-sha>:<path>` reads to finish the round.)
+(Measured 2026-08-27, `Morrison-Lab/gha`: the orchestrating session ran `git checkout <other-branch>` in its own worktree to address a different PR's review finding while a dispatched read-only reviewer subagent was mid-review of the previous branch in that same directory.
+The reviewer noticed the tree had changed mid-flight and fell back to `git show <pinned-sha>:<path>` reads to finish the round.)
 
 ## `git push -u origin HEAD` from a worktree publishes the worktree's own branch name
 

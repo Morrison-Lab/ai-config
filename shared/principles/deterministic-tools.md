@@ -256,6 +256,47 @@ That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) 
 - **Don't:** assume an unused generator is harmless;
   it runs the moment a config elsewhere turns it on.
 
+## An enumeration is still a parse, and a name list is the disguise it wears
+
+This file's argument is that a deterministic instrument beats model judgment.
+It does not follow that every deterministic instrument is sound, and the failure worth naming is the one that looks like having *removed* a parse.
+
+Deciding whether a span of untrusted text belongs to the harness or to the user is delimiter-matching, and it does not converge: a non-greedy match stops at the first close, a repeated opener leaks the remainder, injected content containing a literal closing tag terminates the wrong span.
+Replacing that with a **list of tag names** feels like a different kind of thing --- there is no grammar left, only membership --- and the code said so outright: *"nothing is parsed"*.
+
+It was still parsing.
+The parse had moved from **grammar** to **vocabulary**, and the vocabulary belonged to the format's author rather than to the checker.
+The shipped harness emitted or stripped fifteen tag names inside user content;
+the list held four, and intersected them in two.
+A teammate agent's message and an editor selection appended to the user's own prompt both certified clean.
+
+The tell is that the new instrument's correctness now depends on a set **someone else maintains** and does not publish to you.
+An enumeration over your own domain is fine --- the keys of a dispatch table you wrote are complete by construction.
+An enumeration over someone else's is a snapshot, and it decays silently, because nothing about a missing name looks like an error.
+
+So ask which side owns the set.
+Where the answer is *not you*, the sound move is structural rather than enumerated: match the **shape** the format uses rather than the instances you have seen, so an instance added later is covered without a code change.
+Then measure what the structural form costs on real data before adopting it, because over-matching is a real price and is worth paying only when you know its size.
+
+The same question settles the coverage direction, which is the half that took its own round to surface.
+Reading the shapes you know a payload arrives in is the same snapshot pointed inward: reading one meant reporting "no record contains it" over text the user had typed.
+Recursing into nested payloads is the structural answer there --- a shape nested inside one already read is reached with no code change.
+
+- **Do:** ask whether you or the format's author owns the set your instrument enumerates.
+- **Do:** match the shape rather than the instances when the answer is the author, and measure the over-matching on real data before adopting it.
+- **Do:** apply it to coverage as well as exclusion --- an enumerated list of shapes to read decays exactly as an enumerated list of shapes to reject does.
+- **Don't:** read "there is no grammar left" as "there is no parse left";
+  a membership test over a foreign vocabulary is a parse whose failure mode is silence.
+- **Don't:** count a shortened enumeration as a fix.
+  Four names against fifteen is the same defect as one, with better odds.
+
+(Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), rounds 8 and 9 of twelve.
+Rounds 3 through 8 were grammar;
+round 9 was the vocabulary;
+round 11 established that neither works, because the harness delivers control tags entity-escaped --- `&lt;system-reminder&gt;` is what it writes when it neutralizes them --- namespaced, split across blocks, or with no angle bracket at all.
+The tool was inverted to report records and their provenance rather than classify authorship, which ends the sequence by removing the claim rather than narrowing it.
+Round 12 then found the coverage half.)
+
 ## Limits
 
 Design, genuine judgment, and semantic work stay with a human or a model:

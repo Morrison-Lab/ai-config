@@ -82,13 +82,22 @@ After ARDI completes clean on the current MR/PR:
 Stop the loop when:
 - No more open issues (backlog empty)
 - User interrupts or says "stop" / "that's enough"
-- A configurable max is reached (default: 5 issues per session, to avoid
-  unbounded runs — ask the user to continue if hit)
+- A configurable max is reached (default: 5 issues), which ends the current
+  **wave**, not the session — see below
 - An issue is blocked and no other unblocked issues remain — otherwise
   **bypass** the blocked issue (surface it) and keep going with the rest
 
-If stopping due to max-issues, ask:
-> "Completed 5 issues — want me to keep going, or stop here?"
+Hitting the max is a **wave boundary**, not a question to pose.
+Wrap up one wave of PRs before starting another (user directive, 2026-08-28):
+hold new issue grabs, babysit the wave's open PRs to completion (merge-ready,
+and merged where a merge grant applies), then start the next wave
+automatically.
+
+- **Do:** hold at the boundary and drive the open wave to completion, then
+  continue with the next wave without asking.
+- **Don't:** ask "want me to keep going?" at the max — the wave boundary
+  replaces that ask.
+- **Don't:** read the boundary as forbidding parallel PRs *within* a wave.
 
 #### e. Recurse
 
@@ -187,7 +196,8 @@ When the loop ends, print a summary:
 Issue selection never pauses for confirmation, per `gi`'s step 3, so there is
 no per-issue confirmation for "just go" to skip.
 What the loop still does, in every mode:
-- Still pause at the max-issues checkpoint
+- Still hold at the max-issues wave boundary — babysit the open wave to
+  completion before the next wave, without asking
 - Surface and **bypass** a blocked or ambiguous issue — note it and skip to the
   next rather than halting; stop only if no independent issues remain (per the
   stopping conditions above)
@@ -204,4 +214,6 @@ What the loop still does, in every mode:
   cleanly from main and doesn't need the stack)
 - ❌ Pausing after a clean-but-unmerged MR to wait for a human merge — you don't
   self-merge, but that's no reason to stop; keep going and stack the next issue
-- ❌ Running unbounded without a checkpoint — always pause at 5
+- ❌ Running unbounded without a wave boundary — cap each wave at 5 and wrap
+  the wave's PRs before grabbing more
+- ❌ Asking to continue at the wave boundary — wrap up, then continue

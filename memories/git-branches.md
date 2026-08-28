@@ -411,3 +411,28 @@ success once the error line scrolls away.
 
 (Measured 2026-08-22;
 [ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/1999).)
+
+## A stale remote-tracking ref after a squash merge makes a re-cut branch look unpushed
+
+Squash-merging a PR with auto-delete removes the remote branch, but your local `refs/remotes/origin/<branch>` survives, still pointing at the **pre-squash** head.
+Re-cut the same branch name from the updated `main` and any check comparing it to that ref reports commits to push, because `main`'s squash commit is not an ancestor of the branch history the ref remembers.
+
+Measured 2026-08-28 after [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539) merged: a `Stop` hook reported *"2 unpushed commit(s) on branch claude/gii-x6fd58"* over a branch sitting exactly at `origin/main` with a clean tree.
+
+```bash
+git log --oneline origin/main..HEAD | wc -l   # 0 -- nothing to push
+git ls-remote origin refs/heads/<branch>      # empty -- deleted on merge
+git rev-parse --short origin/<branch>         # still resolves: the stale ref
+git fetch origin --prune                      # the fix
+```
+
+Pushing is the wrong response and is the one the warning invites.
+[`check-before-pushing`](../shared/workflow/check-before-pushing.md) already names the adjacent case --- MERGED means auto-delete, do not recreate --- and this is how you arrive at it without meaning to: the branch is a fresh cut for *new* work, so it does not feel like recreating anything.
+
+Note which direction the instrument failed in.
+Most of this corpus's cases are a check reporting clean when it could not fail;
+this one reports a problem that does not exist, from the same cause --- a measurement taken against a snapshot that has expired.
+
+- **Do:** run `git fetch --prune` after a merge that auto-deletes the branch, and before trusting anything that compares against a remote-tracking ref.
+- **Do:** settle "is there anything to push" from `origin/main..HEAD` and `git ls-remote`, not from the tracking ref.
+- **Don't:** push to clear the warning --- the remote branch is gone, and recreating it is what `check-before-pushing` forbids.

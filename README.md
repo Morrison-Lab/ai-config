@@ -292,6 +292,22 @@ python3 scripts/check-context-closure.py --base ../consumer-repo --compare origi
 
 Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown **+62%**, arriving silently since a bump's gitlink diff is one line (ai-config#1028).
 
+### Attributed quotes (`scripts/check-user-quote.py`)
+
+Shows every transcript record containing a phrase you are about to attribute to the user, with its provenance --- record shape, `origin.kind`, flags, `userType` --- so you can read them and judge.
+
+```sh
+python3 scripts/check-user-quote.py "the sentence you are about to quote"
+```
+
+**It does not decide who wrote the phrase**, and that is the design rather than a gap.
+
+Exit `0` candidates found and printed, `1` none found in any record, `2` the search was degraded or impossible.
+`1` and `2` are kept apart so a search that did not happen is never reported as an absence.
+Pass `--root` on an agent whose transcripts live elsewhere.
+
+[`shared/writing/citations.md`](shared/writing/citations.md) carries the argument, and the eleven certification fail-opens that produced it.
+
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind
 them.

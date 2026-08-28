@@ -486,3 +486,49 @@ When a tool has no second flag at all, commit or stash first, and prefer designi
 (Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515).
 Read from the source rather than the help: `--base-rev` carries `default="origin/main"`, and the other side is loaded from the working-tree copy of the checker unless `--candidate-rev` is non-empty.
 So `--base-rev HEAD` over a dirty tree is `HEAD`-vs-worktree.)
+
+## A check scoped to `A...HEAD` examines nothing before you commit, and prints nothing
+
+The section above is a tool whose *other* side silently defaults to the working tree.
+This is the inverse, and the commoner one: a check whose scope is a **commit range**, so the working tree is not one of the sides at all.
+
+```bash
+git diff origin/main...HEAD -U0 | grep '^+' | grep -P '[^\x00-\x7F]'
+```
+
+Run that before committing and it examines the diff between two commits.
+Your uncommitted edits are in neither.
+It prints nothing, exits 0, and is indistinguishable from a clean result --- so the moment you most want the check is the moment it cannot fail.
+
+Two things make it worse than an ordinary blind spot.
+
+**It is silent by construction.**
+A grep that matches nothing and a grep with nothing to match produce identical output.
+Nothing in the invocation reports the size of the search space, which is the general remedy [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) already prescribes: report what was examined, not only what was found.
+
+**The obvious test passes.**
+Edit a line the commit already added, re-run, and the check *does* fire --- because that line number is in the committed range.
+So a first attempt to verify the theory refutes it, and the bug survives the verification.
+Only a line the commit does not carry is invisible.
+
+Either commit first, or scope to the working tree:
+
+```bash
+git diff origin/main -- <paths>     # two-dot: includes uncommitted work
+git diff --cached                   # staged only
+```
+
+Note that the two-dot form also reports changes made on the base since you branched, which is usually noise here and occasionally the point;
+the "Picking the diff range" section above covers the distinction.
+
+- **Do:** commit before running a range-scoped check, or scope it to the working tree.
+- **Do:** make any check you write report how many files and lines it examined, so a zero is distinguishable from a detector that never engaged.
+- **Don't:** verify this class of bug by editing an already-added line --- that case is covered, and passing it proves nothing.
+- **Don't:** treat "the ad-hoc grep I type by hand" as exempt;
+  it has the same defect as the checker you would file an issue against.
+
+(Measured 2026-08-28, twice in one session and in two independent instruments.
+First in `scripts/vendor/gha-check-new-line-breaks.py`, whose `_added_line_numbers` scopes from `base...HEAD` while reading content from the working tree --- filed as [ai-config#2542](https://github.com/Morrison-Lab/ai-config/issues/2542) after a pre-commit run reported clean and CI failed on the same bytes.
+Then, hours later, in my own non-ASCII sweep on [#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), which reported clean over a literal em-dash a reviewer found immediately;
+filed as [#2550](https://github.com/Morrison-Lab/ai-config/issues/2550), which also carries the reason CI missed it --- the non-ASCII gate scans `.qmd` and `.R`, and this repo is written in Python.
+Having filed the first did not prevent the second, which is the argument for the rule rather than the incident.)

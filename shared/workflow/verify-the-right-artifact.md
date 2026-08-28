@@ -505,6 +505,27 @@ of its factual claims as you would a line of the diff.
   last push rather than before it.
 - **Don't:** leave a body asserting a verification the diff has since outgrown.
 
+**Re-reading each round does not fix it, and which half decays tells you what to write instead.**
+The remedy above is a discipline, and a discipline applied every round on a PR with many rounds still loses, because the body has two kinds of content and they rot at different rates.
+
+A body describing the **mechanism** is stale the moment the mechanism changes, which on a PR under revision is every round.
+A body organized around the change's **invariants** --- what must remain true however it is built --- plus an **append-only history** survives, because neither is invalidated by a rewrite.
+
+The residual after that restructuring is **counts**: a test total, a round number, a file tally.
+They read as settled facts rather than as claims, so they escape the re-read that catches everything else, and they are wrong within one push.
+The fix is not to check them harder but to give the deriving command beside each one, so a stale figure is repairable by running a line rather than by remembering what it was.
+
+Two things follow.
+Keep the mechanism in the module docstring or the code comment, which is version-controlled with the thing it describes and therefore cannot drift from it.
+And prefer a figure a reader can re-derive to one you assert: `wc -l` beside a count costs nothing and converts an assertion into an instrument.
+
+- **Do:** organize a body around invariants and an append-only history, not around how the change currently works.
+- **Do:** print the deriving command beside every count.
+- **Do:** put mechanism detail where the code lives, so it is versioned with what it describes.
+- **Don't:** rely on re-reading each round --- it is necessary and it does not scale past a few rounds.
+- **Don't:** treat a number as the safe part of a body.
+  It is the part that reads as checked and is not.
+
 (Same day, both PRs.
 gha#550's body still read "the fixture suite unchanged and passing" after a
 push that added two fixtures, and "there is no offline test" after a push that

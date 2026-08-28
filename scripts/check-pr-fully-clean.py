@@ -1000,10 +1000,13 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     whole-line no-findings statement and carries no finding-shaped content
     after it.
 
-    The section runs to the next heading or end of body. The FIRST
-    non-empty line must match the NOT_CLEAN_NEGATION_SUFFIX allowlist --
-    the same trigger the old 60-char suffix shortcut keyed on, made
-    line-anchored -- and everything after it must clear the item veto.
+    Text after ``Findings`` on the matched heading line is still part of the
+    heading, not the section body, so scanning starts on the following line
+    (ai-config#2459). The section runs from there to the next heading or end
+    of body. The FIRST non-empty line must match the
+    NOT_CLEAN_NEGATION_SUFFIX allowlist -- the same trigger the old 60-char
+    suffix shortcut keyed on, made line-anchored -- and everything after it
+    must clear the item veto.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -1022,9 +1025,13 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     ones it rejected (`* No new issues.`, `1. None.`) -- exact vocabulary
     parity by reuse rather than by a re-derived strip.
     """
-    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[match_end:])
-    section = scan_body[match_end:match_end + next_heading.start()] \
-        if next_heading else scan_body[match_end:]
+    heading_line_end = scan_body.find("\n", match_end)
+    if heading_line_end == -1:
+        return False
+    section_start = heading_line_end + 1
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
+    section = scan_body[section_start:section_start + next_heading.start()] \
+        if next_heading else scan_body[section_start:]
     lines = [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False

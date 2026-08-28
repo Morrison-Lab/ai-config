@@ -1835,6 +1835,31 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "### Findings\n\n- None.\n\n### Verdict: Ready for merge\n")
           is None)
+    # ai-config#2459: trailing heading text remains part of the heading line;
+    # the empty-section scan begins with the first non-empty body line.
+    check("a descriptive Findings heading with an empty body resolves empty",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content\n\nNone.\n")
+          is None)
+    check("a plain Findings heading with an empty body still resolves empty",
+          checker._unresolved_finding_pattern("## Findings\n\nNone.\n")
+          is None)
+    check("a plain Findings heading with a real item stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings\n\n1. A real finding\n")
+          is not None)
+    check("a descriptive Findings heading with a real item stays a finding",
+          checker._unresolved_finding_pattern(
+              "## Findings on the diff content\n\n1. A real finding\n")
+          is not None)
+    check("trailing ': none' on a Findings heading is not section body",
+          checker._unresolved_finding_pattern("## Findings: none\n")
+          is not None)
+    check("recognized Findings heading suffixes still resolve empty bodies",
+          all(checker._unresolved_finding_pattern(
+                  f"## Findings{suffix}\n\nNone.\n") is None
+              for suffix in (" on the diff content", " (blocking)",
+                             " and notes")))
     check("free-prose resolution stays a safe-direction flag (out of #2370 scope)",
           checker._unresolved_finding_pattern(
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
@@ -2676,4 +2701,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

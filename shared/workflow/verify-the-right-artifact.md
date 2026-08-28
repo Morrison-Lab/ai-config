@@ -345,7 +345,6 @@ reviewer's Python-parsing explanation could not account for.
 Platform: Windows 11 / MINGW64 through the Claude Code Bash tool.
 The entry now leads with that scope and carries the reviewer's null result.)
 
-
 **A sixth: the fact that a check ran, standing in for what the check found.**
 The five above all substitute one artifact for another --- a file, a run, an
 environment.

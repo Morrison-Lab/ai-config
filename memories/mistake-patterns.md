@@ -282,7 +282,10 @@ A clean automated review from every available provider evaluating the current HE
   It compared what the two revisions *blanked* --- asking whether every extra-blanked character lay inside a code span the change exists to blank --- which cannot return non-zero for any implementation of that shape, because the extra-blanked set is the span set.
   It reported 0 while two real fail-opens were live, and was silent by construction about the passes running downstream of the blanking, where both lived.
   A parity proof is over ACCEPTANCE SETS --- which bodies each revision calls clean --- never over the transformation.
-  The replacement instrument, `scripts/check-verdict-scan-parity.py`, demonstrates its own discrimination against the four designs rejected on that branch (3,924 / 108 / 270 / non-zero off-axis, and 0 for the shipped design) rather than asserting it.
+  The replacement instrument, `scripts/check-verdict-scan-parity.py`, demonstrates its own discrimination rather than asserting it --- but only half of that demonstration is reproducible from `main`.
+  The `0` for the shipped design re-runs from any clone.
+  The 3,924 / 108 / 270 / non-zero off-axis figures were taken against the four designs rejected on the PR branch, which the squash merge as `07847b9` left off `main`;
+  recover them with `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) rather than treating them as lost.
   Canonical rule for the general shape: [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s "what a change TRANSFORMS, standing in for what it CONCLUDES".
 
 ## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence

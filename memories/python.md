@@ -154,12 +154,14 @@ Use the system's own local clock (`datetime.datetime.now().astimezone()`) when t
 `itertools.islice(gen, n)` takes the **first** `n` items, not `n` items spread across what `gen` produces.
 Over a nested generator --- an outer loop varying one component, inner loops varying the rest --- the first `n` items therefore share whatever the outer loop emitted first, and a `--limit` implemented this way yields a sample that is narrow rather than merely small.
 The structural claim holds whatever the corpus size: on `scripts/check-verdict-scan-parity.py` (shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515), whose `--limit` now carries the fractional-step form below), `LEAD` is the outermost of seven `itertools.product` axes, so a prefix holds `LEAD[0]` fixed for the first 241,920 of 1,693,440 bodies.
-The **blind-prefix length** is the part that decays, and it decayed here: re-derived 2026-08-28, the negative control's first divergence is at prefix index **485**, with 120 divergences inside the first 8,000, so `--limit 500` already prints `DISCRIMINATES`.
-An earlier reading of this entry said the first 8,000 were blind.
-That was true when measured against a ~221k-body corpus and false after the same PR widened the corpus to 1,693,440 --- adding `FILLER_EXTRA`, two `LEAD` values, two `NEGATION` values and a further template (the generator now carries five;
-the count before the widening is unrecoverable, since #2515 was squash-merged) --- which changed generation order entirely, and nobody re-derived it.
-That is [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "Widening an instrument invalidates every figure it produced" committed into the instrument built to catch that class.
-The same stale sentence is still a source comment on `main`, tracked as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532).
+The **blind-prefix length** is the part that has to be measured, and the measurement on record was wrong: re-derived 2026-08-28, the negative control's first divergence sits at prefix index **485**, with 120 divergences inside the first 8,000, so `--limit 500` already prints `DISCRIMINATES`.
+An earlier reading of this entry said the first 8,000 were blind, and attributed that to figure decay --- the corpus having grown from 221,184 bodies to 1,693,440 under the same PR.
+Recovering the history shows the decay story is wrong.
+The claim was introduced by `936aea2`, the very commit that widened the corpus, so it never faced the smaller one.
+What produced it was the **dead negative control** that commit also carried: patching `strip_cited_finding_vocab` after the scans had moved to `strip_cited_finding_vocab_with_mask`.
+Measured at `936aea2` against base `936aea2^`, the dead control reports **0** divergences over the first 8,000 while the repaired control reports **120** over the identical corpus and revisions.
+So the blind reading was an artifact of a control patching code nothing called, which is the failure [`algorithmatize-checks.md`](../shared/workflow/algorithmatize-checks.md)'s "A control's patch point drifts" section describes, not the widening failure it was filed under.
+The same stale sentence is still a source comment on `main`, tracked as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532). (For the record, the widening did happen and was substantial --- `FILLER_EXTRA` from 0 to 8 entries, `LEAD` from 4 to 7, `NEGATION` from 4 to 6, and a fourth template becoming a fifth --- it simply is not what made the figure wrong.)
 Re-derive a blind-prefix length before quoting one;
 quote the axis structure freely, since it does not decay.
 

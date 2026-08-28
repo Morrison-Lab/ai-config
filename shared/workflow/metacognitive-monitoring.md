@@ -459,30 +459,32 @@ The fix is to take a **stride** across the product space rather than a prefix, s
 The arithmetic that gets this wrong lives in [`python.md`](../../memories/python.md) and is not restated here;
 what belongs here is the reading, which is that a capped figure and a swept figure answer different questions and a run that does not say which it took cannot be quoted as either.
 
-The blind-prefix **length** is a measurement, so it expires like any other.
-Widening the generator reorders it, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s "widening an instrument invalidates every figure it produced" applied to a sampling bound.
-Re-derive it before quoting it;
-the axis structure is what you can quote freely, since the outermost axis stays outermost. (Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py` in [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529): a blind-prefix figure recorded against a ~221k-body corpus survived that same PR's widening to 1,693,440 unre-derived, and the real first divergence sits at prefix index 485.
+The blind-prefix **length** is a measurement, so it expires like any other, and re-deriving it before quoting it is the cheap part.
+The expensive part is not mistaking *why* such a figure went wrong.
+Widening a generator reorders it, which is [`algorithmatize-checks`](algorithmatize-checks.md)'s "widening an instrument invalidates every figure it produced" applied to a sampling bound --- but a blind reading can equally come from a control that fired on nothing, and the two look identical from the figure alone.
+Establish which before citing either, since the remedies differ: re-derive for the first, repair the control's patch point for the second.
+The axis structure is what you can quote freely, since the outermost axis stays outermost.
+
+(Measured 2026-08-28 on `scripts/check-verdict-scan-parity.py`, shipped by [ai-config#2515](https://github.com/Morrison-Lab/ai-config/pull/2515) and recorded here while preparing [ai-config#2529](https://github.com/Morrison-Lab/ai-config/pull/2529).
+A "first 8,000 are blind" figure was first read as decay from #2515's own widening of that corpus, 221,184 bodies to 1,693,440.
+Recovering the branch through `refs/pull/2515/head` refuted that: the claim entered with `936aea2`, the widening commit itself, so it never faced the smaller corpus.
+Measured at `936aea2` against `936aea2^`, the dead control reports 0 divergences over the first 8,000 and the repaired control reports 120 over the identical corpus.
+The real first divergence sits at prefix index 485.
 Tracked for the source comment as [ai-config#2532](https://github.com/Morrison-Lab/ai-config/issues/2532).)
 
-- **Do:** name what the sampled items share, before generalizing from their
-  shared emptiness.
+- **Do:** name what the sampled items share, before generalizing from their shared emptiness.
 - **Do:** ask how a capped sample was *taken*, and read a contiguous prefix over a nested product as a slice of the outer axis rather than a sample of the whole.
 - **Do:** re-derive a blind-prefix or coverage bound whenever the population it was measured against changes, and quote the axis structure rather than the bound when you cannot.
-- **Do:** raise the bound until the answer stops changing, or carry the window
-  into the sentence.
+- **Do:** raise the bound until the answer stops changing, or carry the window into the sentence.
 - **Do:** sample along a second axis --- one large item beside four small ones --- rather than adding a fifth of the same kind.
 - **Do:** scope the claim to what was measured, keeping "these four produced none" distinct from "none has ever".
 - **Do:** enumerate the cases a quantified claim did NOT list, since the ones it listed were chosen by whoever wrote the claim.
 - **Don't:** read a query returning exactly `--limit N` rows as a complete answer --- that is precisely what a truncated one looks like.
 - **Don't:** cap a generated corpus with a contiguous prefix;
   that fixes the slowest-varying axis and hides every shape it produces.
-- **Don't:** read repeated absence as accumulating evidence when a single
-  filter would explain every observation at once.
-- **Don't:** treat a sample you measured as exempt from the Scope check,
-  because measuring it is what makes that check feel already performed.
-- **Don't:** read a reviewer's endorsement of a universal as evidence for it
-  when the reviewer checked the claim's own examples.
+- **Don't:** read repeated absence as accumulating evidence when a single filter would explain every observation at once.
+- **Don't:** treat a sample you measured as exempt from the Scope check, because measuring it is what makes that check feel already performed.
+- **Don't:** read a reviewer's endorsement of a universal as evidence for it when the reviewer checked the claim's own examples.
 
 (The three instances below, all 2026-08-24, all in one session, on three different agents.
 The falsifications and figures are measured.

@@ -938,7 +938,9 @@ Nothing arbitrates, nothing is asked to detect its sibling's failures, and every
 
 What makes it sound is set containment rather than any claim about which way each detector errs.
 An intersection is a subset of both inputs, so it can only ever claim **less** than either --- it cannot invent a claim neither made.
-Every error it has therefore runs in one direction, under-claiming, and the whole condition to establish is that under-claiming is the safe direction for the consumer.
+Every error the composition *introduces* therefore runs in one direction, under-claiming, and the condition the composition *adds* is that under-claiming is the safe direction for the consumer.
+State it that narrowly.
+It says nothing about the errors both inputs already shared, which survive the intersection untouched and are the subject of the paragraph below --- so an intersection bounds the damage its own construction can do and inherits whatever the pair was already wrong about.
 
 Two things follow, and the second is the one that is easy to get backwards.
 The intersection is **exact** when the two detectors' false positives are disjoint, since nothing false survives being claimed twice.

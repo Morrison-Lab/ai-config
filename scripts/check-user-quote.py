@@ -121,8 +121,9 @@ def default_root() -> Path:
 def text_blocks(message: dict) -> List[str]:
     """Each prose block separately, as a str.
 
-    A non-str `text` field is dropped rather than returned: it would otherwise
-    reach `.strip()` and abort the whole scan for every query against the root.
+    A non-str `text` field becomes "", which no phrase can match and which
+    `_regions` filters out. Returning it as-is would reach `.strip()` and abort
+    the whole scan for every query against that root.
     """
     content = message.get("content")
     if isinstance(content, str):
@@ -139,11 +140,20 @@ def text_blocks(message: dict) -> List[str]:
 
 
 def _regions(block: str) -> List[str]:
-    """Non-envelope regions of a block, in order."""
-    if _OPENER_RX.match(block.lstrip()):
-        # Opens with an envelope tag: harness prose, closed or truncated.
-        remainder = _ENVELOPE_RX.sub("", block)
-        return [remainder] if remainder.strip() and not _OPENER_RX.match(remainder.lstrip()) else []
+    """Non-envelope regions of a block, in order.
+
+    Segments are kept SEPARATE rather than joined, so a phrase can never match
+    across the gap a removed envelope left behind -- two fragments of a real
+    turn that merely abut once the injection is cut were never contiguous in
+    what the user typed, and certifying such a span is the failure this whole
+    tool exists to prevent.
+
+    The one special case is a block opening with an UNCLOSED opener, read as a
+    truncated injection and yielding nothing. It has to look only at the
+    block's own opening, which is why it is tested before the split.
+    """
+    if _OPENER_RX.match(block.lstrip()) and not _ENVELOPE_RX.match(block.lstrip()):
+        return []
     out, last = [], 0
     for match in _ENVELOPE_RX.finditer(block):
         out.append(block[last:match.start()])

@@ -125,6 +125,18 @@ def main() -> int:
           "SENTINEL" in " ".join(cuq._regions("why do <system-reminder> tags SENTINEL appear?")))
     check("a block opening with an unclosed opener yields nothing",
           cuq._regions("<system-reminder>TRUNCATED grant") == [])
+    # A block OPENING with a well-formed envelope took a separate code path
+    # that joined the leftovers into one string, so two fragments that merely
+    # abut once the injection is cut became a matchable span. Both branches
+    # must split identically; only the leading-UNCLOSED case differs.
+    lead = ("<system-reminder>A</system-reminder>the first part"
+            "<system-reminder>B</system-reminder>the second part")
+    check("a block opening with a well-formed envelope still splits",
+          cuq._regions(lead) == ["the first part", "the second part"])
+    check("...so no region spans the removed envelope",
+          all("the first partthe second part" not in r for r in cuq._regions(lead)))
+    check("leading and non-leading blocks split the same way",
+          cuq._regions("x " + lead)[1:] == cuq._regions(lead))
     check("a block that is entirely an envelope yields nothing",
           cuq._regions("<task-notification>x</task-notification>") == [])
     for tag in cuq.ENVELOPE_TAGS:
@@ -144,6 +156,15 @@ def main() -> int:
         check("an envelope appended within a human block is not a hit", code == 1)
         code, out = run(root, "ok do it")
         check("...while the genuine part of the same block still hits", code == 0)
+
+    with tempfile.TemporaryDirectory() as root:
+        write(root, "a.jsonl", [user(
+            "<system-reminder>A</system-reminder>please check the issues"
+            "<system-reminder>B</system-reminder>referenced here", human=True)])
+        code, out = run(root, "issuesreferenced here")
+        check("a phrase spanning a removed envelope is not a hit", code == 1)
+        code, out = run(root, "please check the issues")
+        check("...while a contiguous fragment of the same block still hits", code == 0)
 
     with tempfile.TemporaryDirectory() as root:
         write(root, "a.jsonl", [user("<system-reminder>only this</system-reminder>", human=True)])

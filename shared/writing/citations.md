@@ -415,7 +415,10 @@ That distinction is not fastidiousness.
 An earlier version of this check classified on the exclusions alone, and an assistant-written dispatch brief passed all of them, so the tool certified the assistant's own prose as the user's words.
 The version after that classified per *record*, and a human-labelled record carrying an injected second block certified that block the same way.
 The version after *that* moved to blocks and still certified an envelope appended mid-block, since it only tested what a block began with.
-So the phrase is now looked for in a block's non-envelope regions, and a well-formed envelope's content is not the user's wherever it sits.
+The version after *that* cut envelopes out correctly and then joined the leftovers, so two fragments of a real turn that merely abut once an injection is removed became a matchable span --- a sentence the user never typed, certified as theirs.
+So the phrase is now looked for in a block's non-envelope regions, kept separate, and a well-formed envelope's content is not the user's wherever it sits.
+Five successive revisions, each certifying at a finer granularity than the last;
+the pattern is worth stating plainly, since every one of them looked complete from the inside.
 
 The exit codes keep apart two things that are easy to conflate:
 a phrase absent from the quotable human regions (`1`), and a space in which no such region was available to search (`2` --- a missing root, an unreadable file or directory, an empty phrase, or a crash).

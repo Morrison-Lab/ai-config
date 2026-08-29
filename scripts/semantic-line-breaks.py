@@ -2,8 +2,18 @@
 """
 Reformat Markdown prose to use semantic line breaks.
 
-Semantic line breaks = each sentence or independent clause on its own
-source line. Never break a phrase mid-way at a column boundary.
+Semantic line breaks = each sentence on its own source line, plus a clause
+split at the gate's own flagged boundaries -- currently a sufficiently long
+line broken at a mid-line semicolon. Never break a phrase mid-way at a
+column boundary.
+
+This is NARROWER than the house style documented in
+`shared/writing/semantic-line-breaks.md` ("one clause per line"), which also
+breaks at comma and conjunction boundaries this tool does not detect.
+Prose hand-broken at those wider boundaries gets REJOINED into one line when
+run through this tool, since it first joins a paragraph's lines and then
+only re-splits at the sentence/semicolon boundaries above (ai-config#1416).
+Don't run `--all` over already-compliant prose expecting it to be a no-op.
 
 Sentence and clause predicates come from the same
 `check-new-line-breaks.py` CI pins in `.github/workflows/validate.yml`
@@ -54,6 +64,12 @@ _BULLET_RE = re.compile(r'^(\s*)([-*+]|\d+\.)\s+(.*)', re.DOTALL)
 _HEADING_RE = re.compile(r'^\s*#{1,6}[\s#]')
 _TABLE_RE = re.compile(r'^\s*\|')
 _HR_RE = re.compile(r'^\s*[-*_]{3,}\s*$')
+# Setext H1 underline (`===`). Scoped to `=` only, not `-`: a `-`-underline
+# is CommonMark's Setext H2 form too, but `-` already means horizontal rule
+# and bullet marker in this file, and no file in this corpus uses Setext
+# headings at all (ai-config#1416) -- so only the unambiguous `=` form is
+# handled here, leaving the `-` case for whoever needs it.
+_SETEXT_H1_RE = re.compile(r'^\s{0,3}=+\s*$')
 _FENCE_RE = re.compile(r'^\s*(`{3,}|~{3,})')
 _BQ_RE = re.compile(r'^\s*>')
 _BLANK_RE = re.compile(r'^\s*$')
@@ -489,6 +505,16 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 raw_lines=lines[i:j], first_prefix=marker_str,
             )
             i = j
+            continue
+
+        # Setext H1 heading (`Heading\n===\n`): the underline line never
+        # matches _is_new_block on its own, so without this check it gets
+        # swept into the following prose-paragraph accumulation and joined
+        # onto the heading text -- destroying the heading (ai-config#1416).
+        if i + 1 < len(lines) and _SETEXT_H1_RE.match(lines[i + 1]):
+            output.append(line)
+            output.append(lines[i + 1])
+            i += 2
             continue
 
         # Prose paragraphs

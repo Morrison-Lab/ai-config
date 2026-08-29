@@ -231,6 +231,29 @@ check(
     "> The actual note text goes here.\n",
 )
 
+# Bug 9: a Setext H1 heading (`Heading\n===\n`) must not be joined into a
+# single line -- the underline never matches _is_new_block on its own, so it
+# was falling into the following prose-paragraph accumulation and getting
+# merged onto the heading text, destroying the heading (ai-config#1416).
+check(
+    "Setext H1 heading preserved, not joined",
+    "Some heading\n"
+    "=============\n",
+    "Some heading\n"
+    "=============\n",
+)
+check(
+    "Setext H1 heading preserved ahead of following prose",
+    "Some heading\n"
+    "=============\n"
+    "\n"
+    "Body text here.\n",
+    "Some heading\n"
+    "=============\n"
+    "\n"
+    "Body text here.\n",
+)
+
 # ---------------------------------------------------------------------------
 # Write-guard and diff-scoping tests.
 #

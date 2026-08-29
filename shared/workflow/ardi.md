@@ -665,59 +665,37 @@ covers what fixtures cannot".
 you apply to a reviewer's claims --- a stated blocker becomes a premise
 other people build on.**
 
-**A hold SOMEONE ELSE stated is a premise you inherit, and nothing re-tests
-it.**
-The rule directly above governs a blocker *you* assert, and the one further
-down governs a blocker you have restated until it hardened into the record.
+**A hold SOMEONE ELSE stated is a premise you inherit, and nothing re-tests it.**
+The rule directly above governs a blocker *you* assert, and a later rule in this section governs a blocker you have restated until it hardened into the record.
 Both are about your own claims.
-The mirror is the case nobody owns: a hold written by another agent or another
-session --- in a PR body, an issue comment, a handoff note --- with a reason
-attached, whose reason later stops being true.
+The mirror is the case nobody owns: a hold written by another agent or another session --- in a PR body, an issue comment, a handoff note --- with a reason attached, whose reason later stops being true.
 
-It is worse than a stale blocker of your own, for a reason that has nothing to
-do with diligence.
-The natural response to someone else's stated hold is deference, and deference
-costs nothing at the moment it is chosen: honouring it is always defensible,
-and re-testing it looks like second-guessing a peer.
-So the hold is read as a fact about the artifact rather than as a claim with a
-checkable condition inside it, and it survives exactly as long as nobody feels
-entitled to check.
+It is worse than a stale blocker of your own, for a reason that has nothing to do with diligence.
+The natural response to someone else's stated hold is deference, and deference costs nothing at the moment it is chosen: honouring it is always defensible, and re-testing it looks like second-guessing a peer.
+So the hold is read as a fact about the artifact rather than as a claim with a checkable condition inside it, and it survives exactly as long as nobody feels entitled to check.
 
 **The tell is a hold with a reason in it.**
 "Do not merge" alone is a standing instruction and stays binding.
-"Do not merge, because X may not have happened" is a *conditional*, and X is
-checkable --- usually in one query.
-The two look identical at a glance, because the reason reads as an explanation
-of the instruction rather than as its condition.
+"Do not merge, because X may not have happened" is a *conditional*, and X is checkable --- usually in one query.
+The two look identical at a glance, because the reason reads as an explanation of the instruction rather than as its condition.
 
 **A reviewer honouring the hold is not evidence the hold is warranted.**
 A reviewer honours instructions; it does not audit them.
-It can dissolve the premise itself, in the same comment, and still defer ---
-which is correct behaviour and is precisely why it cannot serve as
-confirmation.
+It can dissolve the premise itself, in the same comment, and still defer --- which is correct behaviour and is precisely why it cannot serve as confirmation.
 
 Testing the premise is yours.
-Lifting the hold is not, when it is another party's, so the deliverable is a
-verified report to a human rather than the action the hold was blocking.
+Lifting the hold is not, when it is another party's, so the deliverable is a verified report to a human rather than the action the hold was blocking.
 
-- **Do:** treat a hold carrying a stated reason as a conditional, and test the
-  condition before reporting the item blocked.
-- **Do:** report what you found to whoever can lift it, naming the condition
-  and the evidence, rather than lifting another party's hold yourself.
-- **Don't:** repeat "held" across status reports without having tested the
-  premise once --- the repetition is what converts a claim into a fact.
-- **Don't:** read a reviewer's deference to the hold as an independent
-  endorsement of it.
+- **Do:** treat a hold carrying a stated reason as a conditional, and test the condition before reporting the item blocked.
+- **Do:** report what you found to whoever can lift it, naming the condition and the evidence, rather than lifting another party's hold yourself.
+- **Don't:** repeat "held" across status reports without having tested the premise once --- the repetition is what converts a claim into a fact.
+- **Don't:** read a reviewer's deference to the hold as an independent endorsement of it.
 
 (`Morrison-Lab/gha#678`, 2026-08-26 to 2026-08-28.
-Its body held the PR because the dogfood review might `self_mod`-skip and "a
-skip is not a verdict".
-Two skips did occur; then gha#674 reached `v2`, a genuine review ran at the
-exact head on 2026-08-27 returning **Ready for merge**, and deferred to the
-hold anyway.
-The PR sat fully clean for two days, and one session reported it as "held by
-its own do-not-merge" in three separate status sweeps before testing the
-premise even once.)
+Its body held the PR because the dogfood review might `self_mod`-skip and "a skip is not a verdict".
+Two skips did occur;
+then gha#674 reached `v2`, a genuine review ran at the exact head on 2026-08-27 returning **Ready for merge**, and deferred to the hold anyway.
+The PR sat fully clean for two days, and one session reported it as "held by its own do-not-merge" in three separate status sweeps before testing the premise even once.)
 
 **Attempting the base form of a command is not attempting its variants ---
 a refusal describes the invocation you ran, never the flag you did not try.**

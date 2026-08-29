@@ -256,7 +256,7 @@
   Before merging (or reporting a PR clean), the coordinator double-checks the agent's work against ground truth: re-verify CI myself (`gh pr checks <N>` / `gh pr view <N> --json mergeable,mergeStateStatus` --- a flaky check may have passed by luck, or main may have moved); read the diff on anything load-bearing (CI/workflow files, security-relevant code, conflict resolutions --- an agent can merge-resolve semantically but silently drop one side, so spot-check both features survived); and read verification artifacts myself.
   ESPECIALLY when the bot review self-skipped:
   a PR editing the review workflow itself --- the reusable `claude-code-review`
-  workflow in `d-morrison/gha`, or the repo's own caller that invokes it,
+  workflow in `Morrison-Lab/gha`, or the repo's own caller that invokes it,
   whatever it's named in that repo --- makes the `@claude` bot self-skip
   (it 401s from a PR ref and only runs after merge),
   and a quota skip has the same effect.
@@ -660,7 +660,7 @@
 - Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
-  On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
+  On workflows with `concurrency: cancel-in-progress` (Morrison-Lab/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
   If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>`.
   Attribute in-flight runs to a PR from each run's own `gather-context` log.
   `gh run list` reports `main` as the branch for every dispatched review.
@@ -701,7 +701,7 @@
 - Keep the bot's `@`-mention trigger phrase OUT of PR/issue comment prose unless you actually intend to dispatch.
   The `issue_comment` trigger fires on the bare mention ANYWHERE in a comment --- even in a sentence saying you're NOT triggering a review (e.g. an ARD summary noting "not posting [the mention]").
   A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
-  On the d-morrison/gha mention bot it also starts a session whose residual-commit sweep can churn the branch.
+  On the Morrison-Lab/gha mention bot it also starts a session whose residual-commit sweep can churn the branch.
   Refer to it obliquely ("re-request review", "the review-trigger mention") or split the tokens (e.g. `@ claude`, with a space). (Learned the hard way on ai-config#41; ardi/iterate/ard carry the warning.)
 - Don't ping EXTERNAL people or repos from our OWN repo's PR/issue/commit/comment text.
   An `@username` for a non-team person (e.g. an upstream maintainer) sends them a GitHub notification, and the `owner/repo#number` shorthand for an external issue posts a cross-reference backlink onto THEIR issue.
@@ -774,7 +774,7 @@
   De-slop, don't ban words or flatten voice; any single tell is innocent --- clustering is the signal.
   Code, terse status lines, and short conversational replies are exempt.
   This is the scan-after counterpart to the plain-prose style above. (see the `find-ai-tells` skill, alias `ai-tells`.)
-- It's always OK to register a repo as a consumer in one of our upstream repos' reverse-dependency list, without asking --- e.g. add it to `d-morrison/gha`'s `REVDEPS.md` when a repo starts calling its reusable workflows.
+- It's always OK to register a repo as a consumer in one of our upstream repos' reverse-dependency list, without asking --- e.g. add it to `Morrison-Lab/gha`'s `REVDEPS.md` when a repo starts calling its reusable workflows.
   Open a small doc-only PR off the upstream's `main`.
   Applies across our orgs: the repository owner, UCD-SERG, ucdavis, UCLA-PHP, UCD-IDDRC.
   The REVDEPS list lets us warn consumers before a breaking tag move, so adding is pure upside.
@@ -1002,7 +1002,7 @@ Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which di
 And custom macro command-names leak into `spelling::spell_check_package()` for `.qmd` files under `vignettes/` (the spelling filter strips common LaTeX like `\text`/`\frac` but not custom macros), so add every macro name used, plus genuine terms, to `inst/WORDLIST`; files under `inst/analyses/` are not spell-checked.
 
 This is the author-side half; the review-side counterpart is
-`d-morrison/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input
+`Morrison-Lab/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input
 (gha#204), which flags PR-diff LaTeX simplifiable via an existing macro and
 nontrivial expressions repeated 3+ times as new-macro candidates. It needs
 `checkout-submodules: true` alongside it (the reviewer has no network-fetch
@@ -1042,11 +1042,11 @@ usage-window rules, and headless dispatch mechanics live there.
 
 ## Default new capabilities on for the owner's own repos, opt-out elsewhere
 
-When adding an optional capability to a repo the user personally owns and
+When adding an optional capability to a repo the user owns or controls and
 treats as shared infrastructure for their *own* other repos (e.g.
-`d-morrison/gha`'s reusable workflows, consumed by d-morrison/UCD-SERG/ucdavis
-repos alike), don't default to pure opt-in just because the repo has
-external, non-owner consumers.
+`Morrison-Lab/gha`'s reusable workflows, consumed by
+Morrison-Lab/d-morrison/UCD-SERG/ucdavis repos alike), don't default to pure
+opt-in just because the repo has external, non-owner consumers.
 **Why:** built a `plugin-marketplaces`/`plugins` passthrough on `gha`'s
 `claude.yml`/`claude-code-review.yml` as opt-in-only (empty by default),
 reasoning that gha serves multiple orgs, not just the user's own repos -- but

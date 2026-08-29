@@ -196,16 +196,16 @@ receive, which makes a stale premise persuasive: the turn opens by telling you
 what the situation is, in the voice of an instruction.
 If the PR merged between arming and firing, acting on "drive #N's findings"
 means working a branch GitHub has already auto-deleted --- the orphaned-branch
-recovery [`claim-pr.md`](claim-pr.md) documents, arrived at from the other
-direction.
+recovery [`use-existing-pr-branch.md`](use-existing-pr-branch.md) documents,
+arrived at from the other direction.
 
 - **Do:** word a wakeup against a re-derivable set ("re-check every PR this
   session opened that has not merged or closed") rather than a fixed
   identifier, so it survives any number of merges in the gap.
 - **Do:** treat a named PR's `state`/`merged` as a claim from a past self, and
-  verify it (one `pull_request_read` `get`) before acting on anything the
-  prompt asserts --- `merged: true` means the correct action is `post-merge`,
-  not another ARD round.
+  verify it (`gh pr view <N> --json state,merged` / `pull_request_read` `get`)
+  before acting on anything the prompt asserts --- `merged: true` means the
+  correct action is `post-merge`, not another ARD round.
 - **Don't:** hard-code a PR number into a wakeup that may outlive it.
 - **Don't:** treat a wakeup's premise as current because it arrives in the
   user role --- it is a message from a past self, and the state it describes

@@ -139,9 +139,11 @@ a `Workflow` verify stage.
 - **Do:** route a judgment-heavy verify stage to a model in a different
   family from the one that produced the finding it's checking, when
   cross-family dispatch is available (`delegate-to-codex`, `agy`,
-  `opencode`).
+  `opencode`) --- as a separate dispatch outside the `Workflow` tool's own
+  `agent()` call, whose `model` parameter is Claude-family only.
 - **Do:** treat cost and independence as separate questions --- a verify
-  stage can be cheap-tier and cross-family at once.
+  stage can be cheap-tier (within `agent()`) and cross-family (via a
+  separate dispatch) at once.
 - **Don't:** apply cross-family routing to a mechanical verify (does this
   file exist, does this number match) --- there is no judgment to
   correlate, so the switch buys nothing and only costs a model-family

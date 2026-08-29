@@ -667,8 +667,8 @@ Use a whitespace-tolerant search rather than `grep`, since a quoted title long e
 
 ## A resolving DOI is not a correct DOI
 
-`scdenney/open-science-skills`'s `paper-review-lite` names a check this corpus doesn't state anywhere: "a DOI that resolves to a *different* real work is the single most common LLM-fabrication signature --- never treat 'DOI resolves' as 'DOI correct.'"
-How common the pattern is is their own measurement to defend;
+`scdenney/open-science-skills`'s `citation-check` names a check this corpus doesn't state anywhere: "a DOI that resolves to a *different* real work is the single most common LLM-fabrication signature --- never treat 'DOI resolves' as 'DOI correct.'"
+How common the pattern is, is their own measurement to defend;
 the mechanism is checkable on its own terms and worth adopting regardless of the ranking.
 A syntactically valid, registered DOI is a much higher bar than an invented one, so a fabricated citation is more likely to carry a real DOI that belongs to some *other* paper than to carry one that resolves to nothing.
 So the check a citation needs is not "does this DOI resolve" but "does the resolved **title and authors** match *this* entry."
@@ -697,5 +697,5 @@ it is not yet built here.
 - **Don't:** assume a style renders (or omits) the DOI field without checking that style's own `.bst` or documentation.
 - **Don't:** audit every `.bib` entry when only the cited subset can ever reach a reader.
 
-(Pattern observed in `scdenney/open-science-skills`'s `paper-review-lite`, CC BY-NC 4.0 --- pattern only, nothing copied;
+(Pattern observed in `scdenney/open-science-skills`'s `citation-check`, CC BY-NC 4.0 --- pattern only, nothing copied;
 ai-config#882.)

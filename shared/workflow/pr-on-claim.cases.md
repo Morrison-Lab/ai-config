@@ -21,8 +21,12 @@ Re-running the POST bare discharged it and produced a second, identical refusal 
 ## The blocked-request test's false positive on auto-requesting repos
 
 (Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
-The repo's `main` ruleset carries `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false`, so neither request was ever needed.
-Copilot separately did stay silent on that PR, which is the distinct third state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) records --- the point here is that the empty pending-list was not the evidence for it.)
+The repo's `main` ruleset carried `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false` as of 2026-08-03, so neither request was ever needed.
+Copilot separately did stay silent on that PR, which is the distinct third state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) records --- the point here is that the empty pending-list was not the evidence for it.
+**This does not describe the repo's current state.**
+Re-measured 2026-08-04, the rule was absent: `main`'s ruleset carried only `deletion`, `non_fast_forward`, and `pull_request`, no org-level parent ruleset supplied it either, and the change happened in the one day between the two measurements.
+Re-read the ruleset before trusting this record for `copilot_code_review`'s presence, per [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md) --- the query in the "Three surfaces fail to discriminate a vanished pending request" case record just below reconfirmed the same absence on 2026-08-06, two days later.
+Tracked as [ai-config#1148](https://github.com/Morrison-Lab/ai-config/issues/1148).)
 
 ## Request the reviewer in the same step; don't leave it "review owed"
 

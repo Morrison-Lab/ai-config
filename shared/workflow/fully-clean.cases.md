@@ -724,6 +724,12 @@ stretch.
 Twenty-one consecutive polls of the check run returned `in_progress`; one
 read of the job's step list showed `Complete job` already `completed`.)
 
+## A paginated sweep with inconsistent page size skipped 8 of 30 items and read as complete
+
+(`Morrison-Lab/gha#361`, 2026-07-29: verifying 30 check runs before declaring the PR fully clean, the sweep changed page size mid-flight --- `perPage: 4, page: 1` (items 1-4), then `perPage: 12, page: 2` (items 13-24), then `perPage: 12, page: 3` (items 25-30).
+Items 5-12 were never fetched.
+Every page returned real, green data and `total_count: 30` was present on all three, so nothing in any single response flagged the gap --- only noticing that 4 + 12 + 6 = 22, not 30, caught it before the PR was reported clean.)
+
 ## A later comment stating no verdict does not supersede an earlier one
 
 (Morrison-Lab/ai-config#1267, 2026-08-07, reverted by #1275.

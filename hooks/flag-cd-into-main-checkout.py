@@ -59,7 +59,9 @@ import sys
 # `cd` at the start of the command or of any segment (`;`, `&&`, `||`, a
 # newline, or a pipe). Quoted and bare targets both.
 CD_RE = re.compile(
-    r"""(?:^|[;&|\n]|\|\|)\s*cd\s+(?P<q>['"]?)(?P<path>[^'"\s;&|]+)(?P=q)""",
+    # No `\|\|` alternative: the character class already matches a single
+    # `|`, so `||` is matched by it and the extra branch is unreachable.
+    r"""(?:^|[;&|\n])\s*cd\s+(?P<q>['"]?)(?P<path>[^'"\s;&|]+)(?P=q)""",
     re.MULTILINE,
 )
 

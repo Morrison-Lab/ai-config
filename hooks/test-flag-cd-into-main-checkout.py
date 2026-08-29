@@ -39,13 +39,20 @@ FIRES = [
 
 QUIET = [
     # The reason this guard is narrow: these are all ordinary.
+    #
+    # Every entry here MUST contain an actual `cd`. One of them originally did
+    # not --- a bare path with `&& ls` --- so it was a silent duplicate of "no
+    # cd at all" and covered nothing. Mutation testing could not find it:
+    # mutating the guard cannot make a case fire whose INPUT never reaches the
+    # matcher, so a vacuous negative case is invisible to exactly the technique
+    # that catches a vacuous positive one.
     ("cd to an UNRELATED repo", "cd /home/u/Documents/GitHub/ai-config && python3 s.py"),
     ("cd deeper inside the worktree", f"cd {WT}/subdir && ls"),
     ("cd to the worktree root itself", f"cd {WT} && ls"),
     ("no cd at all", "git status --short"),
     ("git -C against the repo, the correct form", f"git -C {REPO} status --short"),
     ("the repo path mentioned but not cd'd", f"echo {REPO} && grep x f"),
-    ("cd to a sibling worktree", f"{REPO}/.claude/worktrees/other && ls"),
+    ("cd to a sibling worktree", f"cd {REPO}/.claude/worktrees/other && ls"),
     # These two stay quiet because an unexpanded target joins literally and so
     # cannot equal the repo path. They document that behaviour rather than
     # discriminating: no mutation of the guard makes either one fire.

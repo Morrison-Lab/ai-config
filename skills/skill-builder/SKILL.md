@@ -93,27 +93,32 @@ Rule out extending an existing skill *before* scaffolding anything:
    reason.
    `scripts/` was in none of the searched paths.)
 
-2. **Scan EVERY branch AND every local worktree for in-flight work** — you,
-   another CLI session, or the `@claude` bot may already be adding it. A
-   parallel CLI session usually builds its skill in an **unpushed local
-   worktree**, so a remote-only `git branch -r` scan misses it entirely (this
-   hit PR #67 — a sibling skill was caught only by a stray system-reminder, not
-   the scan). Scan local refs *and* the worktree working trees too:
+2. **Scan EVERY branch AND every local worktree for in-flight work --- the whole tree, not only `skills/`.**
+   You, another CLI session, or the `@claude` bot may already be adding it, and a growing share of contributions are edits to `shared/`, `CLAUDE.md`, `memories/`, or `scripts/` rather than a new `skills/<name>/` directory, so a `skills/`-scoped scan is blind to exactly the kind of parallel work most likely to collide (Morrison-Lab/ai-config#776).
+   A parallel CLI session usually builds its skill in an **unpushed local worktree**, so a remote-only `git branch -r` scan misses it entirely (this hit PR #67 --- a sibling skill was caught only by a stray system-reminder, not the scan).
+   Scan local refs *and* the worktree working trees too:
    ```bash
    git fetch origin --prune
-   # local + remote branches — NOT just -r; unpushed local branches count:
+   # local + remote branches --- NOT just -r; unpushed local branches count.
+   # Whole-tree filename match, not skills/[^/]*<keyword> --- a colliding edit
+   # to shared/ or CLAUDE.md has no skills/ path to match:
    for b in $(git branch -a --format='%(refname:short)' | grep -v HEAD); do
-     git ls-tree -r --name-only "$b" | grep -iE "skills/[^/]*<keyword>" \
-       | sed "s|^|$b: |"
+     git ls-tree -r --name-only "$b" | grep -iE "<keyword>" | sed "s|^|$b: |"
    done
    # uncommitted, ref-less work in sibling worktrees — list only UNTRACKED
-   # files, so shipped skills (committed in the main worktree) don't false-match.
+   # files (whole tree, not just skills/), so shipped skills (committed in the
+   # main worktree) don't false-match.
    # Read paths via sed + `while read` (not $(...)/awk $2) so paths with spaces
    # survive:
    git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do
-     git -C "$wt" ls-files --others --exclude-standard -- 'skills/' 2>/dev/null \
-       | grep -iE "skills/[^/]*<keyword>" | sed "s|^|$wt: |"
+     git -C "$wt" ls-files --others --exclude-standard 2>/dev/null \
+       | grep -iE "<keyword>" | sed "s|^|$wt: |"
    done
+   # A filename match still misses an EDIT to an existing shared/ or CLAUDE.md
+   # file that introduces the concept with no new path to catch --- pickaxe by
+   # content instead, recent-window scoped so it doesn't drown in unrelated
+   # history:
+   git log --all --oneline --since=14.days -S'<keyword>' -- shared/ memories/ scripts/ hooks/ CLAUDE.md
    ```
    If a branch or worktree is already building it, **continue that work** (check
    it out / extend its PR) instead of opening a colliding parallel branch.

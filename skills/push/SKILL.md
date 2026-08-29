@@ -125,7 +125,7 @@ A fetch from earlier in the session is a measurement of a moment that has passed
 
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git ls-remote --heads origin "$BRANCH"   # LS_REMOTE --- read-only; updates no ref
+git ls-remote --heads origin "$BRANCH"   # read-only; updates no ref
 ```
 
 If the tip it reports is not an ancestor of the ref you are **pushing** (`git merge-base --is-ancestor <tip> <source>`), **back off** --- another session (or the author) is driving this branch right now.
@@ -183,7 +183,7 @@ with its commits or trigger a redundant re-run.
 
 ```bash
 gh run list --branch "$BRANCH" --json status,name \
-  -q '.[] | select(.status=="in_progress" or .status=="queued") | .name'
+  -q '.[] | select(.status=="in_progress" or .status=="queued") | .name'   # LIST_WORKFLOW_RUNS
 ```
 
 If a `@claude` / review workflow is `in_progress` or `queued`, wait for it to
@@ -195,7 +195,7 @@ Never `git push --force` / `-f`.
 It overwrites the remote tip unconditionally, including commits another agent pushed since you last looked.
 
 ```bash
-git push --force-with-lease --force-if-includes
+git push --force-with-lease --force-if-includes   # PUSH
 ```
 
 `--force-if-includes` (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: `--force-with-lease` compares against your *remote-tracking ref*, so any background fetch --- a poller, another tool in the same checkout, a `--recurse-submodules` fetch --- silently refreshes that ref and the lease then passes over the very commits it existed to protect.

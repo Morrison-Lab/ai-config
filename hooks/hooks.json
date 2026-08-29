@@ -602,6 +602,18 @@
             "why": "skills/check-history/SKILL.md invokes its issue/PR checks at read time, and the omission is broken at the first Write/Edit, which leaves no artifact for review or tests to catch. Warns, never blocks."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-cd-into-main-checkout.py\"",
+            "timeout": 10,
+            "script": "flag-cd-into-main-checkout.py",
+            "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
+          }
+        ]
       }
     ],
     "Stop": [

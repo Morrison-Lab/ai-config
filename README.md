@@ -358,6 +358,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
+| `flag-cd-into-main-checkout.py` | `PreToolUse` (Bash) | warns, never blocks, when a worktree-rooted session `cd`s into the MAIN checkout of its own repository, where every edit and every check silently succeeds against another branch |
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |

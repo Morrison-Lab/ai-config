@@ -392,6 +392,30 @@ return a review", with the 15-minute timeout and session
 A review fix was already staged, so the push carried the re-trigger, and
 Jules returned `VERDICT: approve` on the new head about four minutes later.)
 
+## A precondition failure at session creation has no session id to check, and a reproducing retry means unreachable rather than transient
+
+(Morrison-Lab/ai-config#851, 2026-07-30: `jules/review` failed on PR #849
+with a `400 Bad Request` from `POST .../v1alpha/sessions`, carrying a
+`"Precondition check failed."` message and `status: FAILED_PRECONDITION`,
+thrown before a session ever existed.
+The two cases above both have a session id to anchor the read; this one has
+none, so their shortcuts do not apply, and the job log is the only route in.
+The log ruled out the two easy explanations: `400` rather than `401`/`403`
+means a malformed request or a precondition, not a rejected credential
+(an invalid key fails at creation with 401/403, per the case above); and
+Jules had approved the same PR on the same key about 20 minutes earlier, so
+the key itself was not stale.
+The discriminator that mattered was the retry.
+`rerun_failed_jobs` on run `30511325710`, with no code change, reproduced the
+identical `400 FAILED_PRECONDITION` --- the opposite of what the two cases
+above did, where a no-op retry or a fresh push cleared the failure.
+A retry that reproduces is the negative control that separates a genuine
+crash (retry it) from an unreachable reviewer (stop retrying and say which
+reviewers' verdicts the readiness call rests on).
+The precondition itself was never confirmed --- an account-level session or
+quota limit is consistent with the evidence but untested --- so it was left
+as a stated hypothesis rather than a claimed finding.)
+
 ## The cross-repo test that localizes a durable credential failure
 
 (d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven

@@ -664,3 +664,68 @@ Use a whitespace-tolerant search rather than `grep`, since a quoted title long e
 - **Do:** quote a title you are citing only if you have just read it, since a resolving link is no evidence about the text beside it.
 - **Don't:** read a green `check-links.py` as covering a quoted title --- it discards link text and strips anchors by construction.
 - **Don't:** expect the citing file's own review to catch this --- the edit that invalidated it happened somewhere else.
+
+## A resolving DOI is not a correct DOI
+
+`scdenney/open-science-skills`'s `paper-review-lite` names a check this
+corpus doesn't state anywhere: "a DOI that resolves to a *different* real
+work is the single most common LLM-fabrication signature --- never treat
+'DOI resolves' as 'DOI correct.'" How common the pattern is is their own
+measurement to defend; the mechanism is checkable on its own terms and
+worth adopting regardless of the ranking. A syntactically valid,
+registered DOI is a much higher bar than an invented one, so a fabricated
+citation is more likely to carry a real DOI that belongs to some *other*
+paper than to carry one that resolves to nothing. So the check a citation
+needs is not "does this DOI resolve" but "does the resolved **title and
+authors** match *this* entry." A resolving DOI pointing at the wrong paper
+passes every naive existence check while being exactly the error worth
+catching. Verify against the DOI's own metadata --- Crossref's
+`https://api.crossref.org/works/<doi>` is a stable, unauthenticated
+lookup; add `&mailto=<address>` to a *search* query
+(`works?rows=5&query.bibliographic=<title first-author year>`) for
+Crossref's documented "polite pool" of higher rate limits, and fall back to
+OpenAlex on an HTTP 429 --- rather than trusting resolution alone.
+
+**The reason a wrong DOI stays hidden: a citation style can render every
+field except the one that would catch the error.** BibTeX's classic
+styles --- `plain`, `unsrt`, `abbrv`, and `alpha`, shipped with the
+original 1985 BibTeX distribution, plus the similarly long-standing
+`apalike` --- predate the DOI system (launched 2000) by roughly fifteen
+years, so their format routines were never written to print a field that
+didn't exist yet. A wrong or dead DOI in a `.bib` entry using one of these
+is invisible in the compiled PDF while author, year, title, volume, issue,
+and pages all render correctly and look checked. **Verify the specific
+style actually in use against its own `.bst` source or documentation
+before assuming it omits (or prints) the field** --- this list is not
+exhaustive, and a style can be patched or forked to add DOI support. The
+general lesson holds regardless of which style is in play: for a field a
+reader can see, a compiled read is itself a partial check; for one they
+can't, only checking the field directly against its target catches an
+error there.
+
+**Scope any `.bib` audit to the keys actually `\cite`d, not every entry in
+the file.** A LaTeX document only prints entries reached by `\cite`
+(transitively, following any `\input`/`\include`), so an unused `.bib`
+entry can carry an arbitrary DOI with no reader ever seeing it render.
+Auditing it spends effort on a defect nobody can encounter, and skipping
+this scoping step risks reporting false urgency on an entry the document
+never surfaces.
+
+The mechanical half --- given a `.bib`, resolve each cited DOI and diff the
+returned title and first author against the entry --- is a deterministic
+check with an exact verdict, the shape [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
+says should not stay a prose instruction; it is not yet built here.
+
+- **Do:** verify a cited DOI resolves to a work whose title and authors
+  match the citation, not just that it resolves.
+- **Do:** confirm which fields your document's actual citation style
+  renders before trusting a compiled-PDF read to catch a wrong DOI.
+- **Do:** scope a `.bib` audit to the keys the document actually `\cite`s.
+- **Don't:** treat "the DOI resolves" as "the DOI is correct."
+- **Don't:** assume a style renders (or omits) the DOI field without
+  checking that style's own `.bst` or documentation.
+- **Don't:** audit every `.bib` entry when only the cited subset can ever
+  reach a reader.
+
+(Pattern observed in `scdenney/open-science-skills`'s `paper-review-lite`,
+CC BY-NC 4.0 --- pattern only, nothing copied; ai-config#882.)

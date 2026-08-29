@@ -940,10 +940,10 @@ is incidental to which head the run actually reviewed.**
 
 **A review citing a SHA that is not the PR's head is usually an intermediate commit, not a fabricated one --- resolving it locally settles which.**
 The cases above are about which SHA to trust when several are in play;
-this one is about a body citing a SHA that resolves to nothing you were expecting at all, which reads like the fabricated-fact case that opens this file's review-of-a-review guidance.
-A round with more than one commit --- a fix plus a later `Merge origin/main` on top, say --- has a real, resolvable commit for the fix that is neither the round's first commit nor its head, and a reviewer naming that commit is often the more useful citation of the two.
+this one is about a body citing a SHA that matches none of them, which first reads as a hallucinated citation.
+A round with more than one commit --- a fix plus a later `Merge origin/main` on top, say --- has a real, resolvable commit for the fix that is not the round's head, and a reviewer naming that commit is often the more useful citation of the two.
 
-- **Do:** run `git cat-file -t && git show -s --format='%h %an %s' ` on a cited SHA that does not match the head before concluding it is fabricated.
+- **Do:** run `git cat-file -t <sha> && git show -s --format='%h %an %s' <sha>` on a cited SHA that does not match the head before concluding it is fabricated.
 - **Do:** read a resolvable SHA that sits in the branch's own history as a legitimate citation of an intermediate commit, not a hallucination.
 - **Don't:** treat a claim about **PR state** ("this was already merged", "CI already passed") the same as a claim about **which commit** did something --- the former still deserves the API check this file opens with;
   a bare SHA mismatch does not.

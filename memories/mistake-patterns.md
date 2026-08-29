@@ -464,3 +464,24 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes, and narrower than Pattern 25's proposed hook: a pre-push guard could `git fetch origin <default-branch>` (or compare the local `origin/<default-branch>` SHA against a live `ls-remote`) before invoking the diff-scoped checker, rather than trusting whatever ref happens to be cached locally.
   Not yet built.
+
+## Pattern 27: Trusting an Earlier Clean `new-line-breaks` Run After the Diff Grew
+- **Do**: Re-run the diff-scoped `new-line-breaks` check immediately before the actual `git push`, against the diff as it will be pushed --- not once, mid-task, against whatever the diff happened to contain at that point.
+  If any file is added or edited after the check last ran clean (a changelog fragment, a doc paragraph, a Tests-section writeup), that result no longer describes the diff being pushed and buys nothing.
+- **Don't**: Treat a clean result from earlier in the session as still valid once more files have been written, on the reasoning that the check "already passed" for this task --- the check answers for the diff it examined, not for the task as a whole, and a diff that keeps growing after a scoped, capable machine has confirmed it clean is a diff nobody has actually looked at completely, not one that stays vouched-for by inertia.
+- **Example**: 2026-08-29 GII session (`Morrison-Lab/gha`, not `ai-config` --- confirming this generalizes past the repo Pattern 25/26 were recorded in), wave of 3 PRs, hit identically on all three, each caught only by CI rather than by re-checking before push:
+  PR #731 (`assemble-news`, closes #727): the check ran clean partway through implementation, then a changelog fragment was written afterward and pushed unchecked --- CI's `new-line-breaks` job flagged one two-sentence line in it.
+  PR #732 (`ai-code-review`, closes #729): identical shape, two multi-sentence lines in that PR's own changelog fragment.
+  PR #735 (`audit_capability_versioning_docs`, closes #730): the check ran clean against the script and its tests, then a `CLAUDE.md` Tests-section paragraph and a changelog fragment were both written afterward --- four multi-sentence lines across the two files, all unchecked before push.
+  Each was diagnosed from the CI job log, reproduced locally, fixed with a semantic-line-break pass, and confirmed clean by re-running the same command --- the fix was fast each time, but three CI round-trips in one session were paid for a check that had already been run once, just not against the diff that actually shipped.
+- **Canonical Rule**: Pattern 25 establishes running the check at all.
+  Pattern 26 establishes running it against a fresh base ref.
+  This is the third axis: freshness of the **diff itself**, not the base it's compared against or whether the check ran at all.
+  `gha`'s own `CLAUDE.md` ("Running that check locally before a push proves nothing about files you have not committed yet") already states the committed-vs-uncommitted half of this.
+  It does not name the mid-task-diff-growth half explicitly, which is the gap this pattern closes.
+- **Fix**: Run the check as the last local step before `git push`, after every file for that push is written and staged --- never earlier in the sequence, however natural a mid-task checkpoint feels.
+  In a multi-file PR, that means one run per push, positioned after the *last* file (docs, changelog fragment, test) is added, not after the code.
+- **Algorithmatizable?**
+  Yes, and the same instrument Pattern 25 already proposes (a pre-push guard running the diff-scoped checker) closes this pattern too, for free: a guard that fires immediately before `git push` sees the diff as it will actually be pushed by construction, which is exactly the freshness this pattern is missing when the check is instead run by hand at an arbitrary earlier point.
+  No separate hook is needed.
+  Pattern 25's proposed guard (ai-config#2590) already covers this axis once built.

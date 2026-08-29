@@ -95,11 +95,11 @@ Rule out extending an existing skill *before* scaffolding anything:
 
 2. **Scan EVERY branch AND every local worktree for in-flight work --- the whole tree, not only `skills/`.**
    You, another CLI session, or the `@claude` bot may already be adding it, and a growing share of contributions are edits to `shared/`, `CLAUDE.md`, `memories/`, or `scripts/` rather than a new `skills/<name>/` directory, so a `skills/`-scoped scan is blind to exactly the kind of parallel work most likely to collide (Morrison-Lab/ai-config#776).
-   A parallel CLI session usually builds its skill in an **unpushed local worktree**, so a remote-only `git branch -r` scan misses it entirely (this hit PR #67 — a sibling skill was caught only by a stray system-reminder, not the scan).
+   A parallel CLI session usually builds its skill in an **unpushed local worktree**, so a remote-only `git branch -r` scan misses it entirely (this hit PR #67 --- a sibling skill was caught only by a stray system-reminder, not the scan).
    Scan local refs *and* the worktree working trees too:
    ```bash
    git fetch origin --prune
-   # local + remote branches — NOT just -r; unpushed local branches count.
+   # local + remote branches --- NOT just -r; unpushed local branches count.
    # Whole-tree filename match, not skills/[^/]*<keyword> --- a colliding edit
    # to shared/ or CLAUDE.md has no skills/ path to match:
    for b in $(git branch -a --format='%(refname:short)' | grep -v HEAD); do
@@ -118,7 +118,7 @@ Rule out extending an existing skill *before* scaffolding anything:
    # file that introduces the concept with no new path to catch --- pickaxe by
    # content instead, recent-window scoped so it doesn't drown in unrelated
    # history:
-   git log --all --oneline --since=14.days -S'<keyword>' -- shared/ memories/ scripts/ CLAUDE.md
+   git log --all --oneline --since=14.days -S'<keyword>' -- shared/ memories/ scripts/ hooks/ CLAUDE.md
    ```
    If a branch or worktree is already building it, **continue that work** (check
    it out / extend its PR) instead of opening a colliding parallel branch.

@@ -834,7 +834,14 @@ def offending(command: str, payload: dict | None = None):
             continue  # Allowed via active MWC session grant
         if standing_grant_target(masked_command[start:end], inert_command[start:end]):
             continue  # Allowed via the standing per-repository grant
-        return hit, orig_seg.strip()
+        # Report every interpretation this segment matches, not just the
+        # first: `hit` alone can name the wrong merge type when a segment
+        # satisfies several patterns at once (ai-config#1362) -- a real
+        # BRANCH merge carrying a forged `pulls/N/merge` substring reads as
+        # "gh api PR merge", pointing whoever is debugging the refusal at
+        # patterns that explain nothing.
+        labels = matched_merge_labels(masked_command[start:end], inert_command[start:end])
+        return labels, orig_seg.strip()
     return None
 
 
@@ -867,6 +874,17 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
     return tool_name, segment
 
 
+def _join_labels(labels) -> str:
+    """Render a set of matched merge-type labels as backtick-quoted prose:
+    one label alone, two joined by "and", three or more Oxford-commaed."""
+    quoted = sorted(f"`{label}`" for label in labels)
+    if len(quoted) == 1:
+        return quoted[0]
+    if len(quoted) == 2:
+        return f"{quoted[0]} and {quoted[1]}"
+    return ", ".join(quoted[:-1]) + f", and {quoted[-1]}"
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -888,9 +906,16 @@ def main() -> int:
     if not hit:
         return 0
 
-    label, segment = hit
+    label_or_labels, segment = hit
+    # check_mcp_merge (the MCP path) returns a single label string; offending
+    # (the Bash path) returns the full set every interpretation matches, per
+    # ai-config#1362. Normalize both to a set before rendering.
+    labels = (label_or_labels if isinstance(label_or_labels, (set, frozenset))
+              else {label_or_labels})
+    verb = "is" if len(labels) == 1 else "are"
     reason = (
-        f"MECHANISTIC PROHIBITION: `{label}` is strictly blocked without explicit permission.\n\n"
+        f"MECHANISTIC PROHIBITION: {_join_labels(labels)} {verb} strictly "
+        "blocked without explicit permission.\n\n"
         f"    Offending call/segment: {segment}\n\n"
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "

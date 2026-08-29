@@ -1528,7 +1528,9 @@ When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-st
 
 [shared/workflow/quotable-findings.md](shared/workflow/quotable-findings.md)
 
-A mechanical pre-filter on findings you produce, not findings you receive — the mirror of `address-every-comment.md`'s reviewer-verification checks. Applies wherever this corpus produces or verifies review-shaped findings: `ard`/`ardi`'s self-review step, `code-review`, the prose-review skills, `grade-work`, and any `Workflow` adversarial-verify pattern, ahead of its expensive judgment vote. An absence finding (a missing test, an uncited claim) is exempt from quoting and instead names the location the missing thing belongs.
+A mechanical pre-filter on findings you produce, not findings you receive --- the mirror of `address-every-comment.md`'s reviewer-verification checks.
+Applies wherever this corpus produces or verifies review-shaped findings: `ard`/`ardi`'s self-review step, `code-review`, the prose-review skills, `grade-work`, and any `Workflow` adversarial-verify pattern, ahead of its expensive judgment vote.
+An absence finding (a missing test, an uncited claim) is exempt from quoting and instead names the location the missing thing belongs.
 
 ## Useful prompt formats for coding agents
 

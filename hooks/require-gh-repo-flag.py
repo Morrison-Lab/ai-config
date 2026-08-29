@@ -54,13 +54,16 @@ GATED = [
 # the same implicit-target hazard even though the path looks explicit.
 API_PLACEHOLDER = re.compile(LEAD + r"api\b[^\n]*\{(owner|repo)\}")
 
-# `gh secret set`/`variable set` have three mutually exclusive target
-# selectors -- -R/--repo, -o/--org, -u/--user -- not one. Discharging only on
-# -R left every org/user-scoped write gated with no way to satisfy the guard
-# short of an inert -R that names nothing gh actually uses for that command
+# `gh secret set`/`delete` have three mutually exclusive target selectors --
+# -R/--repo, -o/--org, -u/--user; `gh variable set`/`delete` only have two,
+# -R/--repo and -o/--org (no -u/--user). Discharging only on -R left every
+# org/user-scoped write gated with no way to satisfy the guard short of an
+# inert -R that names nothing gh actually uses for that command
 # (ai-config#2367). -o/--org and -u/--user are equally explicit targets, so
 # accepting them preserves the guard's actual invariant ("the target is
-# named, not inherited from cwd") rather than a proxy for it.
+# named, not inherited from cwd") rather than a proxy for it. Note -u/--user
+# on `secret set`/`delete` is a bare boolean flag (targets the currently
+# authenticated account) -- it takes no value, unlike -R/-o.
 HAS_REPO_FLAG = re.compile(
     r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
 )
@@ -108,7 +111,8 @@ def main() -> int:
         "whichever selector actually applies:\n\n"
         f"    -R <owner>/<repo>   (repository)\n"
         f"    -o <org>            (organization)\n"
-        f"    -u <user>           (user)\n\n"
+        f"    -u                  (your own user account -- no value; "
+        f"`gh secret` only, not `gh variable`)\n\n"
         "If you genuinely mean 'whatever repo the cwd points at', run `git "
         "remote -v` first and then pass that repo by name anyway."
     )

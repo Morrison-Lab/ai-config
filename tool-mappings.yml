@@ -129,7 +129,7 @@ operations:
     github_mcp: mcp__github__manage_repository_notification_subscription (action=watch)
   - id: LIST_NOTIFICATIONS
     description: List the authenticated user's notifications across every repo, optionally filtered to one repo. One call covers every subscribed thread, which is cheaper than polling N PRs individually and can see a PR another session opened. **Requires the `notifications` toolset, off by default.**
-    cli: gh api notifications
+    cli: gh api --paginate notifications
     github_mcp: mcp__github__list_notifications
   - id: MANAGE_NOTIFICATION_SUBSCRIPTION
     description: Watch, ignore, or delete the subscription on a specific notification **thread** (needs a thread/notification id from LIST_NOTIFICATIONS, not a bare PR/issue number --- there is no REST endpoint to subscribe to an arbitrary PR/issue directly without an existing thread). Narrower than WATCH_PR; only useful once a thread already exists (e.g. you were mentioned or already participated). **Requires the `notifications` toolset, off by default.**

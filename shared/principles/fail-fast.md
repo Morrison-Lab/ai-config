@@ -219,6 +219,22 @@ Re-running it to ask of each fallback whether the file actually carried a proven
 - **Don't:** read "every answer is well-formed" as "every answer is right" when a fallback can produce a well-formed wrong one.
 - **Don't:** report a zero from a sweep whose buckets were never shown to discriminate.
 
+### A sixth cause: verifying rendered output can read a stale copy
+
+The five causes above all leave the check examining the wrong population within the repository.
+This one leaves the repository alone and reads a **fetched artifact** instead --- a deployed preview page, a rendered HTML table --- whose broken state and whose meaningful state print identically for a different reason: an intermediary served an old copy.
+
+A CDN or proxy cache in front of a PR-preview deployment can serve the **previous** build for a stretch after a push, so a plain fetch immediately after pushing can return old content while the branch and the deploy are both correct.
+That reads exactly like a failed deploy or a lost edit, and the natural response --- re-checking the branch, re-running the build --- finds nothing wrong, because nothing is.
+
+- **Do:** cache-bust the fetch with a query parameter (`?cb=$RANDOM$RANDOM`), since an intermediary can ignore no-cache headers but not a different URL.
+- **Do:** add `Cache-Control: no-cache` and `Pragma: no-cache` headers as a second line of defense, alongside the cache-busting parameter rather than instead of it.
+- **Don't:** conclude a deploy failed, or an edit was lost, from a fetch that disagrees with the source until a cache-busted re-fetch has been tried.
+- **Don't:** treat this as covered by the parsing-assertion advice above --- a stale-but-well-formed page passes any assertion about its own shape;
+  only a fresh fetch can tell the two states apart.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A cache-busted re-fetch resolved a preview page that looked like a failed deploy".
+
 ### A named regression test is checked against its rule, not against a commit
 
 The causes above are about a check that cannot see a failure.

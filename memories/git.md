@@ -8,6 +8,16 @@ Stash-specific behavior: [`git-stash.md`](git-stash.md).
 Tag management: [`git-tags.md`](git-tags.md).
 Worktree-specific behavior: [`git-worktrees.md`](git-worktrees.md).
 
+## Git push with multiple writable remotes
+
+- **An unqualified `git push` follows the branch's configured upstream, not the repository's canonical remote.**
+  In a dual-forge checkout, the last `git push -u` can leave a branch tracking the review mirror.
+  A later `git push` then succeeds while the canonical branch stays stale.
+- **Do:** name each required remote explicitly, such as `git push origin HEAD:<branch>` followed by `git push github HEAD:<branch>`.
+  Query both servers afterward with `git ls-remote --exit-code --branches <remote> "refs/heads/$BRANCH"`, and require each returned SHA to equal `git rev-parse HEAD`.
+- **Don't:** infer that both forges advanced because one unqualified push succeeded, or rely on the current upstream when the workflow assigns different roles to multiple writable remotes. (ucdavis/matt.contracts#63, 2026-08-28: an unqualified push updated the GitHub review mirror only;
+  exact-SHA verification caught canonical GitLab one commit behind before the MR was marked ready.)
+
 ## Git branches
 
 See [`git-branches.md`](git-branches.md) for branch and remote-branch

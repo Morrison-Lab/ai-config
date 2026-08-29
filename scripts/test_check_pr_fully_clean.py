@@ -1945,6 +1945,28 @@ def main() -> int:
           checker._unresolved_finding_pattern(
               "## Findings on the diff content\n\n1. A real finding\n")
           is not None)
+    # ai-config#1233: the exact reported false-positive shapes. Each was
+    # confirmed to misfire before #2488/#2506/#2515 landed the resolving-
+    # first-line logic above; these pin the fix against the precise wording
+    # reported live rather than only the generic "None." cases already
+    # covered, since #1233's own shape (multi-line prose trailing the
+    # resolving word) had no dedicated regression test.
+    check("#1233's own reprex: 'None.' plus multi-line prose resolves",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone. No CLAUDE.md/lab-manual violations, "
+              "no hallucinated symbols/APIs/citations,\nno logic errors, "
+              "no duplication of existing corpus content.\n\n"
+              "### Verdict\n\n**Ready for merge.**\n")
+          is None)
+    check("#1233 comment: 'None. <same-line prose>' resolves",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone. This commit is a well-reasoned, "
+              "focused fix.\n\n### Verdict\n\nReady for merge\n")
+          is None)
+    check("#1233 comment: bare 'None.' with an unbolded verdict resolves",
+          checker._unresolved_finding_pattern(
+              "### Findings\n\nNone.\n\n### Verdict\n\nReady for merge\n")
+          is None)
     # #2488 review round: colon/dash-led trailing text is the section's
     # first content line (a one-line finding written on the heading must
     # not be swallowed); bare descriptive trailing stays decoration.

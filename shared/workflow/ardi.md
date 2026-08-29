@@ -666,7 +666,7 @@ you apply to a reviewer's claims --- a stated blocker becomes a premise
 other people build on.**
 
 **A hold SOMEONE ELSE stated is a premise you inherit, and nothing re-tests it.**
-The rule directly above governs a blocker *you* assert, and a later rule in this section governs a blocker you have restated until it hardened into the record.
+The rule directly above governs a blocker *you* assert, and this section separately covers a blocker you have restated until it hardened into the record.
 Both are about your own claims.
 The mirror is the case nobody owns: a hold written by another agent or another session --- in a PR body, an issue comment, a handoff note --- with a reason attached, whose reason later stops being true.
 

@@ -792,7 +792,7 @@ That answer is a standing yes across all PRs you are driving.
 Subscribe with `subscribe_pr_activity` when that tool exists (provided by the GitHub MCP server in remote/web sessions), or babysit locally.
 A subscription does not replace the persistent loop: PR-activity webhooks do not deliver CI success, new pushes, or merge / merge-conflict transitions (see [`memories/github-mcp-tools.md`](memories/github-mcp-tools.md)).
 Claude's wake is a `/loop`, `send_later`, `CronCreate`, or schedule timer, per `AGENTS.md`.
-Re-arm it periodically, since webhooks can't fill that gap.
+Re-arm it periodically, since webhooks can't fill that gap --- and word each re-arm against a re-derivable set of PRs rather than a fixed number, per `ardi.md`'s "A scheduled check-in can outlive the PR it names" section.
 Drive every review round to fully-clean.
 
 This watch process never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review --- don't also post "@claude review again" in the same round.

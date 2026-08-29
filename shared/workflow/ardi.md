@@ -187,6 +187,35 @@ does not authorize merging it.
 ARD every item from every review, then request fresh reviews
 (ai-config#2274).
 
+**A scheduled check-in can outlive the PR it names, and its stale premise arrives as a user instruction.**
+Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets
+read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is
+written at T, stored, and delivered at T+N with no intervening reader.
+And it arrives as a user-role turn, the most authoritative framing a turn can
+receive, which makes a stale premise persuasive: the turn opens by telling you
+what the situation is, in the voice of an instruction.
+If the PR merged between arming and firing, acting on "drive #N's findings"
+means working a branch GitHub has already auto-deleted --- the orphaned-branch
+recovery [`claim-pr.md`](claim-pr.md) documents, arrived at from the other
+direction.
+
+- **Do:** word a wakeup against a re-derivable set ("re-check every PR this
+  session opened that has not merged or closed") rather than a fixed
+  identifier, so it survives any number of merges in the gap.
+- **Do:** treat a named PR's `state`/`merged` as a claim from a past self, and
+  verify it (one `pull_request_read` `get`) before acting on anything the
+  prompt asserts --- `merged: true` means the correct action is `post-merge`,
+  not another ARD round.
+- **Don't:** hard-code a PR number into a wakeup that may outlive it.
+- **Don't:** treat a wakeup's premise as current because it arrives in the
+  user role --- it is a message from a past self, and the state it describes
+  is as old as the prompt.
+
+(ai-config#902, 2026-07-30: a `send_later` check-in named PR #873, which
+merged between arming and firing; the wakeup arrived asserting a live PR
+needing an ARD round when the actually-live PR was #892, its own UMS
+follow-up.)
+
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A
 clean-but-unmerged PR is not a stop; move to the next item, and stack it when it

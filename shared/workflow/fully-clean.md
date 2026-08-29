@@ -91,6 +91,18 @@ Worked-example case records for the rules below live in
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
 
+   **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
+   `--paginate` above is the CLI answer;
+   the same failure reaches a manual REST/GraphQL sweep (an MCP tool taking explicit `page`/`perPage` arguments, say) when the page size changes partway through --- `page: N` is relative to whatever size was last requested, so changing it mid-sweep silently renumbers what "page 2" means, and a page fetched at the wrong offset that way returns real, green data with nothing in the response flagging the gap.
+   Both API surfaces hand you the check for free (`total_count` on REST, `pageInfo.hasNextPage`/`endCursor` on GraphQL), so this is a count to assert, not a judgment call.
+
+   - **Do:** hold the page size constant across a paginated sweep, and assert items seen equals `total_count` before drawing a conclusion from it.
+   - **Do:** prefer cursor pagination (`after`/`endCursor`) where offered, since a cursor cannot be invalidated by a page-size change.
+   - **Don't:** change the page size between pages of the same sweep.
+   - **Don't:** treat "every item I looked at was green" as "every item is green" without the count check --- the same mistake made while sweeping review threads (below) is worse, since a skipped range there means an unresolved thread reads as a clean PR.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "A paginated sweep with inconsistent page size skipped 8 of 30 items and read as complete".
+
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A `check_suite.completed` wake at a superseded head".
 

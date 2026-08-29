@@ -6,10 +6,11 @@
 # should reach for, so a wrapper can tell Codex/Copilot/etc. exactly what to
 # run instead of "adapt it yourself."
 #
-# scripts/sync-codex-skill-wrappers.py reads this file, embeds the operations
-# table into every generated Codex wrapper, and renders the full per-model
-# reference at tool-mappings.md. Edit this file, then run that script to
-# regenerate both. CI (`validate`) fails if either is out of sync.
+# scripts/sync-codex-skill-wrappers.py reads this file, renders the full
+# per-model reference at tool-mappings.md, and points every generated Codex
+# wrapper at that reference (a wrapper links to tool-mappings.md rather than
+# embedding the operations table itself). Edit this file, then run that
+# script to regenerate both. CI (`validate`) fails if either is out of sync.
 
 # How each model resolves an operation. Most agents converge on "use the
 # GitHub MCP tool when the session has it, otherwise the CLI command" — only

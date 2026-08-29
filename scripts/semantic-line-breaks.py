@@ -69,6 +69,12 @@ _HR_RE = re.compile(r'^\s*[-*_]{3,}\s*$')
 # and bullet marker in this file, and no file in this corpus uses Setext
 # headings at all (ai-config#1416) -- so only the unambiguous `=` form is
 # handled here, leaving the `-` case for whoever needs it.
+# Also scoped to SINGLE-LINE heading text: the detection below only checks
+# the line immediately before the underline, not a multi-line paragraph
+# ending in one (CommonMark allows the heading text itself to span several
+# lines). A multi-line Setext heading still gets swallowed and collapsed --
+# the same bug this fix addresses, just for a shape neither this corpus nor
+# the reported bug's repro exercises (PR #2587 review round 1).
 _SETEXT_H1_RE = re.compile(r'^\s{0,3}=+\s*$')
 _FENCE_RE = re.compile(r'^\s*(`{3,}|~{3,})')
 _BQ_RE = re.compile(r'^\s*>')

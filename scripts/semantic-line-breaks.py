@@ -57,6 +57,10 @@ _HR_RE = re.compile(r'^\s*[-*_]{3,}\s*$')
 _FENCE_RE = re.compile(r'^\s*(`{3,}|~{3,})')
 _BQ_RE = re.compile(r'^\s*>')
 _BLANK_RE = re.compile(r'^\s*$')
+# GitHub alert marker (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`,
+# `[!CAUTION]`): GitHub only renders the alert when this sits alone on the
+# blockquote's first line, so it must never be joined with adjacent prose.
+_BQ_ALERT_RE = re.compile(r'^\[![A-Z]+\]\s*$')
 _HTML_COMMENT_RE = re.compile(r'^\s*<!--')
 _AT_DIRECTIVE_RE = re.compile(r'^\s*@[\w./-]+\.md\s*$')
 
@@ -421,9 +425,13 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                     block_out.append(bq_line)
                 elif in_bq_code:
                     block_out.append(bq_line)
-                elif _BULLET_RE.match(inner) or _BLANK_RE.match(inner):
-                    # List items and blank separator lines inside blockquotes:
-                    # flush any preceding prose and pass through verbatim.
+                elif _BULLET_RE.match(inner) or _BLANK_RE.match(inner) or _BQ_ALERT_RE.match(inner):
+                    # List items, blank separator lines, and GitHub alert
+                    # markers inside blockquotes: flush any preceding prose
+                    # and pass through verbatim. An alert marker must stay
+                    # alone on its line (never joined with the prose before
+                    # or after it), so it gets the same hard-break treatment
+                    # as a bullet or blank line.
                     _flush_bq_prose(bq_prose, block_out, bq_prose_start, changed)
                     bq_prose = []
                     block_out.append(bq_line)

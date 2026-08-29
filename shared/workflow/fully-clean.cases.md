@@ -1312,3 +1312,17 @@ The coverage-report comment behaves the same way, arriving before
 
 Both inferences were wrong for one reason: the comment is written by a step,
 so it dates that step and nothing after it.
+
+## A hung retry step, not a crashed one
+
+(`Morrison-Lab/gha#361`, 2026-07-29: a review check sat `in_progress` for roughly 28 minutes with no conclusion.
+Reading the check run alone gave no way to tell a hang from the fast double-crash `Morrison-Lab/gha#368` documents --- both read `status: in_progress`, `conclusion: null`.
+The job's step list resolved it: `Run Claude Code Review (attempt 1)` succeeded in 52 seconds, `Fail the check if the review did not complete` succeeded (it had detected a stub result), and `Retry Claude Code Review after a stub result` was the one stuck `in_progress`, next to a sibling attempt that had finished in under a minute.
+That distinguished "the retry hangs" from "the reviewer is broken", and confirmed the stub-retry machinery itself had fired correctly --- neither conclusion was available from the check run's own status.)
+
+## A review cited the fix commit, not the round's merge-topped head
+
+(`d-morrison/ai-config#786`, 2026-07-28, now `Morrison-Lab/ai-config#786`: a round-2 review said both nits were "addressed in commit `004266a`", where the PR's `head.sha` was `2624610`.
+The cited SHA matched nothing on hand, which reads exactly like a fabricated citation.
+The round had two commits: the fix (`004266a`) and a `Merge origin/main` on top of it (`2624610`), and the reviewer had named the commit that actually carried the fix --- arguably the more useful citation of the two.
+`git cat-file -t 004266a` resolving, and `git show -s` placing it in the branch's own history, settled it in one command.)

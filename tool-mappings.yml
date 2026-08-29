@@ -120,9 +120,21 @@ operations:
     cli: gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"<thread_node_id>"}) { thread { isResolved } } }'
     github_mcp: mcp__github__resolve_review_thread
   - id: WATCH_PR
-    description: Subscribe to / unsubscribe from a pull request's activity.
+    description: Subscribe to / unsubscribe from a pull request's activity. Prefer this over WATCH_REPO or LIST_NOTIFICATIONS below where it's available --- it needs no toolset enabled, and targets the PR directly rather than degrading into per-PR polling or a whole-repo subscription.
     cli: (no CLI equivalent)
     github_mcp: mcp__github__subscribe_pr_activity / mcp__github__unsubscribe_pr_activity
+  - id: WATCH_REPO
+    description: Watch a whole repository's notifications. **Requires the GitHub MCP server's `notifications` toolset, which is off by default.** Coarser than WATCH_PR --- use only when WATCH_PR's tool isn't available (e.g. a local CLI session) and no PR-scoped alternative exists.
+    cli: gh api -X PUT "repos/<owner>/<repo>/subscription" -f subscribed=true
+    github_mcp: mcp__github__manage_repository_notification_subscription (action=watch)
+  - id: LIST_NOTIFICATIONS
+    description: List the authenticated user's notifications across every repo, optionally filtered to one repo. One call covers every subscribed thread, which is cheaper than polling N PRs individually and can see a PR another session opened. **Requires the `notifications` toolset, off by default.**
+    cli: gh api notifications
+    github_mcp: mcp__github__list_notifications
+  - id: MANAGE_NOTIFICATION_SUBSCRIPTION
+    description: Watch, ignore, or delete the subscription on a specific notification **thread** (needs a thread/notification id from LIST_NOTIFICATIONS, not a bare PR/issue number --- there is no REST endpoint to subscribe to an arbitrary PR/issue directly without an existing thread). Narrower than WATCH_PR; only useful once a thread already exists (e.g. you were mentioned or already participated). **Requires the `notifications` toolset, off by default.**
+    cli: gh api -X PUT "notifications/threads/<thread_id>/subscription" -f subscribed=true
+    github_mcp: mcp__github__manage_notification_subscription (action=watch)
   - id: VIEW_ISSUE
     description: Read an issue's details.
     cli: gh issue view "<N>"

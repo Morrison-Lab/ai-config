@@ -747,7 +747,7 @@ rule cited while being broken.)
 ## A cache-busted re-fetch resolved a preview page that looked like a failed deploy
 
 (`Morrison-Lab/gha#337`, 2026-07-28: a `rossjrw/pr-preview-action` page, rebuilt minutes after a push that changed its figures, still showed the pre-fix numbers on a plain `curl`.
-The branch was fine --- `git show HEAD:` carried the new text, and local matched `origin` --- so the deploy read as failed.
+The branch was fine --- `git show HEAD:<path>` carried the new text, and local matched `origin` --- so the deploy read as failed.
 A cache-busted re-fetch (`?cb=$RANDOM$RANDOM`, plus `Cache-Control`/`Pragma: no-cache` headers) returned the correct page immediately;
 nothing about the branch or the build had ever been wrong.
 

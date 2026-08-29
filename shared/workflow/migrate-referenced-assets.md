@@ -40,6 +40,8 @@ failure can pass every one of its checks without ever testing the fix. Say
 so in the PR body, and verify the deploy job actually goes green after
 merge before calling the fix done.
 
+**A "green deploy" check is itself only as fresh as the fetch that reads it --- see [`fail-fast`](../principles/fail-fast.md)'s "verifying rendered output can read a stale copy" cause for the cache-busting a preview-page fetch needs**, since a CDN or proxy in front of the preview can serve the previous build for a stretch after the deploy that fixed it.
+
 When *removing* content instead of moving it, check the inverse case too:
 does an asset referenced only by the removed content become orphaned? Decide
 whether to delete it along with the text, or leave a note for a follow-up

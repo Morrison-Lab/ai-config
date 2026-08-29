@@ -5,6 +5,14 @@ the [`scout-peers`](skills/scout-peers/SKILL.md) skill. Each entry names the
 source and its license. Where a source had **no license**, only the *idea* was
 reused — via clean-room reimplementation, with no code or text copied.
 
+This file is the index. When a borrow lands in a skill (a file under
+`skills/*/SKILL.md`), that skill also carries its own short `## Heritage`
+section naming the source, its license, and any reuse constraint --- a
+deliberate second copy rather than a DRY violation, since a reader who
+loaded only that one skill never sees this file. Keep the in-skill note
+short enough that the two cannot meaningfully drift: the license and the
+constraint, not the whole story.
+
 ## Borrowed ideas
 
 - **Skill & manifest CI validation** — `scripts/validate-skills.py`,
@@ -26,6 +34,7 @@ reused — via clean-room reimplementation, with no code or text copied.
   `/heal-skill` command in
   [justcarlson/dotfiles-claude](https://github.com/justcarlson/dotfiles-claude)
   (**no license** — idea only; clean-room reimplementation, nothing copied).
+  Also carries its own `## Heritage` section.
 
 - **Relative-link linter & inventory/verify conventions** —
   `scripts/check-links.py`, `scripts/inventory.sh`, and the README
@@ -38,6 +47,10 @@ reused — via clean-room reimplementation, with no code or text copied.
 
 - **R and Quarto authoring skills** --- `skills/brand-yml/`, `skills/cli/`, `skills/cran-extrachecks/`, `skills/create-release-checklist/`, `skills/lifecycle/`, `skills/quarto-authoring/`, `skills/r-package-development/`, `skills/release-post/`, `skills/testing-r-packages/` --- adapted from [posit-dev/skills](https://github.com/posit-dev/skills) (MIT).
   The upstream license text is kept verbatim at `skills/POSIT-DEV-LICENSE.txt`.
+  Each already carries its own `author`/`version`/`license` in frontmatter
+  rather than a `## Heritage` section --- MIT permits reuse outright, so
+  there is no reuse constraint for an in-body note to carry beyond what the
+  frontmatter and this entry already state.
 
 See the [`scout-peers`](skills/scout-peers/SKILL.md) skill for the full peer
 survey and the license-checking procedure used to vet every borrow above.

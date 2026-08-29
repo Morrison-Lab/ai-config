@@ -18,6 +18,17 @@ session, repair it *now*, while the failure is in front of you. This is the
 retrospective complement to *authoring* a skill and to `ums` (which records
 learnings) — it fixes a skill that already shipped and then misfired.
 
+## Heritage
+
+This is an original ai-config skill, inspired by the idea behind the
+`/heal-skill` command in
+[justcarlson/dotfiles-claude](https://github.com/justcarlson/dotfiles-claude)
+(no license on that repo, so idea only). Nothing from it was copied: the
+procedure, prose, and structure below are a clean-room reimplementation.
+Do not pull text or code from that repository into this skill or its
+output --- verify or reimplement anything a session might otherwise be
+tempted to fetch from it.
+
 ## When this fires
 
 - A skill triggered on the wrong input, or failed to trigger on the right one.

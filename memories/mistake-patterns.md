@@ -434,3 +434,18 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   No decidable condition established.
   "Does this message's claimed scope match what this code path actually examined?" requires reading the branch's semantics, not a pattern match --- same class as `learn-from-review-findings.md`'s own "did the sweep cover the diff's own added lines?" example of a non-algorithmatizable finding.
+
+## Pattern 25: Pushing Prose Without Running the Diff-Scoped `new-line-breaks` Check First
+- **Do**: Before pushing any commit that adds or edits Markdown prose in this repo, run `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py` (or `scripts/semantic-line-breaks.py <file> --write` to auto-fix) against the **committed** diff, and only push once it reports clean.
+- **Don't**: Push a prose commit on the strength of having written it carefully, skipping the local gate check because the change "is just one sentence" or "is obviously fine" --- and don't check an uncommitted/staged version, since the diff-scoped tool reads `origin/main...HEAD` and cannot see anything not yet committed (see this repo's own `CLAUDE.md`, "Running that check locally before a push proves nothing about files you have not committed yet").
+- **Example**: 2026-08-29 GIA session, wave 2 (`Morrison-Lab/ai-config`): hit twice in one session, on two different PRs, despite this exact check being one of the most extensively documented pre-push habits in this repo's own `CLAUDE.md`.
+  PR #2583 (`shared/principles/fail-fast.md`, closes #978): a newly-added cross-reference paragraph packed two sentences on one line;
+  CI's `new-line-breaks` job failed, diagnosed via `mcp__github__get_job_logs`, fixed with `scripts/semantic-line-breaks.py shared/principles/fail-fast.md --write` and a follow-up commit.
+  PR #2585 (`README.md`, closes #1136): the identical failure shape, same session, same fix procedure, on the very next prose-editing PR.
+  In both cases the fix took under a minute once diagnosed --- the cost was the CI round-trip and the recurrence itself, not the remedy.
+- **Canonical Rule**: `CLAUDE.md`'s "About this repo" section (in `gha`, ported here as a general lesson) and the check's own diff-scoping behavior described above;
+  this repo's `scripts/vendor/gha-check-new-line-breaks.py` is the same checker CI runs.
+- **Fix**: Add "run the diff-scoped `new-line-breaks` check against the committed diff" as a mechanical step of every prose-touching commit in this repo, immediately before `git push`, not as a thing recalled from having read about it once.
+- **Algorithmatizable?**
+  Yes, and worth building rather than relying on memory a third time: a pre-push git hook (or a `hooks/` PreToolUse guard on `git push` in this repo specifically) that runs `NLB_BASE_REF=origin/<default-branch> python3 scripts/vendor/gha-check-new-line-breaks.py` and warns (never blocks, per the fail-open convention this repo's own hooks use) when it finds a violation the pending push would carry.
+  Not yet built --- filed as [ai-config#2590](https://github.com/Morrison-Lab/ai-config/issues/2590) rather than left as an unrecorded intention, per `no-empty-promises.md`.

@@ -344,15 +344,8 @@ Everything above is about a check that *cannot report* its own failure.
 - **Don't:** grep a re-serialization -- a YAML dump, a rendered page -- for a
   string whose formatting that step may have changed.
 
-Both entries share the same premise --- a hand-rolled check can be
-confidently wrong in either direction, so neither a zero-hit nor a
-nonzero-hit result is self-validating --- and split on which half is wrong:
-here the pattern itself is the problem while the instrument works. When a
-maintained checker already exists and the right move is reaching for it
-instead of a hand-rolled substitute, see
-[`memories/tools.md`](../../memories/tools.md)'s
-"A hand-rolled verification check is worth nothing until it has caught
-something" (ai-config#978).
+Both entries share the same premise --- a hand-rolled check can be confidently wrong in either direction, so neither a zero-hit nor a nonzero-hit result is self-validating --- and split on which half is wrong: here the pattern itself is the problem while the instrument works.
+When a maintained checker already exists and the right move is reaching for it instead of a hand-rolled substitute, see [`memories/tools.md`](../../memories/tools.md)'s "A hand-rolled verification check is worth nothing until it has caught something" (ai-config#978).
 
 **A third direction, and the one the remedy above passes: the pattern is right
 about the data and admits the stream's own metadata, because that metadata is

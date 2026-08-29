@@ -200,8 +200,9 @@ The `@claude` bot's own behaviour lives in
   Required for any reusable workflow that needs to `git push` from a PR caller.
   **The reading consequence is separate and is the one with no error message.**
   That synthetic commit is `refs/pull/<N>/merge`, the PR's head merged into the base.
-  It exists in no branch, its SHA appears in no `git log` of yours, and its ancestry includes commits `main` has that your branch does not.
-  So a job or a reviewer running `git merge-base --is-ancestor <main-commit> HEAD` inside that checkout gets **yes**, while the identical command on the PR branch gets **no** --- and both answers are correct about the artifact each one read.
+  It exists in no branch, and its SHA appears in no `git log` of yours.
+  When the base has advanced beyond the branch, its ancestry also includes base-only commits.
+  So a job or reviewer testing one of those base-only commits with `git merge-base --is-ancestor <base-only-commit> HEAD` gets **yes** inside the synthetic checkout, while the identical command on the PR branch gets **no** --- and both answers are correct about the artifact each one read.
   The corpus already records `refs/pull/<N>/head`, which is the branch tip and behaves as you expect;
   `/merge` is the one that does not, and only `/merge` is what a `pull_request` job checks out by default.
   The trap is the reconciliation rather than the fact: reading a review's ancestry claim against your own branch makes the review look wrong, and "the reviewer is wrong about our topology" is a confident, publishable, false correction.

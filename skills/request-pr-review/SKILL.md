@@ -36,7 +36,8 @@ and `<num>` from the PR URL returned by `gh pr create`.
   GitHub returns HTTP 422 with `"Review cannot be requested from pull request author"`.
   This is not a transient failure and no retry helps --- in a **local CLI session**, `gh` and the MCP server authenticate as the same human `<reviewer>` the skill would otherwise request, so this fires on every PR such a session opens, not occasionally.
   Don't report it as a bare failure: fall back to an `@`-mention comment (still notifies, still visible) and surface which path ran.
-  In a remote/web session the author is a distinct bot identity, so this edge case does not apply there.
+  A remote/web session is not automatically exempt: per `memories/github-mcp-tools.md`, the authenticated identity there varies by container and client --- it can be a distinct bot identity, but it can also be `the repository owner`, in which case the same 422 fires there too.
+  Settle it from the attributed author of a write you actually made in that session, not from an assumption about the harness, and use the same `@`-mention fallback if the identities collide.
 
 - **Prefer this REST POST over `gh pr edit --add-reviewer`.**
   The CLI form exits 0 with no error when the reviewer is the PR author and

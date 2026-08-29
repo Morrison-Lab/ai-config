@@ -606,7 +606,9 @@ activated.")
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)
 - `commands/` --- slash commands (Claude Code via plugin install)
-- `memories/` — persistent notes & preferences (symlinked into VS Code Copilot memory dir)
+- `memories/` — persistent notes & preferences.
+  No longer symlinked into the VS Code Copilot memory dir --- that install path was removed along with the rest of the global symlink logic ([#2229](https://github.com/Morrison-Lab/ai-config/pull/2229));
+  Copilot has no replacement install path yet.
 - `references/` — reviewed reference material / worked examples (e.g. a cloud
   Setup script). Documentation only: `bootstrap.sh` skips it, so it is **not**
   symlinked into `~/.claude`.

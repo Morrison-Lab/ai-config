@@ -304,6 +304,17 @@ Worked-example case records for the rules below live in
 2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
 
+**In a local CLI session, "external reviewer" means the bot reviewers, not the human one.**
+`gh`/the MCP server authenticate as the same human account that owns the repo, so a formal review *request* against that human always 422s (`request-pr-review`'s own edge case) --- not occasionally, structurally, on every PR such a session opens.
+That does not relax criterion 2; it changes which providers can satisfy it.
+The pinned quorum below is still required in full, and it is answerable entirely by the bot reviewers (`claude-review`, `jules/review`, Copilot) --- none of which is the human the deadlock-escalation ladder in [`address-every-comment.md`](address-every-comment.md) points to.
+So read that ladder's "request the human reviewer" step, in a local session, as "post an `@`-mention with the impasse" instead: the mention still notifies and still counts as re-checking reviewer reachability right before declaring clean, which criterion 2 requires regardless of session type.
+
+- **Do:** treat the bot quorum as the external-reviewer requirement in a local session, and re-check its reachability before calling a PR clean.
+- **Do:** escalate a deadlock with an `@`-mention comment in a local session, in place of a review request that would 422.
+- **Don't:** read the 422 as a transient failure worth retrying, or as evidence the PR cannot reach criterion 2.
+- **Don't:** apply this reading in a remote/web session, where the author is a distinct bot identity and a human review request works normally.
+
 **Criterion 2's test is the absence of findings, not the presence of a verdict
 line saying so.**
 

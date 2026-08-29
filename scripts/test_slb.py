@@ -204,6 +204,33 @@ check(
     "The two run at different rates.\n",
 )
 
+# Bug 8: a GitHub alert marker (`> [!IMPORTANT]`, `[!NOTE]`, `[!WARNING]`,
+# `[!TIP]`, `[!CAUTION]`) inside a blockquote must never be joined onto the
+# following prose line — GitHub only renders the alert when the marker sits
+# alone on the blockquote's first line (ai-config#1799, #1821).
+check(
+    "blockquote alert marker preserved, not joined to prose",
+    "> [!IMPORTANT]\n"
+    "> **A thing is out of service** (user directive,\n"
+    "> 2026-08-20).\n"
+    "> Route nothing to it.\n",
+    "> [!IMPORTANT]\n"
+    "> **A thing is out of service** (user directive, 2026-08-20).\n"
+    "> Route nothing to it.\n",
+)
+
+# Bug 8b: the marker must also not swallow a preceding prose line in the
+# same blockquote (a marker is not necessarily the block's first line).
+check(
+    "blockquote alert marker not merged with preceding prose",
+    "> Some lead-in prose.\n"
+    "> [!NOTE]\n"
+    "> The actual note text goes here.\n",
+    "> Some lead-in prose.\n"
+    "> [!NOTE]\n"
+    "> The actual note text goes here.\n",
+)
+
 # ---------------------------------------------------------------------------
 # Write-guard and diff-scoping tests.
 #

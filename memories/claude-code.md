@@ -897,13 +897,16 @@ before the damage and reports a clean install every single time.
 Run it from `UserPromptSubmit` instead, guarded to once per session on the
 payload's `session_id`, which is late enough that startup has settled.
 
-Upstream, the copies are stale because `upload_skills.sh` is idempotent by
-**skipping** any skill already present in the workspace rather than adding a
-version, so a workspace copy stays frozen at whatever revision was first
-uploaded (ai-config#769).
-That also predicts the shape of the drift: the stale set is exactly the
-long-standing skills, while anything added since the last upload is still a
-working symlink.
+Upstream, the copies used to go stale because `upload_skills.sh` was
+idempotent by **skipping** any skill already present in the workspace rather
+than adding a version, so a workspace copy stayed frozen at whatever
+revision was first uploaded.
+Fixed in ai-config#769: an existing skill now gets a new version
+(`POST /v1/skills/{id}/versions`) on every run instead of being skipped.
+The predicted shape of the drift, while the bug was live, was that the stale
+set was exactly the long-standing skills, while anything added since the
+last upload was still a working symlink -- worth knowing if diagnosing an
+older container that ran before the fix landed.
 
 Detect and repair it with `python3 ~/.claude/scripts/check-install.py --fix`
 rather than by hand; ai-config#765 added it, and the repo's own

@@ -32,15 +32,11 @@ and `<num>` from the PR URL returned by `gh pr create`.
 
 ## Edge cases
 
-- **PR author is the requested reviewer.** GitHub returns HTTP 422 with
-  `"Review cannot be requested from pull request author"`. This is not a
-  transient failure and no retry helps --- in a **local CLI session**, `gh`
-  and the MCP server authenticate as the same human `<reviewer>` the skill
-  would otherwise request, so this fires on every PR such a session opens,
-  not occasionally. Don't report it as a bare failure: fall back to an
-  `@`-mention comment (still notifies, still visible) and surface which path
-  ran. In a remote/web session the author is a distinct bot identity, so
-  this edge case does not apply there.
+- **PR author is the requested reviewer.**
+  GitHub returns HTTP 422 with `"Review cannot be requested from pull request author"`.
+  This is not a transient failure and no retry helps --- in a **local CLI session**, `gh` and the MCP server authenticate as the same human `<reviewer>` the skill would otherwise request, so this fires on every PR such a session opens, not occasionally.
+  Don't report it as a bare failure: fall back to an `@`-mention comment (still notifies, still visible) and surface which path ran.
+  In a remote/web session the author is a distinct bot identity, so this edge case does not apply there.
 
 - **Prefer this REST POST over `gh pr edit --add-reviewer`.**
   The CLI form exits 0 with no error when the reviewer is the PR author and

@@ -566,6 +566,37 @@ The same session then edited a file in that checkout twice more, and hit its
 uncommitted-changes guard on a third attempt --- so the section above describes
 a mistake that recurs within one session even after being recognized.)
 
+### The rule does not work, and there is now a hook
+
+The three failure modes above are correct and were not enough.
+
+Measured 2026-08-29: a session **authored** the branch-switch subsection above,
+and then made the same `cd <repo-root>` mistake **seven more times in the same
+sitting** --- an edit into the peer checkout, two checks run against it and read
+as evidence about its own branch, a `git checkout` that moved a peer session
+off its branch, and a six-site documentation sweep that had to be reverted out
+of somebody else's working tree.
+
+That is the clearest available evidence that this particular rule cannot be
+carried by reading.
+It is not a knowledge problem: the session knew the rule well enough to write
+it down.
+`cd <repo>` is simply the most natural way to name a repository, and the defect
+is composed at the moment of typing rather than decided at the moment of
+recalling.
+
+So the control is `hooks/flag-cd-into-main-checkout.py`, which warns when a
+worktree-rooted session `cd`s to the repository its worktree belongs to.
+It is deliberately narrow --- an unrelated repository is not flagged, because
+running another repo's checker from here is ordinary --- and it warns rather
+than blocking, since operating on the main checkout is occasionally meant.
+
+- **Do:** use `git -C <path>` when a command must target a named checkout.
+- **Do:** drop the `cd` entirely and let the harness's own worktree stand,
+  which is what almost every command actually wants.
+- **Don't:** treat having read this section as protection.
+  The session that wrote it was the session that broke it, seven times.
+
 ## A repo script run from a worktree can measure the MAIN checkout, because it resolves paths relative to itself
 
 The section above is about a `cd` that sends *you* to the wrong checkout.

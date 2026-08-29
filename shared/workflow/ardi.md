@@ -203,7 +203,7 @@ arrived at from the other direction.
   session opened that has not merged or closed") rather than a fixed
   identifier, so it survives any number of merges in the gap.
 - **Do:** treat a named PR's `state`/`merged` as a claim from a past self, and
-  verify it (`gh pr view <N> --json state,merged` / `pull_request_read` `get`)
+  verify it (`gh pr view <N> --json state,mergedAt` / `pull_request_read` `get`)
   before acting on anything the prompt asserts --- `merged: true` means the
   correct action is `post-merge`, not another ARD round.
 - **Don't:** hard-code a PR number into a wakeup that may outlive it.

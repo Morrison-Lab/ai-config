@@ -98,6 +98,13 @@ Generic Actions-authoring material stays there.
   Em dashes / smart quotes in workflow YAML comments, README, or example stubs pass;
   the SAME character in a `.qmd` fails CI (`U+2014` etc.).
   When editing gha docs, keep `.qmd` ASCII (`-`/`;`, not an em-dash).
+- **`check-non-standard-chars` has NO diff-scoping capability at all --- unlike `check-new-line-breaks`, it always scans the whole tree.**
+  Its composite action (`check-non-standard-chars/action.yml` -> `check-non-standard-chars.py`) takes only `python-version` and `extensions` as inputs;
+  no base-ref, no path-filter, no way to check just the lines a PR added.
+  It globs every file under the given extensions (default `.qmd, .R, .md`), respects only a small hardcoded `ignored_dirs` set, and fails on any match anywhere in the tree.
+  Consequence: wiring it into a consumer's CI as a blocking check is safe ONLY once that repo's existing backlog of the banned glyphs is at zero --- there is no "diff-scoped, blocking, land before the sweep" middle state the way `check-new-line-breaks` offers.
+  A consumer with a nonzero backlog (measured on `Morrison-Lab/ai-config` at commit f8d9c24, 2026-08-29, by replicating the action's own glob-plus-`ignored_dirs` logic: 2878 em-dashes across 160 of 657 tracked `.md` files) would see every PR fail immediately on files it never touched.
+  Confirmed the same absence in the reusable-workflow wrapper (`check-non-standard-chars.yml`) too --- it forwards only the same two inputs, no scoping added at that layer either.
 - **403 caveat --- scoped sessions can push ONLY the assigned branch.**
   Tag pushes are denied.
   In remote/web sessions the proxy rejects any ref that isn't the harness-assigned branch with `HTTP 403` --- including `refs/tags/*`.

@@ -158,9 +158,18 @@ def run_one_suite(test_path, subject, timeout):
     """Run one suite against its subject. Returns 0 on pass, 1 on fail."""
     rel_test = os.path.relpath(test_path, ROOT)
     print(f"RUN: {rel_test}", flush=True)
+    # PYTHONWARNINGS, not a `-W` flag: most hooks/test-*.py invoke their
+    # subject hook as a SEPARATE subprocess (subprocess.run([sys.executable,
+    # HOOK], ...)), and a `-W` flag given to this outer interpreter is not
+    # inherited by a child `python` process it launches -- only environment
+    # variables propagate that way. An earlier version of this fix used `-W`
+    # and was caught in review: 36 of 46 suites spawn the subject as a
+    # subprocess, and a SyntaxWarning injected into one of them (verified
+    # empirically) still passed cleanly under the `-W`-only form.
+    env = dict(os.environ, PYTHONWARNINGS="error::SyntaxWarning")
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     try:
         stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:

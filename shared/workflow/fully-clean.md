@@ -43,6 +43,19 @@ Worked-example case records for the rules below live in
      The blob can exist mid-run, so a successful log fetch and a still-running job coexist.
      Completion comes from `status`/`conclusion` alone, in both directions.
 
+   **A hung check is a distinct state from a crashed one, and the step list is what tells them apart.**
+   `status`/`conclusion` look identical for both --- empty and `in_progress` either way --- so the remedies above for a *finished* check that misled you do not apply here: there is no failure yet to `rerun_failed_jobs`, and a fast-crash signature has nothing to match against a job that has not crashed.
+   Read the step list instead: which step is `in_progress`, and for how long relative to that step's usual duration.
+   A retry step stuck for tens of minutes where its sibling attempt finished in under a minute is a hang, not a slow-but-normal run.
+
+   - **Do:** read the job's step list when a check runs unusually long, and name which step is hung and for how long.
+   - **Do:** state a hung check as a tooling status when another reviewer has already given a verdict at the same head, rather than either declaring clean or chasing it as a finding.
+   - **Don't:** try to re-run an `in_progress` job, or apply a fast-crash remedy to a hang --- neither condition has fired yet.
+   - **Don't:** infer from `status: in_progress` alone that the check is merely slow;
+     read the step list before concluding either way.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "A hung retry step, not a crashed one".
+
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**
@@ -77,6 +90,18 @@ Worked-example case records for the rules below live in
      --- [`ardi`](ardi.md)'s superseded-head case is a **red** wake inviting
      a needless fix, and this is its **green**-sounding mirror, inviting a
      needless merge.
+
+   **A paginated sweep with an inconsistent page size silently skips items, and every response still reads as complete coverage.**
+   `--paginate` above is the CLI answer;
+   the same failure reaches a manual REST/GraphQL sweep (an MCP tool taking explicit `page`/`perPage` arguments, say) when the page size changes partway through --- `page: N` is relative to whatever size was last requested, so changing it mid-sweep silently renumbers what "page 2" means, and a page fetched at the wrong offset that way returns real, green data with nothing in the response flagging the gap.
+   Both API surfaces hand you the check for free (`total_count` on REST, `pageInfo.hasNextPage`/`endCursor` on GraphQL), so this is a count to assert, not a judgment call.
+
+   - **Do:** hold the page size constant across a paginated sweep, and assert items seen equals `total_count` before drawing a conclusion from it.
+   - **Do:** prefer cursor pagination (`after`/`endCursor`) where offered, since a cursor cannot be invalidated by a page-size change.
+   - **Don't:** change the page size between pages of the same sweep.
+   - **Don't:** treat "every item I looked at was green" as "every item is green" without the count check --- the same mistake made while sweeping review threads (below) is worse, since a skipped range there means an unresolved thread reads as a clean PR.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "A paginated sweep with inconsistent page size skipped 8 of 30 items and read as complete".
 
    See [`fully-clean.cases.md`](fully-clean.cases.md),
    "A `check_suite.completed` wake at a superseded head".
@@ -924,6 +949,19 @@ is incidental to which head the run actually reviewed.**
 - **Don't:** conclude that reviewers citing their head SHA more consistently
   would fix this; a body can already cite a SHA and still be citing the
   wrong one.
+
+**A review citing a SHA that is not the PR's head is usually an intermediate commit, not a fabricated one --- resolving it locally settles which.**
+The cases above are about which SHA to trust when several are in play;
+this one is about a body citing a SHA that matches none of them, which first reads as a hallucinated citation.
+A round with more than one commit --- a fix plus a later `Merge origin/main` on top, say --- has a real, resolvable commit for the fix that is not the round's head, and a reviewer naming that commit is often the more useful citation of the two.
+
+- **Do:** run `git cat-file -t <sha> && git show -s --format='%h %an %s' <sha>` on a cited SHA that does not match the head before concluding it is fabricated.
+- **Do:** read a resolvable SHA that sits in the branch's own history as a legitimate citation of an intermediate commit, not a hallucination.
+- **Don't:** treat a claim about **PR state** ("this was already merged", "CI already passed") the same as a claim about **which commit** did something --- the former still deserves the API check this file opens with;
+  a bare SHA mismatch does not.
+- **Don't:** re-push a fix already present in the cited commit because the SHA did not match what you expected.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "A review cited the fix commit, not the round's merge-topped head".
 
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---

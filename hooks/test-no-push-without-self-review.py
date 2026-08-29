@@ -533,7 +533,10 @@ CASES = [
 
     # --- shell forms the regex detector handled and the argv one did not ---
     # Every row below was measured ALLOWED at 5af86e2 and blocked by the base
-    # branch it replaced, and the first is the retry loop skills/push prescribes.
+    # branch it replaced. `skills/push/SKILL.md` prescribes no loop -- it
+    # states the retry as prose policy ("retry up to 4 times with exponential
+    # backoff") -- and the first row is the natural shell form of that policy,
+    # not a loop the skill itself spells out.
     (f"for i in 1 2 3; do git -C {REPO} push origin feature && break; sleep 2; done",
      reviewed(), True, "a push inside a `for ... do` retry loop is a push"),
     (f"if ! git -C {REPO} push origin feature; then echo fail; fi", reviewed(), True,

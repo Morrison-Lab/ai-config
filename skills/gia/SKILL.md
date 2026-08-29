@@ -73,12 +73,10 @@ Carry forward an interim table:
 
 ### Phase 2 — GII (open issues)
 
-Once every pre-existing PR/MR is clean, run the full [`gii`](../gii/SKILL.md)
-loop: grab the highest-priority open issue → check history → implement → open
-MR/PR → ARDI to clean → recurse. Stack MRs when a later issue depends on an
-earlier unmerged branch. Respect GII's stopping conditions (backlog empty, user
-stop, or the default 5-issue wave boundary — wrap up the open wave of PRs,
-then continue with the next wave without asking).
+Once every pre-existing PR/MR is clean, run the full [`gii`](../gii/SKILL.md) loop: grab the highest-priority open issue → check history → implement → open MR/PR → ARDI to clean → recurse.
+Stack MRs when a later issue depends on an earlier unmerged branch.
+Respect GII's stopping conditions (backlog empty, user stop, or the default 5-issue wave boundary — wrap up the open wave of PRs, then **check in before starting the next wave** rather than continuing on your own;
+see "Stopping conditions" below).
 
 > Each PR that GII opens in this phase is itself ARDI'd to clean, so it does
 > **not** need a second pass through Phase 1.
@@ -115,8 +113,10 @@ stacks on it.
 - If the trigger was ambiguous about whether to also burn down issues (e.g. a
   bare "clean up the PRs"), stop after Phase 1 and check in before starting
   Phase 2.
-- Honor GII's 5-issue wave boundary in Phase 2: wrap up the open wave of PRs,
-  then continue with the next wave without asking.
+- Honor GII's 5-issue wave boundary in Phase 2: wrap up the open wave of PRs (every PR from that wave merged, closed, or explicitly escalated), then **stop and ask** whether to continue into the next wave or archive the session, giving a recommendation either way -- don't continue on your own judgment.
+  A wave is "completely finished" only once every item in it has reached a terminal state;
+  a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted.
+  This is a deliberate exception to the standing "don't stop to ask" grant the rest of this skill runs under: the wave boundary is the one place GIA hands the decision back, because a fresh wave is new, open-ended commitment (5 more issues, 5 more PRs, 5 more review rounds) rather than work already implied by the current wave.
 - If a PR or issue is blocked or ambiguous, **bypass** it — surface it and move
   on to the next item rather than halting the sweep. Stop only when every
   remaining item depends on that blocked one, so no independent work is left
@@ -160,4 +160,5 @@ and [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 - ❌ Interleaving the two phases — finish all open PRs before grabbing issues.
 - ❌ Re-running Phase 1 on PRs that Phase 2 just opened (GII already ARDI'd them).
 - ❌ Running Phase 2 unbounded — keep GII's wave boundary.
+- ❌ Starting the next wave on your own once the current one is fully finished — stop and ask, with a recommendation, per "Stopping conditions".
 - ❌ Grabbing an issue a pending Phase-1 PR already closes.

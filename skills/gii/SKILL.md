@@ -87,16 +87,13 @@ Stop the loop when:
 - An issue is blocked and no other unblocked issues remain — otherwise
   **bypass** the blocked issue (surface it) and keep going with the rest
 
-Hitting the max is a **wave boundary**, not a question to pose.
-Wrap up one wave of PRs before starting another (user directive, 2026-08-28):
-hold new issue grabs, babysit the wave's open PRs to completion (merge-ready,
-and merged where a merge grant applies), then start the next wave
-automatically.
+Hitting the max is a **wave boundary**.
+Wrap up one wave of PRs before starting another: hold new issue grabs, babysit the wave's open PRs to completion (merge-ready, and merged where a merge grant applies), then stop and ask whether to continue into the next wave or archive the session, giving a recommendation either way (user directive, 2026-08-28, ai-config#2549).
+A wave is "completely finished" only once every item in it has reached a terminal state;
+a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted.
 
-- **Do:** hold at the boundary and drive the open wave to completion, then
-  continue with the next wave without asking.
-- **Don't:** ask "want me to keep going?" at the max — the wave boundary
-  replaces that ask.
+- **Do:** hold at the boundary and drive the open wave to completion, then stop and ask before starting the next wave, with a recommendation.
+- **Don't:** start the next wave on your own judgment once the current one is fully finished.
 - **Don't:** read the boundary as forbidding parallel PRs *within* a wave.
 
 #### e. Recurse
@@ -196,8 +193,7 @@ When the loop ends, print a summary:
 Issue selection never pauses for confirmation, per `gi`'s step 3, so there is
 no per-issue confirmation for "just go" to skip.
 What the loop still does, in every mode:
-- Still hold at the max-issues wave boundary — babysit the open wave to
-  completion before the next wave, without asking
+- Still hold at the max-issues wave boundary — babysit the open wave to completion, then stop and ask before the next wave (see "Check stopping conditions" above)
 - Surface and **bypass** a blocked or ambiguous issue — note it and skip to the
   next rather than halting; stop only if no independent issues remain (per the
   stopping conditions above)
@@ -242,4 +238,4 @@ A stray, differently-named probe branch left over from before this rule existed 
   self-merge, but that's no reason to stop; keep going and stack the next issue
 - ❌ Running unbounded without a wave boundary — cap each wave at 5 and wrap
   the wave's PRs before grabbing more
-- ❌ Asking to continue at the wave boundary — wrap up, then continue
+- ❌ Starting the next wave on your own once the current one is fully finished — wrap up, then stop and ask, with a recommendation

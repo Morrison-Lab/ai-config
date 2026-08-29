@@ -743,3 +743,13 @@ And the corpus already contained the answer --- the review's own closing point
 was that this file's table "independently confirms that `grep -v '^+++ '` drops
 a raw `++ foo`-style line" --- so the defect was not missing knowledge but a
 rule cited while being broken.)
+
+## A cache-busted re-fetch resolved a preview page that looked like a failed deploy
+
+(`Morrison-Lab/gha#337`, 2026-07-28: a `rossjrw/pr-preview-action` page, rebuilt minutes after a push that changed its figures, still showed the pre-fix numbers on a plain `curl`.
+The branch was fine --- `git show HEAD:<path>` carried the new text, and local matched `origin` --- so the deploy read as failed.
+A cache-busted re-fetch (`?cb=$RANDOM$RANDOM`, plus `Cache-Control`/`Pragma: no-cache` headers) returned the correct page immediately;
+nothing about the branch or the build had ever been wrong.
+
+Reported as the third instance of the same shape noticed in one session --- alongside the `grep -P` locale error this file's opening section already covers, and a regex matching a literal `<tr>` against rendered HTML that reported zero table rows, which is not independently recorded here.
+All three share the property that a check's broken state and its meaningful state print identically, each for a distinct reason --- a swallowed exit code, a literal-vs-rendered mismatch, and here a caching intermediary --- which is why this file separates them into distinct causes rather than one shared remedy.)

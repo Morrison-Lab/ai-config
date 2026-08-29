@@ -162,19 +162,14 @@ items to implement (mirror `tidy`'s close-out). For each item the user greenligh
   For a copied file, also keep the original copyright header inline.
 - **No-license idea:** reimplement from scratch; still credit the inspiration
   in `CREDITS.md` as "*idea inspired by …*" (courtesy, not a legal requirement).
-- **When the borrow lands in a skill** (a file under `skills/*/SKILL.md`):
-  add a short `## Heritage` section to that skill naming the source, its
-  license, and any reuse constraint --- especially for an unlicensed or
-  NC source, where the constraint is "do not copy this source's prose",
-  not merely "credit this". A reader who loaded only that skill never sees
-  `CREDITS.md`, so the in-skill note is a deliberate second copy, not a
-  DRY violation --- keep it short (the license and the constraint, not the
-  whole story) so the two records cannot meaningfully drift apart.
+- **When the borrow lands in a skill** (a file under `skills/*/SKILL.md`): add a short `## Heritage` section to that skill naming the source, its license, and any reuse constraint --- especially for an unlicensed or NC source, where the constraint is "do not copy this source's prose", not merely "credit this".
+  A reader who loaded only that skill never sees `CREDITS.md`, so the in-skill note is a deliberate second copy, not a DRY violation --- keep it short (the license and the constraint, not the whole story) so the two records cannot meaningfully drift apart.
 - File deferred items as issues so they aren't lost.
 
 ## Output format
 
-1. **Verdict** — uniformly-superior? yes/no + one-line reason.
+1. **Verdict** — uniformly-superior?
+   yes/no + one-line reason.
 2. **Peer map** — short table: repo · bucket · license · 1-line "what".
 3. **Ranked borrow list** — as in §6, best-bang-for-buck first.
 4. **What this repo uniquely owns** — the capabilities no peer replicated

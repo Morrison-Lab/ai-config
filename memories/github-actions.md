@@ -25,10 +25,16 @@ The `@claude` bot's own behaviour lives in
 
 ## GitHub Actions workflow authoring gotchas
 
+- **`workflow_run.workflows` matches the source workflow's top-level `name`, not its filename, when the source declares `name:`.**
+  **Do:** copy that exact value into the trigger.
+  Test it from a live source event after the complete receiver workflow reaches the default branch.
+  GitHub only loads `workflow_run` receivers from the default branch, so a PR cannot prove its own newly added or repaired trigger.
+  **Don't:** write `workflows: [test-coverage.yaml]` for a source named `Test Coverage`, or treat a missing child run on the trigger-fix PR as evidence that the name correction failed. (ucdavis/matt.contracts#59 tracked the defect;
+  #60 fixed the trigger;
+  #61 was the zero-diff verification PR.
+  On 2026-08-28, `Test Coverage` triggered the trusted reporter only after #60 reached `main`, and #61 then produced the expected child run and sticky coverage comment.)
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
-  Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions
-  step context overwrites `PATH` with only that directory (dropping
-  `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
+  Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
   Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to
   safely prepend to `PATH` while preserving system directories.
 - **A bare `devtools::test()` in a gating CI step never fails the job.**
@@ -194,13 +200,16 @@ The `@claude` bot's own behaviour lives in
   Required for any reusable workflow that needs to `git push` from a PR caller.
   **The reading consequence is separate and is the one with no error message.**
   That synthetic commit is `refs/pull/<N>/merge`, the PR's head merged into the base.
-  It exists in no branch, its SHA appears in no `git log` of yours, and its ancestry includes commits `main` has that your branch does not.
-  So a job or a reviewer running `git merge-base --is-ancestor <main-commit> HEAD` inside that checkout gets **yes**, while the identical command on the PR branch gets **no** --- and both answers are correct about the artifact each one read.
+  It exists in no branch, and its SHA appears in no `git log` of yours.
+  When the base has advanced beyond the branch, its ancestry also includes base-only commits.
+  So a job or reviewer testing one of those base-only commits with `git merge-base --is-ancestor <base-only-commit> HEAD` gets **yes** inside the synthetic checkout, while the identical command on the PR branch gets **no** --- and both answers are correct about the artifact each one read.
   The corpus already records `refs/pull/<N>/head`, which is the branch tip and behaves as you expect;
   `/merge` is the one that does not, and only `/merge` is what a `pull_request` job checks out by default.
   The trap is the reconciliation rather than the fact: reading a review's ancestry claim against your own branch makes the review look wrong, and "the reviewer is wrong about our topology" is a confident, publishable, false correction.
   Ask which ref answered before calling either reading a defect, per [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s checkout-for-the-run shape.
-  Resolve it with `git rev-parse HEAD` inside the run (or `github.event.pull_request.head.sha`, which always names the branch tip) rather than by re-deriving ancestry locally and trusting whichever answer you got. (Measured 2026-08-28 on ai-config#2529: a review stated a `main` commit was an ancestor of the PR head and named a merge SHA absent from the branch;
+  **Do:** identify both artifacts inside the run: `git rev-parse HEAD` names the checked-out synthetic merge commit, while `github.event.pull_request.head.sha` names the branch tip.
+  Compare those values before reconciling an ancestry claim.
+  **Don't:** re-derive ancestry locally and trust whichever answer you get. (Measured 2026-08-28 on ai-config#2529: a review stated a `main` commit was an ancestor of the PR head and named a merge SHA absent from the branch;
   both were true of `refs/pull/2529/merge` and false of the branch, and the branch-side check was one edit away from being published as a correction.)
 - **`always()` + optional upstream job needs an explicit result guard.** The pattern
   `if: ${{ always() && !cancelled() && needs.X.result == 'success' }}` keeps the job

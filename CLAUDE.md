@@ -1002,6 +1002,9 @@ genuinely semantic remainder.
 When you catch yourself (or a reviewer) re-deriving numbers by hand, or
 eyeballing an artifact for a property with a numeric definition, that check
 wants to be an instrument --- see the fragment for the procedure and tells.
+Apply this in review too: a hand-run check where an instrument is possible,
+or a threshold asserted rather than derived, is a review finding, the same
+weight as any other standing review check.
 
 [`shared/workflow/algorithmatize-checks.md`](shared/workflow/algorithmatize-checks.md)
 

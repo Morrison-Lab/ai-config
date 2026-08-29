@@ -457,7 +457,8 @@ A clean automated review from every available provider evaluating the current HE
   By the time the branch was pushed, an unrelated PR (#2597) had merged, advancing `origin/main` to `9124943f`.
   CI's `new-line-breaks` job, diffing against the real current base, failed on 10 lines the stale local check had never seen as "added" because they weren't part of the diff against the base it was actually checking.
   Re-running the identical command locally after `git fetch origin main` reproduced CI's 10 findings exactly, confirming the check itself was never wrong --- only the input ref was.
-- **Canonical Rule**: Pattern 25 above establishes running the check at all; this pattern is the freshness precondition that pattern's own example does not need, because its two PRs did not straddle an intervening merge to the base branch.
+- **Canonical Rule**: Pattern 25 above establishes running the check at all;
+  this pattern is the freshness precondition that pattern's own example does not need, because its two PRs did not straddle an intervening merge to the base branch.
   [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md) makes the identical argument for the PR's *own* remote branch (fetch immediately before acting, not once at the start of a round) --- this is the same argument applied to the *base* branch a diff-scoped local check reads against.
 - **Fix**: Treat any diff-scoped local check (`new-line-breaks`, and by the same reasoning any other `NLB_BASE_REF`/`origin/<default-branch>`-relative tool) as needing a fresh fetch of the base ref immediately before each run, not once per session --- cheapest as a habit in a multi-PR session, where the base moves under you by construction.
 - **Algorithmatizable?**

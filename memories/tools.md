@@ -843,6 +843,15 @@ shrug.
 One under-reported and one over-reported, so neither "it found nothing" nor
 "it found something" is self-validating.
 
+Both entries share that premise and split on which half is wrong: here the
+check itself is hand-rolled when a maintained one exists, so the remedy is
+reaching for the real instrument.
+When no maintained checker exists and the **pattern** is the thing wrong ---
+too loose, too narrow, or matched against a re-serialization ---
+see [`fail-fast`](../shared/principles/fail-fast.md)'s
+"The pattern itself is the other half, and it fails without erroring"
+(ai-config#978).
+
 **Prefer the maintained instrument, and know where it lives.**
 For semantic line breaks that is
 `<gha-checkout>/check-new-line-breaks/check-new-line-breaks.py`, run as

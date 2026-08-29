@@ -31,6 +31,11 @@ BLOCK = [
 ALLOW = [
     (G + "secret set FOO -R a/b", "explicit -R"),
     (G + "pr merge 25 --repo a/b", "explicit --repo"),
+    (G + "secret set FOO -o Morrison-Lab", "org secret: explicit -o (ai-config#2367)"),
+    (G + "secret set FOO --org Morrison-Lab", "org secret: explicit --org"),
+    (G + "secret set FOO -u", "user secret: explicit -u (boolean, no value)"),
+    (G + "secret set FOO --user", "user secret: explicit --user (boolean, no value)"),
+    (G + "variable set FOO -o Morrison-Lab", "org variable: explicit -o"),
     (G + "pr view 25 --json state", "read-only"),
     (G + "run list -R a/b --limit 5", "read-only with -R"),
     (G + "pr comment 25 --body-file x.md", "deliberately ungated (low harm, high frequency)"),

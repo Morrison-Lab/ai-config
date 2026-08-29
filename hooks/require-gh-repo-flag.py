@@ -54,7 +54,19 @@ GATED = [
 # the same implicit-target hazard even though the path looks explicit.
 API_PLACEHOLDER = re.compile(LEAD + r"api\b[^\n]*\{(owner|repo)\}")
 
-HAS_REPO_FLAG = re.compile(r"(^|\s)(-R\b|--repo(=|\s))")
+# `gh secret set`/`delete` have three mutually exclusive target selectors --
+# -R/--repo, -o/--org, -u/--user; `gh variable set`/`delete` only have two,
+# -R/--repo and -o/--org (no -u/--user). Discharging only on -R left every
+# org/user-scoped write gated with no way to satisfy the guard short of an
+# inert -R that names nothing gh actually uses for that command
+# (ai-config#2367). -o/--org and -u/--user are equally explicit targets, so
+# accepting them preserves the guard's actual invariant ("the target is
+# named, not inherited from cwd") rather than a proxy for it. Note -u/--user
+# on `secret set`/`delete` is a bare boolean flag (targets the currently
+# authenticated account) -- it takes no value, unlike -R/-o.
+HAS_REPO_FLAG = re.compile(
+    r"(^|\s)(-R\b|--repo(=|\s)|-o\b|--org(=|\s)|-u\b|--user\b)"
+)
 
 # Split on shell operators so `cd x && gh secret set Y` is judged per segment.
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
@@ -91,12 +103,16 @@ def main() -> int:
 
     label, segment = hit
     reason = (
-        f"Blocked: `{label}` without an explicit -R/--repo.\n\n"
+        f"Blocked: `{label}` without an explicit target.\n\n"
         f"    {segment}\n\n"
         "`gh` would take the target repo from the current working directory, "
         "which is how a secret meant for one repo got written to another on "
-        "2026-07-29. Re-issue the command with the repo named explicitly:\n\n"
-        f"    -R <owner>/<repo>\n\n"
+        "2026-07-29. Re-issue the command with the target named explicitly, "
+        "whichever selector actually applies:\n\n"
+        f"    -R <owner>/<repo>   (repository)\n"
+        f"    -o <org>            (organization)\n"
+        f"    -u                  (your own user account -- no value; "
+        f"`gh secret` only, not `gh variable`)\n\n"
         "If you genuinely mean 'whatever repo the cwd points at', run `git "
         "remote -v` first and then pass that repo by name anyway."
     )

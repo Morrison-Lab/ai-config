@@ -103,7 +103,7 @@ Generic Actions-authoring material stays there.
   no base-ref, no path-filter, no way to check just the lines a PR added.
   It globs every file under the given extensions (default `.qmd, .R, .md`), respects only a small hardcoded `ignored_dirs` set, and fails on any match anywhere in the tree.
   Consequence: wiring it into a consumer's CI as a blocking check is safe ONLY once that repo's existing backlog of the banned glyphs is at zero --- there is no "diff-scoped, blocking, land before the sweep" middle state the way `check-new-line-breaks` offers.
-  A consumer with a nonzero backlog (measured on `Morrison-Lab/ai-config`, 2026-08-29: 2865 em-dashes across 159 of 464 tracked `.md` files) would see every PR fail immediately on files it never touched.
+  A consumer with a nonzero backlog (measured on `Morrison-Lab/ai-config` at commit f8d9c24, 2026-08-29, by replicating the action's own glob-plus-`ignored_dirs` logic: 2878 em-dashes across 160 of 657 tracked `.md` files) would see every PR fail immediately on files it never touched.
   Confirmed the same absence in the reusable-workflow wrapper (`check-non-standard-chars.yml`) too --- it forwards only the same two inputs, no scoping added at that layer either.
 - **403 caveat --- scoped sessions can push ONLY the assigned branch.**
   Tag pushes are denied.

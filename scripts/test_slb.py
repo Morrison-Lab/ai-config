@@ -166,8 +166,9 @@ check(
 
 # Bug 7: a sentence ending in bold (`**...**.`) must split from the next
 # sentence. The closing `**` sits between the period and the whitespace, so a
-# boundary regex keyed on `[.!?]\s+` misses it -- and this is the corpus's
-# most common paragraph opener, so the tool was silently re-merging it.
+# boundary regex keyed on `[.!?]\s+` misses it -- and this shape accounts for
+# about one in six of this corpus's multi-sentence lines (561/3398 = 16.5%,
+# measured 2026-08-03), so the tool was silently re-merging a common case.
 check(
     "bold-close sentence boundary splits (**...**. Next)",
     "**Ending the head poll does not end the PR watch.** "

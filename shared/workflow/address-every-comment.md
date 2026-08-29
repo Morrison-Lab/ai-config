@@ -473,6 +473,11 @@ just as wrong, while feeling like the finding was addressed.
 See [`address-every-comment.cases.md`](address-every-comment.cases.md),
 "A reviewer's replacement diffstat summed per-commit churn".
 
+**The same discipline runs the other direction, over findings you produce
+rather than receive: [`quotable-findings`](quotable-findings.md) drops any
+finding that cannot quote the passage it is about**, with a carve-out for
+findings about an absence.
+
 **The highest-yield version of that check: when a comment names an edge case
 in its own prose and also supplies a fix, run the fix against that edge
 case.**

@@ -1524,6 +1524,12 @@ artifact in hand could show it.
 
 When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review — those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).
 
+## Drop any review finding that cannot quote the passage it is about
+
+[shared/workflow/quotable-findings.md](shared/workflow/quotable-findings.md)
+
+A mechanical pre-filter on findings you produce, not findings you receive — the mirror of `address-every-comment.md`'s reviewer-verification checks. Applies wherever this corpus produces or verifies review-shaped findings: `ard`/`ardi`'s self-review step, `code-review`, the prose-review skills, `grade-work`, and any `Workflow` adversarial-verify pattern, ahead of its expensive judgment vote. An absence finding (a missing test, an uncited claim) is exempt from quoting and instead names the location the missing thing belongs.
+
 ## Useful prompt formats for coding agents
 
 <!-- Vendored from Morrison-Lab/wai; edit there, not here. See README, "Shared content". -->

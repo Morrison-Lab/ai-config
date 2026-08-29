@@ -122,6 +122,36 @@ against its schema --- a schema only checks shape, not substance; skim a
 judgment-heavy agent's actual result before building on it, the same way a
 Verify pass would.
 
+**A second axis, orthogonal to cost: independence.**
+Cost decides which *tier* a bounded task gets.
+It says nothing about whether a verify stage should share the finder's model.
+When the thing being verified is a *judgment* --- a subtle-bug call, an
+architectural read, whether a claim is adequately supported --- rather than a
+checkable fact, a same-model verifier inherits the finder's blind spots along
+with its judgment.
+`N` same-model skeptics ("adversarial verify") or `N` same-model
+lens-holders ("perspective-diverse verify") are then only as diverse as
+their prompts, not their reasoning.
+[`adversarial-self-review`](adversarial-self-review.md) already makes this
+argument for the merge-side single-reviewer case; the same logic applies to
+a `Workflow` verify stage.
+
+- **Do:** route a judgment-heavy verify stage to a model in a different
+  family from the one that produced the finding it's checking, when
+  cross-family dispatch is available (`delegate-to-codex`, `agy`,
+  `opencode`) --- as a separate dispatch outside the `Workflow` tool's own
+  `agent()` call, whose `model` parameter is Claude-family only.
+- **Do:** treat cost and independence as separate questions --- a verify
+  stage can be cheap-tier (within `agent()`) and cross-family (via a
+  separate dispatch) at once.
+- **Don't:** apply cross-family routing to a mechanical verify (does this
+  file exist, does this number match) --- there is no judgment to
+  correlate, so the switch buys nothing and only costs a model-family
+  change.
+- **Don't:** read "adversarial verify" or "perspective-diverse verify" as
+  already solving this --- both patterns vary the *prompt* by default, and
+  neither varies the *model*.
+
 **"Mechanical, bounded" is about the reasoning each step needs, not about
 total output volume --- a cheap tier can still exhaust its own session budget
 purely from doing many precise edits, with no single edit being hard.**

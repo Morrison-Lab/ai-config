@@ -112,6 +112,11 @@ CASES = [
     ([QUERY, PUSH, say('Quoting the review: "not clean." All checks green now.')], True,
      "a closing quote right after the terminator must not swallow the "
      "sentence boundary either"),
+
+    ([QUERY, PUSH, say("PR #1 is not clean; PR #2 is fully clean.")], True,
+     "a semicolon-joined clause is its own sentence boundary too -- a "
+     "negation before the ';' must not suppress an unrelated genuine "
+     "stale-clean claim after it (ai-config#1770)"),
 ]
 
 

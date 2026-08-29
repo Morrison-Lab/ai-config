@@ -121,9 +121,14 @@ RX_NEGATION = re.compile(
 # \n| ... | ready to merge |") is a full independent clause in this repo's
 # own recap conventions, and treating only a BLANK line as a break let a
 # negation on one row silently suppress an unrelated claim on the next.
+# `;` is included alongside `.!?`: a semicolon-joined clause ("PR #1 is not
+# clean; PR #2 is fully clean.") is its own independent clause the same way a
+# table row is, and the same fail-open shape as the newline/markdown bugs
+# ai-config#1764 fixed -- a negation before the `;` was silently suppressing
+# an unrelated genuine claim after it (ai-config#1770).
 # Deliberately coarse -- this only needs to find SOME earlier boundary, not
 # parse prose correctly.
-RX_SENTENCE_BREAK = re.compile(r"[.!?][\"'\)\]*_`]*(?:\s|$)|\n")
+RX_SENTENCE_BREAK = re.compile(r"[.!?;][\"'\)\]*_`]*(?:\s|$)|\n")
 
 
 def all_unnegated_asserts(text):

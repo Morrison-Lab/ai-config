@@ -449,3 +449,17 @@ A clean automated review from every available provider evaluating the current HE
 - **Algorithmatizable?**
   Yes, and worth building rather than relying on memory a third time: a pre-push git hook (or a `hooks/` PreToolUse guard on `git push` in this repo specifically) that runs `NLB_BASE_REF=origin/<default-branch> python3 scripts/vendor/gha-check-new-line-breaks.py` and warns (never blocks, per the fail-open convention this repo's own hooks use) when it finds a violation the pending push would carry.
   Not yet built --- filed as [ai-config#2590](https://github.com/Morrison-Lab/ai-config/issues/2590) rather than left as an unrecorded intention, per `no-empty-promises.md`.
+
+## Pattern 26: Running the `new-line-breaks` Check Against a Stale Local `origin/main`
+- **Do**: Run `git fetch origin main` (or `origin <default-branch>`) immediately before `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`, in any session where other PRs may be merging to the base branch concurrently --- a multi-PR wave session is exactly that case, since each PR's own merge advances the ref every other open branch diffs against.
+- **Don't**: Trust a "clean" result from a check run earlier in the session against whatever `origin/main` pointed to at the time, once any merge has landed since --- the check is base-relative, so its answer decays the same way a cached `mergeable_state` does, and it decays silently: the tool's own output looks identical whether the base is fresh or hours stale.
+- **Example**: 2026-08-29 GIA session, wave 4 (`Morrison-Lab/ai-config`), PR #2604 (`shared/writing/citations.md`, closes #882): the check reported "No lines missing semantic breaks" against a local `origin/main` at `aa94c131`, which was correct at the time.
+  By the time the branch was pushed, an unrelated PR (#2597) had merged, advancing `origin/main` to `9124943f`.
+  CI's `new-line-breaks` job, diffing against the real current base, failed on 10 lines the stale local check had never seen as "added" because they weren't part of the diff against the base it was actually checking.
+  Re-running the identical command locally after `git fetch origin main` reproduced CI's 10 findings exactly, confirming the check itself was never wrong --- only the input ref was.
+- **Canonical Rule**: Pattern 25 above establishes running the check at all; this pattern is the freshness precondition that pattern's own example does not need, because its two PRs did not straddle an intervening merge to the base branch.
+  [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md) makes the identical argument for the PR's *own* remote branch (fetch immediately before acting, not once at the start of a round) --- this is the same argument applied to the *base* branch a diff-scoped local check reads against.
+- **Fix**: Treat any diff-scoped local check (`new-line-breaks`, and by the same reasoning any other `NLB_BASE_REF`/`origin/<default-branch>`-relative tool) as needing a fresh fetch of the base ref immediately before each run, not once per session --- cheapest as a habit in a multi-PR session, where the base moves under you by construction.
+- **Algorithmatizable?**
+  Yes, and narrower than Pattern 25's proposed hook: a pre-push guard could `git fetch origin <default-branch>` (or compare the local `origin/<default-branch>` SHA against a live `ls-remote`) before invoking the diff-scoped checker, rather than trusting whatever ref happens to be cached locally.
+  Not yet built.

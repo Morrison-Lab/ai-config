@@ -1,6 +1,6 @@
 ---
 name: "gmd"
-description: "Run GIA with MWC and DAYTB."
+description: "Run GIA with MWC and AWAY."
 ---
 
 # gmd (Codex wrapper)

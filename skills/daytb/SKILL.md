@@ -112,26 +112,40 @@ That is what keeps countermanding cheap.
    If you had already stated a recommendation, take it -- handing the
    decision back is agreement to it, not an invitation to reopen it.
 
-   **Re-check the premise before taking it, though, and only the premise.**
-   The rule above forbids re-*deliberating*, which is a different act from
-   confirming that the facts the recommendation rested on still hold.
-   A recommendation is a claim about state, so it expires like any other
-   (`metacognitive-monitoring.md`), and the gap between recommending and
-   being handed the decision is exactly where it expires.
-   The risk is one-directional: re-arguing a settled call wastes a round
-   trip, while acting on a lapsed premise ships the wrong thing under a
-   grant that was meant to save time.
+   **Re-read the artifacts the options name before taking it.**
+   A recommendation rests on claims about state, and those expire like any
+   other ([`metacognitive-monitoring.md`](../../shared/workflow/metacognitive-monitoring.md)),
+   so the gap between recommending and being handed the decision is where
+   they expire.
+   [`challenge-the-assignment.md`](../../shared/workflow/challenge-the-assignment.md)
+   owns the general argument and the population it applies to; what is
+   specific to `daytb` is that step 2's take-it-don't-reopen instruction
+   sits directly over that check and can suppress it.
 
-   The stale premise is usually not in your own reasoning but in the
-   **issue or brief** you reasoned from, and its age is the tell -- an
-   issue body is a snapshot of the moment it was filed, and the options it
-   enumerates were scoped against a codebase that has since moved.
-   So read the code the options name, not the description of it.
+   **The check is bounded by artifact, not by judgment, and the bound is
+   what keeps this from swallowing the rule.**
+   It licenses exactly one thing: re-reading the specific artifacts an
+   option names -- the file, the config, the workflow -- and seeing whether
+   they still say what the option assumed.
+   It licenses nothing else.
+   A changed weighting, a new argument, a criterion you would now apply
+   differently, a consideration that did not occur to you before: each is
+   re-deliberation, and each is out of bounds however persuasive.
+   The test is mechanical rather than introspective, which is the point --
+   if you cannot name the artifact you re-read and quote the line that
+   moved, you are reopening the decision, not checking a premise.
 
-   When the premise has moved, the grant still holds and the answer is
-   still yours: pick again on the current facts and report **both** the
-   choice and the change, since a silent switch away from a stated
-   recommendation reads as having reopened it.
+   Note the asymmetry that makes the bound necessary rather than tidy.
+   Every recommendation rests on many premises, and something has always
+   moved -- a branch, a comment, a CI run.
+   An unbounded licence to re-check is therefore an unbounded licence to
+   re-choose, and it would be cheaper to invoke than to comply with, which
+   is a rule that does not exist.
+
+   When a named artifact really has moved, the grant still holds and the
+   answer is still yours: pick again on the current facts and report
+   **both** the choice and the change, since a silent switch away from a
+   stated recommendation reads as having reopened it.
 3. **Act.**
 4. **Report in the past tense**: what you chose, and the single reason that
    decided it.
@@ -172,7 +186,8 @@ That is what keeps countermanding cheap.
 - Asking a confirming question anyway -- "I'll do X, unless you'd rather Y?"
   is the grant declined, not honoured.
 - Reopening a recommendation you had already made, instead of simply taking
-  it.
+  it -- though re-reading the artifacts its options name is not reopening
+  it, per step 2.
 - Filing a stale worktree or a merged local branch back as a question, or as
   an issue for the user to action, when the grant already covers clearing it.
 
@@ -185,31 +200,59 @@ Its analysis rested on three separately-named tool grants:
 I recommended option 3 -- gate those grants on the repo opting into
 computer-algebra review -- and the decision came back as `daytb`.
 
-Step 2's rule says to take the recommendation rather than reopen it, and
-taking it would have been wrong.
-Reading `run-claude-review-attempt/action.yml` rather than the issue body
+Step 2's rule says to take the recommendation rather than reopen it.
+Re-reading the artifact it named,
+`.github/actions/run-claude-review-attempt/action.yml`,
 showed the allowlist had become
 `"Bash,Edit(//tmp/**),WebFetch,WebSearch"`:
-`Bash` is granted **whole** (gha#566/#572), so two of the three grants
-option 3 proposed gating no longer exist as gateable things.
-Implementing it would have meant re-narrowing `Bash` for most consumers,
-reintroducing a starvation failure that five measured incidents and about
-$26 of no-verdict review runs had just been spent removing.
+`Bash` is granted **whole** (gha#566/#572), so the two Bash grants option 3
+proposed gating are no longer separate allow entries.
 
-A second fact had moved the same way: gha#580 split the review so the job
+**What that does and does not establish is where I first got it wrong.**
+It does not make them ungateable.
+Deny rules still gate Bash subcommands, the action carries dozens of them
+today, and the same file records `Bash(python3 -m:*)` being *removed* from
+that deny list under the whole-Bash regime -- which demonstrates the gate
+works rather than that it is gone.
+What actually defeats option 3 is stated in that file directly: the denials
+are "guard rails against an accident, NOT a security boundary", because
+"a prefix rule cannot contain a general shell".
+So denying `python3` and `curl` while granting `Bash` whole leaves egress
+reachable by any other route and reduces no blast radius, which was option
+3's entire purpose.
+Achieving that purpose would mean returning to a named allowlist -- and
+*that* is what five measured starvation incidents had just been spent
+removing, none of which involved `python3` or `curl` at all.
+The four with recorded costs total about $26.
+
+A second premise had moved the same way: gha#580 split the review so the job
 processing attacker-influenceable content holds `contents: read` and no
-forge-write, which narrows the very risk the issue was filed about.
+forge-write, narrowing the risk the issue was filed about.
 
-Both changes post-date the issue by months, and neither is visible from its
-body -- which is the general shape rather than a detail of this case.
+Both changes post-date the issue by roughly seven weeks, and neither is
+visible from its body -- which is the general shape rather than a detail of
+this case.
 The chosen option became option 1, and the report named the switch and its
 cause rather than quietly delivering something other than what had been
 recommended.
 
-- **Do:** re-read the code an option names before acting on a
-  recommendation about it.
-- **Do:** report the switch and its cause when the premise has moved.
-- **Don't:** re-argue a recommendation the user has handed back -- checking
-  a premise is not reopening a decision.
+**The correction is itself part of the record.**
+The first version of this entry claimed the grants were "no longer gateable"
+and that option 3 would have reintroduced the five starvation incidents.
+Both were wrong, and both were caught by an adversarial review reading the
+same file -- the first contradicted by a deny list forty entries long, the
+second by the fact that not one of the five incidents was denied `python3`
+or `curl`.
+The decision survived; the reasoning published for it did not, and had to be
+corrected on the issue as well as here.
+That is the failure mode this entry exists to name, occurring inside the
+entry naming it: a premise checked once, at the moment of deciding, and then
+narrated from memory rather than re-read.
+
+- **Do:** re-read the artifact an option names, and quote the line that
+  moved.
+- **Do:** report the switch and its cause when a named artifact has moved.
+- **Don't:** re-argue a recommendation the user has handed back -- a
+  changed weighting is re-deliberation, not a premise check.
 - **Don't:** treat an issue body's enumerated options as current; the older
   the issue, the more its scoping is a claim about a past codebase.

@@ -72,20 +72,17 @@ RX_CLAIM = re.compile(
     re.I,
 )
 
-# Context directly preceding a timestamp indicating a historical action or artifact conversion,
-# rather than a present-time recap claim. Must not cross sentence boundaries or recap headers.
+# Context directly preceding a timestamp indicating a historical action or artifact conversion
+# (e.g. "merged at 14:51 PT", "committed at 18:19 PDT"), rather than a present-time recap claim (#2661).
+# Must have an explicit preposition ("at", "on", "in", "since", "from", etc.) and not cross sentence boundaries.
 RX_PAST_CONTEXT = re.compile(
     r"\b(?:merged|closed|created|committed|pushed|failed|passed|started|finished|ran|dated|recorded|received|sent|authored|opened|landed|tagged)\s+(?:at|on|in|since|from|before|until|between)\s+[^.!?;\n]{0,35}$",
     re.I,
 )
 
+# UTC-to-local conversions in historical summaries or merge reports (e.g. "... 21:51 UTC (14:51 PT)").
 RX_UTC_CONVERT = re.compile(
     r"\bUTC\s*(?:[/]\s*|\(\s*|\s+at\s+)[^.!?;\n]{0,25}$",
-    re.I,
-)
-
-RX_RECAP_HEADER = re.compile(
-    r"\b(?:recap|status|stopping\s+point|update|summary|as\s+of|now)\b",
     re.I,
 )
 
@@ -104,7 +101,8 @@ RX_CLOCK_READ = re.compile(
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
-# explicitly tells you to trust.
+# explicitly tells you to trust. Supports both Claude Code's "Current time -- local:"
+# (via inject-local-time.sh) and Antigravity/Gemini CLI's "<ADDITIONAL_METADATA>\nThe current local time is:".
 RX_HOOK_CLOCK = re.compile(
     r"Current time\s*--\s*local:|The current local time is:",
     re.I,
@@ -124,8 +122,8 @@ RX_HOOK_CLOCK_VALUE = re.compile(
 )
 
 # How far a stated time may sit from the last measured one and still read as
-# quoting it. Wide enough for a recap that rounds seconds away or is composed a
-# moment later in a multi-step turn; far tighter than the drift that makes a timestamp misleading.
+# quoting it. Raised from 2 to 5 minutes (#2661) to accommodate multi-step turns
+# where commands/subagents run for several minutes before the final recap is emitted.
 TOLERANCE_MIN = 5
 
 # Only a claim running AHEAD of the last measurement is fired on, and the
@@ -248,9 +246,7 @@ def scan(path):
                 # beside it.
                 if role == "user":
                     turn_start = i
-                # A user/system turn can carry a bare string, which is where
-                # the UserPromptSubmit clock line arrives.
-                if RX_HOOK_CLOCK.search(blocks):
+                if role != "assistant" and RX_HOOK_CLOCK.search(blocks):
                     got = RX_HOOK_CLOCK_VALUE.search(blocks)
                     if got:
                         measured = (i, int(got.group(1)) * 60 + int(got.group(2)))
@@ -331,8 +327,7 @@ def main() -> int:
             line_end = len(text)
         local_line = text[line_start:line_end]
 
-        is_recap = bool(RX_RECAP_HEADER.search(prefix))
-        if not is_recap and (RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix)):
+        if RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix):
             continue
 
         if RX_FUTURE_REFERENCE.search(local_line):

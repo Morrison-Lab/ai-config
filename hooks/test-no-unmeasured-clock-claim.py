@@ -257,7 +257,7 @@ CASES = [
     ([say("earlier"),
       say("PR #1131 merged at 2026-07-27 21:51:49 UTC (14:51 PT)\n\nRecap: as of 19:24 PDT")], True,
      "#2661: mixed message with past event and unmeasured recap still catches recap"),
-    ([say("earlier"),
+     ([say("earlier"),
       say("All tests passed. Stopping Point: 18:30 PDT")], True,
      "#2661: action verb before stopping point does not silence unmeasured recap"),
     ([say("earlier"),
@@ -266,6 +266,15 @@ CASES = [
     ([say("earlier"),
       say("Stopping Point: non-clean, as of 19:24 PDT\nScheduled timer to check back at 19:34 PDT")], True,
      "#2661: mixed recap and timer still catches unmeasured recap"),
+    ([say("earlier"),
+      say("Status: PR #123 closed at 14:51 PT after the fix landed.")], False,
+     "#2661: status header followed by past action verb does not fire"),
+    ([say("earlier"),
+      say("I'm continuing this work now. For context, the earlier build finished at 14:51 PT yesterday.")], False,
+     "#2661: 'now' in earlier sentence followed by past action does not fire"),
+    ([{"type": "assistant", "content": "The current local time is: 2026-08-21T18:55:51-07:00 according to my check."},
+      say("Recap: as of 23:59 PDT")], True,
+     "#2661: assistant message containing ISO time string does not discharge guard for unmeasured claim"),
 ]
 
 

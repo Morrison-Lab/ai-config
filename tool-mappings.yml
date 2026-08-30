@@ -281,3 +281,7 @@ operations:
     description: List a workflow's recent runs, with conclusion and timestamps.
     cli: gh run list --workflow "<workflow>.yml" --repo "<owner>/<repo>"
     github_mcp: mcp__github__actions_list (method=list_workflow_runs)
+  - id: GET_WORKFLOW_RUN
+    description: Read a workflow run's details, status, and conclusion.
+    cli: gh run view "<run_id>" --repo "<owner>/<repo>" (or gh api "repos/<owner>/<repo>/actions/runs/<run_id>")
+    github_mcp: mcp__github__actions_get (method=get_workflow_run)

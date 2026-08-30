@@ -10,43 +10,6 @@ exactly — don't reflow to a single long line or a different wrap width.
 **When writing new prose**, add breaks at phrase/sentence boundaries as you
 go.
 
-**`scripts/semantic-line-breaks.py --write` violates the paragraph above when
-pointed at a whole file, so scope it to what you added.**
-The rule two paragraphs up says to preserve an existing file's breaks exactly.
-The repo's own reformatter does not know which lines are yours: run it over a
-file and it reflows every paragraph it disagrees with, including prose written
-by someone else years ago.
-
-Measured on ai-config#2626 (2026-08-30).
-Running it over four files to fix breaks in text I had just added also reflowed
-three pre-existing paragraphs in `shared/workflow/ardi.md` and one in
-`shared/workflow/verify-the-right-artifact.md`, from those files' own
-~70-column wrapping into single lines of 200 to 350 characters.
-Deletions in that PR went from 1 to 11 in one file and 0 to 3 in another --
-churn on lines the change never authored, in a PR about something else.
-
-The reflow is invisible in the rendered Markdown, which is why a reviewer can
-reasonably decline to block on it and why it survives a self-review: nothing
-looks wrong, the diff is merely four times larger than the change.
-The tell is the **deletion count**, not the reading.
-A focused prose edit that reports deletions in files it only touched in one
-place has reflowed something.
-
-Two further traps in the same tool.
-Match the target file's existing line length rather than a global habit --
-a `.cases.md` here already carries 190-to-275-character lines, so rewrapping
-those to 70 is the same unrequested churn in the other direction.
-And the diff-scoped `new-line-breaks` check reads the **commit graph**, so it
-cannot see a staged or untracked file: commit first, then run it, or it
-reports clean over content it never examined.
-
-- **Do:** fix the specific lines the checker names, by hand.
-- **Do:** read the deletion count in your own diff before pushing a prose fix.
-- **Don't:** run the reformatter with `--write` over a whole file inside a
-  focused PR.
-- **Don't:** rewrap to a global width without checking what the file already
-  uses.
-
 **When a review flags a semantic-line-break violation, fix every
 over-length line in the touched section in one pass** — not just the
 specifically-flagged ones. Review bots (`@claude` / Copilot) re-scan on

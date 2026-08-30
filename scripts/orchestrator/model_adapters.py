@@ -1,7 +1,6 @@
 """Multi-model provider adapters and intelligent routing engine.
 
-Supports Claude, Opencode, Ollama (local), OpenRouter, Antigravity (Gemini),
-Cursor, and Codex.
+Supports Claude, Opencode, OpenRouter, Antigravity (Gemini), Cursor, and Codex.
 """
 
 from __future__ import annotations
@@ -91,97 +90,6 @@ class BaseModelAdapter(ABC):
     ) -> ModelResponse:
         """Execute a prompt against the model provider."""
         raise NotImplementedError
-
-
-class OllamaAdapter(BaseModelAdapter):
-    """Local Ollama instance adapter for zero-marginal-cost local inference."""
-
-    provider = ModelProvider.OLLAMA
-    _lock = threading.Lock()
-
-    def __init__(self, base_url: str = "http://127.0.0.1:11434", default_model: str = "qwen2.5-coder:7b"):
-        self.base_url = base_url
-        self.default_model = default_model
-
-    def is_available(self) -> bool:
-        """Check if Ollama local server is responding."""
-        try:
-            req = urllib.request.Request(f"{self.base_url}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                return resp.status == 200
-        except Exception:
-            return False
-
-    def invoke(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        model: Optional[str] = None,
-        timeout_seconds: int = 120,
-    ) -> ModelResponse:
-        start_time = time.time()
-        target_model = model or self.default_model
-
-        payload = {
-            "model": target_model,
-            "prompt": prompt,
-            "stream": False,
-        }
-        if system_prompt:
-            payload["system"] = system_prompt
-
-        try:
-            req = urllib.request.Request(
-                f"{self.base_url}/api/generate",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with self._lock:
-                with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    content = data.get("response", "")
-                return ModelResponse(
-                    success=True,
-                    content=content,
-                    model_used=target_model,
-                    provider=self.provider,
-                    execution_time_seconds=time.time() - start_time,
-                    raw_output=data,
-                )
-        except Exception as exc:
-            # Fallback to opencode run -m ollama/<model> if CLI is present
-            if shutil.which("opencode"):
-                try:
-                    full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-                    cmd = ["opencode", "run", "-m", f"ollama/{target_model}", full_prompt]
-                    proc = subprocess.run(
-                        cmd,
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        timeout=timeout_seconds,
-                    )
-                    if proc.returncode == 0:
-                        return ModelResponse(
-                            success=True,
-                            content=proc.stdout,
-                            model_used=f"ollama/{target_model}",
-                            provider=self.provider,
-                            execution_time_seconds=time.time() - start_time,
-                        )
-                except Exception:
-                    pass
-
-            return ModelResponse(
-                success=False,
-                content="",
-                model_used=target_model,
-                provider=self.provider,
-                execution_time_seconds=time.time() - start_time,
-                error=f"Ollama execution error: {str(exc)}",
-            )
 
 
 class OpencodeAdapter(BaseModelAdapter):
@@ -759,7 +667,6 @@ class ModelRouter:
 
     def __init__(self):
         self.adapters: Dict[ModelProvider, BaseModelAdapter] = {
-            ModelProvider.OLLAMA: OllamaAdapter(),
             ModelProvider.OPENCODE: OpencodeAdapter(),
             ModelProvider.OPENROUTER: OpenRouterAdapter(),
             ModelProvider.CLAUDE: ClaudeAdapter(),
@@ -784,30 +691,25 @@ class ModelRouter:
     ) -> tuple[BaseModelAdapter, str]:
         """Select best available adapter and model string for a given task requirement,
 
-        prioritizing free and local models where feasible, and automatically escalating
+        prioritizing hosted models where feasible, and automatically escalating
         to stronger model tiers if a task has failed and is retrying.
         """
-        # 1. Strict local confidentiality -> Ollama local model only
+        # Confidential work must not be sent to any model without an approved
+        # hosted destination. The mock adapter stops model execution while
+        # preserving the routing contract for callers.
         if is_confidential:
-            ollama = self.adapters[ModelProvider.OLLAMA]
-            if ollama.is_available():
-                return ollama, "qwen2.5-coder:7b"
-            # Fallback to mock if offline
-            return self.adapters[ModelProvider.MOCK], "local-mock"
+            return self.adapters[ModelProvider.MOCK], "confidential-work-disabled"
 
         # Escalate capability tier on retries (when model struggles)
         if retry_count >= 1 and tier not in (TaskTier.ADVERSARIAL_REVIEW, TaskTier.FRONTIER_HEAVY):
             tier = TaskTier.FRONTIER_HEAVY
 
-        # 2. Adversarial Review -> Must use a different model family than author,
-        # preferring local/free reviewers first while strictly preventing same-family self-review.
+        # Adversarial Review -> Must use a different model family than author.
         if tier == TaskTier.ADVERSARIAL_REVIEW:
             author = (prior_author_model or "").lower()
 
             if "claude" in author:
                 # Must not use Claude for review
-                if self.adapters[ModelProvider.OLLAMA].is_available():
-                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
                 if self.adapters[ModelProvider.OPENCODE].is_available():
                     return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
                 if self.adapters[ModelProvider.OPENROUTER].is_available():
@@ -818,8 +720,6 @@ class ModelRouter:
 
             if "opencode" in author:
                 # Must not use Opencode for review
-                if self.adapters[ModelProvider.OLLAMA].is_available():
-                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
                 if self.adapters[ModelProvider.CLAUDE].is_available():
                     return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
                 if self.adapters[ModelProvider.OPENROUTER].is_available():
@@ -829,15 +729,13 @@ class ModelRouter:
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
             if "deepseek" in author:
-                # Must not use DeepSeek family for review (neither Ollama deepseek nor Opencode deepseek)
+                # Must not use DeepSeek family for review.
                 if self.adapters[ModelProvider.CLAUDE].is_available():
                     return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
                 if self.adapters[ModelProvider.AGY].is_available():
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 if self.adapters[ModelProvider.OPENROUTER].is_available():
                     return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
-                if self.adapters[ModelProvider.OLLAMA].is_available():
-                    return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
             if "ollama" in author or "qwen" in author:
@@ -854,8 +752,6 @@ class ModelRouter:
 
             if "cursor" in author:
                 # Must not use Cursor for review
-                if self.adapters[ModelProvider.OLLAMA].is_available():
-                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
                 if self.adapters[ModelProvider.OPENCODE].is_available():
                     return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
                 if self.adapters[ModelProvider.CLAUDE].is_available():
@@ -868,8 +764,6 @@ class ModelRouter:
 
             if "codex" in author:
                 # Must not use Codex for review
-                if self.adapters[ModelProvider.OLLAMA].is_available():
-                    return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
                 if self.adapters[ModelProvider.OPENCODE].is_available():
                     return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
                 if self.adapters[ModelProvider.CLAUDE].is_available():
@@ -880,9 +774,7 @@ class ModelRouter:
                     return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
                 return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
-            # Default: use local/free reviewer if available, else Claude/OpenRouter, with terminal MOCK fallback
-            if self.adapters[ModelProvider.OLLAMA].is_available():
-                return self.adapters[ModelProvider.OLLAMA], "deepseek-r1:8b"
+            # Default: use a hosted reviewer with terminal MOCK fallback.
             if self.adapters[ModelProvider.OPENCODE].is_available():
                 return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
             if self.adapters[ModelProvider.CLAUDE].is_available():
@@ -893,19 +785,16 @@ class ModelRouter:
                 return self.adapters[ModelProvider.AGY], "gemini-2.5-pro"
             return self.adapters[ModelProvider.MOCK], "independent-reviewer-mock"
 
-        # 3. Local Fast (bounded checks, formatting, link checks) -> Local Ollama / Free
+        # Local Fast is retained as a task-shape name for compatibility, but
+        # executes only through a hosted-free provider.
         if tier == TaskTier.LOCAL_FAST:
-            if self.adapters[ModelProvider.OLLAMA].is_available():
-                return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
             if self.adapters[ModelProvider.OPENCODE].is_available():
                 return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
 
-        # 4. Free Hosted (survey, triage, broad sweep) -> Opencode free / Ollama
+        # Free Hosted (survey, triage, broad sweep) -> Opencode or OpenRouter.
         if tier == TaskTier.FREE_HOSTED:
             if self.adapters[ModelProvider.OPENCODE].is_available():
                 return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
-            if self.adapters[ModelProvider.OLLAMA].is_available():
-                return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "openrouter/free"
 
@@ -918,11 +807,9 @@ class ModelRouter:
             if self.adapters[ModelProvider.OPENROUTER].is_available():
                 return self.adapters[ModelProvider.OPENROUTER], "anthropic/claude-3.7-sonnet"
 
-        # 6. Standard Code Tasks -> Prioritize Claude CLI for synthesis, then local Ollama / free pools
+        # Standard Code Tasks -> Prioritize Claude CLI, then hosted providers.
         if self.adapters[ModelProvider.CLAUDE].is_available():
             return self.adapters[ModelProvider.CLAUDE], "claude-3-7-sonnet"
-        if self.adapters[ModelProvider.OLLAMA].is_available():
-            return self.adapters[ModelProvider.OLLAMA], "qwen2.5-coder:7b"
         if self.adapters[ModelProvider.OPENCODE].is_available():
             return self.adapters[ModelProvider.OPENCODE], "opencode/deepseek-v4-flash-free"
         if self.adapters[ModelProvider.CURSOR].is_available():

@@ -3316,15 +3316,25 @@ def main() -> int:
         "a fronted no-new-issues clause does not false-block the resolution",
         checker.classify_verdict(fronted_negator) == "clean",
     )
-    # The guard varies the words BETWEEN the negator and the past-state
+    # The guard varies what sits BETWEEN the negator and the past-state
     # marker, not just two literal phrasings: a fixed glue whitelist
-    # ("of the ...") let a count or modifier through, classifying a
-    # negated resolution as clean.
+    # ("of the ...") let a count or modifier through, and a bounded word
+    # run then let both a longer run and punctuation inside the negated
+    # noun phrase through -- each classifying a negated resolution as
+    # clean, the dangerous direction.
     for negation in ("None of the two earlier",
                      "None of the identified earlier",
                      "Not one of the prior",
                      "Neither of the prior",
-                     "None of these previously"):
+                     "None of these previously",
+                     "None of the several very recently identified earlier",
+                     "Not even a single one of the earlier",
+                     "Zero of the earlier",
+                     "Hardly any of the earlier",
+                     "None of the many previously-identified, "
+                     "still-outstanding earlier",
+                     "None of the (per the last review) earlier",
+                     "None of the -- as flagged before -- earlier"):
         varied = (
             "### Verdict\n**Ready for merge.** " + negation
             + " blocking findings were resolved by this round's diff."
@@ -3333,15 +3343,25 @@ def main() -> int:
             "a negated resolution reading '" + negation + "' stays not-clean",
             checker.classify_verdict(varied) == "not-clean",
         )
-    # Control: punctuation ends the negator's scope, which is what
-    # separates the fronted clause above from the negations here.
-    punctuated_control = (
-        "### Verdict\n**Ready for merge.** No new issues, and the two "
+    # Control: what exempts the fronted clause above is the negator's
+    # grammatical role, not punctuation -- a negator governed by a
+    # preposition heads an adjunct. The same sentence with the negator
+    # as subject quantifier stays blocking.
+    governed_control = (
+        "### Verdict\n**Ready for merge.** With no new issues, the two "
         "earlier blocking findings were resolved by this round's diff."
     )
     check(
-        "punctuation ends the negator scope (control for the matrix)",
-        checker.classify_verdict(punctuated_control) == "clean",
+        "a preposition-governed negator does not block the resolution",
+        checker.classify_verdict(governed_control) == "clean",
+    )
+    ungoverned_control = (
+        "### Verdict\n**Ready for merge.** No new issues and the two "
+        "earlier blocking findings were resolved by this round's diff."
+    )
+    check(
+        "an ungoverned negator over-flags, the safe direction",
+        checker.classify_verdict(ungoverned_control) == "not-clean",
     )
     # The paren-aside and character branches of the clause scan must stay
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a

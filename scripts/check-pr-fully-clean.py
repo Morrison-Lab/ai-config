@@ -918,7 +918,7 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"(?:fixed|resolved|addressed))\b",
         re.IGNORECASE,
     )
-    _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+    _SENTENCE_END = _SENTENCE_END_RE
 
     def _strip_posted_aside(m: "re.Match") -> str:
         head = m.string[:m.start()]
@@ -1022,6 +1022,23 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 )
 
 
+# Shared by the citation-aside veto and the negated-resolution guard: a
+# [.!?] ends a sentence only when whitespace or end-of-text follows, so a
+# filename ("tactics.qmd") or a decimal does not split one.
+_SENTENCE_END_RE = re.compile(r"[.!?](?=\s|$)")
+_NEGATOR_RE = re.compile(
+    r"\b(?:none|no|not|never|neither|nothing|nobody|nor"
+    r"|zero|hardly|barely|scarcely)\b",
+    re.IGNORECASE,
+)
+# A negator under one of these heads an adjunct rather than the subject.
+_ADJUNCT_GOVERNOR_RE = re.compile(
+    r"\b(?:with|without|despite|besides|barring|assuming"
+    r"|aside\s+from|apart\s+from|other\s+than)\s+$",
+    re.IGNORECASE,
+)
+
+
 def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
@@ -1044,22 +1061,32 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # resolved only because the negator sits BEFORE the past-state marker,
     # outside the suffix scan.
     #
-    # The negator must quantify the SAME noun phrase the marker modifies,
-    # and PUNCTUATION is what decides that, not a whitelist of glue words.
-    # A bag-of-words search over the window false-blocked "with no new
-    # issues, both round-2 blocking findings ... are resolved"; a fixed
-    # glue list ("of the ...") then let a count or modifier through --
-    # "None of the two earlier blocking findings were resolved" read as
-    # unnegated and classified clean, the dangerous direction. So the glue
-    # is any short run of bare words: a comma or any other punctuation
-    # ends the negator's scope, which is exactly what separates the
-    # fronted no-new-issues clause from a negated resolution.
-    if re.search(
-        r"\b(?:none|no|not|never|neither|nothing)"
-        r"(?:\s+[\w'\u2019-]+){0,4}\s*$",
-        prefix[:past_state.start()],
-        re.IGNORECASE,
-    ):
+    # Two narrower shapes were tried first and both failed OPEN, which is
+    # the dangerous direction here. A fixed glue whitelist ("of the ...")
+    # let a count or modifier through ("None of the TWO earlier ..."). A
+    # bounded run of bare words then let anything longer than the bound
+    # through ("None of the several very recently identified earlier
+    # ..."), and its premise -- that punctuation ends a negator's scope --
+    # is false when the punctuation sits INSIDE the negated noun phrase
+    # ("None of the many previously-identified, still-outstanding earlier
+    # ...").
+    #
+    # So the search is deliberately wide: any negator anywhere earlier in
+    # the same sentence defeats the exemption. What the guard tests is
+    # instead the negator's GRAMMATICAL ROLE, which is the thing that
+    # actually differs: a negator governed by a preposition heads an
+    # adjunct ("WITH no new issues, both round-2 blocking findings ... are
+    # resolved") and negates something other than the resolution, while a
+    # bare negator is the subject quantifier and negates the resolution
+    # itself. Anything this misjudges over-flags, leaving a resolved
+    # mention blocking, which is the safe direction.
+    sentence_start = 0
+    for end in _SENTENCE_END_RE.finditer(scan[:match.start()]):
+        sentence_start = end.end()
+    sentence_head = scan[sentence_start:match.start()]
+    for negator in _NEGATOR_RE.finditer(sentence_head):
+        if _ADJUNCT_GOVERNOR_RE.search(sentence_head[:negator.start()]):
+            continue
         return False
     suffix = scan[match.end():]
     # A dot glued to the next character -- a filename ("tactics.qmd"), a

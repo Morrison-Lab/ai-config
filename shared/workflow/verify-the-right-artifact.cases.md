@@ -165,3 +165,41 @@ The same file with the same mtime was current before 01:20 and stale after it,
 which is the whole argument against the proxy in one measurement:
 an instrument reading the same value in both states
 has not measured either.
+
+## A summary read as its source, in the session that fixed the summary
+
+Morrison-Lab/ai-config#2622 / #2623, 2026-08-29.
+
+A push refused with `stale info`. The auto-loaded `CLAUDE.md:851` read:
+
+> A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
+
+Acting on that, I plain-pushed, and the push was rejected: the branch existed.
+I then reported to the user that **`memories/git-branches.md` was inaccurate**.
+
+It was not. Opening the file:
+
+> **`stale info` after `checkout -B` *usually* means the remote branch was DELETED, not moved** [...]
+> ```sh
+> git ls-remote --heads origin <branch>   # empty output = deleted
+> ```
+
+It hedges, names the competing cause, and prescribes the disambiguating read.
+Every one of those was dropped by the one-line restatement, and the restatement was the copy in context.
+
+Three things this case pins that the shape's prose states more briefly.
+
+**The summary named the file, which is what made it feel like a citation.**
+Had `CLAUDE.md` asserted the claim without attribution, "which file says that?" is the obvious next question.
+Naming the source answers that question in advance, so nothing prompts the read.
+
+**The error was reported before it was checked.**
+The claim went into a user-facing message, not into a file, so no review, hook, or CI step could see it.
+The correction came from re-reading the source while drafting the fix --- that is, from the work, not from any instrument.
+
+**The near-miss is that the eventual fix was still right.**
+`CLAUDE.md` was genuinely defective and #2623 genuinely fixed it.
+A wrong claim about *which artifact* was defective sat inside an otherwise correct diagnosis, which is the configuration in which such a claim is least likely to be revisited.
+
+An adversarial review of that same PR then caught a second instance of the same substitution one level up: the fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
+The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.

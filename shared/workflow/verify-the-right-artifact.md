@@ -191,6 +191,32 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
+## A summary is another shape, and it is the one that hands you the citation
+
+Every shape above substitutes an artifact that says nothing about the one it replaces.
+A cache does not name its origin, a checkout does not announce which run it belongs to, and a neighbour makes no claim about the target at all.
+A summary does the opposite: it names the source, describes it, and exists in order to describe it.
+So reading one produces the feeling of having consulted the source, and it supplies the filename to cite while doing so.
+
+The asymmetry that hides it is that a summary is usually faithful.
+The substitution is therefore correct nearly every time, which is what stops it registering as a substitution on the occasion it is wrong.
+And when it is wrong it fails in a specific direction: compression drops hedges, caveats, and disambiguating steps, because those read as qualifying detail rather than as the claim.
+
+This corpus makes that structural rather than incidental.
+`CLAUDE.md` and `AGENTS.md` are auto-loaded while `memories/` and most of `shared/` are not, so the summary is the copy always in context and the source is the copy nobody opens.
+A rule restated in an auto-loaded file is the one you will read, and often the only one, unless you deliberately go to the fragment it summarizes.
+
+The tell is grammatical.
+A sentence of the form "`X.md` records that ..." is a claim about a file's contents, and it needs that file open --- not the passage that told you about the file.
+Quoting is not the boundary either: a characterization is the looser form, and the one no phrase-grep can check.
+
+- **Do:** open the cited file before asserting what it says, including when the passage in front of you names it.
+- **Do:** suspect a dropped hedge first when a summary and its source disagree, since that is the direction compression fails in.
+- **Don't:** treat "the auto-loaded file says so" as having consulted the fragment it cites.
+- **Don't:** read a faithful summary's usual reliability as licence --- that reliability is what makes the exception invisible.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A summary read as its source, in the session that fixed the summary".
+
 ## A drift claim is relational, so one read cannot settle it
 
 Every shape above is one substitution: you read A and made a claim about B.

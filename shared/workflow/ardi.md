@@ -188,6 +188,17 @@ ARD every item from every review, then request fresh reviews
 (ai-config#2274).
 
 **A scheduled check-in can outlive the PR it names, and its stale premise arrives as a user instruction.**
+
+The same applies to a head SHA, on a much shorter clock.
+A check-in worded against a specific commit goes stale on the next push, which
+during an ARD round can be minutes away --- measured at four on ai-config#2623,
+where a check-in naming `7db5b98` was obsolete before it ever fired.
+A SHA also fails more quietly than a PR number does: the number at least names
+something that still exists, whereas the commit is simply no longer the head,
+and a check-in that verifies the verdict against it will confirm a review of
+superseded content.
+So word the check-in to *derive* the head ("fetch the current head SHA"), never
+to carry one.
 Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets
 read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is
 written at T, stored, and delivered at T+N with no intervening reader.

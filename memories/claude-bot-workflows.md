@@ -1011,3 +1011,36 @@ the review from the agent's final message instead.
 See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
+
+## A review comment's "current head" can name a commit that exists only in the runner
+
+`claude-code-review.yml`'s `gather-context` job merges the default branch into
+the PR head inside its own checkout, so the reviewer reasons over a merge commit
+that was never pushed and is not reachable from your branch.
+Its prose then reports that SHA as the current head.
+
+Measured on ai-config#2623, 2026-08-29.
+The round-2 review opened:
+
+> **What changed since commit `7db5b981` (last reviewed) -> `e4d3f9ad` (current head):**
+> - `d350629` and its inclusion of `skills/daytb/SKILL.md` are an unrelated main-sync merge
+
+Neither `e4d3f9ad` nor `d350629` was authored on that branch.
+`d350629` was `main`'s tip (a squash of a sibling PR) and `e4d3f9ad` was the
+ephemeral merge of the two.
+`git ls-remote` showed the branch tip unchanged at the pushed commit, and
+`git log HEAD..origin/<branch>` was empty.
+
+**Why this is worth recording rather than shrugging off.**
+Read at face value it is indistinguishable from the scenario
+[`claim-pr`](../shared/workflow/claim-pr.md) warns about --- another agent
+pushing to your branch --- and that reading sends you looking for a collision
+that never happened, or worse, invites a defensive force-push over commits you
+believe are foreign.
+The comment's own `Reviewed commit:` trailer is the reliable field: it names the
+commit whose *content* was reviewed, and on that PR it correctly read the pushed
+head.
+
+- **Do:** settle head identity from `git ls-remote` or the PR's `head.sha`, and
+  read the review's `Reviewed commit:` trailer for what was actually reviewed.
+- **Don't:** treat a SHA in review prose as evidence that your branch moved.

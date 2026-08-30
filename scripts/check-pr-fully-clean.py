@@ -1024,8 +1024,15 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 
 # Shared by the citation-aside veto and the negated-resolution guard: a
 # [.!?] ends a sentence only when whitespace or end-of-text follows, so a
-# filename ("tactics.qmd") or a decimal does not split one.
-_SENTENCE_END_RE = re.compile(r"[.!?](?=\s|$)")
+# filename ("tactics.qmd") or a decimal does not split one. A trailing
+# abbreviation dot does not either -- "e.g." mid-sentence otherwise
+# restarts the sentence and hides everything before it, including a
+# negator. Merging two sentences only ever widens the scan, which
+# over-flags rather than exempting, so the safe direction.
+_SENTENCE_END_RE = re.compile(
+    r"(?<!\be\.g)(?<!\bi\.e)(?<!\bcf)(?<!\bvs)(?<!\betc)"
+    r"(?<!\bapprox)(?<!\bResp)(?<!\bFig)[.!?](?=\s|$)"
+)
 _NEGATOR_RE = re.compile(
     r"\b(?:none|no|not|never|neither|nothing|nobody|nor"
     r"|zero|hardly|barely|scarcely)\b",
@@ -1037,6 +1044,8 @@ _ADJUNCT_GOVERNOR_RE = re.compile(
     r"|aside\s+from|apart\s+from|other\s+than)\s+$",
     re.IGNORECASE,
 )
+# What closes an adjunct before the clause the mention sits in.
+_CLAUSE_BOUNDARY_RE = re.compile(r"[,;:]")
 
 
 def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
@@ -1072,20 +1081,32 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # ...").
     #
     # So the search is deliberately wide: any negator anywhere earlier in
-    # the same sentence defeats the exemption. What the guard tests is
-    # instead the negator's GRAMMATICAL ROLE, which is the thing that
-    # actually differs: a negator governed by a preposition heads an
-    # adjunct ("WITH no new issues, both round-2 blocking findings ... are
-    # resolved") and negates something other than the resolution, while a
-    # bare negator is the subject quantifier and negates the resolution
-    # itself. Anything this misjudges over-flags, leaving a resolved
-    # mention blocking, which is the safe direction.
+    # the same sentence defeats the exemption, and only a negator that is
+    # BOTH governed by a preposition AND separated from the mention by a
+    # clause boundary is passed over. Both conditions are needed, because
+    # each alone admits the other's failure. Governed-only reads "WITH
+    # none of the previously blocking findings were resolved" as an
+    # adjunct, since it tests the word before the negator rather than what
+    # the negator quantifies. Boundary-only reads "None of the many
+    # previously-identified, still-outstanding earlier ..." as clear,
+    # since the comma there sits inside the negated noun phrase. Together
+    # they admit only the fronted adjunct ("WITH no new issues, both
+    # round-2 blocking findings ... are resolved"), whose negator both
+    # hangs off a preposition and quantifies a different noun phrase.
+    # Anything this misjudges over-flags, leaving a resolved mention
+    # blocking, which is the safe direction.
     sentence_start = 0
     for end in _SENTENCE_END_RE.finditer(scan[:match.start()]):
         sentence_start = end.end()
     sentence_head = scan[sentence_start:match.start()]
     for negator in _NEGATOR_RE.finditer(sentence_head):
-        if _ADJUNCT_GOVERNOR_RE.search(sentence_head[:negator.start()]):
+        governed = _ADJUNCT_GOVERNOR_RE.search(
+            sentence_head[:negator.start()]
+        )
+        detached = _CLAUSE_BOUNDARY_RE.search(
+            sentence_head[negator.end():]
+        )
+        if governed and detached:
             continue
         return False
     suffix = scan[match.end():]

@@ -3363,6 +3363,33 @@ def main() -> int:
         "an ungoverned negator over-flags, the safe direction",
         checker.classify_verdict(ungoverned_control) == "not-clean",
     )
+    # Being governed is not sufficient on its own: the negator must also
+    # be detached from the mention by a clause boundary. Otherwise a
+    # governor word prepended to the very phrasing the guard exists to
+    # catch defeats it, for every governor in the list.
+    for governor in ("With", "Without", "Despite", "Besides", "Barring",
+                     "Assuming", "Aside from", "Apart from", "Other than"):
+        governed_but_attached = (
+            "### Verdict\n**Ready for merge.** " + governor
+            + " none of the previously blocking findings were resolved "
+            "by this round's diff."
+        )
+        check(
+            "a governed but undetached negator ('" + governor
+            + "') stays not-clean",
+            checker.classify_verdict(governed_but_attached) == "not-clean",
+        )
+    # An abbreviation dot does not restart the sentence, so a negator
+    # before it stays in scope rather than being hidden.
+    abbreviation_scope = (
+        "### Verdict\n**Ready for merge.** None of the round-2 issues "
+        "were addressed, e.g. the previously blocking findings were "
+        "resolved by this round's diff."
+    )
+    check(
+        "an abbreviation dot does not hide an earlier negator",
+        checker.classify_verdict(abbreviation_scope) == "not-clean",
+    )
     # The paren-aside and character branches of the clause scan must stay
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
     # failing enumeration. Probed on _is_resolved_blocking_mention directly:

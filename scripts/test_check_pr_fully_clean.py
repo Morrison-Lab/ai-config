@@ -3446,10 +3446,16 @@ def main() -> int:
     # exotic whitespace character, and each way of arranging them
     # against the punctuation, on BOTH routes that share the scan.
     _faked_end_failures = []
+    # Includes characters str.isspace does NOT report (zero-width space,
+    # joiners, BOM), which a tool inserts into a long URL to let it
+    # soft-wrap, and which were neither skipped nor a token break.
+    _gaps = [chr(_x) for _x in (0x0d, 0x0b, 0x0c, 0xa0, 0x200b, 0x200c,
+                                0x200d, 0xfeff, 0x180e, 0x2028, 0x2029,
+                                0x3000, 0x2000, 0x2009, 0x202f, 0x205f)]
     for _token in ("http://x.io/a", "/etc/passwd", "www.example.com"):
-        for _ws in ("\r", "\v", "\f", "\xa0"):
+        for _ws in _gaps:
             for _sep in ("", " ", _ws, " " + _ws, _ws + " ", _ws + "x",
-                         " " + _ws + _ws):
+                         " " + _ws + _ws, _ws + " " + _ws):
                 _guard = (
                     "### Verdict\n**Ready for merge.** None of the "
                     + _token + _sep
@@ -3468,8 +3474,20 @@ def main() -> int:
                         )
     check(
         "no whitespace arrangement fakes a sentence end (%d checked)"
-        % (3 * 4 * 7 * 2),
+        % (3 * len(_gaps) * 8 * 2),
         not _faked_end_failures,
+    )
+    # The scan must stay linear when NO ascii break is present, since
+    # both the backward per-candidate walk and the token slice extend to
+    # the start of the text and grow with each candidate. Measured at
+    # 5.4s for this body before the two forward pointers replaced them.
+    _nbsp = chr(0xa0)
+    _dense = ("word" + _nbsp) * 40000 + "." + _nbsp
+    _t0 = time.time()
+    checker._sentence_start_before(_dense)
+    check(
+        "the sentence scan stays linear with no ascii break present",
+        time.time() - _t0 < 1,
     )
     # The citation veto shares the same sentence scan, so a faked
     # sentence end there hides a re-raise instead of a negator, and

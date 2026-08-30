@@ -277,7 +277,7 @@ committed pass.
    **After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns
    empty for an owner-qualified head — it only matches a bare branch name,
    even when a matching PR genuinely exists (verified directly: `gh pr list
-   --head the repository owner:ums-pr635-lessons` returned `[]` against a real open PR
+   --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR
    on that exact branch, while `gh pr list --head ums-pr635-lessons` found
    it). Query the REST API instead, whose `head` filter does honor the
    owner-qualified form:
@@ -295,7 +295,7 @@ committed pass.
    gh pr create --repo "<upstream-owner>/<repo>" --base "<discovered-default-branch>" \
      --head "<head-owner>:<current-branch>" \
      --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
-     --reviewer the repository owner
+     --reviewer <reviewer>
    ```
    If upstream is not accessible in-session, push and explicitly hand off that
    upstream PR creation is still required.

@@ -206,6 +206,28 @@ def extract_files_from_markdown(text: str, context_text: str = "", default_targe
     return files
 
 
+def configured_pr_reviewers() -> Optional[List[str]]:
+    """Return the reviewers to request on an opened PR, or None.
+
+    Read from `AI_CONFIG_PR_REVIEWERS` (comma-separated logins), because this
+    plugin is used by people other than its author and a hardcoded login is
+    correct for at most one of them (user directive, 2026-08-29,
+    ai-config#2627).
+
+    Returns None rather than a fallback when unset. `mark_pr_ready_and_request_review`
+    guards on `if reviewers:`, so None cleanly skips the request -- and no
+    reviewer requested is the right failure, since the alternative is a POST of
+    `reviewers[]=<something wrong>` that fails at the API with no local signal.
+
+    Before this existed the value was the literal string "the repository
+    owner", which is not a username at all: it reached
+    `req_cmd.extend(["-f", f"reviewers[]={r}"])` verbatim, so every request
+    named a login containing spaces that exists for nobody.
+    """
+    raw = os.environ.get("AI_CONFIG_PR_REVIEWERS", "")
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    return names or None
+
 class BaseSubagent(ABC):
     """Abstract base class for all specialized sub-agents conforming to AIConfig protocols."""
 
@@ -823,7 +845,7 @@ class TesterSubagent(BaseSubagent):
         if passed and pr_number and (has_real_diff or dry_run):
             pr_marked_ready = self.pr_claim_mgr.mark_pr_ready_and_request_review(
                 pr_number=pr_number,
-                reviewers=["the repository owner"],
+                reviewers=configured_pr_reviewers(),
                 repo_slug=repo_slug,
                 dry_run=dry_run,
             )

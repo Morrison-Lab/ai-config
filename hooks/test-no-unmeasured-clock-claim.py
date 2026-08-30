@@ -257,6 +257,15 @@ CASES = [
     ([say("earlier"),
       say("PR #1131 merged at 2026-07-27 21:51:49 UTC (14:51 PT)\n\nRecap: as of 19:24 PDT")], True,
      "#2661: mixed message with past event and unmeasured recap still catches recap"),
+    ([say("earlier"),
+      say("All tests passed. Stopping Point: 18:30 PDT")], True,
+     "#2661: action verb before stopping point does not silence unmeasured recap"),
+    ([say("earlier"),
+      say("Branch pushed. Recap: 18:30 PDT")], True,
+     "#2661: action verb before recap does not silence unmeasured recap"),
+    ([say("earlier"),
+      say("Stopping Point: non-clean, as of 19:24 PDT\nScheduled timer to check back at 19:34 PDT")], True,
+     "#2661: mixed recap and timer still catches unmeasured recap"),
 ]
 
 

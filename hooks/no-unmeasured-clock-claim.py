@@ -72,15 +72,20 @@ RX_CLAIM = re.compile(
     re.I,
 )
 
-# Context preceding a timestamp indicating a historical action or artifact conversion,
-# rather than a present-time recap claim.
+# Context directly preceding a timestamp indicating a historical action or artifact conversion,
+# rather than a present-time recap claim. Must not cross sentence boundaries or recap headers.
 RX_PAST_CONTEXT = re.compile(
-    r"\b(?:merged|closed|created|committed|pushed|failed|passed|started|finished|ran|dated|recorded|received|sent|authored|opened|landed|tagged|since|from|between|until|before)\b[^\n]{0,40}$",
+    r"\b(?:merged|closed|created|committed|pushed|failed|passed|started|finished|ran|dated|recorded|received|sent|authored|opened|landed|tagged)\s+(?:at|on|in|since|from|before|until|between)\s+[^.!?;\n]{0,35}$",
     re.I,
 )
 
 RX_UTC_CONVERT = re.compile(
-    r"\bUTC\b[^\n]{0,25}$",
+    r"\bUTC\s*(?:[/]\s*|\(\s*|\s+at\s+)[^.!?;\n]{0,25}$",
+    re.I,
+)
+
+RX_RECAP_HEADER = re.compile(
+    r"\b(?:recap|status|stopping\s+point|update|summary|as\s+of|now)\b",
     re.I,
 )
 
@@ -320,8 +325,20 @@ def main() -> int:
     for hit in hits:
         start, end = hit.start(), hit.end()
         prefix = text[max(0, start - 60):start]
-        # Ignore past conversions or artifact citations
-        if RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix):
+        line_start = text.rfind("\n", 0, start) + 1
+        line_end = text.find("\n", end)
+        if line_end == -1:
+            line_end = len(text)
+        local_line = text[line_start:line_end]
+
+        is_recap = bool(RX_RECAP_HEADER.search(prefix))
+        if not is_recap and (RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix)):
+            continue
+
+        if RX_FUTURE_REFERENCE.search(local_line):
+            # A scheduled check-in states a time that has not happened yet, and
+            # CLAUDE.md requires stating it. It is ahead of the clock by
+            # design, not by invention.
             continue
 
         # A value is usable only when the reading it came from is itself in this
@@ -334,11 +351,6 @@ def main() -> int:
             if skew <= TOLERANCE_MIN:
                 # Quoting the reading, or within tolerance.
                 continue
-            if RX_FUTURE_REFERENCE.search(text):
-                # A scheduled check-in states a time that has not happened yet, and
-                # CLAUDE.md requires stating it. It is ahead of the clock by
-                # design, not by invention.
-                continue
             measured_hhmm = f"{measured[1] // 60:02d}:{measured[1] % 60:02d}"
             detail = (
                 f"the last measured reading in this transcript is "
@@ -348,8 +360,6 @@ def main() -> int:
             unmeasured_hit = hit
             break
         else:
-            if RX_FUTURE_REFERENCE.search(text):
-                continue
             detail = (
                 "no clock read appears in this transcript since your previous message")
             unmeasured_hit = hit

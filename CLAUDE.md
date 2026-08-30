@@ -848,8 +848,11 @@ An earlier fetch is a measurement of a moment that has passed, and it expires ex
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
 Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
-Query `gh pr list --state all --head <branch>` before a plain push.
+A `stale info` refusal is not a reason to force either, and on its own it does not say which of two causes fired: the remote branch was deleted (the case that recurs here, after a squash-merge with auto-delete), or your remote-tracking ref is merely stale.
+`memories/git-branches.md` names both and gives the one read that settles it --- `git ls-remote --heads origin <branch>`, where empty output means deleted.
+Run it before deciding anything, because the two causes take opposite remedies and the message names neither.
+When it comes back non-empty the branch is live: fetch and reconcile, since a plain push is rejected as non-fast-forward and forcing would clobber whoever pushed.
+When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
 MERGED means auto-delete, not a first publish: do not recreate
 (see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
 Otherwise a plain push is the fix.

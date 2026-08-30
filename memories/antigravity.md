@@ -7,16 +7,16 @@ Re-verify against a live install before relying on any of them, since the primar
 
 Antigravity defines lifecycle events in `plugins/<plugin-name>/hooks.json`.
 
-### Command paths must use `${extensionPath}`, never a relative path
+### `extensionPath` is not supported in command paths
 
 A `command` value is resolved against the terminal's active working directory, not against the plugin's own directory --- and Antigravity has a known bug where that cwd can default to `$HOME` regardless of which project is open.
 A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
-### `extensionPath` is not supported
 
 Unlike Claude Code, Antigravity does **not** interpolate variables like
 `${extensionPath}` or `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` commands.
 Commands in `hooks.json` must use absolute paths
 or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
+(Empirical finding verified on macOS 2026-08-29: Antigravity expands `~` when launching the command).
 For example, `ai-config` uses
 `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
 backed by a symlink created in `bootstrap.sh`.

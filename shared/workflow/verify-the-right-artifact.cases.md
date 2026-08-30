@@ -203,5 +203,6 @@ The correction came from re-reading the source while drafting the fix --- that i
 `CLAUDE.md` was genuinely defective and #2623 genuinely fixed it.
 A wrong claim about *which artifact* was defective sat inside an otherwise correct diagnosis, which is the configuration in which such a claim is least likely to be revisited.
 
-An adversarial review of that same PR then caught a second instance of the same substitution one level up: the fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
+An adversarial review of that same PR then caught a second instance of the same substitution one level up.
+The fix had been swept across `CLAUDE.md` and `shared/workflow/check-before-pushing.md` but not `AGENTS.md`, which `CLAUDE.md:3-5` names as the authoritative cross-agent contract and which carried a near-verbatim twin of the edited paragraph.
 The sweep had been keyed on the file that prompted the work rather than on the population carrying the claim.

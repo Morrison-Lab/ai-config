@@ -1021,7 +1021,7 @@ The round-2 review opened:
 > - `d350629` and its inclusion of `skills/daytb/SKILL.md` are an unrelated main-sync merge
 
 Neither SHA was authored on that branch.
-`d350629` was `main`'s tip, and `e4d3f9ad` was the two merged.
+`d350629` was `main`'s tip, and `e4d3f9ad` was the merge of the two.
 `git ls-remote` showed the branch tip unchanged, and `git log HEAD..origin/<branch>` was empty.
 
 **The mechanism is already recorded**, in [`github-actions.md`](github-actions.md)'s `refs/pull/<N>/merge` section: GitHub creates that synthetic ref server-side, the PR's head merged into the base, and it exists in no branch of yours.

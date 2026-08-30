@@ -188,10 +188,16 @@ ARD every item from every review, then request fresh reviews
 (ai-config#2274).
 
 **A scheduled check-in can outlive the PR it names, and its stale premise arrives as a user instruction.**
-
-Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is written at T, stored, and delivered at T+N with no intervening reader.
-And it arrives as a user-role turn, the most authoritative framing a turn can receive, which makes a stale premise persuasive: the turn opens by telling you what the situation is, in the voice of an instruction.
-If the PR merged between arming and firing, acting on "drive #N's findings" means working a branch GitHub has already auto-deleted --- the orphaned-branch recovery [`use-existing-pr-branch.md`](use-existing-pr-branch.md) documents, arrived at from the other direction.
+Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets
+read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is
+written at T, stored, and delivered at T+N with no intervening reader.
+And it arrives as a user-role turn, the most authoritative framing a turn can
+receive, which makes a stale premise persuasive: the turn opens by telling you
+what the situation is, in the voice of an instruction.
+If the PR merged between arming and firing, acting on "drive #N's findings"
+means working a branch GitHub has already auto-deleted --- the orphaned-branch
+recovery [`use-existing-pr-branch.md`](use-existing-pr-branch.md) documents,
+arrived at from the other direction.
 
 - **Do:** word a wakeup against a re-derivable set ("re-check every PR this
   session opened that has not merged or closed") rather than a fixed
@@ -200,7 +206,8 @@ If the PR merged between arming and firing, acting on "drive #N's findings" mean
   verify it (`gh pr view <N> --json state,mergedAt` / `pull_request_read` `get`)
   before acting on anything the prompt asserts --- `merged: true` means the
   correct action is `post-merge`, not another ARD round.
-- **Don't:** hard-code a PR number, or a head SHA, into a wakeup that may outlive either.
+- **Don't:** hard-code a PR number, or a head SHA, into a wakeup that may
+  outlive either.
 - **Don't:** treat a wakeup's premise as current because it arrives in the
   user role --- it is a message from a past self, and the state it describes
   is as old as the prompt.
@@ -210,11 +217,19 @@ merged between arming and firing; the wakeup arrived asserting a live PR
 needing an ARD round when the actually-live PR was #892, its own UMS
 follow-up.)
 
-**A head SHA is the same defect on a far shorter clock, and it fails more quietly.**
-A stale PR number still names something that exists, so verifying it returns an answer that disagrees with the prompt.
-A stale SHA names a commit that is simply no longer the head, so a check-in that verifies the verdict against it confirms a review of superseded content and reports success.
-The clock is the ARD round rather than the merge queue: on ai-config#2623 the two commits either side of one review round were 5m38s apart, and the check-in naming the earlier one was armed 1m23s before the later push landed --- so it was obsolete before it ever fired.
-Word the check-in to *derive* the head ("fetch the current head SHA") rather than to carry one.
+**A head SHA is the same defect on a far shorter clock, and it fails more
+quietly.**
+A stale PR number still names something that exists, so verifying it
+returns an answer that disagrees with the prompt.
+A stale SHA names a commit that is simply no longer the head, so a
+check-in that verifies the verdict against it confirms a review of
+superseded content and reports success.
+The clock is the ARD round rather than the merge queue: on ai-config#2623
+the two commits either side of one review round were 5m38s apart, and the
+check-in naming the earlier one was armed 1m23s before the later push
+landed --- so it was obsolete before it ever fired.
+Word the check-in to *derive* the head ("fetch the current head SHA")
+rather than to carry one.
 
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A

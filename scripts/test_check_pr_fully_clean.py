@@ -3316,6 +3316,33 @@ def main() -> int:
         "a fronted no-new-issues clause does not false-block the resolution",
         checker.classify_verdict(fronted_negator) == "clean",
     )
+    # The guard varies the words BETWEEN the negator and the past-state
+    # marker, not just two literal phrasings: a fixed glue whitelist
+    # ("of the ...") let a count or modifier through, classifying a
+    # negated resolution as clean.
+    for negation in ("None of the two earlier",
+                     "None of the identified earlier",
+                     "Not one of the prior",
+                     "Neither of the prior",
+                     "None of these previously"):
+        varied = (
+            "### Verdict\n**Ready for merge.** " + negation
+            + " blocking findings were resolved by this round's diff."
+        )
+        check(
+            "a negated resolution reading '" + negation + "' stays not-clean",
+            checker.classify_verdict(varied) == "not-clean",
+        )
+    # Control: punctuation ends the negator's scope, which is what
+    # separates the fronted clause above from the negations here.
+    punctuated_control = (
+        "### Verdict\n**Ready for merge.** No new issues, and the two "
+        "earlier blocking findings were resolved by this round's diff."
+    )
+    check(
+        "punctuation ends the negator scope (control for the matrix)",
+        checker.classify_verdict(punctuated_control) == "clean",
+    )
     # The paren-aside and character branches of the clause scan must stay
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
     # failing enumeration. Probed on _is_resolved_blocking_mention directly:

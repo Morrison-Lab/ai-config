@@ -1042,13 +1042,21 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # A negated resolution -- "None of the earlier blocking findings were
     # resolved" -- is a live not-clean statement: the suffix reads as
     # resolved only because the negator sits BEFORE the past-state marker,
-    # outside the suffix scan. The negator must sit ADJACENT to the marker
-    # (glue words allowed): a bag-of-words search over the window
-    # false-blocked "with no new issues, both round-2 blocking findings
-    # ... are resolved".
+    # outside the suffix scan.
+    #
+    # The negator must quantify the SAME noun phrase the marker modifies,
+    # and PUNCTUATION is what decides that, not a whitelist of glue words.
+    # A bag-of-words search over the window false-blocked "with no new
+    # issues, both round-2 blocking findings ... are resolved"; a fixed
+    # glue list ("of the ...") then let a count or modifier through --
+    # "None of the two earlier blocking findings were resolved" read as
+    # unnegated and classified clean, the dangerous direction. So the glue
+    # is any short run of bare words: a comma or any other punctuation
+    # ends the negator's scope, which is exactly what separates the
+    # fronted no-new-issues clause from a negated resolution.
     if re.search(
-        r"\b(?:none|no|not|never|neither|nothing)\s+"
-        r"(?:of\s+|the\s+|all\s+|these\s+|those\s+)*$",
+        r"\b(?:none|no|not|never|neither|nothing)"
+        r"(?:\s+[\w'\u2019-]+){0,4}\s*$",
         prefix[:past_state.start()],
         re.IGNORECASE,
     ):

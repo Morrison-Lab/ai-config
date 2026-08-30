@@ -923,9 +923,7 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     def _strip_posted_aside(m: "re.Match") -> str:
         head = m.string[:m.start()]
         tail = m.string[m.end():]
-        sentence_start = 0
-        for end in _SENTENCE_END.finditer(head):
-            sentence_start = end.end()
+        sentence_start = _sentence_start_before(head)
         forward = _SENTENCE_END.search(tail)
         sentence_tail = tail[:forward.end()] if forward else tail
         context = " ".join(
@@ -1031,9 +1029,31 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 # over-flags rather than exempting, so the safe direction.
 _SENTENCE_END_RE = re.compile(
     r"(?<!\be\.g)(?<!\bi\.e)(?<!\bcf)(?<!\bvs)(?<!\betc)"
-    r"(?<!\bapprox)(?<!\bresp)(?<!\bfig)[.!?](?=\s|$)",
+    r"(?<!\bapprox)(?<!\bresp)(?<!\bfig)"
+    r"(?<![.!?])[.!?](?=\s|$)",
     re.IGNORECASE,
 )
+# A dot inside one of these is not a sentence end either. Checked in code
+# against the token before the candidate, since the token has no bound a
+# lookbehind could take.
+_NOT_SENTENCE_TOKEN_RE = re.compile(r"(?:://|www\.|/)")
+
+
+def _sentence_start_before(text: str) -> int:
+    """Offset just past the last real sentence end in ``text``.
+
+    Splits on ``_SENTENCE_END_RE`` and then discards any candidate whose
+    preceding whitespace-delimited token looks like a URL or path, whose
+    internal dots would otherwise restart the sentence mid-clause and
+    hide everything before them from the caller's scan.
+    """
+    start = 0
+    for end in _SENTENCE_END_RE.finditer(text):
+        head = text[:end.start()].split()
+        if head and _NOT_SENTENCE_TOKEN_RE.search(head[-1]):
+            continue
+        start = end.end()
+    return start
 _NEGATOR_RE = re.compile(
     r"\b(?:none|no|not|never|neither|nothing|nobody|nor"
     r"|zero|hardly|barely|scarcely)\b",
@@ -1102,9 +1122,7 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # A negator AFTER the mention is unaffected, so the common trailing
     # form ("... are resolved, with no new issues introduced") still
     # reads as resolved.
-    sentence_start = 0
-    for end in _SENTENCE_END_RE.finditer(scan[:match.start()]):
-        sentence_start = end.end()
+    sentence_start = _sentence_start_before(scan[:match.start()])
     if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
         return False
     suffix = scan[match.end():]

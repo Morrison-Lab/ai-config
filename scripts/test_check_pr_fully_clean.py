@@ -3392,6 +3392,23 @@ def main() -> int:
                 + "') stays not-clean",
                 checker.classify_verdict(governed) == "not-clean",
             )
+    # Nor does a dot that is part of an ellipsis, a URL, or a path:
+    # each would otherwise restart the sentence mid-clause and hide the
+    # negator before it. The mention's own sentence is what the guard
+    # scans, so anything that fakes a sentence end is a fail-open.
+    for interrupter in ("the...",
+                        "the http://x.io/a.",
+                        "the src/a.py.",
+                        "the www.example.com."):
+        faked_end = (
+            "### Verdict\n**Ready for merge.** None of " + interrupter
+            + " previously blocking finding is resolved."
+        )
+        check(
+            "a faked sentence end ('" + interrupter
+            + "') does not hide the negator",
+            checker.classify_verdict(faked_end) == "not-clean",
+        )
     # An abbreviation dot does not restart the sentence, so a negator
     # before it stays in scope rather than being hidden.
     abbreviation_scope = (

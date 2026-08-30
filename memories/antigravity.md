@@ -13,9 +13,13 @@ A `command` value is resolved against the terminal's active working directory, n
 A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
 ### `extensionPath` is not supported
 
-Unlike Claude Code, Antigravity does **not** interpolate variables like `${extensionPath}` or `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` commands.
-Commands in `hooks.json` must use absolute paths or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
-For example, `ai-config` uses `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` backed by a symlink created in `bootstrap.sh`.
+Unlike Claude Code, Antigravity does **not** interpolate variables like
+`${extensionPath}` or `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` commands.
+Commands in `hooks.json` must use absolute paths
+or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
+For example, `ai-config` uses
+`~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
+backed by a symlink created in `bootstrap.sh`.
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.

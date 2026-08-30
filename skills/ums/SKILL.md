@@ -433,6 +433,40 @@ add a review gate for the cases that need one.
   evidence dies with the session. (ai-config#727: `mcp__github__list_commits`
   was flagged in review as unanchored; it was genuinely verified by use, and
   the fix was registering it as the `LIST_COMMITS` operation.)
+- ❌ Writing up an incident from **recall** rather than re-deriving its
+  figures and its mechanism from the artifacts.
+  The artifacts are still there --- that they are still there is exactly why
+  the entry is worth writing now.
+  The bullet above covers an identifier that appears nowhere else;
+  this covers an entry whose identifiers are all real,
+  and whose *quantities* and *causal claim* are invented.
+  It is the harder case, because having **witnessed** the incident feels like
+  evidence,
+  so nothing about composing the entry resembles guessing.
+  Re-read the commit, re-run the command, re-open the issue,
+  and quote what they say ---
+  [`verify-the-right-artifact.md`](../../shared/workflow/verify-the-right-artifact.md)
+  states the general form, that a figure a reader can re-derive beats one you
+  assert.
+  (ai-config#2637: a 37-line entry recording a reformatter incident from
+  earlier the same session drew eight blocking findings from an adversarial
+  self-review --- a count worth attributing, since the PR's own bot review
+  raised one.
+  Nearly every factual claim in the entry was false.
+  "Three pre-existing paragraphs" was one,
+  "200 to 350 characters" measured 178--268,
+  and "from 1 to 11" was 0 to 11.
+  The mechanism was wrong too:
+  the entry blamed `--write` for reflowing whole files,
+  when `--write` has been diff-scoped since #951 and `--all` is what widens
+  it, so the prescribed remedy would not have prevented the churn the entry
+  was written about.
+  The passage was withdrawn rather than patched.
+  The same PR's other half, which survived, carried the matching error in its
+  citations: "#1373 recorded 47% over" was 487%, read off that issue's title
+  while its own console block sat below it ---
+  and the passage citing it was citing #2626, whose subject is reading a
+  summary in place of its source.)
 - ❌ Inserting a new bullet into any memory file with nested lists (including
   `github-actions.md`, `preferences.md`) without checking the surrounding indentation
   first. These files mix 0-indent top-level bullets with 2-/4-indent sub-bullets and

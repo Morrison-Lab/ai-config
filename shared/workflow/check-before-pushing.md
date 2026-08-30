@@ -202,7 +202,9 @@ The extra commit is squashed cleanly at PR merge, so history tidiness is preserv
   Git's documentation for `-f, --force` says the flag "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`" --- so the two together are a plain force push.
   (That is upstream `master`'s wording.
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
-- **Don't:** answer a `stale info` refusal with a force, or read it as self-explanatory --- it usually means the remote branch is gone and sometimes only means your tracking ref is stale, so `git ls-remote --heads origin <branch>` decides which remedy applies.
+- **Don't:** answer a `stale info` refusal with a force, or read the message as self-explanatory.
+  It reports only that your remote-tracking ref no longer matches the remote, never why.
+  `git ls-remote --heads origin <branch>` settles existence; a non-empty result still needs the tip comparison above before you pick a remedy.
 - **Do:** when `ls-remote` is empty, query
   `gh pr list --state all --head <branch>` before treating the next push as a first publish.
   MERGED means do not recreate.

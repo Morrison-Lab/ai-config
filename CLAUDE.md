@@ -910,6 +910,13 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 <!-- Not yet shared with the lab manual; edit shared/workflow/migrate-referenced-assets.md, not here. -->
 [shared/workflow/migrate-referenced-assets.md](shared/workflow/migrate-referenced-assets.md)
 
+## Fixing your own mistakes is always top priority
+
+[shared/workflow/fixing-mistakes-is-top-priority.md](shared/workflow/fixing-mistakes-is-top-priority.md)
+
+Remediating mistakes, bad merges, regressions, broken tests, or policy violations is the absolute top priority, superseding feature development and backlog work.
+Immediately after reverting or fixing the mistake, creating or repairing a mechanical prevention system is the unconditional next priority.
+
 ## Prioritize internal infrastructure work slightly over feature work
 
 [shared/workflow/pr-prioritization.md](shared/workflow/pr-prioritization.md)

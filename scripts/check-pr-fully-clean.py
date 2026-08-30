@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
+from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -172,7 +173,7 @@ def resolve_repo(explicit: str = "") -> str:
         repo, source = explicit.strip(), "--repo"
     else:
         try:
-            repo = run_cmd(
+            repo = fetch(
                 ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
             )
         except RuntimeError as exc:
@@ -196,11 +197,24 @@ def resolve_repo(explicit: str = "") -> str:
     return repo
 
 
+# Set by --from-json. When present it replaces every `gh` invocation, so the
+# script runs where the CLI does not exist (ai-config#2441). None means "use
+# run_cmd", i.e. the unchanged local behaviour.
+_FETCHER = None
+
+
+def fetch(cmd):
+    """Run *cmd* via `gh`, or answer it from a --from-json payload."""
+    if _FETCHER is not None:
+        return _FETCHER(cmd)
+    return run_cmd(cmd)
+
+
 def get_pr_info(pr_num: str, repo: str):
     if str(Path(__file__).resolve().parent.parent) not in sys.path:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from scripts.lib.pull_request import PullRequest
-    pr = PullRequest(pr_num, repo, fetcher=run_cmd)
+    pr = PullRequest(pr_num, repo, fetcher=fetch)
     return pr
 
 
@@ -420,7 +434,7 @@ def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[st
         return None
     run_id = m.group(1)
     try:
-        out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
+        out = fetch(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
         run = json.loads(out)
         event = run.get("event", "")
         head_branch = run.get("head_branch", "")
@@ -437,7 +451,7 @@ def _workflow_path_for_run(run_id: str, repo: str, cache: dict) -> Optional[str]
     if run_id in cache:
         return cache[run_id]
     try:
-        out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
+        out = fetch(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
         path = json.loads(out).get("path") or ""
     except RuntimeError:
         path = ""
@@ -1875,6 +1889,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--quorum", type=non_negative_int, default=1, help="Number of distinct providers required to return a clean verdict at HEAD")
     parser.add_argument("pr_number", help="Pull request number to check")
     parser.add_argument(
+        "--from-json", default="", metavar="FILE",
+        help="Score a payload gathered by the agent instead of shelling out to "
+             "`gh`. Use this in remote/web sessions, where the CLI does not "
+             "exist (ai-config#2441). shared/workflow/fully-clean.md lists the "
+             "payload keys and the MCP calls that fill them.",
+    )
+    parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",
         help="Repository to check. Defaults to the current checkout's repository. "
              "Previously an extra argument here was silently ignored and the "
@@ -1884,7 +1905,17 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main():
+    global _FETCHER
     args = parse_args()
+
+    # Installed before resolve_repo, because repo resolution is itself one of
+    # the `gh` reads the payload replaces.
+    if args.from_json:
+        try:
+            _FETCHER = PayloadFetcher.from_file(args.from_json)
+        except PayloadError as exc:
+            die(str(exc))
+
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 
@@ -1923,4 +1954,27 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Unusable --from-json data must exit USAGE_EXIT, never 1. Exit 1 is this
+    # script's "NOT fully clean" verdict, so a payload problem surfacing as 1
+    # is indistinguishable from a finding about the PR -- the same conflation
+    # the `gh`-missing guard in run_cmd exists to prevent (ai-config#2441).
+    #
+    # The catch is deliberately BROAD while --from-json is active, and narrow
+    # otherwise. A hand-built payload reaches library code that assumes shapes
+    # `gh` always produced, so a wrong-typed value raises AttributeError or
+    # TypeError inside pull_request.py rather than PayloadError -- six such
+    # shapes were measured landing on exit 1. Under --from-json no exception
+    # can be a statement about the PR, so every one of them is a usage error.
+    try:
+        main()
+    except SystemExit:
+        raise
+    except PayloadError as exc:
+        die(f"--from-json payload is unusable: {exc}")
+    except Exception as exc:  # noqa: BLE001 - see the comment above
+        if _FETCHER is None:
+            raise
+        die(
+            f"--from-json payload is unusable: {type(exc).__name__}: {exc}\n"
+            "This is a defect in the payload's shape, not a verdict about the PR."
+        )

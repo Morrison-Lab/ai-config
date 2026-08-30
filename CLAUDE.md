@@ -763,7 +763,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 [`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md)
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `the repository owner`, or `gh pr edit <N> --add-reviewer <reviewer>`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill, which resolves `<reviewer>` from the repository's configured human reviewer or its CODEOWNERS entry rather than from a name written here, and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -848,8 +848,11 @@ An earlier fetch is a measurement of a moment that has passed, and it expires ex
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
 Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
-A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
-Query `gh pr list --state all --head <branch>` before a plain push.
+A `stale info` refusal is not a reason to force either.
+It reports only that your remote-tracking ref no longer matches the remote, and never why --- the branch may have been deleted (which recurs on this repo's flow, after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
+`git ls-remote --heads origin <branch>` settles existence and nothing further: empty means deleted.
+Non-empty means the branch is live, so compare its tip against the ref you are pushing before choosing a remedy --- an ancestor tip fast-forwards, and only a diverged one needs a reconcile.
+When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
 MERGED means auto-delete, not a first publish: do not recreate
 (see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
 Otherwise a plain push is the fix.
@@ -1002,6 +1005,9 @@ genuinely semantic remainder.
 When you catch yourself (or a reviewer) re-deriving numbers by hand, or
 eyeballing an artifact for a property with a numeric definition, that check
 wants to be an instrument --- see the fragment for the procedure and tells.
+Apply this in review too: a hand-run check where an instrument is possible,
+or a threshold asserted rather than derived, is a review finding, the same
+weight as any other standing review check.
 
 [`shared/workflow/algorithmatize-checks.md`](shared/workflow/algorithmatize-checks.md)
 

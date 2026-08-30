@@ -489,6 +489,41 @@ The `@claude` bot's own behaviour lives in
   `continue-on-error`, the exact fix #350's own body lists under "Two things
   that look like fixes but are not".)
 
+## A bare `key=value` in `$GITHUB_OUTPUT` is an injection point, not a formatting choice
+
+The delimiter form is the **default** for any value you did not write literally yourself.
+The commonly-recorded rule is narrower than that and reads as covering it: `memories/claude-bot-workflows.md`'s "`GITHUB_OUTPUT` multiline heredoc" section says to use a *random* delimiter, which answers what to do once you have already decided the value is multi-line.
+Nothing says how to decide, and the natural reading is "multi-line values get a delimiter, short ones get `key=value`".
+
+That reading is wrong wherever the value is derived rather than authored.
+A step output written as `key=value` is parsed line by line, so a newline anywhere in the value ends the assignment and every following line is read as a **further output**.
+The value does not have to look multi-line for that to happen:
+
+- Free text from a tool's own error stream (git's rejection text is several lines by default).
+- Anything built from a caller-supplied input, even one that "cannot" contain a newline --- validate it, or use the delimiter form and stop caring.
+- Anything built from a **file name**, which may legitimately contain a newline on POSIX.
+
+The failure is silent and points the wrong way, which is what makes it worth a rule.
+A forged output is a plausible value, not a parse error, so the step succeeds, the job succeeds, and a downstream gate acts on something no code produced.
+Measured 2026-08-30 on Morrison-Lab/gha#763: a `deployed-branch` input carrying `ghost\nany-changed=true` made a comparison that never ran report a change found.
+The fix is one line and needs no judgment about which values are safe:
+
+```python
+delimiter = f"gha-eof-{uuid.uuid4().hex}"
+handle.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
+```
+
+The same argument applies to `$GITHUB_ENV` and to `$GITHUB_STEP_SUMMARY` verbatim;
+the mechanism is the file format rather than anything about outputs.
+
+A consequence worth planning for: a test or CI assertion can no longer `grep -qx 'key=value'` the file.
+Write one small reader and share it between the unit tests and the workflow, rather than letting each carry its own parser to drift out of step with the writer.
+
+- **Do:** use the delimiter form for every value not written as a literal in the same line of source.
+- **Do:** generate the delimiter randomly, and refuse to write a value that contains it.
+- **Don't:** decide by whether the value looks multi-line --- the dangerous ones look single-line.
+- **Don't:** read the existing multiline-heredoc rule as permission to use `key=value` for everything else.
+
 ## Changelog section ordering in Morrison-Lab/gha
 
 - **The established order in `CHANGELOG.md` is: Added → Changed → Fixed → Security.**

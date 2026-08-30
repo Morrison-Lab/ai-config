@@ -51,6 +51,28 @@ jobs:
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run orchestrator tests
+        # ai-config#2627: this suite existed and ran nowhere, so the
+        # orchestrator's own behaviour was unpinned -- which is how a literal
+        # non-username reached a live reviewer request.
+        run: python3 scripts/test_orchestrator.py
+      - name: Check for hardcoded person-names in value positions
+        # ai-config#2627: this plugin is used by people other than its author,
+        # so a login hardcoded into an `owner:`/`--reviewer`/`reviewers[]=`
+        # position is correct for at most one of them. subagents.py shipped
+        # the phrase as a lone `reviewers=[...]` element, POSTed verbatim.
+        # Keys on POSITION, not on the phrase: the role reference in prose is
+        # the form the corpus should keep using.
+        run: python3 scripts/check-reviewer-placeholders.py
+      - name: Run reviewer-placeholder gate tests
+        run: python3 scripts/test_check_reviewer_placeholders.py
+      - name: Run fully-clean payload-fetcher tests
+        # ai-config#2441: the --from-json path lets the instrument run where
+        # `gh` does not exist. Its negative cases assert the EXIT CODE, since
+        # exit 1 is this script's not-clean verdict and an unusable payload
+        # must never be mistaken for one. See shared/workflow/fully-clean.md
+        # for why that, rather than a false clean, is the hazard.
+        run: python3 scripts/test_payload_fetcher.py
       - name: Run verdict-scan parity tool tests
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests
@@ -190,9 +212,17 @@ jobs:
         run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
-        # this repo is currently ~4x the shipped budget (ai-config#897), so a
-        # blocking form would be red on every PR and would train everyone to
-        # ignore it -- the failure mode algorithmatize-checks warns about.
+        # the reasoning was that this repo sat far over the shipped budget
+        # (ai-config#897), so a blocking form would be red on every PR and
+        # would train everyone to ignore it -- the failure mode
+        # algorithmatize-checks warns about.
+        #
+        # That premise no longer holds. Measured 2026-08-29 PT: the closure is
+        # 184,016 bytes against the 200,000-byte budget, i.e. 0.92x. What
+        # recovered the headroom is NOT established here -- the closure also
+        # went from 74 files to 5, a structural change to what is auto-loaded
+        # rather than a prose trim -- so this states the measurement and makes
+        # no causal claim. Whether the check should now gate is ai-config#2636.
         #
         # The root file's CHARACTER CAP is the exception, and gates without
         # --strict (ai-config#897, #1258). It is not our budget but the

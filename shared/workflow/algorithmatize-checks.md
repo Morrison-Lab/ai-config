@@ -930,6 +930,28 @@ Prefer shrinking the judgment surface over automating a judgment badly:
 an instrument with a mushy threshold that misfires trains everyone to
 ignore it.
 
+## In review
+
+Flag a hand-run check where the property being checked has a numeric or
+otherwise mechanical definition over data the diff already has access to ---
+the same weight as any other standing review check.
+This includes a new instruction added to a skill's or fragment's prose with
+no runnable command behind it: the author's own words look like diligence,
+which is exactly why nothing else in the review flags it.
+
+Flag a threshold the diff asserts rather than derives from the system's own
+constants, and ask for the derivation --- a number that was never computed
+against a real input is a guess wearing a check's clothes, and it decays the
+moment the constant it should have tracked changes.
+
+Ask "has anyone actually run this?" of any check specified only as prose.
+A command nobody has executed is unverified by construction, whatever else
+about the diff is correct.
+
+Per `Limits` above, this finding is never "automate the judgment" --- when
+the property genuinely has no decidable core, say so and move on, rather
+than pushing for an instrument with a threshold nobody can defend.
+
 ## Name the slice you examined before answering "not mechanizable"
 
 The "Limits" section above licenses leaving a judgment to a reviewer, and

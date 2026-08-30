@@ -10,6 +10,7 @@ allowed-tools:
 metadata:
   author: Simon P. Couch (@simonpcouch)
   version: "1.2"
+license: MIT
 ---
 
 # R package development

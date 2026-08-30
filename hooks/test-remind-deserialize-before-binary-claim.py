@@ -225,7 +225,7 @@ REMIND = [
      "PATH-SCOPED: deserializes a DIFFERENT .rds, so the claim stays owed"),
     ([ESCALATE_ONE_FILE, PROSE_CLAIM],
      "prose asserts the comparison ran, but no tool_use did"),
-    ([txt("@the repository owner can you confirm `results/model.parquet` should be "
+    ([txt("@example-maintainer can you confirm `results/model.parquet` should be "
           "regenerated after this?")],
      "@-mention escalation naming a .parquet"),
     ([txt("Needs a decision: `data/cohort.sas7bdat` differs from main.")],

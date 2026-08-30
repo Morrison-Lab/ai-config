@@ -125,7 +125,7 @@ A fetch from earlier in the session is a measurement of a moment that has passed
 
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git ls-remote --heads origin "$BRANCH"   # LS_REMOTE --- read-only; updates no ref
+git ls-remote --heads origin "$BRANCH"   # read-only; updates no ref
 ```
 
 If the tip it reports is not an ancestor of the ref you are **pushing** (`git merge-base --is-ancestor <tip> <source>`), **back off** --- another session (or the author) is driving this branch right now.
@@ -183,7 +183,7 @@ with its commits or trigger a redundant re-run.
 
 ```bash
 gh run list --branch "$BRANCH" --json status,name \
-  -q '.[] | select(.status=="in_progress" or .status=="queued") | .name'
+  -q '.[] | select(.status=="in_progress" or .status=="queued") | .name'   # LIST_WORKFLOW_RUNS
 ```
 
 If a `@claude` / review workflow is `in_progress` or `queued`, wait for it to
@@ -195,14 +195,15 @@ Never `git push --force` / `-f`.
 It overwrites the remote tip unconditionally, including commits another agent pushed since you last looked.
 
 ```bash
-git push --force-with-lease --force-if-includes
+git push --force-with-lease --force-if-includes   # PUSH
 ```
 
 `--force-if-includes` (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: `--force-with-lease` compares against your *remote-tracking ref*, so any background fetch --- a poller, another tool in the same checkout, a `--recurse-submodules` fetch --- silently refreshes that ref and the lease then passes over the very commits it existed to protect.
 `--force-if-includes` closes that by checking the remote-tracking tip against the local branch's reflog.
 It is an *ancillary* option, so it only does anything alongside a bare `--force-with-lease`.
 
-A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git-branches.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary and there is nothing to race.
+A `stale info` refusal is **not** a reason to force, and reaching for one there is the reflex `memories/git-branches.md` exists to stop: the lease is unsatisfiable rather than violated, so `--force` is unnecessary.
+Whether there is anything to *race* is a separate question the refusal does not answer --- a deleted branch leaves nothing to race, a peer's push leaves everything.
 `git ls-remote --heads origin <branch>` settles existence --- empty output means the next push *creates* the branch.
 Query `gh pr list --state all --head <branch>` first:
 MERGED means auto-delete, not a first publish, so do not recreate

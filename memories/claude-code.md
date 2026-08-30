@@ -347,6 +347,10 @@ the same shallow clone separated the two cleanly.
 The file-borne signal that needs no history at all: the built-ins carry
 `license: Proprietary. LICENSE.txt has complete terms`.)
 
+A third mode --- `git log -S`, `--follow`, and `blame` naming a graft commit
+as the introduction, which is neither self-announcing nor empty --- is in
+[`git.md`](git.md).
+
 `git fetch --depth N origin <branch>` deepens enough history to make
 a real merge-base available if you must merge. (Hit resolving
 UCD-SERG/serocalculator#503's altdoc chain, 2026-07: a `--depth 1` altdoc

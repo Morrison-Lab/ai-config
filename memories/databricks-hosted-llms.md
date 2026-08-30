@@ -16,7 +16,7 @@ An OAuth U2M/M2M profile (`auth_type = databricks-cli`) is different: recent `da
 ## Codex CLI 0.151.0+ hard-rejects `wire_api = "chat"`
 
 Codex CLI's docs page (as WebFetch-summarized) says `wire_api` accepts `"chat"` or `"responses"`, chat being the default --- but that page is stale relative to the installed CLI.
-As of Codex CLI 0.151.0 (Chat Completions support removed, `openai/codex#7782`), `wire_api = "chat"` on a custom `model_providers` entry fails config load outright: `wire_api = "chat" is no longer supported ... set wire_api = "responses"`.
+As of Codex CLI 0.151.0 (Chat Completions support removed, `openai/codex` discussion #7782), `wire_api = "chat"` on a custom `model_providers` entry fails config load outright: `wire_api = "chat" is no longer supported ... set wire_api = "responses"`.
 Databricks does implement a real `/serving-endpoints/responses` route for Responses-capable models (GPT-5.5 Pro, GPT-5.5, GPT-5.3 Codex, GPT-5.6 family) --- a POST with a Responses-shaped body returns a genuine `object: "response"` payload.
 The Claude family on Databricks is Chat-Completions-only, so it is currently unreachable from Codex CLI at all.
 

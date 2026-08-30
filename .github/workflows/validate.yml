@@ -51,6 +51,12 @@ jobs:
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run fully-clean payload-fetcher tests
+        # ai-config#2441: the --from-json path lets the instrument run where
+        # `gh` does not exist. Its negative cases assert the EXIT CODE, since
+        # exit 1 is this script's not-clean verdict and an unusable payload
+        # must never be mistaken for one.
+        run: python3 scripts/test_payload_fetcher.py
       - name: Run verdict-scan parity tool tests
         run: python3 scripts/test_check_verdict_scan_parity.py
       - name: Run check-user-quote tests

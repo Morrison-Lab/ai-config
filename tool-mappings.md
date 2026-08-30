@@ -94,3 +94,38 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `SET_SECRET` | Set an Actions secret. Omit --body so the value is read from stdin, keeping it out of argv (visible in ps) and shell history. Exiting 0 means the value was stored, not that it is valid. | `gh secret set "<name>" --repo "<owner>/<repo>"` | (no GitHub MCP tool; use gh) |
 | `RUN_WORKFLOW` | Dispatch a workflow_dispatch workflow run on a ref. Pass --ref explicitly; omitting it dispatches against the default branch, which is rarely what a PR-scoped dispatch wants. The MCP tool's `ref` is required for the same reason. | `gh workflow run "<workflow>.yml" --repo "<owner>/<repo>" --ref "<branch>" --field "<key>=<value>"` | `mcp__github__actions_run_trigger (method=run_workflow)` |
 | `LIST_WORKFLOW_RUNS` | List a workflow's recent runs, with conclusion and timestamps. | `gh run list --workflow "<workflow>.yml" --repo "<owner>/<repo>"` | `mcp__github__actions_list (method=list_workflow_runs)` |
+
+
+## Gathering a fully-clean payload in a remote session
+
+`scripts/check-pr-fully-clean.py` is the corpus's deterministic instrument for
+the fully-clean verdict, and it shells out to `gh`, which remote/web sessions
+do not have.
+An MCP tool cannot be called from inside a Python subprocess, so the split is
+that the **agent** retrieves and the **script** judges: gather the PR's state
+with the calls below, write it to a file, and pass `--from-json <file>`
+(ai-config#2441).
+
+Nothing about the scoring changes.
+The only difference is where the data came from.
+
+| Payload key | How to fill it | Notes |
+| :--- | :--- | :--- |
+| `repo` | the `OWNER/REPO` you are checking | Or pass `-R` instead; both work. |
+| `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | Must carry `headRefOid`, `headRefName`, `state`, `reviewDecision`, `commits[].committedDate`, `reviews[]`, `comments[]`. |
+| `check_runs` | `pull_request_read` (`get_check_runs`) | Either the bare list or the REST `{"check_runs": [...]}` envelope. |
+| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Optional. Only refines workflow-path attribution. |
+
+**The field names are `gh pr view --json`'s, not the MCP tool's**, so a small
+mapping is needed --- `head.sha` becomes `headRefOid`, and a review's author
+becomes `{"author": {"login": ...}}`.
+That mapping is the agent's job precisely because it is the part that differs
+between session kinds.
+
+**A missing key is an error (exit 2), never an empty value.**
+That is deliberate and is the whole safety property: an absent `check_runs`
+read as `[]` would score "nothing pending, nothing failed" and manufacture a
+clean verdict out of missing data.
+Exit 2 is also distinct from exit 1, which is the script's real *not-clean*
+verdict --- so an unusable payload can never be mistaken for a finding about
+the PR.

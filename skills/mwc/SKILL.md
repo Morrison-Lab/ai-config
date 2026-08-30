@@ -37,6 +37,15 @@ without asking confirmation before every merge.
   other flagged items, MWC does not authorize a merge.
   ARD every item from every review, then request fresh reviews.
   `check-pr-fully-clean.py` fails that state (ai-config#2274).
+  **Run that instrument; do not hand-check the Scope Limit in its place**
+  (user directive, 2026-08-29, ai-config#2441).
+  Checking the axes by hand is unauditable and unreproducible, and it is
+  exactly the multi-signal judgment where the axis you are least expecting is
+  the one dropped.
+  In a remote/web session, where the `gh` CLI does not exist, gather the PR's
+  state with the `pull_request_read` calls [`tool-mappings.md`](../../tool-mappings.md)
+  lists and pass them to `--from-json`, rather than treating the instrument as
+  unavailable.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
 - **Session Duration**: The grant expires automatically when the session ends

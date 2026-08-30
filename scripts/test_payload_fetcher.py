@@ -38,7 +38,7 @@ def check(name, cond):
 
 def base_payload():
     return {
-        "repo": "Morrison-Lab/ai-config",
+        "repo": "example-org/example-repo",
         "pr": {
             "headRefOid": HEAD,
             "headRefName": "feat/example",
@@ -70,7 +70,7 @@ def run_script(payload):
         path = fh.name
     try:
         res = subprocess.run(
-            [sys.executable, str(SCRIPT), "2629", "-R", "Morrison-Lab/ai-config",
+            [sys.executable, str(SCRIPT), "2629", "-R", "example-org/example-repo",
              "--from-json", path],
             capture_output=True, encoding="utf-8", check=False,
         )
@@ -117,7 +117,7 @@ def main():
         fh.write("{not json")
         bad = fh.name
     res = subprocess.run(
-        [sys.executable, str(SCRIPT), "2629", "-R", "Morrison-Lab/ai-config",
+        [sys.executable, str(SCRIPT), "2629", "-R", "example-org/example-repo",
          "--from-json", bad],
         capture_output=True, encoding="utf-8", check=False,
     )
@@ -125,7 +125,7 @@ def main():
     check("malformed JSON exits 2", res.returncode == 2)
 
     res = subprocess.run(
-        [sys.executable, str(SCRIPT), "2629", "-R", "Morrison-Lab/ai-config",
+        [sys.executable, str(SCRIPT), "2629", "-R", "example-org/example-repo",
          "--from-json", "/nonexistent/payload.json"],
         capture_output=True, encoding="utf-8", check=False,
     )
@@ -147,7 +147,7 @@ def main():
         "gh repo view returns the bare repo string",
         PayloadFetcher(base_payload())(
             ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
-        ) == "Morrison-Lab/ai-config",
+        ) == "example-org/example-repo",
     )
 
     # The deliberate asymmetry: an absent Actions-run entry is tolerated,

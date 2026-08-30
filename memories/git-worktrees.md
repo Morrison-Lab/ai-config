@@ -1133,7 +1133,8 @@ to do --- so nothing looks like a fault to investigate.
 
 The tell is a diff you did not write.
 Read it before acting on any dirty-tree report, and check
-[`ListAgents`](../CLAUDE.md) for a live subagent before touching the file:
+[`ListAgents`](../CLAUDE.md) for a live subagent before touching any path that
+report flags:
 a running agent's mutation must be left alone until it finishes and restores,
 per this file's own "A quiet worktree is not evidence the session working it
 has stopped".

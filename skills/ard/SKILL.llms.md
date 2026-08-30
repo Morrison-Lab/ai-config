@@ -213,7 +213,7 @@ Tell the user what you did and give a **clickable URL** to the PR/MR (and to the
 
 - **Every reviewer comment appears in the table AND gets a reply on its own inline thread** (step 4b). The summary table is the overview; the per-thread reply is what the reviewer sees in context. A thread with no reply reads as ignored.
 - **Resolve threads once settled** (Addressed-and-pushed / Deferred-with-issue / Acknowledged), but never resolve a thread you haven’t replied to or whose fix isn’t pushed — and leave a human reviewer’s thread open if they may want to respond.
-- **Severity never exempts.** “Nit” / “optional” / “consider” still require A, R, or D — never K.
+- **Severity never exempts.** “Informational” / “Not a blocker” / “Nit” / “optional” / “consider” still require A, R, or D — never K.
 - **Rebuttals must be falsifiable** — point to specific code, behavior, or documentation.
 - **Deferrals must be tracked.** A defer without a filed issue is just ignoring with extra words.
 - **Push before you post.** The reviewer should be able to verify Addressed fixes are on the branch.

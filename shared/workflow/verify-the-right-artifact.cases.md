@@ -170,14 +170,16 @@ has not measured either.
 
 Morrison-Lab/ai-config#2622 / #2623, 2026-08-29.
 
-A push refused with `stale info`. The auto-loaded `CLAUDE.md:851` read:
+A push refused with `stale info`.
+The auto-loaded `CLAUDE.md:851` read:
 
 > A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
 
 Acting on that, I plain-pushed, and the push was rejected: the branch existed.
 I then reported to the user that **`memories/git-branches.md` was inaccurate**.
 
-It was not. Opening the file:
+It was not.
+Opening the file:
 
 > **`stale info` after `checkout -B` *usually* means the remote branch was DELETED, not moved** [...]
 > ```sh

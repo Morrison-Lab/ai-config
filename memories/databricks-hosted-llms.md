@@ -2,6 +2,19 @@
 
 Facts learned wiring Databricks-hosted models (Claude, GPT-5.x, Llama, and others) up as a provider for third-party CLI/agent clients (Codex CLI, opencode) and the ChatGPT desktop app.
 
+## Homebrew 6.x refuses the `databricks/tap` formula even right after `brew tap`
+
+Homebrew 6.x added a tap-trust gate.
+`brew install databricks` from the `databricks/tap` third-party tap fails with `Error: Refusing to load formula ... from untrusted tap`, even immediately after `brew tap` succeeds.
+The fix is `brew trust <tap>` (or `brew trust --formula <tap>/<formula>` for a narrower grant), which stores the decision in `~/.homebrew/trust.json` (or under `$XDG_CONFIG_HOME`), independently of whether the formula is installed.
+
+- **Do:** run `brew tap`, then `brew trust`, then `brew install`, in that order, for any first-time install from a non-official tap.
+- **Don't:** wait for the install to fail and bolt `brew trust` on afterward.
+- **Don't:** reach for `HOMEBREW_NO_REQUIRE_TAP_TRUST=1` --- Homebrew's own message says the flag "is not recommended and will be removed in a later release";
+  use `brew trust` per-tap instead.
+
+(Verified 2026-08-29 against `brew trust --help` and the error text's own remedy.)
+
 ## `~/.databrickscfg` is plaintext only for PAT profiles, not OAuth ones
 
 A Databricks PAT written via `databricks configure --token` goes straight to `SaveToProfile` with no keyring call, so it lands in `~/.databrickscfg` as plaintext regardless of the file's `auth_storage` setting.

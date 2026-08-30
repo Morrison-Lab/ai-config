@@ -45,6 +45,21 @@ do not grant permission to communicate with a non-member repository.
 This gate takes precedence
 over automatic filing, PR-opening, review, and follow-up rules.
 
+## Check external repository guidelines and PR template before filing
+
+Before filing a PR in an external repository (one outside Morrison-Lab / the
+user's own organizations), read that repository's `CONTRIBUTING.md` (and
+linked contributing guide) and its `.github/pull_request_template.md` (and
+required template sections) --- not only the internal template.
+
+- **Do:** fetch and follow the external repo's contributing guidelines and PR
+  template sections (issue link type, change-type checkboxes, verification,
+  screenshots, checklist) before opening the PR, and structure the PR body to
+  satisfy its required sections.
+- **Don't:** file the external PR from memory or with the internal template,
+  assuming required sections are the same --- a missing required section triggers
+  an automated compliance failure and auto-close.
+
 ## No empty promises
 
 A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again", "that is owed by me" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
@@ -66,6 +81,10 @@ The implication runs one way: a timer fires once and dies, so it cannot keep a s
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
 
+Treat "the pipeline/reviewer will ..." as the same kind of future delivery claim.
+A push may trigger automation but does not prove it will run or finish;
+state the current status or arm monitoring for the result.
+
 ## Resume every non-clean pause
 
 Whenever work remains at a pause, arm a timer or equivalent wake mechanism that
@@ -82,6 +101,24 @@ Unless the user narrows a request, take the broad reading that advances its
 obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
+
+## Always give recommendations with questions
+
+Whenever asking the user a question or presenting options for a genuine decision,
+always provide a clear, specific recommendation.
+Soft open-ended prompts (such as "Let me know if ...") that present choices
+count as decision points and must include a concrete recommendation on what to do next.
+
+This governs genuine questions and decisions,
+not already-authorized actions:
+if an action is already in-scope or authorized under standing rules,
+do the work and report in past tense per [`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)
+rather than offering to do it.
+
+- **Do:** state your specific recommendation alongside every question or choice presented to the user (e.g. "Recommendation: Proceed with Option A because...").
+- **Do:** treat soft open-ended prompts ("Let me know if...") that pose genuine choices as decision points and attach a concrete recommendation.
+- **Don't:** ask questions or present choices without declaring your recommended path.
+- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it ([`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)).
 
 ## Run UMS when work is scrutinized
 
@@ -232,6 +269,10 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
+
+The same drift applies to a dated claim written into a file rather than into chat --- a "verified `<date>`" note in a doc, a code comment, a changelog entry.
+Run the same clock check before typing the date into the file, not only before a chat recap;
+the failure is likeliest late in the day Pacific, once UTC has already rolled to the next calendar date.
 
 ## Summarize analysis effects in PR descriptions
 
@@ -445,6 +486,11 @@ This grants no merge authority: the strict merge policy below still applies.
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+- **When you revert a merge, reopen its issue.**
+  GitHub does not automatically reopen the issue a reverted PR closed;
+  explicitly and immediately reopen the corresponding issue(s)
+  (`gh issue reopen <issue-number>`) per
+  [`revert-merge.md`](shared/workflow/revert-merge.md).
 
 ## Always arm a persistent PR loop
 

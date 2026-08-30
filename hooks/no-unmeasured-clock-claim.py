@@ -72,6 +72,20 @@ RX_CLAIM = re.compile(
     re.I,
 )
 
+# Context directly preceding a timestamp indicating a historical action or artifact conversion
+# (e.g. "merged at 14:51 PT", "committed at 18:19 PDT"), rather than a present-time recap claim (#2661).
+# Must have an explicit preposition ("at", "on", "in", "since", "from", etc.) and not cross sentence boundaries.
+RX_PAST_CONTEXT = re.compile(
+    r"\b(?:merged|closed|created|committed|pushed|failed|passed|started|finished|ran|dated|recorded|received|sent|authored|opened|landed|tagged)\s+(?:at|on|in|since|from|before|until|between)\s+[^.!?;\n]{0,35}$",
+    re.I,
+)
+
+# UTC-to-local conversions in historical summaries or merge reports (e.g. "... 21:51 UTC (14:51 PT)").
+RX_UTC_CONVERT = re.compile(
+    r"\bUTC\s*(?:[/]\s*|\(\s*|\s+at\s+)[^.!?;\n]{0,25}$",
+    re.I,
+)
+
 # Any fresh reading of the wall clock. Covers the bash form the rule
 # prescribes, a bare `date`, and the PowerShell fallback for Git Bash.
 # The lookbehind excludes a word character and a hyphen, so `apt-get update`
@@ -87,25 +101,30 @@ RX_CLOCK_READ = re.compile(
 
 # The harness's own injected reading. Quoting this is correct, so it counts as
 # a measurement -- otherwise the guard would fire on the one case the rule
-# explicitly tells you to trust.
-RX_HOOK_CLOCK = re.compile(r"Current time\s*--\s*local:", re.I)
+# explicitly tells you to trust. Supports both Claude Code's "Current time -- local:"
+# (via inject-local-time.sh) and Antigravity/Gemini CLI's "<ADDITIONAL_METADATA>\nThe current local time is:".
+RX_HOOK_CLOCK = re.compile(
+    r"Current time\s*--\s*local:|The current local time is:",
+    re.I,
+)
 
 # The value that line carries. The example is deliberately written with
 # placeholders rather than a real timestamp: a literal one would match the
 # regex directly below it, so reading, grepping, or diffing THIS FILE during
 # ordinary work would inject a fabricated reading into the transcript the
 # guard scans. `shared/writing/examples-are-scanned.md` names exactly that.
-# Shape: "Current time -- local: <YYYY-MM-DD> <HH:MM:SS> <PDT|PST>".
+# Shape: "Current time -- local: <YYYY-MM-DD> <HH:MM:SS> <PDT|PST>" or ISO string.
 RX_HOOK_CLOCK_VALUE = re.compile(
-    r"Current time\s*--\s*local:\s*\d{4}-\d{2}-\d{2}\s+"
+    r"(?:Current time\s*--\s*local:\s*\d{4}-\d{2}-\d{2}\s+|"
+    r"The current local time is:\s*\d{4}-\d{2}-\d{2}[T\s])"
     r"([01]?\d|2[0-3]):([0-5]\d)",
     re.I,
 )
 
 # How far a stated time may sit from the last measured one and still read as
-# quoting it. Wide enough for a recap that rounds seconds away or is composed a
-# moment later; far tighter than the drift that makes a timestamp misleading.
-TOLERANCE_MIN = 2
+# quoting it. Raised from 2 to 5 minutes (#2661) to accommodate multi-step turns
+# where commands/subagents run for several minutes before the final recap is emitted.
+TOLERANCE_MIN = 5
 
 # Only a claim running AHEAD of the last measurement is fired on, and the
 # asymmetry is deliberate rather than an oversight.
@@ -227,9 +246,7 @@ def scan(path):
                 # beside it.
                 if role == "user":
                     turn_start = i
-                # A user/system turn can carry a bare string, which is where
-                # the UserPromptSubmit clock line arrives.
-                if RX_HOOK_CLOCK.search(blocks):
+                if role != "assistant" and RX_HOOK_CLOCK.search(blocks):
                     got = RX_HOOK_CLOCK_VALUE.search(blocks)
                     if got:
                         measured = (i, int(got.group(1)) * 60 + int(got.group(2)))
@@ -286,8 +303,8 @@ def main() -> int:
 
     if not text:
         return 0
-    hit = RX_CLAIM.search(text)
-    if not hit:
+    hits = list(RX_CLAIM.finditer(text))
+    if not hits:
         return 0
 
     # A `date` invocation inside this turn makes the claim measured. The
@@ -298,31 +315,53 @@ def main() -> int:
     if last_clock >= 0 and last_clock >= turn_start:
         return 0
 
-    detail = (
-        "no clock read appears in this transcript since your previous message")
+    unmeasured_hit = None
+    detail = ""
 
-    # A value is usable only when the reading it came from is itself in this
-    # turn. An older one has expired exactly as a `date` invocation would have.
-    if measured is not None and measured[0] >= turn_start:
-        claimed = _claim_minutes(hit.group(0))
-        if claimed is None:
-            return 0  # fail open on a claim shape we cannot compare
-        skew = _skew(claimed, measured[1])
-        if skew <= TOLERANCE_MIN:
-            # Quoting the reading, or citing a past time off an artifact.
-            # Both are prescribed behavior; see RX_FUTURE_REFERENCE's comment.
-            return 0
-        if RX_FUTURE_REFERENCE.search(text):
+    for hit in hits:
+        start, end = hit.start(), hit.end()
+        prefix = text[max(0, start - 60):start]
+        line_start = text.rfind("\n", 0, start) + 1
+        line_end = text.find("\n", end)
+        if line_end == -1:
+            line_end = len(text)
+        local_line = text[line_start:line_end]
+
+        if RX_UTC_CONVERT.search(prefix) or RX_PAST_CONTEXT.search(prefix):
+            continue
+
+        if RX_FUTURE_REFERENCE.search(local_line):
             # A scheduled check-in states a time that has not happened yet, and
             # CLAUDE.md requires stating it. It is ahead of the clock by
             # design, not by invention.
-            return 0
-        measured_hhmm = f"{measured[1] // 60:02d}:{measured[1] % 60:02d}"
-        detail = (
-            f"the last measured reading in this transcript is "
-            f"{measured_hhmm}, so the stated time runs {skew} minutes ahead "
-            f"of it and cannot have been observed"
-        )
+            continue
+
+        # A value is usable only when the reading it came from is itself in this
+        # turn. An older one has expired exactly as a `date` invocation would have.
+        if measured is not None and measured[0] >= turn_start:
+            claimed = _claim_minutes(hit.group(0))
+            if claimed is None:
+                continue  # fail open on a claim shape we cannot compare
+            skew = _skew(claimed, measured[1])
+            if skew <= TOLERANCE_MIN:
+                # Quoting the reading, or within tolerance.
+                continue
+            measured_hhmm = f"{measured[1] // 60:02d}:{measured[1] % 60:02d}"
+            detail = (
+                f"the last measured reading in this transcript is "
+                f"{measured_hhmm}, so the stated time runs {skew} minutes ahead "
+                f"of it and cannot have been observed"
+            )
+            unmeasured_hit = hit
+            break
+        else:
+            detail = (
+                "no clock read appears in this transcript since your previous message")
+            unmeasured_hit = hit
+            break
+
+    if not unmeasured_hit:
+        return 0
 
     key = hashlib.sha256(text.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-clock-claim-{key}")
@@ -341,24 +380,12 @@ def main() -> int:
     # Every warn-only hook in this repo emits `systemMessage` for exactly that
     # reason; see `flag-unassigned-worktree.py` and
     # `flag-unchained-branch-switch.py`.
+    # Single-line message avoids emitting multi-line "Stop says:" blocks in Claude Code.
     print(json.dumps({
         "systemMessage": (
-            f"Your message states a Pacific clock time -- "
-            f"\"{hit.group(0).strip()}\" -- and {detail}.\n\n"
-            "A reading expires the moment it is taken, so a time extrapolated "
-            "from an earlier one is invented, however honestly the earlier one "
-            "was measured. That is the mechanism `CLAUDE.md`'s \"Timestamp "
-            "recaps in local time\" names: the memory of having consulted the "
-            "clock obscures that the measurement has expired.\n\n"
-            "Re-run it now, in this same message, and use the output "
-            "verbatim:\n\n"
-            "    TZ=America/Los_Angeles date \"+%Y-%m-%d %H:%M %Z\"\n\n"
-            "Check the `%Z` in what it prints. On Windows Git Bash the `TZ` "
-            "override silently falls back to GMT, and the rule's PowerShell "
-            "fallback is what to use there.\n\n"
-            "For a time in the PAST, do not re-run the clock and subtract -- "
-            "read it off an artifact that recorded it: a git committer date "
-            "(`git log --date=format-local:'%H:%M'`), or an API `created_at`."
+            f"Timestamp reminder: Your message states Pacific time \"{unmeasured_hit.group(0).strip()}\" "
+            f"and {detail}. Run 'TZ=America/Los_Angeles date \"+%Y-%m-%d %H:%M %Z\"' "
+            "fresh for recaps; cite artifacts for past times."
         ),
     }))
     return 0

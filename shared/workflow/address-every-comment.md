@@ -1,5 +1,6 @@
 When iterating on a PR with a reviewer, **address every in-scope flagged item**,
-regardless of severity label. The reviewer's "Not a blocker", "minor", "nit",
+regardless of severity label.
+The reviewer's "Informational", "Not a blocker", "minor", "nit",
 "optional", "consider", or "if you want" labels are for prioritization, not a
 free pass for the implementer.
 
@@ -24,7 +25,7 @@ For each flagged item, do exactly one of:
    where the "follow-up" is fixing it on `main` directly, not a new issue.
 
 Then trigger another review and repeat until the PR is **fully clean** --- zero
-flagged items under any heading, no "non-blocking", "harmless", "minor
+flagged items under any heading, no "informational", "non-blocking", "harmless", "minor
 observation", or "could improve" sections. "Looks good" / "no findings" /
 "approved" with no follow-on bullets is the bar. Resolve every inline review
 thread along the way, leaving only the final all-clear exchange.

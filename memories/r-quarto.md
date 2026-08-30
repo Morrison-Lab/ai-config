@@ -970,3 +970,27 @@ Use the enclosing function's return value when it hands back the strings it
 printed (altdoc#87 asserts on `check_altdoc()`'s invisible findings),
 `testthat::expect_output()` when nothing is returned, or
 `conditionMessage()` for `cli_abort()`.
+
+## Quarto chapter frontmatter and site wiring
+
+Adding a new top-level chapter (`chapters/*.qmd`) requires four mechanical steps,
+and missing any one is flagged as blocking:
+
+1. YAML frontmatter `format:` block
+(`html`/`revealjs`→`<slug>-slides.html`/`pdf`→`<slug>-handout.pdf`/`docx`→`<slug>.docx`)
+--- without it the revealjs output collides on the literal `{stem}-slides.html` path.
+2. Navbar entry in `_quarto-website.yml` `navbar.Chapters.menu`.
+3. Homepage bullet in `index.qmd` `## Chapters`.
+4. WORDLIST entries for new proper nouns in `inst/WORDLIST`
+(add, don't reword to dodge).
+
+Lychee link check: authenticated MCP endpoints quoted as prose
+(`https://mcp.granola.ai/mcp`, `https://api.githubcopilot.com/mcp`) are not browsable pages;
+exclude them in `lychee.toml` rather than treating the check failure as a broken link (wai#133).
+
+## Inline R: avoid scientific notation with `formatC(..., format="d", big.mark=",")`
+
+`format(200000, big.mark=",")` renders as `2e+05` under default `scipen`.
+Use `formatC(..., format="d", big.mark=",")` (or `prettyNum(..., scientific=FALSE)`)
+so derived figures like `192,000` render with commas in Quarto inline R.
+Hit on wai#128 (byok ITPM/budget figures).

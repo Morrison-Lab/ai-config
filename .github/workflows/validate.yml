@@ -165,6 +165,10 @@ jobs:
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run Antigravity merge-gate tests
+        # Verdict-parsing and merge-command gating for the Antigravity plugin's
+        # enforce-mwc-review-gate.py, incl. the sparta#1427 regression (#2676).
+        run: python3 scripts/test_enforce_mwc_review_gate.py
       - name: Run hook-runner tests
         # Per-suite timeout and interpreter spawn (ai-config#2098). The
         # runner itself had no test, so a missing timeout would only show

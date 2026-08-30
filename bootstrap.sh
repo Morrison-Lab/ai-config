@@ -84,3 +84,23 @@ for installer in "$SCRIPT_DIR"/dotfiles/*/install.sh; do
   printf '\n--- dotfiles/%s ---\n' "$(basename "$(dirname "$installer")")"
   "$installer" || printf 'warn  %s exited %d\n' "$installer" "$?"
 done
+
+
+# --- Antigravity Hook Enforcement Daemon (macOS only) ---
+if [ "$(uname)" = "Darwin" ]; then
+    printf '
+--- Antigravity Hook Enforcer ---
+'
+    mkdir -p "$HOME/Library/LaunchAgents"
+    mkdir -p "$HOME/Library/Logs"
+    PLIST_DEST="$HOME/Library/LaunchAgents/com.morrison-lab.antigravity-hook-enforcer.plist"
+    PYTHON_PATH=$(command -v python3)
+    LOG_DIR="$HOME/Library/Logs"
+    sed -e "s|--SCRIPT_DIR--|$SCRIPT_DIR|g" -e "s|--PYTHON_PATH--|$PYTHON_PATH|g" -e "s|--LOG_DIR--|$LOG_DIR|g" "$SCRIPT_DIR/launchd/antigravity-hook-enforcer.plist" > "$PLIST_DEST"
+    DOMAIN="gui/$(id -u)"
+    launchctl bootout "$DOMAIN" "$PLIST_DEST" 2>/dev/null || true
+    launchctl bootstrap "$DOMAIN" "$PLIST_DEST"
+    printf 'wrote %s and loaded daemon
+' "$PLIST_DEST"
+fi
+

@@ -1012,12 +1012,7 @@ See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
 
-## A review comment's "current head" can name a commit that exists only in the runner
-
-`claude-code-review.yml`'s `gather-context` job merges the default branch into
-the PR head inside its own checkout, so the reviewer reasons over a merge commit
-that was never pushed and is not reachable from your branch.
-Its prose then reports that SHA as the current head.
+## A review comment's "current head" can name a commit that is in no branch
 
 Measured on ai-config#2623, 2026-08-29.
 The round-2 review opened:
@@ -1025,22 +1020,17 @@ The round-2 review opened:
 > **What changed since commit `7db5b981` (last reviewed) -> `e4d3f9ad` (current head):**
 > - `d350629` and its inclusion of `skills/daytb/SKILL.md` are an unrelated main-sync merge
 
-Neither `e4d3f9ad` nor `d350629` was authored on that branch.
-`d350629` was `main`'s tip (a squash of a sibling PR) and `e4d3f9ad` was the
-ephemeral merge of the two.
-`git ls-remote` showed the branch tip unchanged at the pushed commit, and
-`git log HEAD..origin/<branch>` was empty.
+Neither SHA was authored on that branch.
+`d350629` was `main`'s tip, and `e4d3f9ad` was the two merged.
+`git ls-remote` showed the branch tip unchanged, and `git log HEAD..origin/<branch>` was empty.
 
-**Why this is worth recording rather than shrugging off.**
-Read at face value it is indistinguishable from the scenario
-[`claim-pr`](../shared/workflow/claim-pr.md) warns about --- another agent
-pushing to your branch --- and that reading sends you looking for a collision
-that never happened, or worse, invites a defensive force-push over commits you
-believe are foreign.
-The comment's own `Reviewed commit:` trailer is the reliable field: it names the
-commit whose *content* was reviewed, and on that PR it correctly read the pushed
-head.
+**The mechanism is already recorded**, in [`github-actions.md`](github-actions.md)'s `refs/pull/<N>/merge` section: GitHub creates that synthetic ref server-side, the PR's head merged into the base, and it exists in no branch of yours.
+Do not reach for a workflow-side explanation --- `claude-code-review.yml` contains no `git merge` at all, and its `gather-context` job has no checkout to merge in. (Measured 2026-08-30: `grep -c "git merge"` over that file returns 0.)
 
-- **Do:** settle head identity from `git ls-remote` or the PR's `head.sha`, and
-  read the review's `Reviewed commit:` trailer for what was actually reviewed.
+**Why it is worth a note here anyway.**
+Read at face value, a SHA you did not author appearing as "current head" is indistinguishable from the scenario [`claim-pr`](../shared/workflow/claim-pr.md) warns about --- another session pushing to your branch --- and that reading invites a defensive force-push over commits you wrongly believe are foreign.
+
+- **Do:** settle head identity from `git ls-remote` or the PR's `head.sha`.
 - **Don't:** treat a SHA in review prose as evidence that your branch moved.
+- **Don't:** infer the mechanism from the comment;
+  it is already documented, and guessing it produced a false claim in the first draft of this very note.

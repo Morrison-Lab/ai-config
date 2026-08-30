@@ -189,26 +189,9 @@ ARD every item from every review, then request fresh reviews
 
 **A scheduled check-in can outlive the PR it names, and its stale premise arrives as a user instruction.**
 
-The same applies to a head SHA, on a much shorter clock.
-A check-in worded against a specific commit goes stale on the next push, which
-during an ARD round can be minutes away --- measured at four on ai-config#2623,
-where a check-in naming `7db5b98` was obsolete before it ever fired.
-A SHA also fails more quietly than a PR number does: the number at least names
-something that still exists, whereas the commit is simply no longer the head,
-and a check-in that verifies the verdict against it will confirm a review of
-superseded content.
-So word the check-in to *derive* the head ("fetch the current head SHA"), never
-to carry one.
-Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets
-read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is
-written at T, stored, and delivered at T+N with no intervening reader.
-And it arrives as a user-role turn, the most authoritative framing a turn can
-receive, which makes a stale premise persuasive: the turn opens by telling you
-what the situation is, in the voice of an instruction.
-If the PR merged between arming and firing, acting on "drive #N's findings"
-means working a branch GitHub has already auto-deleted --- the orphaned-branch
-recovery [`use-existing-pr-branch.md`](use-existing-pr-branch.md) documents,
-arrived at from the other direction.
+Nothing reviews a wakeup prompt between authoring and firing --- a PR body gets read by a reviewer, a changelog entry sits in a diff, but a scheduled prompt is written at T, stored, and delivered at T+N with no intervening reader.
+And it arrives as a user-role turn, the most authoritative framing a turn can receive, which makes a stale premise persuasive: the turn opens by telling you what the situation is, in the voice of an instruction.
+If the PR merged between arming and firing, acting on "drive #N's findings" means working a branch GitHub has already auto-deleted --- the orphaned-branch recovery [`use-existing-pr-branch.md`](use-existing-pr-branch.md) documents, arrived at from the other direction.
 
 - **Do:** word a wakeup against a re-derivable set ("re-check every PR this
   session opened that has not merged or closed") rather than a fixed
@@ -217,7 +200,7 @@ arrived at from the other direction.
   verify it (`gh pr view <N> --json state,mergedAt` / `pull_request_read` `get`)
   before acting on anything the prompt asserts --- `merged: true` means the
   correct action is `post-merge`, not another ARD round.
-- **Don't:** hard-code a PR number into a wakeup that may outlive it.
+- **Don't:** hard-code a PR number, or a head SHA, into a wakeup that may outlive either.
 - **Don't:** treat a wakeup's premise as current because it arrives in the
   user role --- it is a message from a past self, and the state it describes
   is as old as the prompt.
@@ -226,6 +209,12 @@ arrived at from the other direction.
 merged between arming and firing; the wakeup arrived asserting a live PR
 needing an ARD round when the actually-live PR was #892, its own UMS
 follow-up.)
+
+**A head SHA is the same defect on a far shorter clock, and it fails more quietly.**
+A stale PR number still names something that exists, so verifying it returns an answer that disagrees with the prompt.
+A stale SHA names a commit that is simply no longer the head, so a check-in that verifies the verdict against it confirms a review of superseded content and reports success.
+The clock is the ARD round rather than the merge queue: on ai-config#2623 the two commits either side of one review round were 5m38s apart, and the check-in naming the earlier one was armed 1m23s before the later push landed --- so it was obsolete before it ever fired.
+Word the check-in to *derive* the head ("fetch the current head SHA") rather than to carry one.
 
 In the **clear-all family** (`ardia`, `gia`, `gii`, `gip`), "report ready, don't
 merge" gates only the merge --- it does **not** pause the sweep. A

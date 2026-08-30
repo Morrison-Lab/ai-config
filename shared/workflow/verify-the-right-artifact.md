@@ -191,38 +191,32 @@ When a brief, an issue body, or a review finding asserts what a repository says,
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".
 
-## A summary is another shape, and it is the one that hands you the citation
+## A summary is another shape, and the auto-loaded copy is the one you read
 
-Every shape above substitutes an artifact that says nothing about the one it replaces.
-A cache does not name its origin, a checkout does not announce which run it belongs to, and a neighbour makes no claim about the target at all.
-A summary does the opposite: it names the source, describes it, and exists in order to describe it.
-So reading one produces the feeling of having consulted the source, and it supplies the filename to cite while doing so.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s "any condensation of a verified source is a fresh claim" already names the psychology, and [`citations`](../writing/citations.md) already names why an unquoted attribution launders --- a paraphrase reports the source's conclusion in your voice, with the source's authority attached.
+What neither covers is the *retrieval* asymmetry that decides which copy you consult at all.
 
-The asymmetry that hides it is that a summary is usually faithful.
-The substitution is therefore correct nearly every time, which is what stops it registering as a substitution on the occasion it is wrong.
-And when it is wrong it fails in a specific direction: compression drops hedges, caveats, and disambiguating steps, because those read as qualifying detail rather than as the claim.
+Run `scripts/check-context-closure.py` for the current set: `CLAUDE.md` and the fragments it `@`-imports are always in context, while `memories/` and the rest of `shared/` are not.
+So a rule restated in an auto-loaded file is the copy you will read, and often the only one, while its source is a file you must decide to open.
+The summary is not merely available --- it is already there, and it names the source, which answers "where does this come from?" convincingly enough that nothing prompts the read.
 
-This corpus makes that structural rather than incidental.
-`CLAUDE.md` and `AGENTS.md` are auto-loaded while `memories/` and most of `shared/` are not, so the summary is the copy always in context and the source is the copy nobody opens.
-A rule restated in an auto-loaded file is the one you will read, and often the only one, unless you deliberately go to the fragment it summarizes.
-
-The tell is grammatical.
-A sentence of the form "`X.md` records that ..." is a claim about a file's contents, and it needs that file open --- not the passage that told you about the file.
-Quoting is not the boundary either: a characterization is the looser form, and the one no phrase-grep can check.
+Two consequences follow that the neighbouring fragments do not draw.
+Compression fails in a direction: hedges, caveats, and disambiguating steps go first, because those read as qualifying detail rather than as the claim itself.
+And quotation is not the boundary.
+A *characterization* --- "`X.md` records that ..." --- is the looser form and the one no phrase-grep can check, so the attributions most likely to be unfaithful are exactly the ones an instrument cannot see.
+`hooks/remind-brief-premises.py` detects that sentence shape already, but only on `Agent`/`Task`/`SendMessage` payloads, so the reader-side case is currently uninstrumented.
 
 - **Do:** open the cited file before asserting what it says, including when the passage in front of you names it.
-- **Do:** suspect a dropped hedge first when a summary and its source disagree, since that is the direction compression fails in.
+- **Do:** suspect a dropped hedge first when a summary and its source disagree.
 - **Don't:** treat "the auto-loaded file says so" as having consulted the fragment it cites.
-- **Don't:** read a faithful summary's usual reliability as licence --- that reliability is what makes the exception invisible.
+- **Don't:** read an unquoted attribution as checkable --- it is precisely the form that is not.
 
 See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A summary read as its source, in the session that fixed the summary".
 
 ## A drift claim is relational, so one read cannot settle it
 
 Every shape above is one substitution: you read A and made a claim about B.
-This is the case where the claim is about **both at once** ---
-A has drifted from B, the install is stale, the two copies have diverged ---
-and a two-place claim needs two reads.
+This is the case where the claim is about **both at once** --- A has drifted from B, the install is stale, the two copies have diverged --- and a two-place claim needs two reads.
 Read one, supply the other from memory, and the check feels complete,
 because the section's own Do line is singular:
 "state which artifact a claim rests on, then read *that* one".

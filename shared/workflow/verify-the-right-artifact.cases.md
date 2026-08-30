@@ -171,7 +171,7 @@ has not measured either.
 Morrison-Lab/ai-config#2622 / #2623, 2026-08-29.
 
 A push refused with `stale info`.
-The auto-loaded `CLAUDE.md:851` read:
+The auto-loaded `CLAUDE.md@05ec10e^:851` read (the line has since been rewritten by that very commit, so the quote is not findable at that path on `main`):
 
 > A `stale info` refusal is not a reason to force either: `memories/git-branches.md` records that it means the remote branch is gone.
 
@@ -181,12 +181,12 @@ I then reported to the user that **`memories/git-branches.md` was inaccurate**.
 It was not.
 Opening the file:
 
-> **`stale info` after `checkout -B` *usually* means the remote branch was DELETED, not moved** [...]
+> **`stale info` after `checkout -B` usually means the remote branch was DELETED, not moved** [...]
 > ```sh
 > git ls-remote --heads origin <branch>   # empty output = deleted
 > ```
 
-It hedges, names the competing cause, and prescribes the disambiguating read.
+It hedges ("usually" --- the source's own word, unemphasised), names the competing cause, and prescribes the disambiguating read.
 Every one of those was dropped by the one-line restatement, and the restatement was the copy in context.
 
 Three things this case pins that the shape's prose states more briefly.

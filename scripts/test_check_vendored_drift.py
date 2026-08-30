@@ -142,6 +142,20 @@ jobs:
     cvd.check_manifest(manifest_path, errors, sync_cfg, repo_root=root)
     check("malformed manifest JSON is flagged", any("cannot read manifest" in e for e in errors))
 
+    # Test unmapped manifest (no workflow configures it)
+    manifest_path.write_bytes(json.dumps(manifest_data, indent=2).encode("utf-8"))
+    errors = []
+    cvd.check_manifest(manifest_path, errors, sync_configs={}, repo_root=root)
+    check("unmapped manifest is flagged", any("no sync workflow in .github/workflows/" in e for e in errors))
+
+    # Test candidate workflow that cannot be parsed
+    bad_wf = wf_dir / "bad_sync.yml"
+    bad_wf.write_bytes(b"name: BadSync\njobs:\n  sync:\n    uses: Morrison-Lab/gha/.github/workflows/sync-shared-fragments.yml@v1\n")
+    errors = []
+    cvd.find_sync_workflows(root, errors)
+    check("unparseable candidate workflow is flagged", any("candidate sync workflow could not be parsed" in e for e in errors))
+    bad_wf.unlink()
+
 # Test empty repository / no manifests
 with tempfile.TemporaryDirectory() as empty_dir:
     check("empty directory reports 0 exit code", cvd.main(repo_root=Path(empty_dir)) == 0)

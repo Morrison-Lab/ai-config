@@ -30,7 +30,10 @@ def sha256_of(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def find_sync_workflows(repo_root: Path) -> dict[str, dict[str, str]]:
+def find_sync_workflows(
+    repo_root: Path,
+    errors: list[str] | None = None,
+) -> dict[str, dict[str, str]]:
     """Scan .github/workflows for caller workflows using sync-shared-fragments.yml.
 
     Returns mapping of normalized manifest relative path -> {'source_repo': ..., 'workflow_path': ...}.
@@ -43,7 +46,9 @@ def find_sync_workflows(repo_root: Path) -> dict[str, dict[str, str]]:
     for wf_path in workflow_dir.glob("*.y*ml"):
         try:
             content = wf_path.read_text(encoding="utf-8")
-        except OSError:
+        except OSError as exc:
+            if errors is not None:
+                errors.append(f"{wf_path.name}: cannot read workflow ({exc})")
             continue
         if "sync-shared-fragments.yml" not in content and "manifest-path" not in content:
             continue
@@ -74,13 +79,17 @@ def find_sync_workflows(repo_root: Path) -> dict[str, dict[str, str]]:
                 manifest_path = m_manifest.group(1).strip("'\"")
                 source_repo = m_repo.group(1).strip("'\"")
 
+        rel_wf = wf_path.relative_to(repo_root).as_posix()
         if manifest_path and source_repo:
             norm_manifest = Path(manifest_path).as_posix()
-            rel_wf = wf_path.relative_to(repo_root).as_posix()
             configs[norm_manifest] = {
                 "source_repo": source_repo,
                 "workflow_path": rel_wf,
             }
+        elif errors is not None:
+            errors.append(
+                f"{rel_wf}: candidate sync workflow could not be parsed for 'manifest-path' and 'source-repo'"
+            )
 
     return configs
 
@@ -92,7 +101,7 @@ def check_manifest(
     repo_root: Path = REPO_ROOT,
 ) -> int:
     if sync_configs is None:
-        sync_configs = find_sync_workflows(repo_root)
+        sync_configs = find_sync_workflows(repo_root, errors)
 
     rel = manifest_path.relative_to(repo_root).as_posix()
     try:
@@ -112,8 +121,11 @@ def check_manifest(
                 f"{rel}: source_repo mismatch: manifest has {manifest_source_repo!r}, "
                 f"but {wf_path} specifies source-repo {expected_repo!r}"
             )
-    elif not manifest_source_repo:
-        errors.append(f"{rel}: 'source_repo' missing or empty")
+    else:
+        errors.append(
+            f"{rel}: no sync workflow in .github/workflows/ configures this manifest "
+            f"(expected caller with manifest-path: {rel})"
+        )
 
     files = data.get("files")
     if not isinstance(files, list):
@@ -165,8 +177,8 @@ def main(repo_root: Path = REPO_ROOT) -> int:
     if not manifests:
         print("✓ no vendored manifests to check")
         return 0
-    sync_configs = find_sync_workflows(repo_root)
     errors: list[str] = []
+    sync_configs = find_sync_workflows(repo_root, errors)
     checked = 0
     for manifest in manifests:
         checked += check_manifest(manifest, errors, sync_configs, repo_root=repo_root)

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Run GIA with MWC and DAYTB.">
+<meta name="description" content="Run GIA with MWC and AWAY.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,7 +311,7 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#gmd-gia-mwc-daytb" id="toc-gmd-gia-mwc-daytb" class="nav-link active" data-scroll-target="#gmd-gia-mwc-daytb">GMD — GIA + MWC + DAYTB</a>
+  <li><a href="#gmd-gia-mwc-delegated-away" id="toc-gmd-gia-mwc-delegated-away" class="nav-link active" data-scroll-target="#gmd-gia-mwc-delegated-away">GMD — GIA + MWC + Delegated (Away)</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a></li>
@@ -326,14 +326,14 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="gmd-gia-mwc-daytb" class="level1">
-<h1>GMD — GIA + MWC + DAYTB</h1>
-<p>Clear the repo’s <strong>entire</strong> work queue end to end (<code>gia</code>) while acting with full decision latitude (<code>daytb</code>) and merge authority (<code>mwc</code>).</p>
+<section id="gmd-gia-mwc-delegated-away" class="level1">
+<h1>GMD — GIA + MWC + Delegated (Away)</h1>
+<p>Clear the repo’s <strong>entire</strong> work queue end to end (<code>gia</code>) while acting with full session-wide decision latitude (<code>away</code>) and merge authority (<code>mwc</code>). (The “D” in GMD stands for Delegated, mapping to the <code>away</code> skill for a session-wide grant).</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
 <li>“gmd”</li>
-<li>“gia mwc daytb”, “/gia /mwc /daytb”</li>
+<li>“gia mwc away”, “/gia /mwc /away”</li>
 <li>“burn down the queue and just merge whatever looks good, don’t ask me”</li>
 </ul>
 </section>
@@ -343,7 +343,7 @@ ul.task-list li input[type="checkbox"] {
 <ol type="1">
 <li><strong><a href="../../skills/gia/SKILL.html"><code>gia</code></a></strong>: Clear the existing PR queue first (Phase 1), then work through the open issues in order (Phase 2).</li>
 <li><strong><a href="../../skills/mwc/SKILL.html"><code>mwc</code></a></strong>: You hold explicit authority to merge the PRs you drive to a clean review verdict.</li>
-<li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong>: You hold latitude to make subjective design or implementation decisions yourself, rather than blocking the loop to ask the user. Apply the option you would have recommended, note it in your report, and keep moving.</li>
+<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong>: You hold a standing session-wide grant to make subjective design or implementation decisions yourself across all tasks, rather than blocking the loop to ask the user. Apply the option you would have recommended, note it in your report, and keep moving.</li>
 </ol>
 <p>See the <code>gia</code> skill for the actual loop mechanics and reporting format.</p>
 

@@ -59,6 +59,11 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   printf '\n--- Antigravity plugins ---\n'
   mkdir -p "$GEMINI_CONFIG_DIR"
   PLUGINS_JSON="$GEMINI_CONFIG_DIR/plugins.json"
+  
+  # Create a symlink so that hooks.json has a stable path that doesn't depend on CWD or unsupported interpolation.
+  mkdir -p "$GEMINI_CONFIG_DIR/plugins"
+  ln -sfn "$SCRIPT_DIR/plugins/ai-config" "$GEMINI_CONFIG_DIR/plugins/ai-config"
+
   if [ ! -f "$PLUGINS_JSON" ]; then
     cat <<EOF > "$PLUGINS_JSON"
 {

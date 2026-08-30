@@ -7,14 +7,19 @@ Re-verify against a live install before relying on any of them, since the primar
 
 Antigravity defines lifecycle events in `plugins/<plugin-name>/hooks.json`.
 
-### Command paths must use `${extensionPath}`, never a relative path
+### `extensionPath` is not supported in command paths
 
 A `command` value is resolved against the terminal's active working directory, not against the plugin's own directory --- and Antigravity has a known bug where that cwd can default to `$HOME` regardless of which project is open.
 A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
-Use the plugin-root interpolation token: `python3 ${extensionPath}/claude-hook-adapter.py`. (Empirical finding verified on Windows 2026-08-30: enclosing `${extensionPath}` in literal double quotes in `hooks.json` causes Antigravity's Windows process launcher to prepend the working directory to the quoted string, producing invalid path strings with embedded internal quotes such as `c:\path\"${extensionPath}\file.py"` which the Windows C runtime rejects with `[Errno 22] Invalid argument`;
-authoring the command token without enclosing double quotes or sanitizing arguments via user site-customization runs cleanly across platforms).
-`${CLAUDE_PLUGIN_ROOT}` is a **Claude Code** interpolant and has no meaning inside Antigravity's own `hooks.json`.
-Do not use it for `hooks.json`'s own `command` paths (the adapter's *internal* rewrite of catalog-hook commands sourced from Claude's `hooks/hooks.json` is a separate, correct use of `${CLAUDE_PLUGIN_ROOT}`, since those commands are authored for Claude Code).
+
+Unlike Claude Code, Antigravity does **not** interpolate variables like
+`${extensionPath}` or `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` commands.
+Commands in `hooks.json` must use absolute paths
+or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
+(Empirical finding verified on macOS 2026-08-29: Antigravity expands `~` when launching the command).
+For example, `ai-config` uses
+`~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
+backed by a symlink created in `bootstrap.sh`.
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.

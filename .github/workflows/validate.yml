@@ -41,6 +41,8 @@ jobs:
         run: python3 scripts/test_check_github_actions_step_if.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
+      - name: Run vendored-drift tests
+        run: python3 scripts/test_check_vendored_drift.py
       - name: Check tui-alloc README defaults
         run: python3 scripts/check-tui-alloc-readme.py
       - name: Check markdown (.md) style

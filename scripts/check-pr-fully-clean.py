@@ -882,34 +882,61 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # (posted 2026-08-30T05:22:14Z, verdict **Needs more work**), per ..."
     # (ai-config#2662). Like _SHA_CITATION above, the strip requires a
     # POSITIVE context signal, not just the parenthesized shape: the aside
-    # must sit right after a markdown link to the cited round, or follow an
-    # attribution phrase ("in response to ...") in the same sentence. A
-    # veto lookahead additionally refuses the strip when the rest of the
-    # sentence re-raises the cited verdict as live ("still stands",
-    # "remains unaddressed", "must be fixed", "persists"); its window
-    # crosses line breaks (semantic line breaks put the re-raise clause on
-    # the next line) and dots glued to a following character ("utils.py"),
-    # stopping only at a real sentence end. An unattributed
+    # must sit right after a markdown link to the cited round (a semantic
+    # line break after the link is allowed), or follow an attribution
+    # phrase ("in response to", "responds to", "replied to"), whose filler
+    # may carry one parenthesized aside of its own. The filler's branches
+    # are disjoint on "(" so a failing scan stays linear. An unattributed
     # "posted <ts>, verdict **X**" -- parenthesized or not -- is left
     # alone entirely: stripping a live not-clean is the dangerous
     # direction, and a veto list alone cannot enumerate every re-raise
     # phrasing.
     _POSTED_VERDICT_CITATION = re.compile(
-        r"(?P<keep>\]\([^()\s]{1,400}\)[ \t]*"
-        r"|\b(?:in\s+)?(?:response|reply|responding)\s+to\s+"
-        r"[^.!?\n()]{0,80})"
+        r"(?P<keep>\]\([^()\s]{1,400}\)[ \t\n]*"
+        r"|\b(?:in\s+)?"
+        r"(?:respon(?:se|ds|ded|ding)|repl(?:y|ies|ied|ying))\s+to\s+"
+        r"(?:\([^()\n]{0,80}\)|[^.!?\n()]){0,80})"
         r"\(posted\s+[0-9]{4}-[0-9]{2}-[0-9]{2}"
         r"T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?Z?"
-        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)"
-        r"(?!(?:(?![.!?](?:\s|$))[\s\S]){0,120}"
-        r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
-        r"|persists?|stands?|must\s+be"
-        r"|(?:not|never)\s+(?:yet\s+)?(?:been\s+)?"
-        r"(?:fixed|resolved|addressed))\b)",
+        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)",
         re.IGNORECASE,
     )
+    # The veto runs in code over the citation's WHOLE containing sentence,
+    # in both directions -- a forward-only lookahead window missed "The
+    # finding remains unaddressed despite my response to it (posted ...)"
+    # and any re-raise past its length bound. Sentence bounds use the
+    # glued-dot rule: [.!?] ends a sentence only when whitespace or
+    # end-of-text follows, so "utils.py" and decimals do not truncate it.
+    # The matched aside itself is excluded from the scan (its own "verdict
+    # **Needs more work**" must not self-veto), while the kept attribution
+    # filler is included.
+    _RERAISE_VOCAB = re.compile(
+        r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
+        r"|outstanding|ignored|reopen(?:s|ed)?|recurs?|persists?|stands?"
+        r"|must\s+be|needs\s+to\s+be|appl(?:y|ies|ied)"
+        r"|(?:not|never)\s+(?:yet\s+)?(?:been\s+)?"
+        r"(?:fixed|resolved|addressed))\b",
+        re.IGNORECASE,
+    )
+    _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+
+    def _strip_posted_aside(m: "re.Match") -> str:
+        head = m.string[:m.start()]
+        tail = m.string[m.end():]
+        sentence_start = 0
+        for end in _SENTENCE_END.finditer(head):
+            sentence_start = end.end()
+        forward = _SENTENCE_END.search(tail)
+        sentence_tail = tail[:forward.end()] if forward else tail
+        context = " ".join(
+            (head[sentence_start:], m.group("keep"), sentence_tail)
+        )
+        if _RERAISE_VOCAB.search(context):
+            return m.group(0)
+        return m.group("keep") + " "
+
     text = _SHA_CITATION.sub(" ", text)
-    text = _POSTED_VERDICT_CITATION.sub(lambda m: m.group("keep") + " ", text)
+    text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
     text, mask = _strip_fences_with_mask(text, mask)
@@ -1015,9 +1042,13 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # A negated resolution -- "None of the earlier blocking findings were
     # resolved" -- is a live not-clean statement: the suffix reads as
     # resolved only because the negator sits BEFORE the past-state marker,
-    # outside the suffix scan.
+    # outside the suffix scan. The negator must sit ADJACENT to the marker
+    # (glue words allowed): a bag-of-words search over the window
+    # false-blocked "with no new issues, both round-2 blocking findings
+    # ... are resolved".
     if re.search(
-        r"\b(?:none|no|not|never|neither|nothing)\b",
+        r"\b(?:none|no|not|never|neither|nothing)\s+"
+        r"(?:of\s+|the\s+|all\s+|these\s+|those\s+)*$",
         prefix[:past_state.start()],
         re.IGNORECASE,
     ):

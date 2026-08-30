@@ -10,6 +10,7 @@ Tests:
 """
 import importlib.util
 import json
+import re
 import time
 from unittest.mock import patch
 import sys
@@ -3189,6 +3190,69 @@ def main() -> int:
         "a 'not been addressed' re-raise refuses the strip",
         checker.classify_verdict(not_been_addressed) == "not-clean",
     )
+    # The veto scans the citation's whole containing sentence in BOTH
+    # directions: a re-raise stated before the attribution still refuses
+    # the strip, and one past any fixed window length does too.
+    backward_reraise = (
+        "The finding remains unaddressed despite my response to it "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise BEFORE the citation refuses the strip",
+        checker.classify_verdict(backward_reraise) == "not-clean",
+    )
+    long_sentence_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "which, given the considerations enumerated at painful length in "
+        "the paragraphs above concerning the overall shape of this change "
+        "and its history, still stands as a blocker.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise far along the same sentence refuses the strip",
+        checker.classify_verdict(long_sentence_reraise) == "not-clean",
+    )
+    for phrase in ("was ignored in this push",
+                   "needs to be fixed",
+                   "applies unchanged in this diff"):
+        vocab_reraise = (
+            "In response to [round 2](https://x) "
+            "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+            "which " + phrase + ".\n\n### Verdict\n**Ready for merge**"
+        )
+        check(
+            "the re-raise vocabulary covers '" + phrase + "'",
+            checker.classify_verdict(vocab_reraise) == "not-clean",
+        )
+    # The positive gate recognizes natural narration inflections, a
+    # semantic line break after the link tail, and an intervening
+    # parenthetical in the attribution filler.
+    for label, narration in (
+        ("'responds to'",
+         "This comment responds to round 6's review "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "which has since been addressed."),
+        ("'replied to'",
+         "I replied to round 6's review "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**) "
+         "with fixes for every item."),
+        ("a line break after the link",
+         "This is the author's direct response to\n"
+         "[round 6's finding](https://x/pull/1#c-2)\n"
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**),\n"
+         "per the ARD protocol."),
+        ("an intervening parenthetical",
+         "In response to round 6's review (comment 12345) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "all items are addressed."),
+    ):
+        body = narration + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "narration with " + label + " is stripped",
+            checker.classify_verdict(body) == "clean",
+        )
 
     # A LIVE verdict phrased with the same "posted <ts>, verdict **X**"
     # vocabulary, outside parens, is NOT erased -- the same adversarial
@@ -3241,19 +3305,36 @@ def main() -> int:
         "a negated resolution of prior blocking findings stays not-clean",
         checker.classify_verdict(negated_prior) == "not-clean",
     )
+    # The negator must sit adjacent to the past-state marker: a fronted
+    # no-new-issues clause does not negate the resolution.
+    fronted_negator = (
+        "### Verdict\n**Ready for merge** \u2014 with no new issues, both "
+        "round-2 blocking findings (demo caption overclaim, missing "
+        "tactics.qmd companion video) are resolved by this round's diff."
+    )
+    check(
+        "a fronted no-new-issues clause does not false-block the resolution",
+        checker.classify_verdict(fronted_negator) == "clean",
+    )
     # The paren-aside and character branches of the clause scan must stay
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
-    # failing enumeration. A regression here hangs this test visibly.
-    enumeration = (
+    # failing enumeration. Probed on _is_resolved_blocking_mention directly:
+    # classify_verdict short-circuits on the leading "Needs more work"
+    # before reaching this path, so a whole-body probe passes even on the
+    # buggy pattern.
+    enumeration_scan = (
         "### Verdict\nNeeds more work: the previously blocking items "
         + "(1) " * 24
         + "are still broken"
     )
+    _blocking = re.search(r"\bblocking\b", enumeration_scan, re.IGNORECASE)
     _t0 = time.time()
-    enumeration_verdict = checker.classify_verdict(enumeration)
+    _exempted = checker._is_resolved_blocking_mention(
+        enumeration_scan, _blocking
+    )
     check(
         "a failing enumeration aside neither hangs nor exempts the mention",
-        enumeration_verdict == "not-clean" and time.time() - _t0 < 5,
+        _exempted is False and time.time() - _t0 < 5,
     )
 
     # The filter guards THREE match loops, and two of them had no test at all:

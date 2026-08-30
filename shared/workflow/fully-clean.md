@@ -383,7 +383,7 @@ So when the two disagree inside one comment, **the findings win**.
 Read to the end of the comment before calling anything clean, and count the
 items under every heading, whatever that heading is called ---
 [`address-every-comment`](address-every-comment.md) already establishes that
-"non-blocking", "nit", "minor", and "optional" are prioritization labels rather
+"informational", "non-blocking", "nit", "minor", and "optional" are prioritization labels rather
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 

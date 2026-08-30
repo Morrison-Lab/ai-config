@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${extensionPath}/enforce-mwc-review-gate.py\""
+            "command": "python3 ~/.gemini/config/plugins/ai-config/enforce-mwc-review-gate.py"
           },
           {
             "type": "command",
-            "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+            "command": "python3 ~/.gemini/config/plugins/ai-config/claude-hook-adapter.py"
           }
         ]
       },
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+            "command": "python3 ~/.gemini/config/plugins/ai-config/claude-hook-adapter.py"
           }
         ]
       }
@@ -27,13 +27,13 @@
     "Stop": [
       {
         "type": "command",
-        "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+        "command": "python3 ~/.gemini/config/plugins/ai-config/claude-hook-adapter.py"
       }
     ],
     "PreInvocation": [
       {
         "type": "command",
-        "command": "python3 \"${extensionPath}/claude-hook-adapter.py\""
+        "command": "python3 ~/.gemini/config/plugins/ai-config/claude-hook-adapter.py"
       }
     ]
   }

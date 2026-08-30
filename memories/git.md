@@ -8,6 +8,62 @@ Stash-specific behavior: [`git-stash.md`](git-stash.md).
 Tag management: [`git-tags.md`](git-tags.md).
 Worktree-specific behavior: [`git-worktrees.md`](git-worktrees.md).
 
+## In a shallow clone, `git log -S`, `--follow`, and `blame` report a graft as the introduction
+
+These walk backwards until they run out of history, and a shallow clone runs
+out at a **graft** --- a commit listed in `.git/shallow` and presented as
+parentless.
+The walk stops there and names that commit, with a real SHA, a real date, and
+a real subject line, so "when was this introduced" gets an answer that looks
+fully derived and is off by however much history is missing.
+
+It is the mode most likely to be reached for while *following* the rule to
+re-derive a claim rather than recall it, since re-deriving "which change
+introduced this" is what sends you to `git log -S` in the first place.
+[`claude-code.md`](claude-code.md)'s shallow-clone section covers the two
+neighbouring modes, a bogus merge-base and an empty history query.
+
+**The rule is `git rev-parse --is-shallow-repository`: a `true` means no
+attribution from this clone is sound, whatever it names.**
+Git will also mark the commit, which is the cheaper tell when you already have
+output in hand --- a `%d` in the format prints `(grafted)` on it, and unlike
+bare `--decorate` it does so when piped too:
+
+```bash
+git rev-parse --is-shallow-repository            # true -> unshallow first
+git log --format='%h %d %s' | tail -1            # ... (grafted) ...
+git fetch --unshallow                            # then derive the claim
+```
+
+Do not substitute a comparison against the clone's oldest commit.
+`.git/shallow` holds one entry per grafted lineage, so a boundary cutting
+through a side lineage leaves several, and the walk can stop at one the
+comparison never looked at --- a silent false negative, in the direction the
+check exists to prevent.
+Enumerate the set with `cat "$(git rev-parse --git-common-dir)/shallow"`,
+never `--git-dir`, which in a linked worktree points at
+`.git/worktrees/<name>` where no `shallow` file exists;
+its `No such file or directory` then reads as "not shallow", and this corpus
+assigns subagents a worktree by default.
+
+- **Do:** `git fetch --unshallow` before deriving an "introduced in #N" claim.
+- **Don't:** read a plausible commit from `-S`/`--follow`/`blame` as evidence
+  the clone was deep enough --- plausibility is what this mode produces.
+
+(Measured 2026-08-30.
+A remote session's clone was shallow at 59 commits,
+and `git log -S'args.all' --reverse -- scripts/semantic-line-breaks.py` named
+its graft.
+After `git fetch --unshallow` the same query named `f17d7dcc`, #951,
+2026-07-31 --- 1602 PR numbers earlier
+(`git log -S'args.all' --oneline --reverse -- <path> | head -1`, run before
+and after).
+The wrong number reached ai-config#2637's description, which said the
+diff-scoping "landed in #2553 two days before the incident I cited": the
+ordering was right and the interval understated by four weeks.
+The graft decoration and the `--git-dir` failure above were reproduced
+directly, on a `--depth 3` clone of this repo plus a linked worktree.)
+
 ## Git push with multiple writable remotes
 
 - **An unqualified `git push` follows the branch's configured upstream, not the repository's canonical remote.**

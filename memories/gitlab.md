@@ -33,7 +33,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   - `glab api "/projects/<ID>/jobs/<JOB_ID>/trace"` --- get job log non-interactively
   - `glab mr note create <MR_IID> --message "..."` --- post MR comment
   - `glab mr list` --- list merge requests
-  - `glab mr view <MR_IID>` --- view MR details
+  - `glab mr view <MR_IID>` --- view MR details (including inline pipeline/checks status)
+  - `glab mr` has no `checks` subcommand --- query MR CI status via `glab ci status` or `glab mr view` (ai-config#2667 / #2670)
 - GitLab CI job token allowlist:
   - When repo A's CI job needs API access to repo B, repo B must add A to its allowlist
   - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`

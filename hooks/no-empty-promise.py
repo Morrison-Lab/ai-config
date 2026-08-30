@@ -137,7 +137,8 @@ _MODAL = (r"(?:" + _APOS + r"ll|\s+will|\s+shall|\s+am\s+going\s+to|"
           + _APOS + r"m\s+going\s+to)")
 _NEG = r"(?:\s+won" + _APOS + r"?t|\s+will\s+not)"
 
-# Two kinds of promise, split because they owe DIFFERENT mechanisms.
+# Three kinds of forward commitment, split because they owe DIFFERENT
+# mechanisms.
 #
 # A RULE promise commits to a class of future occasions ("going forward I'll
 # always X"). What keeps it is something durable that outlives the session.
@@ -198,11 +199,24 @@ _DEBT_SRC = r"""(
     | \b """ + _SUBJ + _MODAL + r"""\s+wait\s+(?:right\s+)?here\b
     )"""
 
+# A statement that CI or a reviewer WILL perform a future action makes the
+# same delivery claim as a first-person debt. It must name a live arming in
+# the turn, not merely infer an automation from an earlier push.
+_AUTOMATION_SRC = r"""(
+            \b(?:gitlab|github(?:\s+actions)?|ci|the\s+workflow|the\s+review\s+bot)
+            \s+will\s+(?:automatically\s+)?
+            (?:launch|run|produce|post|start|complete|pass)\b
+        | \b(?:the\s+)?(?:next\s+)?(?:pipeline|review(?:\s+round)?)\s+will
+            \s+(?:automatically\s+)?(?:launch|run|produce|post|start|complete|pass)\b
+        )"""
+
 RULE = re.compile(_RULE_SRC, re.I | re.X)
 DEBT = re.compile(_DEBT_SRC, re.I | re.X)
+AUTOMATION = re.compile(_AUTOMATION_SRC, re.I | re.X)
 # Kept as the union so any consumer asking "is this a promise at all?" still
 # gets one answer.
-PROMISE = re.compile(_RULE_SRC + r"|" + _DEBT_SRC, re.I | re.X)
+PROMISE = re.compile(
+        _RULE_SRC + r"|" + _DEBT_SRC + r"|" + _AUTOMATION_SRC, re.I | re.X)
 
 # `\b` is the wrong boundary for a bare action word: `-` and `/` are non-word
 # characters, so `\bums\b` matches INSIDE
@@ -518,7 +532,7 @@ def records(path):
 
 
 def scan(path):
-    """Return (rule_txt, debt_txt, durable, scheduled) for the CURRENT turn.
+    """Return (rule_txt, debt_txt, automation_txt, durable, scheduled, monitored).
 
     Both promise kinds are tracked separately, because they discharge on
     different things and a reply can carry one of each. Resolving them at the
@@ -538,12 +552,12 @@ def scan(path):
     requiring the write to come after the promise would block the correct
     case and pass almost nothing else.
     """
-    rule_txt = debt_txt = None
+    rule_txt = debt_txt = automation_txt = None
     # tool_use ids whose call LOOKED like a mechanism, pending their result,
     # keyed by WHICH mechanism it looked like. A call is only evidence once it
     # did not come back an error: permission denial is an ordinary way for a
     # write to fail, and an attempted write ships nothing.
-    pending = {"durable": set(), "scheduled": set()}
+    pending = {"durable": set(), "scheduled": set(), "monitored": set()}
     failed = set()
 
     for m in records(path):
@@ -596,18 +610,37 @@ def scan(path):
                 hit = DEBT.search(prose)
                 if hit:
                     debt_txt = hit.group(0).strip()
+                hit = AUTOMATION.search(prose)
+                if hit:
+                    automation_txt = hit.group(0).strip()
 
             elif b.get("type") == "tool_use":
                 kind_of = discharges(b.get("name") or "", b.get("input") or {})
                 if kind_of:
                     pending[kind_of].add(b.get("id"))
+                if arms_automation_monitor(b.get("name") or "", b.get("input") or {}):
+                    pending["monitored"].add(b.get("id"))
 
     # A call with no result at all still counts: the Stop hook can fire before
     # the result lands, and withholding discharge there would block a turn that
     # did the work. Only an explicit error disqualifies.
     durable = bool(pending["durable"] - failed)
     scheduled = bool(pending["scheduled"] - failed)
-    return rule_txt, debt_txt, durable, scheduled
+    monitored = bool(pending["monitored"] - failed)
+    return rule_txt, debt_txt, automation_txt, durable, scheduled, monitored
+
+
+def arms_automation_monitor(name, inp):
+    """True when an arming call explicitly watches CI or review progress."""
+    if not isinstance(inp, dict) or discharges(name, inp) != "scheduled":
+        return False
+    if inp.get("stop") is True:
+        return False
+    if _poller_executed(str(inp.get("command", ""))):
+        return True
+    blob = json.dumps(inp)
+    return bool(re.search(r"\b(?:ci|pipeline|workflow|review|check(?:s| runs?)?)\b",
+                          blob, re.I))
 
 
 def discharges(name, inp):
@@ -808,6 +841,14 @@ DEBT_REASON = (
     "the state and claims nothing."
 )
 
+AUTOMATION_REASON = (
+    "A pipeline or reviewer automation claim is a prediction that this "
+    "conversation will not carry out. State the current status instead, or "
+    "arm a scheduler or PR/MR monitor in this turn and report what it will "
+    "check and when it fires. A prior push can trigger automation, but it "
+    "does not prove that the pipeline or review will run or complete."
+)
+
 
 def main() -> int:
     if visible_prose is None:
@@ -823,7 +864,7 @@ def main() -> int:
         return 0
 
     try:
-        rule_txt, debt_txt, durable, scheduled = scan(path)
+        rule_txt, debt_txt, automation_txt, durable, scheduled, monitored = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -835,6 +876,8 @@ def main() -> int:
         promise_txt, reason = rule_txt, RULE_REASON
     elif debt_txt and not (durable or scheduled):
         promise_txt, reason = debt_txt, DEBT_REASON
+    elif automation_txt and not monitored:
+        promise_txt, reason = automation_txt, AUTOMATION_REASON
     else:
         return 0
 

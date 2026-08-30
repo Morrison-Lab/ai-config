@@ -212,9 +212,15 @@ jobs:
         run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
-        # this repo is currently ~4x the shipped budget (ai-config#897), so a
-        # blocking form would be red on every PR and would train everyone to
+        # the reasoning was that this repo sat far over the shipped budget, so
+        # a blocking form would be red on every PR and would train everyone to
         # ignore it -- the failure mode algorithmatize-checks warns about.
+        #
+        # That premise no longer holds: the closure measured 184,016 bytes
+        # against the 200,000-byte budget on 2026-08-30 (0.92x), after #1633
+        # restored the headroom #1373 recorded as 47% over. Whether the check
+        # should now gate is ai-config#2636; this comment states the measured
+        # figure rather than the stale one, and does not decide it.
         #
         # The root file's CHARACTER CAP is the exception, and gates without
         # --strict (ai-config#897, #1258). It is not our budget but the

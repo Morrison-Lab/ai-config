@@ -3409,6 +3409,22 @@ def main() -> int:
             + "') does not hide the negator",
             checker.classify_verdict(faked_end) == "not-clean",
         )
+    # The sentence scan runs once per comment body, so it has to stay
+    # linear in the body. Finding each candidate's preceding token by
+    # slicing and splitting the whole prefix was quadratic, and a body at
+    # GitHub's 65536-character comment cap took over five seconds.
+    _cap_prefix = "### Verdict\n**Ready for merge.** "
+    _cap_suffix = "None of the previously blocking finding is resolved."
+    _cap_unit = "x. "
+    _cap_body = _cap_prefix + _cap_unit * (
+        (65536 - len(_cap_prefix) - len(_cap_suffix)) // len(_cap_unit)
+    ) + _cap_suffix
+    _t0 = time.time()
+    _cap_verdict = checker.classify_verdict(_cap_body)
+    check(
+        "a max-length many-sentence body scans linearly and correctly",
+        _cap_verdict == "not-clean" and time.time() - _t0 < 5,
+    )
     # An abbreviation dot does not restart the sentence, so a negator
     # before it stays in scope rather than being hidden.
     abbreviation_scope = (

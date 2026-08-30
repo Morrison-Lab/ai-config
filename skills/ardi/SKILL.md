@@ -147,10 +147,9 @@ sits unread.
    See [*The bar: "fully clean"*](#the-bar-fully-clean).
    It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
-3. **ARD every finding --- regardless of severity label.** "Informational", "Not a blocker",
-   "minor", "nit", "optional", "consider", "if you want" are for the user's
-   prioritization, not a pass for the implementer. For each flagged item,
-   choose exactly one:
+3. **ARD every finding --- regardless of severity label.**
+   "Informational", "Not a blocker", "minor", "nit", "optional", "consider", "if you want" are for the user's prioritization, not a pass for the implementer.
+   For each flagged item, choose exactly one:
    - **Address** --- fix it, commit.
    - **Rebut** --- explain why it's correct (with evidence).
    - **Defer** --- file a follow-up issue, link it (use the `defer-issue` skill).

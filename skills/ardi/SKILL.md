@@ -147,10 +147,9 @@ sits unread.
    See [*The bar: "fully clean"*](#the-bar-fully-clean).
    It requires clean verdicts at the current head from all reachable providers in your pinned quorum, not just a self-review.
 
-3. **ARD every finding --- regardless of severity label.** "Not a blocker",
-   "minor", "nit", "optional", "consider", "if you want" are for the user's
-   prioritization, not a pass for the implementer. For each flagged item,
-   choose exactly one:
+3. **ARD every finding --- regardless of severity label.**
+   "Informational", "Not a blocker", "minor", "nit", "optional", "consider", "if you want" are for the user's prioritization, not a pass for the implementer.
+   For each flagged item, choose exactly one:
    - **Address** --- fix it, commit.
    - **Rebut** --- explain why it's correct (with evidence).
    - **Defer** --- file a follow-up issue, link it (use the `defer-issue` skill).
@@ -361,7 +360,7 @@ Do-Confirm; per
 Always request another review.**
 The loop on a single PR ends on exactly three things:
 
-1. **A totally clean review on the latest pushed commit** -- no nits, no non-blocking comments, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch.
+1. **A totally clean review on the latest pushed commit** -- no nits, no non-blocking comments, no informational notes, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch.
    **Crucial:** Pushing fixes for a review starts a new review cycle. The ARDI loop is **NEVER** finished when you push fixes for a finding-bearing review or post an ARD summary. You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before ending the loop. See [*The bar: "fully clean"*](#the-bar-fully-clean).
 2. **Nothing actionable remains** --- every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take.
    Not "some items are deadlocked"; *all* of them.

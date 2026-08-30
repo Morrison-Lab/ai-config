@@ -876,7 +876,12 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
         re.IGNORECASE,
     )
+    _POSTED_VERDICT_CITATION = re.compile(
+        r"\bposted\s+[0-9T:Z-]+\s*,\s*verdict\s+\*\*[^*]+\*\*",
+        re.IGNORECASE,
+    )
     text = _SHA_CITATION.sub(" ", text)
+    text = _POSTED_VERDICT_CITATION.sub(" ", text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
     text, mask = _strip_fences_with_mask(text, mask)

@@ -3012,6 +3012,16 @@ def main() -> int:
         checker.classify_verdict(contained) == "clean",
     )
 
+    posted_verdict_citation = (
+        "This is in response to finding (posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a posted timestamp verdict citation does not count as a finding or block clean verdict",
+        checker.classify_verdict(posted_verdict_citation) == "clean"
+        and checker._unresolved_finding_pattern(posted_verdict_citation) is None,
+    )
+
     # The filter guards THREE match loops, and two of them had no test at all:
     # deleting the guard in classify_verdict's clean loop, or in
     # _unresolved_finding_pattern, left the suite green. Both are reachable and

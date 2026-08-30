@@ -10,8 +10,8 @@ at the 1200-line gate.
 
 `bootstrap.sh` only reaches local CLI sessions --- a consumer repo's
 `claude`/`claude-code-review` bots (running via `Morrison-Lab/gha`'s reusable
-workflows and `anthropics/claude-code-action`) get nothing from it. The
-pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
+workflows and `anthropics/claude-code-action`) get nothing from it.
+The pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
 and `ucdavis/epi204#360`:
 
 1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`
@@ -20,12 +20,15 @@ and `ucdavis/epi204#360`:
    confirmed via `diff` against ai-config's canonical copy before removing)
    with a **committed symlink** `.claude/skills -> ../.ai-config/skills`, so
    all of ai-config's skills become discoverable, not just the one that was
-   hand-copied. `.claude/commands/` was left as-is in both repos --- those
+   hand-copied.
+`.claude/commands/` was left as-is in both repos --- those
    were genuinely project-specific, not ai-config duplicates.
 3. Check `.gitignore` for a blanket `.claude/*` ignore (rme had one, with an
    existing `!.claude/commands` exception already carved out for the same
-   reason). If it's there, add `!.claude/skills` alongside it, or `git add`
-   silently skips the new symlink as ignored. If `.claude/skills/` was
+   reason).
+If it's there, add `!.claude/skills` alongside it, or `git add`
+   silently skips the new symlink as ignored.
+If `.claude/skills/` was
    already tracked as a real directory, also run
    `git rm -r --cached .claude/skills` first, to clear it from the index
    before the symlink can be staged in its place.
@@ -37,7 +40,8 @@ and `ucdavis/epi204#360`:
 The committed symlink survives `claude-code-action`'s `restoreConfigFromBase`
 (which wipes/restores `.claude/` from the base branch on PR-triggered runs)
 because it's part of that committed base --- this is the same technique
-ai-config's own repo already uses for its own `@claude` bot. `memories/` and
+ai-config's own repo already uses for its own `@claude` bot.
+`memories/` and
 `shared/` get no equivalent auto-load mechanism (Claude Code doesn't scan a
 project memories folder the way it does skills), so they're just readable
 on disk, not injected into context automatically --- unless the consumer's
@@ -57,12 +61,15 @@ protocol supports fetching any reachable commit, not just branch tips.
 
 **A `--depth 1` shallow clone gives a bogus merge-base, so a `git log A..B`
 / `git diff A..B` range against another branch shows the *entire* repo as
-added.** In a shallow clone the histories of two branches share no common
+added.**
+In a shallow clone the histories of two branches share no common
 ancestor git can see (it's truncated), so `origin/main` and a feature branch
 appear fully disjoint --- `git log <branch>..origin/main --stat` reports
 hundreds of files / thousands of insertions that aren't real, and a real
-`git merge origin/main` produces spurious mass conflicts. Don't run
-merge/diff-vs-main operations on a shallow clone. What *is* reliable on a
+`git merge origin/main` produces spurious mass conflicts.
+Don't run
+merge/diff-vs-main operations on a shallow clone.
+What *is* reliable on a
 shallow clone: single-tree reads (`git show origin/main:<file>`,
 `git cat-file`) --- they read the fetched tip's tree directly, no merge-base
 needed.
@@ -82,8 +89,8 @@ shallow clone of this corpus:
   **zero for every candidate**, ours and foreign alike, at depth 50.
   A deletion that happened before the shallow window is simply not in it, so
   this question is unanswerable here while appearing answered.
-- `git log --all -- <path>` ("has the repo ever touched this?") **did**
-  discriminate, on the same clone at depth 55: zero for all seven Anthropic
+- `git log --all -- <path>` ("has the repo ever touched this?")
+  **did** discriminate, on the same clone at depth 55: zero for all seven Anthropic
   built-ins, against 6 for `ums`, 3 for `ardi` and 1 for `config-ai`.
   An actively maintained file gets touched inside almost any window, which is
   what makes the weaker question survive truncation.

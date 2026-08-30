@@ -3440,6 +3440,37 @@ def main() -> int:
         "a max-length many-sentence body scans linearly and correctly",
         _cap_verdict == "not-clean" and time.time() - _t0 < 5,
     )
+    # A faked sentence end was reintroduced twice by fixing one
+    # whitespace shape and breaking another, so the shapes are swept
+    # rather than enumerated one at a time: each URL-like token, each
+    # exotic whitespace character, and each way of arranging them
+    # against the punctuation, on BOTH routes that share the scan.
+    _faked_end_failures = []
+    for _token in ("http://x.io/a", "/etc/passwd", "www.example.com"):
+        for _ws in ("\r", "\v", "\f", "\xa0"):
+            for _sep in ("", " ", _ws, " " + _ws, _ws + " ", _ws + "x",
+                         " " + _ws + _ws):
+                _guard = (
+                    "### Verdict\n**Ready for merge.** None of the "
+                    + _token + _sep
+                    + ". previously blocking finding is resolved."
+                )
+                _veto = (
+                    "### Verdict\nThe finding remains unresolved "
+                    + _token + _sep
+                    + ". in response to it (posted "
+                    "2026-08-30T12:00:00Z, verdict **Needs more work**)."
+                )
+                for _label, _body in (("guard", _guard), ("veto", _veto)):
+                    if checker.classify_verdict(_body) != "not-clean":
+                        _faked_end_failures.append(
+                            _label + ":" + repr(_token + _sep)
+                        )
+    check(
+        "no whitespace arrangement fakes a sentence end (%d checked)"
+        % (3 * 4 * 7 * 2),
+        not _faked_end_failures,
+    )
     # The citation veto shares the same sentence scan, so a faked
     # sentence end there hides a re-raise instead of a negator, and
     # strips a live not-clean citation into a body stating no verdict

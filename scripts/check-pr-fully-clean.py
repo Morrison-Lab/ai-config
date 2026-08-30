@@ -1064,16 +1064,24 @@ def _sentence_start_before(text: str) -> int:
         # accepts a faked sentence end -- narrowing the caller's scan,
         # which is the fail-open direction.
         #
-        # The break set is space, tab and newline rather than every
-        # str.isspace character, because a carriage return or a
-        # non-breaking space INSIDE a URL would otherwise end the token
-        # early ("http://x.io/a\rx.") and leave a bare word whose dot
-        # then reads as a real sentence end -- the same fail-open by a
-        # different route. Treating those as part of the token only ever
-        # makes it longer, so it can only add URL matches and skip more
-        # candidates, which widens the caller's scan.
+        # The two loops use DIFFERENT character sets, and each set is
+        # wrong for the other's job.
+        #
+        # The skip consumes any str.isspace run, so a trailing
+        # non-breaking space -- an ordinary copy-paste artifact -- does
+        # not leave itself behind as the token ("/etc/passwd \xa0."),
+        # which would be content-free and pass the URL check.
+        #
+        # The extent stops only at space, tab or newline, so a carriage
+        # return or non-breaking space INSIDE a URL does not end the
+        # token early ("http://x.io/a\rx.") and leave a bare word whose
+        # dot then reads as a real sentence end.
+        #
+        # Both shapes are the same fail-open by different routes: a
+        # faked sentence end narrows the caller's scan past the negator
+        # or the re-raise it was looking for.
         pos = end.start()
-        while pos > 0 and text[pos - 1] in _TOKEN_BREAK:
+        while pos > 0 and text[pos - 1].isspace():
             pos -= 1
         token_end = pos
         while pos > 0 and text[pos - 1] not in _TOKEN_BREAK:

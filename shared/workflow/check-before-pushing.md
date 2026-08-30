@@ -204,7 +204,8 @@ The extra commit is squashed cleanly at PR merge, so history tidiness is preserv
   The man page shipped with git 2.50.1 words it differently and says the same thing.)
 - **Don't:** answer a `stale info` refusal with a force, or read the message as self-explanatory.
   It reports only that your remote-tracking ref no longer matches the remote, never why.
-  `git ls-remote --heads origin <branch>` settles existence; a non-empty result still needs the tip comparison above before you pick a remedy.
+  `git ls-remote --heads origin <branch>` settles existence and nothing further.
+  A non-empty result still needs the tip comparison above before you pick a remedy.
 - **Do:** when `ls-remote` is empty, query
   `gh pr list --state all --head <branch>` before treating the next push as a first publish.
   MERGED means do not recreate.

@@ -1,3 +1,10 @@
+## Fixing your own mistakes is always top priority
+
+When an error, mistake, bad merge, regression, broken test, or policy violation is identified in your work:
+- **Remediating it is the absolute top priority** --- it supersedes all feature development, new issue pickup, and backlog progression.
+- **Act immediately**: Revert the bad merge, fix the regression, or resolve the failure before proceeding with any other work.
+- **Never make empty promises**: Do not substitute verbal assurances or apologies for mechanical gates and concrete fixes.
+
 When picking which PR or issue to work on next — choosing among several open
 PRs to review, iterate (ARDI), or pick up first in a queue, or triaging which
 open issue to grab next (`gi`/`gii`/`gip`) — slightly prefer **internal

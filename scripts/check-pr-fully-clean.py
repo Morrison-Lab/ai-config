@@ -1037,6 +1037,7 @@ _SENTENCE_END_RE = re.compile(
 # against the token before the candidate, since the token has no bound a
 # lookbehind could take.
 _NOT_SENTENCE_TOKEN_RE = re.compile(r"(?:://|www\.|/)")
+_TOKEN_BREAK = " \t\n"
 
 
 def _sentence_start_before(text: str) -> int:
@@ -1062,11 +1063,20 @@ def _sentence_start_before(text: str) -> int:
         # otherwise yields an empty token, which passes the URL check and
         # accepts a faked sentence end -- narrowing the caller's scan,
         # which is the fail-open direction.
+        #
+        # The break set is space, tab and newline rather than every
+        # str.isspace character, because a carriage return or a
+        # non-breaking space INSIDE a URL would otherwise end the token
+        # early ("http://x.io/a\rx.") and leave a bare word whose dot
+        # then reads as a real sentence end -- the same fail-open by a
+        # different route. Treating those as part of the token only ever
+        # makes it longer, so it can only add URL matches and skip more
+        # candidates, which widens the caller's scan.
         pos = end.start()
-        while pos > 0 and text[pos - 1].isspace():
+        while pos > 0 and text[pos - 1] in _TOKEN_BREAK:
             pos -= 1
         token_end = pos
-        while pos > 0 and not text[pos - 1].isspace():
+        while pos > 0 and text[pos - 1] not in _TOKEN_BREAK:
             pos -= 1
         token = text[pos:token_end]
         if token and _NOT_SENTENCE_TOKEN_RE.search(token):

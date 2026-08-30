@@ -3407,7 +3407,14 @@ def main() -> int:
                         "the http://x.io/a .",
                         "the /etc/passwd .",
                         "the www.example.com .",
-                        "the http://x.io/a\r."):
+                        "the http://x.io/a\r.",
+                        # An exotic whitespace INSIDE the URL must not
+                        # end the token early and leave a bare word whose
+                        # dot then reads as a real sentence end.
+                        "the http://x.io/a\rx.",
+                        "the http://x.io/a\vx.",
+                        "the http://x.io/a\fx.",
+                        "the http://x.io/a\xa0x."):
         faked_end = (
             "### Verdict\n**Ready for merge.** None of " + interrupter
             + " previously blocking finding is resolved."
@@ -3432,6 +3439,19 @@ def main() -> int:
     check(
         "a max-length many-sentence body scans linearly and correctly",
         _cap_verdict == "not-clean" and time.time() - _t0 < 5,
+    )
+    # The citation veto shares the same sentence scan, so a faked
+    # sentence end there hides a re-raise instead of a negator, and
+    # strips a live not-clean citation into a body stating no verdict
+    # at all.
+    veto_faked_end = (
+        "### Verdict\nThe finding remains unresolved http://x.io/a\rx. "
+        "in response to it (posted 2026-08-30T12:00:00Z, verdict "
+        "**Needs more work**)."
+    )
+    check(
+        "a faked sentence end does not hide a re-raise from the veto",
+        checker.classify_verdict(veto_faked_end) == "not-clean",
     )
     # An abbreviation dot does not restart the sentence, so a negator
     # before it stays in scope rather than being hidden.

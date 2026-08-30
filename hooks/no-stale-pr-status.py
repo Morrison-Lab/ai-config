@@ -35,17 +35,18 @@ import tempfile
 # `algorithmatize-checks`'s "Limits" failure arriving through the remedy.
 RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
 
-# What makes a count a claim about THIS PR rather than about a local run.
+# What makes a count a claim about THIS PR/MR rather than about a local run.
 # Proximity, not presence anywhere in the message: a recap routinely mentions
-# a PR number paragraphs away from an unrelated test count.
+# a PR/MR number paragraphs away from an unrelated test count.
 RX_PR_NEARBY = re.compile(
-    r"#\d+|/pull/\d+|\bgh pr\b|\bcheck[- ]runs?\b|\bstatusCheckRollup\b"
+    r"#\d+|!\d+|/pull/\d+|/merge_requests/\d+|\bgh pr\b|\bglab mr\b|\bglab ci\b"
+    r"|\bcheck[- ]runs?\b|\bstatusCheckRollup\b|\bpipelines?\b|\bjobs?\b"
     r"|\bCI\b|\bworkflow\b|\bhead SHA\b|\bheadRefOid\b"
-    # The plain word is the most natural way to reference a PR in prose, and
+    # The plain word is the most natural way to reference a PR/MR in prose, and
     # omitting it classified a message opening "PR checks: ..." as having no
     # PR reference at all. Erring toward the STRONG wording is the safe
     # direction, so a loose match here costs nothing.
-    r"|\bPRs?\b|\bpull requests?\b",
+    r"|\bPRs?\b|\bMRs?\b|\bpull requests?\b|\bmerge requests?\b",
     re.I,
 )
 NEARBY_WINDOW = 250
@@ -70,7 +71,7 @@ RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 # A push invalidates any earlier reading.
 RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 
-# A fresh reading. Covers the CLI and the MCP surfaces.
+# A fresh reading. Covers the CLI and the MCP surfaces for both GitHub and GitLab (#2667).
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
     r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
@@ -81,7 +82,12 @@ RX_QUERY = re.compile(
     # told the author to re-run the weaker command instead. The MCP spelling
     # `get_check_runs` was covered; the CLI/REST spelling was not.
     r"commits/[^\s]+/check-runs|commits/[^\s]+/status|"
-    r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py",
+    r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py|"
+    r"glab\s+ci\s+(?:status|list|view)|"
+    r"glab\s+mr\s+(?:view|checks)|"
+    r"glab\s+pipeline\s+view|"
+    r"projects/[^\s]+/pipelines|"
+    r"projects/[^\s]+/merge_requests",
     re.I,
 )
 
@@ -301,10 +307,14 @@ def main() -> int:
             "Re-query now, in this same message, and state the head SHA "
             "alongside the counts:\n\n"
             "    git rev-parse --short origin/<branch>\n"
+            "    # GitHub:\n"
             "    gh pr view <N> -R <owner>/<repo> --json headRefOid "
             "--jq '.headRefOid[0:8]'\n"
             "    gh pr checks <N> -R <owner>/<repo> | awk -F'\\t' '{print $2}' "
-            "| sort | uniq -c\n\n"
+            "| sort | uniq -c\n"
+            "    # GitLab:\n"
+            "    glab mr view <IID> -R <group>/<project>\n"
+            "    glab ci status -R <group>/<project>\n\n"
             "Confirm the two SHAs agree before reporting. Note also that a "
             "freshly pushed head often shows a small green count simply "
             "because most jobs have not been scheduled yet -- an early reading "

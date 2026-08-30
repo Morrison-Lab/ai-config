@@ -364,6 +364,11 @@ Worked-example case records for the rules below live in
 2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
 
+   **"Informational" or "non-blocking" findings must still be explicitly ARD-ed.**
+   A reviewer marking a finding as "informational" or "flagging only so the author can confirm" does not exempt it from the ARD requirement.
+   - **Do:** Address, Rebut, or Defer every finding, regardless of its stated severity or "informational" label, before merging under `mwc`.
+   - **Don't:** silently skip an informational finding without explicitly confirming or deferring it.
+
 **In a local CLI session, "external reviewer" means the bot reviewers, not the human one.**
 `gh`/the MCP server authenticate as the same human account that owns the repo, so a formal review *request* against that human always 422s (`request-pr-review`'s own edge case) --- not occasionally, structurally, on every PR such a session opens.
 That does not relax criterion 2; it changes which providers can satisfy it.

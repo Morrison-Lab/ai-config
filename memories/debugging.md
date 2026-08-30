@@ -1200,3 +1200,33 @@ artifact ever existed for any of them --- confirmed by
 steps and no upload.
 See [`claude-bot-workflows.md`](claude-bot-workflows.md), whose
 artifact-download advice presupposes `@v2`.)
+
+## Security hook: don't heuristic-strip heredoc bodies to silence a false positive
+
+A PreToolUse hook that blocks a git exec-vector flag (`--upload-pack`, `-O`) via tokenized scanning had a false positive: `cat <<'EOF'` prose mentioning `git grep -O` was flagged. Three successive attempts to silence it by stripping heredoc bodies each introduced a new full bypass:
+
+1. Truncate at first `<<` → bypass for any command *after* a heredoc (`cat <<'EOF' … EOF; git grep -lO…`).
+2. Skip every heredoc body to its terminator → bypass for interpreter heredocs (`bash <<EOF … git grep -lO… EOF`, `ssh … <<'EOF' …`).
+3. Allow-list `cat`/`tee` as "safe" consumers by single-token lookback → bypass for `cat <<'EOF' | bash` pipes.
+
+Each fix patched the demonstrated case without addressing the underlying design: whether a heredoc body executes depends on the full pipeline shape, not one adjacent token. The robust fix (per three consecutive `Needs more work` reviews) is to not special-case heredocs at all and scan the full token stream, accepting the narrow false positive (blocking benign prose) as the security-conservative trade-off over a false negative that lets the one vector the hook exists to catch (`-lO` bundling, which has no other defense layer in `.claude/settings.json`) through. The value-flag walk (`-e`/`-f`/`-m`/`-A`/`-B`/`-C` consumes the rest of the token) is the only heredoc-adjacent fix that is genuinely safe and should be kept.
+
+**Test matrix for this hook that would have caught each round before review:** `git grep -eOK` (no flag), `git grep -A2 -B2 -nO` (flag), `cat <<'EOF'` prose (conservative flag is okay), `cat <<'EOF' … EOF; git grep -lO…` (must flag), `bash <<EOF … git grep -lO… EOF` (must flag), `cat <<'EOF' | bash … git grep -lO…` (must flag), `echo $((1<<2)) && git grep -lO…` (must flag).
+
+(Morrison-Lab/wai#125, PR #137, 2026-08-29, three review rounds.)
+
+## Quarto chapter frontmatter and site wiring
+
+Adding a new top-level chapter (`chapters/*.qmd`) requires four mechanical steps, and missing any one is flagged as blocking:
+
+1. YAML frontmatter `format:` block (`html`/`revealjs`→`<slug>-slides.html`/`pdf`→`<slug>-handout.pdf`/`docx`→`<slug>.docx`) — without it the revealjs output collides on the literal `{stem}-slides.html` path.
+2. Navbar entry in `_quarto-website.yml` `navbar.Chapters.menu`.
+3. Homepage bullet in `index.qmd` `## Chapters`.
+4. WORDLIST entries for new proper nouns in `inst/WORDLIST` (add, don't reword to dodge).
+
+Lychee link check: authenticated MCP endpoints quoted as prose (`https://mcp.granola.ai/mcp`, `https://api.githubcopilot.com/mcp`) are not browsable pages; exclude them in `lychee.toml` rather than treating the check failure as a broken link (wai#133).
+
+## Inline R: avoid scientific notation with `formatC(..., format="d", big.mark=",")`
+
+`format(200000, big.mark=",")` renders as `2e+05` under default `scipen`. Use `formatC(..., format="d", big.mark=",")` (or `prettyNum(..., scientific=FALSE)`) so derived figures like `192,000` render with commas in Quarto inline R. Hit on wai#128 (byok ITPM/budget figures).
+

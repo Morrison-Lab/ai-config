@@ -1,11 +1,3 @@
-## Fixing your own mistakes is always top priority
-
-When an error, mistake, bad merge, regression, broken test, or policy violation is identified in your work:
-- **Remediating it is the absolute top priority** --- it supersedes all feature development, new issue pickup, and backlog progression.
-- **Act immediately**: Revert the bad merge, fix the regression, or resolve the failure before proceeding with any other work.
-- **Next top priority: prevent recurrence mechanically**: Immediately after reverting or fixing the mistake, the unconditional next priority is creating or repairing a mechanical system (a harness hook, automated CI check, linter rule, or deterministic test) to ensure that mistake can never be made again (see [`no-mistake-without-a-hook.py`](file:///hooks/no-mistake-without-a-hook.py), [`memories/preferences.md`](file:///memories/preferences.md), and [`shared/workflow/no-empty-promises.md`](file:///shared/workflow/no-empty-promises.md)).
-- **Never make empty promises**: Do not substitute verbal assurances or apologies for mechanical gates and concrete fixes.
-
 When picking which PR or issue to work on next — choosing among several open
 PRs to review, iterate (ARDI), or pick up first in a queue, or triaging which
 open issue to grab next (`gi`/`gii`/`gip`) — slightly prefer **internal

@@ -85,11 +85,17 @@ def load_rev(rev: str, name: str = "base_checker"):
 DELIMS = ["", BT, BT * 2, BT * 3]
 FILLER = ["a.py", "x", f"a {BT}b", f"a {BT}{BT}b", f" {BT} ", ""]
 VOCAB = ["Needs more work", "Changes requested", "Blocking", "Rejected",
-         "**[Defect]** Needs more work", "**Location:** a.py:1"]
+         "**[Defect]** Needs more work", "**Location:** a.py:1",
+         # ai-config#2668's two mechanisms, absent from this corpus when that
+         # change first ran the tool -- its zero was a coverage statement.
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**)",
+         "round-2 blocking findings (x overclaim, y.qmd caption) are "
+         "resolved by this round's diff"]
 NEGATION = ["", ": none elsewhere.", " No other findings.", " none blocking.",
-            " is still there; nothing fixed.", " remains open."]
+            " is still there; nothing fixed.", " remains open.",
+            " still stands.", " must be fixed before merge."]
 LEAD = ["", "No ", 'The body says "', "## Nits ", "The previously-blocking ",
-        "> ", "## "]
+        "> ", "## ", "In response to [round 6](https://x) "]
 # Marker-only span contents. BARE_CLEAN_MARKED accepts [ \t] and [#>*_+-], so a
 # span holding only one of those decides whether a bare rejection counts as
 # marked -- a shape the first version of this corpus could not generate at all,

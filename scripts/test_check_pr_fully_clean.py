@@ -10,6 +10,7 @@ Tests:
 """
 import importlib.util
 import json
+import time
 from unittest.mock import patch
 import sys
 from pathlib import Path
@@ -3121,6 +3122,139 @@ def main() -> int:
         and checker._unresolved_finding_pattern(posted_verdict_citation) is None,
     )
 
+    # The strip requires a positive attribution signal (a preceding markdown
+    # link or an "in response to" phrase), so the link-attributed narration
+    # from ai-config#2662 is stripped even though no resolution wording
+    # follows it.
+    linked_citation = (
+        "This is the author's direct response to "
+        "[round 6's finding](https://github.com/x/y/pull/1#issuecomment-2) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "per the ARD protocol.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a link-attributed posted-verdict citation is stripped",
+        checker.classify_verdict(linked_citation) == "clean"
+        and checker._unresolved_finding_pattern(linked_citation) is None,
+    )
+    # Without a link or attribution phrase, the same parenthesized shape is
+    # NOT stripped -- an unattributed cited verdict may be a live one.
+    bare_paren_citation = (
+        "The finding (posted 2026-08-25T10:00:00Z, verdict "
+        "**Needs more work**) was noted.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "an unattributed parenthesized posted-verdict is NOT stripped",
+        checker.classify_verdict(bare_paren_citation) == "not-clean",
+    )
+    # The veto window crosses a semantic line break: the re-raise clause on
+    # the next line still refuses the strip.
+    linebreak_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)\n"
+        "which remains unaddressed.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise across a semantic line break refuses the strip",
+        checker.classify_verdict(linebreak_reraise) == "not-clean",
+    )
+    # The veto window also crosses a dot glued to a following character
+    # (a filename), and catches re-raise verbs the first veto list missed.
+    glued_dot_reraise = (
+        "This is in response to the finding "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "which in utils.py still applies.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise past a glued filename dot refuses the strip",
+        checker.classify_verdict(glued_dot_reraise) == "not-clean",
+    )
+    imperative_reraise = (
+        "In response to [round 3](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "must be fixed before merge.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "an imperative re-raise (must be fixed) refuses the strip",
+        checker.classify_verdict(imperative_reraise) == "not-clean",
+    )
+    not_been_addressed = (
+        "In response to [round 4](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "has not been addressed.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a 'not been addressed' re-raise refuses the strip",
+        checker.classify_verdict(not_been_addressed) == "not-clean",
+    )
+
+    # A LIVE verdict phrased with the same "posted <ts>, verdict **X**"
+    # vocabulary, outside parens, is NOT erased -- the same adversarial
+    # direction as the #1762 round-1/round-2 regression tests for
+    # _SHA_CITATION above.
+    live_posted_verdict = (
+        "This review was posted 2026-08-30T05:22:14Z, verdict "
+        "**Needs more work** because the null check is still missing."
+    )
+    check(
+        "an unparenthesized live 'posted <ts>, verdict' statement is NOT erased",
+        checker.classify_verdict(live_posted_verdict) == "not-clean",
+    )
+    reraised_posted_verdict = (
+        "The finding from round 1 was posted 2026-08-25T10:00:00Z, verdict "
+        "**Needs more work** and is still present and unaddressed in this "
+        "diff.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a finding re-raised with 'posted <ts>, verdict' wording is NOT erased",
+        checker.classify_verdict(reraised_posted_verdict) == "not-clean",
+    )
+    # Even a parenthesized citation is kept when the rest of the sentence
+    # re-raises the cited verdict as still open.
+    still_standing_citation = (
+        "The prior verdict (posted 2026-08-30T05:22:14Z, verdict "
+        "**Needs more work**) still stands.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a parenthesized verdict citation re-raised as still standing is NOT erased",
+        checker.classify_verdict(still_standing_citation) == "not-clean",
+    )
+
+    # A negated resolution is a live not-clean statement: the negator sits
+    # before the past-state marker, where the suffix scan cannot see it.
+    negated_resolution = (
+        "### Verdict\nNone of the earlier blocking findings were resolved."
+        "\n\nDo not merge."
+    )
+    check(
+        "a negated resolution of earlier blocking findings stays not-clean",
+        checker.classify_verdict(negated_resolution) == "not-clean",
+    )
+    negated_prior = (
+        "### Verdict\nNone of the prior blocking findings were resolved."
+        "\n\nDo not merge."
+    )
+    check(
+        "a negated resolution of prior blocking findings stays not-clean",
+        checker.classify_verdict(negated_prior) == "not-clean",
+    )
+    # The paren-aside and character branches of the clause scan must stay
+    # disjoint: an overlapping `(` was exponential backtracking (51s) on a
+    # failing enumeration. A regression here hangs this test visibly.
+    enumeration = (
+        "### Verdict\nNeeds more work: the previously blocking items "
+        + "(1) " * 24
+        + "are still broken"
+    )
+    _t0 = time.time()
+    enumeration_verdict = checker.classify_verdict(enumeration)
+    check(
+        "a failing enumeration aside neither hangs nor exempts the mention",
+        enumeration_verdict == "not-clean" and time.time() - _t0 < 5,
+    )
 
     # The filter guards THREE match loops, and two of them had no test at all:
     # deleting the guard in classify_verdict's clean loop, or in
@@ -3170,7 +3304,9 @@ def main() -> int:
     # Test resolved blocking mentions in verdict sections
     resolved_round2 = (
         "### Verdict\n"
-        "**Ready for merge** — both round-2 blocking findings (demo caption overclaim, missing tactics.qmd companion video) are resolved by this round's diff, with no new issues introduced."
+        "**Ready for merge** \u2014 both round-2 blocking findings "
+        "(demo caption overclaim, missing tactics.qmd companion video) "
+        "are resolved by this round's diff, with no new issues introduced."
     )
     check(
         "resolved round-N blocking findings in verdict section classifies clean",

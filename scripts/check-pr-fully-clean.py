@@ -876,12 +876,40 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
         re.IGNORECASE,
     )
+    # A parenthesized citation of a PAST round's verdict -- the shape the
+    # review bot uses when narrating which round a comment responded to:
+    # "This is the author's direct response to [round 6's finding](<url>)
+    # (posted 2026-08-30T05:22:14Z, verdict **Needs more work**), per ..."
+    # (ai-config#2662). Like _SHA_CITATION above, the strip requires a
+    # POSITIVE context signal, not just the parenthesized shape: the aside
+    # must sit right after a markdown link to the cited round, or follow an
+    # attribution phrase ("in response to ...") in the same sentence. A
+    # veto lookahead additionally refuses the strip when the rest of the
+    # sentence re-raises the cited verdict as live ("still stands",
+    # "remains unaddressed", "must be fixed", "persists"); its window
+    # crosses line breaks (semantic line breaks put the re-raise clause on
+    # the next line) and dots glued to a following character ("utils.py"),
+    # stopping only at a real sentence end. An unattributed
+    # "posted <ts>, verdict **X**" -- parenthesized or not -- is left
+    # alone entirely: stripping a live not-clean is the dangerous
+    # direction, and a veto list alone cannot enumerate every re-raise
+    # phrasing.
     _POSTED_VERDICT_CITATION = re.compile(
-        r"\bposted\s+[0-9T:Z-]+\s*,\s*verdict\s+\*\*[^*]+\*\*",
+        r"(?P<keep>\]\([^()\s]{1,400}\)[ \t]*"
+        r"|\b(?:in\s+)?(?:response|reply|responding)\s+to\s+"
+        r"[^.!?\n()]{0,80})"
+        r"\(posted\s+[0-9]{4}-[0-9]{2}-[0-9]{2}"
+        r"T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?Z?"
+        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)"
+        r"(?!(?:(?![.!?](?:\s|$))[\s\S]){0,120}"
+        r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
+        r"|persists?|stands?|must\s+be"
+        r"|(?:not|never)\s+(?:yet\s+)?(?:been\s+)?"
+        r"(?:fixed|resolved|addressed))\b)",
         re.IGNORECASE,
     )
     text = _SHA_CITATION.sub(" ", text)
-    text = _POSTED_VERDICT_CITATION.sub(" ", text)
+    text = _POSTED_VERDICT_CITATION.sub(lambda m: m.group("keep") + " ", text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
     text, mask = _strip_fences_with_mask(text, mask)
@@ -930,20 +958,24 @@ _BARE_REJECTION = (
 # reviewer enumerating the resolved findings puts them in parens -- "both
 # round-2 blocking findings (demo caption overclaim, missing tactics.qmd
 # companion video) are resolved" -- and the commas and filename dots inside
-# that aside are not clause boundaries. The resolution verb is
+# that aside are not clause boundaries. Bare parens are excluded from the
+# character alternative so the two branches are disjoint: letting `(` match
+# either branch is exponential backtracking on a failing enumeration like
+# "(1) (2) ... (24)" (measured at 51s), and a stray unmatched paren failing
+# the scan fails safe (the mention stays blocking). The resolution verb is
 # tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
 # longer applies") so a live directive like "must be fixed before merge"
 # never reads as already resolved.
 RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"^(?:(?!\b(?:and|but|while|although|however)\b)"
-    r"(?:\([^()\n]{0,120}\)|[^,:;.!?])){0,120}\b(?:"
+    r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
     r"(?:is|are|was|were)\s+(?:now\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
-    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['’]s)?\s+"
+    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['\u2019]s)?\s+"
     r"(?:diff|push|commit|changes?|fixes?))?"
     r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
@@ -979,6 +1011,16 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
         re.IGNORECASE,
     )
     if past_state is None:
+        return False
+    # A negated resolution -- "None of the earlier blocking findings were
+    # resolved" -- is a live not-clean statement: the suffix reads as
+    # resolved only because the negator sits BEFORE the past-state marker,
+    # outside the suffix scan.
+    if re.search(
+        r"\b(?:none|no|not|never|neither|nothing)\b",
+        prefix[:past_state.start()],
+        re.IGNORECASE,
+    ):
         return False
     suffix = scan[match.end():]
     # A dot glued to the next character -- a filename ("tactics.qmd"), a

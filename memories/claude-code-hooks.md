@@ -315,3 +315,12 @@ Measured 2026-08 against Claude Code v2.1 CLI runtime (v2.1.236):
   receiving `{"prompt_response": "<id>", "selected": "..."}` back on stdin.
 - **`asyncRewake` execution**:
   Background hooks can run asynchronously and wake the model only if exit code 2 (blocking error) occurs.
+
+## Stop hook `systemMessage` formatting: single-line vs multiline rendering
+
+In Claude Code, every newline in a `Stop` hook's `systemMessage` payload is prefixed with `Stop says: `.
+When a hook emits a multi-paragraph message with blank lines (`\n\n`), each blank line renders as an empty `Stop says: ` line, producing walls of repetitive output (ai-config#2661 incident on `hooks/no-unmeasured-clock-claim.py`).
+
+To keep warnings legible and avoid visual clutter:
+- Format warn-only `Stop` hook `systemMessage` strings as a concise, single-line actionable reminder.
+- Avoid internal double newlines (`\n\n`) in `systemMessage` payloads emitted by `Stop` guards.

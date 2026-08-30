@@ -56,7 +56,7 @@ At fully clean, every inline review thread is resolved. The only open conversati
 
 See [`shared/workflow/fully-clean.md`](https://github.com/Morrison-Lab/ai-config/blob/main/shared/workflow/fully-clean.md) for the full definition this page summarizes.
 
-**Deadlock:** if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer (`gh pr edit <N> --add-reviewer the repository owner`) rather than looping.
+**Deadlock:** if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer via the `request-pr-review` skill (which resolves that person from the repository’s own configuration, not from a name written here) rather than looping.
 
 ## Keep branches synced with main
 

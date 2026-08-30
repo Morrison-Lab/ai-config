@@ -113,7 +113,7 @@ git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the 
 
 **After the PR merges**, remove the worktree so it doesn’t accumulate: `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the `post-merge` skill’s own tidy step does this automatically).
 
-**After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head — it only matches a bare branch name, even when a matching PR genuinely exists (verified directly: `gh pr list --head the repository owner:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch, while `gh pr list --head ums-pr635-lessons` found it). Query the REST API instead, whose `head` filter does honor the owner-qualified form: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'` (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`). If no open PR exists and upstream is accessible, open it as a cross-fork PR: prepare explicit title and body first, show the draft for approval (per the “always show the draft before posting” rule in `memories/preferences.md`), then create non-interactively – bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
+**After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head — it only matches a bare branch name, even when a matching PR genuinely exists (verified directly: `gh pr list --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch, while `gh pr list --head ums-pr635-lessons` found it). Query the REST API instead, whose `head` filter does honor the owner-qualified form: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'` (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`). If no open PR exists and upstream is accessible, open it as a cross-fork PR: prepare explicit title and body first, show the draft for approval (per the “always show the draft before posting” rule in `memories/preferences.md`), then create non-interactively – bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
 
 ``` bash
 gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
@@ -121,7 +121,7 @@ gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
 gh pr create --repo "<upstream-owner>/<repo>" --base "<discovered-default-branch>" \
   --head "<head-owner>:<current-branch>" \
   --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
-  --reviewer the repository owner
+  --reviewer <reviewer>
 ```
 
 If upstream is not accessible in-session, push and explicitly hand off that upstream PR creation is still required.

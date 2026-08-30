@@ -30,7 +30,7 @@ What stays: a **general standing rule** (“always link PRs in tables”) → `C
 
 1.  **Route + choose the target file** using `memorize`’s rules: standing rule → `CLAUDE.md`; reference fact → the fitting `memories/<topic>.md`. When you add a *new* file under `memories/`, also add a row for it to `memories/MEMORY.md` (the index). Don’t duplicate — if the point is already recorded, update it in place rather than stacking a second copy.
 
-2.  **Get the current content of the target file(s)** so you append in the right place and match the file’s voice — and decide your delivery path now, since reading and writing both follow it. In a **web/remote session, or with no usable local `ai-config` checkout**, use the GitHub file API (**Path A**, step 4): read with `mcp__github__get_file_contents` (`owner: the repository owner`, `repo: ai-config`). With a **clean local checkout you can branch in**, use a local worktree (**Path B**, step 4): read the file there.
+2.  **Get the current content of the target file(s)** so you append in the right place and match the file’s voice — and decide your delivery path now, since reading and writing both follow it. In a **web/remote session, or with no usable local `ai-config` checkout**, use the GitHub file API (**Path A**, step 4): read with `mcp__github__get_file_contents` (`owner: <owner>`, `repo: ai-config`). With a **clean local checkout you can branch in**, use a local worktree (**Path B**, step 4): read the file there.
 
 3.  **Write** a concise bullet (one line preferred), matching the file’s voice; include the *why* if it isn’t obvious. Never edit files in the repo you’re working in — only the `ai-config` target file(s).
 
@@ -38,7 +38,7 @@ What stays: a **general standing rule** (“always link PRs in tables”) → `C
 
     **Path A — GitHub file API (remote/web; no local `ai-config` checkout).** The robust default when you’re in a web session or lack a clean checkout — it touches no working tree.
 
-    1.  Branch off `main`: `mcp__github__create_branch` (`owner: the repository owner`, `repo: ai-config`, `from_branch: main`, `branch: memory/<slug>`). In a web session pinned to its assigned branch, use that assigned branch name instead.
+    1.  Branch off `main`: `mcp__github__create_branch` (`owner: <owner>`, `repo: ai-config`, `from_branch: main`, `branch: memory/<slug>`). In a web session pinned to its assigned branch, use that assigned branch name instead.
     2.  Read each target with `mcp__github__get_file_contents` (keep the returned `sha`), edit locally, then write the updated file(s) on the branch — `mcp__github__create_or_update_file` per file, or `mcp__github__push_files` for several files in one commit (needed when you also touch `memories/MEMORY.md`).
     3.  Open the PR: `mcp__github__create_pull_request` (`base: main`, `head: <branch>`), body `Closes #<issue>` if a tracking issue exists.
 

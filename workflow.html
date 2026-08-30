@@ -420,7 +420,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ol>
 <p>At fully clean, every inline review thread is resolved. The only open conversation is the final all-clear exchange.</p>
 <p>See <a href="https://github.com/Morrison-Lab/ai-config/blob/main/shared/workflow/fully-clean.md"><code>shared/workflow/fully-clean.md</code></a> for the full definition this page summarizes.</p>
-<p><strong>Deadlock:</strong> if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer (<code>gh pr edit &lt;N&gt; --add-reviewer the repository owner</code>) rather than looping.</p>
+<p><strong>Deadlock:</strong> if you and the reviewer can’t reach consensus after a rebuttal exchange, escalate to a human reviewer via the <code>request-pr-review</code> skill (which resolves that person from the repository’s own configuration, not from a name written here) rather than looping.</p>
 </section>
 </section>
 <section id="keep-branches-synced-with-main" class="level2">

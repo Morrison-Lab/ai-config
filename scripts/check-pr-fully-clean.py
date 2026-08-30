@@ -37,6 +37,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1037,14 +1038,17 @@ _SENTENCE_END_RE = re.compile(
 # against the token before the candidate, since the token has no bound a
 # lookbehind could take.
 _TOKEN_BREAK = " \t\n"
-# Invisible characters that str.isspace does NOT report, and that a tool
-# inserts into a long URL precisely so it can soft-wrap. Skipped like
-# whitespace so one cannot be left behind as the whole token.
-_ZERO_WIDTH = "\u200b\u200c\u200d\ufeff\u180e"
-
-
 def _is_gap(char: str) -> bool:
-    return char.isspace() or char in _ZERO_WIDTH
+    """True for whitespace and for any invisible formatting character.
+
+    ``str.isspace`` reports neither a zero-width space nor a joiner, a
+    BOM, a word joiner or a soft hyphen -- and a tool inserts exactly
+    those into a long URL so it can soft-wrap. One left behind becomes
+    the whole token, which carries no URL marker and so accepts a faked
+    sentence end. The Unicode format category covers the class rather
+    than a list that the next such character escapes.
+    """
+    return char.isspace() or unicodedata.category(char) == "Cf"
 
 
 def _sentence_start_before(text: str) -> int:
@@ -1108,7 +1112,14 @@ def _sentence_start_before(text: str) -> int:
         while scanned < token_end:
             if text[scanned] in _TOKEN_BREAK:
                 last_break = scanned
-            elif text[scanned] == "/" or text.startswith("www.", scanned):
+            elif text[scanned] == "/" or (
+                scanned + 4 <= token_end
+                and text.startswith("www.", scanned)
+            ):
+                # The bound matters: startswith reads the global text, so
+                # without it a token ending in "www" glued to the
+                # sentence's own period matches on that period and the
+                # candidate is discarded as a URL.
                 last_marker = scanned
             scanned += 1
         if last_marker > last_break:

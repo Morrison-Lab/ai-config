@@ -3451,7 +3451,8 @@ def main() -> int:
     # soft-wrap, and which were neither skipped nor a token break.
     _gaps = [chr(_x) for _x in (0x0d, 0x0b, 0x0c, 0xa0, 0x200b, 0x200c,
                                 0x200d, 0xfeff, 0x180e, 0x2028, 0x2029,
-                                0x3000, 0x2000, 0x2009, 0x202f, 0x205f)]
+                                0x3000, 0x2000, 0x2009, 0x202f, 0x205f,
+                                0x2060, 0xad, 0x200e, 0x200f)]
     for _token in ("http://x.io/a", "/etc/passwd", "www.example.com"):
         for _ws in _gaps:
             for _sep in ("", " ", _ws, " " + _ws, _ws + " ", _ws + "x",
@@ -3476,6 +3477,23 @@ def main() -> int:
         "no whitespace arrangement fakes a sentence end (%d checked)"
         % (3 * len(_gaps) * 8 * 2),
         not _faked_end_failures,
+    )
+    # The marker test must not read past the token's end: startswith
+    # runs against the whole text, so a token ending in "www" glued to
+    # the sentence's own period otherwise matched on that period and the
+    # real sentence end was discarded as a URL.
+    check(
+        "a token ending in 'www' does not swallow the sentence's period",
+        checker._sentence_start_before("a www. b") == 6,
+    )
+    www_boundary = (
+        "### Verdict\n**Ready for merge.** No other findings remain in "
+        "www. The previously blocking finding is resolved and confirmed "
+        "passing."
+    )
+    check(
+        "a bare 'www' before a sentence end does not force a not-clean",
+        checker.classify_verdict(www_boundary) == "clean",
     )
     # The scan must stay linear when NO ascii break is present, since
     # both the backward per-candidate walk and the token slice extend to

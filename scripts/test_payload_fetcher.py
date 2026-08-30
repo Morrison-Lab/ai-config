@@ -9,6 +9,14 @@ specific to this script: exit 1 is its "NOT fully clean" verdict. So a payload
 that cannot be read must exit 2, not 1 -- otherwise a data problem is
 indistinguishable from a finding about the PR. Every "must error" case below
 asserts the exit CODE, not merely that something went wrong.
+
+Two groups earn their place beyond that. The false-clean guard pins the one
+shape that scored exit 0 wrongly (a `pr` with no `headRefOid`, which made
+`"" in body` true for every comment). And the routing group asserts against
+`PayloadFetcher.seen`, because a `fetch()` call site left as `run_cmd` is
+invisible to an output-only test: `run_cmd` raises SystemExit(2) when `gh` is
+absent, so the miss aborts the run in exactly the environment this feature
+targets. Two such call sites survived mutation before those cases existed.
 """
 import json
 import subprocess
@@ -166,6 +174,71 @@ def main():
                                    "actions_runs": {"9": {"path": ".github/workflows/v.yml"}}})(
             ["gh", "api", "repos/o/r/actions/runs/9"]))["path"] == ".github/workflows/v.yml",
     )
+
+    # --- the false-clean guard (the defect --from-json introduced) ---
+    p = base_payload()
+    del p["pr"]["headRefOid"]
+    p["pr"]["comments"][0]["body"] = (
+        "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+        "Reviewed commit: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+    )
+    code, out = run_script(p)
+    check("a pr with no headRefOid exits 2, NOT 0", code == 2)
+    check("...and never says FULLY CLEAN", "FULLY CLEAN" not in out)
+    check("...and names headRefOid", "headRefOid" in out)
+
+    p = base_payload()
+    p["pr"]["headRefOid"] = "   "
+    code, _ = run_script(p)
+    check("a blank headRefOid exits 2", code == 2)
+
+    # --- wrong-typed values must be exit 2, not exit 1 (they raise
+    #     AttributeError deep in pull_request.py, not PayloadError) ---
+    for mutate, label in [
+        (lambda p: p.__setitem__("pr", "oops"), "pr as a string"),
+        (lambda p: p.__setitem__("pr", []), "pr as a list"),
+        (lambda p: p.__setitem__("pr", None), "pr as null"),
+        (lambda p: p["pr"].__setitem__("commits", "oops"), "pr.commits as a string"),
+        (lambda p: p["pr"].__setitem__("comments", "oops"), "pr.comments as a string"),
+        (lambda p: p.__setitem__("check_runs", ["oops"]), "a string check-run entry"),
+    ]:
+        p = base_payload()
+        mutate(p)
+        code, _ = run_script(p)
+        check(f"{label} exits 2, NOT 1", code == 2)
+
+    # --- routing: every gh call site must go through the fetcher ---
+    # Asserted on `seen` rather than on output, because a call site left as
+    # run_cmd raises SystemExit(2) where `gh` is absent -- which looks like a
+    # usage error, not like a routing bug.
+    f = PayloadFetcher({**base_payload(),
+                        "actions_runs": {"900": {"path": ".github/workflows/v.yml"}}})
+    pr_obj = json.loads(f(["gh", "pr", "view", "1", "--repo", "o/r", "--json", "x"]))
+    check("routing: gh pr view is served", pr_obj["headRefOid"] == HEAD)
+    f(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+    f(["gh", "api", "repos/o/r/commits/x/check-runs?per_page=100"])
+    f(["gh", "api", "repos/o/r/actions/runs/900"])
+    check("routing: all four command shapes recorded", len(f.seen) == 4)
+
+    # An end-to-end run WITHOUT -R must exercise resolve_repo through the
+    # payload rather than shelling out; a run WITH a realistic Actions URL
+    # must exercise the actions/runs call site.
+    p = base_payload()
+    p["check_runs"][0]["html_url"] = (
+        "https://github.com/example-org/example-repo/actions/runs/900/job/1")
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump(p, fh)
+        path = fh.name
+    res = subprocess.run(
+        [sys.executable, str(SCRIPT), "2629", "--from-json", path],
+        capture_output=True, encoding="utf-8", check=False, cwd="/tmp",
+    )
+    Path(path).unlink(missing_ok=True)
+    combined = (res.stdout or "") + (res.stderr or "")
+    check("no -R: repo resolved from the payload, not from `gh`",
+          "example-org/example-repo" in combined)
+    check("no -R: an Actions html_url does not abort the run",
+          "not installed or not on PATH" not in combined)
 
     for bad_cmd, label in [
         (["gh", "issue", "list"], "an unmapped gh subcommand"),

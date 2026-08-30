@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
+from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -1891,9 +1892,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--from-json", default="", metavar="FILE",
         help="Score a payload gathered by the agent instead of shelling out to "
              "`gh`. Use this in remote/web sessions, where the CLI does not "
-             "exist (ai-config#2441). See PAYLOAD_SCHEMA in the module "
-             "docstring of scripts/lib/payload_fetcher.py for the keys, and "
-             "tool-mappings.md for the MCP calls that fill them.",
+             "exist (ai-config#2441). shared/workflow/fully-clean.md lists the "
+             "payload keys and the MCP calls that fill them.",
     )
     parser.add_argument(
         "-R", "--repo", default="", metavar="OWNER/REPO",
@@ -1911,9 +1911,6 @@ def main():
     # Installed before resolve_repo, because repo resolution is itself one of
     # the `gh` reads the payload replaces.
     if args.from_json:
-        if str(Path(__file__).resolve().parent) not in sys.path:
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from lib.payload_fetcher import PayloadError, PayloadFetcher
         try:
             _FETCHER = PayloadFetcher.from_file(args.from_json)
         except PayloadError as exc:
@@ -1957,14 +1954,27 @@ def main():
 
 
 if __name__ == "__main__":
-    # A malformed --from-json payload must exit USAGE_EXIT, never 1. Exit 1 is
-    # this script's "NOT fully clean" code, so letting a PayloadError reach the
-    # interpreter would report a verdict about the PR when what actually
-    # happened is that the payload could not be read -- the same conflation the
-    # `gh`-missing guard in run_cmd exists to prevent (ai-config#2441).
+    # Unusable --from-json data must exit USAGE_EXIT, never 1. Exit 1 is this
+    # script's "NOT fully clean" verdict, so a payload problem surfacing as 1
+    # is indistinguishable from a finding about the PR -- the same conflation
+    # the `gh`-missing guard in run_cmd exists to prevent (ai-config#2441).
+    #
+    # The catch is deliberately BROAD while --from-json is active, and narrow
+    # otherwise. A hand-built payload reaches library code that assumes shapes
+    # `gh` always produced, so a wrong-typed value raises AttributeError or
+    # TypeError inside pull_request.py rather than PayloadError -- six such
+    # shapes were measured landing on exit 1. Under --from-json no exception
+    # can be a statement about the PR, so every one of them is a usage error.
     try:
         main()
-    except Exception as exc:  # noqa: BLE001 - narrowed immediately below
-        if type(exc).__name__ != "PayloadError":
-            raise
+    except SystemExit:
+        raise
+    except PayloadError as exc:
         die(f"--from-json payload is unusable: {exc}")
+    except Exception as exc:  # noqa: BLE001 - see the comment above
+        if _FETCHER is None:
+            raise
+        die(
+            f"--from-json payload is unusable: {type(exc).__name__}: {exc}\n"
+            "This is a defect in the payload's shape, not a verdict about the PR."
+        )

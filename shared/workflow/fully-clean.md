@@ -12,9 +12,19 @@ a Python subprocess, so the split is that the **agent** retrieves and the
 | Payload key | Gather with | Notes |
 | :--- | :--- | :--- |
 | `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
-| `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | Needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, `commits[].committedDate`, `reviews[]`, `comments[]`. |
+| `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | See the field list below. |
 | `check_runs` | `pull_request_read` (`get_check_runs`) | Bare list or the REST `{"check_runs": [...]}` envelope. |
-| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Optional; only refines workflow-path attribution. |
+| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Omitting it changes verdicts --- see below. |
+
+`pr` needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, and
+`commits[].committedDate`, plus two nested shapes the scan reads directly:
+each entry of `reviews[]` needs `state`, `submittedAt`, `body`,
+`commit.oid`, `author.login`, and `authorAssociation`, and each entry of
+`comments[]` needs `body`, `author.login`, `createdAt`, and
+`authorAssociation`.
+`commit.oid` is the exact-SHA gate, and `submittedAt`/`createdAt` order the
+latest-verdict selection, so a payload omitting them is accepted and scored on
+weaker evidence.
 
 The field names are `gh pr view --json`'s rather than the MCP tool's, so a
 small mapping is needed --- `head.sha` becomes `headRefOid`, and an author
@@ -22,12 +32,34 @@ becomes `{"author": {"login": ...}}`.
 That mapping is the agent's job precisely because it is the part that differs
 between session kinds.
 
-**A missing key is an error (exit 2), never an empty value.**
-That is the whole safety property: an absent `check_runs` read as `[]` would
-score "nothing pending, nothing failed" and manufacture a clean verdict out of
-missing data.
-Exit 2 is also distinct from exit 1, the script's real *not-clean* verdict, so
-an unusable payload can never be read as a finding about the PR.
+**Page through `pull_request_read`.**
+It caps at 100 per page, and a truncated `comments[]` is indistinguishable
+from a complete one --- so dropping a later standing not-clean yields a
+**false clean**, which is the one error this instrument exists to prevent.
+
+**`actions_runs` is optional but not inert.**
+Omitting it disables the ai-config#2277 suppression of a `cancelled` run
+superseded by a later success, and disables run-based attribution of a verdict
+whose comment cites its run URL rather than a SHA.
+Both omissions push toward a false **not**-clean, which is the safe direction
+--- but if a PR reads not-clean for a reason you cannot see in its checks or
+reviews, gather this key before concluding anything.
+Never add entries until the verdict flips: that is tuning the instrument to
+agree with you.
+
+**Unusable payload data exits 2, never 1.**
+Exit 1 is the script's real not-clean verdict, so a data problem reported as
+exit 1 would be indistinguishable from a finding about the PR.
+That covers a missing or wrong-typed top-level key, a `pr` missing
+`headRefOid`, malformed JSON, and --- while `--from-json` is active --- any
+other exception, since none of them can be a statement about the PR.
+
+Note what the rationale is *not*: an absent `check_runs` read as `[]` does not
+score clean.
+`check_ci_runs` already reports "No check runs found" and returns not-clean.
+Refusing absent data is still right, because substituting an empty value would
+manufacture a *finding bullet* out of missing data, which is worse than a
+crash rather than better.
 
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in

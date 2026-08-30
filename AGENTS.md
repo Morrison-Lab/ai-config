@@ -50,14 +50,14 @@ over automatic filing, PR-opening, review, and follow-up rules.
 Before filing a PR in an external repository (one outside Morrison-Lab / the
 user's own organizations), read that repository's `CONTRIBUTING.md` (and
 linked contributing guide) and its `.github/pull_request_template.md` (and
-required template sections) — not only the internal template.
+required template sections) --- not only the internal template.
 
 - **Do:** fetch and follow the external repo's contributing guidelines and PR
   template sections (issue link type, change-type checkboxes, verification,
   screenshots, checklist) before opening the PR, and structure the PR body to
   satisfy its required sections.
 - **Don't:** file the external PR from memory or with the internal template,
-  assuming required sections are the same — a missing required section triggers
+  assuming required sections are the same --- a missing required section triggers
   an automated compliance failure and auto-close.
 
 ## No empty promises

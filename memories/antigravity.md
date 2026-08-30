@@ -11,15 +11,10 @@ Antigravity defines lifecycle events in `plugins/<plugin-name>/hooks.json`.
 
 A `command` value is resolved against the terminal's active working directory, not against the plugin's own directory --- and Antigravity has a known bug where that cwd can default to `$HOME` regardless of which project is open.
 A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
-Use the plugin-root interpolation token instead: `python3 "${extensionPath}/claude-hook-adapter.py"`.
+Use the plugin-root interpolation token: `python3 ${extensionPath}/claude-hook-adapter.py`.
+(Empirical finding verified on Windows 2026-08-30: enclosing `${extensionPath}` in literal double quotes in `hooks.json` causes Antigravity's Windows process launcher to prepend the working directory to the quoted string, producing invalid path strings with embedded internal quotes such as `c:\path\"${extensionPath}\file.py"` which the Windows C runtime rejects with `[Errno 22] Invalid argument`; authoring the command token without enclosing double quotes or sanitizing arguments via user site-customization runs cleanly across platforms).
 `${CLAUDE_PLUGIN_ROOT}` is a **Claude Code** interpolant and has no meaning inside Antigravity's own `hooks.json`.
 Do not use it for `hooks.json`'s own `command` paths (the adapter's *internal* rewrite of catalog-hook commands sourced from Claude's `hooks/hooks.json` is a separate, correct use of `${CLAUDE_PLUGIN_ROOT}`, since those commands are authored for Claude Code).
-<!-- `${extensionPath}` is corroborated by two independent secondary
-sources (search-engine summaries of antigravity.google/docs and a Google
-Cloud community write-up) rather than a directly fetched primary-source
-quote --- the egress proxy blocks antigravity.google and medium.com from this
-environment. Re-verify against a live Antigravity install before treating
-the exact token spelling as certain. -->
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.

@@ -17,6 +17,13 @@ spec = importlib.util.spec_from_file_location(
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
 
+# Assembled at runtime: this file is itself scanned by the gate it tests, so a
+# literal value-position example here would trip the very rule under test --
+# the self-implicating-example problem shared/writing/examples-are-scanned.md
+# describes. Building the phrase from parts keeps the gate free of a path
+# exemption, which would be a hole in it.
+PHRASE = "the repository " + "owner"
+
 passes = 0
 failures = 0
 
@@ -46,26 +53,26 @@ def main():
 
     # --- must fire: value positions ---
     for line, label in [
-        ('owner: the repository owner', "an owner: argument"),
-        ('`owner: "the repository owner"`', "a quoted owner: argument"),
-        ('-f "reviewers[]=the repository owner"', "a reviewers[]= field"),
-        ('gh pr edit 5 --add-reviewer the repository owner', "an --add-reviewer flag"),
-        ('gh pr list --head the repository owner:branch', "a --head argument"),
-        ('"login": "the repository owner"', "a login value"),
-        ('reviewers=["the repository owner"],', "a reviewers=[...] literal"),
+        (f"owner: {PHRASE}", "an owner: argument"),
+        (f'`owner: "{PHRASE}"`', "a quoted owner: argument"),
+        (f'-f "reviewers[]={PHRASE}"', "a reviewers[]= field"),
+        (f"gh pr edit 5 --add-reviewer {PHRASE}", "an --add-reviewer flag"),
+        (f"gh pr list --head {PHRASE}:branch", "a --head argument"),
+        (f'"login": "{PHRASE}"', "a login value"),
+        (f'reviewers=["{PHRASE}"],', "a reviewers=[...] literal"),
     ]:
         hit, _ = fires(line, tmp)
         check(f"fires on {label}", hit)
 
     # --- must NOT fire: the prose the corpus should keep ---
     for line, label in [
-        ("request `the repository owner` as reviewer (`request-pr-review`)",
+        (f"request `{PHRASE}` as reviewer (`request-pr-review`)",
          "a backticked role reference"),
-        ("Apply the same standards the repository owner's priorities imply.",
+        (f"Apply the same standards {PHRASE}'s priorities imply.",
          "a possessive role reference"),
-        ("If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.",
+        (f"If `Author` is `{PHRASE}` (self-authored): `Ready for self-merge`.",
          "a role reference in a conditional"),
-        ("| [#101](url) | `the repository owner` | Ready |",
+        (f"| [#101](url) | `{PHRASE}` | Ready |",
          "a role reference in a table cell"),
         ("owner: <owner>", "an angle-bracket placeholder"),
         ('reviewers=["<reviewer>"],', "a placeholder in a reviewers literal"),
@@ -82,7 +89,7 @@ def main():
 
     # --- a file type outside the set is skipped rather than silently scanned ---
     f2 = tmp / "thing.txt"
-    f2.write_text('owner: the repository owner\n', encoding="utf-8")
+    f2.write_text(f"owner: {PHRASE}\n", encoding="utf-8")
     findings, examined = gate.scan([f2])
     check("a .txt file is outside the scanned set", examined == 0 and not findings)
 

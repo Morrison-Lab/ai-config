@@ -55,7 +55,7 @@ jobs:
         # ai-config#2627: this plugin is used by people other than its author,
         # so a login hardcoded into an `owner:`/`--reviewer`/`reviewers[]=`
         # position is correct for at most one of them. subagents.py shipped
-        # `reviewers=["the repository owner"]`, POSTed verbatim to the API.
+        # the phrase as a lone `reviewers=[...]` element, POSTed verbatim.
         # Keys on POSITION, not on the phrase: the role reference in prose is
         # the form the corpus should keep using.
         run: python3 scripts/check-reviewer-placeholders.py

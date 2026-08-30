@@ -12,7 +12,8 @@ What is not fine is the same phrase in a value position -- an `owner:`
 argument, a `--reviewer` flag, a `reviewers[]=` field, a `"login"` value --
 where a literal string is passed to an API. There it is a username containing
 spaces, valid for nobody. `scripts/orchestrator/subagents.py` shipped exactly
-that: `reviewers=["the repository owner"]`, POSTed verbatim.
+that: the phrase as the sole element of a `reviewers=[...]` literal, POSTed
+verbatim to the API.
 
 So this gate keys on POSITION, not on the phrase. It is deliberately narrow:
 a false positive here blocks CI over prose, and the prose form is the one the

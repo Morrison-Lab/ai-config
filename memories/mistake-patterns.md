@@ -317,6 +317,10 @@ A clean automated review from every available provider evaluating the current HE
   route to whichever resolves, per `delegate-to-codex`/`delegate-to-opencode`.
   Only fall back to a same-vendor subagent, stating so explicitly in the
   push reply, when none of those three CLIs are reachable at all.
+- **2nd occurrence, 2026-08-29** ([ucdavis/hac.it#9](https://github.com/ucdavis/hac.it/pull/9), a docs PR): same shape, one step later.
+  `adversarial-reviewer` was unregistered in this Claude Code CLI session (as opposed to Cursor Cloud, where it is registered), so a same-vendor `general-purpose` subagent was dispatched as the substitute reviewer and the PR was pushed on that verdict alone --- with `self-review-fallback.md`'s cross-vendor section already loaded in context and not applied.
+  The user corrected it directly: "you should have run adv without me having to ask."
+  A subsequent `adv --engine cursor` pass produced a genuinely independent verdict (Ready for merge, several non-blocking nits the same-vendor pass had not surfaced) --- concrete evidence the cross-vendor pass adds real signal rather than ceremony, and a second data point toward this pattern's third-occurrence bar for a hook.
 
 ## Pattern 17: Theorizing a Cause for a Guard Refusal Instead of Running Its Own Reader
 - **Mistake**: When `hooks/no-push-without-self-review.py` refuses a push citing "The latest adversarial self-review returned a blocking verdict" despite believing the most recent dispatch was clean, attributing the refusal to session/harness mechanics (the transcript lagging the current turn) instead of executing the guard's own `read_latest_review`/`parse_report` against the live transcript and reading what it actually parsed.

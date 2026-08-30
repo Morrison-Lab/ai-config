@@ -1031,21 +1031,14 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 # over-flags rather than exempting, so the safe direction.
 _SENTENCE_END_RE = re.compile(
     r"(?<!\be\.g)(?<!\bi\.e)(?<!\bcf)(?<!\bvs)(?<!\betc)"
-    r"(?<!\bapprox)(?<!\bResp)(?<!\bFig)[.!?](?=\s|$)"
+    r"(?<!\bapprox)(?<!\bresp)(?<!\bfig)[.!?](?=\s|$)",
+    re.IGNORECASE,
 )
 _NEGATOR_RE = re.compile(
     r"\b(?:none|no|not|never|neither|nothing|nobody|nor"
     r"|zero|hardly|barely|scarcely)\b",
     re.IGNORECASE,
 )
-# A negator under one of these heads an adjunct rather than the subject.
-_ADJUNCT_GOVERNOR_RE = re.compile(
-    r"\b(?:with|without|despite|besides|barring|assuming"
-    r"|aside\s+from|apart\s+from|other\s+than)\s+$",
-    re.IGNORECASE,
-)
-# What closes an adjunct before the clause the mention sits in.
-_CLAUSE_BOUNDARY_RE = re.compile(r"[,;:]")
 
 
 def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
@@ -1080,34 +1073,39 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # ("None of the many previously-identified, still-outstanding earlier
     # ...").
     #
-    # So the search is deliberately wide: any negator anywhere earlier in
-    # the same sentence defeats the exemption, and only a negator that is
-    # BOTH governed by a preposition AND separated from the mention by a
-    # clause boundary is passed over. Both conditions are needed, because
-    # each alone admits the other's failure. Governed-only reads "WITH
-    # none of the previously blocking findings were resolved" as an
-    # adjunct, since it tests the word before the negator rather than what
-    # the negator quantifies. Boundary-only reads "None of the many
-    # previously-identified, still-outstanding earlier ..." as clear,
-    # since the comma there sits inside the negated noun phrase. Together
-    # they admit only the fronted adjunct ("WITH no new issues, both
-    # round-2 blocking findings ... are resolved"), whose negator both
-    # hangs off a preposition and quantifies a different noun phrase.
-    # Anything this misjudges over-flags, leaving a resolved mention
-    # blocking, which is the safe direction.
+    # So the rule is the blunt one: ANY negator earlier in the same
+    # sentence defeats the exemption, with no attempt to judge what it
+    # quantifies.
+    #
+    # Three narrower rules were tried and each failed OPEN, which is the
+    # dangerous direction, so this is a deliberate retreat rather than a
+    # first guess. Deciding whether a negator scopes over the resolution
+    # is a parsing problem, and every lexical proxy for it admitted a new
+    # shape: a glue whitelist let a count through ("None of the TWO
+    # earlier ..."), a bounded word run let a longer run and
+    # punctuation-inside-the-noun-phrase through ("None of the many
+    # previously-identified, still-outstanding earlier ..."), and testing
+    # the negator's apparent grammatical role let a governor word
+    # prepended to the target phrasing through ("WITH none of the
+    # previously blocking findings were resolved"), including when a
+    # required clause boundary was also present but sat inside the
+    # negated noun phrase ("With none of the recently reported,
+    # previously blocking ...").
+    #
+    # What the blunt rule costs is one over-flag: a genuinely resolved
+    # narration whose sentence happens to open with an unrelated negated
+    # clause ("With no new issues, both round-2 blocking findings ... are
+    # resolved") stays blocking. That is a false NOT-clean, which stalls a
+    # merge until a human looks, whereas every rule above bought that case
+    # by risking a false clean, which merges over a live rejection. The
+    # asymmetry is this file's stated policy, so the trade is not close.
+    # A negator AFTER the mention is unaffected, so the common trailing
+    # form ("... are resolved, with no new issues introduced") still
+    # reads as resolved.
     sentence_start = 0
     for end in _SENTENCE_END_RE.finditer(scan[:match.start()]):
         sentence_start = end.end()
-    sentence_head = scan[sentence_start:match.start()]
-    for negator in _NEGATOR_RE.finditer(sentence_head):
-        governed = _ADJUNCT_GOVERNOR_RE.search(
-            sentence_head[:negator.start()]
-        )
-        detached = _CLAUSE_BOUNDARY_RE.search(
-            sentence_head[negator.end():]
-        )
-        if governed and detached:
-            continue
+    if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
         return False
     suffix = scan[match.end():]
     # A dot glued to the next character -- a filename ("tactics.qmd"), a

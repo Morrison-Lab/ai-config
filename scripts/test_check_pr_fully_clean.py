@@ -3305,16 +3305,43 @@ def main() -> int:
         "a negated resolution of prior blocking findings stays not-clean",
         checker.classify_verdict(negated_prior) == "not-clean",
     )
-    # The negator must sit adjacent to the past-state marker: a fronted
-    # no-new-issues clause does not negate the resolution.
+    # A negator anywhere earlier in the sentence blocks the resolved
+    # reading, including a fronted clause that negates something else.
+    # This is the deliberate over-flag the blunt rule costs: judging what
+    # a negator scopes over is a parsing problem, and each lexical proxy
+    # tried for it admitted a fresh FALSE CLEAN. A false not-clean stalls
+    # a merge until a human looks; a false clean merges over a live
+    # rejection.
     fronted_negator = (
         "### Verdict\n**Ready for merge** \u2014 with no new issues, both "
         "round-2 blocking findings (demo caption overclaim, missing "
         "tactics.qmd companion video) are resolved by this round's diff."
     )
     check(
-        "a fronted no-new-issues clause does not false-block the resolution",
-        checker.classify_verdict(fronted_negator) == "clean",
+        "a fronted negated clause over-flags, the safe direction",
+        checker.classify_verdict(fronted_negator) == "not-clean",
+    )
+    # The same sentence with the negated clause TRAILING the mention is
+    # unaffected, which is the common shape and the one this PR is for.
+    trailing_negator = (
+        "### Verdict\n**Ready for merge** \u2014 both round-2 blocking "
+        "findings (demo caption overclaim, missing tactics.qmd companion "
+        "video) are resolved by this round's diff, with no new issues "
+        "introduced."
+    )
+    check(
+        "a trailing no-new-issues clause still reads as resolved",
+        checker.classify_verdict(trailing_negator) == "clean",
+    )
+    # A negator in a PRECEDING sentence is out of scope.
+    prior_sentence_negator = (
+        "### Verdict\n**Ready for merge.** No new issues were found. "
+        "The previously blocking findings were resolved by this "
+        "round's diff."
+    )
+    check(
+        "a negator in a preceding sentence does not block the resolution",
+        checker.classify_verdict(prior_sentence_negator) == "clean",
     )
     # The guard varies what sits BETWEEN the negator and the past-state
     # marker, not just two literal phrasings: a fixed glue whitelist
@@ -3343,42 +3370,28 @@ def main() -> int:
             "a negated resolution reading '" + negation + "' stays not-clean",
             checker.classify_verdict(varied) == "not-clean",
         )
-    # Control: what exempts the fronted clause above is the negator's
-    # grammatical role, not punctuation -- a negator governed by a
-    # preposition heads an adjunct. The same sentence with the negator
-    # as subject quantifier stays blocking.
-    governed_control = (
-        "### Verdict\n**Ready for merge.** With no new issues, the two "
-        "earlier blocking findings were resolved by this round's diff."
-    )
-    check(
-        "a preposition-governed negator does not block the resolution",
-        checker.classify_verdict(governed_control) == "clean",
-    )
-    ungoverned_control = (
-        "### Verdict\n**Ready for merge.** No new issues and the two "
-        "earlier blocking findings were resolved by this round's diff."
-    )
-    check(
-        "an ungoverned negator over-flags, the safe direction",
-        checker.classify_verdict(ungoverned_control) == "not-clean",
-    )
-    # Being governed is not sufficient on its own: the negator must also
-    # be detached from the mention by a clause boundary. Otherwise a
-    # governor word prepended to the very phrasing the guard exists to
-    # catch defeats it, for every governor in the list.
+    # A preceding preposition does not exempt a negator. Testing the
+    # negator's apparent grammatical role let a governor word prepended
+    # to the guard's target phrasing through as clean, for every governor
+    # tried -- and adding a required clause boundary did not close it,
+    # since the boundary can sit inside the negated noun phrase.
     for governor in ("With", "Without", "Despite", "Besides", "Barring",
                      "Assuming", "Aside from", "Apart from", "Other than"):
-        governed_but_attached = (
-            "### Verdict\n**Ready for merge.** " + governor
-            + " none of the previously blocking findings were resolved "
-            "by this round's diff."
-        )
-        check(
-            "a governed but undetached negator ('" + governor
-            + "') stays not-clean",
-            checker.classify_verdict(governed_but_attached) == "not-clean",
-        )
+        for tail in ("the previously",
+                     "the recently reported, previously",
+                     "the recently reported; previously",
+                     "the following: previously",
+                     "the reviewers' concerns, previously"):
+            governed = (
+                "### Verdict\n**Ready for merge.** " + governor
+                + " none of " + tail
+                + " blocking findings were resolved by this round's diff."
+            )
+            check(
+                "a governed negator ('" + governor + "' / '" + tail
+                + "') stays not-clean",
+                checker.classify_verdict(governed) == "not-clean",
+            )
     # An abbreviation dot does not restart the sentence, so a negator
     # before it stays in scope rather than being hidden.
     abbreviation_scope = (

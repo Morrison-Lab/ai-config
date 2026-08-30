@@ -43,9 +43,9 @@ without asking confirmation before every merge.
   exactly the multi-signal judgment where the axis you are least expecting is
   the one dropped.
   In a remote/web session, where the `gh` CLI does not exist, gather the PR's
-  state with the `pull_request_read` calls [`tool-mappings.md`](../../tool-mappings.md)
-  lists and pass them to `--from-json`, rather than treating the instrument as
-  unavailable.
+  state via MCP and pass it to `--from-json`, rather than treating the
+  instrument as unavailable --- see
+  [`fully-clean`](../../shared/workflow/fully-clean.md) for the payload keys.
   A later all-clear from a different reviewer does not supersede a standing
   not-clean; only a later clean from the same reviewer does.
 - **Session Duration**: The grant expires automatically when the session ends

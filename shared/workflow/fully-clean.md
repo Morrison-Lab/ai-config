@@ -1,6 +1,34 @@
 "Fully clean" is the terminal state the ARDI review loop drives toward.
 A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py --quorum <number-of-reachable-providers> <pr-number>`):
 
+**In a remote/web session the instrument still runs, and hand-checking the
+axes in its place is not acceptable** (user directive, 2026-08-29,
+ai-config#2441).
+Those sessions have no `gh` CLI, and an MCP tool cannot be called from inside
+a Python subprocess, so the split is that the **agent** retrieves and the
+**script** judges: gather the PR's state via MCP, write it to a file, and pass
+`--from-json <file>`.
+
+| Payload key | Gather with | Notes |
+| :--- | :--- | :--- |
+| `repo` | the `OWNER/REPO` under check | Or pass `-R` instead. |
+| `pr` | `pull_request_read` (`get`, `get_reviews`, `get_comments`) | Needs `headRefOid`, `headRefName`, `state`, `reviewDecision`, `commits[].committedDate`, `reviews[]`, `comments[]`. |
+| `check_runs` | `pull_request_read` (`get_check_runs`) | Bare list or the REST `{"check_runs": [...]}` envelope. |
+| `actions_runs` | `actions_get` (`get_workflow_run`), keyed by run id | Optional; only refines workflow-path attribution. |
+
+The field names are `gh pr view --json`'s rather than the MCP tool's, so a
+small mapping is needed --- `head.sha` becomes `headRefOid`, and an author
+becomes `{"author": {"login": ...}}`.
+That mapping is the agent's job precisely because it is the part that differs
+between session kinds.
+
+**A missing key is an error (exit 2), never an empty value.**
+That is the whole safety property: an absent `check_runs` read as `[]` would
+score "nothing pending, nothing failed" and manufacture a clean verdict out of
+missing data.
+Exit 2 is also distinct from exit 1, the script's real *not-clean* verdict, so
+an unusable payload can never be read as a finding about the PR.
+
 Extended rationale --- the mechanism, evidence, and argument behind
 each rule below --- lives in
 [`fully-clean.rationale.md`](fully-clean.rationale.md),

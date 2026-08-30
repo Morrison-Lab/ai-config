@@ -1248,3 +1248,16 @@ Positional prompt strings must be passed *before* `--file` to avoid them being p
 - **Don't**: `opencode run --file file1.txt file2.txt "my prompt here"` (it will fail with "File not found: my prompt here").
 
 (Measured 2026-08-26 on Morrison-Lab/ai-config#2255 during adversarial review script integration).
+
+## Homebrew 6.x refuses an untrusted tap's formula even right after `brew tap`
+
+Homebrew 6.x added a tap-trust gate.
+`brew install <formula>` from a third-party tap (e.g. `databricks/tap`) fails with `Error: Refusing to load formula ... from untrusted tap`, even immediately after `brew tap` succeeds.
+The fix is `brew trust <tap>` (or `brew trust --formula <tap>/<formula>` for a narrower grant), which stores the decision in `~/.homebrew/trust.json` (or under `$XDG_CONFIG_HOME`), independently of whether the formula is installed.
+
+- **Do:** run `brew tap`, then `brew trust`, then `brew install`, in that order, for any first-time install from a non-official tap.
+- **Don't:** wait for the install to fail and bolt `brew trust` on afterward.
+- **Don't:** reach for `HOMEBREW_NO_REQUIRE_TAP_TRUST=1` --- Homebrew's own message says the flag "is not recommended and will be removed in a later release";
+  use `brew trust` per-tap instead.
+
+(Verified 2026-08-29 against `brew trust --help` and the error text's own remedy.)

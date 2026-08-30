@@ -644,7 +644,8 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # @shared/workflow/read-canonical-doc-before-starting.md; 60 after converting
 # 20 heavy @shared fragments to on-demand markdown links; 8 after consolidating
 # overhead context across AI models; 4 after ai-config#2393 converted four more
-# heavy workflow imports to on-demand markdown links.)
+# heavy workflow imports to on-demand markdown links; 5 after ai-config#2652
+# added @shared/workflow/revert-merge.md.)
 #
 # The pin is deliberately a magic number rather than a value derived from
 # CLAUDE.md. Deriving it would make the guard vacuous, since it would then
@@ -653,12 +654,12 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # so the assertion name below carries that remedy: `check` prints only the
 # name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 4 anchored imports "
+    "this repo's CLAUDE.md still yields 5 anchored imports "
     "(adding or removing an @-import bumps this pin -- update the count and "
     "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 4,
+    )[0]) == 5,
 )
 
 # --- round-6 review findings ------------------------------------------------

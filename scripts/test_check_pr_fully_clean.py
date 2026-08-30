@@ -3067,6 +3067,20 @@ def main() -> int:
         checker.classify_verdict(under) == "clean",
     )
 
+    # Test resolved blocking mentions in verdict sections
+    resolved_round2 = (
+        "### Verdict\n"
+        "**Ready for merge** — both round-2 blocking findings (demo caption overclaim, missing tactics.qmd companion video) are resolved by this round's diff, with no new issues introduced."
+    )
+    check(
+        "resolved round-N blocking findings in verdict section classifies clean",
+        checker.classify_verdict(resolved_round2) == "clean",
+    )
+    check(
+        "resolved round-N blocking findings does not trigger unresolved finding pattern",
+        checker._unresolved_finding_pattern(resolved_round2) is None,
+    )
+
     # match_is_cited is the whole filter, so it is tested directly.
     check("match_is_cited: empty range is never cited",
           not checker.match_is_cited(bytearray(b"\x01\x01"), 1, 1))

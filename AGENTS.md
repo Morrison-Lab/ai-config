@@ -81,8 +81,8 @@ The implication runs one way: a timer fires once and dies, so it cannot keep a s
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
 
-Treat "the pipeline/reviewer will ..." as the same kind of future delivery
-claim. A push may trigger automation but does not prove it will run or finish;
+Treat "the pipeline/reviewer will ..." as the same kind of future delivery claim.
+A push may trigger automation but does not prove it will run or finish;
 state the current status or arm monitoring for the result.
 
 ## Resume every non-clean pause

@@ -9,9 +9,9 @@ accountability mechanism in the same turn** --- or not be made at all.
 
 The same rule applies to a concrete claim that automation will finish later:
 "GitLab will launch the next review round," "GitHub Actions will run CI," or
-"the review bot will post a review." A push may trigger automation, but it does
-not establish that it will run or finish. State the live status, or arm a
-monitor that explicitly checks the CI or review result and report when it fires.
+"the review bot will post a review."
+A push may trigger automation, but it does not establish that it will run or finish.
+State the live status, or arm a monitor that explicitly checks the CI or review result and report when it fires.
 
 ## Why this needs a rule rather than more care
 

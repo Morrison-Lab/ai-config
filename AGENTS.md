@@ -233,6 +233,10 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 
+The same drift applies to a dated claim written into a file rather than into chat --- a "verified `<date>`" note in a doc, a code comment, a changelog entry.
+Run the same clock check before typing the date into the file, not only before a chat recap;
+the failure is likeliest late in the day Pacific, once UTC has already rolled to the next calendar date.
+
 ## Summarize analysis effects in PR descriptions
 
 When a code change affects analysis outputs or their interpretation, summarize
@@ -445,6 +449,11 @@ This grants no merge authority: the strict merge policy below still applies.
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+- **When you revert a merge, reopen its issue.**
+  GitHub does not automatically reopen the issue a reverted PR closed;
+  explicitly and immediately reopen the corresponding issue(s)
+  (`gh issue reopen <issue-number>`) per
+  [`revert-merge.md`](shared/workflow/revert-merge.md).
 
 ## Always arm a persistent PR loop
 

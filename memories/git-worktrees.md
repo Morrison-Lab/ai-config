@@ -1097,3 +1097,63 @@ from a worktree whose local branch was `wt-1787`, creating
 The same commit reached `feat/register-hooks-after-merge` seconds later via an
 explicit refspec, so the PR was unaffected;
 the stray ref could not be deleted from that session and was filed instead.)
+
+## An unisolated subagent's live edits get read by a dirty-tree check as YOUR uncommitted work
+
+The rule to set `isolation` on every `Agent` call is stated in
+[`CLAUDE.md`](../CLAUDE.md) and warned about by
+[`hooks/flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py),
+and its stated rationale is about agents organizing their own directories and
+about the two directions of liveness misreading.
+Neither names the consequence measured here, which is the one that can cause
+damage rather than confusion.
+
+A dispatched agent working in the session's **primary checkout** leaves its
+in-flight edits in the tree the session's own tooling inspects.
+A repo-wide dirty-tree check --- a `Stop` hook, a pre-push guard, a wrap-up
+sweep --- cannot tell whose edits those are.
+It reports uncommitted changes and prescribes the ordinary remedy: commit and
+push them.
+
+That remedy is correct for your own work and **actively harmful** for an
+agent's.
+The measured case: an adversarial reviewer was asked to confirm that each new
+test fails when its corresponding fix is reverted, so it was doing exactly
+that --- mutating the implementation --- when the `Stop` hook fired.
+Committing and pushing on that instruction would have shipped the reverted fix
+under a commit message claiming the opposite, and closed the issue with the
+bug intact.
+
+Three things make it hard to catch from the inside.
+The hook's report is accurate: the tree *is* dirty.
+The prescribed action is the one that is right almost every other time it
+fires.
+And the agent is behaving correctly --- running mutations is what it was asked
+to do --- so nothing looks like a fault to investigate.
+
+The tell is a diff you did not write.
+Read it before acting on any dirty-tree report, and check
+[`ListAgents`](../CLAUDE.md) for a live subagent before touching any path that
+report flags:
+a running agent's mutation must be left alone until it finishes and restores,
+per this file's own "A quiet worktree is not evidence the session working it
+has stopped".
+
+- **Do:** read the actual diff on a dirty-tree report, rather than acting on
+  the report's summary.
+- **Do:** check for a live subagent before committing, reverting, or stashing
+  anything you do not recognize.
+- **Do:** decline the hook's instruction, and say why, when the uncommitted
+  delta is another agent's scratch state.
+- **Don't:** dispatch a write-capable agent into the primary checkout ---
+  which is what puts its state where a whole-repo check will claim it.
+- **Don't:** read "my own work is committed" as making a dirty tree safe to
+  clear; the danger is the extra content, not the missing content.
+
+(Measured 2026-08-30 on `Morrison-Lab/gha#755`.
+The reviewer's mutation reverted `normalize_bullet_markers`'s fix --- one line
+--- while the session's own three commits were already safe.
+The hook fired on that single line.
+The prior instance in [`CLAUDE.cases.md`](../CLAUDE.cases.md) records the same
+unassigned-isolation slip with no harmful consequence available; this is the
+consequence.)

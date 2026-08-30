@@ -1009,6 +1009,28 @@ class TestWorktreeIsolation(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
+        # This test commits inside a worktree, so it depended on an ambient git
+        # identity and failed wherever none is configured -- which is every
+        # fresh CI runner. It passed locally and only for that reason
+        # (ai-config#2634). Supply one for the subprocess git calls rather than
+        # inheriting whatever the host happens to have, so the test asserts
+        # worktree isolation rather than the machine's git config.
+        ident = {
+            "GIT_AUTHOR_NAME": "ai-config tests",
+            "GIT_AUTHOR_EMAIL": "tests@example.invalid",
+            "GIT_COMMITTER_NAME": "ai-config tests",
+            "GIT_COMMITTER_EMAIL": "tests@example.invalid",
+        }
+        saved = {k: os.environ.get(k) for k in ident}
+        os.environ.update(ident)
+        self.addCleanup(
+            lambda: [
+                os.environ.__setitem__(k, v) if v is not None
+                else os.environ.pop(k, None)
+                for k, v in saved.items()
+            ]
+        )
+
         with tempfile.TemporaryDirectory() as tmpdir:
             from orchestrator.worktree_manager import WorktreeManager
             wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))

@@ -235,12 +235,7 @@
   Order the queue most-blocking first, record each outcome where it belongs (the relevant PR/issue thread, per the post-feedback-to-PR rule), and say explicitly when the queue is empty.
   This is the interactive counterpart to `prompt-me` (surface the single most pressing question) and `prompt-me-all` (all open questions as one numbered list): pm picks one, pma batches all, this walks all of them one per exchange. (Requested on sparta 2026-07-16: "cai: go through the decisions you need from me one at a time.")
 - **Always provide an explicit recommendation with every question or choice presented to the user.**
-  Statements like "Let me know if ...", "Would you like me to ...", or open-ended prompts count as questions and must include a clear recommendation on the preferred course of action rather than leaving the decision open-ended.
-  - **Do:** State your specific recommendation alongside every question or choice presented to the user (e.g. "Recommendation: Proceed with Option A because...").
-  - **Do:** Treat soft open-ended closing statements ("Let me know if you would like me to...") as decision points and provide a concrete recommendation.
-  - **Don't:** Ask questions or present a list of choices without declaring your recommended path.
-  - **Don't:** End responses with open-ended "Let me know if..." prompts without stating what you recommend doing next.
-  (User directive / CAI, 2026-08-29.)
+  See [`AGENTS.md`](../AGENTS.md) § Always give recommendations with questions (User directive / CAI, 2026-08-29).
 - Operate as a COORDINATOR, not an implementer.
   Delegate all hands-on implementation to subagents (Agent tool, worktree isolation) --- even core, high-stakes, architecturally-significant changes.
   Stay at the bird's-eye level: decide WHAT to build and in what order, write precise specs, launch/direct agents, sequence merges, verify results, surface decisions to the user, and relay feedback to the right agent.

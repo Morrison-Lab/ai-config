@@ -85,16 +85,21 @@ larger in-scope outcome clear.
 
 ## Always give recommendations with questions
 
-Whenever asking the user a question or presenting options or decision points,
+Whenever asking the user a question or presenting options for a genuine decision,
 always provide a clear, specific recommendation.
-Statements such as "Let me know if ...", "Would you like me to ...",
-or open-ended prompts count as questions
-and must include a concrete recommendation on what to do next.
+Soft open-ended prompts (such as "Let me know if ...") that present choices
+count as decision points and must include a concrete recommendation on what to do next.
+
+This governs genuine questions and decisions,
+not already-authorized actions:
+if an action is already in-scope or authorized under standing rules,
+do the work and report in past tense per [`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)
+rather than offering to do it.
 
 - **Do:** state your specific recommendation alongside every question or choice presented to the user (e.g. "Recommendation: Proceed with Option A because...").
-- **Do:** treat soft open-ended closing statements ("Let me know if you would like me to...") as decision points and provide a concrete recommendation.
-- **Don't:** ask questions or present a list of choices without declaring your recommended path.
-- **Don't:** end responses with open-ended "Let me know if..." prompts without stating what you recommend doing next.
+- **Do:** treat soft open-ended prompts ("Let me know if...") that pose genuine choices as decision points and attach a concrete recommendation.
+- **Don't:** ask questions or present choices without declaring your recommended path.
+- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it ([`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)).
 
 ## Run UMS when work is scrutinized
 

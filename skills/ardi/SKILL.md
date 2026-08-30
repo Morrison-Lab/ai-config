@@ -361,7 +361,7 @@ Do-Confirm; per
 Always request another review.**
 The loop on a single PR ends on exactly three things:
 
-1. **A totally clean review on the latest pushed commit** -- no nits, no non-blocking comments, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch.
+1. **A totally clean review on the latest pushed commit** -- no nits, no non-blocking comments, no informational notes, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch.
    **Crucial:** Pushing fixes for a review starts a new review cycle. The ARDI loop is **NEVER** finished when you push fixes for a finding-bearing review or post an ARD summary. You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before ending the loop. See [*The bar: "fully clean"*](#the-bar-fully-clean).
 2. **Nothing actionable remains** --- every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take.
    Not "some items are deadlocked"; *all* of them.

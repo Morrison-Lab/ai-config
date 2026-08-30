@@ -249,6 +249,24 @@ refuse to share a working tree, isolate into a `git worktree`, and auto-recover
 after a crash. There's an optional `SessionStart` hook for hands-off
 registration. See [`docs/local-session-deconfliction.md`](docs/local-session-deconfliction.md).
 
+## Configuration
+
+Settings this repo's own tooling reads from the environment.
+
+| Variable | Effect |
+| :--- | :--- |
+| `AI_CONFIG_PR_REVIEWERS` | Comma-separated GitHub logins to request as reviewers on a PR the orchestrator opens. **Unset means no reviewer is requested**, which is deliberate: this repo is used by people other than its author, so there is no login that could be a correct default. Before this existed the value was hardcoded, and every request named a login that exists for nobody (ai-config#2627). |
+| `AI_CONFIG_DOTFILES_FORCE` | Install dotfiles on a machine that fails the environment gate --- see [`dotfiles/shiva/README.md`](dotfiles/shiva/README.md). |
+| `ALLOW_FORCE_PUSH` | Escape valve for `hooks/no-clobbering-push.py`, for a case the guard did not foresee. Using it means stating why. |
+
+`scripts/check-reviewer-placeholders.py` gates the first of these: it fails
+CI when a person-shaped name is written into a value position --- an `owner:`
+argument, a `--reviewer` flag, a `reviewers[]=` field --- rather than read
+from configuration.
+It keys on **position**, not on any particular name, so an ordinary role
+reference in prose ("request the repository owner as reviewer") is untouched;
+that phrasing is the user-agnostic form the corpus should keep using.
+
 ## Quality gates
 
 Two lightweight checks keep the skill catalog well-formed:

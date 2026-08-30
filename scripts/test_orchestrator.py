@@ -22,6 +22,7 @@ from orchestrator.models import (
 )
 from orchestrator.state_store import StateStore
 from orchestrator.subagents import (
+    configured_pr_reviewers,
     CoderSubagent,
     CoordinatorSubagent,
     ResearcherSubagent,
@@ -1008,6 +1009,28 @@ class TestWorktreeIsolation(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
+        # This test commits inside a worktree, so it depended on an ambient git
+        # identity and failed wherever none is configured -- which is every
+        # fresh CI runner. It passed locally and only for that reason
+        # (ai-config#2634). Supply one for the subprocess git calls rather than
+        # inheriting whatever the host happens to have, so the test asserts
+        # worktree isolation rather than the machine's git config.
+        ident = {
+            "GIT_AUTHOR_NAME": "ai-config tests",
+            "GIT_AUTHOR_EMAIL": "tests@example.invalid",
+            "GIT_COMMITTER_NAME": "ai-config tests",
+            "GIT_COMMITTER_EMAIL": "tests@example.invalid",
+        }
+        saved = {k: os.environ.get(k) for k in ident}
+        os.environ.update(ident)
+        self.addCleanup(
+            lambda: [
+                os.environ.__setitem__(k, v) if v is not None
+                else os.environ.pop(k, None)
+                for k, v in saved.items()
+            ]
+        )
+
         with tempfile.TemporaryDirectory() as tmpdir:
             from orchestrator.worktree_manager import WorktreeManager
             wt_mgr = WorktreeManager(repo_root=Path.cwd(), worktree_parent=Path(tmpdir))
@@ -1258,6 +1281,57 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(args_sweep.claim_pr)
         self.assertTrue(args_sweep.mwc)
 
+
+class TestConfiguredPRReviewers(unittest.TestCase):
+    """ai-config#2627: the reviewer must come from config, not a hardcoded login.
+
+    Before this, `subagents.py` passed the literal string "the repository
+    owner" straight into `reviewers[]=` on a real API POST -- a username
+    containing spaces, valid for nobody, including the author. The plugin is
+    used by people other than its author, so a hardcoded login is correct for
+    at most one of them.
+
+    The unset case is the one that matters: returning None (rather than a
+    fallback) is what lets `mark_pr_ready_and_request_review`'s `if reviewers:`
+    guard skip the request entirely. No reviewer requested is the right
+    failure; a wrong one fails at the API with the result discarded, so it
+    leaves no local signal at all.
+    """
+
+    def setUp(self):
+        self._saved = os.environ.get("AI_CONFIG_PR_REVIEWERS")
+        os.environ.pop("AI_CONFIG_PR_REVIEWERS", None)
+
+    def tearDown(self):
+        os.environ.pop("AI_CONFIG_PR_REVIEWERS", None)
+        if self._saved is not None:
+            os.environ["AI_CONFIG_PR_REVIEWERS"] = self._saved
+
+    def test_unset_returns_none_so_the_request_is_skipped(self):
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_empty_returns_none(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = ""
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_separators_only_returns_none(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = " , , "
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_single_login(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = "octocat"
+        self.assertEqual(configured_pr_reviewers(), ["octocat"])
+
+    def test_multiple_logins_are_split_and_trimmed(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = " alice , bob "
+        self.assertEqual(configured_pr_reviewers(), ["alice", "bob"])
+
+    def test_never_returns_a_value_containing_a_space(self):
+        # The original defect in one assertion: whatever comes back must be
+        # usable as a GitHub login.
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = "alice,bob"
+        for name in configured_pr_reviewers() or []:
+            self.assertNotIn(" ", name)
 
 def main():
     unittest.main(verbosity=2)

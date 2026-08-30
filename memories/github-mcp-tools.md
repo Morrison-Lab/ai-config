@@ -669,9 +669,9 @@ See ai-config#694 for the precedent.
   is the node's own repository, so that comparison would have matched.
   Why that first comparison fails where string-addressed calls follow the
   redirect was not established.
-  Measured on `Morrison-Lab/ai-config` (transferred from `the repository owner`),
+  Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
   2026-07-31, against PR #975 --- two different gates, one per spelling:
-  - `owner: the repository owner` --- `Access denied: review thread
+  - `owner: d-morrison` --- `Access denied: review thread
     PRRT_kwDOShagnM6VdO1_ does not belong to the declared repo
     "d-morrison/ai-config".`
   - `owner: Morrison-Lab` --- `Access denied: repository
@@ -683,7 +683,7 @@ See ai-config#694 for the precedent.
   start, and `add_repo` refuses a cross-owner add --- so this is **not
   transient**, and re-testing it each polling round buys nothing.
   Every other tool used in that session worked normally under
-  `owner: the repository owner`: `pull_request_read` (every method),
+  `owner: d-morrison`: `pull_request_read` (every method),
   `add_issue_comment`, `add_reply_to_pull_request_comment`,
   `update_pull_request`, `request_copilot_review`, and
   `subscribe_pr_activity`.

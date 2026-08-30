@@ -51,6 +51,21 @@ jobs:
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run orchestrator tests
+        # ai-config#2627: this suite existed and ran nowhere, so the
+        # orchestrator's own behaviour was unpinned -- which is how a literal
+        # non-username reached a live reviewer request.
+        run: python3 scripts/test_orchestrator.py
+      - name: Check for hardcoded person-names in value positions
+        # ai-config#2627: this plugin is used by people other than its author,
+        # so a login hardcoded into an `owner:`/`--reviewer`/`reviewers[]=`
+        # position is correct for at most one of them. subagents.py shipped
+        # the phrase as a lone `reviewers=[...]` element, POSTed verbatim.
+        # Keys on POSITION, not on the phrase: the role reference in prose is
+        # the form the corpus should keep using.
+        run: python3 scripts/check-reviewer-placeholders.py
+      - name: Run reviewer-placeholder gate tests
+        run: python3 scripts/test_check_reviewer_placeholders.py
       - name: Run fully-clean payload-fetcher tests
         # ai-config#2441: the --from-json path lets the instrument run where
         # `gh` does not exist. Its negative cases assert the EXIT CODE, since

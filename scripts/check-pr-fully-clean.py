@@ -1049,17 +1049,26 @@ def _sentence_start_before(text: str) -> int:
     """
     start = 0
     for end in _SENTENCE_END_RE.finditer(text):
-        # The token is found by scanning back to the nearest whitespace,
-        # which costs the token's own length. Slicing and splitting the
-        # whole prefix instead is quadratic over a body with many
-        # sentences, and a review comment at GitHub's 65536-character cap
-        # took over five seconds that way.
-        token_start = max(
-            text.rfind(" ", 0, end.start()),
-            text.rfind("\n", 0, end.start()),
-            text.rfind("\t", 0, end.start()),
-        ) + 1
-        token = text[token_start:end.start()]
+        # The token is found by scanning back over any whitespace run and
+        # then over the word itself, which costs their lengths rather
+        # than the prefix's. Slicing and splitting the whole prefix
+        # instead is quadratic over a body with many sentences, and a
+        # review comment at GitHub's 65536-character cap took over five
+        # seconds that way.
+        #
+        # Skipping the whitespace run FIRST is what makes the token the
+        # preceding word rather than the empty string: a candidate whose
+        # punctuation is itself preceded by a space ("... /etc/passwd .")
+        # otherwise yields an empty token, which passes the URL check and
+        # accepts a faked sentence end -- narrowing the caller's scan,
+        # which is the fail-open direction.
+        pos = end.start()
+        while pos > 0 and text[pos - 1].isspace():
+            pos -= 1
+        token_end = pos
+        while pos > 0 and not text[pos - 1].isspace():
+            pos -= 1
+        token = text[pos:token_end]
         if token and _NOT_SENTENCE_TOKEN_RE.search(token):
             continue
         start = end.end()

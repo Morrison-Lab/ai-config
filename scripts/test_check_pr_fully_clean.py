@@ -3396,10 +3396,18 @@ def main() -> int:
     # each would otherwise restart the sentence mid-clause and hide the
     # negator before it. The mention's own sentence is what the guard
     # scans, so anything that fakes a sentence end is a fail-open.
+    # The whitespace-separated forms matter separately: locating the
+    # preceding token by the nearest whitespace alone yields an EMPTY
+    # token there, which passes the URL check and accepts the faked
+    # sentence end.
     for interrupter in ("the...",
                         "the http://x.io/a.",
                         "the src/a.py.",
-                        "the www.example.com."):
+                        "the www.example.com.",
+                        "the http://x.io/a .",
+                        "the /etc/passwd .",
+                        "the www.example.com .",
+                        "the http://x.io/a\r."):
         faked_end = (
             "### Verdict\n**Ready for merge.** None of " + interrupter
             + " previously blocking finding is resolved."

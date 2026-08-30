@@ -264,6 +264,10 @@ This makes "as of when" unambiguous when the user reads the recap later.
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
 
+**The same drift hits a dated claim written into a file, not only a chat recap.**
+A "verified `<date>`" note added to a doc, a code comment, or a changelog entry during a long session is exactly as exposed to the UTC-versus-Pacific gap as a status recap is --- run the same clock check before typing the date into the file, not only before a chat update.
+The risk peaks late in the day Pacific (roughly after 17:00), once UTC has already rolled over to the next calendar date.
+
 **Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
 If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.
 Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.

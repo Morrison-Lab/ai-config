@@ -264,6 +264,10 @@ This makes "as of when" unambiguous when the user reads the recap later.
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
 
+**The same drift hits a dated claim written into a file, not only a chat recap.**
+A "verified `<date>`" note added to a doc, a code comment, or a changelog entry during a long session is exactly as exposed to the UTC-versus-Pacific gap as a status recap is --- run the same clock check before typing the date into the file, not only before a chat update.
+The risk peaks late in the day Pacific (roughly after 17:00), once UTC has already rolled over to the next calendar date.
+
 **Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
 If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.
 Otherwise use PowerShell: `[System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Pacific Standard Time')`.
@@ -758,6 +762,13 @@ Run it regardless: a short pass that finds nothing new is the expected outcome w
 "merge it" / "merge this" / "merge the PR" as bare directives (no slash) trigger the `merge-it` skill: when the PR isn't merged yet, it merges the ready PR (squash by default) **then** chains straight into `post-merge` (tidy + UMS); when the PR is already merged it goes directly to `post-merge`.
 Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.
 If the phrase is clearly part of ordinary prose rather than a standalone directive, treat it as such.
+
+## When you revert a merge, reopen its issue
+
+@shared/workflow/revert-merge.md
+
+GitHub does not automatically reopen the issue a reverted PR closed.
+Reopen it explicitly (`gh issue reopen <issue-number>`).
 
 ## What "fully clean" means
 

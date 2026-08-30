@@ -763,6 +763,13 @@ Run it regardless: a short pass that finds nothing new is the expected outcome w
 Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.
 If the phrase is clearly part of ordinary prose rather than a standalone directive, treat it as such.
 
+## When you revert a merge, reopen its issue
+
+@shared/workflow/revert-merge.md
+
+GitHub does not automatically reopen the issue a reverted PR closed.
+Reopen it explicitly (`gh issue reopen <issue-number>`).
+
 ## What "fully clean" means
 
 [`shared/workflow/fully-clean.md`](shared/workflow/fully-clean.md)

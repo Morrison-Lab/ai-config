@@ -449,6 +449,11 @@ This grants no merge authority: the strict merge policy below still applies.
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per
   [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md).
+- **When you revert a merge, reopen its issue.**
+  GitHub does not automatically reopen the issue a reverted PR closed;
+  explicitly and immediately reopen the corresponding issue(s)
+  (`gh issue reopen <issue-number>`) per
+  [`revert-merge.md`](shared/workflow/revert-merge.md).
 
 ## Always arm a persistent PR loop
 

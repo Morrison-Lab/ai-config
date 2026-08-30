@@ -234,6 +234,8 @@
 - When the user asks to go through the decisions I need from them ("go through the decisions you need from me", "one at a time"), walk the pending-decision queue SEQUENTIALLY --- one decision per exchange, each with its context and a recommended option (AskUserQuestion with the recommendation listed first, where available), waiting for the answer before raising the next --- rather than dumping a batched list.
   Order the queue most-blocking first, record each outcome where it belongs (the relevant PR/issue thread, per the post-feedback-to-PR rule), and say explicitly when the queue is empty.
   This is the interactive counterpart to `prompt-me` (surface the single most pressing question) and `prompt-me-all` (all open questions as one numbered list): pm picks one, pma batches all, this walks all of them one per exchange. (Requested on sparta 2026-07-16: "cai: go through the decisions you need from me one at a time.")
+- **Always provide an explicit recommendation with every question or choice presented to the user.**
+  See [`AGENTS.md`](../AGENTS.md) § Always give recommendations with questions (User directive / CAI, 2026-08-29).
 - Operate as a COORDINATOR, not an implementer.
   Delegate all hands-on implementation to subagents (Agent tool, worktree isolation) --- even core, high-stakes, architecturally-significant changes.
   Stay at the bird's-eye level: decide WHAT to build and in what order, write precise specs, launch/direct agents, sequence merges, verify results, surface decisions to the user, and relay feedback to the right agent.

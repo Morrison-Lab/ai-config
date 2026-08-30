@@ -530,6 +530,9 @@ The ai-config `claude-review.yml` (merged in #275) uses a static
 `__REVIEWS_EOF__` delimiter instead — accepted by design but is a known
 divergence from this best practice.
 
+This section answers what to do **once you have decided** the value is multi-line.
+`memories/github-actions.md`'s "A bare `key=value` in `$GITHUB_OUTPUT` is an injection point" section answers the prior question, and its answer is that the delimiter form is the default for any derived value --- so do not read this one as licensing `key=value` for everything that looks short.
+
 **`needs.X.result != 'cancelled'` vs `== 'success'`** — when the dependency job
 is non-critical (acceptable to proceed without its output), use
 `!= 'cancelled'` in the dependent job's `if:` so genuine failures fall through

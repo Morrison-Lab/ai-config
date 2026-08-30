@@ -197,7 +197,6 @@ QUERY_FORMS = [
     ("glab ci list -R group/project", "GitLab glab ci list (#2667)"),
     ("glab ci view -R group/project", "GitLab glab ci view (#2667)"),
     ("glab mr view 47 -R group/project", "GitLab glab mr view (#2667)"),
-    ("glab mr checks 47 -R group/project", "GitLab glab mr checks (#2667)"),
     ("glab pipeline view 1234 -R group/project", "GitLab glab pipeline view (#2667)"),
     ("glab api projects/123/pipelines/456/jobs", "GitLab REST pipelines endpoint (#2667)"),
     ("glab api projects/group%2Fproject/merge_requests/47", "GitLab REST merge_requests endpoint (#2667)"),

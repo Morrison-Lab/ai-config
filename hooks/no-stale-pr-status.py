@@ -84,7 +84,7 @@ RX_QUERY = re.compile(
     r"commits/[^\s]+/check-runs|commits/[^\s]+/status|"
     r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py|"
     r"glab\s+ci\s+(?:status|list|view)|"
-    r"glab\s+mr\s+(?:view|checks)|"
+    r"glab\s+mr\s+view|"
     r"glab\s+pipeline\s+view|"
     r"projects/[^\s]+/pipelines|"
     r"projects/[^\s]+/merge_requests",

@@ -111,6 +111,27 @@ That is what keeps countermanding cheap.
    `🧭 RECOMMENDATION` box.
    If you had already stated a recommendation, take it -- handing the
    decision back is agreement to it, not an invitation to reopen it.
+
+   **Re-check the premise before taking it, though, and only the premise.**
+   The rule above forbids re-*deliberating*, which is a different act from
+   confirming that the facts the recommendation rested on still hold.
+   A recommendation is a claim about state, so it expires like any other
+   (`metacognitive-monitoring.md`), and the gap between recommending and
+   being handed the decision is exactly where it expires.
+   The risk is one-directional: re-arguing a settled call wastes a round
+   trip, while acting on a lapsed premise ships the wrong thing under a
+   grant that was meant to save time.
+
+   The stale premise is usually not in your own reasoning but in the
+   **issue or brief** you reasoned from, and its age is the tell -- an
+   issue body is a snapshot of the moment it was filed, and the options it
+   enumerates were scoped against a codebase that has since moved.
+   So read the code the options name, not the description of it.
+
+   When the premise has moved, the grant still holds and the answer is
+   still yours: pick again on the current facts and report **both** the
+   choice and the change, since a silent switch away from a stated
+   recommendation reads as having reopened it.
 3. **Act.**
 4. **Report in the past tense**: what you chose, and the single reason that
    decided it.
@@ -154,3 +175,41 @@ That is what keeps countermanding cheap.
   it.
 - Filing a stale worktree or a merged local branch back as a question, or as
   an issue for the user to action, when the grant already covers clearing it.
+
+## Case record: a recommendation that expired between stating and taking it
+
+`Morrison-Lab/gha#240` asked how to restrict the review workflow's network
+egress, and enumerated three options.
+Its analysis rested on three separately-named tool grants:
+`WebFetch`, `Bash(curl:*)`, and `Bash(python3:*)`.
+I recommended option 3 -- gate those grants on the repo opting into
+computer-algebra review -- and the decision came back as `daytb`.
+
+Step 2's rule says to take the recommendation rather than reopen it, and
+taking it would have been wrong.
+Reading `run-claude-review-attempt/action.yml` rather than the issue body
+showed the allowlist had become
+`"Bash,Edit(//tmp/**),WebFetch,WebSearch"`:
+`Bash` is granted **whole** (gha#566/#572), so two of the three grants
+option 3 proposed gating no longer exist as gateable things.
+Implementing it would have meant re-narrowing `Bash` for most consumers,
+reintroducing a starvation failure that five measured incidents and about
+$26 of no-verdict review runs had just been spent removing.
+
+A second fact had moved the same way: gha#580 split the review so the job
+processing attacker-influenceable content holds `contents: read` and no
+forge-write, which narrows the very risk the issue was filed about.
+
+Both changes post-date the issue by months, and neither is visible from its
+body -- which is the general shape rather than a detail of this case.
+The chosen option became option 1, and the report named the switch and its
+cause rather than quietly delivering something other than what had been
+recommended.
+
+- **Do:** re-read the code an option names before acting on a
+  recommendation about it.
+- **Do:** report the switch and its cause when the premise has moved.
+- **Don't:** re-argue a recommendation the user has handed back -- checking
+  a premise is not reopening a decision.
+- **Don't:** treat an issue body's enumerated options as current; the older
+  the issue, the more its scoping is a claim about a past codebase.

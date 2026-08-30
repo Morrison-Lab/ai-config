@@ -1822,6 +1822,105 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The previously blocking "
               "line-break failure is fixed and confirmed passing.\n", "")
           == "clean")
+    check("a resolved prior verdict blocking issue is not an active finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is resolved.\n", "")
+          == "clean")
+    check("a curly-apostrophe prior verdict blocking issue can resolve",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict\u2019s blocking "
+              "issue is resolved.\n", "")
+          == "clean")
+    check("a resolved prior issue with a second resolved item stays clean",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is resolved, and the two follow-up nitpicks are also resolved.\n", "")
+          == "clean")
+    check("an explicit no-new-issues close preserves the resolution",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is resolved. I found no new issues in this review.\n", "")
+          == "clean")
+    check("unrelated unresolved wording in a later paragraph does not poison resolution",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is resolved.\n\n### Other notes\n" + "x" * 200 + "\n"
+              "Unrelated: something else has not been fixed yet, but it is not blocking.\n",
+              "")
+          == "clean")
+    check("a contrasting next sentence can reverse the resolution",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is fixed. However, it may recur under load.\n", "")
+          == "not-clean")
+    check("unrecognized next-sentence commentary fails closed",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is fixed. The full suite also passes.\n", "")
+          == "not-clean")
+    check("a later reversal in the same paragraph stays a finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is fixed. Great news. However, testing later showed it "
+              "still remains open.\n", "")
+          == "not-clean")
+    for reversal in (
+        "Yet it remains open.",
+        "Nevertheless it remains unresolved.",
+        "Still, it has not been fixed.",
+        "Actually it still needs to be fixed.",
+        "On second thought, it has not been fixed.",
+    ):
+        check(f"a next-sentence reversal stays a finding: {reversal}",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+                  f"issue is fixed. {reversal}\n", "")
+              == "not-clean")
+    check("an unresolved prior verdict blocking issue stays a finding",
+          checker.classify_verdict(
+              "### Verdict\nThe prior verdict's blocking issue remains open.\n", "")
+          == "not-clean")
+    check("a prior verdict blocking issue not yet fixed stays a finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue has not been fixed.\n", "")
+          == "not-clean")
+    check("a prior verdict blocking issue requiring a fix stays a finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue must be fixed.\n", "")
+          == "not-clean")
+    check("a prior verdict blocking issue still open stays a finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue is still open and must be resolved.\n", "")
+          == "not-clean")
+    check("an incorrectly addressed prior blocker stays a finding",
+          checker.classify_verdict(
+              "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+              "issue was addressed incorrectly; it remains a blocker.\n", "")
+          == "not-clean")
+    for separator in (";", ",", ":", " and"):
+        check(f"resolution after {separator!r} cannot apply to the prior blocker",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+                  f"issue still reproduces{separator} the unrelated typo was fixed.\n", "")
+              == "not-clean")
+    for unresolved in (
+        "hasn\u2019t been fixed",
+        "hasn" + chr(0x2019) + "t been fixed",
+        "isn\u2019t fixed",
+        "isn" + chr(0x2019) + "t fixed",
+        "has not actually been fixed",
+        "has yet to be fixed",
+        "cannot be fixed",
+    ):
+        check(f"a partly resolved prior blocking issue that {unresolved} stays a finding",
+              checker.classify_verdict(
+                  "### Verdict\n**Ready for merge.** The prior verdict's blocking "
+                  f"issue is now fixed, but {unresolved}.\n", "")
+              == "not-clean")
     check("a bold resolved blocking mention is not an active finding",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The previously **blocking** "
@@ -3021,6 +3120,7 @@ def main() -> int:
         checker.classify_verdict(posted_verdict_citation) == "clean"
         and checker._unresolved_finding_pattern(posted_verdict_citation) is None,
     )
+
 
     # The filter guards THREE match loops, and two of them had no test at all:
     # deleting the guard in classify_verdict's clean loop, or in

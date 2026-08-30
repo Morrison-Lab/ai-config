@@ -926,13 +926,39 @@ _BARE_REJECTION = (
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
 
+# The clause scan admits a parenthesized aside as a single unit, because a
+# reviewer enumerating the resolved findings puts them in parens -- "both
+# round-2 blocking findings (demo caption overclaim, missing tactics.qmd
+# companion video) are resolved" -- and the commas and filename dots inside
+# that aside are not clause boundaries. The resolution verb is
+# tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
+# longer applies") so a live directive like "must be fixed before merge"
+# never reads as already resolved.
 RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?![.!?](?:\s|$))[\s\S]){0,160}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
+    r"^(?:(?!\b(?:and|but|while|although|however)\b)"
+    r"(?:\([^()\n]{0,120}\)|[^,:;.!?])){0,120}\b(?:"
+    r"(?:is|are|was|were)\s+(?:now\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|no\s+longer\s+applies"
+    r")\b"
+    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['’]s)?\s+"
+    r"(?:diff|push|commit|changes?|fixes?))?"
+    r"(?:"
+    r"\s+and\s+(?:confirmed\s+)?passing"
+    r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
+    r"(?:is|are|was|were)\s+(?:also\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|,?\s+with\s+no\s+new\s+(?:issues?|findings?)"
+    r"(?:\s+(?:introduced|found|added|identified))?"
+    r")?\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
-UNRESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"\b(?:not\s+(?:yet\s+)?(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|remain(?:s)?\s+(?:open|unresolved|unfixed|unaddressed))\b",
+AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
+    r"^\s*(?:I\s+found\s+no\s+new\s+(?:issues|findings)"
+    r"(?:\s+in\s+(?:this|the)\s+(?:round|review|pass)[^.!?]*)?"
+    r"[.!?]?)?\s*$",
     re.IGNORECASE,
 )
 
@@ -941,17 +967,33 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
         return False
-    prefix = scan[max(0, match.start() - 35):match.start()]
-    if not re.search(
-        r"\b(?:previously|prior(?:\s+round(?:'s)?)?|earlier|round-\d+)(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
+    prefix = scan[max(0, match.start() - 40):match.start()]
+    past_state = re.search(
+        r"(?:\bpreviously"
+        r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
+        r"|\s+(?:finding|issue)s?)?"
+        r"|\bearlier"
+        r"|\bround-\d+(?:['\u2019]s)?"
+        r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
         prefix,
         re.IGNORECASE,
-    ):
+    )
+    if past_state is None:
         return False
-    suffix = scan[match.end():match.end() + 160]
+    suffix = scan[match.end():]
+    # A dot glued to the next character -- a filename ("tactics.qmd"), a
+    # decimal -- is not a sentence end; only [.!?] followed by whitespace
+    # or end-of-text terminates the sentence.
+    sentence = re.match(r"^(?:(?![.!?](?:\s|$))[\s\S])*[.!?]?", suffix)
+    if sentence is None:
+        return False
+    paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
+    if paragraph is None:
+        return False
+    following = paragraph.group(0)[sentence.end():]
     return (
-        RESOLVED_BLOCKING_SUFFIX.search(suffix) is not None
-        and UNRESOLVED_BLOCKING_SUFFIX.search(suffix) is None
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
+        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
     )
 
 # The findings-heading pattern is likewise built once: the two list copies

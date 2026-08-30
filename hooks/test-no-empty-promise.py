@@ -428,6 +428,26 @@ CASES = [
      False, "the schedule skill discharges an owed action"),
     ([say("I owe #1937 the ARDI loop."), ARMED_POLLER],
      False, "arming the detached PR poller discharges an owed action"),
+    # A future CI/reviewer action is also a delivery claim. The incident was
+    # a pushed GitLab branch followed by the forecast that a pipeline would
+    # produce a review, without keeping the session alive to inspect either.
+    ([say("GitLab will automatically launch the next review round.")],
+     True, "an automation forecast without monitoring blocks"),
+    ([say("The next pipeline will produce a review."), ARMED_WAKEUP],
+     False, "an armed wakeup discharges an automation forecast"),
+    ([say("GitHub Actions will run CI.")],
+     True, "a GitHub Actions CI forecast without monitoring blocks"),
+    ([say("The review bot will post a review."), ARMED_WAKEUP],
+     False, "a review-monitoring wakeup discharges the forecast"),
+    ([say("GitLab will launch the next review round."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "ScheduleWakeup",
+           "input": {"delaySeconds": 300, "prompt": "Tidy local notes."}}]}}],
+     True, "an unrelated wakeup does not discharge an automation forecast"),
+    ([say("The next pipeline should automatically run.")],
+     False, "a tentative automation expectation is not a delivery claim"),
+    ([say("The pipeline is running for the current head.")],
+     False, "current in-progress state is not an automation forecast"),
     # The durable floor still clears a debt -- it is the wrong instinct, not
     # an invalid mechanism, and blocking it would wedge the honest case where
     # the debt is somebody else's to schedule.

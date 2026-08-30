@@ -3,8 +3,7 @@
 
 Morrison-Lab/ai-config#2627. This plugin is used by people other than its
 author, so a hardcoded login is correct for at most one of them (user
-directive, 2026-08-29). The corpus had 103 occurrences of the phrase "the
-repository owner"; most were fine, because a sentence like "request the
+directive, 2026-08-29). Most occurrences of that phrase in this corpus are fine, because a sentence like "request the
 repository owner as reviewer" is a ROLE reference and is exactly the
 user-agnostic form wanted.
 
@@ -32,17 +31,29 @@ REPO = Path(__file__).resolve().parent.parent
 # A value position: the phrase reached where an API expects an identifier.
 # Each alternative names a concrete call shape rather than matching loosely,
 # so a new shape is a deliberate addition rather than an accidental catch.
+# Every alternative allows an optional surrounding quote, because quoting is
+# exactly what anyone writing a two-word value into a shell command does -- so
+# an unquoted-only pattern is blind to the likeliest spelling of the defect.
+# The command forms come from the set `hooks/no-unreviewed-pr.py` already
+# enumerates for this one effect (see derive-dont-enumerate.md): the corpus
+# knew the effect had several spellings while an earlier grep searched for one.
+Q = r"[\"']?"
+NAME = r"the repository owner"
 PATTERNS = [
-    (r"owner\s*[:=]\s*[\"']?the repository owner", "an `owner:` argument"),
-    (r"reviewers?\[\]\s*=\s*the repository owner", "a `reviewers[]=` field"),
-    (r"--(?:add-)?reviewers?\s+the repository owner", "a `--reviewer` flag"),
-    (r"--head\s+the repository owner", "a `--head` argument"),
-    (r"[\"']login[\"']\s*:\s*[\"']the repository owner", "a `login` value"),
-    (r"reviewers\s*=\s*\[\s*[\"']the repository owner", "a `reviewers=[...]` literal"),
+    (rf"owner\s*[:=]\s*{Q}{NAME}", "an `owner:` argument"),
+    (rf"reviewers?\[\]\s*=\s*{Q}{NAME}", "a `reviewers[]=` field"),
+    (rf"--(?:add-)?reviewers?[\s=]+{Q}{NAME}", "a `--reviewer` flag"),
+    (rf"(?:^|\s)-r[\s=]+{Q}{NAME}", "a `-r` reviewer flag"),
+    (rf"--head[\s=]+{Q}{NAME}", "a `--head` argument"),
+    (rf"{Q}login{Q}\s*:\s*{Q}{NAME}", "a `login` value"),
+    (rf"reviewers{Q}\s*[:=]\s*\[\s*{Q}{NAME}", "a `reviewers` array"),
+    (rf"reviewers{Q}\s*:\s*(?:\n\s*)?-\s+{Q}{NAME}", "a YAML `reviewers:` list item"),
 ]
 
-SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv"}
-SUFFIXES = {".md", ".py", ".sh", ".json", ".yml", ".yaml"}
+# .qmd is the published website source and .mdc mirrors cursor-rules/;
+# omitting them hid the user-facing copy of this very instruction, which is
+# the one surface a new user actually reads.
+SUFFIXES = {".md", ".qmd", ".mdc", ".py", ".sh", ".json", ".yml", ".yaml"}
 
 
 def tracked_files():
@@ -65,22 +76,39 @@ def scan(paths):
     for path in paths:
         if path.suffix not in SUFFIXES:
             continue
-        if SKIP_DIRS & set(path.relative_to(REPO).parts):
-            continue
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         examined += 1
-        for i, line in enumerate(text.splitlines(), 1):
-            for pattern, what in PATTERNS:
-                if re.search(pattern, line):
-                    findings.append((path.relative_to(REPO), i, what, line.strip()))
+        # Match over the whole file with newlines folded to spaces: a value
+        # position wrapped across a line break is invisible to a per-line scan,
+        # and that is exactly how the published .qmd copy was written.
+        flat = re.sub(r"\s+", " ", text)
+        lines = text.splitlines()
+        for pattern, what in PATTERNS:
+            if not re.search(pattern, flat):
+                continue
+            # Report the first line whose own text starts the match, falling
+            # back to the first line naming the phrase, so the annotation
+            # points somewhere real rather than at line 1.
+            line_no = next(
+                (i for i, ln in enumerate(lines, 1) if NAME in ln), 1
+            )
+            findings.append(
+                (path.relative_to(REPO), line_no, what, lines[line_no - 1].strip())
+            )
     return findings, examined
 
 
-def main(argv=None):
+def main():
     findings, examined = scan(tracked_files())
+    if examined == 0:
+        # A gate that examined nothing reports clean and is indistinguishable
+        # from a passing one. The exception handler above covers only the git
+        # failure; this covers every other route to an empty population.
+        print("::error::examined 0 files -- the gate did not run", file=sys.stderr)
+        return 2
     # Report the population, not just the hits: a zero with no denominator is
     # indistinguishable from a detector that never ran.
     print(f"Examined {examined} tracked file(s) for person-shaped values.")

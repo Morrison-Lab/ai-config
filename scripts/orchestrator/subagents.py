@@ -228,6 +228,7 @@ def configured_pr_reviewers() -> Optional[List[str]]:
     names = [n.strip() for n in raw.split(",") if n.strip()]
     return names or None
 
+
 class BaseSubagent(ABC):
     """Abstract base class for all specialized sub-agents conforming to AIConfig protocols."""
 

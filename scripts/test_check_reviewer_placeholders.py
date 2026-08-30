@@ -38,8 +38,8 @@ def check(name, cond):
         print(f"FAIL: {name}")
 
 
-def fires(line, tmp_path):
-    f = tmp_path / "sample.md"
+def fires(line, tmp_path, name="sample.md"):
+    f = tmp_path / name
     f.write_text(line, encoding="utf-8")
     findings, examined = gate.scan([f])
     return bool(findings), examined
@@ -60,6 +60,14 @@ def main():
         (f"gh pr list --head {PHRASE}:branch", "a --head argument"),
         (f'"login": "{PHRASE}"', "a login value"),
         (f'reviewers=["{PHRASE}"],', "a reviewers=[...] literal"),
+        # Quoting is the likeliest real spelling of a two-word value.
+        (f'--reviewer "{PHRASE}"', "a QUOTED --reviewer flag"),
+        (f"--add-reviewer '{PHRASE}'", "a single-quoted --add-reviewer flag"),
+        (f"--reviewer={PHRASE}", "an =-joined --reviewer flag"),
+        (f"gh pr create -r {PHRASE}", "a -r reviewer flag"),
+        (f'-f reviewers[]="{PHRASE}"', "a quoted reviewers[]= field"),
+        (f'"reviewers": ["{PHRASE}"]', "a JSON reviewers array"),
+        (f"reviewers:\n  - {PHRASE}", "a YAML reviewers list item"),
     ]:
         hit, _ = fires(line, tmp)
         check(f"fires on {label}", hit)
@@ -81,17 +89,36 @@ def main():
         hit, _ = fires(line, tmp)
         check(f"does NOT fire on {label}", not hit)
 
+    # --- a value position WRAPPED ACROSS A LINE BREAK must still fire.
+    #     This is verbatim the shape the published workflow.qmd carried, and a
+    #     per-line scan could not see it.
+    hit, _ = fires(f"escalate to a human reviewer (`gh pr edit <N> --add-reviewer\n{PHRASE}`) rather than looping.", tmp)
+    check("fires on a value wrapped across a line break", hit)
+
+    # --- .qmd is scanned: the published site copy is the surface a new user
+    #     reads, and it was invisible while SUFFIXES omitted this extension.
+    hit, _ = fires(f"--add-reviewer {PHRASE}", tmp, name="page.qmd")
+    check("a .qmd file IS scanned", hit)
+    hit, _ = fires(f"--add-reviewer {PHRASE}", tmp, name="rule.mdc")
+    check("a .mdc file IS scanned", hit)
+
     # --- the population is reported, so a zero has a denominator ---
     f = tmp / "clean.md"
     f.write_text("nothing here\n", encoding="utf-8")
     findings, examined = gate.scan([f])
     check("reports how many files it examined", examined == 1 and not findings)
 
-    # --- a file type outside the set is skipped rather than silently scanned ---
-    f2 = tmp / "thing.txt"
-    f2.write_text(f"owner: {PHRASE}\n", encoding="utf-8")
-    findings, examined = gate.scan([f2])
-    check("a .txt file is outside the scanned set", examined == 0 and not findings)
+    # --- an empty population is exit 2, not a clean pass. A gate that
+    #     examined nothing reports clean and is indistinguishable from one
+    #     that passed, which the module docstring claims and the git-error
+    #     handler alone did not deliver.
+    real_tracked = gate.tracked_files
+    gate.tracked_files = lambda: []
+    try:
+        rc = gate.main()
+    finally:
+        gate.tracked_files = real_tracked
+    check("examining zero files exits 2, not 0", rc == 2)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

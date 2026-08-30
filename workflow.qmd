@@ -89,8 +89,9 @@ See
 for the full definition this page summarizes.
 
 **Deadlock:** if you and the reviewer can't reach consensus after a rebuttal
-exchange, escalate to a human reviewer (`gh pr edit <N> --add-reviewer
-the repository owner`) rather than looping.
+exchange, escalate to a human reviewer via the `request-pr-review` skill, which
+resolves the reviewer from the repository's own configuration rather than
+from a name written here, rather than looping.
 
 ## Keep branches synced with main
 

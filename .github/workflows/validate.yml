@@ -51,6 +51,11 @@ jobs:
         run: python3 scripts/test_oaicopilot_models_template.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run orchestrator tests
+        # ai-config#2627: this suite existed and ran nowhere, so the
+        # orchestrator's own behaviour was unpinned -- which is how a literal
+        # non-username reached a live reviewer request.
+        run: python3 scripts/test_orchestrator.py
       - name: Check for hardcoded person-names in value positions
         # ai-config#2627: this plugin is used by people other than its author,
         # so a login hardcoded into an `owner:`/`--reviewer`/`reviewers[]=`

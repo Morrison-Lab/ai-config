@@ -22,6 +22,7 @@ from orchestrator.models import (
 )
 from orchestrator.state_store import StateStore
 from orchestrator.subagents import (
+    configured_pr_reviewers,
     CoderSubagent,
     CoordinatorSubagent,
     ResearcherSubagent,
@@ -1258,6 +1259,57 @@ class TestAIConfigProtocolsAndPRClaim(unittest.TestCase):
         self.assertFalse(args_sweep.claim_pr)
         self.assertTrue(args_sweep.mwc)
 
+
+class TestConfiguredPRReviewers(unittest.TestCase):
+    """ai-config#2627: the reviewer must come from config, not a hardcoded login.
+
+    Before this, `subagents.py` passed the literal string "the repository
+    owner" straight into `reviewers[]=` on a real API POST -- a username
+    containing spaces, valid for nobody, including the author. The plugin is
+    used by people other than its author, so a hardcoded login is correct for
+    at most one of them.
+
+    The unset case is the one that matters: returning None (rather than a
+    fallback) is what lets `mark_pr_ready_and_request_review`'s `if reviewers:`
+    guard skip the request entirely. No reviewer requested is the right
+    failure; a wrong one fails at the API with the result discarded, so it
+    leaves no local signal at all.
+    """
+
+    def setUp(self):
+        self._saved = os.environ.get("AI_CONFIG_PR_REVIEWERS")
+        os.environ.pop("AI_CONFIG_PR_REVIEWERS", None)
+
+    def tearDown(self):
+        os.environ.pop("AI_CONFIG_PR_REVIEWERS", None)
+        if self._saved is not None:
+            os.environ["AI_CONFIG_PR_REVIEWERS"] = self._saved
+
+    def test_unset_returns_none_so_the_request_is_skipped(self):
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_empty_returns_none(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = ""
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_separators_only_returns_none(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = " , , "
+        self.assertIsNone(configured_pr_reviewers())
+
+    def test_single_login(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = "octocat"
+        self.assertEqual(configured_pr_reviewers(), ["octocat"])
+
+    def test_multiple_logins_are_split_and_trimmed(self):
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = " alice , bob "
+        self.assertEqual(configured_pr_reviewers(), ["alice", "bob"])
+
+    def test_never_returns_a_value_containing_a_space(self):
+        # The original defect in one assertion: whatever comes back must be
+        # usable as a GitHub login.
+        os.environ["AI_CONFIG_PR_REVIEWERS"] = "alice,bob"
+        for name in configured_pr_reviewers() or []:
+            self.assertNotIn(" ", name)
 
 def main():
     unittest.main(verbosity=2)

@@ -7,6 +7,12 @@ Every commitment of the form "going forward, I will X", "from now on I won't Y",
 "I'll always Z", "I won't do that again", "that is owed by me" must ship an **implemented
 accountability mechanism in the same turn** --- or not be made at all.
 
+The same rule applies to a concrete claim that automation will finish later:
+"GitLab will launch the next review round," "GitHub Actions will run CI," or
+"the review bot will post a review." A push may trigger automation, but it does
+not establish that it will run or finish. State the live status, or arm a
+monitor that explicitly checks the CI or review result and report when it fires.
+
 ## Why this needs a rule rather than more care
 
 A promise is composed at the exact moment a correction lands, which is the

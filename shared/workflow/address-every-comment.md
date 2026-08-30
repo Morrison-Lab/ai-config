@@ -1,5 +1,6 @@
 When iterating on a PR with a reviewer, **address every in-scope flagged item**,
-regardless of severity label. The reviewer's "Informational", "Not a blocker", "minor", "nit",
+regardless of severity label.
+The reviewer's "Informational", "Not a blocker", "minor", "nit",
 "optional", "consider", or "if you want" labels are for prioritization, not a
 free pass for the implementer.
 

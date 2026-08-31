@@ -125,8 +125,9 @@ the diagnostic signal lies in clustering and mechanical repetition.
   while avoiding semicolons, colons, parentheses, or mid-thought periods.
 - **Em-dash density:**
   Overusing em-dashes as an all-purpose glue for clause attachment
-  (human baseline is ~3---10 per 1,000 words;
-  unconstrained LLM output often exceeds 30+ per 1,000 words).
+  (human baseline is ~3.2 per 1,000 words;
+  GPT-4.1 measured at ~10.6 per 1,000 words,
+  with concern thresholds at 20+ per 1,000 words).
 - **Smart punctuation leakage:**
   Curly quotes (typographic double and single quotes), ellipsis glyphs,
   and model artifacts (`attributableIndex`, `turn0search0`, `oaicite`, `oai_citation`, `[cite: 1]`).

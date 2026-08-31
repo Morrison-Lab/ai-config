@@ -168,8 +168,9 @@ vs. *"One stray 'delve'; otherwise clean."*
 ## Relationship to other skills
 
 - **[`memories/ai-writing-patterns.md`](../../memories/ai-writing-patterns.md)** —
-  the underlying research catalog (29 empirical patterns, statistical detection
-  metrics including burstiness and TTR, and multi-tier anti-slop architectures).
+  the underlying research catalog (20 core empirical patterns synthesized from
+  community research, statistical detection metrics including burstiness and TTR,
+  and multi-tier anti-slop architectures).
 - **`simplify` / `tidy`** — the code-side analogues (cut dead code / cruft);
   this skill is the prose-side analogue (cut filler / reflexes).
 - **`grade-work`** — when reviewing a deliverable, fold an AI-tells pass into

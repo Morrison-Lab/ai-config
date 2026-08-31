@@ -104,6 +104,26 @@ class TestDoctor(unittest.TestCase):
         self.assertEqual(data["key"], "value // not a comment")
         self.assertEqual(data["nested"]["num"], 42)
 
+    def test_strip_jsonc_trailing_commas(self):
+        jsonc_with_trailing = """{
+            "items": [
+                1,
+                2,
+                3,
+            ],
+            "nested": {
+                "a": "hello",
+                "b": "world",
+            },
+            "quoted_comma": "keep this comma, inside string",
+        }"""
+        clean = doctor.strip_jsonc_comments(jsonc_with_trailing)
+        data = json.loads(clean)
+        self.assertEqual(data["items"], [1, 2, 3])
+        self.assertEqual(data["nested"]["a"], "hello")
+        self.assertEqual(data["nested"]["b"], "world")
+        self.assertEqual(data["quoted_comma"], "keep this comma, inside string")
+
     def test_check_jsonc_configs_valid(self):
         res = doctor.check_jsonc_configs()
         self.assertTrue(res["ok"])

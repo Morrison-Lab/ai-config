@@ -163,7 +163,7 @@ def check_context_closure() -> Dict[str, Any]:
 
 
 def strip_jsonc_comments(text: str) -> str:
-    """Strip single-line (//) and multi-line (/* */) comments from JSONC text."""
+    """Strip comments and trailing commas from JSONC text while preserving string literals."""
     out = []
     i = 0
     n = len(text)
@@ -207,7 +207,47 @@ def strip_jsonc_comments(text: str) -> str:
         out.append(char)
         i += 1
 
-    return "".join(out)
+    no_comments = "".join(out)
+
+    # Second pass: strip trailing commas before } or ] outside string literals
+    out2 = []
+    i = 0
+    n2 = len(no_comments)
+    in_string = False
+    escape = False
+
+    while i < n2:
+        char = no_comments[i]
+
+        if in_string:
+            out2.append(char)
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            out2.append(char)
+            i += 1
+            continue
+
+        if char == ",":
+            j = i + 1
+            while j < n2 and no_comments[j] in " \t\r\n":
+                j += 1
+            if j < n2 and no_comments[j] in ("}", "]"):
+                i += 1
+                continue
+
+        out2.append(char)
+        i += 1
+
+    return "".join(out2)
 
 
 def check_jsonc_configs() -> Dict[str, Any]:
@@ -241,7 +281,7 @@ def check_jsonc_configs() -> Dict[str, Any]:
             clean = strip_jsonc_comments(raw)
             json.loads(clean)
         except Exception as exc:
-            failed.append(f"{path.name} ({exc})")
+            failed.append(f"{path} ({exc})")
 
     if failed:
         return {

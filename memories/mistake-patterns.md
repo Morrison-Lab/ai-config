@@ -643,3 +643,14 @@ A clean automated review from every available provider evaluating the current HE
   Mutation testing with encoded/escaped representations detects unhandled
   transformation divergences.
 
+## Pattern 35: Tone-Policing or Ignoring User Profanity Instead of Diagnosing the Underlying Defect
+- **Do**: Treat user profanity, exasperation, or intense frustration as a top-severity telemetry signal that a severe mistake or workflow failure just occurred.
+  Immediately halt, inspect live state, tool outputs, and recent steps to diagnose the root cause, execute the complete fix in that same turn, and run UMS to prevent recurrence mechanically.
+- **Don't**: Scold or tone-police the user, lecture them about politeness, dismiss profanity as irrelevant emotional venting, offer defensive excuses, or emit canned corporate apologies ("I apologize for any frustration...") without fixing the underlying defect.
+- **Example**: 2026-08-31, Issue #2644: User profanity is often met by language models with reflex tone-policing, defensiveness, or vacuous HR apologies while leaving the broken code, stale state, or dropped context unaddressed.
+- **Canonical Rule**: [`user-profanity-signal.md`](../shared/workflow/user-profanity-signal.md), [`fixing-mistakes-is-top-priority.md`](../shared/workflow/fixing-mistakes-is-top-priority.md), [`no-empty-promises.md`](../shared/workflow/no-empty-promises.md), and [`preferences.md`](preferences.md).
+- **Fix**: Immediately diagnose what broke, state the factual defect plainly, execute the full remediation in the same turn, and trigger an urgent UMS pass.
+- **Algorithmatizable?**
+  Partially.
+  Hook triggers or prompt analysis can flag high-frustration turns to prompt immediate diagnosis and UMS passes.
+

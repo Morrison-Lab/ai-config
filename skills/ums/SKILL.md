@@ -29,6 +29,10 @@ committed pass.
   **A user correction is a mandatory immediate trigger.** Persist the lesson
   before resuming the main task; never wait for the user to invoke UMS or
   remind you a second time.
+  **User profanity or frustration is an urgent trigger.**
+  It signals a severe mistake, broken assumption, or dropped preference
+  requiring immediate diagnosis, repair, and learning
+  (see [`user-profanity-signal`](../../shared/workflow/user-profanity-signal.md)).
 - **When you read a review of your work, receive critical feedback on it,
   or a questioned claim turns out to be wrong.**
   The trigger is the scrutiny, not Address, not a clean verdict, and not

@@ -22,6 +22,11 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- **Treat user profanity and frustration as an urgent defect signal**:
+  Profanity, exasperation, or intense frustration from the user is almost always a signal that an agent made a severe mistake, regressed behavior, dropped context, violated a preference, or gave a cop-out offer.
+  Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.
+  Immediately halt, inspect recent actions/state to diagnose the root cause, remediate the defect completely in that same turn, trigger an urgent UMS pass, and implement mechanical enforcement.
+  See [`shared/workflow/user-profanity-signal.md`](../shared/workflow/user-profanity-signal.md) and [`memories/mistake-patterns.md`](mistake-patterns.md) Pattern 35. (User directive / Issue #2644, 2026-08-31.)
 - **Do:** use hosted/cloud models for delegated work and adversarial review; if
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.

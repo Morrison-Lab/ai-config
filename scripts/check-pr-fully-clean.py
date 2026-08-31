@@ -966,7 +966,21 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         return m.group("keep") + " "
 
     text = _SHA_CITATION.sub(" ", text)
-    text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
+    # The strip only ever protects a reviewer's OWN stated verdict from
+    # being overridden by one it cites. Where the body states no verdict
+    # of its own, there is nothing to protect, and stripping the cited
+    # one leaves a body stating no verdict at all -- which does not clear
+    # anything, but does drop a signal origin/main acts on.
+    #
+    # That gate is structural rather than lexical, which is what makes it
+    # worth having: the veto below is a closed word list, and this file
+    # says elsewhere that a veto list cannot enumerate every re-raise
+    # phrasing. Requiring an explicit verdict section bounds the strip's
+    # blast radius no matter how the surrounding prose is worded -- the
+    # worst it can now do is let a stated verdict stand, never invent
+    # silence where a signal was.
+    if _VERDICT_HEADING_RE.search(text):
+        text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
     text, mask = _strip_fences_with_mask(text, mask)
@@ -976,6 +990,14 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     text, mask = _sub_with_mask(_STRAIGHT_QUOTE_SPAN, _blank_quote, text, mask)
     text, mask = _sub_with_mask(_CURLY_QUOTE_SPAN, _blank_quote, text, mask)
     return text, mask
+
+
+# An explicit verdict heading, the same shape
+# _is_marked_or_in_verdict_section looks for. Its presence is what
+# licenses the posted-verdict citation strip.
+_VERDICT_HEADING_RE = re.compile(
+    r"(?:^|\n)[ \t]*#{1,4}[ \t]*verdict\b", re.IGNORECASE
+)
 
 
 def strip_cited_finding_vocab(text: str) -> str:

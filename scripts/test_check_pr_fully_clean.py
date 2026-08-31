@@ -3261,6 +3261,36 @@ def main() -> int:
             "narration with " + label + " is stripped",
             checker.classify_verdict(body) == "clean",
         )
+    # The strip is gated on the body stating a verdict of its own: it
+    # exists to stop a CITED verdict from overriding the reviewer's own,
+    # so with none to protect it must not fire. This bounds the strip
+    # structurally rather than by vocabulary, which matters because the
+    # veto is a closed word list and this file says elsewhere that such
+    # a list cannot enumerate every re-raise phrasing. Each body below
+    # is a live rejection whose re-raise is phrased outside that list,
+    # or sits in the next sentence entirely.
+    for label, unstated in (
+        ("a re-raise in the next sentence",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**). "
+         "This must be fixed before merge."),
+        ("'the bug is present'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "the bug is present."),
+        ("\"hasn't been fixed\"",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it hasn't been fixed."),
+        ("'requires a fix'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it requires a fix."),
+    ):
+        check(
+            "no verdict section, so " + label + " is NOT stripped",
+            checker.classify_verdict(unstated) == "not-clean",
+        )
     # The adversarial direction for the same gate: a real citation with
     # a live requirement riding behind it, and an unrelated link standing
     # in for the attribution. Both classified clean while origin/main

@@ -1448,7 +1448,7 @@ _LINE_RESOLUTION_WORDS = re.compile(
     r"|no\s+longer\s+applies"
     r"|(?:now|already|previously|all)\s+(?:fixed|resolved|addressed|cleared|closed)"
     r"|(?:item|items|feedback|issues?|findings?|bugs?|everything|both|all)\s+(?:now\s+|also\s+|already\s+|since\s+)?(?:fixed|resolved|addressed|closed|cleared)"
-    r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:(?:this|it|that|the\s+(?:bug|issue|finding|defect|crash|problem|leak))\s+)?(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
     r")\b"
     r"|^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
 )

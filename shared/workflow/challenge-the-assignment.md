@@ -596,6 +596,59 @@ particular manufacture is gone.
 The script is still not the diff-scoped job.
 That fragment's own Don't pair already said not to treat it as the check CI runs.)
 
+**An issue body is an assignment you author, and its proposed fix is a second
+claim the brief case does not carry.**
+This fragment's opening already names an issue body among the assignments a
+**recipient** must challenge.
+Everything in this section is written for a brief, though, so nothing here
+fires when the artifact you are writing is an issue --- and an issue is the
+worse case on every property the section leans on.
+It is self-contained by force, like a brief.
+It arrives as authority, like a brief.
+And it outlives the session that wrote it, so its reader is a stranger or a
+later you, with no conversation left to contradict it.
+
+The derive-and-paste remedy transfers unchanged.
+What does not transfer is the shape of the damage, because an issue body
+carries something a brief usually does not: a **proposed fix**, whose
+sufficiency is computed from the state claim above it.
+
+So a wrong count does not merely make one sentence false.
+It makes the proposal unable to produce the outcome the issue's own
+motivation section promises, while every sentence stays individually
+defensible --- the state claim is a sincere report of what the author found,
+and the fix does address the problem as stated.
+A reader checks the fix against the stated problem, and it passes.
+The gap sits between the stated problem and the real one, and nothing inside
+the issue exposes it.
+
+The check is one question, asked before filing: does the sufficiency of what
+I am proposing depend on a count, a set, or an enumeration?
+When it does, derive that set with a command and paste the command, per the
+bullets above.
+[`derive-dont-enumerate`](derive-dont-enumerate.md)'s "A helper's call sites
+are a subset of the effect's sites" covers how such a set gets undercounted
+while looking complete.
+
+- **Do:** apply this section's derive-and-paste rule to an issue body, not
+  only to a brief handed to an agent.
+- **Do:** ask whether the proposed fix's sufficiency turns on the count you
+  just asserted, and derive that count before proposing.
+- **Don't:** read an internally consistent issue as a checked one ---
+  agreement between a problem statement and its own fix says nothing about
+  either against the world.
+
+([`Morrison-Lab/gha#778`](https://github.com/Morrison-Lab/gha/issues/778),
+2026-08-31.
+The issue was filed stating that `claude.yml` has three review-dispatch sites
+and proposing an input that would gate one of them.
+It has four, verified by grepping `gh workflow run` over that file at
+`838011e`, so the proposed input would have left the fourth dispatching, and
+the issue's own "Why it matters now" section promised an on-request-only
+reviewer that its proposed fix could not deliver.
+An [`adversarial-reviewer`](adversarial-self-review.md) subagent found it;
+the author had already read the same file twice without finding it.)
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

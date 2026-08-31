@@ -979,7 +979,19 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # blast radius no matter how the surrounding prose is worded -- the
     # worst it can now do is let a stated verdict stand, never invent
     # silence where a signal was.
-    if _VERDICT_HEADING_RE.search(text):
+    #
+    # What it does NOT close: a body whose own verdict is clean and whose
+    # only live signal is prose the checker cannot read as a finding.
+    # That is not a detection this loses -- with the citation removed,
+    # origin/main reads such a body clean too -- so it is the general
+    # prose-detection gap rather than this strip's, tracked as
+    # ai-config#2696 and asserted in the suite.
+    # The heading is looked for in FENCE-STRIPPED text. This gate runs
+    # before the fences are removed, so a "### Verdict" inside a code
+    # block would otherwise license the strip -- and a review OF this
+    # file quotes exactly that heading in a fence.
+    _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))
+    if _VERDICT_HEADING_RE.search(_fence_free):
         text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.

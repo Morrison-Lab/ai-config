@@ -3291,6 +3291,44 @@ def main() -> int:
             "no verdict section, so " + label + " is NOT stripped",
             checker.classify_verdict(unstated) == "not-clean",
         )
+    # A verdict heading inside a FENCE does not license the strip. The
+    # gate runs before fences are removed, and a review of this file
+    # quotes that heading in a code block.
+    fenced_heading = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "the bug is present.\n\n```\n### Verdict\n```\n"
+    )
+    check(
+        "a verdict heading inside a fence does not license the strip",
+        checker.classify_verdict(fenced_heading) == "not-clean",
+    )
+    # The residual this gate does NOT close, asserted so it is visible
+    # rather than discovered: a body stating its own clean verdict, whose
+    # only live signal is prose the checker cannot detect as a finding,
+    # reads clean once the cited verdict is stripped. That is not a lost
+    # detection -- with the citation removed, this same body reads clean
+    # on origin/main too, because neither version detects "the bug is
+    # present" as a finding. The block origin/main produces here comes
+    # entirely from the citation false positive this PR removes, so the
+    # two are inseparable. Tracked as ai-config#2696.
+    undetectable_prose = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "the bug is present.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a stated clean verdict stands over prose the checker cannot read",
+        checker.classify_verdict(undetectable_prose) == "clean",
+    )
+    control_no_citation = (
+        "In response to a prior round, the bug is present."
+        "\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "control: the same prose without a citation is already clean",
+        checker.classify_verdict(control_no_citation) == "clean",
+    )
     # The adversarial direction for the same gate: a real citation with
     # a live requirement riding behind it, and an unrelated link standing
     # in for the attribution. Both classified clean while origin/main

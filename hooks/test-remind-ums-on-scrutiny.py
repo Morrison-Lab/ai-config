@@ -122,6 +122,11 @@ REMIND = [
     ([Q, WRONG, FIX_SHARED], "a corpus edit is not an explicit UMS pass"),
     ([UMS, Q, WRONG], "UMS before the correction does not count"),
     ([UMS, REVIEW], "UMS before the review-read does not count"),
+    # Flawed query / filter explanation after questioning (ai-config#2775).
+    ([Q, txt("It filtered discussion-level timestamps rather than every nested note.")],
+     "questioned then filtered ... rather than explanation"),
+    ([Q, txt("You are right. Note 14169 is an unresolved diff comment. My prior query missed it because it filtered discussion-level timestamps rather than every nested note.")],
+     "questioned then issue #2775 admission"),
 ]
 
 SILENT = [

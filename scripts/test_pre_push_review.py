@@ -1055,10 +1055,11 @@ class TestPrePushReview(unittest.TestCase):
 
     def test_verdict_no_blockers_found(self):
         commit = "12345678abcdef00"
-        report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] No blockers found.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
-        is_valid, is_clean, _ = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
-        self.assertTrue(is_valid)
-        self.assertTrue(is_clean)
+        for phrase in ("No blockers found.", "No known blockers remain outstanding.", "Zero blockers identified in this review.", "There are no blockers preventing merge."):
+            report = f"### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] {phrase}\n### Verification Steps\nNone\nReviewed-Commit: {commit}"
+            is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+            self.assertTrue(is_valid, f"Expected valid for '{phrase}', got: {reason}")
+            self.assertTrue(is_clean, f"Expected clean for '{phrase}', got: {reason}")
 
     def test_verdict_mislabeled_blocker(self):
         commit = "12345678abcdef00"

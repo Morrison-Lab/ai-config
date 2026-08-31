@@ -310,3 +310,7 @@ Capture the SHA `update-branch` produces (or re-read `head.sha` / `headRefOid` i
 - **Do:** merge the moment a pinned-head read comes back clean --- on a base advancing this fast, waiting for a second confirmation only buys the base another chance to move again first.
 - **Don't:** key a poller on exit status alone with no head pin --- an unpinned poll can return a stale head's "clean" verdict after `update-branch` has already superseded it.
 - **Don't:** batch-update several PRs before merging any of them (per `gh-cli.md`'s "Strict branch protection makes a clean PR queue merge serially" section) --- the pinning fix here does not relax that serialization requirement.
+
+**Follow-up, 2026-08-30: strict mode is confirmed active in this repo.**
+`gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true` (read 2026-08-30, during the ai-config#2638 merge described in [`gh-cli.md`](gh-cli.md)'s update-branch section).
+That settles the setting's presence, not the #2470/#2480 asymmetry above --- the queue-ordering account of why one comparably-stale PR merged while the other was refused remains unverified.

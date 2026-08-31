@@ -203,7 +203,8 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
 - **`check-history`** — run *before* implementing to avoid creating avoidable
   conflicts/regressions in the first place; this skill cleans up the ones that
   still happen.
-- **`deconflict-sessions` / `session-lock`** — **not** this skill. Those are
+- **`session-lock`** — **not** this skill.
+  It is
   about two AI *sessions* clobbering one local checkout (a locking concern),
   not git *content* conflicts. Different sense of "conflict."
 

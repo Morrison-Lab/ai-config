@@ -429,6 +429,29 @@
   Org-level rulesets (`gh api "orgs/<org>/rulesets"`) can also gate branches in member repos and would still return "nothing required" with the repo queries alone;
   add that sweep when the repo belongs to an org.
 
+  **One endpoint answers both scopes, and `bypass_actors` is what turns a merge into evidence.**
+  `repos/<o>/<r>/rules/branches/<branch>` returns the rules actually **in effect** on that branch, org-level rulesets included, so it needs no separate org sweep;
+  each entry carries `ruleset_source_type` and `ruleset_id`, which is how a repo rule is told from an org one.
+  Then read the bypass fields off the single-ruleset object before treating a successful merge as evidence about the gates:
+  `mergeable_state: "clean"` says no required check is missing only when the actor could not have bypassed the rule instead.
+  ```bash
+  gh api "repos/<o>/<r>/rules/branches/<branch>" \
+    --jq '.[] | "\(.type) \(.ruleset_source_type) \(.ruleset_id)"'
+  gh api "repos/<o>/<r>/rulesets/<id>" --jq '{current_user_can_bypass, bypass_actors}'
+  ```
+  `current_user_can_bypass` is one of `always`, `pull_requests_only`, `never`.
+  `bypass_actors` can be **absent from the response entirely** rather than an empty array, so test for the key rather than for a length.
+  (Measured 2026-08-31 against two rulesets, both reporting
+  `current_user_can_bypass: "never"` and no `bypass_actors` key at all:
+  `Morrison-Lab/ai-config` ruleset 17712474 and `UCD-SERG/shigella` ruleset 6339629.
+  The second is worth its own mention because it is how the trap was met:
+  a reader who tests the value rather than the key sees `None` from
+  `dict.get`, reports it as `bypass_actors: null`, and has recorded a field
+  that is not in the response.)
+  These are plain REST endpoints, so `curl` with `GH_TOKEN` reaches every one of them in a session with no `gh` on `PATH` and no ruleset MCP tool.
+  Do not read the absence of such a tool as the settings being unreadable, per
+  [`growth-mindset`](../shared/workflow/growth-mindset.md)'s "A limitation you never tested leaves no error to diagnose" (UCD-SERG/shigella#46, 2026-08-31).
+
   **Required checks are not the only thing a ruleset carries -- Copilot code review is turned on there too.**
   A `copilot_code_review` rule schedules Copilot itself, so nothing in the PR requests the review and no per-PR reviewer entry explains where it came from.
   Read it off the same endpoint:
@@ -705,6 +728,15 @@ This will trigger any CI pipelines or automated review workflows that run on pus
 You must wait for those new runs to pass before the PR is fully clean again.
 
 (Measured 2026-08-25 via `gh pr update-branch --help`)
+
+**Confirmed live 2026-08-30 on Morrison-Lab/ai-config#2638, as the remedy for a merge refusal --- and the re-verify runs against the NEW head.**
+`gh pr merge --squash` refused a review-clean PR whose `mergeable` read `MERGEABLE` with "not mergeable: the head branch is not up to date with the base branch" --- `MERGEABLE` reports only conflict-freedom, so it does not predict this refusal (branch protection requires up-to-date branches here: `gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true`, read 2026-08-30).
+`gh pr update-branch <N>` cleared it (the merge commit changes the branch, not the PR's diff against the base);
+after the re-triggered runs described above, `python3 scripts/check-pr-fully-clean.py <N>` re-verified against the **new** head, and the merge went through.
+[`github.md`](github.md)'s "not up to date with the base branch" section carries the fuller treatment, including pinning any poller to the head SHA `update-branch` actually produced.
+
+- **Do:** on the "not up to date" refusal, run `gh pr update-branch <N>`, then re-verify fully-clean on the new head before merging.
+- **Don't:** retry the merge unchanged, treat the old head's clean verdict as covering the new head, or read `MERGEABLE` as predicting the merge will be accepted.
 
 ## Strict branch protection makes a clean PR queue merge serially
 

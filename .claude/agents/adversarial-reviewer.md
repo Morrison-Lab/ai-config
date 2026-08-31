@@ -51,6 +51,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
+     You must append a machine-readable block at the end of the findings section (as a bare line, not inside a fence or backticks): [FINDINGS_COUNT: <N>] where <N> is the integer number of findings.
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
 6. **Fingerprint what you read and include structured data**

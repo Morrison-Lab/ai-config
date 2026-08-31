@@ -39,14 +39,14 @@ check.
 Claim **type** can, because it is observable in the sentence you are about to
 write:
 
-The five are worth keeping as a list rather than collapsing into "check your
+They are worth keeping as a list rather than collapsing into "check your
 claims", because each names a different *repair*, and the repair is the part
 that is easy to skip.
 
 ## A premise you were handed is still a claim
 
-All five types above describe assertions **you** generate, so all five trigger
-on the act of writing one.
+Every type above describes an assertion **you** generate, so each one triggers
+on the act of writing it.
 A premise supplied by the user triggers on nothing.
 It arrives as context rather than as a claim, you did not reason your way to
 it, and adopting it feels like listening rather than like asserting.
@@ -295,7 +295,7 @@ ends up protected while the person does not.
 
 ## An action you recommend is a claim about state
 
-The five types above fire on an assertion, and the section above extends them
+The claim types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 Both are things somebody states.
 A recommendation states nothing about the world.

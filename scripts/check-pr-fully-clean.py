@@ -37,8 +37,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import bisect
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -943,7 +945,173 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
         re.IGNORECASE,
     )
+    # A parenthesized citation of a PAST round's verdict -- the shape the
+    # review bot uses when narrating which round a comment responded to:
+    # "This is the author's direct response to [round 6's finding](<url>)
+    # (posted 2026-08-30T05:22:14Z, verdict **Needs more work**), per ..."
+    # (ai-config#2662). Like _SHA_CITATION above, the strip requires a
+    # POSITIVE context signal rather than just the parenthesized shape,
+    # and here that signal is a markdown link whose TEXT names the cited
+    # round, sitting immediately before the aside -- a semantic line
+    # break between them is allowed. An unattributed "posted <ts>,
+    # verdict **X**", parenthesized or not, is left alone entirely:
+    # stripping a live not-clean is the dangerous direction, and a veto
+    # list alone cannot enumerate every re-raise phrasing.
+    #
+    # An attribution PHRASE ("in response to", "responds to", "replied
+    # to") was once accepted in the link's place. It is not, and must not
+    # be: it matched any prose containing those words, which is what let
+    # an unrelated link and a live requirement through. The link is now
+    # the only accepted signal.
+    #
+    # The link text naming the round, and the aside ending the clause,
+    # are both required, and neither is cosmetic.
+    #
+    # Accepting any "](url)" made an unrelated link into an attribution
+    # signal, so "violates the style guide [docs](url) (posted ...,
+    # verdict **Needs more work**) so please fix it" was stripped. And
+    # accepting any following text let a live requirement ride behind a
+    # real citation -- "[round 2](url) (posted ...) which should be
+    # fixed before merge". Both classified clean while origin/main
+    # classified them not-clean, which is the fail-open this whole
+    # mechanism must not produce.
+    #
+    # So the shape is the machine-generated narration this exists for,
+    # and nothing wider: a link whose text says which round, the aside,
+    # then the end of the clause. Human prose falls outside it and is
+    # kept, which over-flags rather than merging over a live rejection.
+    _POSTED_VERDICT_CITATION = re.compile(
+        r"(?P<keep>\[[^\]\n]{0,120}\bround[ \t]*[-#]?[ \t]*\d+"
+        r"[^\]\n]{0,120}\]\([^()\s]{1,400}\)[ \t\n]*)"
+        r"\(posted\s+[0-9]{4}-[0-9]{2}-[0-9]{2}"
+        r"T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?Z?"
+        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)"
+        r"(?=[,;.!?]|$)",
+        re.IGNORECASE,
+    )
+    # The veto is the second gate, not the only one. It runs in code
+    # over the citation's whole containing SECTION, heading to heading,
+    # in both directions.
+    #
+    # Every narrower bound tried first leaked. A forward-only lookahead
+    # window missed "The finding remains unaddressed despite my response
+    # to it (posted ...)" and any re-raise past its length bound.
+    # Bounding backward by the sentence and forward by the paragraph
+    # then missed a re-raise in the preceding sentence and one in the
+    # following paragraph -- which is where narration puts it, since the
+    # citation must end its own clause to match at all. The section is
+    # the bound that stopped leaking, and it needs no paragraph
+    # arithmetic, so a run of blank lines cannot mislead it.
+    #
+    # The matched aside itself is excluded from the scan (its own
+    # "verdict **Needs more work**" must not self-veto), while the kept
+    # attribution link text is included.
+    _RERAISE_VOCAB = re.compile(
+        r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
+        r"|outstanding|ignored|reopen(?:s|ed)?|recurs?|persists?|stands?"
+        r"|must\s+be|needs?\s+to\s+be|should\s+be|has\s+to\s+be"
+        r"|blocks?|blocking|blocker|before\s+merg(?:e|ing)"
+        r"|appl(?:y|ies|ied)|valid"
+        r"|(?:not|never)\s+(?:yet\s+)?(?:been\s+)?"
+        r"(?:fixed|resolved|addressed|corrected))\b",
+        re.IGNORECASE,
+    )
+
+    def _vocab_between(lo: int, hi: int) -> bool:
+        if hi <= lo:
+            return False
+        return bisect.bisect_left(_vocab_at, lo) < bisect.bisect_left(
+            _vocab_at, hi
+        )
+
+    def _strip_posted_aside(m: "re.Match") -> str:
+        _h_idx_back = bisect.bisect_right(_heading_starts, m.start()) - 1
+        backward_start = _heading_starts[_h_idx_back] if _h_idx_back >= 0 else 0
+
+        _h_idx_fwd = bisect.bisect_left(_heading_starts, m.end())
+        forward_end = (
+            _heading_starts[_h_idx_fwd]
+            if _h_idx_fwd < len(_heading_starts)
+            else len(m.string)
+        )
+
+        keep_end = m.start() + len(m.group("keep"))
+        if _vocab_between(backward_start, keep_end) or _vocab_between(
+            m.end(), forward_end
+        ):
+            return m.group(0)
+        return m.group("keep") + " "
+
     text = _SHA_CITATION.sub(" ", text)
+    # The strip only ever protects a reviewer's OWN stated verdict from
+    # being overridden by one it cites. Where the body states no verdict
+    # of its own, there is nothing to protect, and stripping the cited
+    # one leaves a body stating no verdict at all -- which does not clear
+    # anything, but does drop a signal origin/main acts on.
+    #
+    # That gate is structural rather than lexical, which is what makes it
+    # worth having: the veto below is a closed word list, and this file
+    # says elsewhere that a veto list cannot enumerate every re-raise
+    # phrasing. Requiring an explicit verdict section bounds the strip's
+    # blast radius no matter how the surrounding prose is worded -- the
+    # worst it can now do is let a stated verdict stand, never invent
+    # silence where a signal was.
+    #
+    # What it does NOT close: a body whose own verdict is clean and whose
+    # only live signal is prose the checker cannot read as a finding.
+    # That is not a detection this loses -- with the citation removed,
+    # origin/main reads such a body clean too -- so it is the general
+    # prose-detection gap rather than this strip's, tracked as
+    # ai-config#2696 and asserted in the suite.
+    # The heading is looked for in FENCE-STRIPPED text. This gate runs
+    # before the fences are removed, so a "### Verdict" inside a code
+    # block would otherwise license the strip -- and a review OF this
+    # file quotes exactly that heading in a fence.
+    # Computed ONCE for the whole body and looked up per match.
+    # Recomputing inside the callback rebuilds the entire prefix on every
+    # citation, which is quadratic in the body -- 6.8s on a comment at
+    # GitHub's 65536-character cap packed with citations, against 0.007s
+    # for origin/main. That is the same trap _sentence_start_before's
+    # own two-pointer scan exists to avoid, reintroduced at its other
+    # call site.
+    #
+    # And computed AFTER _SHA_CITATION.sub above, because that substitution
+    # replaces a variable-length match with one space and therefore
+    # SHIFTS every position after it. Building these against the raw
+    # argument left them describing a string that no longer existed, so
+    # a veto word sitting right beside a citation was looked for at the
+    # wrong offset and missed -- and missing the veto strips a live
+    # not-clean, the dangerous direction. Positions and text must come
+    # from the same revision of the string.
+    # Heading starts and veto-word positions are likewise computed once. Slicing the tail per citation re-scans the
+    # rest of the body every time, which is quadratic in a body packed
+    # with them: 400 citations took 1.26s and each doubling quadrupled it.
+    #
+    # Testing membership by bisect over precomputed positions preserves
+    # the semantics exactly, rather than approximating them with a
+    # per-paragraph flag: the regions searched are the containing section's
+    # bounds around the citation, with the aside itself still excluded so
+    # its own verdict text cannot self-veto.
+    _lines = text.split("\n")
+    _line_starts = [0]
+    for _l in _lines[:-1]:
+        _line_starts.append(_line_starts[-1] + len(_l) + 1)
+    # swallow_unclosed=True folds an unclosed fence's interior into
+    # fenced_lines and leaves orphan_markers empty by construction, so
+    # there is no second set to union in here.
+    _ignored_lines = find_fence_spans(text, swallow_unclosed=True)[0]
+
+    _heading_starts = []
+    for _h in re.finditer(r"(?m)^#{1,6}\s", text):
+        _lineno = bisect.bisect_right(_line_starts, _h.start()) - 1
+        if _lineno not in _ignored_lines:
+            _heading_starts.append(_h.start())
+
+    _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
+
+    _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))
+    if _VERDICT_HEADING_RE.search(_fence_free):
+        text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
     text, mask = _strip_fences_with_mask(text, mask)
@@ -953,6 +1121,14 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     text, mask = _sub_with_mask(_STRAIGHT_QUOTE_SPAN, _blank_quote, text, mask)
     text, mask = _sub_with_mask(_CURLY_QUOTE_SPAN, _blank_quote, text, mask)
     return text, mask
+
+
+# An explicit verdict heading, the same shape
+# _is_marked_or_in_verdict_section looks for. Its presence is what
+# licenses the posted-verdict citation strip.
+_VERDICT_HEADING_RE = re.compile(
+    r"(?:^|\n)[ \t]*#{1,4}[ \t]*verdict\b", re.IGNORECASE
+)
 
 
 def strip_cited_finding_vocab(text: str) -> str:
@@ -988,19 +1164,36 @@ _BARE_REJECTION = (
     r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
 )
 
+# The clause scan admits a parenthesized aside as a single unit, because a
+# reviewer enumerating the resolved findings puts them in parens -- "both
+# round-2 blocking findings (demo caption overclaim, missing tactics.qmd
+# companion video) are resolved" -- and the commas and filename dots inside
+# that aside are not clause boundaries. Bare parens are excluded from the
+# character alternative so the two branches are disjoint: letting `(` match
+# either branch is exponential backtracking on a failing enumeration like
+# "(1) (2) ... (24)" (measured at 51s), and a stray unmatched paren failing
+# the scan fails safe (the mention stays blocking). The resolution verb is
+# tense-checked ("is/are/was/were ... fixed", "has/have been fixed", "no
+# longer applies") so a live directive like "must be fixed before merge"
+# never reads as already resolved.
 RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?!\b(?:and|but|while|although|however)\b)[^,:;.!?]){0,120}\b(?:"
-    r"(?:is|was)\s+(?:now\s+)?"
+    r"^(?:(?!\b(?:and|but|while|although|however)\b)"
+    r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
+    r"(?:is|are|was|were)\s+(?:now\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|has\s+(?:since\s+)?been\s+"
+    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
+    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['\u2019]s)?\s+"
+    r"(?:diff|push|commit|changes?|fixes?))?"
     r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
     r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
     r"(?:is|are|was|were)\s+(?:also\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|,?\s+with\s+no\s+new\s+(?:issues?|findings?)"
+    r"(?:\s+(?:introduced|found|added|identified))?"
     r")?\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
@@ -1012,21 +1205,179 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 )
 
 
+# Used by the negated-resolution guard, its only caller: a
+# [.!?] ends a sentence only when whitespace or end-of-text follows, so a
+# filename ("tactics.qmd") or a decimal does not split one. A trailing
+# abbreviation dot does not either -- "e.g." mid-sentence otherwise
+# restarts the sentence and hides everything before it, including a
+# negator. Merging two sentences only ever widens the scan, which
+# over-flags rather than exempting, so the safe direction.
+_SENTENCE_END_RE = re.compile(
+    r"(?<!\be\.g)(?<!\bi\.e)(?<!\bcf)(?<!\bvs)(?<!\betc)"
+    r"(?<!\bapprox)(?<!\bresp)(?<!\bfig)"
+    r"(?<![.!?])[.!?](?=\s|$)",
+    re.IGNORECASE,
+)
+# A dot inside one of these is not a sentence end either. Checked in code
+# against the token before the candidate, since the token has no bound a
+# lookbehind could take.
+_TOKEN_BREAK = " \t\n"
+def _is_gap(char: str) -> bool:
+    """True for whitespace and for any invisible formatting character.
+
+    ``str.isspace`` reports neither a zero-width space nor a joiner, a
+    BOM, a word joiner or a soft hyphen -- and a tool inserts exactly
+    those into a long URL so it can soft-wrap. One left behind becomes
+    the whole token, which carries no URL marker and so accepts a faked
+    sentence end. The Unicode format category covers the class rather
+    than a list that the next such character escapes.
+    """
+    return char.isspace() or unicodedata.category(char) == "Cf"
+
+
+def _sentence_start_before(text: str) -> int:
+    """Offset just past the last real sentence end in ``text``.
+
+    Splits on ``_SENTENCE_END_RE`` and then discards any candidate whose
+    preceding whitespace-delimited token looks like a URL or path --
+    one carrying ``/`` or ``www.``, which covers ``://`` too -- since its
+    internal dots would otherwise restart the sentence mid-clause and
+    hide everything before them from the caller's scan.
+    """
+    start = 0
+    # Two pointers that only ever move FORWARD across the text, so every
+    # character is visited once over the whole loop: the last token
+    # break seen, and the last URL marker seen. The token then "contains
+    # a marker" exactly when the marker is more recent than the break,
+    # which answers the question without ever materializing the token.
+    #
+    # Both the backward per-candidate scan and the token slice are
+    # quadratic on a body whose separators are all non-ASCII, because
+    # the token extends to the start of the text and grows with each
+    # candidate. Measured at 5.4s for 256,000 characters separated by
+    # non-breaking spaces, against 0.02s here.
+    last_break = -1
+    last_marker = -1
+    scanned = 0
+    for end in _SENTENCE_END_RE.finditer(text):
+        # The token is found by scanning back over any whitespace run and
+        # then over the word itself, which costs their lengths rather
+        # than the prefix's. Slicing and splitting the whole prefix
+        # instead is quadratic over a body with many sentences, and a
+        # review comment at GitHub's 65536-character cap took over five
+        # seconds that way.
+        #
+        # Skipping the whitespace run FIRST is what makes the token the
+        # preceding word rather than the empty string: a candidate whose
+        # punctuation is itself preceded by a space ("... /etc/passwd .")
+        # otherwise yields an empty token, which passes the URL check and
+        # accepts a faked sentence end -- narrowing the caller's scan,
+        # which is the fail-open direction.
+        #
+        # The two loops use DIFFERENT character sets, and each set is
+        # wrong for the other's job.
+        #
+        # The skip consumes any str.isspace run, so a trailing
+        # non-breaking space -- an ordinary copy-paste artifact -- does
+        # not leave itself behind as the token ("/etc/passwd \xa0."),
+        # which would be content-free and pass the URL check.
+        #
+        # The extent stops only at space, tab or newline, so a carriage
+        # return or non-breaking space INSIDE a URL does not end the
+        # token early ("http://x.io/a\rx.") and leave a bare word whose
+        # dot then reads as a real sentence end.
+        #
+        # Both shapes are the same fail-open by different routes: a
+        # faked sentence end narrows the caller's scan past the negator
+        # it was looking for. (The citation veto once shared this scan
+        # and no longer does, so only the negator guard is at stake.)
+        token_end = end.start()
+        while token_end > 0 and _is_gap(text[token_end - 1]):
+            token_end -= 1
+        while scanned < token_end:
+            if text[scanned] in _TOKEN_BREAK:
+                last_break = scanned
+            elif text[scanned] == "/" or (
+                scanned + 4 <= token_end
+                and text[scanned:scanned + 4].lower() == "www."
+            ):
+                # The bound matters: startswith reads the global text, so
+                # without it a token ending in "www" glued to the
+                # sentence's own period matches on that period and the
+                # candidate is discarded as a URL.
+                last_marker = scanned
+            scanned += 1
+        if last_marker > last_break:
+            continue
+        start = end.end()
+    return start
+_NEGATOR_RE = re.compile(
+    r"\b(?:none|no|not|never|neither|nothing|nobody|nor"
+    r"|zero|hardly|barely|scarcely)\b",
+    re.IGNORECASE,
+)
+
+
 def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
         return False
     prefix = scan[max(0, match.start() - 40):match.start()]
     past_state = re.search(
-        r"(?:\bpreviously(?:[-\s]+|\s+\*{1,2})"
-        r"|\bprior\s+(?:verdict(?:['\u2019]s)?|(?:finding|issue)s?)\s+)$",
+        r"(?:\bpreviously"
+        r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
+        r"|\s+(?:finding|issue)s?)?"
+        r"|\bearlier"
+        r"|\bround-\d+(?:['\u2019]s)?"
+        r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",
         prefix,
         re.IGNORECASE,
     )
     if past_state is None:
         return False
+    # A negated resolution -- "None of the earlier blocking findings were
+    # resolved" -- is a live not-clean statement: the suffix reads as
+    # resolved only because the negator sits BEFORE the past-state marker,
+    # outside the suffix scan.
+    #
+    # Three narrower rules were tried and each failed OPEN, which is the
+    # dangerous direction, so the blunt rule below is a deliberate
+    # retreat rather than a first guess. Deciding whether a negator
+    # scopes over the resolution is a parsing problem, and every lexical
+    # proxy for it admitted a new shape: a glue whitelist let a count
+    # through ("None of the TWO earlier ..."), a bounded word run let a
+    # longer run through ("None of the several very recently identified
+    # earlier ...") and rested on the false premise that punctuation
+    # ends a negator's scope, which fails when the punctuation sits
+    # INSIDE the negated noun phrase ("None of the many
+    # previously-identified, still-outstanding earlier ..."), and
+    # testing the negator's apparent grammatical role let a governor
+    # word prepended to the target phrasing through ("WITH none of the
+    # previously blocking findings were resolved"), including when a
+    # required clause boundary was present but sat inside that same noun
+    # phrase.
+    #
+    # So: ANY negator earlier in the same sentence defeats the
+    # exemption, with no attempt to judge what it quantifies.
+    #
+    # What that costs is one over-flag: a genuinely resolved narration
+    # whose sentence happens to open with an unrelated negated clause
+    # ("With no new issues, both round-2 blocking findings ... are
+    # resolved") stays blocking. That is a false NOT-clean, which stalls
+    # a merge until a human looks, whereas every rule above bought that
+    # case by risking a false clean, which merges over a live rejection.
+    # The asymmetry is this file's stated policy, so the trade is not
+    # close. A negator AFTER the mention is unaffected, so the common
+    # trailing form ("... are resolved, with no new issues introduced")
+    # still reads as resolved.
+    sentence_start = _sentence_start_before(scan[:match.start()])
+    if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
+        return False
     suffix = scan[match.end():]
-    sentence = re.match(r"^[^.!?]*[.!?]?", suffix)
+    # A dot glued to the next character -- a filename ("tactics.qmd"), a
+    # decimal -- is not a sentence end; only [.!?] followed by whitespace
+    # or end-of-text terminates the sentence.
+    sentence = re.match(r"^(?:(?![.!?](?:\s|$))[\s\S])*[.!?]?", suffix)
     if sentence is None:
         return False
     paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
@@ -1063,6 +1414,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
     r"changes\s+requested\b",
     _BARE_REJECTION,
+    r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 
@@ -1153,6 +1505,7 @@ FINDING_PATTERNS = [
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
     _BARE_REJECTION,
+    r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
 ]
 FINDING_HEADING_PATTERNS = {

@@ -42,7 +42,7 @@
     "max_bytes": 8192
   },
   "compaction": {
-    "auto": true,
-    "tail_turns": 15
+    "auto": false,
+    "prune": false
   }
 }

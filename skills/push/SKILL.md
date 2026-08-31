@@ -254,7 +254,7 @@ review, not a draft).
 
 - **`claim-pr`** — posts/removes the claim comment this skill reads in check #3.
   `push` is the read side; `claim-pr` is the write side.
-- **`session-lock` / `deconflict-sessions`** — the local-checkout counterpart: it keeps parallel sessions on one machine from sharing a working tree.
+- **`session-lock`** — the local-checkout counterpart: it keeps parallel sessions on one machine from sharing a working tree.
   `push` guards the *remote* branch; `session-lock` guards the *local* tree.
 - **`sync-pr-branch` / `merge-main`** — when check #2 fires because `main` (not the branch) moved ahead, sync the branch first, then push.
   `sync-pr-branch` ends in a push and should itself honor these checks.

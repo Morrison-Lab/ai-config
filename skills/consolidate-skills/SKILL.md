@@ -41,7 +41,7 @@ cluster into exactly one of three buckets:
 
 1. **Intentional alias family — LEAVE ALONE.** One canonical SKILL.md with real
    content; the rest are thin stubs that only redirect to it (e.g.
-   `ard`/`adr`/`address-rebut-defer`, `cb`/`prune`/`clean-branches`,
+   `ard`/`adr`, `cb`/`prune`/`clean-branches`,
    `sync-pr-branch`/`merge-main`/`resync-branch`). This is the *target* state,
    not a problem. Tell: the others' bodies are ~5 lines ending in
    `→ **[<canonical>](../<canonical>/SKILL.md)**`.

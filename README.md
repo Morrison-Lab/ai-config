@@ -241,7 +241,8 @@ are picked up automatically.
 When several AI sessions have the **same local checkout** open at once (two
 Claude Code tabs, a CLI + the IDE extension, two terminals) they can clobber
 each other — branch switches under uncommitted edits, racing pushes, duplicate
-builds. The **`session-lock`** skill (alias `deconflict-sessions`) is the
+builds.
+The **`session-lock`** skill is the
 local-filesystem counterpart to `claim-pr`: a small registry CLI
 (`skills/session-lock/scripts/ai-session.sh`) keeps a machine-local list of
 active sessions under `.git/ai-sessions/`, so sessions can see each other,
@@ -365,7 +366,7 @@ The event mapping is [docs/cursor-hook-mapping.md](docs/cursor-hook-mapping.md).
 | `remind-ums-on-scrutiny.py` | `UserPromptSubmit` | reminds, never blocks, when a review of your work was read, or a questioned claim was then corrected, with no explicit UMS after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion; wholly inert until its `MORATORIUM_END` (2026-09-01) while the standing directive forbids the Copilot request it would demand |
-| `no-unshipped-commit.py` | `Stop` | blocks a completion reply after a commit with no later push or PR creation |
+| `no-unshipped-commit.py` | `Stop` | blocks a completion reply while the session's branch carries unpushed commits (derived from `git rev-list --count @{u}..HEAD`; a dropped commit no longer blocks) |
 | `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
 | `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
 | `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt, and surfaces once a monitor whose last 3 polls all errored with the same text; local pollers cannot wake a terminated model session |

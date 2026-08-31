@@ -197,6 +197,8 @@ _DEBT_SRC = r"""(
       \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
     | \b """ + _SUBJ + _MODAL + r"""\s+wait\s+(?:right\s+)?here\b
+    | \b(?:scheduled\s+check(?:in)?\s+at\b)
+    | \b(?:next\s+check(?:in)?\s+at\b)
     )"""
 
 # A statement that CI or a reviewer WILL perform a future action makes the

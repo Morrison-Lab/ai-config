@@ -4484,6 +4484,17 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ok, issues = wrapped_check_review_comments("123", target_sha, "octocat/example", quorum=1)
         check("check_review_comments: does not match mismatched structured commit_sha", not ok)
 
+    # Partial reviews / truncated diffs must classify as not-clean (#note_14109)
+    truncated_review_sample = (
+        "🔍 **Auto-review by primary (databricks-gpt-5-6-sol) of MR !50** (75 commit(s), latest: 2ce64536)\n\n"
+        "**Partial review:** the supplied MR diff was truncated by 31,743 bytes. This review covers only the provided diff and post-change file contents; the omitted region was not assessed, so this is not approval of the MR as a whole.\n\n"
+        "Within the available scope, I found no new actionable defects."
+    )
+    check("classify_verdict: partial review with truncated diff classifies as not-clean",
+          checker.classify_verdict(truncated_review_sample) == "not-clean")
+    check("_unresolved_finding_pattern: partial review triggers finding pattern",
+          checker._unresolved_finding_pattern(truncated_review_sample) is not None)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

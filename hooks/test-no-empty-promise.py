@@ -599,6 +599,13 @@ CASES = [
     ([say("I owe #1937 the ARDI loop."),
       bash("/usr/bin/env python3 hooks/monitor-open-prs.py --monitor")],
      False, "`/usr/bin/env python3` discharges"),
+    ([say("Running unit tests. Scheduled check at 2026-08-31 09:02:15 PDT.")],
+     True, "an un-armed 'Scheduled check at' claim blocks as an empty promise"),
+    ([say("Running unit tests. Scheduled check at 2026-08-31 09:02:15 PDT."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "ScheduleWakeup",
+           "input": {"delaySeconds": 60, "prompt": "Check unit tests."}}]}}],
+     False, "an armed 'Scheduled check at' claim discharges"),
     ([say("I owe #1937 the ARDI loop."),
       bash("env PATH=/opt/homebrew/bin:$PATH python3 hooks/monitor-open-prs.py "
            "--monitor")],

@@ -131,7 +131,7 @@ For a long or multi-item run, borrow the background-runner-plus-DONE-marker *sha
 
 Capture stdout and gate on the exit status instead, per step 4.
 
-**`MAXPAR` is the fifth, and it half-transfers: it applies to the hosted tier and not to the local one.** Local runs share one machine’s GPU and memory, so raising parallelism against a single ollama daemon contends for the same hardware instead of fanning out. The crossover point is unmeasured here, so treat local work as serial until somebody measures it.
+**`MAXPAR` is the fifth, and it needs a provider-aware bound.** Hosted providers enforce their own rate and concurrency limits. Start with the provider’s documented limit and reduce parallelism when responses report throttling.
 
 ### 4. Detect failure
 

@@ -485,7 +485,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>The <code>bytes=0</code> success gate</strong>, which reads the <code>-o</code> file that was never written. It therefore reports <code>bytes=0</code> for every item, misclassifying a run that fully succeeded as one that entirely failed.</li>
 </ul>
 <p>Capture stdout and gate on the exit status instead, per step 4.</p>
-<p><strong><code>MAXPAR</code> is the fifth, and it half-transfers: it applies to the hosted tier and not to the local one.</strong> Local runs share one machine’s GPU and memory, so raising parallelism against a single ollama daemon contends for the same hardware instead of fanning out. The crossover point is unmeasured here, so treat local work as serial until somebody measures it.</p>
+<p><strong><code>MAXPAR</code> is the fifth, and it needs a provider-aware bound.</strong> Hosted providers enforce their own rate and concurrency limits. Start with the provider’s documented limit and reduce parallelism when responses report throttling.</p>
 </section>
 <section id="detect-failure" class="level3">
 <h3 class="anchored" data-anchor-id="detect-failure">4. Detect failure</h3>

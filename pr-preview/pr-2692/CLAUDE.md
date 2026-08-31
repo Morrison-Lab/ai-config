@@ -188,7 +188,8 @@ models via Zen, operationalized by `delegate-to-opencode`), `agy` CLI
 (headless dispatch available since the 2026-08-25 clarification), and
 OpenRouter (prepaid credit balance for frontier/stealth previews).
 Local and on-device models are prohibited because they can crash the user's
-computer. When hosted quota is unavailable, report the blocker or use
+computer.
+When hosted quota is unavailable, report the blocker or use
 deterministic checks instead of starting a local inference runtime.
 `agy` (Google Antigravity)'s **API** route was permanently retired for
 dispatched work (user directive, 2026-08-20, ai-config#1776).

@@ -952,22 +952,30 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         )
 
     def _strip_posted_aside(m: "re.Match") -> str:
-        sentence_start = _sentence_starts[
-            bisect.bisect_right(_sentence_starts, m.start()) - 1
-        ]
-        # Forward to the end of the PARAGRAPH, not the sentence. A
-        # re-raise often lands in the next sentence ("(posted ...). It
-        # remains open."), which a sentence-bounded scan cannot see.
-        # Widening the scan can only make the veto fire more often, so it
-        # keeps more citations -- the fail-closed direction.
-        _idx = bisect.bisect_left(_paragraph_ends, m.end())
-        paragraph_end = (
-            _paragraph_ends[_idx] if _idx < len(_paragraph_ends)
+        _p_idx = bisect.bisect_right(_paragraph_starts, m.start()) - 1
+        prev_p_start = _paragraph_starts[max(0, _p_idx - 1)]
+        _h_idx_back = bisect.bisect_right(_heading_starts, m.start()) - 1
+        h_start = _heading_starts[_h_idx_back] if _h_idx_back >= 0 else 0
+        backward_start = max(prev_p_start, h_start)
+
+        _idx_fwd = bisect.bisect_left(_paragraph_ends, m.end())
+        _target_p_idx = _idx_fwd + 1
+        p_bound = (
+            _paragraph_ends[_target_p_idx]
+            if _target_p_idx < len(_paragraph_ends)
             else len(m.string)
         )
+        _h_idx_fwd = bisect.bisect_left(_heading_starts, m.end())
+        h_bound = (
+            _heading_starts[_h_idx_fwd]
+            if _h_idx_fwd < len(_heading_starts)
+            else len(m.string)
+        )
+        forward_end = min(p_bound, h_bound)
+
         keep_end = m.start() + len(m.group("keep"))
-        if _vocab_between(sentence_start, keep_end) or _vocab_between(
-            m.end(), paragraph_end
+        if _vocab_between(backward_start, keep_end) or _vocab_between(
+            m.end(), forward_end
         ):
             return m.group(0)
         return m.group("keep") + " "
@@ -1013,23 +1021,20 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # wrong offset and missed -- and missing the veto strips a live
     # not-clean, the dangerous direction. Positions and text must come
     # from the same revision of the string.
-    _sentence_starts = [0]
-    for _end in _SENTENCE_END.finditer(text):
-        _sentence_starts.append(_end.end())
-    # Paragraph ends and veto-word positions are likewise computed once.
-    # Slicing the tail per citation re-scans the rest of the body every
-    # time, which is quadratic in a body packed with them: 400 citations
-    # took 1.26s and each doubling quadrupled it. Only the BACKWARD half
-    # had been fixed; widening the forward scan to the paragraph
-    # reintroduced the trap on the other side.
+    # Paragraph starts/ends, heading starts, and veto-word positions are
+    # likewise computed once. Slicing the tail per citation re-scans the
+    # rest of the body every time, which is quadratic in a body packed
+    # with them: 400 citations took 1.26s and each doubling quadrupled it.
     #
     # Testing membership by bisect over precomputed positions preserves
     # the semantics exactly, rather than approximating them with a
-    # per-paragraph flag: the regions searched are still the sentence
-    # before the citation, the attribution link, and the paragraph after
-    # it, with the aside itself still excluded so its own verdict text
-    # cannot self-veto.
+    # per-paragraph flag: the regions searched are the containing section's
+    # preceding and following paragraph bounds around the citation, with
+    # the aside itself still excluded so its own verdict text cannot
+    # self-veto.
+    _paragraph_starts = [0] + [_p.end() for _p in re.finditer(r"\n[ \t]*\n", text)]
     _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
+    _heading_starts = [_h.start() for _h in re.finditer(r"(?m)^#{1,6}\s", text)]
     _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
 
     _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))

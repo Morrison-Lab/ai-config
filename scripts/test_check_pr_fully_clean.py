@@ -3256,17 +3256,36 @@ def main() -> int:
         "a 'not been addressed' re-raise refuses the strip",
         checker.classify_verdict(not_been_addressed) == "not-clean",
     )
-    # The veto scans the containing sentence BACKWARD and the containing
-    # paragraph FORWARD: a re-raise stated before the attribution refuses
-    # the strip, and one past any fixed window length does too.
+    # The veto scans the containing and adjoining paragraphs around the citation:
+    # a re-raise stated before the attribution (even in a preceding sentence) refuses
+    # the strip, and one in a following paragraph within the section does too.
     backward_reraise = (
-        "The finding remains unaddressed despite my response to it "
+        "The finding remains unaddressed in [round 2](https://x) "
         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
         "### Verdict\n**Ready for merge**"
     )
     check(
         "a re-raise BEFORE the citation refuses the strip",
         checker.classify_verdict(backward_reraise) == "not-clean",
+    )
+    preceding_sentence_reraise = (
+        "The blocking issue is still open. [round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise in the preceding sentence refuses the strip",
+        checker.classify_verdict(preceding_sentence_reraise) == "not-clean",
+    )
+    following_paragraph_reraise = (
+        "[round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "This is still unresolved.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise in the following paragraph refuses the strip",
+        checker.classify_verdict(following_paragraph_reraise) == "not-clean",
     )
     long_sentence_reraise = (
         "In response to [round 2](https://x) "

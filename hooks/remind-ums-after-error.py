@@ -115,7 +115,7 @@ ADMISSION = re.compile(
     | \bi\s+(?:missed|overlooked)\s+
         (?!(?:out|the\s+point)\b)
         (?:(?:that|this|it|these|those)|(?:(?:the|a|an|that|this|these|those|my|our)\s+)?(?:note|comment|issue|pr|diff|finding|warning|error|file|line)|\w+\s+because)\b
-    | \b(?:it|\bi|\bwe)\s+filtered\s+[^\n.!?]+?\s+rather\s+than\b
+    | \b(?:it|i|we)\s+filtered\s+[^\n.!?]+?\s+rather\s+than\b
     )""",
     re.I | re.X,
 )

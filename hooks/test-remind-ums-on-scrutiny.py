@@ -159,6 +159,10 @@ SILENT = [
      "bare admission without a question is the sibling's case"),
     ([Q, txt("The API filtered results by date rather than author.")],
      "third-party filtered ... rather than in scrutiny turn"),
+    ([Q, txt("The commit filtered lines rather than files.")],
+     "commit filtered ... rather than (word ending in it)"),
+    ([Q, txt("The audit filtered results rather than users.")],
+     "audit filtered ... rather than (word ending in it)"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

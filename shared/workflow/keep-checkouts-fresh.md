@@ -142,6 +142,11 @@ In every session --- at session start, and again periodically during long sessio
    Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal.
    A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref --- the discarded commits stay recoverable via `git reflog` regardless.
 4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry --- not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this).
+   **If the repository uses ai-config (or another tool) as both a native plugin and a submodule, remove the submodule rather than bumping it.**
+   Native plugin integration supersedes the submodule;
+   keeping both causes drift, double-loading, and maintenance friction.
+   See [`remove-redundant-plugin-submodules.md`](remove-redundant-plugin-submodules.md).
+   Where a repo legitimately relies on the submodule (e.g. an environment lacking plugin support):
    Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.
    A pin more than a few weeks or dozens of commits stale is worth refreshing: file a tracking issue, bump it (`git submodule update --init --remote .ai-config` from the parent repo handles both init and fetch in one step; or, if already checked out, `git fetch origin` inside the submodule before `git checkout origin/main`), then `git add .ai-config` in the parent repo to record the new gitlink, verify the parent repo's own checks still pass, and open a PR.
    Before assuming this is risk-free, check whether the parent repo's CI actually reads the submodule's checked-out content (vs. treating it as inert until a dev runs `git submodule update --init` locally) --- a pin bump is a pure pointer change with no functional surface only when nothing reads it.

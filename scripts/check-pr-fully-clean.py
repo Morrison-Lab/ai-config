@@ -330,7 +330,7 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
         fenced, _, orphans = find_fence_spans(body)
         fenced_lines = fenced | orphans
     except Exception:
-        fenced_lines = set()
+        return None
 
     comment_pattern = re.compile(
         r"<!--\s*review-(?:data|json)\s*:\s*(\{[\s\S]*?\})\s*-->",
@@ -1728,7 +1728,7 @@ def check_latest_verdict(
 
 
 _REVIEW_STRUCTURE_HEADING = re.compile(
-    r"(?im)^#{1,6}\s*(?:Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
+    r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
 
 
@@ -1744,8 +1744,6 @@ def _is_structured_review_body(body: str) -> bool:
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
-    if extract_structured_review(body) is not None:
-        return True
     scan = strip_cited_finding_vocab(body)
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
@@ -1905,11 +1903,12 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         oid = item[3]
 
         structured = extract_structured_review(body)
-        struct_sha = str(structured.get("commit_sha", "")).strip() if structured else ""
+        struct_sha = str(structured.get("commit_sha", "")).strip().lower() if structured else ""
+        sha_lower = sha.lower()
         is_struct_sha_match = bool(
-            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha or sha.startswith(struct_sha))
+            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha_lower or sha_lower.startswith(struct_sha))
         )
-        is_sha_match = bool((oid and oid == sha) or is_struct_sha_match or sha_short in body or sha in body)
+        is_sha_match = bool((oid and oid.lower() == sha_lower) or is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

@@ -3223,6 +3223,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_reviewer_identity: agent marker takes precedence over structured reviewer field", checker._reviewer_identity("**claude finished review**\n" + struct_clean.replace('"Claude"', '"adversarial-reviewer"'), author="github-actions[bot]") == "Claude")
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
+    check("_is_structured_review_body: casual mention of JSON without heading/fingerprint is NOT structured body", not checker._is_structured_review_body("Here is the JSON format:\n<!-- review-data: {\"verdict\":\"CLEAN\"} -->"))
 
     # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
     conflicting_body = """

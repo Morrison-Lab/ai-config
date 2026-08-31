@@ -1042,6 +1042,18 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
+    def test_verdict_false_negatives_rejected(self):
+        commit = "12345678abcdef00"
+        reports = [
+            "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] The fix addresses no fewer than three blocking issues in the auth module.\n### Verification Steps\nNone\nReviewed-Commit: " + commit,
+            "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] This bug is blocking issue #123 and must be resolved first.\n### Verification Steps\nNone\nReviewed-Commit: " + commit,
+            "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] The regression was blocking issue tracking for release.\n### Verification Steps\nNone\nReviewed-Commit: " + commit,
+        ]
+        for report in reports:
+            is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+            self.assertFalse(is_clean, f"Report should be rejected: {report}")
+            self.assertIn("Contradictory output: clean verdict but report contains blocking phrase", reason)
+
     def test_verdict_mislabeled_blocker(self):
         commit = "12345678abcdef00"
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[MINOR] The command crashes on every invocation and is not ready for merge.\n### Verification Steps\nNone\nReviewed-Commit: " + commit

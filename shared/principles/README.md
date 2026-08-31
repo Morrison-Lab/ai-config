@@ -318,6 +318,23 @@ or write and validate the software yourself before consuming its output.
 
 Full statement: [`no-llm-algorithmic-thinking`](no-llm-algorithmic-thinking.md).
 
+## Specific beats general
+
+When two instructions, policies, configurations, or design rules apply
+to the same decision, the narrower, more specific rule takes precedence
+over the broader, more general one.
+General policies define default baselines for the standard case;
+specific instructions express intentional decisions for the concrete case at hand.
+Explicit human user instructions in a session override general repository defaults,
+narrow subsystem and file configs override repository-wide policies,
+and targeted types and condition handlers beat generic catch-alls.
+
+Full statement: [`specific-beats-general`](specific-beats-general.md).
+Operationalized by:
+[`fail-fast`](fail-fast.md) (specific condition classes over catch-alls),
+[`least-flexible-tool`](../coding/least-flexible-tool.md) (narrowest construct for the job),
+and [`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (clarifying ambiguity vs resisting explicit direction).
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -392,6 +409,12 @@ The goal half fires only on the third occurrence, by which point
 recurrence is observed rather than predicted.
 Feeling both at once usually means the count is one or two, and the way
 out is to wait rather than to argue.
+
+Specific-beats-general governs precedence across the entire catalog:
+it resolves conflicts between layers by establishing that explicit user
+instructions outrank repository defaults, scoped subsystem configs
+outrank top-level policies, and specific types and handlers outrank
+generic fallbacks in code.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

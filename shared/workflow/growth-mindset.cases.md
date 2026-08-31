@@ -43,3 +43,28 @@ as a flat denial, and answered by searching the MCP registry and plugin
 catalog for a GitHub Discussions server to install.
 Neither could have helped -- a local server sits behind the same proxy.
 The REST route the refusal named worked on the first attempt.)
+
+## "A limitation you never tested" --- branch-protection settings reported unreadable across several turns, never once queried
+
+(`UCD-SERG/shigella#46`, 2026-08-31: across several turns a session told the
+user that GitHub branch-protection and ruleset settings were "not readable
+from this session" and that confirming a required-checks list needed a human
+to open Settings.
+The claim was inferred from the absence of a dedicated MCP tool for rulesets,
+never tested, and then restated across several turns --- including in a merged
+PR body and in a filed issue, where it became a "needs a human with
+branch-protection access" note that outlived the conversation.
+
+`GH_TOKEN` was set in the environment throughout, and plain `curl` against the
+REST API answered every part of the question on the first attempt:
+`/repos/{owner}/{repo}/rulesets` for the list,
+`/repos/{owner}/{repo}/rulesets/{id}` for a ruleset's rules and
+`bypass_actors`, `/repos/{owner}/{repo}/rules/branches/{branch}` for the rules
+in effect including org-level ones, and
+`/repos/{owner}/{repo}/branches/{branch}` for the classic protection summary.
+The endpoints are recorded in
+[`memories/gh-cli.md`](../../memories/gh-cli.md).
+
+The false claim was load-bearing rather than incidental: it is what put the
+"a human has to check this" note into two deliverables, so the cost was not a
+mistaken sentence in chat but a premise shipped to later readers.)

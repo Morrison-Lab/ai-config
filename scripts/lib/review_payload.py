@@ -136,16 +136,23 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
         # other.
         #
         # WHITESPACE rather than column zero, which an earlier cut required and
-        # which was worse than the hole it closed: `build_review_prompt` and
-        # both persona files render the payload three spaces in, so a reviewer
-        # following the prompt's own layout had its payload silently dropped
-        # and a NOT_CLEAN verdict reported clean.  One leading space was enough.
+        # which was worse than the hole it closed.  `build_review_prompt` and
+        # both persona files then rendered the payload three spaces in, so a
+        # reviewer following the prompt's own layout had its payload silently
+        # dropped and a NOT_CLEAN verdict reported clean.  One leading space
+        # was enough.
         #
-        # Three spaces is deliberately still readable while four is not: four
-        # is a CommonMark indented code block, which `code_region_mask` masks,
-        # so the two rules meet exactly at the CommonMark boundary rather than
-        # at an arbitrary one.  The prompt renders three and now says "flush
-        # left, not indented" explicitly, so a four-space payload is a
+        # Those three artifacts now render it FLUSH LEFT and say so, so the
+        # tolerance is no longer load-bearing for the prompt's own output --
+        # it is defence in depth against a reviewer that indents anyway, which
+        # is what the incident showed they do.  Keeping it costs nothing, and
+        # removing it would put the guard one whitespace character from
+        # failing open again.
+        #
+        # One to three spaces is deliberately still readable while four is not:
+        # four is a CommonMark indented code block, which `code_region_mask`
+        # masks, so the two rules meet exactly at the CommonMark boundary
+        # rather than at an arbitrary one.  A four-space payload is therefore a
         # deviation from a stated instruction reading as the code block it is.
         line_start = body.rfind("\n", 0, m.start()) + 1
         if body[line_start:m.start()].strip():

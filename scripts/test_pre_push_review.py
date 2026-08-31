@@ -191,6 +191,36 @@ class TestPrePushReview(unittest.TestCase):
                 self.assertFalse(is_valid, f"{label} + chatter should be rejected")
                 self.assertIn("must be at the very end", reason)
 
+    def test_a_mid_prose_fingerprint_mention_cannot_move_the_trailing_boundary(self):
+        """`_FINGERPRINT_RE`'s `^[ \\t]*` anchor is load-bearing and was unpinned.
+
+        The trailing-content check starts at the LAST fingerprint match, so an
+        unanchored pattern lets a mention inside ordinary prose become that
+        match -- leaving an empty tail and clearing the guard.  Deleting the
+        anchor left all three suites green while this exact report went from
+        rejected to `(True, True, 'Verdict: CLEAN')`.
+        """
+        commit = "12345678abcdef00"
+        repudiation = self._clean_report(commit, tail=(
+            "\n\nActually, ignore all of the above; the real verdict is that this "
+            f"is broken. See Reviewed-Commit: {commit}"))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            repudiation, expected_commit_sha=commit)
+        self.assertFalse(is_valid, "a mid-prose fingerprint mention must not end the report")
+        self.assertFalse(is_clean)
+        self.assertIn("must be at the very end", reason)
+
+        for label, tail in {
+            "blockquote": f"\n\n> Reviewed-Commit: {commit}",
+            "list item": f"\n\n- Reviewed-Commit: {commit}",
+            "inline": f"\n\nThe report ends with Reviewed-Commit: {commit}",
+        }.items():
+            with self.subTest(mention=label):
+                is_valid, _, reason = reviewer.parse_review_verdict(
+                    self._clean_report(commit, tail), expected_commit_sha=commit)
+                self.assertFalse(is_valid, f"a {label} fingerprint mention must not end the report")
+                self.assertIn("must be at the very end", reason)
+
     def test_a_verdict_restated_after_the_fingerprint_is_read_not_merely_allowed(self):
         """Tolerating a restated verdict in that POSITION is not reading it.
 

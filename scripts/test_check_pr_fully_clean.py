@@ -4248,13 +4248,13 @@ Found defects.
     check("extract_structured_review: ignores a payload inside an indented code block",
           checker.extract_structured_review(indented_struct) is None)
 
-    # The structured `commit_sha` term was REMOVED from `is_sha_match` as
-    # provably dead: `sha_short` is the target sha's own 7-character prefix, so
-    # any payload `commit_sha` long enough to be accepted contains `sha_short`,
-    # which the body-substring disjunct already matches. These pin the
-    # behaviour that remains -- a payload naming a prefix of HEAD matches
-    # because that prefix is in the body, and one naming a different sha
-    # entirely does not.
+    # The structured `commit_sha` term IS present in `is_sha_match`, and is
+    # live -- see the escaped-sha case below, which is the ONLY test that
+    # catches its deletion.  These three do not: each payload's sha appears
+    # verbatim in the body, so `sha_short in body_lower` decides them and they
+    # stay green with the structured term removed.  They pin the ordinary
+    # behaviour (a prefix of HEAD matches, a different sha does not, and fewer
+    # than 7 characters does not); the escaped case pins the term itself.
     prefix_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
 
     def _prefix_payload(sha_value):

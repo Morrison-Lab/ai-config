@@ -103,10 +103,11 @@ def generated_bodies(exhaustive=False):
     if exhaustive:
         leads, vocabs, negs = LEAD, VOCAB, NEGATION
     else:
-        # Fast default tier: include the baseline plus the specific entries added in #2668
-        leads = ["", "## "]
-        vocabs = ["Needs more work", "**[Defect]** Needs more work", "**Location:** a.py:1"]
-        negs = ["", " is still there; nothing fixed.", " remains open."]
+        # Fast default tier: include the baseline, the negation guards, quote placement,
+        # and complex finding shapes, while dropping redundant variations.
+        leads = [LEAD[0], LEAD[1], LEAD[2], LEAD[6]]
+        vocabs = [VOCAB[0], VOCAB[4], VOCAB[5]]
+        negs = [NEGATION[0], NEGATION[2], NEGATION[5]]
 
     for lead, d1, f1, v, d2, f2, neg in itertools.product(
         leads, DELIMS, FILLER + FILLER_EXTRA, vocabs, DELIMS, FILLER, negs

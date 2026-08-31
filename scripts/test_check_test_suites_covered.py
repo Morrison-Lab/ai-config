@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,10 +15,13 @@ SCRIPT_PATH = Path(__file__).resolve().parent / "check-test-suites-covered.py"
 
 spec = importlib.util.spec_from_file_location("check_test_suites_covered", SCRIPT_PATH)
 mod = importlib.util.module_from_spec(spec)
+sys.modules["check_test_suites_covered"] = mod
 spec.loader.exec_module(mod)
 
 check_coverage = mod.check_coverage
 find_test_suites = mod.find_test_suites
+extract_active_run_commands = mod.extract_active_run_commands
+is_suite_executed = mod.is_suite_executed
 main = mod.main
 
 
@@ -44,7 +48,7 @@ class TestFindTestSuites(unittest.TestCase):
             self.assertEqual(names, ["test_a.py", "test_b.py"])
 
 
-class TestCheckCoverage(unittest.TestCase):
+class TestExtractAndCheckCoverage(unittest.TestCase):
     def test_workflow_file_not_found(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
@@ -59,24 +63,7 @@ class TestCheckCoverage(unittest.TestCase):
             with self.assertRaises(ValueError):
                 check_coverage(wf, td)
 
-    def test_all_covered(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            td = Path(tmpdir)
-            (td / "test_a.py").write_text("# test", encoding="utf-8")
-            (td / "test_b.py").write_text("# test", encoding="utf-8")
-            wf = td / "validate.yml"
-            wf.write_text(
-                "steps:\n"
-                "  - run: python3 scripts/test_a.py\n"
-                "  - run: python3 scripts/test_b.py\n",
-                encoding="utf-8",
-            )
-
-            covered, missing = check_coverage(wf, td)
-            self.assertEqual(covered, ["test_a.py", "test_b.py"])
-            self.assertEqual(missing, [])
-
-    def test_missing_suites_reported(self):
+    def test_all_covered_single_and_multiline(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
             (td / "test_a.py").write_text("# test", encoding="utf-8")
@@ -85,13 +72,55 @@ class TestCheckCoverage(unittest.TestCase):
             wf = td / "validate.yml"
             wf.write_text(
                 "steps:\n"
-                "  - run: python3 scripts/test_a.py\n",
+                "  - name: Run test a\n"
+                "    run: python3 scripts/test_a.py\n"
+                "  - name: Run multiline\n"
+                "    run: |\n"
+                "      python3 scripts/test_b.py\n"
+                "      python3 scripts/test_c.py\n",
+                encoding="utf-8",
+            )
+
+            covered, missing = check_coverage(wf, td)
+            self.assertEqual(covered, ["test_a.py", "test_b.py", "test_c.py"])
+            self.assertEqual(missing, [])
+
+    def test_commented_out_line_does_not_cover(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            (td / "test_a.py").write_text("# test", encoding="utf-8")
+            (td / "test_b.py").write_text("# test", encoding="utf-8")
+            wf = td / "validate.yml"
+            wf.write_text(
+                "steps:\n"
+                "  - name: Run test a\n"
+                "    run: python3 scripts/test_a.py\n"
+                "  # - run: python3 scripts/test_b.py\n",
                 encoding="utf-8",
             )
 
             covered, missing = check_coverage(wf, td)
             self.assertEqual(covered, ["test_a.py"])
-            self.assertEqual(missing, ["test_b.py", "test_c.py"])
+            self.assertEqual(missing, ["test_b.py"])
+
+    def test_step_name_or_prose_mention_does_not_cover(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            (td / "test_a.py").write_text("# test", encoding="utf-8")
+            (td / "test_b.py").write_text("# test", encoding="utf-8")
+            wf = td / "validate.yml"
+            wf.write_text(
+                "steps:\n"
+                "  - name: Run test a\n"
+                "    run: python3 scripts/test_a.py\n"
+                "  - name: Mention test_b.py without running it\n"
+                "    run: echo 'no test here'\n",
+                encoding="utf-8",
+            )
+
+            covered, missing = check_coverage(wf, td)
+            self.assertEqual(covered, ["test_a.py"])
+            self.assertEqual(missing, ["test_b.py"])
 
 
 class TestMainCLI(unittest.TestCase):

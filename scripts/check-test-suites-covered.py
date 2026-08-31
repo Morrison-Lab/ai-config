@@ -6,12 +6,13 @@ If a test suite is added to `scripts/test_*.py` but omitted from `validate.yml`,
 it will never run in CI, leaving regressions unflagged (ai-config#2540).
 
 This check discovers all `scripts/test_*.py` files and verifies that each
-suite is referenced in `.github/workflows/validate.yml`.
+suite is executed on an active (uncommented) run line in `.github/workflows/validate.yml`.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,11 +28,54 @@ def find_test_suites(scripts_dir: Path) -> list[Path]:
     return sorted(scripts_dir.glob("test_*.py"))
 
 
+def extract_active_run_commands(workflow_text: str) -> list[str]:
+    """Extract all active (uncommented) command lines from run blocks in a workflow."""
+    lines = workflow_text.splitlines()
+    run_lines: list[str] = []
+    in_multiline_run = False
+    multiline_indent = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        if in_multiline_run:
+            current_indent = len(line) - len(line.lstrip())
+            if current_indent > multiline_indent:
+                run_lines.append(stripped)
+                continue
+            in_multiline_run = False
+
+        # Check for single line run: command
+        match_single = re.match(r"^\s*(?:-\s+)?run:\s+(.*)$", line)
+        if match_single:
+            cmd = match_single.group(1).strip()
+            if cmd in ("|", ">", "|-", ">-"):
+                in_multiline_run = True
+                multiline_indent = len(line) - len(line.lstrip())
+            else:
+                run_lines.append(cmd)
+
+    return run_lines
+
+
+def is_suite_executed(suite_name: str, run_commands: list[str]) -> bool:
+    """Return True if suite_name is executed in any active run command."""
+    pattern = re.compile(rf"(?:\bpython3?\s+[^\n]*\b|\b){re.escape(suite_name)}\b")
+    for cmd in run_commands:
+        # Ignore inline comments in commands if any
+        cmd_code = cmd.split("#")[0].strip()
+        if pattern.search(cmd_code):
+            return True
+    return False
+
+
 def check_coverage(
     workflow_path: Path,
     scripts_dir: Path,
 ) -> tuple[list[str], list[str]]:
-    """Compare discovered test suites against workflow content.
+    """Compare discovered test suites against active execution in workflow.
 
     Returns (covered_names, missing_names).
     """
@@ -43,13 +87,14 @@ def check_coverage(
     if not suites:
         raise ValueError(f"No test suites found in {scripts_dir}")
 
+    run_commands = extract_active_run_commands(workflow_text)
+
     covered: list[str] = []
     missing: list[str] = []
 
     for suite in suites:
         name = suite.name
-        # Match test suite file name in workflow text
-        if name in workflow_text:
+        if is_suite_executed(name, run_commands):
             covered.append(name)
         else:
             missing.append(name)
@@ -85,13 +130,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         covered, missing = check_coverage(args.workflow, args.scripts_dir)
-    except FileNotFoundError as exc:
-        if args.json:
-            print(json.dumps({"error": str(exc), "status": "error"}))
-        else:
-            print(f"error: {exc}", file=sys.stderr)
-        return 2
-    except ValueError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         if args.json:
             print(json.dumps({"error": str(exc), "status": "error"}))
         else:

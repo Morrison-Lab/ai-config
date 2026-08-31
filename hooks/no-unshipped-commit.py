@@ -119,6 +119,21 @@ def strip_quoted(command):
     return "\n".join(kept)
 
 
+
+def unwrap_command(cmd):
+    if not isinstance(cmd, str):
+        return ""
+    if cmd.startswith('"'):
+        try:
+            return json.loads(cmd)
+        except Exception:
+            # Handle truncated JSON strings by unescaping manually
+            cmd = cmd[1:]
+            if cmd.endswith('"'):
+                cmd = cmd[:-1]
+            return cmd.replace('\\n', '\n').replace('\\"', '"')
+    return cmd
+
 def pending_commit(path):
     pending = None
     try:
@@ -138,18 +153,12 @@ def pending_commit(path):
                             cmd = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
                             commands.append(cmd)
                 elif record.get("type") == "PLANNER_RESPONSE":
-                    for block in record.get("tool_calls", []):
+                    for block in (record.get("tool_calls") or []):
                         if isinstance(block, dict) and block.get("name") in {"Bash", "bash", "run_command"}:
                             args = block.get("args") or {}
                             cmd = str(args.get("CommandLine") or args.get("command") or args.get("cmd") or "")
-                            # Handle Gemini CLI stringified JSON
-                            if cmd.startswith('"') and cmd.endswith('"'):
-                                try:
-                                    cmd = json.loads(cmd)
-                                except Exception:
-                                    pass
+                            cmd = unwrap_command(cmd)
                             commands.append(cmd)
-                
                 for command in commands:
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
@@ -182,7 +191,7 @@ def last_assistant_text(path):
                     )
                 elif record.get("type") == "PLANNER_RESPONSE":
                     text = str(record.get("content") or "")
-                
+
                 if text.strip():
                     last = text
     except Exception:

@@ -61,4 +61,24 @@ try:
 finally:
     os.unlink(opened)
     os.unlink(scheduled)
+
+def antigravity_transcript(tool_calls):
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        stream.write(json.dumps({"type": "PLANNER_RESPONSE", "tool_calls": tool_calls}) + "\n")
+    return path
+
+ag_opened = antigravity_transcript([{"name": "run_command", "args": {"CommandLine": "gh pr create"}}])
+ag_scheduled = antigravity_transcript([
+    {"name": "run_command", "args": {"CommandLine": "gh pr create"}},
+    {"name": "schedule", "args": {"DurationSeconds": 120, "Prompt": "Wake up"}}
+])
+
+try:
+    assert subject.pending(ag_opened)
+    assert not subject.pending(ag_scheduled)
+finally:
+    os.unlink(ag_opened)
+    os.unlink(ag_scheduled)
+
 print("PASS: detects an unmonitored PR and gives each PR a stable timer state file")

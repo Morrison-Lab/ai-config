@@ -16,10 +16,25 @@ import tempfile
 import time
 
 OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|^schedule\b", re.I)
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
+
+
+def unwrap_command(cmd):
+    if not isinstance(cmd, str):
+        return ""
+    if cmd.startswith('"'):
+        try:
+            return json.loads(cmd)
+        except Exception:
+            # Handle truncated JSON strings by unescaping manually
+            cmd = cmd[1:]
+            if cmd.endswith('"'):
+                cmd = cmd[:-1]
+            return cmd.replace('\\n', '\n').replace('\\"', '"')
+    return cmd
 
 def records(path):
     try:
@@ -42,17 +57,12 @@ def pending(path):
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
         elif record.get("type") == "PLANNER_RESPONSE":
-            for block in record.get("tool_calls", []):
+            for block in (record.get("tool_calls") or []):
                 if isinstance(block, dict):
                     args = block.get("args") or {}
                     cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
-                    if isinstance(cmd, str) and cmd.startswith('"') and cmd.endswith('"'):
-                        try:
-                            cmd = json.loads(cmd)
-                        except Exception:
-                            pass
+                    cmd = unwrap_command(cmd)
                     blobs.append(block.get("name", "") + " " + json.dumps({"command": cmd}))
-                    
         for blob in blobs:
             if OPEN.search(blob):
                 opened, armed = True, False
@@ -78,17 +88,7 @@ def extract_pr_urls(path):
         content_items = []
         if isinstance(record.get("content"), list):
             content_items.extend(record.get("content"))
-        if isinstance(record.get("tool_calls"), list):
-            for tc in record.get("tool_calls"):
-                if isinstance(tc, dict):
-                    args = tc.get("args") or {}
-                    cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
-                    if isinstance(cmd, str) and cmd.startswith('"') and cmd.endswith('"'):
-                        try:
-                            cmd = json.loads(cmd)
-                        except Exception:
-                            pass
-                    content_items.append({"type": "tool_use", "name": tc.get("name", ""), "input": {"command": cmd}})
+
         if isinstance((record.get("message") or {}).get("content"), list):
             content_items.extend(record["message"]["content"])
         elif isinstance(record.get("message"), list):

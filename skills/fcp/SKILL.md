@@ -8,7 +8,6 @@ allowed-tools:
   - Grep
   - Glob
   - WebFetch
-  - WebSearch
   - Edit
   - Write
 ---

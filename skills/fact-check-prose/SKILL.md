@@ -8,7 +8,6 @@ allowed-tools:
   - Grep
   - Glob
   - WebFetch
-  - WebSearch
   - Edit
   - Write
 ---
@@ -43,25 +42,53 @@ Read the changed prose and pull out three kinds of units to check:
   external fact ("X was introduced in version Y", "the estimator is
   unbiased under Z").
 - **Undefended claims** — a factual claim with no internal reasoning and no
-  citation backing it, even if it turns out to be accurate. Flag it
+  citation backing it, even if it turns out to be accurate.
+  Flag it
   separately from an accuracy check (below) — a claim can pass accuracy and
   still fail this one.
 - **Reasoning chains** — an argument the document makes, not just its
-  individual facts. This includes **formal mathematical reasoning**
+  individual facts.
+  This includes **formal mathematical reasoning**
   (derivations, proofs, algebraic manipulations — check every step follows
   from the last, check dimensional/unit consistency, check edge cases) and
   **informal reasoning** (X therefore Y, a causal claim, a design
   justification).
 - **Computed/rendered values** — a number, table entry, or figure the prose
   describes as the output of code, a model fit, or a render.
+- **Citations to external works** --- identify all sources cited that will need to be checked.
 
-### 2. Check factual claims
+### 2. Pre-flight Readiness Gate (Hard Stop)
 
-For each factual claim, check it against domain knowledge first. Where it's
-checkable against an external source — a package's own docs, a spec, a
-paper, a dataset's documentation — fetch that source (`WebFetch`/
-`WebSearch`) and confirm or refute the claim against it, not against a
-secondhand summary. Don't wave a plausible-sounding claim through
+Before evaluating any claim against an external source,
+check whether the repository's local source corpus (`sources/` or equivalent)
+actually contains the needed sources:
+**(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).**
+
+1. **Are required sources missing from the local corpus?**
+2. **Is the required source present but unconverted?**
+   For example, a `.pdf`, `.docx`, or `.epub` file without a corresponding Markdown conversion.
+
+If **either** of these conditions hold, **refuse to run**.
+- Do NOT silently narrow scope.
+- Do NOT partially check around the gap.
+- Do NOT fall back to memory or the open web for the missing sources.
+
+Return **`Pre-flight: NOT READY`** instead of a report,
+and print remediation instructions.
+For example, "Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally."
+
+Only proceed to Step 3 if the gate passes.
+
+### 3. Check factual claims
+
+For each factual claim, check it against domain knowledge first.
+Where it's
+checkable against an external source --- a package's own docs, a spec, a
+paper, a dataset's documentation --- fetch that source **from the local `sources/` corpus**.
+Do **not** fall back to the open web (`WebFetch`) if the local source is missing.
+If you discover during verification that a local source is incomplete (e.g. missing a chapter), abort and return **`Pre-flight: NOT READY`**.
+Confirm or refute the claim against the local source, not against a secondhand summary.
+Don't wave a plausible-sounding claim through
 unchecked — see
 [`challenge-ambiguous-terminology`](../../shared/workflow/challenge-ambiguous-terminology.md)
 for the sibling rule on ambiguous phrasing specifically.
@@ -71,7 +98,7 @@ surrounding text give reasoning for it, or does it carry a citation? A
 claim can be accurate and still undefended — flag both kinds of gap, not
 just outright inaccuracy.
 
-### 3. Verify document-internal reasoning
+### 4. Verify document-internal reasoning
 
 Walk each reasoning chain step by step:
 
@@ -84,7 +111,7 @@ Walk each reasoning chain step by step:
   conclusion drawn, or is there a gap (an unstated assumption doing the
   real work, a non sequitur, an overgeneralization from one example)?
 
-### 4. Cross-check computed values and figures against the rendered output
+### 5. Cross-check computed values and figures against the rendered output
 
 Don't trust the source prose's own description of a computed value — verify
 it against what was actually produced:
@@ -104,7 +131,7 @@ it against what was actually produced:
    finding even if the prose "sounds" right — the rendered output is ground
    truth, not the sentence describing it.
 
-### 5. Report
+### 6. Report
 
 For every unit checked:
 
@@ -121,7 +148,7 @@ Then, separately, list **additional citations/references worth adding** —
 proactively, anywhere a pointer to a source would help a reader, not only
 where a claim is currently flagged as uncited.
 
-### 6. Offer to apply corrections
+### 7. Offer to apply corrections
 
 On request, fix the flagged inaccuracies and reasoning gaps in place with
 `Edit`, preserving the author's intent and voice — same posture as

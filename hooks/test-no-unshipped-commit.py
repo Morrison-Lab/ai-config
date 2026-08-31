@@ -364,7 +364,7 @@ def gitrepo(*steps):
     env = dict(os.environ,
                GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
                GIT_TERMINAL_PROMPT="0")
-    subprocess.run(["git", "init", "-q", "--bare", bare], check=True, env=env)
+    subprocess.run(["git", "init", "-q", "-b", "main", "--bare", bare], check=True, env=env)
 
     def run(cmd, cwd=None):
         result = subprocess.run(

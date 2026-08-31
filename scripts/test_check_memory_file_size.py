@@ -53,7 +53,7 @@ def make_repo(tmpdir: Path) -> Path:
     (memories / "MEMORY.md").write_text("# index\n" + "row\n" * 200, encoding="utf-8")
     (memories / "session" / "notes.md").write_text("# s\n" + "n\n" * 200, "utf-8")
 
-    subprocess.run(["git", "init", "-q"], cwd=tmpdir, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmpdir, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=tmpdir, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=tmpdir, check=True)
     subprocess.run(["git", "add", "-A"], cwd=tmpdir, check=True)

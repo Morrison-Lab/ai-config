@@ -776,7 +776,7 @@ round, on any PR, however clean the diff.
 The failure is quiet in the way the `gh` case is not.
 Exit `2` announces itself as a non-answer; exit `1` is indistinguishable from a
 real finding, and it reaches the PR as a withheld verdict that blocks merge
-under [`mwc`](../../.claude/skills/mwc/SKILL.md)'s Scope Limit --- on a PR the
+under [`mwc`](../../skills/mwc/SKILL.md)'s Scope Limit --- on a PR the
 same review just declared sound.
 
 **It also poisons the rounds after it.**

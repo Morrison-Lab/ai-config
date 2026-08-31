@@ -1176,10 +1176,10 @@ RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"(?:(?!\b(?:and|but|while|although|however|yet|though|"
     r"not|never|neither|nor|no|none|nothing|without|"
     r"hardly|barely|scarcely|zero|"
-    r"partially?|incomplete(?:ly)?|ignoring|omitting|skipping|"
+    r"partially?|incomplete(?:ly)?|ignor(?:e|ed|ing|es)?|omit(?:s|ted|ting)?|skip(?:s|ped|ping)?|"
     r"except|unresolved|unfixed|unaddressed|open|reproduce[s]?|broken|failing|fails?|"
-    r"(?:suppress|disabl|mut|weaken|bypass|remov|delet|revert)(?:e|ed|ing)?\s+(?:the\s+|an?\s+)?(?:test|check|assertion|warning|linter|guard|lint|detector|error)|"
-    r"comment(?:ed|ing)?\s+out\s+(?:the\s+|an?\s+)?(?:test|check|assertion|warning|linter|guard|lint|detector|error))\b)"
+    r"(?:suppress|disabl|mut|weaken|bypass|silenc|remov|delet|revert)(?:e|ed|ing)?\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?)|"
+    r"comment(?:ed|ing)?\s+out\s+(?:(?:the|an?|all|these|those|that|our|any)\s+)?(?:[a-z0-9_-]+\s+)?(?:tests?|checks?|assertions?|warnings?|linters?|guards?|lints?|detectors?|errors?))\b)"
     r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
     r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
@@ -1409,7 +1409,9 @@ def _is_resolved_blocking_mention(
 # below and the section-resolution wiring in _unresolved_finding_pattern
 # compare against this exact string, so a drifted copy would silently
 # disable the ai-config#2370 exemption.
-_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
+_FINDINGS_HEADING_PATTERN = (
+    r"#+\s*(Actionable\s+|Detailed\s+)?Findings(?!\s*\([^)\n]*non-blocking[^)\n]*\))"
+)
 
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only

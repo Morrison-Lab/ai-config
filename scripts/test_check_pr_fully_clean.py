@@ -1947,6 +1947,18 @@ def main() -> int:
         "was resolved by commenting out the check",
         "was resolved by weakening the assertion",
         "was resolved by bypassing the check",
+        "was resolved by deleting tests",
+        "was resolved by removing tests",
+        "was resolved by disabling checks",
+        "was resolved by commenting out tests",
+        "was resolved by muting warnings",
+        "was resolved by suppressing errors",
+        "was resolved by disabling all checks",
+        "was resolved by deleting these tests",
+        "was resolved by deleting unit tests",
+        "was resolved by a patch that ignores tests",
+        "was resolved by code that skips the assertion",
+        "was resolved by silencing the test",
     ):
         check(
             f"classify_verdict: hedged resolution '{hedged_suffix}' stays not-clean (#2774)",
@@ -1963,6 +1975,22 @@ def main() -> int:
             )
             is not None,
         )
+
+    check(
+        "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
+        checker.classify_verdict(
+            "### Findings (non-blocking)\n- Some observation\n\n### Verdict\n**Ready for merge.**\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' heading produces no finding",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\n- Some observation\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is None,
+    )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

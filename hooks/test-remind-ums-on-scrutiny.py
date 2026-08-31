@@ -157,6 +157,8 @@ SILENT = [
     ([TASK_VERDICT], "an adversarial-reviewer brief naming ### Verdict is not a review-read"),
     ([txt("I was wrong about this.")],
      "bare admission without a question is the sibling's case"),
+    ([Q, txt("The API filtered results by date rather than author.")],
+     "third-party filtered ... rather than in scrutiny turn"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

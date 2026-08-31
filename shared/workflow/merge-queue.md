@@ -50,7 +50,7 @@ main ---> Queue ----+--- PR 2 (speculatively tested against main + PR 1) --> Mer
                     +--- PR 3 (speculatively tested against main + PR 1 + PR 2) --> Merged to main
 ```
 
-1. **Queue entry:** When a PR passes review and required pre-merge checks, it is added to the merge queue (`gh pr merge --auto --squash` or `gh pr merge --queue`).
+1. **Queue entry:** When a PR passes review and required pre-merge checks, it is added to the merge queue (`gh pr merge <PR>` or `gh pr merge --auto` --- the `gh` CLI automatically detects that the base branch requires a merge queue and submits the PR to the queue).
 2. **Speculative branches:** GitHub creates temporary merge branches (e.g. `gh-readonly-queue/main/pr-...`) that speculatively merge queued PRs in sequence.
 3. **Single CI pass:** Required checks run on the speculative merge commit rather than requiring developers or bots to update individual feature branches.
 4. **Fast-forward merge:** When checks on a speculative commit pass, GitHub updates `main` directly.

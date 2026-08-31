@@ -39,7 +39,7 @@ In a Claude Code or Cursor session with the plugin installed (see each harness's
 
 `ai-config` natively integrates with **Google Antigravity** (`agy` CLI, Antigravity IDE, and Antigravity 2.0) and **Gemini CLI**:
 
-- **Global Plugin**: `bootstrap.sh` writes `~/.gemini/config/plugins.json` and `skills.json`, registering this checkout's `plugins/ai-config` and `skills/` paths directly (no symlink).
+- **Global Plugin**: `bootstrap.sh` stages the plugin layout under `~/.gemini/config/plugins/ai-config` and writes `~/.gemini/config/plugins.json` and `skills.json` (registering the staged `plugins/ai-config` path and the checkout's `skills/` path directly).
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
 ### opencode
@@ -699,7 +699,7 @@ These are either machine-specific, sensitive, or pure session state:
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
 - `plugins/` (in `~/.claude`) --- managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests.
-  `bootstrap.sh` registers `~/.gemini/config/plugins.json` with this checkout's path, no symlink.)
+  `bootstrap.sh` stages `plugins/ai-config` into `~/.gemini/config/plugins/ai-config` and registers it in `~/.gemini/config/plugins.json`.)
 
 If a per-machine variation appears that's worth syncing (e.g., a global `CLAUDE.md`), add it as a top-level entry here and wire it into whichever install path (plugin manifest, or `bootstrap.sh` itself) needs to know about it.
 

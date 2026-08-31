@@ -514,10 +514,10 @@ A clean automated review from every available provider evaluating the current HE
   No separate hook is needed.
   Pattern 25's proposed guard (ai-config#2590) already covers this axis once built.
 
-## Pattern 28: Trusting Both Sides' Test Suites After Uniting Two Regex Versions in a Merge Conflict
-- **Do**: When resolving a merge conflict by uniting two versions of a regex (or any validation mechanism) --- one side's structure extended with the other side's prefixes, verbs, or branches --- write adversarial tests against the **union** itself before trusting it: negated forms, failing (non-matching) inputs, and combinations that exercise one side's extensions inside the other side's structure.
+## Pattern 28: Trusting Both Sides' Test Suites After a Merge That United Two Independently Grown Versions of One File
+- **Do**: When merging two independently grown versions of a file (whether resolved through a merge conflict or merged cleanly by git's auto-merge heuristics) --- one side's structure extended or modified alongside the other side's changes --- write adversarial tests against the **union** itself before trusting it: negated forms, failing (non-matching) inputs, and combinations that exercise one side's extensions inside the other side's structure.
   Also check that alternation branches under a shared quantifier stay disjoint on their first character, so no starting position offers the engine more than one branch to try.
-- **Don't**: Read "both sides' full suites pass" as evidence the union is sound --- each suite covers only its own side's cases by construction, and the defects live in the cross terms neither side had any reason to test.
+- **Don't**: Read "both sides' full suites pass" or "git auto-merged with no conflict" as evidence the union is sound --- each suite covers only its own side's cases by construction, and defects live in the cross terms neither side had any reason to test.
 - **Example**: 2026-08-30, `Morrison-Lab/ai-config` PR [#2668](https://github.com/Morrison-Lab/ai-config/pull/2668): the PR and main's #2684 had both rewritten the same two regexes in `scripts/check-pr-fully-clean.py` (`RESOLVED_BLOCKING_SUFFIX` and `_is_resolved_blocking_mention`'s prefix).
   In the session driving that PR, the conflict was resolved as a union: main's tense-checked, sentence-scoped structure extended with the PR's prefixes (`earlier`, `round-\d+`), plural verbs (`are`/`were`), and a parenthesized-aside branch in the clause scan. (As of this entry's date the resolution lived in that session's working tree, not yet on the PR's pushed head --- verify the specifics against PR #2668 as merged before citing them as its content.)
   The union passed both sides' full suites (344 tests, as counted in that session's united suite) yet carried two defects, both found only by adversarial probes against the union: (1) a negation fail-open --- "None of the earlier blocking findings were resolved." was exempted as a resolved mention, so `classify_verdict` lost a not-clean verdict;
@@ -526,10 +526,14 @@ A clean automated review from every available provider evaluating the current HE
   fixed with a negator check (`none|no|not|never|neither|nothing`) on the prefix window before the past-state marker;
   (2) catastrophic backtracking (51 seconds measured) --- the new paren-aside branch `\([^()\n]{0,120}\)` overlapped the char-class branch `[^,:;.!?]` (both could consume `(`), so a failing enumeration input like `"(1) " * 24` was exponential;
   fixed by excluding `()` from the char class so the branches are disjoint --- a stray unmatched paren then fails the clause scan, which fails safe (the mention stays blocking).
-- **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Four silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges;
-  this pattern is the sharper case where the conflict *was* seen and resolved, and the resolution itself is the new, untested code.
+
+  2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with **no conflict at all** (359 lines from `main`, 109 from the branch);
+  the only conflicted path in that merge was `memories/mistake-patterns.md` itself.
+  Yet the post-merge adversarial review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and `scripts/pre-push-review.py`, commit `cea1a533`) returned twelve findings, five of them letting not-clean artifacts score clean across the newly combined review-matching, payload-extraction, and disclosure-footer mechanisms (admitting all comments with Claude Code disclosure footers as automated reviews, first-payload-wins admitting quoted prompt templates with clean verdicts, unmasked code spans/blocks, unclosed details tags, and stripped HTML comments ignoring NOT_CLEAN payloads).
+- **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Five silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges and clean auto-merges;
+  this pattern covers both the case where the conflict *was* seen and resolved, and the clean auto-merge where no conflict was raised.
   [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) covers verifying the implementation rather than trusting its green suite.
-- **Fix**: Treat a union resolution as new code with zero targeted coverage: derive probes from the cross product of the two sides' extensions (each new prefix with each new verb with each new branch), include negated and failing inputs, and time the regex on a pathological non-matching input before committing the resolution.
+- **Fix**: Treat a union resolution or clean auto-merge of independently grown logic as new code with zero targeted coverage: derive probes from the cross product of the two sides' extensions (each new prefix with each new verb with each new branch), include negated and failing inputs, and time the regex on a pathological non-matching input before committing.
 - **Algorithmatizable?**
   Partially.
   The first-character-disjointness check on alternation branches under a quantifier is mechanically decidable and would have caught the backtracking defect;
@@ -577,3 +581,65 @@ A clean automated review from every available provider evaluating the current HE
   Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result."
 - **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit.
   Complete the full chain (commit -> self-review -> push -> PR -> review request) in that same turn.
+
+## Pattern 31: Self-Ambiguous Alternative Under Repetition Causing Catastrophic Backtracking
+- **Do**: When writing a repeated pattern `(A|B)*` or quantifier, verify that alternation branches are strictly disjoint and cannot match prefixes or subsets of each other.
+  Replace nested or self-ambiguous quantifiers (like `(={3,}|\s*)*` or duplicated whitespace inside a group with leading whitespace) with linear scans by construction (line scans, string slicing) that cannot backtrack.
+  Time the regex on pathological failing inputs (e.g. runs of 40-60+ characters followed by non-matching text).
+- **Don't**: Assume that because every branch consumes at least one character, catastrophic backtracking is impossible --- an alternative that is self-ambiguous (like `={3,}` under `*`, which partitions N `=` characters in exponentially many ways) or overlapping branches reintroduce exponential backtracking on non-matching inputs.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/pre-push-review.py`): In round 1, removing an empty `\s*` alternative from the fingerprint anchor's `*` quantifier was necessary and not sufficient;
+  round 2 revealed `={3,}` under an outer `*` still backtracked exponentially on the tool's own `"=" * 60` report separator followed by non-matching text (0.50s at 36, 4.01s at 42, 14.18s at 45).
+  Fixed by replacing the nested-quantifier regex with a linear line scan (0.36ms at 4000 `=`).
+- **Canonical Rule**: [`regex-backtracking-pitfalls.md`](../shared/coding/regex-backtracking-pitfalls.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Replace repeated ambiguous quantifiers with linear scans
+  or enforce strict disjointness between alternatives under repetition;
+  measure execution time on long pathological inputs.
+- **Algorithmatizable?**
+  Yes --- static regex linters and timeout probes
+  ([ai-config#2768](https://github.com/Morrison-Lab/ai-config/issues/2768)).
+
+## Pattern 32: Treating a Sampling Instrument's Zero as a Result Without Verifying Arm Reach
+- **Do**: When using a corpus-sampling or generator-based instrument (such as `scripts/check-verdict-scan-parity.py`) to verify parity or absence of regressions, explicitly report and verify the **reach** of newly added arms or branches (e.g., confirming the new arm was actually executed and reached, and reporting the number of cases evaluated).
+  Place newly added arms where generators and limit/stride logic will not skip or truncate them.
+- **Don't**: Accept a sampling instrument reporting "0 widened, 0 narrowed" as evidence of correctness when the new arm was never reached (e.g. truncated by `--limit`, skipped by strided sampling, bypassed by an earlier deciding branch, or missing from the corpus entirely).
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/check-verdict-scan-parity.py`): Across rounds 2, 3, and 4, the instrument repeatedly reported 0 widened / 0 narrowed as a coverage statement rather than a verification:
+  (1) round 2 yielded the payload arm last at index 241,920 where `--limit` truncated it before execution;
+  (2) yielding it first in round 2 was still lost because `--limit` used strided sampling selecting only 1 of 57 bodies;
+  (3) in round 3 (`cfdedd9c`), generated payload bodies carried a prose `## Verdict:` line that decided before `payload_is_clean` was ever reached (reached 0 of 32 times), fixed in that round by generating payload-only bodies;
+  (4) in round 4 (`3a7648a7`), the arm still reported 0/0 because `--limit`'s strided sample skipped the first-yielded payload bodies.
+  Fixed in round 5 (`fbf50a69`) by appending the arm after `--limit`, revealing 1 widening and 5 narrowings previously hidden.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A sampling instrument's zero is a coverage statement unless the new arm's reach is reported") and [`fail-fast.md`](../shared/principles/fail-fast.md).
+- **Fix**: Measure and report reach counts (e.g. "reached M of N times") on every arm of a sampling instrument, and ensure new arms are appended after sampling limits.
+- **Algorithmatizable?**
+  Yes --- test runners asserting non-zero generator arm execution counts
+  ([ai-config#2769](https://github.com/Morrison-Lab/ai-config/issues/2769)).
+
+## Pattern 33: Cross-Artifact Comment Staleness During Multi-Commit PRs
+- **Do**: When modifying an invariant, data format, layout, or implementation across commits in a PR, grep across the entire repository (including tests, documentation, helper scripts, and sister modules) for comments and docstrings that assert the state or layout of the modified artifact.
+- **Don't**: Rely on adjacent-comment linters (e.g. 10-line single-file windows) or memory of modified files to catch stale assertions about other artifacts;
+  comments asserting facts about *another* file expire when that other file changes.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): Round 5 (`fbf50a69`) restored the structured `commit_sha` term in `scripts/check-pr-fully-clean.py` and changed prompt/persona rendering from 3-space indentation to flush-left.
+  Round 6 (`c725c449`) found two stale cross-artifact comments left behind by round 5's changes: (1) `scripts/test_check_pr_fully_clean.py` still contained a comment claiming `commit_sha` "was REMOVED as provably dead", pointing readers away from the test pinning it;
+  (2) `scripts/lib/review_payload.py` still stated that prompts and personas render the payload 3 spaces in.
+  Neither was in the diff or within 10 lines of the changed code in their respective files.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits").
+- **Fix**: Grep for tokens and cross-references
+  when changing a cross-module contract or layout;
+  audit test comments when reverting or restoring implementation logic.
+- **Algorithmatizable?**
+  Partially.
+  Cross-file comment scanning can detect file-name citations and literal quotes,
+  but semantic claims require reading.
+
+## Pattern 34: Claiming Subsumption Proofs Over Raw Text Without Accounting for Transformations
+- **Do**: When arguing that a structured extraction or parsing branch is redundant and subsumed by a raw text search (e.g. raw substring or regex match), verify whether any transformation (JSON escape decoding like `\u0061`, URL decoding, character set normalization, or whitespace normalization) occurs between the raw text and the parsed value.
+- **Don't**: Delete a parser disjunct or term as "provably dead" based on a raw-text subsumption proof that assumes the parsed value appears byte-for-byte in the unparsed body.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): In round 4 (`3a7648a7`), the structured `commit_sha` check in `scripts/check-pr-fully-clean.py` was deleted as "provably inert" under the belief that `payload.get("commit_sha") == head_sha` was subsumed by raw substring checks on `head_sha` in the body.
+  In round 5 (`fbf50a69`), this had to be restored: `json.loads` resolves Unicode escapes (e.g. `"commit_sha": "\u0061bc1234..."`), so a payload with escaped characters matches the parsed SHA while escaping the raw substring disjuncts.
+- **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
+- **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
+- **Algorithmatizable?**
+  Partially.
+  Mutation testing with encoded/escaped representations detects unhandled
+  transformation divergences.
+

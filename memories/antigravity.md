@@ -116,6 +116,7 @@ Three layers had to fail together, and each is worth checking separately when au
 
 ## Reactive wakeup vs background task polling
 
-- In Antigravity, background commands, subagents, and schedules resume execution reactively via system messages (`MESSAGE_PRIORITY_HIGH`).
+- In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming system messages (`MESSAGE_PRIORITY_HIGH`).
 - Do not poll `manage_task(Action='status')` or run repetitive checks in a loop while waiting for a long-running background command or test suite to finish.
 - After launching an asynchronous task or schedule timer, end the tool turn and let the reactive system wakeup resume execution when the process exits or the timer expires.
+  (Observed in live Antigravity sessions 2026-08-30.)

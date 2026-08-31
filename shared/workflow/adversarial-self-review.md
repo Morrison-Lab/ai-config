@@ -131,7 +131,15 @@ The reviewer reports; the author disposes.
 A reviewer that can edit turns a finding into a silent fix, which loses the finding and the disposition together.
 
 **No Agent tool, or no reviewer registered here?**
-A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
+A separate CLI is the same move and a stronger one ---
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md),
+[`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md),
+or [`adv`](../../skills/adv/SKILL.md) (`pre-push-review.py`).
+`adv` auto-detects and excludes the active agent harness
+from rotation via session environment variables;
+specify a target directly (`--engine <name>`)
+or pass `--exclude-engine cursor` in alternate mode
+until headless cursor dispatch is enabled.
 The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
 
 Note what that CLI fallback does to the pre-push guard, since the two rules meet here and pull opposite ways.

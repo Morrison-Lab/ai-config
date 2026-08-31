@@ -314,3 +314,4 @@ Capture the SHA `update-branch` produces (or re-read `head.sha` / `headRefOid` i
 **Follow-up, 2026-08-30: strict mode is confirmed active in this repo.**
 `gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true` (read 2026-08-30, during the ai-config#2638 merge described in [`gh-cli.md`](gh-cli.md)'s update-branch section).
 That settles the setting's presence, not the #2470/#2480 asymmetry above --- the queue-ordering account of why one comparably-stale PR merged while the other was refused remains unverified.
+Enabling a GitHub merge queue ([`shared/workflow/merge-queue.md`](../shared/workflow/merge-queue.md)) eliminates the O(N^2) review rounds caused by this strict mode by building speculative merge trees on the forge side.

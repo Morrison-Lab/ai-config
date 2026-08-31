@@ -134,15 +134,36 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
 
 
 def payload_findings(payload: Optional[Dict[str, Any]]) -> list:
-    """The payload's ``findings`` list, or ``[]`` when absent or malformed."""
+    """The payload's ``findings`` list, or ``[]`` when absent or not a list.
+
+    Callers must pair this with :func:`payload_findings_malformed`: on its own
+    it cannot distinguish "the reviewer listed nothing" from "the reviewer put
+    something there that is not a list", and those two must not be treated
+    alike.
+    """
     if not payload:
         return []
     findings = payload.get("findings")
     return findings if isinstance(findings, list) else []
 
 
+def payload_findings_malformed(payload: Optional[Dict[str, Any]]) -> bool:
+    """True when ``findings`` is PRESENT but is not a list.
+
+    A present-but-malformed field must never CLEAR, only block.  Folding it to
+    ``[]`` made a type deviation do what an empty array does, so a payload
+    reading ``"findings": "3 defects listed above"`` satisfied quorum and the
+    PR gate reported fully clean -- the fail-open direction in a fail-closed
+    scanner (``shared/principles/fail-fast.md``).
+    """
+    if not payload:
+        return False
+    return "findings" in payload and not isinstance(payload["findings"], list)
+
+
 def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
-    """True when the payload blocks: a not-clean verdict OR any finding.
+    """True when the payload blocks: a not-clean verdict, any finding, or a
+    malformed ``findings`` field.
 
     Findings alone block regardless of the stated verdict, because a reviewer
     that enumerates findings and then labels itself clean is contradicting
@@ -150,6 +171,8 @@ def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
     """
     if not payload:
         return False
+    if payload_findings_malformed(payload):
+        return True
     if payload_findings(payload):
         return True
     return normalize_verdict(payload.get("verdict")) in NOT_CLEAN_VERDICTS
@@ -158,6 +181,8 @@ def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
 def payload_is_clean(payload: Optional[Dict[str, Any]]) -> bool:
     """True when the payload affirmatively clears: clean verdict, no findings."""
     if not payload:
+        return False
+    if payload_findings_malformed(payload):
         return False
     if payload_findings(payload):
         return False

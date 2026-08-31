@@ -16,6 +16,7 @@ from scripts.lib.review_payload import (
     extract_structured_review,
     normalize_verdict,
     payload_findings,
+    payload_findings_malformed,
     payload_is_blocking,
     payload_is_clean,
 )
@@ -142,6 +143,79 @@ Actual report follows:
         payload = extract_structured_review(body)
         self.assertIsNotNone(payload)
         self.assertEqual(payload.get("verdict"), "NOT_CLEAN")
+
+    def test_code_region_mask_marks_each_region_and_nothing_else(self):
+        """`code_region_mask` had no direct test -- it was exercised only
+        through `extract_structured_review`, which cannot show WHICH region
+        kind the mask attributed a character to.
+        """
+        body = "plain\n```\nfenced\n```\n    indented\nsee `span` here\n"
+        mask = code_region_mask(body)
+        self.assertEqual(len(mask), len(body))
+
+        def masked(fragment):
+            start = body.index(fragment)
+            return set(mask[start:start + len(fragment)])
+
+        self.assertEqual(masked("plain"), {0})
+        self.assertEqual(masked("fenced"), {1})
+        self.assertEqual(masked("indented"), {1})
+        self.assertEqual(masked("`span`"), {1})
+        self.assertEqual(masked("see "), {0})
+
+    def test_code_region_mask_offset_arithmetic_edge_cases(self):
+        for label, body in {
+            "empty": "",
+            "no trailing newline": "    indented",
+            "CRLF": "a\r\n    indented\r\nb",
+            "tab indent": "\tindented\n",
+            "multi-byte": "caf\u00e9\n    indented\n",
+        }.items():
+            with self.subTest(body=label):
+                self.assertEqual(len(code_region_mask(body)), len(body))
+
+    def test_verdict_vocabularies_are_disjoint(self):
+        """A string in both sets would make `payload_is_blocking` and
+        `payload_is_clean` true at once, and the two callers order those
+        checks differently.
+        """
+        self.assertFalse(CLEAN_VERDICTS & NOT_CLEAN_VERDICTS)
+        for verdict in CLEAN_VERDICTS | NOT_CLEAN_VERDICTS:
+            with self.subTest(verdict=verdict):
+                self.assertEqual(normalize_verdict(verdict), verdict,
+                                 "set members must already be in normalized form")
+
+    def test_malformed_findings_block_rather_than_clear(self):
+        """A present-but-non-list `findings` must never CLEAR, only block.
+
+        Folding it to `[]` made a type deviation do what an empty array does,
+        so a payload reading `"findings": "3 defects listed above"` satisfied
+        quorum and the PR gate reported fully clean.
+        """
+        for label, value in {
+            "string": '"3 defects listed above"',
+            "object": '{"a": 1}',
+            "number": "3",
+            "null": "null",
+        }.items():
+            with self.subTest(findings=label):
+                body = ('<!-- review-data: {"verdict": "CLEAN", "findings": '
+                        + value + "} -->")
+                payload = extract_structured_review(body)
+                self.assertIsNotNone(payload)
+                self.assertTrue(payload_findings_malformed(payload))
+                self.assertTrue(payload_is_blocking(payload))
+                self.assertFalse(payload_is_clean(payload))
+                self.assertEqual(payload_findings(payload), [])
+
+    def test_absent_findings_key_lets_the_verdict_decide(self):
+        clean = extract_structured_review('<!-- review-data: {"verdict": "CLEAN"} -->')
+        self.assertFalse(payload_findings_malformed(clean))
+        self.assertTrue(payload_is_clean(clean))
+        self.assertFalse(payload_is_blocking(clean))
+        blocking = extract_structured_review('<!-- review-data: {"verdict": "NOT_CLEAN"} -->')
+        self.assertTrue(payload_is_blocking(blocking))
+        self.assertFalse(payload_is_clean(blocking))
 
     def test_empty_or_none_inputs(self):
         self.assertIsNone(extract_structured_review(""))

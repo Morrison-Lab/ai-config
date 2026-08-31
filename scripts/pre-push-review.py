@@ -204,13 +204,21 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
-# The fingerprint line, in every form the contract tolerates: optional bold
-# markers, a hyphen or a space in the label, and flexible spacing around the
-# colon.  ONE pattern, used by both the SHA harvest and the trailing-content
-# scan below -- as two literals they drifted apart within a single session,
-# and a form the harvest accepted then matched nothing in the scan.
+# The fingerprint line.  Derived from `hooks/no-push-without-self-review.py`'s
+# REVIEWED_COMMIT -- the pattern the persona file names as authoritative -- so
+# every form that hook accepts is accepted here: optional bold markers on either
+# side of the colon, and an optional backtick around the sha.  Two local
+# additions: a space instead of a hyphen in the label, and LEADING indentation,
+# because `build_review_prompt` renders the line three spaces in (see the
+# structure block below) and an `^`-anchored pattern rejected exactly the layout
+# this file asks for.
+#
+# ONE pattern, used by both the SHA harvest and the trailing-content scan below.
+# As two literals they drifted apart within a single session: a loosening
+# applied to the harvest alone left the scan matching nothing on the very forms
+# the harvest had started accepting.
 _FINGERPRINT_RE = re.compile(
-    r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*([a-f0-9A-F]+)"
+    r"(?im)^[ \t]*\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]+)`?"
 )
 
 
@@ -219,6 +227,14 @@ _FINGERPRINT_RE = re.compile(
 # a stopping-point declaration, or a restated verdict.  Anything else -- a
 # chatty sign-off, a smuggled "actually final verdict" line -- means the
 # fingerprint is not last, which is what the check exists to establish.
+# The verdict alternative of `_TRAILING_AFTER_FINGERPRINT`, with the phrase
+# captured, so a restated verdict after the fingerprint is evaluated rather than
+# merely permitted.
+_TRAILING_VERDICT_RE = re.compile(
+    r"(?i)^\s*(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+?)\s*$"
+)
+
+
 _TRAILING_AFTER_FINGERPRINT = re.compile(
     r"(?i)^\s*(?:_?Posted by\b.*|={3,}\s*|Status:.*|\*\*Stopping Point\*\*:.*"
     r"|(?:###\s*)?(?:Summary\s+)?Verdict:.*)$"
@@ -404,6 +420,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if verification_text is None: return False, False, "Missing required section: Verification Steps"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
+    trailing_verdicts: List[str] = []
     if expected_commit_sha:
         all_shas = _FINGERPRINT_RE.findall(unfenced_report)
         if not all_shas:
@@ -419,8 +436,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         # `\s*` alternative that matched empty, then -- after removing it --
         # the `={3,}` alternative, which is self-ambiguous under the outer `*`
         # because a run of `=` splits into chunks of size >= 3 in exponentially
-        # many ways.  Measured on the tool's OWN `"=" * 60` banner
-        # (`log_error`/report separator) followed by any non-matching text:
+        # many ways.  Measured on the tool's OWN `"=" * 60` banner -- the
+        # report separator `main` prints around the review, not `log_error`,
+        # which emits only `Error: {msg}` -- followed by any non-matching text:
         # 0.50s at 36 `=`, 4.01s at 42, 14.18s at 45.  `parse_review_verdict`
         # runs in-process with no timeout, so the guard hung rather than
         # failing.  Matching each trailing line independently is linear by
@@ -440,6 +458,21 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         ):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 
+        # Tolerating a restated verdict line in that POSITION is not the same as
+        # not reading it.  `verdict_matches` below scans `summary_text` only, so
+        # a report ending `### Verdict: Needs more work` cleared the position
+        # check and then reached no verdict scan at all -- parsing as
+        # (True, True, 'Verdict: CLEAN') where the pre-line-scan regex had
+        # rejected it outright.  Feed any trailing verdict line into the same
+        # evaluation the Summary section's verdict goes through, so a not-clean
+        # restatement blocks and an unrecognized one invalidates.
+        trailing_verdicts = [
+            m.group(1)
+            for line in tail_lines
+            for m in [_TRAILING_VERDICT_RE.match(line)]
+            if m
+        ]
+
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
     if not verdict_matches:
         bold_matches = re.findall(
@@ -451,6 +484,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     if not verdict_matches:
         return False, False, "No valid anchored verdict line found."
+
+    verdict_matches = list(verdict_matches) + trailing_verdicts
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {

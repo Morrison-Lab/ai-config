@@ -4249,20 +4249,39 @@ Found defects.
           checker.extract_structured_review(indented_struct) is None)
 
     # F11: the short-prefix structured commit_sha branch had no test -- both
-    # added SHA tests used a full 40-character exact match.
-    full_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
-    prefix_payload = ('### Verdict: Ready for merge\n\n'
-                      '<!-- review-data: {"verdict": "CLEAN", "findings": [], '
-                      '"commit_sha": "3a7b9c1"} -->')
-    struct = checker.extract_structured_review(prefix_payload) or {}
-    check("extract_structured_review: a 7-character commit_sha prefix is readable",
-          full_sha.startswith(str(struct.get("commit_sha", "")).lower()))
-    short_payload = ('### Verdict: Ready for merge\n\n'
-                     '<!-- review-data: {"verdict": "CLEAN", "findings": [], '
-                     '"commit_sha": "3a7b9"} -->')
-    short_struct = checker.extract_structured_review(short_payload) or {}
-    check("check_review_comments: a commit_sha under 7 characters is too short to match",
-          len(str(short_struct.get("commit_sha", ""))) < 7)
+    # existing SHA tests used a full 40-character exact match, which
+    # `sha_lower in body_lower` decides on its own, so `is_struct_sha_match`
+    # was never the deciding term. These call check_review_comments with the
+    # full sha ABSENT from the body, so only the structured prefix can match.
+    prefix_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
+
+    def _prefix_payload(sha_value):
+        return {
+            "comments": [
+                {
+                    "author": {"login": "claude[bot]"},
+                    "createdAt": "2026-08-30T20:00:00Z",
+                    "authorAssociation": "NONE",
+                    "body": ('### Verdict: Ready for merge\n\n'
+                             '<!-- review-data: {"schema_version": "1.0", '
+                             '"verdict": "CLEAN", "findings": [], '
+                             f'"commit_sha": "{sha_value}"}} -->\n'),
+                }
+            ],
+            "reviews": [],
+        }
+
+    with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("3a7b9c1"))):
+        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
+        check("check_review_comments: a 7-character structured commit_sha prefix matches HEAD", ok)
+
+    with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("3a7b9"))):
+        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
+        check("check_review_comments: a structured commit_sha under 7 characters does not match", not ok)
+
+    with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("deadbee"))):
+        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
+        check("check_review_comments: a 7-character prefix of a DIFFERENT sha does not match", not ok)
 
     # A finding object using the persona's own ReportFindings key (`summary`)
     # rather than `message` must still name what it found.

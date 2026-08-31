@@ -191,6 +191,36 @@ class TestPrePushReview(unittest.TestCase):
                 self.assertFalse(is_valid, f"{label} + chatter should be rejected")
                 self.assertIn("must be at the very end", reason)
 
+    def test_a_verdict_restated_after_the_fingerprint_is_read_not_merely_allowed(self):
+        """Tolerating a restated verdict in that POSITION is not reading it.
+
+        `verdict_matches` scans the Summary section only, so a report ending
+        `### Verdict: Needs more work` cleared the position check and then
+        reached no verdict scan at all -- parsing clean where the pre-line-scan
+        regex had rejected it outright.
+        """
+        commit = "12345678abcdef00"
+        for label, tail in {
+            "heading form": "\n\n### Verdict: Needs more work",
+            "bare form": "\n\nVerdict: Needs more work",
+            "summary form": "\n\nSummary Verdict: Blocked",
+            "negated clean": "\n\nVerdict: Ready for merge - must not merge.",
+        }.items():
+            with self.subTest(trailing=label):
+                is_valid, is_clean, reason = reviewer.parse_review_verdict(
+                    self._clean_report(commit, tail), expected_commit_sha=commit)
+                self.assertFalse(
+                    is_clean,
+                    f"a not-clean verdict restated after the fingerprint must not parse clean ({reason})")
+
+        # A restated CLEAN verdict still passes -- the point is that the line is
+        # evaluated, not that every trailing verdict line is rejected.
+        is_valid, is_clean, _ = reviewer.parse_review_verdict(
+            self._clean_report(commit, "\n\n### Verdict: Ready for merge"),
+            expected_commit_sha=commit)
+        self.assertTrue(is_valid)
+        self.assertTrue(is_clean)
+
     def test_structured_payload_blocks_a_clean_prose_verdict(self):
         """HTML comments are stripped before every check, so the payload the prompt
         asks for was never validated -- the local parser and

@@ -1923,6 +1923,32 @@ def main() -> int:
         )
         == "clean",
     )
+    for hedged_suffix in (
+        "was resolved by ignoring it entirely without actually fixing anything",
+        "was resolved by a partial patch that does not cover the edge case",
+        "was resolved without fixing the bug",
+        "was resolved except for the edge cases",
+        "was resolved by a patch that fails under load",
+        "was resolved by not doing anything",
+        "was resolved by skipping tests",
+        "was resolved by a patch that remains open",
+        "was resolved by code that is broken",
+    ):
+        check(
+            f"classify_verdict: hedged resolution '{hedged_suffix}' stays not-clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n",
+                "",
+            )
+            == "not-clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: hedged resolution '{hedged_suffix}' returns finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n"
+            )
+            is not None,
+        )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

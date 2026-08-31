@@ -1405,6 +1405,54 @@ def _is_resolved_blocking_mention(
 # disable the ai-config#2370 exemption.
 _FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
 
+_EXEMPT_FINDINGS_HEADING_NON_BLOCKING = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\bfindings\b.*?\bnon[- ]blocking\b"
+    r"|"
+    r"\bnon[- ]blocking\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r")"
+)
+_EXEMPT_FINDINGS_HEADING_RESOLVED = re.compile(
+    r"(?i)^[ \t]*#{1,6}[ \t]*.*?"
+    r"(?:"
+    r"\b(?:resolved|addressed)\s+(?:actionable\s+|detailed\s+)?findings\b"
+    r"|"
+    r"\bfindings\b.*?(?:[\(\[\{:\-\u2013\u2014\s]|\b(?:from|prior|previous|earlier|rounds?|now|all|already|previously))\s*"
+    r"(?:from\s+(?:prior|previous|earlier)\s+rounds?\s*[\-\u2013\u2014:]?\s*)?"
+    r"(?:now\s+|all\s+|already\s+|previously\s+)?"
+    r"(?:resolved|addressed)\b"
+    r")"
+)
+_FINDINGS_HEADING_NOT_EXEMPT = re.compile(
+    r"(?i)\b(?:unresolved|unaddressed|not\s+resolved|not\s+addressed|partially\s+resolved|partially\s+addressed|still\s+unresolved)\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+
+
+def _is_exempt_findings_heading(
+    scan_body: str, match_start: int, match_end: int
+) -> bool:
+    """True when a Findings heading indicates non-blocking or resolved findings.
+
+    Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
+    '### Findings from prior rounds — now resolved', '### Findings (addressed)', etc.
+    Does not exempt headings with unaddressed/unresolved or blocking signals.
+    """
+    line_start = scan_body.rfind("\n", 0, match_start) + 1
+    line_end = scan_body.find("\n", match_end)
+    if line_end == -1:
+        line_end = len(scan_body)
+    heading_line = scan_body[line_start:line_end]
+
+    if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
+        return False
+    if _EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line):
+        return True
+    if _EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line):
+        return True
+    return False
+
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
     # ones a reviewer writes. Found by running this classifier over the real
@@ -1680,10 +1728,11 @@ def classify_verdict(body: str, state: str = "") -> str:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan, match.start(), match.end()):
+                    continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -1860,10 +1909,11 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
                 if not _is_negated_resolution(scan_body, match):
                     continue
-            if pat == _BARE_REJECTION and _is_resolved_blocking_mention(
-                scan_body, match, cited
-            ):
-                continue
+            if pat == _BARE_REJECTION:
+                if _is_resolved_blocking_mention(scan_body, match, cited):
+                    continue
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix
                 # shortcut for this heading: the shortcut read "No new
@@ -1872,9 +1922,13 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 # #2370's review of this very fix). The replacement keeps
                 # the shortcut's first-line trigger and adds the item veto
                 # over the rest of the section.
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 if _findings_section_resolves_empty(scan_body, match.end()):
                     continue
             elif pat in FINDING_HEADING_PATTERNS:
+                if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
                 suffix = scan_body[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue

@@ -2180,6 +2180,151 @@ def main() -> int:
               "### Findings\n\nI traced everything and found no remaining bugs in the diff.\n")
           is not None)
 
+    # --- Issue #2781: exempt non-blocking or resolved findings headings ---
+    check("### Findings (non-blocking) is exempt from unresolved findings (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n- [Nit] Variable could be renamed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (Non-blocking) with None resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (Non-blocking)\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (non blocking) without hyphen resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non blocking)\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Non-blocking Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Non-blocking Findings\n\nNone.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings: non-blocking resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings: non-blocking\n\n- Suggestion: rename foo to bar\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings — non-blocking resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings \u2014 non-blocking\n\n- Minor formatting note.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from prior rounds — now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- `foo()` crash was fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from prior rounds -- now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds -- now resolved\n\n"
+              "- Fixed in abc1234\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from prior rounds - now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds - now resolved\n\n"
+              "- Fixed in abc1234\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings from previous rounds — now resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from previous rounds \u2014 now resolved\n\n"
+              "- Resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- All items fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (addressed) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (addressed)\n\n"
+              "- All feedback addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (now resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (now resolved)\n\n"
+              "- Item fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings (all addressed) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (all addressed)\n\n"
+              "- Items addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Findings: resolved resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings: resolved\n\n"
+              "- Resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Resolved Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Resolved Findings\n\n"
+              "- Fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Addressed Findings resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Addressed Findings\n\n"
+              "- Fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Actionable Findings (resolved) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Actionable Findings (resolved)\n\n"
+              "- Fixed in abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("### Detailed Findings (non-blocking) resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Detailed Findings (non-blocking)\n\n"
+              "- Nit: style.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("full review with Findings (non-blocking) and structured CLEAN payload is clean (#2781)",
+          checker.classify_verdict(
+              "### Summary\nChecked all files.\n\n"
+              "### Findings (non-blocking)\n- Optional nit on naming.\n\n"
+              "### Verdict: Ready for merge\n\n"
+              "<!-- review-data: {\"schema_version\": \"1.0\", \"verdict\": \"CLEAN\", \"findings\": []} -->\n")
+          == "clean")
+    check("review with Findings (non-blocking) and structured CLEAN payload has no unresolved findings (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Summary\nChecked all files.\n\n"
+              "### Findings (non-blocking)\n- Optional nit on naming.\n\n"
+              "### Verdict: Ready for merge\n\n"
+              "<!-- review-data: {\"schema_version\": \"1.0\", \"verdict\": \"CLEAN\", \"findings\": []} -->\n")
+          is None)
+    check("Findings (blocking) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (blocking)\n\n1. Real crash bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (unresolved) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (unresolved)\n\n1. Real bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (not addressed) still flags as an unresolved finding (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (not addressed)\n\n1. Real bug.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+    check("Findings (non-blocking) beside a real Actionable Findings heading still flags (#2781 control)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n- Nit: style.\n\n"
+              "### Actionable Findings\n1. Critical vulnerability.\n\n"
+              "### Verdict\nNeeds work\n")
+          is not None)
+
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------
     human_notclean_round = {

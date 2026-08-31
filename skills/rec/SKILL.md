@@ -5,7 +5,7 @@ user-invocable: true
 allowed-tools: []
 ---
 
-# rec — provide recommendations for choices and questions
+# rec --- provide recommendations for choices and questions
 
 Whenever posing a choice or asking a question to the user,
 always provide a clear, specific, and grounded recommendation.
@@ -20,7 +20,7 @@ or asks what the agent recommends after an unweighted question was asked.
 
 - **Proactively**: whenever presenting options for a genuine decision,
   asking a clarifying or architectural question,
-  or using interactive question modals (`AskUserQuestion` / `ask_question`).
+  or using interactive question modals (`AskUserQuestion` / `ask_user_question` / `ask_question`).
 - **Reactively**:
   - Explicit invocation: `/rec`, `/recommend`, "recommend", "rec".
   - The user asks "what do you recommend?", "what's your recommendation?",
@@ -38,7 +38,7 @@ State the specific recommendation clearly
 
 ### 2. Interactive tools format: put recommendation first
 
-When using interactive question tools (`AskUserQuestion` or `ask_question`):
+When using interactive question tools (`AskUserQuestion`, `ask_user_question`, or `ask_question`):
 - Place the recommended option **first** in the options array.
 - Prefix the label with `(Recommended)`
   (e.g., `(Recommended) Option A: ...`).
@@ -67,7 +67,7 @@ Distinguish genuine decisions from authorized or standard workflow steps:
 
 ## Procedure
 
-### Step 1 — Identify the choice or question
+### Step 1 --- Identify the choice or question
 
 - **Proactive**: State the decision point, the context that makes it necessary,
   and the distinct feasible options.
@@ -75,7 +75,7 @@ Distinguish genuine decisions from authorized or standard workflow steps:
   Scan back through recent conversation turns to locate the latest question
   or unresolved decision point, restating the options if context is needed.
 
-### Step 2 — Evaluate trade-offs
+### Step 2 --- Evaluate trade-offs
 
 Weigh the alternatives across:
 - **Simplicity and minimal blast radius**: least complex change that solves the issue.
@@ -85,11 +85,11 @@ Weigh the alternatives across:
 
 Select the single strongest path as the recommendation.
 
-### Step 3 — Present the recommendation
+### Step 3 --- Present the recommendation
 
 Present the question or decision with its structured recommendation:
 
-- **For interactive GUI modals** (`AskUserQuestion` / `ask_question`):
+- **For interactive GUI modals** (`AskUserQuestion`, `ask_user_question`, or `ask_question`):
   List the recommended choice as option 1 with the `(Recommended)` prefix.
 - **For inline chat questions**:
   State the context, outline the trade-offs, and attach the boxed recommendation:

@@ -158,7 +158,7 @@ def main() -> int:
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+        "ignoredSystemMessage": (
             f"Agent launch without `isolation` (subagent_type: {subagent_type}). "
             "Assign a worktree or decide deliberately not to."
         ),

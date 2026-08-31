@@ -50,16 +50,20 @@ reflexes — **not** to ban words or flatten a real human voice.
    hollow conclusions, uniform rhythm.
 4. **Apply the deletion test** — remove the rhetorical framing and check if any
    concrete fact remains (a specific name, date, measurement, trade-off, or
-   actionable decision). If nothing remains, the passage has zero information content.
-5. **Report** *(external targets only — skip for the self-check)*. A table —
+   actionable decision).
+   If nothing remains, the passage has zero information content.
+5. **Report** *(external targets only — skip for the self-check)*.
+   A table —
    *tell · location (`file:line` or quoted snippet) · why it reads as AI ·
-   suggested revision* — followed by a one-line **density verdict**: is this an
-   isolated word or a pervasive pattern? Don't cry wolf on a single innocent
-   em-dash.
+   suggested revision* — followed by a one-line **density verdict**:
+   is this an isolated word or a pervasive pattern?
+   Don't cry wolf on a single innocent em-dash.
 6. **Offer to apply** *(external targets)* / **just fix it silently**
-   *(self-check)*. For an external target, on request rewrite in place with
-   `Edit`, preserving the author's meaning and voice. When scanning my own
-   draft, skip the report (step 5) and simply cut the tells before presenting.
+   *(self-check)*.
+   For an external target, on request rewrite in place with
+   `Edit`, preserving the author's meaning and voice.
+   When scanning my own draft,
+   skip the report (step 5) and simply cut the tells before presenting.
 
 ## The catalog
 
@@ -78,8 +82,8 @@ Reflex vocabulary that LLMs reach for far more than human writers:
   heart of", "when it comes to", "more than just", "stands as a testament to",
   "plays a crucial/pivotal role".
 
-Quick first-pass grep (case-insensitive, prints `file:line`). Define the
-pattern once, then run it through whichever tool is on hand:
+Quick first-pass grep (case-insensitive, prints `file:line`).
+Define the pattern once, then run it through whichever tool is on hand:
 
 ```bash
 tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as'
@@ -91,7 +95,8 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 
 - **Copula avoidance (dodging "is" and "are")** — refusing plain statements
   of fact in favor of dressed-up constructions ("serves as a", "stands as a",
-  "acts as a", "marks a"). Replace with "is" or "are".
+  "acts as a", "marks a").
+  Replace with "is" or "are".
 - **Trailing "-ing" participle commentary** — tacking a participial phrase onto
   the end of a factual clause to simulate analysis ("...thereby highlighting the
   importance of X", "...ensuring seamless alignment", "...paving the way for").
@@ -154,9 +159,11 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 | em-dash ×5 in one paragraph | intro.md:4–9 | em-dash used as default connector | split into sentences; keep one |
 ```
 
-Then a density verdict, e.g.: *"Pervasive — antithesis + triads in most
-paragraphs; reads strongly AI. Recommend a rewrite pass,"* vs. *"One stray
-'delve'; otherwise clean."*
+Then a density verdict, e.g.:
+*"Pervasive — antithesis + triads in most paragraphs;
+reads strongly AI.
+Recommend a rewrite pass,"*
+vs. *"One stray 'delve'; otherwise clean."*
 
 ## Relationship to other skills
 

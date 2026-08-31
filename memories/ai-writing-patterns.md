@@ -72,13 +72,17 @@ the diagnostic signal lies in clustering and mechanical repetition.
   *Fix:* Replace with "is" or "are".
 - **Negative parallelism (antithesis reflex):**
   The most recognizable syntactic formula:
-  "It's not just X, it's Y"; "This is not about X; it's about Y"; "Not only X, but also Y".
+  "It's not just X, it's Y";
+  "This is not about X; it's about Y";
+  "Not only X, but also Y".
   *Fix:* Delete the negation and state the positive half directly.
 - **Rule-of-three autopilot (tricolon clustering):**
   Defaulting to triplets of adjectives, nouns, or parallel clauses
   ("fast, reliable, and scalable")
   to mimic comprehensive coverage without committing to actual enumeration.
-  *Fix:* Use one, two, or four items; vary list lengths; keep three only when accurate.
+  *Fix:* Use one, two, or four items;
+  vary list lengths;
+  keep three only when accurate.
 - **Trailing "-ing" participle commentary:**
   Tacking a participial phrase onto the end of a factual clause
   to simulate profound analysis without verifiable substance
@@ -113,14 +117,16 @@ the diagnostic signal lies in clustering and mechanical repetition.
 
 - **Uniform sentence length (low burstiness):**
   Human prose alternates short, punchy sentences with longer complex structures
-  (burstiness = standard deviation / mean of sentence lengths; human baseline is 0.6---1.2).
+  (burstiness = standard deviation / mean of sentence lengths;
+  human baseline is 0.6---1.2).
   LLM text often hovers around a flat 18---24 word average with low burstiness (~0.3).
 - **Thin punctuation:**
   Over-reliance on commas and additive conjunctions ("and")
   while avoiding semicolons, colons, parentheses, or mid-thought periods.
 - **Em-dash density:**
-  Overusing em-dashes as an all-purpose glue for clause attachment.
-  (Human baseline is ~3---10 per 1,000 words; unconstrained LLM output often exceeds 30+ per 1,000 words).
+  Overusing em-dashes as an all-purpose glue for clause attachment
+  (human baseline is ~3---10 per 1,000 words;
+  unconstrained LLM output often exceeds 30+ per 1,000 words).
 - **Smart punctuation leakage:**
   Curly quotes (typographic double and single quotes), ellipsis glyphs,
   and model artifacts (`attributableIndex`, `turn0search0`, `oaicite`, `oai_citation`, `[cite: 1]`).
@@ -139,5 +145,6 @@ the diagnostic signal lies in clustering and mechanical repetition.
 
 - **Do:** use deterministic regex and metric hooks for mechanical writing checks.
 - **Do:** apply the deletion test to catch substance-free paragraphs that pass lexical filters.
-- **Don't:** ban valid vocabulary words in isolation; evaluate clustering and mechanical repetition.
+- **Don't:** ban valid vocabulary words in isolation;
+  evaluate clustering and mechanical repetition.
 - **Don't:** load extensive research catalogs into every session's baseline context.

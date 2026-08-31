@@ -1933,6 +1933,15 @@ def main() -> int:
         "was resolved by skipping tests",
         "was resolved by a patch that remains open",
         "was resolved by code that is broken",
+        "was resolved by removing the test that caught it",
+        "was resolved by deleting the assertion",
+        "was resolved by muting the linter warning",
+        "was resolved by reverting the check that flagged it",
+        "was resolved by suppressing the error",
+        "was resolved by disabling the test",
+        "was resolved by commenting out the check",
+        "was resolved by weakening the assertion",
+        "was resolved by bypassing the check",
     ):
         check(
             f"classify_verdict: hedged resolution '{hedged_suffix}' stays not-clean (#2774)",

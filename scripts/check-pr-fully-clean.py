@@ -240,6 +240,8 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "verdict: block": "Jules",
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
+    "_posted by claude (ai agent)": "Claude",
+    "_posted by claude code (ai agent)": "Claude",
 }
 
 # Logins that are one reviewer, never shared. Claude and Antigravity both post
@@ -392,16 +394,18 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
-    structured = extract_structured_review(body or "")
-    if structured and structured.get("reviewer"):
-        rev = str(structured["reviewer"]).strip()
-        if rev:
-            return rev
     scan = strip_cited_finding_vocab(body or "")
     lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
     first_line = lines[0] if lines else ""
     last_line = lines[-1] if lines else ""
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
+
+    structured = extract_structured_review(body or "")
+    if structured and structured.get("reviewer"):
+        rev = str(structured["reviewer"]).strip()
+        if rev and (_is_bot_author(login) or agent):
+            return rev
+
     if agent:
         return agent
     if login:

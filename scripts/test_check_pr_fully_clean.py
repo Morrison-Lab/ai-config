@@ -3218,7 +3218,9 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     data = checker.extract_structured_review(struct_clean)
     check("extract_structured_review: extracts valid comment payload", data is not None and data.get("verdict") == "CLEAN")
     check("classify_verdict: structured clean review returns clean", checker.classify_verdict(struct_clean) == "clean")
-    check("_reviewer_identity: reads reviewer from structured payload", checker._reviewer_identity(struct_clean) == "Claude")
+    check("_reviewer_identity: reads reviewer from structured payload for bot login", checker._reviewer_identity(struct_clean, author="github-actions[bot]") == "Claude")
+    check("_reviewer_identity: does not escalate unauthenticated member comment to bot identity", checker._reviewer_identity(struct_clean, author="human_member") == "human_member")
+    check("_reviewer_identity: accepts structured reviewer when agent marker is present on member comment", checker._reviewer_identity(struct_clean + "\n_posted by claude (ai agent)", author="human_member") == "Claude")
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
 
@@ -3243,7 +3245,7 @@ Found defects.
 -->
 """
     check("classify_verdict: structured not-clean review returns not-clean", checker.classify_verdict(struct_not_clean) == "not-clean")
-    check("_reviewer_identity: reads reviewer from structured not-clean payload", checker._reviewer_identity(struct_not_clean) == "Codex")
+    check("_reviewer_identity: reads reviewer from structured not-clean payload", checker._reviewer_identity(struct_not_clean, author="github-actions[bot]") == "Codex")
     check("_unresolved_finding_pattern: not-clean structured review returns finding pattern", checker._unresolved_finding_pattern(struct_not_clean) is not None)
 
     # Findings override clean verdict in structured JSON
@@ -3275,7 +3277,7 @@ Found defects.
 """
     check("extract_structured_review: extracts from <details> block", checker.extract_structured_review(struct_details) is not None)
     check("classify_verdict: extracts Ready for merge verdict from <details> block", checker.classify_verdict(struct_details) == "clean")
-    check("_reviewer_identity: extracts reviewer from <details> block", checker._reviewer_identity(struct_details) == "OpenCode")
+    check("_reviewer_identity: extracts reviewer from <details> block", checker._reviewer_identity(struct_details, author="github-actions[bot]") == "OpenCode")
 
     # Code fence citation guard (quoted structured review in markdown fence is ignored)
     quoted_struct = """

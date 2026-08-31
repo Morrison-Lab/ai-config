@@ -62,6 +62,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    Append the machine-readable structured review payload immediately after in an HTML comment:
 
+   ```html
    <!-- review-data:
    {
      "schema_version": "1.0",
@@ -71,6 +72,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      "findings": []
    }
    -->
+   ```
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and list each finding object in "findings".)
 

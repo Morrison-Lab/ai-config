@@ -110,3 +110,28 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: doctor-tests
+        name: doctor diagnostics tests
+        entry: python scripts/test_doctor.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: fences-tests
+        name: markdown fences library tests
+        entry: python scripts/test_fences.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: check-test-suites-covered
+        name: check all scripts test suites are gated in CI
+        entry: python scripts/check-test-suites-covered.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: test-check-test-suites-covered
+        name: test-suite coverage check tests
+        entry: python scripts/test_check_test_suites_covered.py
+        language: python
+        pass_filenames: false
+        always_run: true
+

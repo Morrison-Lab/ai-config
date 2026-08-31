@@ -241,7 +241,8 @@ are picked up automatically.
 When several AI sessions have the **same local checkout** open at once (two
 Claude Code tabs, a CLI + the IDE extension, two terminals) they can clobber
 each other — branch switches under uncommitted edits, racing pushes, duplicate
-builds. The **`session-lock`** skill (alias `deconflict-sessions`) is the
+builds.
+The **`session-lock`** skill is the
 local-filesystem counterpart to `claim-pr`: a small registry CLI
 (`skills/session-lock/scripts/ai-session.sh`) keeps a machine-local list of
 active sessions under `.git/ai-sessions/`, so sessions can see each other,

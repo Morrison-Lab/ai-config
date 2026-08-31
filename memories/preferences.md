@@ -358,7 +358,8 @@
 - When resolving a git merge/rebase/cherry-pick conflict, consolidate the best of BOTH branches --- read why each side changed the hunk and preserve both intents; never blind-pick `--ours`/`--theirs`, which silently discards the other side's work.
   Remove every marker (verify with `git diff --check`), run the repo's pre-commit checks (a merge clean on each side separately can break combined), then stage and finish the operation --- don't `--abort`/`--skip` a conflict you were asked to resolve.
   Note: "ours"/"theirs" are reversed in a rebase vs a merge.
-  The `resolve-conflicts` skill (alias `rc`) operationalizes this; `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`/`deconflict-sessions`, which deconflicts AI *sessions*, not git content.)
+  The `resolve-conflicts` skill (alias `rc`) operationalizes this.
+  `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`, which deconflicts AI *sessions*, not git content.)
 - When deferring items to follow-up issues during a PR/MR review loop, always update the PR/MR description with a "Known Deferred Items" section listing each deferred issue (with link), description, and rationale.
   This gives automated reviewers context so they stop re-flagging the same items.
   Include a "Notes for Automated Reviewers" section for any recurring false positives.
@@ -483,7 +484,7 @@
   Untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
   Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
   Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
-  The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
+  The `session-lock` skill tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
   Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
@@ -763,7 +764,7 @@
   Prefer extending (a new alias/section/trigger) over a near-duplicate skill; if another branch is already building it, continue that work rather than opening a colliding branch. (see the `skill-builder` skill.)
 - "slide <tag>" means force-move a floating Git tag to current main HEAD (delete + recreate + push).
   Common for repos with floating major-version tags that consumers reference.
-- Use the `session-lock` skill (alias `deconflict-sessions`) as the detection/recovery layer on top of the worktree-by-default policy (see above): register at start, `check` before editing, so parallel sessions can see each other.
+- Use the `session-lock` skill as the detection/recovery layer on top of the worktree-by-default policy (see above): register at start, `check` before editing, so parallel sessions can see each other.
   Worktrees are already the default, so most sessions start isolated; session-lock surfaces the rare SAME-WORKING-TREE collision before files get clobbered.
   This is the LOCAL counterpart to `claim-pr` (remote) and `sync-pr-branch` (reconcile with origin) --- use all three together on shared PR work.
   Registry lives under `.git/ai-sessions/` (never committed).

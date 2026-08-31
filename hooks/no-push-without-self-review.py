@@ -519,18 +519,22 @@ def _blank_shell_redirections(command: str) -> str:
 
 
 def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
-    """Resolve the directory after a `cd` or `pushd` command relative to `cur_dir`.
+    """Resolve the directory after a `cd`, `pushd`, or `popd` command relative to `cur_dir`.
 
     Returns the new effective directory, or None if cleared / indeterminate.
     """
     cmd_name = rest[0]
     if cmd_name == "popd":
-        # Without a full dirstack simulation across commands, popd clears the hint.
+        # `popd -n` suppresses the directory change, leaving cur_dir untouched.
+        if any(tok.startswith("-") and "n" in tok and tok != "-" for tok in rest[1:]):
+            return cur_dir
+        # Without a full dirstack simulation across commands, popd without -n clears the hint.
         return None
 
     # For `cd` and `pushd`: parse flags and positional directory target.
     i = 1
     target = None
+    suppress_chdir = False
     while i < len(rest):
         tok = rest[i]
         if tok == "--":
@@ -541,12 +545,21 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         if tok == "-":
             # `cd -` switches to OLDPWD, which is indeterminate without shell state.
             return None
+        if tok.startswith("+") or (tok.startswith("-") and tok[1:].isdigit()):
+            # `pushd +N` or `pushd -N` rotates the directory stack.
+            return None
         if tok.startswith("-"):
             # Flags like -P, -L, -e, -@ for cd, or -n for pushd
+            if cmd_name == "pushd" and "n" in tok:
+                suppress_chdir = True
             i += 1
             continue
         target = tok
         break
+
+    if cmd_name == "pushd" and suppress_chdir:
+        # `pushd -n <dir>` rotates/modifies stack without changing current working directory.
+        return cur_dir
 
     if target is None:
         # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).

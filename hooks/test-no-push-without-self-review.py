@@ -441,6 +441,10 @@ CASES = [
      "resolves through push.default rather than through the ref `main`"),
     (f"pushd {OTHER} >/dev/null && git push origin main", reviewed(), True,
      "a `pushd` moves the repo the verdict must cover, exactly as `cd` does"),
+    (f"pushd -n {OTHER} >/dev/null && git push origin main", reviewed(), False,
+     "a `pushd -n` leaves the repo unchanged, so the push stays in REPO"),
+    (f"pushd -n {OTHER} >/dev/null && git push origin main", reviewed(body(commit=OTHER_HEAD)), True,
+     "a `pushd -n` does not move the repo to OTHER"),
     (f"cd {OTHER} && git -C {REPO} push origin main", reviewed(), False,
      "an explicit -C wins over an earlier `cd`"),
     # A command can point git at another repository without leaving anything a
@@ -1346,6 +1350,20 @@ def cd_tracking_cases() -> tuple[int, int]:
     p = list(mod.iter_pushes("cd $UNKNOWN_VAR/foo && git push origin main"))
     check("cd with unknown variable sets hint to None",
           len(p) == 1 and p[0][2] is None)
+
+    # pushd -n does not change hint
+    p = list(mod.iter_pushes("pushd -n /other && git push origin main"))
+    check("pushd -n does not set directory hint",
+          len(p) == 1 and p[0][2] is None)
+
+    p = list(mod.iter_pushes("cd /dir1 && pushd -n /other && git push origin main"))
+    check("pushd -n preserves existing directory hint",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
+
+    # popd -n preserves existing hint
+    p = list(mod.iter_pushes("cd /dir1 && popd -n && git push origin main"))
+    check("popd -n preserves existing directory hint",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
 
     # subshell scoping with multiple pushes
     p = list(mod.iter_pushes("(cd /sub && git push origin main) && git push origin main"))

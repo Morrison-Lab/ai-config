@@ -133,6 +133,16 @@ The full rule, including the Do/Don't pair, is
 Questioning alone does not owe a pass: the check has to show the claim
 was wrong.
 
+## Treat user profanity and frustration as urgent defect signals
+
+Profanity, exasperation, or intense frustration from the user is a high-priority signal that a mistake, regression, broken assumption, or workflow failure occurred.
+Treat it as an immediate, top-priority defect alert:
+diagnose what failed,
+acknowledge the concrete mistake directly without defensive boilerplate, tone policing, or canned apologies,
+execute the repair immediately in that very turn,
+and run `ums` to learn from the defect and prevent recurrence mechanically.
+See [`shared/workflow/user-profanity-signal.md`](shared/workflow/user-profanity-signal.md).
+
 ## Status and diagnostic requests do not make issues report-only
 
 Treat any request for status or diagnostic inquiry

@@ -1,6 +1,7 @@
 # Claude Code hooks: manifest, registration, and install failures
 
 How this repo's hooks reach a machine and how that goes wrong --- the native `hooks/hooks.json` schema, the split between `install-hooks.py` (which binds) and a manual copy (which places, the plugin loader serving its hooks from the plugin root instead), and the two routes to a registered hook whose script is absent, one of which takes the whole `Bash` tool down.
+For the complete catalog of active hooks and rules for proactively complying with each hook, see [`hooks.md`](hooks.md).
 `check-install.py`, this file's original placement instrument, was removed along with the symlink install it verified.
 [ai-config#2352](https://github.com/Morrison-Lab/ai-config/issues/2352) tracks a replacement, so read every reference to it below as historical.
 

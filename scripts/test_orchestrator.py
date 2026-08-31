@@ -12,7 +12,7 @@ from pathlib import Path
 # Ensure orchestrator package is on path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from orchestrator.engine import OrchestratorEngine
+from orchestrator.engine import OrchestratorEngine, ensure_git_identity
 from orchestrator.models import (
     SubagentContext,
     SubagentResult,
@@ -20,6 +20,14 @@ from orchestrator.models import (
     TaskPriority,
     TaskStatus,
 )
+
+
+def setUpModule():
+    """Ensure mock git identity is configured for all tests in this suite."""
+    ensure_git_identity(
+        author_name="ai-config tests",
+        author_email="tests@example.invalid",
+    )
 from orchestrator.state_store import StateStore
 from orchestrator.subagents import (
     configured_pr_reviewers,
@@ -1339,7 +1347,79 @@ class TestConfiguredPRReviewers(unittest.TestCase):
         for name in configured_pr_reviewers() or []:
             self.assertNotIn(" ", name)
 
+
+class TestEnsureGitIdentity(unittest.TestCase):
+    """Test ensure_git_identity helper and runner initialization."""
+
+    def test_ensure_git_identity_sets_defaults_when_unset(self):
+        keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
+        saved = {k: os.environ.get(k) for k in keys}
+        for k in keys:
+            os.environ.pop(k, None)
+        try:
+            ensure_git_identity(author_name="custom-author", author_email="custom@example.invalid")
+            self.assertEqual(os.environ.get("GIT_AUTHOR_NAME"), "custom-author")
+            self.assertEqual(os.environ.get("GIT_AUTHOR_EMAIL"), "custom@example.invalid")
+            self.assertEqual(os.environ.get("GIT_COMMITTER_NAME"), "custom-author")
+            self.assertEqual(os.environ.get("GIT_COMMITTER_EMAIL"), "custom@example.invalid")
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+                else:
+                    os.environ.pop(k, None)
+
+    def test_ensure_git_identity_preserves_existing_environment(self):
+        keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
+        saved = {k: os.environ.get(k) for k in keys}
+        try:
+            os.environ["GIT_AUTHOR_NAME"] = "pre-existing"
+            os.environ["GIT_AUTHOR_EMAIL"] = "pre-existing@example.invalid"
+            os.environ["GIT_COMMITTER_NAME"] = "pre-existing-committer"
+            os.environ["GIT_COMMITTER_EMAIL"] = "pre-existing-committer@example.invalid"
+            ensure_git_identity(author_name="override", author_email="override@example.invalid")
+            self.assertEqual(os.environ.get("GIT_AUTHOR_NAME"), "pre-existing")
+            self.assertEqual(os.environ.get("GIT_AUTHOR_EMAIL"), "pre-existing@example.invalid")
+            self.assertEqual(os.environ.get("GIT_COMMITTER_NAME"), "pre-existing-committer")
+            self.assertEqual(os.environ.get("GIT_COMMITTER_EMAIL"), "pre-existing-committer@example.invalid")
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+                else:
+                    os.environ.pop(k, None)
+
+    def test_engine_start_ensures_git_identity(self):
+        keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
+        saved = {k: os.environ.get(k) for k in keys}
+        for k in keys:
+            os.environ.pop(k, None)
+        try:
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                db_path = os.path.join(tmpdir, "engine_id_test.db")
+                engine = OrchestratorEngine(db_path=db_path)
+                try:
+                    engine.start(run_in_background=True)
+                    self.assertEqual(os.environ.get("GIT_AUTHOR_NAME"), "ai-config orchestrator")
+                    self.assertEqual(os.environ.get("GIT_AUTHOR_EMAIL"), "orchestrator@noreply.ai-config.local")
+                    self.assertEqual(os.environ.get("GIT_COMMITTER_NAME"), "ai-config orchestrator")
+                    self.assertEqual(os.environ.get("GIT_COMMITTER_EMAIL"), "orchestrator@noreply.ai-config.local")
+                finally:
+                    engine.stop()
+        finally:
+            for k, v in saved.items():
+                if v is not None:
+                    os.environ[k] = v
+                else:
+                    os.environ.pop(k, None)
+
+
 def main():
+    ensure_git_identity(
+        author_name="ai-config tests",
+        author_email="tests@example.invalid",
+    )
     unittest.main(verbosity=2)
 
 

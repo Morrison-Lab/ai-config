@@ -131,14 +131,26 @@ def pending_commit(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                if record.get("type") != "assistant":
-                    continue
-                for block in (record.get("message") or {}).get("content") or []:
-                    if not isinstance(block, dict) or block.get("type") != "tool_use":
-                        continue
-                    if block.get("name") not in {"Bash", "bash", "run_command"}:
-                        continue
-                    command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
+                commands = []
+                if record.get("type") == "assistant":
+                    for block in (record.get("message") or {}).get("content") or []:
+                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in {"Bash", "bash", "run_command"}:
+                            cmd = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
+                            commands.append(cmd)
+                elif record.get("type") == "PLANNER_RESPONSE":
+                    for block in record.get("tool_calls", []):
+                        if isinstance(block, dict) and block.get("name") in {"Bash", "bash", "run_command"}:
+                            args = block.get("args") or {}
+                            cmd = str(args.get("CommandLine") or args.get("command") or args.get("cmd") or "")
+                            # Handle Gemini CLI stringified JSON
+                            if cmd.startswith('"') and cmd.endswith('"'):
+                                try:
+                                    cmd = json.loads(cmd)
+                                except Exception:
+                                    pass
+                            commands.append(cmd)
+                
+                for command in commands:
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
                         pending = command
@@ -161,13 +173,16 @@ def last_assistant_text(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                if record.get("type") != "assistant":
-                    continue
-                blocks = (record.get("message") or {}).get("content") or []
-                text = "".join(
-                    b.get("text", "") for b in blocks
-                    if isinstance(b, dict) and b.get("type") == "text"
-                )
+                text = ""
+                if record.get("type") == "assistant":
+                    blocks = (record.get("message") or {}).get("content") or []
+                    text = "".join(
+                        b.get("text", "") for b in blocks
+                        if isinstance(b, dict) and b.get("type") == "text"
+                    )
+                elif record.get("type") == "PLANNER_RESPONSE":
+                    text = str(record.get("content") or "")
+                
                 if text.strip():
                     last = text
     except Exception:

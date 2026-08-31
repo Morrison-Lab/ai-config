@@ -36,12 +36,24 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        if record.get("type") != "assistant":
-            continue
-        for block in (record.get("message") or {}).get("content") or []:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
+        blobs = []
+        if record.get("type") == "assistant":
+            for block in (record.get("message") or {}).get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
+        elif record.get("type") == "PLANNER_RESPONSE":
+            for block in record.get("tool_calls", []):
+                if isinstance(block, dict):
+                    args = block.get("args") or {}
+                    cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
+                    if isinstance(cmd, str) and cmd.startswith('"') and cmd.endswith('"'):
+                        try:
+                            cmd = json.loads(cmd)
+                        except Exception:
+                            pass
+                    blobs.append(block.get("name", "") + " " + json.dumps({"command": cmd}))
+                    
+        for blob in blobs:
             if OPEN.search(blob):
                 opened, armed = True, False
             if opened and SCHEDULE.search(blob):
@@ -66,6 +78,17 @@ def extract_pr_urls(path):
         content_items = []
         if isinstance(record.get("content"), list):
             content_items.extend(record.get("content"))
+        if isinstance(record.get("tool_calls"), list):
+            for tc in record.get("tool_calls"):
+                if isinstance(tc, dict):
+                    args = tc.get("args") or {}
+                    cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
+                    if isinstance(cmd, str) and cmd.startswith('"') and cmd.endswith('"'):
+                        try:
+                            cmd = json.loads(cmd)
+                        except Exception:
+                            pass
+                    content_items.append({"type": "tool_use", "name": tc.get("name", ""), "input": {"command": cmd}})
         if isinstance((record.get("message") or {}).get("content"), list):
             content_items.extend(record["message"]["content"])
         elif isinstance(record.get("message"), list):

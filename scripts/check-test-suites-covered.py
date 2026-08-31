@@ -62,7 +62,7 @@ def extract_active_run_commands(workflow_text: str) -> list[str]:
 
 def is_suite_executed(suite_name: str, run_commands: list[str]) -> bool:
     """Return True if suite_name is executed in any active run command."""
-    pattern = re.compile(rf"(?:\bpython3?\s+[^\n]*\b|\b){re.escape(suite_name)}\b")
+    pattern = re.compile(rf"\bpython3?\s+[^\n]*\b{re.escape(suite_name)}\b")
     for cmd in run_commands:
         # Ignore inline comments in commands if any
         cmd_code = cmd.split("#")[0].strip()

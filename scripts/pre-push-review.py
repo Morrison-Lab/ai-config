@@ -18,6 +18,13 @@ from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
+from scripts.lib.review_payload import (
+    extract_structured_review,
+    payload_findings,
+    payload_findings_malformed,
+    payload_is_blocking,
+    normalize_verdict,
+)
 
 
 def log_error(msg: str):
@@ -198,6 +205,95 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
+# The fingerprint line.  Adapted from `hooks/no-push-without-self-review.py`'s
+# REVIEWED_COMMIT, NOT a superset of it -- two differences are deliberate
+# narrowings and two are additions:
+#
+#   NARROWER: `(?m)^[ \t]*` requires the line to START with the label (leading
+#   indentation aside).  The hook's pattern is unanchored, so it also matches
+#   `The report ends with Reviewed-Commit: <sha>`, a `> ` blockquote, and a
+#   `- ` list item.  Those are mentions, and this file uses the match POSITION
+#   to decide where trailing content begins, so a mention mid-prose would move
+#   that boundary.
+#   NARROWER: the sha is length-bounded `{7,40}`, as the hook bounds it.  An
+#   earlier cut here dropped the bound and accepted `Reviewed-Commit: abc`.
+#   WIDER: a space is accepted instead of the hyphen, and LEADING indentation
+#   is tolerated -- `build_review_prompt` renders the line three spaces in (see
+#   the structure block below), so an `^`-only anchor rejected exactly the
+#   layout this file asks the reviewer for.
+#
+# Bold markers on either side of the colon and a backticked sha are accepted,
+# as in the hook.
+#
+# ONE pattern, used by both the SHA harvest and the trailing-content scan below.
+# As two literals they drifted apart within a single session: a loosening
+# applied to the harvest alone left the scan matching nothing on the very forms
+# the harvest had started accepting.
+_FINGERPRINT_RE = re.compile(
+    r"(?im)^[ \t]*\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]{7,40})`?"
+)
+
+
+# The verdict alternative of `_TRAILING_AFTER_FINGERPRINT` below, with the
+# phrase captured, so a restated verdict after the fingerprint is EVALUATED
+# rather than merely permitted in that position.
+_TRAILING_VERDICT_RE = re.compile(
+    r"(?i)^\s*(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+?)\s*$"
+)
+
+
+# Lines tolerated AFTER the final `Reviewed-Commit:` fingerprint.  Each must
+# start with a known marker: a status banner, a rule line, a disclosure footer,
+# a stopping-point declaration, or a restated verdict.  Anything else -- a
+# chatty sign-off, a smuggled "actually final verdict" line -- means the
+# fingerprint is not last, which is what the check exists to establish.
+_TRAILING_AFTER_FINGERPRINT = re.compile(
+    r"(?i)^\s*(?:_?Posted by\b.*|={3,}\s*|Status:.*|\*\*Stopping Point\*\*:.*"
+    r"|(?:###\s*)?(?:Summary\s+)?Verdict:.*)$"
+)
+
+
+def _structured_contradiction(report: str) -> Optional[str]:
+    """Reason string when the report's structured payload blocks, else ``None``.
+
+    ``build_review_prompt`` asks the reviewer to append a machine-readable
+    ``<!-- review-data: {...} -->`` payload, and both verdict parsers below
+    strip HTML comments before every check -- so nothing read the field the
+    prompt requested, and the two consumers of one report disagreed.
+    Measured: a report with ``Verdict: Ready for merge``, ``Critical Findings:
+    None.`` and a trailing payload saying ``NOT_CLEAN`` with one finding parsed
+    as ``(True, True, 'Verdict: CLEAN')`` here, while
+    ``scripts/check-pr-fully-clean.py`` scored the same artifact blocking.
+
+    Read off the RAW report, before that strip, through the extractor both
+    scripts share (``scripts/lib/review_payload.py``).  Call this only on a
+    path about to report CLEAN: a payload that agrees with an already-not-clean
+    prose verdict adds nothing, and a payload that says CLEAN never overrides
+    prose findings -- prose wins that contradiction, matching
+    ``classify_verdict``'s ordering on the PR side.
+    """
+    structured = extract_structured_review(report)
+    if not payload_is_blocking(structured):
+        return None
+    findings = payload_findings(structured)
+    if payload_findings_malformed(structured):
+        # Checked FIRST: `payload_findings` folds a malformed field to `[]`, so
+        # the verdict branch would otherwise report "the payload reports verdict
+        # CLEAN" -- which is not a contradiction, and is not why it blocked.
+        detail = (
+            "a `findings` field that is present but is not a list "
+            f"({type(structured.get('findings')).__name__})"
+        )
+    elif findings:
+        detail = f"{len(findings)} finding(s)"
+    else:
+        detail = f"verdict {normalize_verdict(structured.get('verdict'))}"
+    return (
+        "Contradictory output: prose verdict is clean but the structured "
+        f"review-data payload reports {detail}."
+    )
+
+
 def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
     """Validate a persona-contract report (Summary / Findings / Verdict /
     Reviewed-Commit) via the hook's own parse_report() (ai-config#2309).
@@ -273,6 +369,9 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             )
 
     if verdict == "clean":
+        contradiction = _structured_contradiction(report)
+        if contradiction:
+            return False, False, contradiction
         return True, True, "Clean (persona contract)"
     return True, False, "Needs work (persona contract)"
 
@@ -301,14 +400,14 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         return False, False, "Unterminated HTML comment detected."
 
     def extract_section(text, header_pattern):
-        pattern = r"(?im)^#{2,3}\s+(?:" + header_pattern + r")\s*(.*?)(?=^#{2,3}\s+|\Z)"
+        pattern = r"(?im)^#{1,6}\s*(?:" + header_pattern + r")\b[^\n]*\n(.*?)(?=^#{1,6}\s+|\Z)"
         matches = re.findall(pattern, text, re.DOTALL)
         return "\n\n".join(m.strip() for m in matches) if matches else None
 
-    summary_text = extract_section(unfenced_report, r"(?:Summary\s+)?Verdict")
-    critical_text = extract_section(unfenced_report, r"Critical Findings")
-    observations_text = extract_section(unfenced_report, r"Observations")
-    verification_text = extract_section(unfenced_report, r"Verification(?: Steps)?")
+    summary_text = extract_section(unfenced_report, r"(?:(?:Summary|Review)\s+)?Verdict[^\n]*")
+    critical_text = extract_section(unfenced_report, r"Critical\s+Findings[^\n]*")
+    observations_text = extract_section(unfenced_report, r"Observations[^\n]*")
+    verification_text = extract_section(unfenced_report, r"(?:Testing|Validation|Verification)[^\n]*")
 
     # Two report contracts exist (ai-config#2309): this engine's own
     # (Summary Verdict / Critical Findings / Observations / Verification
@@ -340,8 +439,9 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         if verification_text is None: return False, False, "Missing required section: Verification Steps"
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
+    trailing_verdicts: List[str] = []
     if expected_commit_sha:
-        all_shas = re.findall(r"(?i)Reviewed-Commit:\s*([a-f0-9A-F]+)", unfenced_report)
+        all_shas = _FINGERPRINT_RE.findall(unfenced_report)
         if not all_shas:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
@@ -349,9 +449,48 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             if found_sha_raw.lower() != exp_sha:
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
-        # Also ensure the final fingerprint is anchored at the end of the report
-        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+\s*\Z", unfenced_report):
+        # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
+        # A LINE SCAN, not a nested-quantifier regex.  Two successive regex
+        # cuts each backtracked exponentially and each looked fixed: first a
+        # `\s*` alternative that matched empty, then -- after removing it --
+        # the `={3,}` alternative, which is self-ambiguous under the outer `*`
+        # because a run of `=` splits into chunks of size >= 3 in exponentially
+        # many ways.  Measured on the tool's OWN `"=" * 60` banner -- the
+        # report separator `main` prints around the review, not `log_error`,
+        # which emits only `Error: {msg}` -- followed by any non-matching text:
+        # 0.50s at 36 `=`, 4.01s at 42, 14.18s at 45.  `parse_review_verdict`
+        # runs in-process with no timeout, so the guard hung rather than
+        # failing.  Matching each trailing line independently is linear by
+        # construction, and no further alternative can reintroduce the class.
+        last_fp = None
+        for fp_match in _FINGERPRINT_RE.finditer(unfenced_report):
+            last_fp = fp_match
+        if last_fp is None:
+            # Unreachable while both sites share `_FINGERPRINT_RE` -- `all_shas`
+            # above is non-empty by the same pattern. Fail closed rather than
+            # raise, since the only way here is that they drifted apart again.
+            return False, False, "Reviewed-Commit fingerprint could not be located for the trailing-content check."
+        tail_lines = unfenced_report[last_fp.end():].split("\n")
+        if not all(
+            not line.strip() or _TRAILING_AFTER_FINGERPRINT.match(line)
+            for line in tail_lines
+        ):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
+
+        # Tolerating a restated verdict line in that POSITION is not the same as
+        # not reading it.  `verdict_matches` below scans `summary_text` only, so
+        # a report ending `### Verdict: Needs more work` cleared the position
+        # check and then reached no verdict scan at all -- parsing as
+        # (True, True, 'Verdict: CLEAN') where the pre-line-scan regex had
+        # rejected it outright.  Feed any trailing verdict line into the same
+        # evaluation the Summary section's verdict goes through, so a not-clean
+        # restatement blocks and an unrecognized one invalidates.
+        trailing_verdicts = [
+            m.group(1)
+            for line in tail_lines
+            for m in [_TRAILING_VERDICT_RE.match(line)]
+            if m
+        ]
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
     if not verdict_matches:
@@ -364,6 +503,8 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     if not verdict_matches:
         return False, False, "No valid anchored verdict line found."
+
+    verdict_matches = list(verdict_matches) + trailing_verdicts
 
     clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
     needs_work_allowlist = {
@@ -407,28 +548,20 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     else:
         is_clean = True
 
-    findings_matches = list(re.finditer(r"(?im)^#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report, flags=re.DOTALL))
-    if not findings_matches:
-        return False, False, "Missing required section: Critical Findings"
-
-    for f_match in findings_matches:
-        findings_body = f_match.group(1).strip()
-        if not findings_body:
-            return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
-        is_clean_findings = bool(
-            re.match(
-                r"^\s*(?:none(?:\.|\b)|n/a|(?:zero|no)(?:\s+(?:critical|blocking))?(?:\s+(?:issues|findings|bugs|problems))?(?:\s+found)?\.?)\s*$",
-                findings_body,
-                flags=re.IGNORECASE,
-            )
+    if not critical_text or not critical_text.strip():
+        return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
+    is_clean_findings = bool(
+        re.match(
+            r"^\s*(?:none(?:\.|\b)|n/a|(?:zero|no)(?:\s+(?:critical|blocking))?(?:\s+(?:issues|findings|bugs|problems))?(?:\s+found)?\.?)\s*$",
+            critical_text.strip(),
+            flags=re.IGNORECASE,
         )
-        if is_clean and not is_clean_findings:
-            return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
+    )
+    if is_clean and not is_clean_findings:
+        return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
-
-    observations_match = re.search(r"(?i)#{2,3}\s*Observations(?: & Non-Blocking Suggestions)?(.*?)(?:#{2,3}|$)", unfenced_report, re.DOTALL)
-    if is_clean and observations_match:
-        obs_body = observations_match.group(1).strip()
+    if is_clean and observations_text:
+        obs_body = observations_text.strip()
         if obs_body and not re.match(r"^\s*(?:none(?:\.|\b)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
             # Check that ALL non-empty lines start with [P3], [P4], [INFO], or a list marker followed by them
             for line in obs_body.splitlines():
@@ -447,6 +580,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         blocker_match = re.search(blocker_pattern, masked_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
+
+    if is_clean:
+        contradiction = _structured_contradiction(report)
+        if contradiction:
+            return False, False, contradiction
 
     refusal = _refusal_reason(report)
     if refusal:
@@ -507,9 +645,9 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
-        print("Notice: Claude review timed out after 360s.", file=sys.stderr)
+        print("Notice: Claude review timed out after 600s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: Claude execution failed: {e}", file=sys.stderr)
@@ -911,8 +1049,29 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   - ### Observations & Non-Blocking Suggestions",
         "     Every observation MUST be explicitly prefixed with a machine-readable non-blocking severity label: [INFO] or [MINOR]. Do not include conversational filler.",
         "   - ### Verification Steps",
+        "     (List the specific tests and validation steps you performed)",
         f"   Reviewed-Commit: {head_sha}",
-        "CRITICAL: The 'Reviewed-Commit' fingerprint MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
+        "   Append the machine-readable structured JSON review data directly after the fingerprint in an HTML comment.",
+        "   Write it FLUSH LEFT, at column zero -- not indented like this instruction block. Four or more",
+        "   leading spaces make it a Markdown indented code block, and a payload inside one is ignored.",
+        "<!-- review-data:",
+        "{",
+        '  "schema_version": "1.0",',
+        '  "reviewer": "adversarial-reviewer",',
+        f'  "commit_sha": "{head_sha}",',
+        '  "verdict": "CLEAN",',
+        '  "findings": []',
+        "}",
+        "-->",
+        "   (For a not-clean verdict, set \"verdict\": \"NOT_CLEAN\" and give \"findings\" one object per",
+        "   finding, each with exactly these four keys: {\"file\": \"<repo-relative path>\", \"line\": <1-indexed int>,",
+        "   \"category\": \"<kebab-case slug>\", \"message\": \"<one sentence stating the defect>\"}.",
+        "   Use those key names literally -- a consumer that cannot find them reports the finding as",
+        "   \"structured finding in unknown: \", which names nothing.",
+        "   Any finding listed here blocks whatever the \"verdict\" string says, and a CLEAN payload",
+        "   requires an EXPLICIT empty \"findings\" array -- omitting the key does not clear.)",
+        "CRITICAL: The closing '-->' of the review-data comment MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
+        "CRITICAL: Emit the review-data comment as raw unfenced text. A payload inside a code fence, an inline code span, or an indented block is deliberately ignored, so a fenced payload authorizes nothing.",
     ]
 
     if guidelines:

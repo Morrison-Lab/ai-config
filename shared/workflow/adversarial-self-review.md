@@ -382,6 +382,49 @@ pushing branch A afterward compares its shipped commit `X` against the held `Y`,
 - **Don't:** read that refusal as a defect in branch A's review;
   the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
 
+## Structured review data (JSON payload)
+
+Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
+
+```html
+Reviewed-Commit: <sha>
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "<agent/bot name>",
+  "commit_sha": "<full sha>",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+```
+
+For a not-clean verdict, set `"verdict": "NOT_CLEAN"` and give `"findings"` one object per finding, each with the four keys `file`, `line`, `category`, and `message`.
+State those keys in any brief you write, rather than only asking for "finding objects" --- a reviewer that guesses the key names produces `structured finding in unknown: ` as the reported blocking reason.
+
+Three rules govern how the payload is read, and each exists because its absence inverted a verdict:
+
+- **The payload must be last, and the last one wins.**
+  The authoritative payload follows the verdict and the `Reviewed-Commit` fingerprint.
+  A reviewer who quotes the template above (it hardcodes `"verdict": "CLEAN"`) before writing its own would otherwise publish a `NOT_CLEAN` review that scored clean.
+- **A payload inside a code region does not count.**
+  Fences, inline code spans, and indented blocks are all excluded, so a comment that merely mentions the format is not a review of anything.
+  This is the same rule `check-pr-fully-clean.py` already applies to quoted *finding* vocabulary (ai-config#2449), applied to a *verdict*.
+- **Findings block regardless of the stated verdict.**
+  A payload that enumerates findings and then labels itself `CLEAN` is contradicting itself, and the safe reading of a contradiction is the blocking one.
+
+Two consumers read the payload through one extractor, [`scripts/lib/review_payload.py`](../../scripts/lib/review_payload.py): [`scripts/check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) for a comment posted to a PR, and [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) for a report produced locally.
+They score the same artifact, so they must agree, and they did not: the local parser stripped HTML comments before every check, so a report whose payload said `NOT_CLEAN` parsed as `Verdict: CLEAN` locally while the PR-side consumer scored it blocking.
+Markdown parsing remains the fallback when no payload is present.
+
+**A third consumer does not read it yet, and it is the one that blocks the push.**
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s `parse_report` blanks HTML comments before parsing, so the payload is invisible to it.
+Measured 2026-08-31: a report stating `Verdict: Ready for merge` alongside a `NOT_CLEAN` payload carrying one finding parses there as `clean`.
+So the three bullets above bind the two scripts, and the hook still decides on the prose verdict alone --- write the prose verdict truthfully rather than relying on the payload to correct it.
+Tracked as [ai-config#2749](https://github.com/Morrison-Lab/ai-config/issues/2749);
+once the hook reads the payload, this paragraph goes away.
+
 ## The review gates the push, not the work --- and it is one round, not a loop
 
 The rule above is a gate on a **push**.

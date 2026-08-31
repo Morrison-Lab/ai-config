@@ -175,7 +175,7 @@ with tempfile.TemporaryDirectory() as tmp:
     sub = base / ".ai-config"
     sub.mkdir()
     (sub / "sub.md").write_text("working-tree version", encoding="utf-8")
-    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=sub, check=True)
     subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
@@ -381,12 +381,12 @@ with tempfile.TemporaryDirectory() as tmp:
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
-    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
     sub = base / ".ai-config"
     sub.mkdir()
-    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=sub, check=True)
     (sub / "sub.md").write_text("old pinned content", encoding="utf-8")
@@ -544,12 +544,12 @@ check("re-walking does not defeat the depth limit",
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
-    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
     sub = base / ".ai-config"
     sub.mkdir()
-    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=sub, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=sub, check=True)
     # Baseline is BROKEN: it cites gone.md, which does not exist at the pin.
@@ -961,7 +961,7 @@ with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
     (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8")
     (base / "frag.md").write_text("short", encoding="utf-8")
-    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
     subprocess.run(["git", "add", "-A"], cwd=base, check=True)

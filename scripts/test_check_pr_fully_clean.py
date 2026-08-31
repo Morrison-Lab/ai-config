@@ -10,6 +10,8 @@ Tests:
 """
 import importlib.util
 import json
+import re
+import time
 from unittest.mock import patch
 import sys
 from pathlib import Path
@@ -105,6 +107,27 @@ def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch=
 
 checker.check_ci_runs = wrapped_check_ci_runs
 checker.check_review_comments = wrapped_check_review_comments
+
+def best_of_three(fn, *args):
+    """Fastest of three runs, with the last return value.
+
+    A timing check is about complexity, not about how busy the machine
+    is, so a single sample makes it flaky: one of these failed under
+    contention at 6.7x headroom while measuring 0.148s standalone.
+    Taking the minimum keeps the threshold tight enough to catch a
+    quadratic -- which misses by orders of magnitude, not by noise --
+    without failing on a loaded runner.
+    """
+    best = None
+    value = None
+    for _ in range(3):
+        start = time.time()
+        value = fn(*args)
+        elapsed = time.time() - start
+        if best is None or elapsed < best:
+            best = elapsed
+    return best, value
+
 
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
@@ -3140,6 +3163,732 @@ def main() -> int:
         checker.classify_verdict(contained) == "clean",
     )
 
+    posted_verdict_citation = (
+        "This is in response to finding [round 3](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a posted timestamp verdict citation does not count as a finding or block clean verdict",
+        checker.classify_verdict(posted_verdict_citation) == "clean"
+        and checker._unresolved_finding_pattern(posted_verdict_citation) is None,
+    )
+    # ... and the SAME sentence without a round-naming link is kept. A
+    # bare "in response to" filler was accepted as attribution, which
+    # made any unrelated link or phrase into a licence to delete a live
+    # verdict.
+    unattributed_citation = (
+        "This is in response to finding "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a citation with no round-naming link is NOT stripped",
+        checker.classify_verdict(unattributed_citation) == "not-clean",
+    )
+
+    # The strip requires a positive attribution signal, and a markdown
+    # link naming the round is the only one accepted -- an "in response
+    # to" phrase was once accepted in its place and was removed, because
+    # it matched any prose containing those words. So the link-attributed
+    # narration from ai-config#2662 is stripped even though no resolution
+    # wording follows it.
+    linked_citation = (
+        "This is the author's direct response to "
+        "[round 6's finding](https://github.com/x/y/pull/1#issuecomment-2) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "per the ARD protocol.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a link-attributed posted-verdict citation is stripped",
+        checker.classify_verdict(linked_citation) == "clean"
+        and checker._unresolved_finding_pattern(linked_citation) is None,
+    )
+    # Without a round-naming link, the same parenthesized shape is
+    # NOT stripped -- an unattributed cited verdict may be a live one.
+    bare_paren_citation = (
+        "The finding (posted 2026-08-25T10:00:00Z, verdict "
+        "**Needs more work**) was noted.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "an unattributed parenthesized posted-verdict is NOT stripped",
+        checker.classify_verdict(bare_paren_citation) == "not-clean",
+    )
+    # The veto window crosses a semantic line break: the re-raise clause on
+    # the next line still refuses the strip.
+    linebreak_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**)\n"
+        "which remains unaddressed.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise across a semantic line break refuses the strip",
+        checker.classify_verdict(linebreak_reraise) == "not-clean",
+    )
+    # The veto window also crosses a dot glued to a following character
+    # (a filename), and catches re-raise verbs the first veto list missed.
+    glued_dot_reraise = (
+        "This is in response to the finding "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "which in utils.py still applies.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise past a glued filename dot refuses the strip",
+        checker.classify_verdict(glued_dot_reraise) == "not-clean",
+    )
+    imperative_reraise = (
+        "In response to [round 3](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "must be fixed before merge.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "an imperative re-raise (must be fixed) refuses the strip",
+        checker.classify_verdict(imperative_reraise) == "not-clean",
+    )
+    not_been_addressed = (
+        "In response to [round 4](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "has not been addressed.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a 'not been addressed' re-raise refuses the strip",
+        checker.classify_verdict(not_been_addressed) == "not-clean",
+    )
+    # The veto scans the containing and adjoining paragraphs around the citation:
+    # a re-raise stated before the attribution (even in a preceding sentence) refuses
+    # the strip, and one in a following paragraph within the section does too.
+    backward_reraise = (
+        "The finding remains unaddressed in [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise BEFORE the citation refuses the strip",
+        checker.classify_verdict(backward_reraise) == "not-clean",
+    )
+    preceding_sentence_reraise = (
+        "The blocking issue is still open. [round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise in the preceding sentence refuses the strip",
+        checker.classify_verdict(preceding_sentence_reraise) == "not-clean",
+    )
+    following_paragraph_reraise = (
+        "[round 2's finding](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**).\n\n"
+        "This is still unresolved.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise in the following paragraph refuses the strip",
+        checker.classify_verdict(following_paragraph_reraise) == "not-clean",
+    )
+    fenced_code_comment_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), "
+        "this was noted in the thread.\n"
+        "```\n### not a real heading, just quoted\n```\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise past a fenced code block with # comments refuses the strip",
+        checker.classify_verdict(fenced_code_comment_forward_reraise) == "not-clean",
+    )
+    fenced_code_comment_backward_reraise = (
+        "This is still unresolved.\n"
+        "```python\n# a plain code comment\n```\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise before a fenced code block with # comments refuses the strip",
+        checker.classify_verdict(fenced_code_comment_backward_reraise) == "not-clean",
+    )
+    fenced_blank_line_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n"
+        "```\ncode line 1\n\ncode line 2\n```\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise past a fenced code block with blank lines refuses the strip",
+        checker.classify_verdict(fenced_blank_line_forward_reraise) == "not-clean",
+    )
+    fenced_blank_line_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "```\ncode line 1\n\ncode line 2\n```\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise before a fenced code block with blank lines refuses the strip",
+        checker.classify_verdict(fenced_blank_line_backward_reraise) == "not-clean",
+    )
+    multi_paragraph_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n\n"
+        "Just an intervening paragraph with nothing special in it.\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise across multiple intervening paragraphs refuses the strip",
+        checker.classify_verdict(multi_paragraph_forward_reraise) == "not-clean",
+    )
+    multi_paragraph_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "Just an intervening paragraph with nothing special in it.\n\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise across multiple intervening paragraphs refuses the strip",
+        checker.classify_verdict(multi_paragraph_backward_reraise) == "not-clean",
+    )
+    fenced_paragraph_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n\n"
+        "```\ncode\n```\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise separated by a standalone fenced block paragraph refuses the strip",
+        checker.classify_verdict(fenced_paragraph_forward_reraise) == "not-clean",
+    )
+    fenced_paragraph_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "```\ncode\n```\n\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise separated by a standalone fenced block paragraph refuses the strip",
+        checker.classify_verdict(fenced_paragraph_backward_reraise) == "not-clean",
+    )
+    long_sentence_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+        "which, given the considerations enumerated at painful length in "
+        "the paragraphs above concerning the overall shape of this change "
+        "and its history, still stands as a blocker.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a re-raise far along the same sentence refuses the strip",
+        checker.classify_verdict(long_sentence_reraise) == "not-clean",
+    )
+    for phrase in ("was ignored in this push",
+                   "needs to be fixed",
+                   "applies unchanged in this diff"):
+        vocab_reraise = (
+            "In response to [round 2](https://x) "
+            "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+            "which " + phrase + ".\n\n### Verdict\n**Ready for merge**"
+        )
+        check(
+            "the re-raise vocabulary covers '" + phrase + "'",
+            checker.classify_verdict(vocab_reraise) == "not-clean",
+        )
+    # The gate recognizes the round-naming link in its several written
+    # forms, including a semantic line break after the link tail.
+    for label, narration in (
+        ("a possessive round reference",
+         "This comment responds to [round 6's review](https://x/pull/1#c-2) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "which has since been addressed."),
+        ("a hyphenated round reference",
+         "I replied to [round-6 review](https://x/pull/1#c-2) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**)."),
+        ("a line break after the link",
+         "This is the author's direct response to\n"
+         "[round 6's finding](https://x/pull/1#c-2)\n"
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**),\n"
+         "per the ARD protocol."),
+    ):
+        body = narration + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "narration with " + label + " is stripped",
+            checker.classify_verdict(body) == "clean",
+        )
+    # The strip is gated on the body stating a verdict of its own: it
+    # exists to stop a CITED verdict from overriding the reviewer's own,
+    # so with none to protect it must not fire. This bounds the strip
+    # structurally rather than by vocabulary, which matters because the
+    # veto is a closed word list and this file says elsewhere that such
+    # a list cannot enumerate every re-raise phrasing. Each body below
+    # is a live rejection whose re-raise is phrased outside that list,
+    # or sits in the next sentence entirely.
+    for label, unstated in (
+        ("a re-raise in the next sentence",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**). "
+         "This must be fixed before merge."),
+        ("'the bug is present'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "the bug is present."),
+        ("\"hasn't been fixed\"",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it hasn't been fixed."),
+        ("'requires a fix'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it requires a fix."),
+    ):
+        check(
+            "no verdict section, so " + label + " is NOT stripped",
+            checker.classify_verdict(unstated) == "not-clean",
+        )
+    # These four reach _RERAISE_VOCAB and the ones above it do not.
+    # The citation regex requires its closing paren to be followed
+    # IMMEDIATELY by clause punctuation, so a body continuing ") which
+    # must ..." never matches the regex at all and is refused before the
+    # veto is consulted. Those tests are still correct, but they pass on
+    # the lookahead rather than on the vocabulary -- verified by
+    # mutation: replacing _RERAISE_VOCAB with a never-matching pattern
+    # leaves them green, and flips every case below to clean.
+    for label, veto_shape in (
+        ("comma then 'still remains'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it still remains a blocker."),
+        ("comma then 'must be fixed'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "which must be fixed before merge."),
+        ("semicolon then 'not been addressed'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**); "
+         "it has not been addressed."),
+        # The veto scans the paragraph, so a re-raise in the NEXT
+        # sentence is seen; a sentence-bounded scan cleared this one.
+        ("a period then 'remains open' in the next sentence",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**). "
+         "It remains open."),
+    ):
+        body = veto_shape + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "the veto refuses the strip on " + label,
+            checker.classify_verdict(body) == "not-clean",
+        )
+    # The veto's regions are found by bisect over positions computed
+    # once, not by slicing the tail per citation. Slicing re-scanned the
+    # rest of the body every time: 400 citations took 1.26s and each
+    # doubling quadrupled it, so a cap-sized body of them ran for
+    # seconds inside a checker that runs this per review item.
+    _cite_unit = (
+        "In response to [round 2](https://example.com/x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), "
+        "resolved. "
+    )
+    _cite_body = "### Verdict\n**Ready for merge.** " + _cite_unit * 555
+    _cite_secs, _cite_verdict = best_of_three(
+        checker.classify_verdict, _cite_body)
+    check(
+        "a body packed with citations scans linearly",
+        _cite_verdict == "clean" and _cite_secs < 1,
+    )
+    # Both citation kinds in one body. _SHA_CITATION.sub runs first and
+    # replaces a variable-length match with a single space, shifting
+    # every position after it -- so the veto's precomputed positions must
+    # be built from the post-substitution text. Built from the raw
+    # argument, they described a string that no longer existed, and the
+    # veto looked for "Still"/"remains unresolved" at the wrong offsets
+    # and missed them, stripping a live not-clean.
+    both_citations = (
+        "**Round 5 review**\n\n"
+        "**[Defect] Retry loop does not release the connection-pool lock "
+        "on timeout, so a stuck request starves every later request** "
+        "reviewed at `a1b2c3d4e5f6789012345678901234567890abcd` is now "
+        "Addressed.\n\n"
+        "Still, per [round 6's finding](https://x/pull/1#c-2) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), the "
+        "race condition in the retry loop remains unresolved.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a sha citation before a posted citation does not shift the veto",
+        checker.classify_verdict(both_citations) == "not-clean",
+    )
+    # A verdict heading inside a FENCE does not license the strip. The
+    # gate runs before fences are removed, and a review of this file
+    # quotes that heading in a code block.
+    fenced_heading = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "the bug is present.\n\n```\n### Verdict\n```\n"
+    )
+    check(
+        "a verdict heading inside a fence does not license the strip",
+        checker.classify_verdict(fenced_heading) == "not-clean",
+    )
+    # The residual this gate does NOT close, asserted so it is visible
+    # rather than discovered: a body stating its own clean verdict, whose
+    # only live signal is prose the checker cannot detect as a finding,
+    # reads clean once the cited verdict is stripped. That is not a lost
+    # detection -- with the citation removed, this same body reads clean
+    # on origin/main too, because neither version detects "the bug is
+    # present" as a finding. The block origin/main produces here comes
+    # entirely from the citation false positive this PR removes, so the
+    # two are inseparable. Tracked as ai-config#2696.
+    undetectable_prose = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+        "the bug is present.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a stated clean verdict stands over prose the checker cannot read",
+        checker.classify_verdict(undetectable_prose) == "clean",
+    )
+    control_no_citation = (
+        "In response to a prior round, the bug is present."
+        "\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "control: the same prose without a citation is already clean",
+        checker.classify_verdict(control_no_citation) == "clean",
+    )
+    # The adversarial direction for the same gate: a real citation with
+    # a live requirement riding behind it, and an unrelated link standing
+    # in for the attribution. Both classified clean while origin/main
+    # classified them not-clean, which is the fail-open this mechanism
+    # must never produce.
+    for label, live in (
+        ("a requirement clause after a real citation",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+         "which should be fixed before merge."),
+        ("a blocker clause after a real citation",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+         "which is a blocker."),
+        ("an unrelated link as the attribution",
+         "Confirmed this violates the style guide "
+         "[docs](https://example.com/guide) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**) "
+         "so please fix it before merging."),
+    ):
+        body = live + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "a live verdict behind " + label + " is NOT stripped",
+            checker.classify_verdict(body) == "not-clean",
+        )
+
+    # A LIVE verdict phrased with the same "posted <ts>, verdict **X**"
+    # vocabulary, outside parens, is NOT erased -- the same adversarial
+    # direction as the #1762 round-1/round-2 regression tests for
+    # _SHA_CITATION above.
+    live_posted_verdict = (
+        "This review was posted 2026-08-30T05:22:14Z, verdict "
+        "**Needs more work** because the null check is still missing."
+    )
+    check(
+        "an unparenthesized live 'posted <ts>, verdict' statement is NOT erased",
+        checker.classify_verdict(live_posted_verdict) == "not-clean",
+    )
+    reraised_posted_verdict = (
+        "The finding from round 1 was posted 2026-08-25T10:00:00Z, verdict "
+        "**Needs more work** and is still present and unaddressed in this "
+        "diff.\n\n### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a finding re-raised with 'posted <ts>, verdict' wording is NOT erased",
+        checker.classify_verdict(reraised_posted_verdict) == "not-clean",
+    )
+    # Even a parenthesized citation is kept when the rest of the sentence
+    # re-raises the cited verdict as still open.
+    still_standing_citation = (
+        "The prior verdict (posted 2026-08-30T05:22:14Z, verdict "
+        "**Needs more work**) still stands.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a parenthesized verdict citation re-raised as still standing is NOT erased",
+        checker.classify_verdict(still_standing_citation) == "not-clean",
+    )
+
+    # A negated resolution is a live not-clean statement: the negator sits
+    # before the past-state marker, where the suffix scan cannot see it.
+    negated_resolution = (
+        "### Verdict\nNone of the earlier blocking findings were resolved."
+        "\n\nDo not merge."
+    )
+    check(
+        "a negated resolution of earlier blocking findings stays not-clean",
+        checker.classify_verdict(negated_resolution) == "not-clean",
+    )
+    negated_prior = (
+        "### Verdict\nNone of the prior blocking findings were resolved."
+        "\n\nDo not merge."
+    )
+    check(
+        "a negated resolution of prior blocking findings stays not-clean",
+        checker.classify_verdict(negated_prior) == "not-clean",
+    )
+    # A negator anywhere earlier in the sentence blocks the resolved
+    # reading, including a fronted clause that negates something else.
+    # This is the deliberate over-flag the blunt rule costs: judging what
+    # a negator scopes over is a parsing problem, and each lexical proxy
+    # tried for it admitted a fresh FALSE CLEAN. A false not-clean stalls
+    # a merge until a human looks; a false clean merges over a live
+    # rejection.
+    fronted_negator = (
+        "### Verdict\n**Ready for merge** \u2014 with no new issues, both "
+        "round-2 blocking findings (demo caption overclaim, missing "
+        "tactics.qmd companion video) are resolved by this round's diff."
+    )
+    check(
+        "a fronted negated clause over-flags, the safe direction",
+        checker.classify_verdict(fronted_negator) == "not-clean",
+    )
+    # The same sentence with the negated clause TRAILING the mention is
+    # unaffected, which is the common shape and the one this PR is for.
+    trailing_negator = (
+        "### Verdict\n**Ready for merge** \u2014 both round-2 blocking "
+        "findings (demo caption overclaim, missing tactics.qmd companion "
+        "video) are resolved by this round's diff, with no new issues "
+        "introduced."
+    )
+    check(
+        "a trailing no-new-issues clause still reads as resolved",
+        checker.classify_verdict(trailing_negator) == "clean",
+    )
+    # A negator in a PRECEDING sentence is out of scope.
+    prior_sentence_negator = (
+        "### Verdict\n**Ready for merge.** No new issues were found. "
+        "The previously blocking findings were resolved by this "
+        "round's diff."
+    )
+    check(
+        "a negator in a preceding sentence does not block the resolution",
+        checker.classify_verdict(prior_sentence_negator) == "clean",
+    )
+    # The guard varies what sits BETWEEN the negator and the past-state
+    # marker, not just two literal phrasings: a fixed glue whitelist
+    # ("of the ...") let a count or modifier through, and a bounded word
+    # run then let both a longer run and punctuation inside the negated
+    # noun phrase through -- each classifying a negated resolution as
+    # clean, the dangerous direction.
+    for negation in ("None of the two earlier",
+                     "None of the identified earlier",
+                     "Not one of the prior",
+                     "Neither of the prior",
+                     "None of these previously",
+                     "None of the several very recently identified earlier",
+                     "Not even a single one of the earlier",
+                     "Zero of the earlier",
+                     "Hardly any of the earlier",
+                     "None of the many previously-identified, "
+                     "still-outstanding earlier",
+                     "None of the (per the last review) earlier",
+                     "None of the -- as flagged before -- earlier"):
+        varied = (
+            "### Verdict\n**Ready for merge.** " + negation
+            + " blocking findings were resolved by this round's diff."
+        )
+        check(
+            "a negated resolution reading '" + negation + "' stays not-clean",
+            checker.classify_verdict(varied) == "not-clean",
+        )
+    # A preceding preposition does not exempt a negator. Testing the
+    # negator's apparent grammatical role let a governor word prepended
+    # to the guard's target phrasing through as clean, for every governor
+    # tried -- and adding a required clause boundary did not close it,
+    # since the boundary can sit inside the negated noun phrase.
+    for governor in ("With", "Without", "Despite", "Besides", "Barring",
+                     "Assuming", "Aside from", "Apart from", "Other than"):
+        for tail in ("the previously",
+                     "the recently reported, previously",
+                     "the recently reported; previously",
+                     "the following: previously",
+                     "the reviewers' concerns, previously"):
+            governed = (
+                "### Verdict\n**Ready for merge.** " + governor
+                + " none of " + tail
+                + " blocking findings were resolved by this round's diff."
+            )
+            check(
+                "a governed negator ('" + governor + "' / '" + tail
+                + "') stays not-clean",
+                checker.classify_verdict(governed) == "not-clean",
+            )
+    # Nor does a dot that is part of an ellipsis, a URL, or a path:
+    # each would otherwise restart the sentence mid-clause and hide the
+    # negator before it. The mention's own sentence is what the guard
+    # scans, so anything that fakes a sentence end is a fail-open.
+    # The whitespace-separated forms matter separately: locating the
+    # preceding token by the nearest whitespace alone yields an EMPTY
+    # token there, which passes the URL check and accepts the faked
+    # sentence end.
+    for interrupter in ("the...",
+                        "the http://x.io/a.",
+                        "the src/a.py.",
+                        "the www.example.com.",
+                        "the http://x.io/a .",
+                        "the /etc/passwd .",
+                        "the www.example.com .",
+                        "the http://x.io/a\r.",
+                        # An exotic whitespace INSIDE the URL must not
+                        # end the token early and leave a bare word whose
+                        # dot then reads as a real sentence end.
+                        "the http://x.io/a\rx.",
+                        "the http://x.io/a\vx.",
+                        "the http://x.io/a\fx.",
+                        "the http://x.io/a\xa0x."):
+        faked_end = (
+            "### Verdict\n**Ready for merge.** None of " + interrupter
+            + " previously blocking finding is resolved."
+        )
+        check(
+            "a faked sentence end ('" + interrupter
+            + "') does not hide the negator",
+            checker.classify_verdict(faked_end) == "not-clean",
+        )
+    # The sentence scan runs once per comment body, so it has to stay
+    # linear in the body. Finding each candidate's preceding token by
+    # slicing and splitting the whole prefix was quadratic, and a body at
+    # GitHub's 65536-character comment cap took over five seconds.
+    _cap_prefix = "### Verdict\n**Ready for merge.** "
+    _cap_suffix = "None of the previously blocking finding is resolved."
+    _cap_unit = "x. "
+    _cap_body = _cap_prefix + _cap_unit * (
+        (65536 - len(_cap_prefix) - len(_cap_suffix)) // len(_cap_unit)
+    ) + _cap_suffix
+    _cap_secs, _cap_verdict = best_of_three(
+        checker.classify_verdict, _cap_body)
+    # 2s, not 5s: the quadratic this guards against measured 4.4-4.8s on
+    # this exact body, so a 5s bar caught it by 5-12% and would stop
+    # catching it on a faster machine. The linear implementation
+    # measures under 0.1s, so 2s still leaves more than an order of
+    # magnitude of headroom.
+    check(
+        "a max-length many-sentence body scans linearly and correctly",
+        _cap_verdict == "not-clean" and _cap_secs < 2,
+    )
+    # A faked sentence end was reintroduced twice by fixing one
+    # whitespace shape and breaking another, so the shapes are swept
+    # rather than enumerated one at a time: each URL-like token, each
+    # exotic whitespace character, and each way of arranging them
+    # against the punctuation, on BOTH routes that share the scan.
+    _faked_end_failures = []
+    # Includes characters str.isspace does NOT report (zero-width space,
+    # joiners, BOM), which a tool inserts into a long URL to let it
+    # soft-wrap, and which were neither skipped nor a token break.
+    _gaps = [chr(_x) for _x in (0x0d, 0x0b, 0x0c, 0xa0, 0x200b, 0x200c,
+                                0x200d, 0xfeff, 0x180e, 0x2028, 0x2029,
+                                0x3000, 0x2000, 0x2009, 0x202f, 0x205f,
+                                0x2060, 0xad, 0x200e, 0x200f)]
+    for _token in ("http://x.io/a", "/etc/passwd", "www.example.com"):
+        for _ws in _gaps:
+            for _sep in ("", " ", _ws, " " + _ws, _ws + " ", _ws + "x",
+                         " " + _ws + _ws, _ws + " " + _ws):
+                _guard = (
+                    "### Verdict\n**Ready for merge.** None of the "
+                    + _token + _sep
+                    + ". previously blocking finding is resolved."
+                )
+                _veto = (
+                    "### Verdict\nThe finding remains unresolved "
+                    + _token + _sep
+                    + ". in response to it (posted "
+                    "2026-08-30T12:00:00Z, verdict **Needs more work**)."
+                )
+                for _label, _body in (("guard", _guard), ("veto", _veto)):
+                    if checker.classify_verdict(_body) != "not-clean":
+                        _faked_end_failures.append(
+                            _label + ":" + repr(_token + _sep)
+                        )
+    check(
+        "no whitespace arrangement fakes a sentence end (%d checked)"
+        % (3 * len(_gaps) * 8 * 2),
+        not _faked_end_failures,
+    )
+    # The marker test must not read past the token's end: startswith
+    # runs against the whole text, so a token ending in "www" glued to
+    # the sentence's own period otherwise matched on that period and the
+    # real sentence end was discarded as a URL.
+    check(
+        "a token ending in 'www' does not swallow the sentence's period",
+        checker._sentence_start_before("a www. b") == 6,
+    )
+    www_boundary = (
+        "### Verdict\n**Ready for merge.** No other findings remain in "
+        "www. The previously blocking finding is resolved and confirmed "
+        "passing."
+    )
+    check(
+        "a bare 'www' before a sentence end does not force a not-clean",
+        checker.classify_verdict(www_boundary) == "clean",
+    )
+    # The scan must stay linear when NO ascii break is present, since
+    # both the backward per-candidate walk and the token slice extend to
+    # the start of the text and grow with each candidate. Measured at
+    # 5.4s for this body before the two forward pointers replaced them.
+    _nbsp = chr(0xa0)
+    _dense = ("word" + _nbsp) * 40000 + "." + _nbsp
+    _dense_secs, _ = best_of_three(checker._sentence_start_before, _dense)
+    check(
+        "the sentence scan stays linear with no ascii break present",
+        _dense_secs < 1,
+    )
+    # The citation veto shares the same sentence scan, so a faked
+    # sentence end there hides a re-raise instead of a negator, and
+    # strips a live not-clean citation into a body stating no verdict
+    # at all.
+    veto_faked_end = (
+        "### Verdict\nThe finding remains unresolved http://x.io/a\rx. "
+        "in response to it (posted 2026-08-30T12:00:00Z, verdict "
+        "**Needs more work**)."
+    )
+    check(
+        "a faked sentence end does not hide a re-raise from the veto",
+        checker.classify_verdict(veto_faked_end) == "not-clean",
+    )
+    # An abbreviation dot does not restart the sentence, so a negator
+    # before it stays in scope rather than being hidden.
+    abbreviation_scope = (
+        "### Verdict\n**Ready for merge.** None of the round-2 issues "
+        "were addressed, e.g. the previously blocking findings were "
+        "resolved by this round's diff."
+    )
+    check(
+        "an abbreviation dot does not hide an earlier negator",
+        checker.classify_verdict(abbreviation_scope) == "not-clean",
+    )
+    # The paren-aside and character branches of the clause scan must stay
+    # disjoint: an overlapping `(` was exponential backtracking (51s) on a
+    # failing enumeration. Probed on _is_resolved_blocking_mention directly:
+    # classify_verdict short-circuits on the leading "Needs more work"
+    # before reaching this path, so a whole-body probe passes even on the
+    # buggy pattern.
+    enumeration_scan = (
+        "### Verdict\nNeeds more work: the previously blocking items "
+        + "(1) " * 24
+        + "are still broken"
+    )
+    _blocking = re.search(r"\bblocking\b", enumeration_scan, re.IGNORECASE)
+    _t0 = time.time()
+    _exempted = checker._is_resolved_blocking_mention(
+        enumeration_scan, _blocking
+    )
+    check(
+        "a failing enumeration aside neither hangs nor exempts the mention",
+        _exempted is False and time.time() - _t0 < 5,
+    )
+
     # The filter guards THREE match loops, and two of them had no test at all:
     # deleting the guard in classify_verdict's clean loop, or in
     # _unresolved_finding_pattern, left the suite green. Both are reachable and
@@ -3183,6 +3932,22 @@ def main() -> int:
     check(
         "the same line under the bound is masked (the bound discriminates)",
         checker.classify_verdict(under) == "clean",
+    )
+
+    # Test resolved blocking mentions in verdict sections
+    resolved_round2 = (
+        "### Verdict\n"
+        "**Ready for merge** \u2014 both round-2 blocking findings "
+        "(demo caption overclaim, missing tactics.qmd companion video) "
+        "are resolved by this round's diff, with no new issues introduced."
+    )
+    check(
+        "resolved round-N blocking findings in verdict section classifies clean",
+        checker.classify_verdict(resolved_round2) == "clean",
+    )
+    check(
+        "resolved round-N blocking findings does not trigger unresolved finding pattern",
+        checker._unresolved_finding_pattern(resolved_round2) is None,
     )
 
     # match_is_cited is the whole filter, so it is tested directly.

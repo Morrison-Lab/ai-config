@@ -283,7 +283,7 @@ dependency, needs design decision, upstream bug):
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
-- **`scout-peers`** — suggested in step 5 to check how peers solved a problem so you don't reinvent the wheel (distinct from `oppo`, which finds *what* to build)
+- **`scout-peers`** --- suggested in step 5 to check how peers solved a problem so you don't reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean
 - **`claim-pr`** — the issue claim in step 6 follows the same pattern
 - **`pr-on-claim`** — the rule behind step 8: open the draft PR up front so the

@@ -544,6 +544,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         actual_cwd = mock_run.call_args_list[0].kwargs['cwd']
         self.assertEqual(actual_cwd, '/tmp/mock-caller-project')
         self.assertNotEqual(actual_cwd, ROOT)
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/tmp/mock-caller-project')
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -574,6 +576,8 @@ class TestAgyHookAdapter(unittest.TestCase):
         for call in mock_run.call_args_list:
             self.assertEqual(call.kwargs['cwd'], '/tmp/mock-caller-project')
             self.assertNotEqual(call.kwargs['cwd'], ROOT)
+            call_input = json.loads(call.kwargs['input'])
+            self.assertEqual(call_input.get("cwd"), '/tmp/mock-caller-project')
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -594,6 +598,54 @@ class TestAgyHookAdapter(unittest.TestCase):
 
         self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/tmp/mock-caller-project')
         self.assertNotEqual(mock_run.call_args_list[0].kwargs['cwd'], ROOT)
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/tmp/mock-caller-project')
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_hook_forwards_explicit_payload_cwd(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "terminationReason": "model_stop",
+            "cwd": "/path/to/explicit-project"
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/path/to/explicit-project')
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/path/to/explicit-project')
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_stop_hook_forwards_workspace_paths_cwd(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "terminationReason": "model_stop",
+            "workspacePaths": ["file:///path/to/workspace-project"]
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/path/to/workspace-project')
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/path/to/workspace-project')
 
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
@@ -614,6 +666,57 @@ class TestAgyHookAdapter(unittest.TestCase):
 
         self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/tmp/mock-caller-project')
         self.assertNotEqual(mock_run.call_args_list[0].kwargs['cwd'], ROOT)
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/tmp/mock-caller-project')
+
+    @patch('os.path.exists', return_value=True)
+    @patch('builtins.open', new_callable=mock_open, read_data=json.dumps(MOCK_HOOKS_DEF))
+    @patch('sys.stdin', new_callable=io.StringIO)
+    @patch('sys.stdout', new_callable=io.StringIO)
+    @patch('sys.stderr', new_callable=io.StringIO)
+    @patch('subprocess.run')
+    def test_pre_invocation_hook_forwards_explicit_payload_cwd(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
+        mock_result = MagicMock(returncode=0, stdout=json.dumps({}), stderr="")
+        mock_run.return_value = mock_result
+
+        payload = {
+            "invocationNum": 1,
+            "prompt": "test",
+            "cwd": "/path/to/explicit-inv-project"
+        }
+        mock_stdin.write(json.dumps(payload))
+        mock_stdin.seek(0)
+
+        self.adapter.main()
+
+        self.assertEqual(mock_run.call_args_list[0].kwargs['cwd'], '/path/to/explicit-inv-project')
+        call_input = json.loads(mock_run.call_args_list[0].kwargs['input'])
+        self.assertEqual(call_input.get("cwd"), '/path/to/explicit-inv-project')
+
+    def test_extract_cwd_helper(self):
+        # 1. tool_args Cwd / cwd takes priority
+        self.assertEqual(self.adapter.extract_cwd({}, {"Cwd": "/path/from/tool_args"}), "/path/from/tool_args")
+        self.assertEqual(self.adapter.extract_cwd({}, {"cwd": "/path/from/tool_args_lower"}), "/path/from/tool_args_lower")
+        self.assertEqual(self.adapter.extract_cwd({}, {"Cwd": "file:///path/from/tool_args_uri"}), "/path/from/tool_args_uri")
+
+        # 2. payload direct cwd fields
+        self.assertEqual(self.adapter.extract_cwd({"cwd": "/path/from/payload_cwd"}), "/path/from/payload_cwd")
+        self.assertEqual(self.adapter.extract_cwd({"Cwd": "/path/from/payload_Cwd"}), "/path/from/payload_Cwd")
+        self.assertEqual(self.adapter.extract_cwd({"workingDirectory": "/path/from/wd"}), "/path/from/wd")
+        self.assertEqual(self.adapter.extract_cwd({"workspacePath": "/path/from/wspath"}), "/path/from/wspath")
+        self.assertEqual(self.adapter.extract_cwd({"workspace": "file:///path/from/ws_uri"}), "/path/from/ws_uri")
+
+        # 3. payload workspacePaths / workspaces list or string
+        self.assertEqual(self.adapter.extract_cwd({"workspacePaths": "/single/ws/string"}), "/single/ws/string")
+        self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["/first/ws/path", "/second/ws/path"]}), "/first/ws/path")
+        self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["file:///uri/ws/path"]}), "/uri/ws/path")
+        self.assertEqual(self.adapter.extract_cwd({"workspaces": [{"path": "/dict/ws/path"}]}), "/dict/ws/path")
+        self.assertEqual(self.adapter.extract_cwd({"workspaces": [{"uri": "file:///dict/uri/path"}]}), "/dict/uri/path")
+
+        # 4. Fallback to os.getcwd()
+        with patch('os.getcwd', return_value='/tmp/fallback-process-cwd'):
+            self.assertEqual(self.adapter.extract_cwd({}), "/tmp/fallback-process-cwd")
+            self.assertEqual(self.adapter.extract_cwd({"workspacePaths": []}), "/tmp/fallback-process-cwd")
 
     def test_extract_hook_list_supports_script_key(self):
         item = [{"script": "python3 /path/to/script.py"}]

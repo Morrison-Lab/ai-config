@@ -106,8 +106,6 @@ jobs:
         # scripts/lib/plugin_overlap.py stays live: install-hooks.py imports
         # enabled_ai_config_plugins for its double-registration warning.
         run: python3 scripts/test_plugin_overlap.py
-      - name: Run Ollama locality verification tests
-        run: python3 scripts/test_check_ollama_locality.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run Cursor rules-sync tests

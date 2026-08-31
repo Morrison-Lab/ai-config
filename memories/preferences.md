@@ -18,6 +18,10 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- **Do:** use hosted/cloud models for delegated work and adversarial review; if
+  hosted quota is unavailable, report the blocker or use deterministic checks instead.
+- **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.
+  Local inference can crash the user's computer. (User directive, 2026-08-30.)
 - Treat a request to disable AI review as narrowly repository-scoped: it applies only to the repositories the user explicitly names in that request.
   The invariant is organization-independent --- don't widen a named-repository request into a sibling repository, into the rest of that organization, or into later unrelated PRs, and don't remove review automation anywhere that wasn't named.
   Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.

@@ -183,10 +183,14 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Active delegation budgets include `codex` (ChatGPT plan, operationalized by
-`delegate-to-codex`), `opencode` (OpenCode Go subscription, free models via
-Zen, local Ollama, operationalized by `delegate-to-opencode`), `agy` CLI
+`delegate-to-codex`), `opencode` (OpenCode Go subscription and free hosted
+models via Zen, operationalized by `delegate-to-opencode`), `agy` CLI
 (headless dispatch available since the 2026-08-25 clarification), and
 OpenRouter (prepaid credit balance for frontier/stealth previews).
+Local and on-device models are prohibited because they can crash the user's
+computer.
+When hosted quota is unavailable, report the blocker or use
+deterministic checks instead of starting a local inference runtime.
 `agy` (Google Antigravity)'s **API** route was permanently retired for
 dispatched work (user directive, 2026-08-20, ai-config#1776).
 Only that route is out --- the `agy --print` CLI and the interactive

@@ -73,7 +73,7 @@ To verify the branching site:
   A guard keyed on an empty variable should fail loudly rather than silently taking an invalid fallback.
 - [`algorithmatize-checks.md`](../workflow/algorithmatize-checks.md):
   Extract execution scripts into testable units rather than embedding untestable multi-line shell blocks in CI templates.
-- Pattern 36 in [`mistake-patterns.md`](../../memories/mistake-patterns.md):
+- Pattern 35 in [`mistake-patterns.md`](../../memories/mistake-patterns.md):
   The recurring failure record for admitting-vs-branching half-fixes.
 
 ## Do / Don't

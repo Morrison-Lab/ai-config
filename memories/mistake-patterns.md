@@ -643,7 +643,7 @@ A clean automated review from every available provider evaluating the current HE
   Mutation testing with encoded/escaped representations detects unhandled
   transformation divergences.
 
-## Pattern 36: Fixing the Admitting Site But Not the Branching Site
+## Pattern 35: Fixing the Admitting Site But Not the Branching Site
 - **Do**: When handling a new condition, trigger, or input case, verify both the **admitting site** (the gate deciding whether the code runs) and the **branching site** (the logic deciding what the code does once it runs).
   Find branching sites by searching for the conditions or variables they test *instead of* the new condition (e.g., variables that go empty, unset, or defaulted in the new case).
   Test admitted cases by running the actual execution logic against realistic fixtures.

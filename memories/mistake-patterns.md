@@ -38,6 +38,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): wrote content, committed, but stopped before pushing/opening a PR.
   AGENTS.md line 63-72 already mandated the full delivery cycle.
   The fix was recorded verbally but not persisted.
+  Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts`): formatted Statistical Analysis Plan, ran tests and verified renders, generated walkthrough artifact, but presented summary recap to the user instead of automatically completing the delivery cycle (issue creation, commit, adversarial review subagent, push, and opening PR). Corrected by user with `cai: you should have pushed a PR without me having to tell you`.
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
 - **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply.
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).

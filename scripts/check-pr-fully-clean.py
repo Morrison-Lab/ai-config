@@ -1782,7 +1782,7 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     heading, not the section body, so scanning starts on the following line
     (ai-config#2459). The section runs from there to the next heading or end
     of body. The FIRST non-empty line must match the
-    NOT_CLEAN_NEGATION_SUFFIX allowlist -- the same trigger the old 60-char
+    _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
     must clear the item veto.
 

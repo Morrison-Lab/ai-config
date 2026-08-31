@@ -132,7 +132,8 @@ If an open PR already exists for the issue:
 ### 5. Check history and peers
 
 Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don't undo past progress.
-If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don't reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you've already grabbed an issue).
+If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don't reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here;
+`oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you've already grabbed an issue).
 
 ### 6. Claim the issue
 

@@ -40,8 +40,9 @@ import tempfile
 # The two guards' interaction guaranteed the loop: one required the prefix,
 # the other could not see prefixed pushes.
 _ENV = r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-COMMIT = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+commit(?![\w-])", re.MULTILINE)
-PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+push(?![\w-])", re.MULTILINE)
+_GIT_FLAGS = r"(?:-(?:C\s*\S+|c\s*\S+|[a-zA-Z0-9_-]+(?:=\S*)?)\s+|--[a-zA-Z0-9_-]+(?:=\S*)?\s+)*"
+COMMIT = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"commit(?![\w-])", re.MULTILINE)
+PUSH = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+" + _GIT_FLAGS + r"push(?![\w-])", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n])\s*" + _ENV + r"gh\s+pr\s+create\b", re.MULTILINE)
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
@@ -132,6 +133,77 @@ def strip_quoted(command):
 
 
 
+CD_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"cd\s+([^\s;&|]+)",
+    re.MULTILINE
+)
+GIT_C_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+-C\s+([^\s;&|]+)",
+    re.MULTILINE
+)
+WORKTREE_ADD_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+worktree\s+add\s+([^;&|\n]+)",
+    re.MULTILINE
+)
+BRANCH_CMD = re.compile(
+    r"(?:^|[;&|\n])\s*" + _ENV + r"git\s+(?:checkout|switch|branch)\s+([^;&|\n]+)",
+    re.MULTILINE
+)
+
+
+def extract_touched_paths(command):
+    """Extract worktree paths touched by cd, git -C, or git worktree add."""
+    paths = set()
+    for m in CD_CMD.finditer(command):
+        p = m.group(1).strip("\"'").strip()
+        if p and not p.startswith("-"):
+            paths.add(p)
+    for m in GIT_C_CMD.finditer(command):
+        p = m.group(1).strip("\"'").strip()
+        if p:
+            paths.add(p)
+    for m in WORKTREE_ADD_CMD.finditer(command):
+        args = m.group(1).split()
+        for arg in args:
+            if arg.startswith("-") or arg == "add":
+                continue
+            p = arg.strip("\"'").strip()
+            if p and ("/" in p or os.path.exists(p)):
+                paths.add(p)
+    return paths
+
+
+def extract_touched_branches(command):
+    """Extract branch names touched by checkout/switch/branch/worktree add commands."""
+    branches = set()
+    for m in BRANCH_CMD.finditer(command):
+        args = m.group(1).split()
+        skip_next = False
+        for arg in args:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg in ("-b", "-B", "-c", "-C", "-d", "-D", "-m", "-M", "--create", "--orphan"):
+                continue
+            if arg.startswith("-"):
+                if arg in ("-t", "--track", "--recurse-submodules", "--set-upstream-to", "-u"):
+                    skip_next = True
+                continue
+            if arg == "--":
+                continue
+            b = arg
+            if b.startswith("refs/heads/"):
+                b = b[len("refs/heads/"):]
+            if not b.startswith("-") and not b.startswith("@"):
+                branches.add(b)
+    for m in WORKTREE_ADD_CMD.finditer(command):
+        args = m.group(1).split()
+        for i, arg in enumerate(args):
+            if arg in ("-b", "-B") and i + 1 < len(args):
+                branches.add(args[i + 1])
+    return branches
+
+
 def unwrap_command(cmd):
     if not isinstance(cmd, str):
         return ""
@@ -147,14 +219,16 @@ def unwrap_command(cmd):
     return cmd
 
 def scan_transcript(path):
-    """Return (saw_commit, pending) from the transcript scan.
+    """Return (saw_commit, pending, touched_branches, touched_paths) from the transcript scan.
 
     `saw_commit` is whether a real `git commit` ran at all --- the gate that
     decides whether repository state is worth consulting, so a session that
     never committed is not blocked for commits it did not make. `pending` is
     the last committed-but-never-discharged command, by the same scan.
+    `touched_branches` is the set of branch names touched via checkout/switch.
+    `touched_paths` is the set of working directories / worktree paths touched.
     """
-    saw, pending = False, None
+    saw, pending, touched_branches, touched_paths = False, None, set(), set()
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             for line in stream:
@@ -186,17 +260,23 @@ def scan_transcript(path):
                 for name, inp in tool_calls:
                     if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
                         continue
+                    for k in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
+                        val = inp.get(k)
+                        if isinstance(val, str) and val:
+                            touched_paths.add(val)
                     command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
                     command = unwrap_command(command)
                     scanned = strip_quoted(command)
+                    touched_branches |= extract_touched_branches(scanned)
+                    touched_paths |= extract_touched_paths(scanned)
                     if COMMIT.search(scanned):
                         saw = True
                         pending = command
                     if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:
-        return saw, pending
-    return saw, pending
+        return saw, pending, touched_branches, touched_paths
+    return saw, pending, touched_branches, touched_paths
 
 
 def pending_commit(path):
@@ -338,13 +418,14 @@ def decide(cwd, path):
     The transcript scan gates whether to look; `git rev-list --count
     @{u}..HEAD` across checkouts and branches answers (ai-config#2727,
     ai-config#2737). Inspects all linked worktrees of the repo
-    via `git worktree list --porcelain` and unpushed local branches to detect
-    unshipped session commits left across checkouts or on switched branches.
+    via `git worktree list --porcelain` and unpushed local branches touched
+    in this session to detect unshipped session commits left across checkouts
+    or on switched branches.
     Without a `cwd` in the hook payload, repository state is unknowable,
     so the verdict falls back to the transcript scan --- the old behaviour,
     fail-safe rather than blind.
     """
-    saw_commit, pending = scan_transcript(path)
+    saw_commit, pending, touched_branches, touched_paths = scan_transcript(path)
     if not saw_commit:
         return ""
     if not cwd:
@@ -371,32 +452,49 @@ def decide(cwd, path):
     undefined_wts = []
     checked_out_branches = set()
     cwd_real = os.path.realpath(cwd) if os.path.exists(cwd) else cwd
+    touched_paths_real = set()
+    for p in touched_paths:
+        try:
+            touched_paths_real.add(os.path.realpath(p))
+        except Exception:
+            touched_paths_real.add(p)
 
     for wt in worktrees:
         if wt.get("bare"):
             continue
         wt_path = wt.get("path") or ""
-        if wt.get("branch"):
-            checked_out_branches.add(wt["branch"])
+        wt_path_real = os.path.realpath(wt_path) if os.path.exists(wt_path) else wt_path
+        wt_branch = wt.get("branch")
+
+        # Only check checkouts active in this session (cwd, touched paths, or touched branches)
+        is_relevant = (wt_path_real == cwd_real) or (wt_path_real in touched_paths_real) or (wt_path in touched_paths) or (wt_branch and wt_branch in touched_branches)
+        if not is_relevant:
+            continue
+
+        if wt_branch:
+            checked_out_branches.add(wt_branch)
         count = unpushed_count(wt_path)
         if count is not None and count > 0:
             unpushed_wts.append((wt, count))
         elif count is None:
             undefined_wts.append(wt)
 
-    # Check switched-away branches (local branches not checked out in any worktree)
+    # Check switched-away branches (local branches touched in this session not checked out in any worktree)
     unpushed_branches = []
-    for branch, upstream, _ in list_local_branches(cwd):
-        if branch in checked_out_branches:
-            continue
-        if upstream:
-            b_count = unpushed_count_branch(cwd, branch, upstream)
-            if b_count is not None and b_count > 0:
-                unpushed_branches.append((branch, b_count))
-        elif pending:
-            b_count = unpushed_commits_against_remotes(cwd, branch)
-            if b_count is not None and b_count > 0:
-                unpushed_branches.append((branch, b_count))
+    if touched_branches:
+        for branch, upstream, _ in list_local_branches(cwd):
+            if branch not in touched_branches:
+                continue
+            if branch in checked_out_branches:
+                continue
+            if upstream:
+                b_count = unpushed_count_branch(cwd, branch, upstream)
+                if b_count is not None and b_count > 0:
+                    unpushed_branches.append((branch, b_count))
+            elif pending:
+                b_count = unpushed_commits_against_remotes(cwd, branch)
+                if b_count is not None and b_count > 0:
+                    unpushed_branches.append((branch, b_count))
 
     if unpushed_wts or unpushed_branches:
         if len(unpushed_wts) == 1 and not unpushed_branches:

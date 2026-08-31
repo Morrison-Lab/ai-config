@@ -557,7 +557,8 @@ try:
     # --- ai-config#2737: multi-worktree and branch-switch unshipped detection -
     # A session commit made in another worktree (cross-checkout) or on a branch
     # since checked out away was previously invisible to the single cwd check.
-    # decide() now inspects all linked worktrees and switched local branches.
+    # decide() now inspects linked worktrees and switched local branches
+    # touched in the session, ignoring abandoned/unrelated worktrees and branches.
     wt_root, wt_bare, wt_run = gitrepo(
         BASE,
         "git remote add origin BARE",
@@ -567,6 +568,11 @@ try:
     wt_run(f"git worktree add -q -b feat2 {wt2} main")
     wt_run("git push -q -u origin feat2", cwd=wt2)
     wt_run(HOOK, cwd=wt2)
+
+    # An abandoned/leftover worktree from a prior session with unpushed commits
+    abandoned_wt = tempfile.mkdtemp()
+    wt_run(f"git worktree add -q -b abandoned {abandoned_wt} main")
+    wt_run("git commit --allow-empty -m abandoned_commit", cwd=abandoned_wt)
 
     sw_root, sw_bare, sw_run = gitrepo(
         BASE,
@@ -589,32 +595,64 @@ try:
         "git checkout -q main",
     )
 
+    # Repository with an old, unrelated local branch holding unpushed commits
+    unrelated_root, unrelated_bare, unrelated_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b old-unrelated",
+        "git push -q -u origin old-unrelated",
+        HOOK,
+        "git checkout -q main",
+    )
+
+    wt2_transcript = transcript([f"git worktree add -b feat2 {wt2} main", f"git -C {wt2} commit -m hook"])
+    wt_clean_transcript = transcript(["git commit -m hook", "git push origin main"])
+    sw_transcript = transcript(["git checkout -b feat-sw", "git commit -m hook", "git checkout main"])
+    sw_dropped_transcript = transcript(["git checkout -b feat-drop", "git commit -m hook", "git checkout main"])
+    unrelated_pushed_transcript = transcript(["git commit -m hook", "git push origin main"])
+
     try:
-        # Cross-checkout: payload cwd is clean, but linked worktree wt2 has an unpushed commit.
-        _wt_reason = subject.decide(wt_root, commit_only)
+        # Cross-checkout: payload cwd is clean, but linked worktree wt2 was touched and has unpushed commit.
+        _wt_reason = subject.decide(wt_root, wt2_transcript)
         assert _wt_reason and "worktree" in _wt_reason and "feat2" in _wt_reason, _wt_reason
         assert _wt_reason.startswith("1 commit(s) on worktree"), _wt_reason
 
+        # An abandoned worktree not touched in this session must not block.
+        assert subject.decide(wt_root, wt_clean_transcript) == "", \
+            "an abandoned worktree not touched in the session must not block"
+
         # Pushing wt2 discharges the multi-worktree debt.
         wt_run("git push -q origin feat2", cwd=wt2)
-        assert subject.decide(wt_root, commit_only) == ""
+        assert subject.decide(wt_root, wt2_transcript) == ""
 
-        # Branch switch: payload cwd is on clean main, but feat-sw has an unpushed commit.
-        _sw_reason = subject.decide(sw_root, commit_only)
+        # Branch switch: payload cwd is on clean main, but feat-sw was touched and has unpushed commits.
+        _sw_reason = subject.decide(sw_root, sw_transcript)
         assert _sw_reason and "branch 'feat-sw'" in _sw_reason, _sw_reason
         assert _sw_reason.startswith("1 commit(s) on branch 'feat-sw'"), _sw_reason
 
         # Dropped commit on switched branch: clean.
-        assert subject.decide(sw_dropped_root, commit_only) == ""
+        assert subject.decide(sw_dropped_root, sw_dropped_transcript) == ""
+
+        # Old unrelated branch with unpushed commits is ignored if session never touched it.
+        assert subject.decide(unrelated_root, unrelated_pushed_transcript) == "", \
+            "an old unrelated branch must not block a session that never touched it"
+
+        # If current session has unpushed commits on HEAD, only HEAD is named, not the unrelated branch.
+        _head_reason = subject.decide(unrelated_root, commit_only)
+        assert "old-unrelated" not in _head_reason
 
         # Multiple unpushed worktrees: both wt_root and wt2 unpushed.
         wt_run(HOOK, cwd=wt_root)
         wt_run(HOOK, cwd=wt2)
-        _multi_reason = subject.decide(wt_root, commit_only)
+        _multi_reason = subject.decide(wt_root, wt2_transcript)
         assert "HEAD" in _multi_reason and "worktree" in _multi_reason and "are not on upstream" in _multi_reason, _multi_reason
     finally:
-        for _p in (wt_root, wt_bare, wt2, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare):
+        for _p in (wt_root, wt_bare, wt2, abandoned_wt, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare,
+                   unrelated_root, unrelated_bare):
             shutil.rmtree(_p, ignore_errors=True)
+        for _p in (wt2_transcript, wt_clean_transcript, sw_transcript, sw_dropped_transcript, unrelated_pushed_transcript):
+            os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
                   plain_push_root, scoped_root, behind_root, other,

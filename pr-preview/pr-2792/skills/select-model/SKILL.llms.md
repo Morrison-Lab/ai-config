@@ -61,6 +61,7 @@ The script outputs a recommendation and optionally suggests updating `~/.claude/
 - **Procedural mode (manual decision tree):** Read this procedure, follow the decision tree or task mapping, choose your model.
 - **Executable mode (auto-recommend):** Invoke `/select-model --task "<task description>"` and the script provides a personalized recommendation and config suggestion.
 - **Chained from assess-model-fit:** If `/assess-model-fit` recommends escalation, it auto-invokes `select-model` with your task details.
+- **Holistic stack recommendation ([recm](../../skills/recm/SKILL.llms.md)):** Use `recm` when deciding across harnesses (Claude Code, agy, Codex, OpenCode), provider tiers, and review engines rather than only Claude model tiers.
 
 ## FAQ
 

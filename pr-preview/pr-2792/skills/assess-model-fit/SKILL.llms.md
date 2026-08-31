@@ -36,5 +36,6 @@ The script reads your current model, evaluates the task complexity, and either g
 - **Procedural mode (manual checklist):** Read this procedure, run through the scoring criteria, decide if escalation is needed.
 - **Executable mode (auto-analysis):** Invoke `/assess-model-fit --task "<your task description>"` and let the script recommend a verdict and model.
 - **When in doubt:** Use executable mode — it’s faster and catches nuance the manual checklist might miss.
+- **Broader stack recommendation ([recm](../../skills/recm/SKILL.llms.md)):** Use `recm` when deciding across harnesses, billing tiers, or multi-engine review rather than within-session Claude escalation.
 
 Back to top

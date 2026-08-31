@@ -1057,6 +1057,7 @@ class TestPrePushReview(unittest.TestCase):
             "No known blockers remain outstanding.",
             "No previously known blockers remain.",
             "No newly known blockers remain.",
+            "No new, previously known blockers remain.",
             "Zero blockers identified in this review.",
             "There are no blockers preventing merge.",
         ):

@@ -106,6 +106,17 @@ jobs:
         # scripts/lib/plugin_overlap.py stays live: install-hooks.py imports
         # enabled_ai_config_plugins for its double-registration warning.
         run: python3 scripts/test_plugin_overlap.py
+      - name: Run doctor tests
+        # ai-config#2540: doctor.py install diagnostics and path checks.
+        run: python3 scripts/test_doctor.py
+      - name: Run markdown fences library tests
+        # ai-config#2540: scripts/lib/fences.py code block and code span parsing.
+        run: python3 scripts/test_fences.py
+      - name: Check that all scripts/test_*.py test suites are gated
+        # ai-config#2540: verify every test suite in scripts/ is gated in CI.
+        run: python3 scripts/check-test-suites-covered.py
+      - name: Run test-suite coverage check tests
+        run: python3 scripts/test_check_test_suites_covered.py
       - name: Check harness ignore files cover local residue
         run: python3 scripts/check-harness-ignores.py
       - name: Run Cursor rules-sync tests

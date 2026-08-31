@@ -1428,22 +1428,17 @@ _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
     r"(?i)\b(?:unresolved|unaddressed|not\s+resolved|not\s+addressed|partially\s+resolved|partially\s+addressed|still\s+unresolved)\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
-_SECTION_SEVERITY_TAG = re.compile(
-    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:Critical|Defect|Blocking|Major|Warning|P[0-2])\b\]?"
-    r"|\*\*Location:\*\*"
-)
 _LINE_RESOLUTION_WORDS = re.compile(
     r"(?i)\b(?:"
-    r"(?:is|are|was|were)\s+(?:now\s+|also\s+|already\s+|since\s+)?"
-    r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
-    r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
-    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"(?:is|are|was|were|have|has)\s+(?:now\s+|also\s+|already\s+|since\s+|been\s+)*"
     r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
     r"(?:\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?)))?"
     r"|no\s+longer\s+applies"
-    r"|(?:now|already|previously)\s+(?:fixed|resolved|addressed|cleared)"
-    r"|(?:fixed|resolved|addressed|cleared)\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r"|(?:now|already|previously|all)\s+(?:fixed|resolved|addressed|cleared|closed)"
+    r"|(?:item|items|feedback|issues?|findings?|bugs?|everything|both|all)\s+(?:now\s+|also\s+|already\s+|since\s+)?(?:fixed|resolved|addressed|closed|cleared)"
+    r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
     r")\b"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
 )
 _LINE_UNRESOLVED_WORDS = re.compile(
     r"(?i)\b(?:"
@@ -1460,22 +1455,58 @@ _LINE_UNRESOLVED_WORDS = re.compile(
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
 
+# A line that reads as a finding ITEM. Severity/class tags and Location
+# markers are the explicit forms; a bare list item in any CommonMark form
+# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
+# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
+# it is the dangerous direction.
+_SECTION_FINDING_ITEM = re.compile(
+    r"(?im)"
+    r"^[ \t]*(?:\*\*)?\[?"
+    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
+    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
+    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
+    r"|\*\*Location:\*\*"
+    r"|^[ \t]*>\s*\S"
+    r"|^[ \t]*\*\*(?!\s*$)"
+)
+_ITEM_NON_BLOCKING_TAG = re.compile(
+    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?"
+    r"(?:Nit|Non-blocking|Suggestion|Note|Question|Minor|Optional|Low)\b\]?"
+    r"|^[ \t]*(?:[-*+]|\d+[.)])[ \t]*(?:Nit|Suggestion|Note|Question|Optional|Minor|Low)(?::|\b)"
+)
 
-def _section_has_unresolved_blocking_items(section: str) -> bool:
-    """True when the section contains unresolved severity-tagged or blocking items."""
+
+def _item_is_resolved(line: str) -> bool:
+    if _LINE_UNRESOLVED_WORDS.search(line):
+        return False
+    res_match = _LINE_RESOLUTION_WORDS.search(line)
+    if not res_match:
+        return False
+    after_res = line[res_match.end():]
+    if re.search(r"(?i)^[ \t]*(?:in|by|via)\s+(?!commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round)", after_res):
+        return False
+    if re.search(r"(?i)\b(?:but|however|although|except|yet|reverted|partially|only)\b", after_res):
+        return False
+    return True
+
+
+def _section_has_unresolved_blocking_items(
+    section: str, is_non_blocking_heading: bool = False
+) -> bool:
+    """True when the section contains unresolved severity-tagged, untagged, or blocking items."""
     for line in section.splitlines():
         line = line.strip()
         if not line:
             continue
         if _LINE_UNRESOLVED_WORDS.search(line):
             return True
-        if _SECTION_SEVERITY_TAG.search(line):
-            res_match = _LINE_RESOLUTION_WORDS.search(line)
-            if not res_match:
-                return True
-            after_res = line[res_match.end():]
-            if re.search(r"(?i)\b(?:but|however|although|except|yet|reverted|partially|only)\b", after_res):
-                return True
+        if _SECTION_FINDING_ITEM.search(line):
+            if _item_is_resolved(line):
+                continue
+            if is_non_blocking_heading and _ITEM_NON_BLOCKING_TAG.search(line):
+                continue
+            return True
     return False
 
 
@@ -1483,12 +1514,12 @@ def _is_exempt_findings_heading(
     scan_body: str, match_start: int, match_end: int
 ) -> bool:
     """True when a Findings heading indicates non-blocking or resolved findings,
-    AND the section body underneath it contains no unresolved severity-tagged or blocking items.
+    AND the section body underneath it contains no unresolved severity-tagged, untagged, or blocking items.
 
     Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
     '### Findings from prior rounds — now resolved', '### Findings (addressed)', etc.
     Does not exempt headings with unaddressed/unresolved or blocking signals, or
-    sections containing unresolved blocking/severity-tagged items.
+    sections containing unresolved blocking/severity-tagged/untagged items.
     """
     line_start = scan_body.rfind("\n", 0, match_start) + 1
     line_end = scan_body.find("\n", match_end)
@@ -1498,8 +1529,9 @@ def _is_exempt_findings_heading(
 
     if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
         return False
-    if not (_EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line) or
-            _EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line)):
+    is_non_blocking = bool(_EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line))
+    is_resolved = bool(_EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line))
+    if not (is_non_blocking or is_resolved):
         return False
 
     section_start = line_end + 1
@@ -1509,7 +1541,7 @@ def _is_exempt_findings_heading(
         if next_heading
         else scan_body[section_start:]
     )
-    if _section_has_unresolved_blocking_items(section):
+    if _section_has_unresolved_blocking_items(section, is_non_blocking_heading=is_non_blocking):
         return False
 
     return True
@@ -1850,21 +1882,7 @@ def classify_verdict(body: str, state: str = "") -> str:
     return ""
 
 
-# A line that reads as a finding ITEM. Severity/class tags and Location
-# markers are the explicit forms; a bare list item in any CommonMark form
-# (`-`, `*`, `+`, `1.`, `1)`) vetoes too, because an untagged finding
-# ("1. `foo()` crashes on empty input") is still a finding, and swallowing
-# it is the dangerous direction.
-_SECTION_FINDING_ITEM = re.compile(
-    r"(?im)"
-    r"^[ \t]*(?:\*\*)?\[?"
-    r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
-    r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
-    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
-    r"|\*\*Location:\*\*"
-    r"|^[ \t]*>\s*\S"
-    r"|^[ \t]*\*\*(?!\s*$)"
-)
+
 
 
 def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:

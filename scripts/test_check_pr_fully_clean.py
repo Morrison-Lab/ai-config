@@ -2426,6 +2426,36 @@ def main() -> int:
               "- **[Major]** bug fixed in some_function\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (non-blocking) with untagged bullet describing bug is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- SQL injection in query builder\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with untagged numbered item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "1. Crash occurs when payload is null.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with untagged unresolved bullet is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- Untagged finding still present.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with explicit Nit bullet resolves cleanly (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- Nit: variable naming could be cleaner.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (non-blocking) with explicit Suggestion bullet resolves cleanly (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- Suggestion: add type hints.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

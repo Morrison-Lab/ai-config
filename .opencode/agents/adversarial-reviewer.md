@@ -55,17 +55,18 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
 
-   Append the machine-readable structured review payload immediately after in an HTML comment (as raw unfenced text, never wrapped in markdown backticks or code fences):
+   Append the machine-readable structured review payload immediately after in an HTML comment, as raw unfenced text -- never wrapped in markdown backticks or code fences.
+   Write it FLUSH LEFT, at column zero, not indented like this instruction block: four or more leading spaces make it a Markdown indented code block, and a payload inside one is ignored.
 
-   <!-- review-data:
-   {
-     "schema_version": "1.0",
-     "reviewer": "adversarial-reviewer",
-     "commit_sha": "<full sha from git rev-parse HEAD>",
-     "verdict": "CLEAN",
-     "findings": []
-   }
-   -->
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "adversarial-reviewer",
+  "commit_sha": "<full sha from git rev-parse HEAD>",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.

@@ -50,6 +50,7 @@ from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
     payload_findings,
+    payload_findings_malformed,
     payload_is_blocking,
     payload_is_clean,
     normalize_verdict,
@@ -371,9 +372,11 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     # REVIEW_AGENT_MARKERS above -- and it is load-bearing for quorum, not
     # merely stylistic: measured, two clean comments from the single login
     # `github-actions[bot]` whose payloads named different reviewers satisfied
-    # `--quorum 2`, which `shared/workflow/fully-clean.md` makes the normal
-    # invocation.  Identity comes from the marker on the first or last line, or
-    # from the login.
+    # `--quorum 2`.  A quorum above 1 is the ordinary case rather than a corner
+    # -- `shared/workflow/fully-clean.md` prescribes
+    # `--quorum <number-of-reachable-providers>` and pins a three-provider
+    # quorum for this repo.  Identity comes from the marker on the first or
+    # last line, or from the login.
     if login:
         return login
     return "unknown"
@@ -1782,6 +1785,16 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             what = str(first.get("message") or first.get("summary") or "")
             return f"structured finding in {where}: {what}"
         return "structured finding"
+    if payload_findings_malformed(structured):
+        # Checked BEFORE the verdict branch, for the reason
+        # `pre-push-review.py`'s `_structured_contradiction` states: a malformed
+        # field folds to `[]`, so the verdict branch would print the payload's
+        # own `CLEAN` string as the reason it blocked -- self-contradictory, and
+        # reading as a parser bug to whoever has to disposition it.
+        return (
+            "structured payload has a `findings` field that is present but is "
+            f"not a list ({type(structured.get('findings')).__name__})"
+        )
     if payload_is_blocking(structured):
         return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
 
@@ -2210,22 +2223,32 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         body_lower = body.lower()
         oid = item[3]
 
-        # No structured-`commit_sha` term here.  It was provably unable to
-        # change the result: `sha_short` is the target sha's own 7-character
-        # prefix, so any payload `commit_sha` long enough to be accepted
-        # (>= 7 characters, and a prefix of the target) CONTAINS `sha_short` as
-        # a substring -- which the `sha_short in body_lower` disjunct below
-        # already matches, since the payload is part of the body.  Mutation
-        # confirmed it: deleting the term left every structured-sha test
-        # passing.  A dead disjunct that reads as a feature is worse than no
-        # feature, because the tests appear to cover it.
+        # The structured `commit_sha` term IS live, though it is subsumed for
+        # every ORDINARY payload: `sha_short` is the target sha's own
+        # 7-character prefix, so a payload naming a >= 7-character prefix of the
+        # target contains `sha_short` verbatim, and the `sha_short in
+        # body_lower` disjunct below already matches it.
+        #
+        # What that argument misses -- and what an earlier cut deleted the term
+        # over, calling it "provably" inert -- is that `json.loads` resolves
+        # escapes, so the DECODED value need not appear in the raw body at all.
+        # A payload carrying `"commit_sha": "abc\u0031234..."` decodes to a
+        # match while the literal text reads `abc\u00312...`, which neither
+        # substring disjunct sees.  Dropping the term made that case fail
+        # closed (a real review stops counting as evaluating HEAD, reported as
+        # "no review posted"), which is safe and still wrong.
+        structured = extract_structured_review(body)
+        struct_sha = str(structured.get("commit_sha", "")).strip().lower() if structured else ""
         sha_lower = sha.lower()
+        is_struct_sha_match = bool(
+            struct_sha and len(struct_sha) >= 7 and sha_lower.startswith(struct_sha)
+        )
         # No `oid` term here either: `is_sha_match` is read only in the `else:`
         # arm below, where `oid` is falsy by construction, so an `oid`
         # comparison can never contribute -- and writing one reads as having
         # made formal-review OID matching case-insensitive, which
         # `is_match = (oid == sha)` in the `if oid:` arm is not.
-        is_sha_match = bool(sha_short.lower() in body_lower or sha_lower in body_lower)
+        is_sha_match = bool(is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

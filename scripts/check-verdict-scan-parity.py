@@ -113,12 +113,44 @@ FILLER_EXTRA = ["-", "#", ">", "_", "+", "a.py:10", "**Location:**", "[Defect]"]
 # crossed with every other list and one more entry roughly doubles the sweep
 # (the runtime cost VOCAB's own comment already records, tracked as #2702).
 #
+# `main` appends this arm AFTER `--limit` is applied, so every body here is
+# always examined.  Neither placement inside `generated_bodies` works: yielded
+# last, the first payload body sat at index 241,920 and no hand-run limit
+# reached it; yielded FIRST, `--limit`'s STRIDED sample (see its comment in
+# `main`) still selected roughly one of the 57.  Both reported a zero that was
+# a coverage statement -- the exact trap this arm exists to close, twice.
+#
 # The corpus carried no payload fragment when #2736 first ran this tool, so its
 # "0 widened" was a coverage statement -- the same failure VOCAB's comment
 # records for #2668.  These bodies cross the three axes a payload can be wrong
 # on: WHERE it sits (bare, fenced, unclosed-fence, code span, indented block),
 # WHICH of several payloads is authoritative (a quoted template before the real
 # one), and whether its verdict and its findings AGREE.
+# ACCEPTED WIDENING, stated here because this tool's docstring requires a human
+# to state one and nothing else in the repo will surface it (the tool is not in
+# `validate.yml`). Against `origin/main` this arm reports one OFF-AXIS widening:
+#
+#   ('unreadable', False) -> ('clean', False)
+#   '**Claude finished** review\n\nReviewed-Commit: abc1234\n\n<!-- review-data: {"verdict": "CLEAN", "findings": []} -->\n'
+#
+# That is the feature, not a regression: a review whose ONLY verdict is a
+# structured payload used to be `unreadable` (a known agent in a format the
+# classifier could not parse) and now reads as the clean verdict it states.
+# It is accepted on three grounds -- the payload must be unfenced, unquoted and
+# whitespace-prefixed only; it must carry an explicit empty `findings` list, so
+# a payload omitting the key still cannot clear; and `classify_verdict` checks
+# every prose not-clean pattern BEFORE consulting it, so prose findings still
+# win.
+#
+# The arm also produces five NARROWINGS, all intended and all fail-closed:
+# a payload carrying findings now blocks whatever its verdict string says
+# (four of them, two from `clean` and two from `unreadable`), and a `findings`
+# field present but not a list blocks rather than clearing (one).
+#
+# So this tool exits 1 on this branch, which is its documented read-and-justify
+# mode rather than a gate ("Exits 1 if any widening is found ... so a change
+# with an accepted widening is expected to be run and read rather than gated
+# on"). It is not in `validate.yml`, so nothing else will surface it.
 _P_CLEAN = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
 _P_BLOCK = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
             '[{"file": "a.py", "message": "boom"}]} -->')
@@ -172,16 +204,6 @@ def payload_bodies():
 
 def generated_bodies(exhaustive=False):
     seen = set()
-
-    # FIRST, deliberately. `--limit N` truncates this generator and the full
-    # product is ~242k bodies, so an arm yielded last is unreachable at any
-    # limit anyone runs by hand -- reporting a zero that is a coverage
-    # statement, which is the exact trap this arm exists to close. Measured:
-    # yielded last, the first payload body sat at index 241,920.
-    for body in payload_bodies():
-        if body not in seen:
-            seen.add(body)
-            yield body
 
     if exhaustive:
         leads, vocabs, negs = LEAD, VOCAB, NEGATION
@@ -382,6 +404,11 @@ def main(argv=None):
         step = len(generated) / args.limit
         generated = [generated[int(i * step)] for i in range(args.limit)]
     corpus += [("generated", b) for b in generated]
+    # AFTER the limit, unconditionally: the payload arm is bounded (57 bodies)
+    # and every one of them must be examined on every run, including a capped
+    # smoke run. See `payload_bodies`'s own comment for the two placements
+    # inside `generated_bodies` that each silently dropped it.
+    corpus += [("generated", b) for b in payload_bodies()]
 
     # THE primary invariant, checked before anything else. Every fail-open the
     # four rejected designs produced was a downstream pass reading text

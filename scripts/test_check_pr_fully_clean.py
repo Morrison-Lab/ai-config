@@ -4285,6 +4285,35 @@ Found defects.
         ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
         check("check_review_comments: a payload naming fewer than 7 characters does not match", not ok)
 
+    # The structured term is NOT subsumed by the body-substring disjuncts, and
+    # this is the input that proves it: `json.loads` resolves escapes, so a
+    # payload whose `commit_sha` DECODES to a prefix of HEAD need not contain
+    # that prefix as literal body text. An earlier cut deleted the term calling
+    # it "provably" inert; this case failed closed under that deletion.
+    escaped_prefix = "3a7b9c1" .replace("1", chr(92) + "u0031")
+    escaped_payload = {
+        "comments": [
+            {
+                "author": {"login": "claude[bot]"},
+                "createdAt": "2026-08-30T20:00:00Z",
+                "authorAssociation": "NONE",
+                "body": ('### Verdict: Ready for merge\n\n'
+                         '<!-- review-data: {"schema_version": "1.0", '
+                         '"verdict": "CLEAN", "findings": [], '
+                         f'"commit_sha": "{escaped_prefix}"}} -->\n'),
+            }
+        ],
+        "reviews": [],
+    }
+    escaped_body = escaped_payload["comments"][0]["body"]
+    check("test fixture: the escaped commit_sha does NOT appear verbatim in the body",
+          "3a7b9c1" not in escaped_body.lower())
+    check("test fixture: it decodes to a prefix of the target sha",
+          (checker.extract_structured_review(escaped_body) or {}).get("commit_sha") == "3a7b9c1")
+    with patch.object(checker, "run_cmd", return_value=json.dumps(escaped_payload)):
+        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
+        check("check_review_comments: a JSON-escaped commit_sha still matches HEAD", ok)
+
     # A finding object using the persona's own ReportFindings key (`summary`)
     # rather than `message` must still name what it found.
     summary_key_payload = ('### Verdict: Needs more work\n\n'
@@ -4342,6 +4371,20 @@ Found defects.
           checker.has_review_body_marker(payload_only))
     check("is_non_review_notice: a dispatch notice carrying a payload is not excluded",
           checker.is_non_review_notice("Claude Review Dispatched\n\n" + payload_only) is False)
+
+    # A malformed `findings` field must block AND say why. `payload_findings`
+    # folds it to `[]`, so the verdict branch would otherwise print the
+    # payload's own CLEAN string as the reason it blocked.
+    malformed_payload = ('### Verdict: Ready for merge\n\n'
+                         '<!-- review-data: {"verdict": "CLEAN", "findings": '
+                         '"3 defects listed above"} -->')
+    check("classify_verdict: a malformed findings field blocks",
+          checker.classify_verdict(malformed_payload) == "not-clean")
+    malformed_reason = checker._unresolved_finding_pattern(malformed_payload) or ""
+    check("_unresolved_finding_pattern: names the malformed findings field as the cause",
+          "not a list" in malformed_reason)
+    check("_unresolved_finding_pattern: does not report the payload's CLEAN verdict as the cause",
+          "verdict (CLEAN)" not in malformed_reason)
 
     # Code fence citation guard (quoted structured review in markdown fence is ignored)
     quoted_struct = """

@@ -222,14 +222,22 @@ Actual report follows:
         self.assertTrue(payload_is_blocking(blocking))
         self.assertFalse(payload_is_clean(blocking))
 
-    def test_a_payload_must_begin_a_line(self):
-        """Masking code regions is not enough on its own.
+    def test_only_whitespace_may_precede_a_payload_on_its_line(self):
+        """Masking code regions is not enough on its own, and column zero is
+        too strict.
 
         A payload written mid-sentence in ordinary prose, or behind a `> `
         blockquote marker (what GitHub's Quote reply emits), sits in no code
         region -- and was read as the comment's authoritative verdict, giving a
         false CLEAN in one direction and an undischargeable finding in the
-        other.
+        other.  But requiring column zero then dropped the three-space-indented
+        layout `build_review_prompt` and both persona files render, so a
+        reviewer following the prompt shipped a NOT_CLEAN payload that the
+        guard reported clean.  One leading space was enough.
+
+        Whitespace-only is the rule, and it meets `code_region_mask` exactly at
+        the CommonMark boundary: three spaces is readable, four is an indented
+        code block and is not.
         """
         clean = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
         blocking = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
@@ -239,17 +247,24 @@ Actual report follows:
             "blockquote": f"> {clean}",
             "list item": f"- {clean}",
             "narrated earlier round": f"Round 1 emitted {blocking} which is now fixed.",
+            "four spaces (indented code block)": f"    {clean}",
+            "tab (indented code block)": f"\t{clean}",
         }.items():
             with self.subTest(placement=label):
                 self.assertIsNone(extract_structured_review(body))
 
         for label, body in {
             "alone": clean,
+            "one space": f" {clean}",
+            "three spaces (the prompt's own layout)": f"   {clean}",
             "after a blank line": f"### Verdict: Ready for merge\n\n{clean}",
-            "at the very start": f"{clean}\n\ntrailing prose",
+            "after CRLF": f"prose\r\n{clean}",
+            "after a closing fence": f"```\nx\n```\n{clean}",
         }.items():
             with self.subTest(placement=label):
-                self.assertIsNotNone(extract_structured_review(body))
+                self.assertIsNotNone(
+                    extract_structured_review(body),
+                    "a payload the prompt's own layout produces must be read")
 
     def test_a_clean_payload_needs_an_explicit_empty_findings_list(self):
         """Both persona files and build_review_prompt say a CLEAN payload

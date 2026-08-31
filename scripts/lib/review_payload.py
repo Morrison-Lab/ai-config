@@ -126,16 +126,29 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
     for m in _PAYLOAD_RE.finditer(body):
         if mask[m.start()]:
             continue
-        # The payload must BEGIN A LINE, at column zero.  Masking code regions
-        # is not enough on its own: a payload written mid-sentence in ordinary
-        # prose ("Reviewers must end with <!-- review-data: ... -->") or behind
-        # a `> ` blockquote marker (what GitHub's Quote reply emits) sits in no
-        # code region at all, and was read as the comment's authoritative
-        # verdict -- producing a false CLEAN in one direction and, from a
-        # narrated earlier round, an undischargeable finding in the other.
-        # The contract puts the payload on its own line, so requiring that is
-        # free, and it is a property of position rather than of wording.
-        if m.start() != 0 and body[m.start() - 1] != "\n":
+        # Everything before the payload ON ITS OWN LINE must be WHITESPACE.
+        # Masking code regions is not enough by itself: a payload written
+        # mid-sentence in ordinary prose ("Reviewers must end with <!-- review-
+        # data: ... -->") or behind a `> ` blockquote marker (what GitHub's
+        # Quote reply emits) sits in no code region at all, and was read as the
+        # comment's authoritative verdict -- a false CLEAN in one direction
+        # and, from a narrated earlier round, an undischargeable finding in the
+        # other.
+        #
+        # WHITESPACE rather than column zero, which an earlier cut required and
+        # which was worse than the hole it closed: `build_review_prompt` and
+        # both persona files render the payload three spaces in, so a reviewer
+        # following the prompt's own layout had its payload silently dropped
+        # and a NOT_CLEAN verdict reported clean.  One leading space was enough.
+        #
+        # Three spaces is deliberately still readable while four is not: four
+        # is a CommonMark indented code block, which `code_region_mask` masks,
+        # so the two rules meet exactly at the CommonMark boundary rather than
+        # at an arbitrary one.  The prompt renders three and now says "flush
+        # left, not indented" explicitly, so a four-space payload is a
+        # deviation from a stated instruction reading as the code block it is.
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        if body[line_start:m.start()].strip():
             continue
         try:
             data = json.loads(m.group(1).strip())

@@ -11,13 +11,6 @@
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
 - **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
-- **Always hyperlink mentioned PRs and issues.**
-  Whenever mentioning pull requests or issues in chat responses, recaps,
-  comments, reviews, or documentation,
-  always format them as clickable markdown hyperlinks to their forge URLs
-  (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
-  never as bare unlinked `#123` text.
-  (User directive / CAI, 2026-08-30.)
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -452,6 +445,13 @@
   Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
+  Whenever mentioning pull requests or issues in chat responses, recaps,
+  comments, reviews, or documentation,
+  always format them as clickable markdown hyperlinks to their forge URLs
+  (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
+  never as bare unlinked `#123` text
+  (except for forge issue-closing syntax like `Closes #123`).
+  (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`

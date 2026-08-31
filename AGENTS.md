@@ -344,7 +344,8 @@ And a comment posted under a genuine bot token, where the forge already reports 
   reviews, or documentation,
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
-  never as bare unlinked text (such as `#123`).
+  never as bare unlinked text (such as `#123`),
+  except for forge issue-closing syntax (such as `Closes #123`).
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
 
 ## Deliver completed implementation work

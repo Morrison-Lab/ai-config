@@ -7,7 +7,7 @@ For a GitLab MR, establish the same criteria from GitLab's current-head pipeline
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
 
-- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/discussions` and confirm that every note with `resolvable: true` has `resolved: true` before reporting it fully clean.
+- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/discussions` and confirm that every resolvable note with an actionable finding is resolved before reporting it fully clean.
 - **Do:** for a GitLab MR, obtain the current head SHA and page through every pipeline on that SHA;
   confirm each has completed successfully or was skipped.
 - **Do:** accept a GitLab review verdict as current-head evidence only when its body names that SHA or its diff discussion has `position.head_sha` equal to it;
@@ -16,6 +16,8 @@ Do not report a PR/MR fully clean, ready to merge, or merge it until the review 
   when it changed during the sweep, restart the pipeline, review, and discussion checks against the new head.
 - **Do:** state an MR is *mergeable but not fully clean* when CI and merge status are green but an actionable review thread remains open.
 - **Don't:** treat GitLab's `detailed_merge_status: mergeable` as a substitute for a current clean review verdict and resolved discussion threads.
+- **Don't:** treat an unresolved clean final verdict as an actionable finding;
+  GitLab can mark that all-clear note resolvable too.
 - **Don't:** treat a resolved GitLab discussion sweep as a clean current-head review;
   findings can appear in an overall review note without a resolvable discussion.
 - **Don't:** let an earlier review's green pipeline or later code push erase an unresolved finding without a reviewer-confirmed clean round.

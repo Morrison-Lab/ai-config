@@ -611,9 +611,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A sampling instrument's zero is a coverage statement unless the new arm's reach is reported") and [`fail-fast.md`](../shared/principles/fail-fast.md).
 - **Fix**: Measure and report reach counts (e.g. "reached M of N times") on every arm of a sampling instrument, and ensure new arms are appended after sampling limits.
 - **Algorithmatizable?**
-  Yes.
-  Not yet built --- the test runner can assert non-zero execution counts on
-  every generator arm and fail if any arm executes zero times.
+  Yes --- test runners asserting non-zero generator arm execution counts
+  ([ai-config#2769](https://github.com/Morrison-Lab/ai-config/issues/2769)).
 
 ## Pattern 33: Cross-Artifact Comment Staleness During Multi-Commit PRs
 - **Do**: When modifying an invariant, data format, layout, or implementation across commits in a PR, grep across the entire repository (including tests, documentation, helper scripts, and sister modules) for comments and docstrings that assert the state or layout of the modified artifact.

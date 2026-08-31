@@ -1480,6 +1480,12 @@ _PREFIX_DISQUALIFY_RE = re.compile(
     r"|in\s+theory|theoretically|hypothetically|ostensibly|tentatively"
     r"|maybe|perhaps|possibly|probably|likely|unclear|unsure|suspects?"
     r"|appears?(?:\s+to(?:\s+be)?)?"
+    r"|in\s+(?:my|our|your|their|his|her)\s+(?:opinion|view|judgment|judgement|assessment|estimation|belief|impression|experience)"
+    r"|to\s+(?:my|our|your|their|his|her)\s+(?:knowledge|understanding|recollection|mind)"
+    r"|as\s+far\s+as\s+(?:i|we|you|they|he|she)\s+(?:know|understand|recall|remember|can\s+tell)"
+    r"|according\s+to"
+    r"|from\s+(?:my|our|what\s+i|what\s+we)"
+    r"|my|our|your|his|her|their|i|we|you|he|she|it|they"
     r")\b"
 )
 _PREFIX_NON_RESOLUTION_SUBJECT = re.compile(

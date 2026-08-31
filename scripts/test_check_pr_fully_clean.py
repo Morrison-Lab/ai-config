@@ -2528,6 +2528,30 @@ def main() -> int:
               "- in theory this is fixed\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (resolved) with 'in my opinion this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in my opinion this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'in my view this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- in my view this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'as far as I know this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- as far as I know this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'to my knowledge this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- to my knowledge this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

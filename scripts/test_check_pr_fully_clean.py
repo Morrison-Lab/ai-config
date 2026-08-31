@@ -3198,6 +3198,118 @@ def main() -> int:
         neutered_finding is not None,
     )
 
+    # Structured Review JSON parsing tests
+    struct_clean = """
+## Review Summary
+Looks great!
+
+Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "Claude",
+  "commit_sha": "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+"""
+    data = checker.extract_structured_review(struct_clean)
+    check("extract_structured_review: extracts valid comment payload", data is not None and data.get("verdict") == "CLEAN")
+    check("classify_verdict: structured clean review returns clean", checker.classify_verdict(struct_clean) == "clean")
+    check("_reviewer_identity: reads reviewer from structured payload", checker._reviewer_identity(struct_clean) == "Claude")
+    check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
+    check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
+
+    struct_not_clean = """
+## Review Summary
+Found defects.
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "Codex",
+  "commit_sha": "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b",
+  "verdict": "NOT_CLEAN",
+  "findings": [
+    {
+      "file": "scripts/check-pr-fully-clean.py",
+      "line": 42,
+      "message": "Null pointer on empty input"
+    }
+  ]
+}
+-->
+"""
+    check("classify_verdict: structured not-clean review returns not-clean", checker.classify_verdict(struct_not_clean) == "not-clean")
+    check("_reviewer_identity: reads reviewer from structured not-clean payload", checker._reviewer_identity(struct_not_clean) == "Codex")
+    check("_unresolved_finding_pattern: not-clean structured review returns finding pattern", checker._unresolved_finding_pattern(struct_not_clean) is not None)
+
+    # Findings override clean verdict in structured JSON
+    struct_clean_with_findings = """
+<!-- review-data:
+{
+  "verdict": "CLEAN",
+  "findings": [{"file": "foo.py", "message": "Bug"}]
+}
+-->
+"""
+    check("classify_verdict: structured review with findings classifies not-clean despite CLEAN verdict", checker.classify_verdict(struct_clean_with_findings) == "not-clean")
+
+    # Details tag format
+    struct_details = """
+<details>
+<summary>Structured Review Data</summary>
+
+```json
+{
+  "schema_version": "1.0",
+  "reviewer": "OpenCode",
+  "commit_sha": "abc1234567890abcdef1234567890abcdef12345",
+  "verdict": "Ready for merge",
+  "findings": []
+}
+```
+</details>
+"""
+    check("extract_structured_review: extracts from <details> block", checker.extract_structured_review(struct_details) is not None)
+    check("classify_verdict: extracts Ready for merge verdict from <details> block", checker.classify_verdict(struct_details) == "clean")
+    check("_reviewer_identity: extracts reviewer from <details> block", checker._reviewer_identity(struct_details) == "OpenCode")
+
+    # Code fence citation guard (quoted structured review in markdown fence is ignored)
+    quoted_struct = """
+Here is an example of structured review format:
+```markdown
+<!-- review-data:
+{
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+```
+
+Actual review:
+### Verdict: Needs more work
+"""
+    check("extract_structured_review: ignores structured review inside code fence", checker.extract_structured_review(quoted_struct) is None)
+    check("classify_verdict: code-fenced structured review does not override real verdict", checker.classify_verdict(quoted_struct) == "not-clean")
+
+    # Malformed JSON safely falls back
+    malformed_struct = """
+### Verdict: Ready for merge
+
+Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
+
+<!-- review-data:
+{
+  "verdict": "CLEAN", invalid json here
+}
+-->
+"""
+    check("extract_structured_review: malformed JSON returns None", checker.extract_structured_review(malformed_struct) is None)
+    check("classify_verdict: malformed structured JSON falls back to regex classification", checker.classify_verdict(malformed_struct) == "clean")
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -489,3 +489,11 @@ A clean automated review from every available provider evaluating the current HE
   Yes, and the same instrument Pattern 25 already proposes (a pre-push guard running the diff-scoped checker) closes this pattern too, for free: a guard that fires immediately before `git push` sees the diff as it will actually be pushed by construction, which is exactly the freshness this pattern is missing when the check is instead run by hand at an arbitrary earlier point.
   No separate hook is needed.
   Pattern 25's proposed guard (ai-config#2590) already covers this axis once built.
+
+## Pattern 28: Stopping at Uncommitted Worktree After Implementation Instead of Completing Delivery Cycle
+- **Do**: When executing implementation work on a branch, complete the full delivery cycle automatically: run tests, commit scoped changes, run adversarial self-review, check remote branch, push, open/update PR, and request AI review.
+- **Don't**: Stop after writing files or tests and report "done" or wait for a follow-up prompt to commit and open a PR.
+- **Example**: 2026-08-30 session (`Morrison-Lab/ai-config` on branch `structured_review_bot_output`): implemented structured review JSON parsing in `check-pr-fully-clean.py` and updated reviewer prompts, verified all tests pass, wrote walkthrough artifact, but stopped without committing, pushing, or opening a PR until the user prompted "where's my PR? ums".
+- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): "When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree. Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result."
+- **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit. Complete the full chain (commit → self-review → push → PR → review request) in that same turn.
+

@@ -362,6 +362,28 @@ The gap is any other brief that asks something to act as an adversarial reviewer
 - **Don't:** file or accept a "the transcript lags the current turn" diagnosis for a refused push without first executing the parser against the actual transcript;
   the two failures produce an identical refusal message.
 
+## Structured review data (JSON payload)
+
+Reviewers emit dual representations:
+human-readable Markdown followed by an embedded machine-readable JSON payload in an HTML comment block:
+
+```html
+Reviewed-Commit: <sha>
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "<agent/bot name>",
+  "commit_sha": "<full sha>",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+```
+
+For not-clean verdicts, set `"verdict": "NOT_CLEAN"` and populate `"findings"` with an array of objects (`{"file": "...", "line": 0, "category": "...", "message": "..."}`).
+Downstream automated checkers (`scripts/check-pr-fully-clean.py`) parse this structured block directly, providing deterministic verdict and SHA evaluation while maintaining legacy Markdown parsing fallback.
+
 (ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
 The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
 

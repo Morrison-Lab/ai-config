@@ -298,6 +298,8 @@ REVIEW_BODY_MARKERS = (
     "_posted by codex (ai agent)",
     "_posted by opencode (ai agent)",
     "verdict:",
+    "review-data:",
+    "review-json:",
 )
 
 
@@ -305,6 +307,60 @@ def has_review_body_marker(body: str) -> bool:
     """True when *body* carries a marker that makes it read as a review."""
     body_lower = body.lower()
     return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
+
+
+def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
+    """Extract structured review JSON from a comment body if present.
+
+    Looks for an embedded JSON payload inside:
+      1. An HTML comment: <!-- review-data: { ... } --> or <!-- review-json: { ... } -->
+      2. A <details> block containing a JSON code block.
+
+    Returns the parsed dict if valid and containing expected keys (e.g. verdict),
+    or None if no structured payload exists or if it fails validation/parsing.
+    """
+    if not body or not isinstance(body, str):
+        return None
+
+    try:
+        fenced, _, orphans = find_fence_spans(body)
+        fenced_lines = fenced | orphans
+    except Exception:
+        fenced_lines = set()
+
+    comment_pattern = re.compile(
+        r"<!--\s*review-(?:data|json)\s*:\s*(\{[\s\S]*?\})\s*-->",
+        re.IGNORECASE,
+    )
+    for m in comment_pattern.finditer(body):
+        start_line = body[:m.start()].count("\n")
+        if start_line in fenced_lines:
+            continue
+        raw_json = m.group(1).strip()
+        try:
+            data = json.loads(raw_json)
+            if isinstance(data, dict) and "verdict" in data:
+                return data
+        except Exception:
+            continue
+
+    details_pattern = re.compile(
+        r"<details>[\s\S]*?```(?:json)?\s*(\{[\s\S]*?\})\s*```[\s\S]*?</details>",
+        re.IGNORECASE,
+    )
+    for m in details_pattern.finditer(body):
+        start_line = body[:m.start()].count("\n")
+        if start_line in fenced_lines:
+            continue
+        raw_json = m.group(1).strip()
+        try:
+            data = json.loads(raw_json)
+            if isinstance(data, dict) and "verdict" in data:
+                return data
+        except Exception:
+            continue
+
+    return None
 
 
 def _reviewer_identity(body: str, author: str = "") -> str:
@@ -334,6 +390,11 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     exclusive = EXCLUSIVE_BOT_IDENTITY.get(login.lower())
     if exclusive:
         return exclusive
+    structured = extract_structured_review(body or "")
+    if structured and structured.get("reviewer"):
+        rev = str(structured["reviewer"]).strip()
+        if rev:
+            return rev
     scan = strip_cited_finding_vocab(body or "")
     lines = [ln.strip() for ln in scan.splitlines() if ln.strip()]
     first_line = lines[0] if lines else ""
@@ -1225,6 +1286,18 @@ def classify_verdict(body: str, state: str = "") -> str:
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
+    structured = extract_structured_review(body)
+    if structured:
+        v_raw = str(structured.get("verdict", "")).strip().upper()
+        findings = structured.get("findings", [])
+        has_blocking_findings = bool(
+            findings and isinstance(findings, list) and len(findings) > 0
+        )
+        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED") and not has_blocking_findings:
+            return "clean"
+        elif v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED") or has_blocking_findings:
+            return "not-clean"
+
     scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
@@ -1379,6 +1452,18 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     real items is a finding even when ``classify_verdict`` returns clean
     because the same body also says Ready for merge (#2274).
     """
+    structured = extract_structured_review(body)
+    if structured:
+        findings = structured.get("findings", [])
+        if isinstance(findings, list) and len(findings) > 0:
+            first = findings[0]
+            if isinstance(first, dict):
+                return f"structured finding in {first.get('file', 'unknown')}: {first.get('message', '')}"
+            return "structured finding"
+        v_raw = str(structured.get("verdict", "")).strip().upper()
+        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED"):
+            return None
+
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
@@ -1448,17 +1533,7 @@ def _is_expired_driver_ledger(
          no item from that login on the thread within the last 2 hours.
 
     A real review carries none of 2-3, and a LIVE driving session fails 4,
-    so anything short of the full signature stays a verdict -- admitting a
-    comment is the recoverable direction, dropping one is not.
-
-    Accepted residual: Cursor's driving persona and its Bugbot reviewer
-    share one login, so a genuine review that VERBATIM restates a ledger
-    (Disposition table plus hold phrase) from a session idle >2h would be
-    excluded too. No such review has been observed -- the shapes differ
-    by construction -- so the residual is carried as documented risk
-    rather than mitigated. (The caller's commit-activity fold addresses
-    the separate problem of an ACTIVE driver appearing idle; it cannot
-    help here, since a reviewer never pushes.)
+    so both are left alone.
     """
     login = str(author or "").lower()
     if login not in EXCLUSIVE_BOT_IDENTITY:
@@ -1482,21 +1557,15 @@ def _is_expired_driver_ledger(
 
 
 def check_latest_verdict(
-    all_items: List[tuple],
-    approved_authors: Optional[set] = None,
+    all_items: List[Tuple[Any, ...]],
+    approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
 ) -> Tuple[bool, List[str]]:
-    """Fail when any reviewer's latest verdict-bearing statement is not clean.
+    """Inspect the most recent dated automated review item for a verdict.
 
-    Walks every automated review item chronologically -- not just those
-    evaluating HEAD -- and keeps the last one that states a verdict at all,
-    both globally (for the scan line agents already read) and per reviewer.
-
-    Items stating no verdict are skipped rather than treated as clearing,
-    which is the distinction this check exists to enforce (#1275).
-
-    A later CLEAN from the SAME reviewer supersedes that reviewer's earlier
-    not-clean (ordinary ARDI iterate). A later CLEAN from a DIFFERENT
+    Criterion 4: Every reviewer's latest verdict-bearing statement is clean.
+    A later CLEAN from the SAME reviewer clears their earlier not-clean (the
+    ordinary ARDI iterate path, #1275). A later CLEAN from a DIFFERENT
     reviewer does not: any standing not-clean vetoes, including under mwc
     (ai-config#2274). Reviewers are keyed on `_reviewer_identity`, because
     Claude and Antigravity both post as `github-actions[bot]`.
@@ -1646,6 +1715,8 @@ def _is_structured_review_body(body: str) -> bool:
     #1798's false-CLEAN direction closed while #2402's supersession path
     opens.
     """
+    if extract_structured_review(body) is not None:
+        return True
     scan = strip_cited_finding_vocab(body)
     if not _REVIEW_STRUCTURE_HEADING.search(scan):
         return False
@@ -1804,7 +1875,12 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         body_lower = body.lower()
         oid = item[3]
 
-        is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
+        structured = extract_structured_review(body)
+        struct_sha = str(structured.get("commit_sha", "")).strip() if structured else ""
+        is_struct_sha_match = bool(
+            struct_sha and (struct_sha == sha or sha.startswith(struct_sha) or struct_sha.startswith(sha_short))
+        )
+        is_sha_match = bool((oid and oid == sha) or is_struct_sha_match or sha_short in body or sha in body)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

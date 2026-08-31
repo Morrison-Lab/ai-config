@@ -53,23 +53,36 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-6. **Fingerprint what you read**
+6. **Fingerprint what you read and include structured data**
 
    End the report, after the verdict, with the commit you reviewed
    as a bare line, not inside a fence:
 
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
 
+   Append the machine-readable structured review payload immediately after in an HTML comment:
+
+   <!-- review-data:
+   {
+     "schema_version": "1.0",
+     "reviewer": "adversarial-reviewer",
+     "commit_sha": "<full sha from git rev-parse HEAD>",
+     "verdict": "CLEAN",
+     "findings": []
+   }
+   -->
+
+   (For a not-clean verdict, set "verdict": "NOT_CLEAN" and list each finding object in "findings".)
+
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
-   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it last.
+   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it right after the verdict.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
    Write the label plainly on its own line: emphasis around it is tolerated.
 
 State the verdict on its own line in that exact form.
 Return the structured report as this call's own message,
 not as a pointer to a file.
-Emit nothing after the fingerprint.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as
 `Needs more work`, an optional heading, and spaces around the colon.

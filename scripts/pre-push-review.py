@@ -204,6 +204,16 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
+# The fingerprint line, in every form the contract tolerates: optional bold
+# markers, a hyphen or a space in the label, and flexible spacing around the
+# colon.  ONE pattern, used by both the SHA harvest and the trailing-content
+# scan below -- as two literals they drifted apart within a single session,
+# and a form the harvest accepted then matched nothing in the scan.
+_FINGERPRINT_RE = re.compile(
+    r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*([a-f0-9A-F]+)"
+)
+
+
 # Lines tolerated AFTER the final `Reviewed-Commit:` fingerprint.  Each must
 # start with a known marker: a status banner, a rule line, a disclosure footer,
 # a stopping-point declaration, or a restated verdict.  Anything else -- a
@@ -395,7 +405,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        all_shas = re.findall(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*([a-f0-9A-F]+)", unfenced_report)
+        all_shas = _FINGERPRINT_RE.findall(unfenced_report)
         if not all_shas:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
@@ -416,8 +426,13 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         # failing.  Matching each trailing line independently is linear by
         # construction, and no further alternative can reintroduce the class.
         last_fp = None
-        for fp_match in re.finditer(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+", unfenced_report):
+        for fp_match in _FINGERPRINT_RE.finditer(unfenced_report):
             last_fp = fp_match
+        if last_fp is None:
+            # Unreachable while both sites share `_FINGERPRINT_RE` -- `all_shas`
+            # above is non-empty by the same pattern. Fail closed rather than
+            # raise, since the only way here is that they drifted apart again.
+            return False, False, "Reviewed-Commit fingerprint could not be located for the trailing-content check."
         tail_lines = unfenced_report[last_fp.end():].split("\n")
         if not all(
             not line.strip() or _TRAILING_AFTER_FINGERPRINT.match(line)

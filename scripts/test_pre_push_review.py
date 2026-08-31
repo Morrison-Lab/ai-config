@@ -157,6 +157,40 @@ class TestPrePushReview(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("must be at the very end", reason)
 
+    def test_every_fingerprint_form_reaches_both_checks(self):
+        """The SHA harvest and the trailing-content scan must share one pattern.
+
+        They were two separate literals, and loosening only the harvest (bold
+        markers, `Reviewed Commit` with a space) left the scan matching nothing
+        on exactly the forms the harvest had just started accepting.
+        """
+        commit = "12345678abcdef00"
+        head = (
+            "### Summary Verdict\nVerdict: Ready for merge\n\n"
+            "### Critical Findings\nNone.\n\n"
+            "### Observations & Non-Blocking Suggestions\nNone.\n\n"
+            "### Verification Steps\n- Both suites pass.\n\n"
+        )
+        forms = {
+            "plain": f"Reviewed-Commit: {commit}",
+            "bold": f"**Reviewed-Commit**: {commit}",
+            "space": f"Reviewed Commit: {commit}",
+            "bold and space": f"**Reviewed Commit**: {commit}",
+            "padded colon": f"Reviewed-Commit :  {commit}",
+        }
+        for label, fingerprint in forms.items():
+            with self.subTest(fingerprint=label):
+                is_valid, is_clean, reason = reviewer.parse_review_verdict(
+                    head + fingerprint, expected_commit_sha=commit)
+                self.assertTrue(is_valid, f"{label} should validate: {reason}")
+                self.assertTrue(is_clean)
+                # The trailing scan must still reject chatter after this form,
+                # rather than failing to locate the fingerprint at all.
+                is_valid, _, reason = reviewer.parse_review_verdict(
+                    head + fingerprint + "\n\nthanks!", expected_commit_sha=commit)
+                self.assertFalse(is_valid, f"{label} + chatter should be rejected")
+                self.assertIn("must be at the very end", reason)
+
     def test_structured_payload_blocks_a_clean_prose_verdict(self):
         """HTML comments are stripped before every check, so the payload the prompt
         asks for was never validated -- the local parser and

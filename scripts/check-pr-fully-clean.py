@@ -1409,9 +1409,7 @@ def _is_resolved_blocking_mention(
 # below and the section-resolution wiring in _unresolved_finding_pattern
 # compare against this exact string, so a drifted copy would silently
 # disable the ai-config#2370 exemption.
-_FINDINGS_HEADING_PATTERN = (
-    r"#+\s*(Actionable\s+|Detailed\s+)?Findings(?!\s*\([^)\n]*non-blocking[^)\n]*\))"
-)
+_FINDINGS_HEADING_PATTERN = r"#+\s*(Actionable\s+|Detailed\s+)?Findings"
 
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only
@@ -1467,7 +1465,7 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
     r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
     r"|"
-    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
     r")",
     re.IGNORECASE,
 )

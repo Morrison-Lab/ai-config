@@ -1979,17 +1979,24 @@ def main() -> int:
     check(
         "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
         checker.classify_verdict(
-            "### Findings (non-blocking)\n- Some observation\n\n### Verdict\n**Ready for merge.**\n",
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n",
             "",
         )
         == "clean",
     )
     check(
-        "_unresolved_finding_pattern: '### Findings (non-blocking)' heading produces no finding",
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with no new issues produces no finding",
         checker._unresolved_finding_pattern(
-            "### Findings (non-blocking)\n- Some observation\n\n### Verdict\n**Ready for merge.**\n"
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n"
         )
         is None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with real finding item blocks",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\n- **scripts/foo.py:42** SQL concatenation bug\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
     )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(

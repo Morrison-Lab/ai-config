@@ -1234,6 +1234,16 @@ Explicit human user instructions in a specific session override general reposito
 
 [`shared/principles/specific-beats-general.md`](shared/principles/specific-beats-general.md)
 
+## Think outside the box --- distinguish real from artificial limitations
+
+Do not make unnecessary assumptions about structural limitations;
+consider which limitations are real (hard architectural, mathematical, security, or physical bounds)
+and which are artificial (inherited conventions, unexamined defaults, or local scoping traps).
+When a task or design becomes awkward or overly complex, test the assumed constraints empirically
+and reframe or dissolve problems rather than building intricate workarounds inside an unnecessary box.
+
+[`shared/principles/think-outside-the-box.md`](shared/principles/think-outside-the-box.md)
+
 ## Coding: KISS is the umbrella principle
 
 Apply KISS to code and prose: use the simplest construct that does the job,

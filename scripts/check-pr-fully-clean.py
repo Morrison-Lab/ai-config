@@ -1541,7 +1541,17 @@ def _is_expired_driver_ledger(
          no item from that login on the thread within the last 2 hours.
 
     A real review carries none of 2-3, and a LIVE driving session fails 4,
-    so both are left alone.
+    so anything short of the full signature stays a verdict -- admitting a
+    comment is the recoverable direction, dropping one is not.
+
+    Accepted residual: Cursor's driving persona and its Bugbot reviewer
+    share one login, so a genuine review that VERBATIM restates a ledger
+    (Disposition table plus hold phrase) from a session idle >2h would be
+    excluded too. No such review has been observed -- the shapes differ
+    by construction -- so the residual is carried as documented risk
+    rather than mitigated. (The caller's commit-activity fold addresses
+    the separate problem of an ACTIVE driver appearing idle; it cannot
+    help here, since a reviewer never pushes.)
     """
     login = str(author or "").lower()
     if login not in EXCLUSIVE_BOT_IDENTITY:
@@ -1569,11 +1579,17 @@ def check_latest_verdict(
     approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
 ) -> Tuple[bool, List[str]]:
-    """Inspect the most recent dated automated review item for a verdict.
+    """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
-    Criterion 4: Every reviewer's latest verdict-bearing statement is clean.
-    A later CLEAN from the SAME reviewer clears their earlier not-clean (the
-    ordinary ARDI iterate path, #1275). A later CLEAN from a DIFFERENT
+    Walks every automated review item chronologically -- not just those
+    evaluating HEAD -- and keeps the last one that states a verdict at all,
+    both globally (for the scan line agents already read) and per reviewer.
+
+    Items stating no verdict are skipped rather than treated as clearing,
+    which is the distinction this check exists to enforce (#1275).
+
+    A later CLEAN from the SAME reviewer supersedes that reviewer's earlier
+    not-clean (ordinary ARDI iterate). A later CLEAN from a DIFFERENT
     reviewer does not: any standing not-clean vetoes, including under mwc
     (ai-config#2274). Reviewers are keyed on `_reviewer_identity`, because
     Claude and Antigravity both post as `github-actions[bot]`.

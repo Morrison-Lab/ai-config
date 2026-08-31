@@ -60,9 +60,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
 
-   Append the machine-readable structured review payload immediately after in an HTML comment:
+   Append the machine-readable structured review payload immediately after in an HTML comment (as raw unfenced text, never wrapped in markdown backticks or code fences):
 
-   ```html
    <!-- review-data:
    {
      "schema_version": "1.0",
@@ -72,7 +71,6 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      "findings": []
    }
    -->
-   ```
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and list each finding object in "findings".)
 

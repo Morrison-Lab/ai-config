@@ -45,8 +45,6 @@ jobs:
         run: python3 scripts/test_check_vendored_drift.py
       - name: Check tui-alloc README defaults
         run: python3 scripts/check-tui-alloc-readme.py
-      - name: Check markdown (.md) style
-        run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run skills-validator tests
         run: python3 scripts/test_validate_skills.py
       - name: Validate OAICopilot model-template policy
@@ -343,8 +341,8 @@ jobs:
         # NUMBERS in the log on each run, and specifically the orphan list,
         # which is a link-graph fact the shallow clone does not affect.
         run: python3 scripts/check-stale-records.py
-      - name: Check Quarto (.qmd) prose style
-        uses: Morrison-Lab/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
+  lint-qmd:
+    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
 
   new-line-breaks:
     # Diff-scoped, blocking (ai-config#682, ported to gha#300): MD013 is off
@@ -410,3 +408,9 @@ jobs:
           # the expression the reusable workflow supplied, which is why no
           # `if: github.event_name == 'pull_request'` guard is needed.
           base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+
+  lint-markdown:
+    uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2
+    with:
+      config-file: '.markdownlint-cli2.jsonc'
+      globs: '*.md'

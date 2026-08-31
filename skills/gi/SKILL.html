@@ -355,7 +355,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#triage-prioritize" id="toc-triage-prioritize" class="nav-link" data-scroll-target="#triage-prioritize">2. Triage / prioritize</a></li>
   <li><a href="#select-top-issue-automatically" id="toc-select-top-issue-automatically" class="nav-link" data-scroll-target="#select-top-issue-automatically">3. Select top issue automatically</a></li>
   <li><a href="#check-the-issue-isnt-already-in-flight" id="toc-check-the-issue-isnt-already-in-flight" class="nav-link" data-scroll-target="#check-the-issue-isnt-already-in-flight">4. Check the issue isn’t already in-flight</a></li>
-  <li><a href="#check-history" id="toc-check-history" class="nav-link" data-scroll-target="#check-history">5. Check history</a></li>
+  <li><a href="#check-history-and-peers" id="toc-check-history-and-peers" class="nav-link" data-scroll-target="#check-history-and-peers">5. Check history and peers</a></li>
   <li><a href="#claim-the-issue" id="toc-claim-the-issue" class="nav-link" data-scroll-target="#claim-the-issue">6. Claim the issue</a></li>
   <li><a href="#create-a-branch" id="toc-create-a-branch" class="nav-link" data-scroll-target="#create-a-branch">7. Create a branch</a></li>
   <li><a href="#open-the-pr-now-draft-from-an-empty-commit" id="toc-open-the-pr-now-draft-from-an-empty-commit" class="nav-link" data-scroll-target="#open-the-pr-now-draft-from-an-empty-commit">8. Open the PR now — draft, from an empty commit</a></li>
@@ -484,9 +484,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'</span> <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># ISSUE_LINKED_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If an open PR already exists for the issue: - <strong>Don’t open a competing PR.</strong> The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.</p>
 </section>
-<section id="check-history" class="level3">
-<h3 class="anchored" data-anchor-id="check-history">5. Check history</h3>
-<p>Before implementing, invoke the <code>check-history</code> skill to review merged MRs/PRs that touched the same area. Don’t undo past progress.</p>
+<section id="check-history-and-peers" class="level3">
+<h3 class="anchored" data-anchor-id="check-history-and-peers">5. Check history and peers</h3>
+<p>Before implementing, invoke the <code>check-history</code> skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. If the issue is a new feature or architectural change, also consider running <code>scout-peers</code> to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run <code>opposition-research</code> / <code>oppo</code> here; <code>oppo</code> mines community demand to decide <em>what</em> to build and feeds the issue tracker, while <code>scout-peers</code> checks <em>how</em> others built it once you’ve already grabbed an issue).</p>
 </section>
 <section id="claim-the-issue" class="level3">
 <h3 class="anchored" data-anchor-id="claim-the-issue">6. Claim the issue</h3>
@@ -575,6 +575,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
 <li><strong><code>check-history</code></strong> — invoked in step 5 to avoid undoing past work</li>
+<li><strong><code>scout-peers</code></strong> — suggested in step 5 to check how peers solved a problem so you don’t reinvent the wheel (distinct from <code>oppo</code>, which finds <em>what</em> to build)</li>
 <li><strong><code>ardi</code></strong> — invoked in step 11 to drive the MR/PR to clean</li>
 <li><strong><code>claim-pr</code></strong> — the issue claim in step 6 follows the same pattern</li>
 <li><strong><code>pr-on-claim</code></strong> — the rule behind step 8: open the draft PR up front so the work is visible to other sessions before you implement</li>

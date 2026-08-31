@@ -83,9 +83,9 @@ gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline \
 
 If an open PR already exists for the issue: - **Don’t open a competing PR.** The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.
 
-### 5. Check history
+### 5. Check history and peers
 
-Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area. Don’t undo past progress.
+Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don’t undo past progress. If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don’t reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here; `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you’ve already grabbed an issue).
 
 ### 6. Claim the issue
 
@@ -182,6 +182,7 @@ If during implementation you discover the issue is blocked (missing dependency, 
 ## Relationship to other skills
 
 - **`check-history`** — invoked in step 5 to avoid undoing past work
+- **`scout-peers`** — suggested in step 5 to check how peers solved a problem so you don’t reinvent the wheel (distinct from `oppo`, which finds *what* to build)
 - **`ardi`** — invoked in step 11 to drive the MR/PR to clean
 - **`claim-pr`** — the issue claim in step 6 follows the same pattern
 - **`pr-on-claim`** — the rule behind step 8: open the draft PR up front so the work is visible to other sessions before you implement

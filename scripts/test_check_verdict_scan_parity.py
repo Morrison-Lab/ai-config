@@ -35,8 +35,11 @@ def main() -> int:
     print("Testing check-verdict-scan-parity.py...")
 
     bodies = list(parity.generated_bodies())
-    check("generates a non-trivial corpus", len(bodies) > 1000)
+    check("generates a non-trivial corpus for fast tier", len(bodies) > 1000)
     check("every generated body is a str", all(isinstance(b, str) for b in bodies))
+
+    exhaustive_count = sum(1 for _ in parity.generated_bodies(exhaustive=True))
+    check("exhaustive tier is larger than fast tier", exhaustive_count > len(bodies))
 
     # is_widening encodes the direction that matters: accepting what the base
     # rejected. Getting this backwards would make the tool report zero forever.

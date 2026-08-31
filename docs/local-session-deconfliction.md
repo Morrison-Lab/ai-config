@@ -20,7 +20,7 @@ GitHub/GitLab PR or issue) via comment claims.
 | Piece | Path | Role |
 |-------|------|------|
 | Registry CLI | `skills/session-lock/scripts/ai-session.sh` | the system: register / check / list / worktree / release / prune |
-| Skill | `skills/session-lock/SKILL.md` | how an agent should use it (with `deconflict-sessions` as an alias) |
+| Skill | `skills/session-lock/SKILL.md` | how an agent should use it |
 | Optional hook | `skills/session-lock/hooks/session-start-register.sh` | auto-register on `SessionStart` and surface conflicts |
 
 Once `bootstrap.sh` has run, the script lives at

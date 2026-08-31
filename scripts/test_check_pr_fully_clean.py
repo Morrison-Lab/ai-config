@@ -2184,7 +2184,7 @@ def main() -> int:
         "body": (
             "### Summary Verdict\nVerdict: Needs more work\n\n"
             "### Critical Findings\n1. The parser drops rows.\n\n"
-            "Reviewed-Commit: sha123\n"
+            "Reviewed-Commit: sha12345678\n"
         ),
     }
     human_clean_round = {
@@ -2195,7 +2195,7 @@ def main() -> int:
             "### Summary Verdict\nVerdict: Ready for merge\n\n"
             "### Critical Findings\nNone.\n\n"
             "### Observations\nNone.\n\n### Verification Steps\n- suite passes\n\n"
-            "Reviewed-Commit: sha123\n"
+            "Reviewed-Commit: sha12345678\n"
         ),
     }
     bot_clean_round = {
@@ -2258,7 +2258,7 @@ def main() -> int:
         "body": (
             "**Claude finished review**\n\n### Summary\nAll good.\n\n"
             "### Findings\nNone.\n\n### Verdict\n**Ready for merge**\n\n"
-            "Reviewed-Commit: sha123\n"
+            "Reviewed-Commit: sha12345678\n"
         ),
     }
     # A quorum-satisfying legitimate clean rides along so the assertion
@@ -2270,7 +2270,7 @@ def main() -> int:
         "author": {"login": "cursor"},
         "body": (
             "### Summary\nLooks good.\n\n### Findings\nNone.\n\n"
-            "### Verdict: Ready for merge\n\nReviewed-Commit: sha123\n"
+            "### Verdict: Ready for merge\n\nReviewed-Commit: sha12345678\n"
         ),
     }
     mock_spoof = json.dumps({"comments": [bot_notclean_round,
@@ -2294,7 +2294,7 @@ def main() -> int:
         "authorAssociation": "OWNER",
         "body": (
             "Quoting the earlier report:\n\n```\n### Verdict\n"
-            "Ready for merge\nReviewed-Commit: sha123\n```\n\n"
+            "Ready for merge\nReviewed-Commit: sha12345678\n```\n\n"
             "Verdict: Ready for merge\n"
         ),
     }
@@ -2432,6 +2432,35 @@ def main() -> int:
             "criterion 4 fires on them",
             (not r_ok) and any("Latest verdict-bearing" in i for i in r_issues),
         )
+
+
+    # Test for #2696 (Option 2): A bot review that states a clean verdict and has NO findings heading,
+    # but contains a machine-readable findings count > 0, should be classified as not-clean.
+    # This prevents prose-only findings from failing open.
+    bot_machine_readable_findings = {
+        "createdAt": "2026-08-01T00:00:00Z",
+        "author": {"login": "claude"},
+        "state": "COMMENT",
+        "body": "In response to a prior round, the bug is present.\n\n### Verdict\n**Ready for merge**\n\n[FINDINGS_COUNT: 1]\n\nReviewed-Commit: sha12345678"
+    }
+    mock_machine_readable = json.dumps({"comments": [bot_machine_readable_findings], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_machine_readable):
+        mr_ok, mr_issues = checker.check_review_comments("2696", "sha12345678", TEST_REPO)
+    check("a clean verdict with a machine-readable finding count > 0 is not-clean (#2696)",
+          not mr_ok and mr_issues and "NOT clean" in mr_issues[0])
+
+    # Control: same thing but count is 0
+    bot_machine_readable_zero = {
+        "createdAt": "2026-08-01T00:00:00Z",
+        "author": {"login": "claude"},
+        "state": "COMMENT",
+        "body": "In response to a prior round, the bug is fixed.\n\n### Verdict\n**Ready for merge**\n\n[FINDINGS_COUNT: 0]\n\nReviewed-Commit: sha12345678"
+    }
+    mock_machine_readable_zero = json.dumps({"comments": [bot_machine_readable_zero], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_machine_readable_zero):
+        mrz_ok, mrz_issues = checker.check_review_comments("2696", "sha12345678", TEST_REPO)
+    check("a clean verdict with [FINDINGS_COUNT: 0] is clean (#2696)",
+          mrz_ok and mrz_issues == [])
 
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({

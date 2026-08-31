@@ -811,10 +811,16 @@ class TestModelRouterAndSweeper(unittest.TestCase):
         self.store.close()
         self.temp_dir.cleanup()
 
-    def test_model_router_confidential_routes_local_ollama(self):
+    def test_model_router_confidential_disables_model_execution(self):
         adapter, model = self.router.route_task(tier=TaskTier.LOCAL_FAST, is_confidential=True)
-        # Should route to Ollama or Mock (both local, zero external leak)
-        self.assertIn(adapter.provider, (ModelProvider.OLLAMA, ModelProvider.MOCK))
+        self.assertEqual(adapter.provider, ModelProvider.MOCK)
+        self.assertEqual(model, "confidential-work-disabled")
+
+    def test_model_router_never_registers_or_routes_ollama(self):
+        self.assertNotIn(ModelProvider.OLLAMA, self.router.adapters)
+        for tier in TaskTier:
+            adapter, _ = self.router.route_task(tier=tier)
+            self.assertNotEqual(adapter.provider, ModelProvider.OLLAMA)
 
     def test_model_router_adversarial_review_routes_cross_model(self):
         # When author is Claude, reviewer must not be Claude

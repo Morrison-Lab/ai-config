@@ -706,6 +706,15 @@ You must wait for those new runs to pass before the PR is fully clean again.
 
 (Measured 2026-08-25 via `gh pr update-branch --help`)
 
+**Confirmed live 2026-08-30 on Morrison-Lab/ai-config#2638, as the remedy for a merge refusal --- and the re-verify runs against the NEW head.**
+`gh pr merge --squash` refused a review-clean PR whose `mergeable` read `MERGEABLE` with "not mergeable: the head branch is not up to date with the base branch" --- `MERGEABLE` reports only conflict-freedom, so it does not predict this refusal (branch protection requires up-to-date branches here: `gh api repos/Morrison-Lab/ai-config/branches/main/protection` reported `required_status_checks.strict: true`, read 2026-08-30).
+`gh pr update-branch <N>` cleared it (the merge commit changes the branch, not the PR's diff against the base);
+after the re-triggered runs described above, `python3 scripts/check-pr-fully-clean.py <N>` re-verified against the **new** head, and the merge went through.
+[`github.md`](github.md)'s "not up to date with the base branch" section carries the fuller treatment, including pinning any poller to the head SHA `update-branch` actually produced.
+
+- **Do:** on the "not up to date" refusal, run `gh pr update-branch <N>`, then re-verify fully-clean on the new head before merging.
+- **Don't:** retry the merge unchanged, treat the old head's clean verdict as covering the new head, or read `MERGEABLE` as predicting the merge will be accepted.
+
 ## Strict branch protection makes a clean PR queue merge serially
 
 Under branch protection with `required_status_checks.strict: true`,

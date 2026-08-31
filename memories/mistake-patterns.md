@@ -99,6 +99,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
 - **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
 - **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
+  - 2nd occurrence: 2026-08-30 session (Conductor setup in `Morrison-Lab/gha`): promised to "monitor their progress" for CI/review after pushing a PR, but ended the turn without using the schedule tool, prompting an "empty promise" correction.
 - **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
 - **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer before concluding any turn, and report what was armed and its firing time.
   When actively waiting on fast CI jobs, use short intervals (1--2 minutes);
@@ -367,6 +368,20 @@ A clean automated review from every available provider evaluating the current HE
   What ended it was abandoning the claim rather than narrowing it: the tool now reports every matching record with its provenance and decides nothing, so the class is unreachable rather than guarded --- the same resolution shape as the 2nd occurrence's parallel mask, one level up.
   A twelfth round then found the mirror failure the eleven had all missed, because every round had been hunting false positives: the tool was *under-reading* the corpus, and reported "no record contains it" over text the user had typed.
   Canonical rule: [`deterministic-tools.md`](../shared/principles/deterministic-tools.md)'s "An enumeration is still a parse", and the recurrence test one level up again --- when refutation recurs past the second design, ask whether the CLAIM is achievable rather than which discriminator to try next.
+- **4th occurrence, 2026-08-30** (ai-config#2668, on the same module and citation-stripping machinery as the 2nd/3rd occurrences above;
+  open, with the driving session still pushing commits, at time of writing), the occurrence that names the axis the first three resolved by trial rather than by rule.
+  As the driving session reported it, two separate discriminators in the same file failed open across a review series it logged at roughly sixteen adversarial rounds, and in both cases the fix it settled on was a change of KIND rather than a further narrowing of the same kind. (a) A guard deciding whether a negator scopes over a resolution went through four lexical designs in sequence --- a fixed glue whitelist, a bounded word run, a grammatical-role (preposition-governed) test, then a governed-and-clause-detached test --- and each admitted a fresh false-clean the next round found.
+  The design the session settled on abandons the lexical proxy entirely: any negator earlier in the same sentence defeats the exemption, trading a fifth refinement for a documented, bounded over-flag --- the same trade [`learn-from-review-findings.md`](../shared/workflow/learn-from-review-findings.md) already names ("a bounded, nameable false positive beats a silent bypass, and both beat a heuristic nobody can characterize"). (b) A citation strip deciding whether a `(posted <timestamp>, verdict **X**)` aside was narration or a live statement used a positive attribution gate plus a closed vocabulary veto, and each round's re-raise arrived in a phrasing the vocabulary had not enumerated.
+  The design the session settled on is a discriminator on a different axis: a structural gate that strips the citation only when the comment body states a verdict of its own, because a cited verdict overriding the reviewer's OWN stated verdict is the only thing the strip ever needed to protect against, and that test is blind to how the citation happens to be phrased. (As of this entry, `origin/fix/check-pr-fully-clean-posted-verdict-citation` --- distinct from `origin/main`, which has neither fix yet --- carries `_POSTED_VERDICT_CITATION`, a general "posted TS, verdict `**X**`" pattern rather than an enumerated word list;
+  whether that pushed form is the closed-vocabulary design this entry describes being refuted, an intermediate step, or already the structural gate is not independently reconstructable from the two commits on the remote branch alone, so the round-by-round narrative above is the driving session's own account, not a re-derivation from this checkout.)
+  The module carries a directly relevant caution already, in the docstring of `strip_cited_finding_vocab_with_mask` --- verified on both `origin/main` and the PR branch of `scripts/check-pr-fully-clean.py`, about 115 lines above where the PR branch's new citation regex lives in that same function: "the true discriminator...cannot be determined from text alone" (lines 761-763) and, of four earlier attempts at a sibling citation-scan, "every one of those was fail-open on a fail-closed instrument" (line 802).
+  Per the driving session's account, that lesson did not travel to the vocabulary veto being written later in the same function.
+  A principle stated in one part of a file and contradicted by practice in another part of the same file is itself a signal worth reading, independent of the round count.
+  Canonical rule: not a wider or narrower version of the failing test, but a test on a different axis --- structural or positional (does the body carry its own verdict heading at all) rather than lexical (which words appear).
+  See also [`learn-from-review-findings.md`](../shared/workflow/learn-from-review-findings.md)'s "A finding class that RECURS is evidence about your instrument, not about its threshold" section, which this occurrence specializes: the replacement axis, not just the recurrence signal.
+- **Do:** after a second narrowing of one discriminator fails review, ask what KIND of test would decide the question, and prefer a structural or positional test over a vocabulary list wherever the property being tested is actually structural.
+- **Don't:** write a fourth or fifth lexical refinement --- a longer word list, a tighter adjacency window, a new grammatical exception --- once three have already failed on the same axis;
+  every occurrence above did that at least once before finding the axis change.
 
 ## Pattern 19: A "Needs More Work" Loop Can Have Two Independent Mechanisms, and Fixing One Leaves the Other
 - **Mistake**: Treating a stuck "Needs more work" verdict as one bug --- a review conditioning its verdict on its own run's in-flight sibling checks --- and re-dispatching review rounds expecting one of them to converge, when a second, independent mechanism also reproduces the block: a review deferring to `scripts/check-pr-fully-clean.py`'s exit status, which itself only reports the PREVIOUS round's status-conditioned verdict, so each new round inherits the prior round's hedge.
@@ -489,3 +504,58 @@ A clean automated review from every available provider evaluating the current HE
   Yes, and the same instrument Pattern 25 already proposes (a pre-push guard running the diff-scoped checker) closes this pattern too, for free: a guard that fires immediately before `git push` sees the diff as it will actually be pushed by construction, which is exactly the freshness this pattern is missing when the check is instead run by hand at an arbitrary earlier point.
   No separate hook is needed.
   Pattern 25's proposed guard (ai-config#2590) already covers this axis once built.
+
+## Pattern 28: Trusting Both Sides' Test Suites After Uniting Two Regex Versions in a Merge Conflict
+- **Do**: When resolving a merge conflict by uniting two versions of a regex (or any validation mechanism) --- one side's structure extended with the other side's prefixes, verbs, or branches --- write adversarial tests against the **union** itself before trusting it: negated forms, failing (non-matching) inputs, and combinations that exercise one side's extensions inside the other side's structure.
+  Also check that alternation branches under a shared quantifier stay disjoint on their first character, so no starting position offers the engine more than one branch to try.
+- **Don't**: Read "both sides' full suites pass" as evidence the union is sound --- each suite covers only its own side's cases by construction, and the defects live in the cross terms neither side had any reason to test.
+- **Example**: 2026-08-30, `Morrison-Lab/ai-config` PR [#2668](https://github.com/Morrison-Lab/ai-config/pull/2668): the PR and main's #2684 had both rewritten the same two regexes in `scripts/check-pr-fully-clean.py` (`RESOLVED_BLOCKING_SUFFIX` and `_is_resolved_blocking_mention`'s prefix).
+  In the session driving that PR, the conflict was resolved as a union: main's tense-checked, sentence-scoped structure extended with the PR's prefixes (`earlier`, `round-\d+`), plural verbs (`are`/`were`), and a parenthesized-aside branch in the clause scan. (As of this entry's date the resolution lived in that session's working tree, not yet on the PR's pushed head --- verify the specifics against PR #2668 as merged before citing them as its content.)
+  The union passed both sides' full suites (344 tests, as counted in that session's united suite) yet carried two defects, both found only by adversarial probes against the union: (1) a negation fail-open --- "None of the earlier blocking findings were resolved." was exempted as a resolved mention, so `classify_verdict` lost a not-clean verdict;
+  in the union the exemption passes main's tense-checked structure only via two PR-side extensions, the prefix `earlier` and the plural verb `were`;
+  the same input also fails open on the PR side alone, whose suffix check requires no verb and whose negation test covers only suffix forms (`not (yet) X`, `remains open`), so a quantifier negator preceding `blocking` escapes it --- the union thus inherited a vulnerability main's structure alone would have blocked;
+  fixed with a negator check (`none|no|not|never|neither|nothing`) on the prefix window before the past-state marker;
+  (2) catastrophic backtracking (51 seconds measured) --- the new paren-aside branch `\([^()\n]{0,120}\)` overlapped the char-class branch `[^,:;.!?]` (both could consume `(`), so a failing enumeration input like `"(1) " * 24` was exponential;
+  fixed by excluding `()` from the char class so the branches are disjoint --- a stray unmatched paren then fails the clause scan, which fails safe (the mention stays blocking).
+- **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Four silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges;
+  this pattern is the sharper case where the conflict *was* seen and resolved, and the resolution itself is the new, untested code.
+  [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) covers verifying the implementation rather than trusting its green suite.
+- **Fix**: Treat a union resolution as new code with zero targeted coverage: derive probes from the cross product of the two sides' extensions (each new prefix with each new verb with each new branch), include negated and failing inputs, and time the regex on a pathological non-matching input before committing the resolution.
+- **Algorithmatizable?**
+  Partially.
+  The first-character-disjointness check on alternation branches under a quantifier is mechanically decidable and would have caught the backtracking defect;
+  regex-timeout linters (or a bounded `re` probe in the test suite) catch the symptom generically.
+  Union-level adversarial test *generation* stays judgment.
+  The negator and disjointness fixes were made in that driving session's resolution (see the caveat in the Example above about verifying them against PR #2668 as merged).
+
+## Pattern 29: Claiming formal completion of an admin tracking step without actually modifying the tracking file
+- **Do**: When announcing that an administrative, tracking,
+  or orchestration step is "formally closed out" or "complete"
+  (e.g., closing a Conductor track, checking off a checklist item),
+  actively verify that the corresponding tracking file
+  (e.g. `tracks.md`, `plan.md`)
+  has been explicitly modified and saved in the repository to reflect that status.
+- **Don't**: Claim a tracking step is "formally closed out"
+  just because the underlying implementation work (like merging a PR) is done,
+  without actually opening and updating the tracking file itself.
+- **Example**: 2026-08-30 session (`Morrison-Lab/gha`):
+  The agent successfully squash-merged a PR delivering the `conductor` orchestration setup
+  and announced, "This successfully completes the delivery of the Conductor orchestration scaffolding
+  and formally closes out this implementation track."
+  However, `conductor/tracks.md` remained entirely empty;
+  the agent had not registered or closed the track in the file.
+  The user correctly flagged this as an "empty promise"
+  because the agent claimed a tracking closure on the record
+  without shipping the corresponding file change.
+- **Canonical Rule**: [`no-empty-promises.md`](../shared/workflow/no-empty-promises.md)
+  establishes that a promise leaves a problem addressed *on the record*
+  without changing any files, concealing the unaddressed state.
+  Claiming an administrative file update without writing to the file
+  falls under this exact definition of a false record.
+- **Fix**: Open the administrative file (`tracks.md` or `plan.md`),
+  make the explicit string change (e.g., adding the track row with `Closed`),
+  and commit it.
+- **Algorithmatizable?**
+  Partially.
+  A post-completion verification check could grep the tracking file
+  for the target track name to ensure it exists before allowing the session to claim closure.

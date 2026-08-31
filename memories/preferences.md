@@ -18,6 +18,10 @@
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
+- **Do:** use hosted/cloud models for delegated work and adversarial review; if
+  hosted quota is unavailable, report the blocker or use deterministic checks instead.
+- **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.
+  Local inference can crash the user's computer. (User directive, 2026-08-30.)
 - Treat a request to disable AI review as narrowly repository-scoped: it applies only to the repositories the user explicitly names in that request.
   The invariant is organization-independent --- don't widen a named-repository request into a sibling repository, into the rest of that organization, or into later unrelated PRs, and don't remove review automation anywhere that wasn't named.
   Verify each named repository independently rather than inferring one from another, since App installation is a per-repository fact.
@@ -165,7 +169,9 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
-  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".)
+  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".
+  Recurred 2026-08-30 on Lacaedemon/sparta: session prompted confirmation for code review and track cleanup rather than deciding directly.
+  User corrected "/daytb; don't ask so many questions".)
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
@@ -188,7 +194,11 @@
   - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step. (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
   - **Don't:** un-draft a **deliberately draft-gated** dependent PR.
     That PR is review-ready by construction and sits in draft only to block the wrong merge order until its prerequisite merges, so `AGENTS.md`'s draft-status carve-out and this file's own blocking-dependency entry both reserve it --- this rule does not reach it.
-- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never finish or stop without stating whether or not a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
+- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
+  Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration.
+  Never finish or stop without stating whether or not a clean stopping point has been reached.
+  If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:
@@ -354,7 +364,8 @@
 - When resolving a git merge/rebase/cherry-pick conflict, consolidate the best of BOTH branches --- read why each side changed the hunk and preserve both intents; never blind-pick `--ours`/`--theirs`, which silently discards the other side's work.
   Remove every marker (verify with `git diff --check`), run the repo's pre-commit checks (a merge clean on each side separately can break combined), then stage and finish the operation --- don't `--abort`/`--skip` a conflict you were asked to resolve.
   Note: "ours"/"theirs" are reversed in a rebase vs a merge.
-  The `resolve-conflicts` skill (alias `rc`) operationalizes this; `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`/`deconflict-sessions`, which deconflicts AI *sessions*, not git content.)
+  The `resolve-conflicts` skill (alias `rc`) operationalizes this.
+  `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`, which deconflicts AI *sessions*, not git content.)
 - When deferring items to follow-up issues during a PR/MR review loop, always update the PR/MR description with a "Known Deferred Items" section listing each deferred issue (with link), description, and rationale.
   This gives automated reviewers context so they stop re-flagging the same items.
   Include a "Notes for Automated Reviewers" section for any recurring false positives.
@@ -434,6 +445,13 @@
   Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
+  Whenever mentioning pull requests or issues in chat responses, recaps,
+  comments, reviews, or documentation,
+  always format them as clickable markdown hyperlinks to their forge URLs
+  (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
+  never as bare unlinked `#123` text
+  (except for forge issue-closing syntax like `Closes #123`).
+  (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
@@ -479,7 +497,7 @@
   Untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
   Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
   Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
-  The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
+  The `session-lock` skill tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
   Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
@@ -759,7 +777,7 @@
   Prefer extending (a new alias/section/trigger) over a near-duplicate skill; if another branch is already building it, continue that work rather than opening a colliding branch. (see the `skill-builder` skill.)
 - "slide <tag>" means force-move a floating Git tag to current main HEAD (delete + recreate + push).
   Common for repos with floating major-version tags that consumers reference.
-- Use the `session-lock` skill (alias `deconflict-sessions`) as the detection/recovery layer on top of the worktree-by-default policy (see above): register at start, `check` before editing, so parallel sessions can see each other.
+- Use the `session-lock` skill as the detection/recovery layer on top of the worktree-by-default policy (see above): register at start, `check` before editing, so parallel sessions can see each other.
   Worktrees are already the default, so most sessions start isolated; session-lock surfaces the rare SAME-WORKING-TREE collision before files get clobbered.
   This is the LOCAL counterpart to `claim-pr` (remote) and `sync-pr-branch` (reconcile with origin) --- use all three together on shared PR work.
   Registry lives under `.git/ai-sessions/` (never committed).

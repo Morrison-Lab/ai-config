@@ -108,10 +108,20 @@ LEAD = ["", "No ", 'The body says "', "## Nits ", "The previously-blocking ",
 FILLER_EXTRA = ["-", "#", ">", "_", "+", "a.py:10", "**Location:**", "[Defect]"]
 
 
-def generated_bodies():
+def generated_bodies(exhaustive=False):
     seen = set()
+    
+    if exhaustive:
+        leads, vocabs, negs = LEAD, VOCAB, NEGATION
+    else:
+        # Fast default tier: include the baseline, the negation guards, quote placement,
+        # and complex finding shapes, while dropping redundant variations.
+        leads = [LEAD[0], LEAD[1], LEAD[2], LEAD[6]]
+        vocabs = [VOCAB[0], VOCAB[4], VOCAB[5]]
+        negs = [NEGATION[0], NEGATION[2], NEGATION[5]]
+
     for lead, d1, f1, v, d2, f2, neg in itertools.product(
-        LEAD, DELIMS, FILLER + FILLER_EXTRA, VOCAB, DELIMS, FILLER, NEGATION
+        leads, DELIMS, FILLER + FILLER_EXTRA, vocabs, DELIMS, FILLER, negs
     ):
         core = f"{lead}{d1}{f1} {v} {d2}{f2}{neg}"
         for template in (
@@ -263,6 +273,10 @@ def main(argv=None):
     parser.add_argument("--corpus", action="append", default=[])
     parser.add_argument("--max-report", type=int, default=10)
     parser.add_argument(
+        "--exhaustive", action="store_true",
+        help="Generate the exhaustive product instead of a fast default tier.",
+    )
+    parser.add_argument(
         "--limit", type=int, default=0,
         help="Cap the generated corpus. For a fast smoke run only: a "
              "capped sweep is not a parity proof.",
@@ -282,7 +296,7 @@ def main(argv=None):
     for path in args.corpus:
         for record in json.loads(Path(path).read_text()):
             corpus.append(("real", record["body"]))
-    generated = list(generated_bodies())
+    generated = list(generated_bodies(args.exhaustive))
     if args.limit and args.limit < len(generated):
         # Strided, not a prefix. The generator varies its last fragment fastest,
         # so a contiguous head shares one leading fragment throughout and is a

@@ -40,6 +40,35 @@ class TestPrePushReview(unittest.TestCase):
         self.assertNotIn("🤖", formatted)
         self.assertIn("### Local Adversarial AI Review (OpenAI Codex)", formatted)
 
+    def test_parse_review_verdict_with_structured_payload_and_trailing_status(self):
+        commit = "12345678abcdef00"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready for merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations & Non-Blocking Suggestions\n"
+            "[INFO] Clean diff.\n\n"
+            "### Verification Steps\n"
+            "- Tests pass.\n\n"
+            f"Reviewed-Commit: {commit}\n\n"
+            "<!-- review-data:\n"
+            "{\n"
+            '  "schema_version": "1.0",\n'
+            '  "reviewer": "adversarial-reviewer",\n'
+            f'  "commit_sha": "{commit}",\n'
+            '  "verdict": "CLEAN",\n'
+            '  "findings": []\n'
+            "}\n"
+            "-->\n\n"
+            "============================================================\n"
+            "Status: Verdict: CLEAN\n"
+            "_Posted by Claude Code (AI agent) --- not written by a human._"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, f"Expected valid report, got: {reason}")
+        self.assertTrue(is_clean, f"Expected clean report, got: {reason}")
+
     def test_validate_review_output(self):
         commit = "12345678abcdef00"
         valid = (

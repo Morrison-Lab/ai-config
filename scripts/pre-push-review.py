@@ -350,7 +350,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
         # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
-        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|[^\n]*verdict[^\n]*|\s*))*\Z", unfenced_report):
+        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+|\s*))*\Z", unfenced_report):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)

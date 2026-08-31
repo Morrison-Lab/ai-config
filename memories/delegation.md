@@ -31,7 +31,7 @@ independence-first order,
 not this cost-first ladder.
 Three of those destinations are separately-billed plans with usage windows
 (`codex`, `agy`, and OpenCode's `opencode-go/*` tier);
-`opencode`'s free/local tiers cost nothing,
+`opencode`'s hosted-free tier costs nothing,
 and `openrouter` draws a prepaid balance rather than a window.
 Claude stays the orchestrator ---
 writes prompts, assembles stages, integrates outputs ---
@@ -42,14 +42,14 @@ not occasional use.
 
 **Three of these are metered plans, and the rule is to try all three before
 Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
-`opencode`'s free and local tiers sit outside that window logic entirely, and
+`opencode`'s hosted-free tier sits outside that window logic entirely, and
 `openrouter` is a prepaid balance rather than a window at all.**
 
 | CLI / Provider | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
-| `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) + local (`ollama/*`) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
+| `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
 
 Headless dispatch: `agy --print="<prompt>" [--effort low]`,
@@ -93,27 +93,26 @@ then fall back to Claude until a window resets.
 "Delegate first" means the current window,
 not abandoning Claude permanently.
 
-**`opencode`'s free and local tiers have no window to exhaust,
+**`opencode`'s hosted-free tier has no window to exhaust,
 which changes where they sit rather than just adding a row.**
-Those two tiers cost nothing,
+That tier costs nothing,
 so for work a small model can actually do it goes *ahead* of codex and agy
 rather than behind them: there is no budget to conserve by skipping it.
 Capability is the binding constraint in its place,
 and it is unmeasured here ---
-the local ids carry parameter counts from 2B to 30B,
-and the hosted ids are preview names
+the hosted ids are preview names
 nobody has benchmarked against this corpus's work.
-**The discriminator between the free and local tiers is the provider
-prefix, not a `-free` id suffix.**
+**The discriminator between hosted tiers is the provider prefix,
+not a `-free` id suffix.**
 See [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s
-"Hosted-free versus local: the routing rule" section
+"Hosted-only routing rule" section
 for the `opencode models` evidence and exact count.
 
 **A third OpenCode tier, `opencode-go/*`, is a $10/mo windowed
-subscription** rather than a free or local one, active and verified
+subscription** rather than a free one, active and verified
 2026-08-25.
 It behaves like `codex`'s window --- exhaust it before falling back ---
-not like the free/local tiers above.
+not like the hosted-free tier above.
 
 **A fourth destination, OpenRouter, is neither windowed nor free: it draws
 on a prepaid credit balance**, active and verified 2026-08-25.
@@ -129,25 +128,19 @@ not spending OpenRouter credit before those free tiers and windows are
 exhausted.
 One class of OpenRouter model is worth the balance: anonymized frontier
 **stealth previews**, unbenchmarked but plausibly capable of judgment
-work the free/local tiers cannot do --- see
+work the hosted-free tier cannot do --- see
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A
 third destination" section for the activation mechanics, the stealth
 roster query, and the data-sensitivity rule (a hosted destination's
 payload leaves the machine regardless of billing tier, so a data
 trigger forbids `openrouter/*` exactly as it forbids `opencode/*` and
 `opencode-go/*`).
-The local (`ollama/*`) tier is also the only destination anywhere in this
-ladder that *can* keep the payload on the machine,
-so it is the one route for work whose data must not leave.
-That is a property of the endpoint its provider entry is configured with,
-not of the `ollama/` prefix,
-which reads the same when the `baseURL` points at a LAN box or a remote
-`OLLAMA_HOST`.
-So the claim is licensed by the loopback check in that skill's step 1
-rather than by the model id,
-and the check refuses rather than passing when the config cannot be read.
+When work must not leave the machine, do not delegate it to a model unless the
+repository explicitly approves a hosted destination.
+Use deterministic tools
+or handle it in the authoring session instead.
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the
-mechanics and the hosted-versus-local routing rule.
+mechanics and the hosted-only routing rule.
 The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
 `delegate-to-codex` operationalizes the codex mechanics ---
 background runner plus DONE-marker poll, `--output-schema`,
@@ -284,7 +277,7 @@ The next dispatch attempt then reads a brief file that was never written, and fa
 - **Don't:** bundle a file-write with a dispatch that might be denied --- assume nothing in a denied compound call executed, including segments before the denied one.
 - **Don't:** reach for an interactive-trust or standing-permission flag (`--trust`, `--dangerously-skip-permissions`, `--mode accept-edits`) to make a headless dispatch "just work" --- the plain non-interactive form is both sufficient and classifier-approved.
 
-## "Local" means CLI-reachable, not on-device --- and the preference is a standing default
+## "Local" means CLI-reachable, not on-device --- and local inference is prohibited
 
 Directive from the user, 2026-08-27, given across three messages:
 "use cheap and free local models when feasible";
@@ -299,39 +292,37 @@ I don't care if they run on this computer or in the cloud."
 - **Do (inferred):** apply that preference as this file's own ladder:
   CLI-reachable budgets first ---
   `codex`'s ChatGPT-plan window,
-  `opencode`'s free hosted tier plus Zen plus local Ollama,
+  `opencode`'s free hosted tier plus Zen,
   and the `agy --print` window ---
   then OpenRouter's prepaid credit balance,
   then a cheap Claude tier (haiku, then sonnet) ---
   reserving the conductor's own tier for judgment-heavy work.
-  Only `opencode`'s hosted-free and local tiers are actually free;
+  Only `opencode`'s hosted-free tier is actually free;
   `codex` and `agy` stay the metered plans this file already calls
   them,
   placed ahead of Claude because their cost is sunk within the
   current window, not because they cost nothing.
   Within the CLI-reachable group itself, no new ordering is implied
   beyond what the rest of this file already sets:
-  `opencode`'s free and local tiers have no window to exhaust,
-  so they go ahead of the metered `codex` and `agy` windows,
+  `opencode`'s hosted-free tier has no window to exhaust,
+  so it goes ahead of the metered `codex` and `agy` windows,
   per the "no window to exhaust" paragraph above.
-- **Do (inferred):** read "local" as CLI-reachable everywhere in this
-  ladder EXCEPT the data-sensitivity trigger,
-  where on-device residency --- not CLI-reachability --- is still the
-  deciding factor.
-  A cloud-hosted model reached through a local CLI
-  (`codex`, `agy`, OpenCode's hosted/Zen tiers, OpenRouter)
-  still sends its payload off-machine,
-  so only the `ollama/*` tier's loopback check (see above) satisfies a
-  "must not leave this machine" requirement ---
-  this section widens what counts as "local" for the cost-ordering
-  preference, not for that separate residency check.
+- **Do (inferred):** read "local" as CLI-reachable for cost ordering only.
+  A hosted model reached through a local CLI still sends its payload
+  off-machine.
+  If data must stay on the machine and no hosted destination is
+  approved, keep the work in the authoring session and use deterministic tools.
 - **Don't (inferred):** default a dispatch to the inherited conductor
   tier because the cheaper route costs setup effort ---
   staging a brief file, checking a window's remaining budget, or
   probing an unmeasured destination is the ladder's ordinary cost of
-  entry, not a reason to skip the cheaper route ---
-  and don't skip a free CLI merely because its model happens to run
-  off-device rather than on this machine.
+  entry, not a reason to skip the cheaper hosted route.
+- **Don't (user directive, 2026-08-30):** run Ollama, LM Studio, llama.cpp,
+  or another local/on-device model.
+  Local inference can crash the user's computer.
+  This later directive supersedes the 2026-08-27 inclusion of local
+  Ollama in the cost ladder without changing the CLI-reachable meaning of
+  "local" for hosted tools.
 - **Don't (inferred):** route work to a cheap tier where it
   predictably fails for a small model ---
   adversarial review, long-list triage, or any of the judgment-heavy

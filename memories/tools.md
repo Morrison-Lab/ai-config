@@ -32,7 +32,7 @@
 
 [`memories/delegation.md`](delegation.md) is the canonical catalog of active
 subscriptions, balances, and delegation entrypoints (`codex`, OpenCode Go,
-OpenCode Zen free, local Ollama, OpenRouter, `agy`) --- read it there rather
+OpenCode Zen free, OpenRouter, `agy`) --- read it there rather
 than duplicating the table here.
 That includes the OpenRouter activation mechanics
 (the `~/.config/opencode/opencode.jsonc` provider entry
@@ -586,15 +586,13 @@ what lets `compact` run at all against a suspended VM.
 A VM already shut down cleanly needs neither `--force` nor a `.mem` deletion.
 
 **Everything else, in rough order of yield.**
-`~/.ollama` holds multi-GB models that `ollama list` dates by last use, and
-`ollama rm` reclaims immediately with a `pull` to undo it.
 Chrome keeps a 4 GB on-device model under
 `Application Support/Google/Chrome/OptGuideOnDeviceModel`, separate from
 its profile and cache directories.
 Outlook's local mail store under `Group Containers/UBF8T346G9.Office/Outlook`
 shrinks only by narrowing the sync window in Outlook's own settings.
 Regenerable dev caches worth sweeping together: `~/.cache/codex-runtimes`,
-`~/.cache/puppeteer`, `~/.cache/uv`, `~/Library/Caches/{copilot,github-copilot-sdk,ollama}`,
+`~/.cache/puppeteer`, `~/.cache/uv`, `~/Library/Caches/{copilot,github-copilot-sdk}`,
 plus `npm cache clean --force` and `brew cleanup --prune=all`.
 
 ## Two shell gotchas that make a path silently unreachable

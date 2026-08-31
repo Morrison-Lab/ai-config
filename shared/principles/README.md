@@ -431,6 +431,12 @@ instructions outrank repository defaults, scoped subsystem configs
 outrank top-level policies, and specific types and handlers outrank
 generic fallbacks in code.
 
+Prefer-optionality-over-removal complements KISS, least-flexible-tool, and simplify:
+while least-flexible-tool guides authoring new code without speculative flexibility,
+and simplify/tidy prune dead or unreferenced code paths,
+prefer-optionality-over-removal protects active capabilities with legitimate callers
+from being deleted outright when a default behavior needs improvement.
+
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves
 maintainability; purity and fail-fast serve reliability — a pure core

@@ -44,6 +44,26 @@ Wholesale deletion is legitimate when:
 
 Outside those exceptions, prefer optionality over outright removal.
 
+## Boundary with least-flexible-tool, simplify, and KISS
+
+This principle does not contradict [`least-flexible-tool`](../coding/least-flexible-tool.md),
+[`simplify`](../../skills/simplify/SKILL.md), or KISS:
+
+- **`least-flexible-tool`** governs *authoring new code*:
+  choose the narrowest construct that meets current requirements rather than speculating on unneeded flexibility.
+- **`simplify` and `tidy`** govern *dead or redundant code*:
+  pruning unused abstractions, unreachable branches, and obsolete fallbacks remains mandatory.
+- **`prefer-optionality-over-removal`** governs *active capabilities with legitimate callers*:
+  when an issue reports that a default behavior is problematic in a specific scenario,
+  do not resolve the issue by deleting the capability entirely if other callers or workflows rely on it.
+  Make the improved behavior the default, and retain the alternative behavior as a configurable option.
+
+## Provenance
+
+(User directive, 2026-08-31: "never remove functionality when you can add optionality instead",
+originating from `health-analytics-core/HACtions` MR !54 / issue #74 where merge-commit review skipping
+was made opt-in via `HAC_SKIP_MERGE_COMMITS=true` rather than deleted outright.)
+
 ## Do / Don't
 
 - **Do:** make the improved behavior the default while preserving the previous capability behind an opt-in toggle.

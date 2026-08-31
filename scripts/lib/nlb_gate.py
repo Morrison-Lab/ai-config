@@ -47,16 +47,16 @@ VENDOR_PIN = SCRIPTS_DIR / "vendor" / "gha-check-new-line-breaks.pin"
 VALIDATE_YML = REPO_ROOT / ".github" / "workflows" / "validate.yml"
 
 # The composite action this repo pins. A comment in validate.yml names an
-# older SHA; the capture is a full action ref on a `uses:` line so
+# older SHA; the capture is a full 40-char object id on a `uses:` line so
 # that comment cannot match.
 _USES_RE = re.compile(
-    r"(?m)^\s+uses:\s+Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@([A-Za-z0-9_.-]+)\b"
+    r"(?m)^\s+uses:\s+Morrison-Lab/gha/check-new-line-breaks@([0-9a-f]{40})\b"
 )
 
 # Same action reference, anchored to the bare `uses:` *value* a YAML parse
 # hands back (no leading whitespace or `uses:` key to match past), for
 # `parse_ci_nlb_with`'s step lookup below.
-_USES_VALUE_RE = re.compile(r"^Morrison-Lab/gha/\.github/workflows/check-new-line-breaks\.yml@[A-Za-z0-9_.-]+\b")
+_USES_VALUE_RE = re.compile(r"^Morrison-Lab/gha/check-new-line-breaks@[0-9a-f]{40}\b")
 
 _CHECKER: ModuleType | None = None
 
@@ -70,13 +70,13 @@ class NLBSplitError(RuntimeError):
 
 
 def parse_ci_nlb_sha(validate_yml: Path | None = None) -> str:
-    """Return the action ref `validate.yml` pins for the NLB action."""
+    """Return the 40-char SHA `validate.yml` pins for the NLB action."""
     path = VALIDATE_YML if validate_yml is None else validate_yml
     text = path.read_text(encoding="utf-8")
     matches = _USES_RE.findall(text)
     if not matches:
         raise NLBPinError(
-            f"{path}: no `uses: Morrison-Lab/gha/check-new-line-breaks@<ref>` line"
+            f"{path}: no `uses: Morrison-Lab/gha/check-new-line-breaks@<40-char-sha>` line"
         )
     unique = set(matches)
     if len(unique) > 1:
@@ -116,16 +116,13 @@ def parse_ci_nlb_with(validate_yml: Path | None = None) -> dict[str, object]:
     for job in (doc.get("jobs") or {}).values():
         if not isinstance(job, dict):
             continue
-        uses = job.get("uses")
-        if isinstance(uses, str) and _USES_VALUE_RE.match(uses):
-            matches.append(job.get("with") or {})
         for step in job.get("steps") or []:
             uses = step.get("uses") if isinstance(step, dict) else None
             if isinstance(uses, str) and _USES_VALUE_RE.match(uses):
                 matches.append(step.get("with") or {})
     if not matches:
         raise NLBPinError(
-            f"{path}: no step `uses: Morrison-Lab/gha/check-new-line-breaks@<ref>` found"
+            f"{path}: no step `uses: Morrison-Lab/gha/check-new-line-breaks@<40-char-sha>` found"
         )
     if len(matches) > 1:
         raise NLBPinError(
@@ -241,15 +238,15 @@ def load_nlb_config(
 
 
 def read_vendor_pin(pin_path: Path | None = None) -> str:
-    """Return the action ref recorded next to the vendored checker.
+    """Return the git SHA recorded next to the vendored checker.
 
-    The pin file is two lines: the action ref, then the sha256 of
+    The pin file is two lines: the 40-char object id, then the sha256 of
     the vendored script at that id. `assert_pin_matches_ci` checks both.
     """
     path = VENDOR_PIN if pin_path is None else pin_path
     lines = [ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    if not lines or not re.fullmatch(r"[A-Za-z0-9_.-]+", lines[0]):
-        raise NLBPinError(f"{path}: expected a action ref on line 1, got {lines[:1]!r}")
+    if not lines or not re.fullmatch(r"[0-9a-f]{40}", lines[0]):
+        raise NLBPinError(f"{path}: expected a 40-char SHA on line 1, got {lines[:1]!r}")
     return lines[0]
 
 
@@ -284,7 +281,7 @@ def assert_pin_matches_ci(
 
     Two checks, both required:
 
-    - the pin's action ref equals the `uses:` SHA in `validate.yml`
+    - the pin's git SHA equals the `uses:` SHA in `validate.yml`
     - the pin's sha256 equals the vendored file's bytes
 
     The first catches a bumped action pin with a stale vendor copy.

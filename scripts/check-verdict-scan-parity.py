@@ -88,6 +88,11 @@ VOCAB = ["Needs more work", "Changes requested", "Blocking", "Rejected",
          "**[Defect]** Needs more work", "**Location:** a.py:1",
          # ai-config#2668's two mechanisms, absent from this corpus when that
          # change first ran the tool -- its zero was a coverage statement.
+         # These five new entries (two here, two in NEGATION, one in LEAD)
+         # roughly double the sweep, since the product crosses every list
+         # with every other: 338,688 raw combinations before, 688,128
+         # after. Kept, because dropping them makes the instrument quieter
+         # rather than better; the runtime is tracked as ai-config#2702.
          "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**)",
          "round-2 blocking findings (x overclaim, y.qmd caption) are "
          "resolved by this round's diff"]

@@ -3291,6 +3291,39 @@ def main() -> int:
             "no verdict section, so " + label + " is NOT stripped",
             checker.classify_verdict(unstated) == "not-clean",
         )
+    # These four reach _RERAISE_VOCAB and the ones above it do not.
+    # The citation regex requires its closing paren to be followed
+    # IMMEDIATELY by clause punctuation, so a body continuing ") which
+    # must ..." never matches the regex at all and is refused before the
+    # veto is consulted. Those tests are still correct, but they pass on
+    # the lookahead rather than on the vocabulary -- verified by
+    # mutation: replacing _RERAISE_VOCAB with a never-matching pattern
+    # leaves them green, and flips every case below to clean.
+    for label, veto_shape in (
+        ("comma then 'still remains'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "it still remains a blocker."),
+        ("comma then 'must be fixed'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
+         "which must be fixed before merge."),
+        ("semicolon then 'not been addressed'",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**); "
+         "it has not been addressed."),
+        # The veto scans the paragraph, so a re-raise in the NEXT
+        # sentence is seen; a sentence-bounded scan cleared this one.
+        ("a period then 'remains open' in the next sentence",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**). "
+         "It remains open."),
+    ):
+        body = veto_shape + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "the veto refuses the strip on " + label,
+            checker.classify_verdict(body) == "not-clean",
+        )
     # A verdict heading inside a FENCE does not license the strip. The
     # gate runs before fences are removed, and a review of this file
     # quotes that heading in a code block.

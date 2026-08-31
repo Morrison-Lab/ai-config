@@ -954,9 +954,14 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         sentence_start = _sentence_starts[
             bisect.bisect_right(_sentence_starts, m.start()) - 1
         ]
+        # Forward to the end of the PARAGRAPH, not the sentence. A
+        # re-raise often lands in the next sentence ("(posted ...). It
+        # remains open."), which a sentence-bounded scan cannot see.
+        # Widening the scan can only make the veto fire more often, so it
+        # keeps more citations -- the fail-closed direction.
         tail = m.string[m.end():]
-        forward = _SENTENCE_END.search(tail)
-        sentence_tail = tail[:forward.end()] if forward else tail
+        paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", tail)
+        sentence_tail = paragraph.group(0) if paragraph else tail
         context = " ".join(
             (m.string[sentence_start:m.start()], m.group("keep"),
              sentence_tail)

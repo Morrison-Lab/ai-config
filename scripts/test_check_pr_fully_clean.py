@@ -4248,11 +4248,13 @@ Found defects.
     check("extract_structured_review: ignores a payload inside an indented code block",
           checker.extract_structured_review(indented_struct) is None)
 
-    # F11: the short-prefix structured commit_sha branch had no test -- both
-    # existing SHA tests used a full 40-character exact match, which
-    # `sha_lower in body_lower` decides on its own, so `is_struct_sha_match`
-    # was never the deciding term. These call check_review_comments with the
-    # full sha ABSENT from the body, so only the structured prefix can match.
+    # The structured `commit_sha` term was REMOVED from `is_sha_match` as
+    # provably dead: `sha_short` is the target sha's own 7-character prefix, so
+    # any payload `commit_sha` long enough to be accepted contains `sha_short`,
+    # which the body-substring disjunct already matches. These pin the
+    # behaviour that remains -- a payload naming a prefix of HEAD matches
+    # because that prefix is in the body, and one naming a different sha
+    # entirely does not.
     prefix_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
 
     def _prefix_payload(sha_value):
@@ -4273,15 +4275,15 @@ Found defects.
 
     with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("3a7b9c1"))):
         ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
-        check("check_review_comments: a 7-character structured commit_sha prefix matches HEAD", ok)
+        check("check_review_comments: a payload naming a 7-character prefix of HEAD matches", ok)
+
+    with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("deadbeef1234"))):
+        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
+        check("check_review_comments: a payload naming a different sha does not match", not ok)
 
     with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("3a7b9"))):
         ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
-        check("check_review_comments: a structured commit_sha under 7 characters does not match", not ok)
-
-    with patch.object(checker, "run_cmd", return_value=json.dumps(_prefix_payload("deadbee"))):
-        ok, _ = wrapped_check_review_comments("123", prefix_sha, "octocat/example", quorum=1)
-        check("check_review_comments: a 7-character prefix of a DIFFERENT sha does not match", not ok)
+        check("check_review_comments: a payload naming fewer than 7 characters does not match", not ok)
 
     # A finding object using the persona's own ReportFindings key (`summary`)
     # rather than `message` must still name what it found.
@@ -4329,6 +4331,17 @@ Found defects.
                   + payload_block)
     check("classify_verdict: an unfenced trailing payload is still authoritative",
           checker.classify_verdict(real_block) == "not-clean")
+
+    # `review-data:` as a REVIEW_BODY_MARKERS entry survived deletion with
+    # every suite green. It is what stops a payload-only comment from being
+    # excluded as a non-review notice.
+    payload_only = ('<!-- review-data: {"verdict": "CLEAN", "findings": []} -->')
+    check("REVIEW_BODY_MARKERS: carries a review-data entry",
+          "review-data:" in checker.REVIEW_BODY_MARKERS)
+    check("has_review_body_marker: a payload-only body is a review body",
+          checker.has_review_body_marker(payload_only))
+    check("is_non_review_notice: a dispatch notice carrying a payload is not excluded",
+          checker.is_non_review_notice("Claude Review Dispatched\n\n" + payload_only) is False)
 
     # Code fence citation guard (quoted structured review in markdown fence is ignored)
     quoted_struct = """

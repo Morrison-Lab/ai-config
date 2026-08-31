@@ -414,9 +414,16 @@ Three rules govern how the payload is read, and each exists because its absence 
 - **Findings block regardless of the stated verdict.**
   A payload that enumerates findings and then labels itself `CLEAN` is contradicting itself, and the safe reading of a contradiction is the blocking one.
 
-Both consumers read the payload through one extractor, [`scripts/lib/review_payload.py`](../../scripts/lib/review_payload.py): [`scripts/check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) for a comment posted to a PR, and [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) for a report produced locally.
+Two consumers read the payload through one extractor, [`scripts/lib/review_payload.py`](../../scripts/lib/review_payload.py): [`scripts/check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) for a comment posted to a PR, and [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) for a report produced locally.
 They score the same artifact, so they must agree, and they did not: the local parser stripped HTML comments before every check, so a report whose payload said `NOT_CLEAN` parsed as `Verdict: CLEAN` locally while the PR-side consumer scored it blocking.
 Markdown parsing remains the fallback when no payload is present.
+
+**A third consumer does not read it yet, and it is the one that blocks the push.**
+[`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py)'s `parse_report` blanks HTML comments before parsing, so the payload is invisible to it.
+Measured 2026-08-31: a report stating `Verdict: Ready for merge` alongside a `NOT_CLEAN` payload carrying one finding parses there as `clean`.
+So the three bullets above bind the two scripts, and the hook still decides on the prose verdict alone --- write the prose verdict truthfully rather than relying on the payload to correct it.
+Tracked as [ai-config#2749](https://github.com/Morrison-Lab/ai-config/issues/2749);
+once the hook reads the payload, this paragraph goes away.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

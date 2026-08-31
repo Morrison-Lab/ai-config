@@ -208,14 +208,77 @@ Actual report follows:
                 self.assertFalse(payload_is_clean(payload))
                 self.assertEqual(payload_findings(payload), [])
 
-    def test_absent_findings_key_lets_the_verdict_decide(self):
+    def test_an_absent_findings_key_never_clears(self):
+        """An omitted required key is a commoner model failure than a
+        wrong-typed one, so it gets the same treatment: it cannot clear.
+        A not-clean verdict still blocks on its own.
+        """
         clean = extract_structured_review('<!-- review-data: {"verdict": "CLEAN"} -->')
-        self.assertFalse(payload_findings_malformed(clean))
-        self.assertTrue(payload_is_clean(clean))
+        self.assertFalse(payload_findings_malformed(clean),
+                         "an absent key is not the same as a malformed one")
+        self.assertFalse(payload_is_clean(clean))
         self.assertFalse(payload_is_blocking(clean))
         blocking = extract_structured_review('<!-- review-data: {"verdict": "NOT_CLEAN"} -->')
         self.assertTrue(payload_is_blocking(blocking))
         self.assertFalse(payload_is_clean(blocking))
+
+    def test_a_payload_must_begin_a_line(self):
+        """Masking code regions is not enough on its own.
+
+        A payload written mid-sentence in ordinary prose, or behind a `> `
+        blockquote marker (what GitHub's Quote reply emits), sits in no code
+        region -- and was read as the comment's authoritative verdict, giving a
+        false CLEAN in one direction and an undischargeable finding in the
+        other.
+        """
+        clean = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
+        blocking = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+                    '[{"file": "x.py", "message": "old"}]} -->')
+        for label, body in {
+            "mid-sentence": f"Reviewers must end with {clean} so the gate can read it.",
+            "blockquote": f"> {clean}",
+            "list item": f"- {clean}",
+            "narrated earlier round": f"Round 1 emitted {blocking} which is now fixed.",
+        }.items():
+            with self.subTest(placement=label):
+                self.assertIsNone(extract_structured_review(body))
+
+        for label, body in {
+            "alone": clean,
+            "after a blank line": f"### Verdict: Ready for merge\n\n{clean}",
+            "at the very start": f"{clean}\n\ntrailing prose",
+        }.items():
+            with self.subTest(placement=label):
+                self.assertIsNotNone(extract_structured_review(body))
+
+    def test_a_clean_payload_needs_an_explicit_empty_findings_list(self):
+        """Both persona files and build_review_prompt say a CLEAN payload
+        requires an empty `findings` array; nothing enforced it, so a payload
+        that simply omitted the key cleared.
+        """
+        omitted = extract_structured_review('<!-- review-data: {"verdict": "CLEAN"} -->')
+        self.assertIsNotNone(omitted)
+        self.assertFalse(payload_is_clean(omitted))
+        explicit = extract_structured_review(
+            '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->')
+        self.assertTrue(payload_is_clean(explicit))
+
+    def test_fence_span_failure_is_not_swallowed(self):
+        """`except Exception: fenced_lines = set()` disabled fence masking
+        entirely on any failure -- the UNDER-masking direction, silently.
+        """
+        import scripts.lib.review_payload as module
+        original = module.find_fence_spans
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("fence scan failed")
+
+        module.find_fence_spans = boom
+        try:
+            with self.assertRaises(RuntimeError):
+                code_region_mask("```\nx\n```\n")
+        finally:
+            module.find_fence_spans = original
 
     def test_empty_or_none_inputs(self):
         self.assertIsNone(extract_structured_review(""))

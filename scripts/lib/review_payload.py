@@ -68,17 +68,19 @@ def code_region_mask(body: str) -> bytearray:
     list continuations -- for that reason.
     """
     mask = bytearray(len(body))
-    try:
-        # swallow_unclosed=True, matching check-pr-fully-clean.py's own call:
-        # the default records only an unclosed fence's OPENER line and leaves
-        # its interior live, which breaks this function in both directions --
-        # a truncated review's quoted CLEAN template counts as a real verdict,
-        # and a quoted NOT_CLEAN payload mints a finding no ARD round can
-        # discharge (the ai-config#2482 class).
-        fenced, _, orphans = find_fence_spans(body, swallow_unclosed=True)
-        fenced_lines = set(fenced) | set(orphans)
-    except Exception:
-        fenced_lines = set()
+    # NOT wrapped in try/except.  Swallowing an exception here would set
+    # `fenced_lines` empty and so disable fence masking entirely for that body
+    # -- the UNDER-masking direction this docstring calls unsafe, silently and
+    # with nothing red.  The sibling call in `check-pr-fully-clean.py` is
+    # unwrapped for the same reason (`shared/principles/fail-fast.md`).
+    #
+    # swallow_unclosed=True, matching that sibling: the default records only an
+    # unclosed fence's OPENER line and leaves its interior live, which breaks
+    # this function in both directions -- a truncated review's quoted CLEAN
+    # template counts as a real verdict, and a quoted NOT_CLEAN payload mints a
+    # finding no ARD round can discharge (the ai-config#2482 class).
+    fenced, _, orphans = find_fence_spans(body, swallow_unclosed=True)
+    fenced_lines = set(fenced) | set(orphans)
 
     offset = 0
     for lineno, line in enumerate(body.split("\n")):
@@ -123,6 +125,17 @@ def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
     found: Optional[Dict[str, Any]] = None
     for m in _PAYLOAD_RE.finditer(body):
         if mask[m.start()]:
+            continue
+        # The payload must BEGIN A LINE, at column zero.  Masking code regions
+        # is not enough on its own: a payload written mid-sentence in ordinary
+        # prose ("Reviewers must end with <!-- review-data: ... -->") or behind
+        # a `> ` blockquote marker (what GitHub's Quote reply emits) sits in no
+        # code region at all, and was read as the comment's authoritative
+        # verdict -- producing a false CLEAN in one direction and, from a
+        # narrated earlier round, an undischargeable finding in the other.
+        # The contract puts the payload on its own line, so requiring that is
+        # free, and it is a property of position rather than of wording.
+        if m.start() != 0 and body[m.start() - 1] != "\n":
             continue
         try:
             data = json.loads(m.group(1).strip())
@@ -179,11 +192,21 @@ def payload_is_blocking(payload: Optional[Dict[str, Any]]) -> bool:
 
 
 def payload_is_clean(payload: Optional[Dict[str, Any]]) -> bool:
-    """True when the payload affirmatively clears: clean verdict, no findings."""
+    """True when the payload affirmatively clears.
+
+    Requires all three: a clean verdict, a ``findings`` key that is PRESENT and
+    a list, and that list empty.  Requiring presence is the point -- both
+    persona files and ``build_review_prompt`` tell the reviewer that "a CLEAN
+    payload requires an empty findings array", and nothing enforced it, so a
+    payload that simply omitted the key cleared.  An omitted required key is a
+    commoner model failure than a wrong-typed one, and treating the two
+    differently is the inconsistency ``payload_findings_malformed`` was added
+    to remove.
+    """
     if not payload:
         return False
-    if payload_findings_malformed(payload):
+    if not isinstance(payload.get("findings"), list):
         return False
-    if payload_findings(payload):
+    if payload["findings"]:
         return False
     return normalize_verdict(payload.get("verdict")) in CLEAN_VERDICTS

@@ -221,6 +221,37 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
+    def test_persona_contract_path_also_honours_the_payload(self):
+        """`_structured_contradiction` guards TWO clean paths, and only the
+        local-contract one was covered -- deleting the persona-path call left
+        every suite green.
+        """
+        commit = "cccccccccccccccccccccccccccccccccccccccc"
+        report = (
+            "## Summary\n\nLooks fine.\n\n"
+            "## Findings\n\nNone.\n\n"
+            f"### Verdict: Ready for merge\n\nReviewed-Commit: {commit}\n\n"
+            '<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+            '[{"file": "a.py", "message": "boom"}]} -->'
+        )
+        is_valid, is_clean, reason = reviewer._parse_persona_verdict(
+            report, expected_commit_sha=commit)
+        self.assertFalse(is_clean, f"persona path must honour a blocking payload: {reason}")
+        self.assertIn("Contradictory output", reason)
+
+    def test_malformed_findings_reason_names_the_actual_cause(self):
+        commit = "12345678abcdef00"
+        report = self._clean_report(commit, tail=(
+            '\n\n<!-- review-data: {"verdict": "CLEAN", '
+            '"findings": "3 defects listed above"} -->'))
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(
+            report, expected_commit_sha=commit)
+        self.assertFalse(is_valid)
+        self.assertFalse(is_clean)
+        self.assertIn("not a list", reason)
+        self.assertNotIn("verdict CLEAN", reason,
+                         "the reason must not report the payload's verdict as the cause")
+
     def test_structured_payload_blocks_a_clean_prose_verdict(self):
         """HTML comments are stripped before every check, so the payload the prompt
         asks for was never validated -- the local parser and
@@ -317,7 +348,14 @@ class TestPrePushReview(unittest.TestCase):
         )
         is_valid, _, reason = reviewer.parse_review_verdict(short_sha_report, expected_commit_sha="b2c4191f")
         self.assertFalse(is_valid)
-        self.assertIn("mismatch", reason)
+        # Rejected as MISSING rather than as a mismatch, since `_FINGERPRINT_RE`
+        # bounds the sha at `{7,40}` (as the pre-push hook's own REVIEWED_COMMIT
+        # does) and so does not harvest a one-character value at all. Either
+        # reason is a rejection; the assertion names both so a future change of
+        # mechanism is visible rather than silently re-passing.
+        self.assertTrue(
+            "mismatch" in reason or "Missing required" in reason,
+            f"a one-character fingerprint must be rejected, got: {reason}")
 
         # NOT APPROVED, DISAPPROVED, Never approve, Do not approve are NOT clean
         for neg in [

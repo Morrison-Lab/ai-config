@@ -21,6 +21,7 @@ from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
     payload_findings,
+    payload_findings_malformed,
     payload_is_blocking,
     normalize_verdict,
 )
@@ -204,21 +205,40 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
-# The fingerprint line.  Derived from `hooks/no-push-without-self-review.py`'s
-# REVIEWED_COMMIT -- the pattern the persona file names as authoritative -- so
-# every form that hook accepts is accepted here: optional bold markers on either
-# side of the colon, and an optional backtick around the sha.  Two local
-# additions: a space instead of a hyphen in the label, and LEADING indentation,
-# because `build_review_prompt` renders the line three spaces in (see the
-# structure block below) and an `^`-anchored pattern rejected exactly the layout
-# this file asks for.
+# The fingerprint line.  Adapted from `hooks/no-push-without-self-review.py`'s
+# REVIEWED_COMMIT, NOT a superset of it -- two differences are deliberate
+# narrowings and two are additions:
+#
+#   NARROWER: `(?m)^[ \t]*` requires the line to START with the label (leading
+#   indentation aside).  The hook's pattern is unanchored, so it also matches
+#   `The report ends with Reviewed-Commit: <sha>`, a `> ` blockquote, and a
+#   `- ` list item.  Those are mentions, and this file uses the match POSITION
+#   to decide where trailing content begins, so a mention mid-prose would move
+#   that boundary.
+#   NARROWER: the sha is length-bounded `{7,40}`, as the hook bounds it.  An
+#   earlier cut here dropped the bound and accepted `Reviewed-Commit: abc`.
+#   WIDER: a space is accepted instead of the hyphen, and LEADING indentation
+#   is tolerated -- `build_review_prompt` renders the line three spaces in (see
+#   the structure block below), so an `^`-only anchor rejected exactly the
+#   layout this file asks the reviewer for.
+#
+# Bold markers on either side of the colon and a backticked sha are accepted,
+# as in the hook.
 #
 # ONE pattern, used by both the SHA harvest and the trailing-content scan below.
 # As two literals they drifted apart within a single session: a loosening
 # applied to the harvest alone left the scan matching nothing on the very forms
 # the harvest had started accepting.
 _FINGERPRINT_RE = re.compile(
-    r"(?im)^[ \t]*\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]+)`?"
+    r"(?im)^[ \t]*\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]{7,40})`?"
+)
+
+
+# The verdict alternative of `_TRAILING_AFTER_FINGERPRINT` below, with the
+# phrase captured, so a restated verdict after the fingerprint is EVALUATED
+# rather than merely permitted in that position.
+_TRAILING_VERDICT_RE = re.compile(
+    r"(?i)^\s*(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+?)\s*$"
 )
 
 
@@ -227,14 +247,6 @@ _FINGERPRINT_RE = re.compile(
 # a stopping-point declaration, or a restated verdict.  Anything else -- a
 # chatty sign-off, a smuggled "actually final verdict" line -- means the
 # fingerprint is not last, which is what the check exists to establish.
-# The verdict alternative of `_TRAILING_AFTER_FINGERPRINT`, with the phrase
-# captured, so a restated verdict after the fingerprint is evaluated rather than
-# merely permitted.
-_TRAILING_VERDICT_RE = re.compile(
-    r"(?i)^\s*(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+?)\s*$"
-)
-
-
 _TRAILING_AFTER_FINGERPRINT = re.compile(
     r"(?i)^\s*(?:_?Posted by\b.*|={3,}\s*|Status:.*|\*\*Stopping Point\*\*:.*"
     r"|(?:###\s*)?(?:Summary\s+)?Verdict:.*)$"
@@ -264,11 +276,18 @@ def _structured_contradiction(report: str) -> Optional[str]:
     if not payload_is_blocking(structured):
         return None
     findings = payload_findings(structured)
-    detail = (
-        f"{len(findings)} finding(s)"
-        if findings
-        else f"verdict {normalize_verdict(structured.get('verdict'))}"
-    )
+    if payload_findings_malformed(structured):
+        # Checked FIRST: `payload_findings` folds a malformed field to `[]`, so
+        # the verdict branch would otherwise report "the payload reports verdict
+        # CLEAN" -- which is not a contradiction, and is not why it blocked.
+        detail = (
+            "a `findings` field that is present but is not a list "
+            f"({type(structured.get('findings')).__name__})"
+        )
+    elif findings:
+        detail = f"{len(findings)} finding(s)"
+    else:
+        detail = f"verdict {normalize_verdict(structured.get('verdict'))}"
     return (
         "Contradictory output: prose verdict is clean but the structured "
         f"review-data payload reports {detail}."
@@ -1047,8 +1066,8 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   \"category\": \"<kebab-case slug>\", \"message\": \"<one sentence stating the defect>\"}.",
         "   Use those key names literally -- a consumer that cannot find them reports the finding as",
         "   \"structured finding in unknown: \", which names nothing.",
-        "   Any finding listed here blocks whatever the \"verdict\" string says, so a CLEAN payload requires",
-        "   an empty \"findings\" array.)",
+        "   Any finding listed here blocks whatever the \"verdict\" string says, and a CLEAN payload",
+        "   requires an EXPLICIT empty \"findings\" array -- omitting the key does not clear.)",
         "CRITICAL: The closing '-->' of the review-data comment MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
         "CRITICAL: Emit the review-data comment as raw unfenced text. A payload inside a code fence, an inline code span, or an indented block is deliberately ignored, so a fenced payload authorizes nothing.",
     ]

@@ -2210,18 +2210,22 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         body_lower = body.lower()
         oid = item[3]
 
-        structured = extract_structured_review(body)
-        struct_sha = str(structured.get("commit_sha", "")).strip().lower() if structured else ""
+        # No structured-`commit_sha` term here.  It was provably unable to
+        # change the result: `sha_short` is the target sha's own 7-character
+        # prefix, so any payload `commit_sha` long enough to be accepted
+        # (>= 7 characters, and a prefix of the target) CONTAINS `sha_short` as
+        # a substring -- which the `sha_short in body_lower` disjunct below
+        # already matches, since the payload is part of the body.  Mutation
+        # confirmed it: deleting the term left every structured-sha test
+        # passing.  A dead disjunct that reads as a feature is worse than no
+        # feature, because the tests appear to cover it.
         sha_lower = sha.lower()
-        is_struct_sha_match = bool(
-            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha_lower or sha_lower.startswith(struct_sha))
-        )
-        # No `oid` term here: `is_sha_match` is read only in the `else:` arm
-        # below, where `oid` is falsy by construction, so an `oid` comparison
-        # can never contribute -- and writing one reads as having made formal-
-        # review OID matching case-insensitive, which `is_match = (oid == sha)`
-        # in the `if oid:` arm is not.
-        is_sha_match = bool(is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
+        # No `oid` term here either: `is_sha_match` is read only in the `else:`
+        # arm below, where `oid` is falsy by construction, so an `oid`
+        # comparison can never contribute -- and writing one reads as having
+        # made formal-review OID matching case-insensitive, which
+        # `is_match = (oid == sha)` in the `if oid:` arm is not.
+        is_sha_match = bool(sha_short.lower() in body_lower or sha_lower in body_lower)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

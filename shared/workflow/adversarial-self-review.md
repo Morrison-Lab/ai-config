@@ -455,16 +455,23 @@ other sessions, it is unbacked-up, and its merge conflict with a moving base
 grows the whole time.
 
 So the gate is per push and the review is of what that push ships.
-Once a round's fix is verified --- its own tests, its own mutation control,
-its own measurement --- push it, and let the next review run against the
-pushed head, which is the head that matters.
+Under harnesses without a strict local push guard, once a round's fix is verified ---
+its own tests, its own mutation control, its own measurement ---
+push it, and let the next review run against the pushed head, which is the head that matters.
 
-- **Do:** push a verified round and let the reviewer read the pushed head.
+**Under Claude Code**, however, the `no-push-without-self-review.py` guard
+enforces the loop strictly: a push is rejected by default if the latest review on the branch returned findings.
+The primary remedy is not to bypass the guard by pushing mid-round (which the guard blocks without an override),
+but to keep each round's scope strictly minimal.
+Address the findings, get a clean verdict on that focused diff, and push immediately.
+
+- **Do:** (Non-Claude harnesses) push a verified round and let the reviewer read the pushed head.
+- **Do:** (Claude Code) keep the scope of each fix round small so you can achieve a clean verdict quickly, and push the verified round as soon as you obtain a clean local verdict on it.
 - **Do:** batch a round's fixes into one push, per
   [`efficient-pr-babysitting`](efficient-pr-babysitting.md), rather than
   trickling or hoarding.
-- **Don't:** hold a branch until some future round returns clean --- that
-  condition recedes with every fix.
+- **Don't:** hold a branch until some future round returns clean if the harness allows pushing ---
+  that condition recedes with every fix.
 - **Don't:** read a gate on pushing as a gate on shipping any of the work.
 
 (Directive from the user, 2026-08-22, mid-session on #1911: "what are you

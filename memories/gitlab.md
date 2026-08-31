@@ -15,6 +15,12 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 - Use for MR comments, pipeline checks, CI job logs, etc.
 - `glab issue list --opened` is deprecated --- `--opened` is the default when `--closed` is not used.
   Just use `glab issue list` (no flag needed).
+- `glab mr list` also defaults to open items, and the installed CLI may reject
+  GitHub-style `--state opened` / `--state open` flags as unknown.
+  - **Do:** run `glab mr list` and `glab issue list` without a state flag for
+    open items; read each subcommand's `--help` before translating a `gh`
+    command mechanically.
+  - **Don't:** assume `gh ... list --state open` syntax transfers to `glab`.
 - `GITLAB_TOKEN` **is** read and takes precedence over the stored config (per the official `glab` README, 2026-08-26) --- an unset or wrong value in the environment silently overrides a working `glab auth login` session.
   Absent that env var, `glab` falls back to its own config at `~/Library/Application Support/glab-cli/config.yml` (macOS path);
   other platforms use their own config-dir convention.

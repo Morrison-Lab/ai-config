@@ -45,7 +45,7 @@ Choose the primary interactive harness or non-interactive sidecar CLI based on r
 | **Claude Code** | Primary Orchestrator & Conductor | Multi-turn reasoning, project context closure, git workflows, subagent management | Interactive terminal CLI; manages workflows and tool execution. |
 | **Antigravity / Gemini CLI (`agy`)** | DeepMind Ecosystem Harness & Sidecar | Antigravity plugins/skills discovery (`plugins/ai-config`), interactive UI, headless sidecar | Headless: `agy --print "<prompt>"`. **Note**: API route retired; CLI available. Keep prompt immediately after `--print`. |
 | **Codex CLI (`codex`)** | Mechanical Sidecar Executor | Heavy parallelizable read/draft/verify, bounded implementation from clear specs | `codex exec -C <repo> -s read-only - < prompt.txt`. Sunk ChatGPT plan (~5h window). |
-| **OpenCode CLI (`opencode`)** | Zero-Cost & Multi-Provider Sidecar | Mechanical edits with deterministic test suites, OpenRouter stealth previews | `opencode run --model <id>`. Free hosted tier (`opencode/*`) & Zen, or `$10/mo` Go window. |
+| **OpenCode CLI (`opencode`)** | Zero-Cost & Multi-Provider Sidecar | Mechanical edits with deterministic test suites, OpenRouter stealth previews | `opencode run -m <id>`. Free hosted tier (`opencode/*`) & Zen, or `$10/mo` Go window. |
 | **Cursor / VS Code** | Interactive Editor & Visual IDE | Interactive human editing, real-time typing autocomplete, visual diff navigation | IDE harness; probe CLI automation before relying on headless runs. |
 | **`adv` / `pre-push-review.py`** | Multi-Engine Review Harness | Adversarial self-review across diverse model families prior to pushing code | Dedicated review dispatch runner (`adv` skill). |
 

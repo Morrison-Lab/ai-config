@@ -272,6 +272,43 @@ except Exception as exc:  # covered by orphan_cases() in
     _SIBLING_ERROR = str(exc)
 
 
+def _load_review_payload():
+    try:
+        from scripts.lib.review_payload import (
+            extract_review_payload,
+            payload_is_blocking,
+        )
+        return extract_review_payload, payload_is_blocking
+    except ImportError:
+        pass
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    lib_dir = os.path.join(repo_root, "scripts", "lib")
+    path = os.path.join(lib_dir, "review_payload.py")
+    if os.path.isfile(path):
+        try:
+            if lib_dir not in sys.path:
+                sys.path.insert(0, lib_dir)
+            if repo_root not in sys.path:
+                sys.path.insert(0, repo_root)
+            spec = importlib.util.spec_from_file_location("scripts.lib.review_payload", path)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                extract_fn = getattr(module, "extract_review_payload", None) or getattr(module, "extract_structured_review", None)
+                blocking_fn = getattr(module, "payload_is_blocking", None)
+                if extract_fn and blocking_fn:
+                    return extract_fn, blocking_fn
+        except Exception:
+            pass
+    return None, None
+
+
+try:
+    _extract_review_payload, _payload_is_blocking = _load_review_payload()
+except Exception:
+    _extract_review_payload, _payload_is_blocking = None, None
+
+
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 
@@ -1211,6 +1248,13 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     last = matches[-1]
     verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
     sha = REVIEWED_COMMIT.search(blanked, last.end())
+    if verdict == "clean" and _extract_review_payload is not None and _payload_is_blocking is not None:
+        try:
+            payload = _extract_review_payload(text)
+            if _payload_is_blocking(payload):
+                verdict = "needs_work"
+        except Exception:
+            pass
     return verdict, (sha.group(1).lower() if sha else None)
 
 

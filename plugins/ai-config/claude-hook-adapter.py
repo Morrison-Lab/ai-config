@@ -224,7 +224,7 @@ def main():
         print(json.dumps({"decision": "allow"}))
         return
 
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     claude_hooks_json_path = os.path.join(repo_root, "hooks", "hooks.json")
     
     if not os.path.exists(claude_hooks_json_path):

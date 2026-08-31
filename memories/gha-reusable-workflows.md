@@ -242,3 +242,21 @@ Generic Actions-authoring material stays there.
   - **Do:** dump every input's default at once when a caller is under review, rather than looking up the one input you came for.
   - **Don't:** read an absent or commented-out input as a disabled feature.
   - **Don't:** describe a caller-side pin of an already-defaulted input as enabling something --- it records intent, which is a different and smaller claim.
+
+- **Scoping negative formatting constraints in review prompt templates ([gha#794](https://github.com/Morrison-Lab/gha/pull/794)).**
+  When designing or updating AI reviewer prompt templates that embed machine-readable payloads
+  (e.g. hidden `<!-- review-data: ... -->` HTML comments wrapped inside a collapsible `<details><summary>...</summary>...</details>` block alongside visible syntax-highlighted code fences),
+  negative formatting instructions must be scoped precisely to the marker lines rather than the entire trailing context.
+  A blanket negative constraint like *"Do NOT add text inside or after `<!-- review-data:` or `-->`"*
+  directly contradicts subsequent required elements in the template
+  (such as the visible companion code fence and closing `</details>` tag).
+  Instead, scope the rule to the delimiter lines themselves:
+  *"Keep the `<!-- review-data:` and `-->` marker lines alone with no extra text on those exact lines, and keep the JSON in the hidden comment and visible code fence identical."*
+  Additionally, when prompts instruct reviewers to provide dual representations
+  (e.g. a hidden machine-readable comment and a visible rendered code block),
+  explicitly mandate that both payloads remain synchronized
+  so automated consumers and human readers inspect identical data.
+  - **Do:** scope negative line-formatting rules ("no extra text") strictly to the marker lines themselves rather than forbidding subsequent block elements.
+  - **Do:** require that companion hidden and visible payloads (e.g., HTML comment and markdown code block) remain synchronized.
+  - **Don't:** use broad "no text after `-->`" phrasing when subsequent block elements (code fences, closing tags) are required by the template.
+  (Measured 2026-08-31 on [Morrison-Lab/gha#794](https://github.com/Morrison-Lab/gha/pull/794).)

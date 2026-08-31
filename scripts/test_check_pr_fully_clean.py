@@ -3717,6 +3717,29 @@ def main() -> int:
         "a negated resolution of prior blocking findings stays not-clean",
         checker.classify_verdict(negated_prior) == "not-clean",
     )
+    for past_word in ("prior", "earlier", "previously", "round-1"):
+        negated_short = (
+            f"### Verdict\nNo {past_word} blocking findings were resolved.\n\nDo not merge."
+        )
+        check(
+            f"short negated resolution 'No {past_word} blocking... resolved' stays not-clean (#2688)",
+            checker.classify_verdict(negated_short) == "not-clean"
+            and checker._unresolved_finding_pattern(negated_short) is not None,
+        )
+
+    # Negative controls for #2688: non-resolution "No <past-state> blocking findings"
+    # must still be exempted by NOT_CLEAN_NEGATION_PREFIX.
+    for no_findings_body in (
+        "### Verdict\nNo prior blocking findings remain.",
+        "### Verdict\nNo prior blocking findings exist.",
+        "### Verdict\nNo earlier blocking findings were found.",
+        "### Verdict\nNo previously blocking findings.",
+    ):
+        check(
+            f"non-resolution negator exempts: {no_findings_body!r} (#2688 control)",
+            checker.classify_verdict(no_findings_body) == ""
+            and checker._unresolved_finding_pattern(no_findings_body) is None,
+        )
     # A negator anywhere earlier in the sentence blocks the resolved
     # reading, including a fronted clause that negates something else.
     # This is the deliberate over-flag the blunt rule costs: judging what
@@ -3947,6 +3970,36 @@ def main() -> int:
         "an abbreviation dot does not hide an earlier negator",
         checker.classify_verdict(abbreviation_scope) == "not-clean",
     )
+
+    # Issue #2689: negators inside code spans or quotes must not be hidden
+    # from the negated-resolution check by span blanking.
+    for quote_label, span_str in (
+        ("inline single backtick", "`None of the`"),
+        ("inline double backtick", "``None of the``"),
+        ("straight double quotes", '"None of the"'),
+        ("curly double quotes", "\u201cNone of the\u201d"),
+    ):
+        masked_negation = (
+            f"### Verdict\n**Ready for merge.** {span_str} previously blocking finding is resolved."
+        )
+        check(
+            f"negator in {quote_label} prevents resolved exemption (#2689)",
+            checker.classify_verdict(masked_negation) == "not-clean"
+            and checker._unresolved_finding_pattern(masked_negation) is not None,
+        )
+
+    # Negative control for #2689: affirmative resolutions with unmasked or suffix-masked elements classify clean.
+    for clean_label, clean_body in (
+        ("unmasked resolution", "### Verdict\n**Ready for merge.** The previously blocking finding is resolved."),
+        ("quoted filename in suffix", '### Verdict\n**Ready for merge.** The previously blocking finding in "foo.py" is resolved.'),
+        ("code-span filename in suffix", "### Verdict\n**Ready for merge.** The previously blocking finding in `main.py` is resolved."),
+        ("parenthesized code span in suffix", "### Verdict\n**Ready for merge.** Both round-2 blocking findings (`auth.py`, `token.py`) are resolved."),
+    ):
+        check(
+            f"{clean_label} classifies clean (#2689 control)",
+            checker.classify_verdict(clean_body) == "clean"
+            and checker._unresolved_finding_pattern(clean_body) is None,
+        )
     # The paren-aside and character branches of the clause scan must stay
     # disjoint: an overlapping `(` was exponential backtracking (51s) on a
     # failing enumeration. Probed on _is_resolved_blocking_mention directly:

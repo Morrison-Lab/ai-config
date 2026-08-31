@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Spot AI prose tells.">
+<meta name="description" content="Audit and disable unneeded MCP tools.">
 
 <title>skill – ai-config</title>
 <style>
@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -346,23 +311,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#find-ai-tells-spot-the-telltale-signs-of-ai-written-prose" id="toc-find-ai-tells-spot-the-telltale-signs-of-ai-written-prose" class="nav-link active" data-scroll-target="#find-ai-tells-spot-the-telltale-signs-of-ai-written-prose">find-ai-tells — spot the telltale signs of AI-written prose</a>
+  <li><a href="#cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" id="toc-cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" class="nav-link active" data-scroll-target="#cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets">cut-tools — audit and disable unneeded MCP servers and toolsets</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a></li>
-  <li><a href="#the-catalog" id="toc-the-catalog" class="nav-link" data-scroll-target="#the-catalog">The catalog</a>
+  <li><a href="#core-principle" id="toc-core-principle" class="nav-link" data-scroll-target="#core-principle">Core principle</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#a.-lexical-tells-overused-words-phrases" id="toc-a.-lexical-tells-overused-words-phrases" class="nav-link" data-scroll-target="#a.-lexical-tells-overused-words-phrases">A. Lexical tells (overused words &amp; phrases)</a></li>
-  <li><a href="#b.-rhetorical-tells-sentence-level-reflexes" id="toc-b.-rhetorical-tells-sentence-level-reflexes" class="nav-link" data-scroll-target="#b.-rhetorical-tells-sentence-level-reflexes">B. Rhetorical tells (sentence-level reflexes)</a></li>
-  <li><a href="#c.-structural-typographic-tells" id="toc-c.-structural-typographic-tells" class="nav-link" data-scroll-target="#c.-structural-typographic-tells">C. Structural &amp; typographic tells</a></li>
-  <li><a href="#d.-tonal-content-tells" id="toc-d.-tonal-content-tells" class="nav-link" data-scroll-target="#d.-tonal-content-tells">D. Tonal / content tells</a></li>
+  <li><a href="#audit-active-tools-and-mcp-servers" id="toc-audit-active-tools-and-mcp-servers" class="nav-link" data-scroll-target="#audit-active-tools-and-mcp-servers">1. Audit active tools and MCP servers</a></li>
+  <li><a href="#identify-unused-or-redundant-toolsets" id="toc-identify-unused-or-redundant-toolsets" class="nav-link" data-scroll-target="#identify-unused-or-redundant-toolsets">2. Identify unused or redundant toolsets</a></li>
+  <li><a href="#disable-unneeded-toolsets" id="toc-disable-unneeded-toolsets" class="nav-link" data-scroll-target="#disable-unneeded-toolsets">3. Disable unneeded toolsets</a></li>
+  <li><a href="#verify-and-confirm" id="toc-verify-and-confirm" class="nav-link" data-scroll-target="#verify-and-confirm">4. Verify and confirm</a></li>
   </ul></li>
-  <li><a href="#reporting-format" id="toc-reporting-format" class="nav-link" data-scroll-target="#reporting-format">Reporting format</a></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/find-ai-tells/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/find-ai-tells/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -371,112 +335,76 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="find-ai-tells-spot-the-telltale-signs-of-ai-written-prose" class="level1">
-<h1>find-ai-tells — spot the telltale signs of AI-written prose</h1>
-<p>Scan prose for the patterns that make text read as machine-generated, report each one with its location and a plain-English revision, and (on request) apply the fixes. The same catalog doubles as a <strong>self-check on my own writing</strong>.</p>
-<p>A “tell” is a heuristic, never proof. Any single one is innocent — <code>delve</code> is a real word, an em-dash is correct punctuation, three items is sometimes just three items. The signal is <strong>clustering and mechanical repetition</strong>: the same rhetorical move every paragraph, every bullet built <code>**Term:** gloss</code>, a triad in every sentence. The goal is to <em>de-slop</em> — cut the filler and the reflexes — <strong>not</strong> to ban words or flatten a real human voice.</p>
+<section id="cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" class="level1">
+<h1>cut-tools — audit and disable unneeded MCP servers and toolsets</h1>
+<p>Every active tool and MCP server injects parameter schemas and descriptions into the model’s base prompt on every interaction. Disabling unused MCP servers and tool sets directly buys context window space, reduces per-turn latency, costs no quota, and requires no permanent code changes.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>“find AI tells”, “find-ai-tells”, “ai-tells”, “de-slop this”, “remove the AI tells”, “make this not sound AI-generated”</li>
-<li>“does this sound like AI / ChatGPT?”, “was this written by AI?”, “check this draft for tells”</li>
-<li><strong>As part of any PR/MR review where the diff touches narrative prose</strong> — docs, READMEs, lecture notes, textbook chapters, commit/PR descriptions making a substantive claim. Run alongside (not instead of) accuracy review (<code>fact-check-prose</code>) and style review (<code>use-preferred-style</code>).</li>
-<li><strong>Standing self-check (no invocation needed):</strong> before I present any non-trivial prose I authored — a PR/issue description, a commit body, README or doc text, a vignette paragraph, a long chat answer meant as deliverable prose — I first run my draft against the catalog below and cut what I find. Code, terse status lines, and short conversational replies are exempt.</li>
+<li>“cut tools”, “cut tool definitions”, “disable unused MCP servers”, “audit active tools”, “free up context from tools”, “disable unneeded extensions”, “prune tool definitions”</li>
+<li>Proactively when context is constrained or before long, multi-step sessions</li>
+<li>When starting work in a repository that only requires local editing and CLI tools, but has extensive external MCP servers or plugins enabled</li>
 </ul>
+</section>
+<section id="core-principle" class="level2">
+<h2 class="anchored" data-anchor-id="core-principle">Core principle</h2>
+<p>Tool definitions consume fixed context overhead on every single prompt turn before any conversation history or workspace files are read. An environment configured with multiple heavyweight MCP servers (such as GitHub, database, cloud infrastructure, browser automation, or search servers) can spend thousands of tokens purely on tool parameter schemas.</p>
+<p>Cutting unneeded tool definitions: 1. <strong>Directly recovers context budget</strong> for code, diffs, and reasoning. 2. <strong>Costs zero quota</strong> — reducing system prompt size saves tokens on every turn. 3. <strong>Eliminates tool selection ambiguity</strong> — reduces hallucinated or misrouted tool calls by presenting only relevant capabilities.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<ol type="1">
-<li><strong>Identify the target.</strong> A path, a PR/MR (<code>gh pr diff N</code> / <code>glab mr diff N</code>), pasted text, or — for the self-check — my own draft before I send it.</li>
-<li><strong>First pass, grep the cheap lexical/typographic tells</strong> (catalog below has a ready-to-run command). This finds the mechanical ones fast and cheaply.</li>
-<li><strong>Second pass, read for the rhetorical and structural tells</strong> that grep can’t see — copula avoidance, participle commentary, antithesis, triads, both-sidesing, hollow conclusions, uniform rhythm.</li>
-<li><strong>Apply the deletion test</strong> — remove the rhetorical framing and check if any concrete fact remains (a specific name, date, measurement, trade-off, or actionable decision). If nothing remains, the passage has zero information content.</li>
-<li><strong>Report</strong> <em>(external targets only — skip for the self-check)</em>. A table — <em>tell · location (<code>file:line</code> or quoted snippet) · why it reads as AI · suggested revision</em> — followed by a one-line <strong>density verdict</strong>: is this an isolated word or a pervasive pattern? Don’t cry wolf on a single innocent em-dash.</li>
-<li><strong>Offer to apply</strong> <em>(external targets)</em> / <strong>just fix it silently</strong> <em>(self-check)</em>. For an external target, on request rewrite in place with <code>Edit</code>, preserving the author’s meaning and voice. When scanning my own draft, skip the report (step 5) and simply cut the tells before presenting.</li>
-</ol>
-</section>
-<section id="the-catalog" class="level2">
-<h2 class="anchored" data-anchor-id="the-catalog">The catalog</h2>
-<section id="a.-lexical-tells-overused-words-phrases" class="level3">
-<h3 class="anchored" data-anchor-id="a.-lexical-tells-overused-words-phrases">A. Lexical tells (overused words &amp; phrases)</h3>
-<p>Reflex vocabulary that LLMs reach for far more than human writers:</p>
+<section id="audit-active-tools-and-mcp-servers" class="level3">
+<h3 class="anchored" data-anchor-id="audit-active-tools-and-mcp-servers">1. Audit active tools and MCP servers</h3>
+<p>Inspect which tools, plugins, and MCP servers are currently registered and active in the session across project and user configuration:</p>
 <ul>
-<li><strong>Verbs:</strong> delve, leverage, harness, utilize, foster, facilitate, navigate, underscore, embark, unlock, elevate, spotlight, “shed light on”, “dive into”.</li>
-<li><strong>Nouns/imagery:</strong> tapestry, testament, realm, landscape, beacon, journey, treasure trove, plethora, myriad, game-changer, deep dive.</li>
-<li><strong>Adjectives:</strong> robust, seamless, holistic, nuanced, multifaceted, intricate, comprehensive, pivotal, crucial, vital, paramount, vibrant, bustling, cutting-edge, state-of-the-art, ever-evolving, rich (as in “rich history”).</li>
-<li><strong>Stock frames:</strong> “in today’s fast-paced world”, “in the realm of”, “at the heart of”, “when it comes to”, “more than just”, “stands as a testament to”, “plays a crucial/pivotal role”.</li>
-</ul>
-<p>Quick first-pass grep (case-insensitive, prints <code>file:line</code>). Define the pattern once, then run it through whichever tool is on hand:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">tells</span><span class="op">=</span><span class="st">'delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as'</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rg</span> <span class="at">-niE</span> <span class="st">"\b(</span><span class="va">$tells</span><span class="st">)\b"</span> <span class="op">&lt;</span>target<span class="op">&gt;</span>          <span class="co"># ripgrep</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rniE</span> <span class="st">"\b(</span><span class="va">$tells</span><span class="st">)\b"</span> <span class="op">&lt;</span>target<span class="op">&gt;</span>       <span class="co"># no ripgrep — same pattern, via grep</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="b.-rhetorical-tells-sentence-level-reflexes" class="level3">
-<h3 class="anchored" data-anchor-id="b.-rhetorical-tells-sentence-level-reflexes">B. Rhetorical tells (sentence-level reflexes)</h3>
-<ul>
-<li><strong>Copula avoidance (dodging “is” and “are”)</strong> — refusing plain statements of fact in favor of dressed-up constructions (“serves as a”, “stands as a”, “acts as a”, “marks a”). Replace with “is” or “are”.</li>
-<li><strong>Trailing “-ing” participle commentary</strong> — tacking a participial phrase onto the end of a factual clause to simulate analysis (“…thereby highlighting the importance of X”, “…ensuring seamless alignment”, “…paving the way for”). Cut the participle clause or split into a concrete second sentence.</li>
-<li><strong>The negation-reversal antithesis</strong> — the single biggest tell: “It’s not just X, it’s Y” / “It isn’t about X; it’s about Y” / “This isn’t merely X — it’s Z”. Grep: <code>rg -niE "(it'?s|this is) not (just|only|merely|about)"</code>.</li>
-<li><strong>Rule of three, mechanically</strong> — triadic lists everywhere (“fast, reliable, and scalable”; “discover, explore, and master”). One triad is rhetoric; a triad in every sentence is a tell.</li>
-<li><strong>Sweeping range frames</strong> — “from X to Y”, “whether you’re X or Y”.</li>
-<li><strong>Signposting filler</strong> — “It’s worth noting that”, “It’s important to note”, “Importantly,”, “Notably,”, “That said,”, “At the end of the day,”, “It’s essential to understand that”.</li>
-<li><strong>Hedging stacks</strong> — piled modals: “may potentially”, “can sometimes help to”.</li>
-<li><strong>Conversational scaffolding</strong> (chat-style) — “Certainly!”, “Absolutely!”, “Great question!”, “Let’s dive in”, “Let’s explore”, “I hope this helps!”, “Feel free to…”.</li>
-<li><strong>Transition-adverb pileup</strong> — “Moreover,”, “Furthermore,”, “Additionally,”, “Consequently,” opening consecutive sentences.</li>
-<li><strong>Hollow conclusion</strong> — an “In conclusion,” / “In summary,” paragraph that only restates, adding nothing.</li>
+<li><strong>Claude Code:</strong> Run <code>claude mcp list</code> or inspect <code>~/.claude.json</code>, <code>.claude/settings.json</code>, and <code>.mcp.json</code>.</li>
+<li><strong>Cursor:</strong> Check <code>.cursor/mcp.json</code> and Cursor Settings -&gt; Features -&gt; MCP.</li>
+<li><strong>Antigravity / Gemini CLI:</strong> Check <code>.agents/plugins.json</code>, <code>.agents/skills.json</code>, and <code>~/.gemini/config/plugins.json</code>.</li>
+<li><strong>Codex / OpenCode:</strong> Check active tool configurations and CLI flags.</li>
 </ul>
 </section>
-<section id="c.-structural-typographic-tells" class="level3">
-<h3 class="anchored" data-anchor-id="c.-structural-typographic-tells">C. Structural &amp; typographic tells</h3>
+<section id="identify-unused-or-redundant-toolsets" class="level3">
+<h3 class="anchored" data-anchor-id="identify-unused-or-redundant-toolsets">2. Identify unused or redundant toolsets</h3>
+<p>Evaluate active tools against the repository and current task:</p>
 <ul>
-<li><strong>Forced tables and forced structure</strong> — tabulating content that is not multidimensional data, or bulleting narrative paragraphs to mimic analytical rigor.</li>
-<li><strong>Lead construction (title as an object)</strong> — opening a document by defining its own title as a noun in the world (“X is a comprehensive guide that outlines…”).</li>
-<li><strong>Em-dash overuse</strong> — multiple <code>—</code> per paragraph used as a default connector. (Em-dashes are correct; the tell is <em>frequency</em>, not presence.) Grep: <code>rg -n '—' &lt;target&gt;</code> and judge density.</li>
-<li><strong>Bold-leading bullets</strong> — every list item shaped <code>**Term:** explanation</code>, applied mechanically rather than where emphasis helps.</li>
-<li><strong>Emoji section headers / bullets</strong> — ✅ 🚀 🎯 🔑 decorating headings or list items in otherwise plain prose.</li>
-<li><strong>Uniform rhythm</strong> — every section the same length, every paragraph 3–4 sentences; conspicuously even, sanded-down structure.</li>
-<li><strong>Over-signposting</strong> — “Let’s take a closer look”, “Now, let’s…”, a heading before every two sentences.</li>
+<li><strong>CLI redundancy:</strong> If <code>gh</code> and <code>git</code> CLI tools are available in Bash, heavyweight GitHub MCP servers (which define dozens of PR, issue, and repo management schemas) may be redundant.</li>
+<li><strong>Domain irrelevance:</strong> Database (Postgres, SQLite), cloud (AWS, Kubernetes), or communication (Slack) servers are unneeded for local code refactoring or documentation work.</li>
+<li><strong>Unused browser/search tools:</strong> Web automation servers (Playwright, Puppeteer) when working entirely on offline or local unit tasks.</li>
+<li><strong>Dormant workspace plugins:</strong> Repository or user plugins whose skills or tools are not applicable to the current project.</li>
 </ul>
 </section>
-<section id="d.-tonal-content-tells" class="level3">
-<h3 class="anchored" data-anchor-id="d.-tonal-content-tells">D. Tonal / content tells</h3>
+<section id="disable-unneeded-toolsets" class="level3">
+<h3 class="anchored" data-anchor-id="disable-unneeded-toolsets">3. Disable unneeded toolsets</h3>
+<p>Disable identified servers at the workspace or project level where possible:</p>
 <ul>
-<li><strong>Promotional register</strong> — marketing gloss on neutral material (“a powerful, intuitive solution that empowers you to…”).</li>
-<li><strong>Reflexive both-sidesing</strong> — “on one hand… on the other hand…” balance where the writer should just take a position.</li>
-<li><strong>Vague universals with no specifics</strong> — claims with no names, numbers, or concrete detail; the absence of specifics is itself a tell.</li>
-<li><strong>Restating the prompt</strong> before answering; over-explaining the obvious.</li>
-<li><strong>False precision</strong> — confident, invented-looking statistics.</li>
+<li><strong>Claude Code:</strong> Disable or remove unneeded servers for the project (<code>claude mcp remove &lt;name&gt;</code>, configure <code>disabledMcpServers</code> in settings, or scope <code>.mcp.json</code>).</li>
+<li><strong>Cursor:</strong> Disable unneeded MCP servers in workspace settings or <code>.cursor/mcp.json</code>.</li>
+<li><strong>Antigravity / Gemini CLI:</strong> Remove or comment out unneeded plugins/servers in <code>.agents/plugins.json</code> or workspace configurations.</li>
 </ul>
 </section>
+<section id="verify-and-confirm" class="level3">
+<h3 class="anchored" data-anchor-id="verify-and-confirm">4. Verify and confirm</h3>
+<ul>
+<li>Confirm that essential core tools remain active.</li>
+<li>Report the disabled tools and the approximate context space recovered.</li>
+</ul>
 </section>
-<section id="reporting-format" class="level2">
-<h2 class="anchored" data-anchor-id="reporting-format">Reporting format</h2>
-<pre><code>| Tell | Location | Why it reads as AI | Suggested revision |
-|------|----------|--------------------|--------------------|
-| "it's not just a library, it's a platform" | README.md:12 | negation-reversal antithesis | "It's a platform, not just a library." (or cut) |
-| em-dash ×5 in one paragraph | intro.md:4–9 | em-dash used as default connector | split into sentences; keep one |</code></pre>
-<p>Then a density verdict, e.g.: <em>“Pervasive — antithesis + triads in most paragraphs; reads strongly AI. Recommend a rewrite pass,”</em> vs.&nbsp;<em>“One stray ‘delve’; otherwise clean.”</em></p>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><a href="../../memories/ai-writing-patterns.md"><code>memories/ai-writing-patterns.md</code></a></strong> — the underlying research catalog (20 core empirical patterns synthesized from community research, statistical detection metrics including burstiness and TTR, and multi-tier anti-slop architectures).</li>
-<li><strong><code>simplify</code> / <code>tidy</code></strong> — the code-side analogues (cut dead code / cruft); this skill is the prose-side analogue (cut filler / reflexes).</li>
-<li><strong><code>grade-work</code></strong> — when reviewing a deliverable, fold an AI-tells pass into the quality check.</li>
-<li><strong><code>memorize</code> / <code>ums</code></strong> — if a new recurring tell surfaces, add it here and note it; keep the catalog living.</li>
-<li><strong><code>find-overlap</code></strong> — the sibling read-only scanner: this skill scans prose for AI tells; <code>find-overlap</code> scans a corpus for duplicated/redundant content. Same detect-and-report posture, different signal.</li>
-<li><strong><code>check-info-quality</code> / <code>ciq</code></strong> — another sibling scanner: this skill checks <em>how</em> text is written; <code>ciq</code> checks <em>what</em> it claims (stale, irrelevant, or misleading/out-of-context content). Run both over the same target.</li>
-<li><strong><code>fact-check-prose</code></strong> — the accuracy-side sibling: this skill flags prose that <em>reads</em> as machine-generated; <code>fact-check-prose</code> checks whether prose claims and reasoning are actually <em>true</em>. Run both on a review pass.</li>
+<li><strong><a href="../../skills/compress-session/SKILL.html"><code>compress-session</code></a> / <a href="../../skills/checkpoint/SKILL.html"><code>checkpoint</code></a> / <a href="../../skills/memorize/SKILL.html"><code>memorize</code></a>:</strong> Manage conversation and memory context; <code>cut-tools</code> manages the <em>fixed base system prompt</em> and tool schema overhead.</li>
+<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a>:</strong> Optimizes model tier; <code>cut-tools</code> optimizes prompt payload size.</li>
+<li><strong><a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> / <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>:</strong> Offloads bounded work to separate CLIs with their own tool configurations.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li><strong>Don’t</strong> treat any single tell as proof of AI authorship — it’s a heuristic; weigh clustering, not isolated hits.</li>
-<li><strong>Don’t</strong> robotically purge correct words (<code>delve</code>, <code>robust</code>) or correct em-dashes when they’re well-used in context.</li>
-<li><strong>Don’t</strong> rewrite until the text is flat and voiceless — de-slopping removes filler, it doesn’t sand off a real human style.</li>
-<li><strong>Don’t</strong> flag code, identifiers, or quoted source material as prose tells.</li>
-<li><strong>Don’t</strong> skip the self-check on my own draft, then ship prose full of the very tells this skill exists to catch.</li>
+<li>❌ Disabling core development tools (<code>Bash</code>, <code>Read</code>, <code>Edit</code>, <code>Write</code>, <code>Grep</code>, <code>Glob</code>) required for baseline editing and verification.</li>
+<li>❌ Disabling MCP servers globally when they are actively needed in other concurrent workspaces (prefer project/workspace scoping).</li>
+<li>❌ Guessing which tools are active without auditing first.</li>
+<li>❌ Keeping all external MCP servers enabled by default “just in case” during large, context-heavy refactors.</li>
 </ul>
 
 
@@ -907,7 +835,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/find-ai-tells/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/find-ai-tells/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

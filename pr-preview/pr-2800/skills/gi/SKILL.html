@@ -352,7 +352,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
   <li><a href="#list-open-issues" id="toc-list-open-issues" class="nav-link" data-scroll-target="#list-open-issues">1. List open issues</a></li>
-  <li><a href="#triage-prioritize" id="toc-triage-prioritize" class="nav-link" data-scroll-target="#triage-prioritize">2. Triage / prioritize</a></li>
+  <li><a href="#triage-label-and-prioritize" id="toc-triage-label-and-prioritize" class="nav-link" data-scroll-target="#triage-label-and-prioritize">2. Triage, label, and prioritize</a></li>
   <li><a href="#select-top-issue-automatically" id="toc-select-top-issue-automatically" class="nav-link" data-scroll-target="#select-top-issue-automatically">3. Select top issue automatically</a></li>
   <li><a href="#check-the-issue-isnt-already-in-flight" id="toc-check-the-issue-isnt-already-in-flight" class="nav-link" data-scroll-target="#check-the-issue-isnt-already-in-flight">4. Check the issue isn’t already in-flight</a></li>
   <li><a href="#check-history-and-peers" id="toc-check-history-and-peers" class="nav-link" data-scroll-target="#check-history-and-peers">5. Check history and peers</a></li>
@@ -402,9 +402,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue list <span class="at">--per-page</span><span class="op">=</span>20 <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">cat</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="triage-prioritize" class="level3">
-<h3 class="anchored" data-anchor-id="triage-prioritize">2. Triage / prioritize</h3>
-<p>Scan the issue list and rank by priority. Use these signals (in order):</p>
+<section id="triage-label-and-prioritize" class="level3">
+<h3 class="anchored" data-anchor-id="triage-label-and-prioritize">2. Triage, label, and prioritize</h3>
+<p>While surveying open issues to select the top candidate, inspect candidate issues and apply triage labels to any that are unlabeled or undertriaged.</p>
+<p><strong>Apply triage labels:</strong></p>
+<ol type="1">
+<li><strong>Check repo taxonomy:</strong> Use existing labels on the repository (check <code>gh label list</code> / <code>glab label list</code> if unsure) rather than inventing new ones.</li>
+<li><strong>Classify each candidate:</strong>
+<ul>
+<li><strong>Type:</strong> <code>bug</code>, <code>enhancement</code>, <code>documentation</code>, <code>maintenance</code> / <code>refactor</code> / <code>chore</code> (match repo conventions).</li>
+<li><strong>Priority:</strong> <code>high-priority</code>, <code>low-priority</code>, <code>P0</code> / <code>P1</code> / <code>P2</code> if the repo uses explicit priority labels.</li>
+<li><strong>Status:</strong> <code>blocked</code>, <code>duplicate</code>, <code>invalid</code>, <code>wontfix</code> if applicable.</li>
+</ul></li>
+<li><strong>Add labels to inspected issues:</strong></li>
+</ol>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue edit <span class="op">&lt;</span>N<span class="op">&gt;</span> --add-label <span class="st">"&lt;label1&gt;,&lt;label2&gt;"</span>   <span class="co"># LABEL_ISSUE</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue update <span class="op">&lt;</span>N<span class="op">&gt;</span> --label <span class="st">"&lt;label1&gt;,&lt;label2&gt;"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>gh issue edit --add-label</code> is additive and preserves existing labels.</p>
+<p><strong>Rank by priority:</strong></p>
+<p>Scan the triaged issues and rank by priority. Use these signals (in order):</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -451,10 +470,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p><strong>Re-triage if helpful:</strong> If labels are stale, missing, or inconsistent, briefly suggest re-labeling to the user before proceeding. Don’t unilaterally relabel without asking — but do flag it:</p>
-<blockquote class="blockquote">
-<p>“Issues #4 and #7 both look high-priority but neither is labeled. Want me to label them before picking one, or just grab #4 (older, looks like a bug)?”</p>
-</blockquote>
 </section>
 <section id="select-top-issue-automatically" class="level3">
 <h3 class="anchored" data-anchor-id="select-top-issue-automatically">3. Select top issue automatically</h3>
@@ -465,23 +480,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="check-the-issue-isnt-already-in-flight">4. Check the issue isn’t already in-flight</h3>
 <p>Before claiming or branching, confirm no other session is already on this issue. Two signals must <strong>both</strong> be clear (<code>gh issue list</code> in step 1 returns titles, labels, and assignees but neither comment text nor linked PRs, so check both explicitly here).</p>
 <p><strong>(1) No live “Working on this” claim on the issue:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub -- read the claim/release exchange, not just the newest comment:</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json comments <span class="dt">\</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | "\(.createdAt) \(.author.login): \(.body)"'</span>   <span class="co"># READ_ISSUE_COMMENTS</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json updatedAt <span class="at">--jq</span> .updatedAt   <span class="co"># VIEW_ISSUE -- latest activity</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub -- read the claim/release exchange, not just the newest comment:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json comments <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'[.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i"))] | last | "\(.createdAt) \(.author.login): \(.body)"'</span>   <span class="co"># READ_ISSUE_COMMENTS</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json updatedAt <span class="at">--jq</span> .updatedAt   <span class="co"># VIEW_ISSUE -- latest activity</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Reading only <code>.comments | last</code> is the bug this replaces.</strong> A claim is live for two hours from the most recent <em>activity</em>, so any unrelated comment posted after it — a status note, a bot’s build result, a question — becomes the last comment while the claim is still binding. The claim then goes invisible and this check reports the issue free, which is the parallel-session collision the whole convention exists to prevent. Filter to the exchange and take the last member of <em>that</em>.</p>
 <p><strong>Both timestamps are needed, which is why the second command is there.</strong> The claim’s own <code>createdAt</code> says when it was made; the issue’s <code>updatedAt</code> says when the thread last saw activity, and the 2-hour rule expires on <em>activity</em>, not on the claim’s age. A day-old claim followed by a comment thirty minutes ago is <strong>live</strong>; the same claim with nothing after it is <strong>expired</strong>. Reading only the claim’s body cannot tell those apart, so it cannot decide the question the step is asking.</p>
 <p>Match the two-word invariant <code>hold off</code>, or either retired wording <code>paws off</code> / <code>back off</code>, case-insensitively — then <strong>exclude the comment if it also carries a release term</strong> (<code>unclaim|released|PR is free|now mergeable</code>), because the retired release wording <code>... done --- paws off released.</code> contains <code>paws off</code> and would otherwise read as a live claim. See <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>’s “Match the two-word invariant”. If a live claim stands, skip the issue — unless the claim has expired: no push or comment on the issue in over 2 hours, per <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>’s expiration rule. An expired claim is taken over by posting your own claim comment, never silently.</p>
 <p><strong>(2) No open PR already references the issue:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub — list open PRs and scan for any whose title or branch references this issue:</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> open <span class="at">--json</span> number,title,headRefName <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># LIST_PRS</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Authoritative — the issue's cross-referenced open PRs via the REST timeline API.</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># (gh issue view --json has no timelineItems field; in the timeline, source.type is</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">#  always "issue", so a PR is one whose source.issue.pull_request is non-null. The</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co">#  state filter keeps only open PRs — merged/closed siblings aren't active competitors.</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co">#  --paginate walks every page so a cross-reference past the first 30 events isn't missed.)</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">--paginate</span> repos/<span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span>/issues/<span class="op">&lt;</span>N<span class="op">&gt;</span>/timeline <span class="dt">\</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'</span> <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># ISSUE_LINKED_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub — list open PRs and scan for any whose title or branch references this issue:</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> open <span class="at">--json</span> number,title,headRefName <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># LIST_PRS</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Authoritative — the issue's cross-referenced open PRs via the REST timeline API.</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># (gh issue view --json has no timelineItems field; in the timeline, source.type is</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co">#  always "issue", so a PR is one whose source.issue.pull_request is non-null. The</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co">#  state filter keeps only open PRs — merged/closed siblings aren't active competitors.</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co">#  --paginate walks every page so a cross-reference past the first 30 events isn't missed.)</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">--paginate</span> repos/<span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span>/issues/<span class="op">&lt;</span>N<span class="op">&gt;</span>/timeline <span class="dt">\</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'</span> <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># ISSUE_LINKED_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If an open PR already exists for the issue: - <strong>Don’t open a competing PR.</strong> The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and you’re taking it over, check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh.</p>
 </section>
 <section id="check-history-and-peers" class="level3">
@@ -490,37 +505,37 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="claim-the-issue" class="level3">
 <h3 class="anchored" data-anchor-id="claim-the-issue">6. Claim the issue</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"Claude Code CLI (local session) is working on this — please hold off until I'm done.</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_ISSUE</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue note <span class="op">&lt;</span>N<span class="op">&gt;</span> --message <span class="st">"Claude Code CLI (local session) is working on this — please hold off until I'm done.</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue comment <span class="op">&lt;</span>N<span class="op">&gt;</span> --body <span class="st">"Claude Code CLI (local session) is working on this — please hold off until I'm done.</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span>   <span class="co"># COMMENT_ISSUE</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> issue note <span class="op">&lt;</span>N<span class="op">&gt;</span> --message <span class="st">"Claude Code CLI (local session) is working on this — please hold off until I'm done.</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="st">_Posted by Claude Code (AI agent) --- not written by a human._"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="create-a-branch" class="level3">
 <h3 class="anchored" data-anchor-id="create-a-branch">7. Create a branch</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin main                    <span class="co"># FETCH</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout <span class="at">-b</span> fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span> origin/main   <span class="co"># CREATE_BRANCH — or feat/&lt;slug&gt;, docs/&lt;slug&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin main                    <span class="co"># FETCH</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> checkout <span class="at">-b</span> fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span> origin/main   <span class="co"># CREATE_BRANCH — or feat/&lt;slug&gt;, docs/&lt;slug&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Branch naming: - Bug fix → <code>fix/&lt;issue-slug&gt;</code> - Feature → <code>feat/&lt;issue-slug&gt;</code> - Docs → <code>docs/&lt;issue-slug&gt;</code> - Refactor → <code>refactor/&lt;issue-slug&gt;</code></p>
 </section>
 <section id="open-the-pr-now-draft-from-an-empty-commit" class="level3">
 <h3 class="anchored" data-anchor-id="open-the-pr-now-draft-from-an-empty-commit">8. Open the PR now — draft, from an empty commit</h3>
 <p>Open the PR <strong>immediately, before implementing</strong>, so the open-PR signal that step 4 relies on fires right away and other sessions can see the issue is being worked (see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a>). Give the branch a diff with an empty commit, push, and open a <strong>draft</strong> PR:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">--allow-empty</span> <span class="at">-m</span> <span class="st">"start: &lt;issue title&gt; (closes #&lt;N&gt;)"</span>   <span class="co"># COMMIT</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">-u</span> origin fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span>                                      <span class="co"># PUSH</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub — draft PR</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr create <span class="at">--draft</span> <span class="at">--title</span> <span class="st">"&lt;title&gt;"</span> <span class="at">--body</span> <span class="st">"Closes #&lt;N&gt;</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="st">WIP — opened up front to claim the issue; implementing now."</span>   <span class="co"># CREATE_PR</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab — draft MR</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr create <span class="at">--draft</span> <span class="at">--title</span> <span class="st">"&lt;title&gt;"</span> <span class="at">--description</span> <span class="st">"Closes #&lt;N&gt;</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="st">WIP — opened up front to claim the issue; implementing now."</span> <span class="at">--assignee</span> <span class="op">&lt;</span>your-gitlab-username<span class="op">&gt;</span>  <span class="co"># default: &lt;user&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> commit <span class="at">--allow-empty</span> <span class="at">-m</span> <span class="st">"start: &lt;issue title&gt; (closes #&lt;N&gt;)"</span>   <span class="co"># COMMIT</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">-u</span> origin fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span>                                      <span class="co"># PUSH</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># GitHub — draft PR</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr create <span class="at">--draft</span> <span class="at">--title</span> <span class="st">"&lt;title&gt;"</span> <span class="at">--body</span> <span class="st">"Closes #&lt;N&gt;</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">WIP — opened up front to claim the issue; implementing now."</span>   <span class="co"># CREATE_PR</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab — draft MR</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="ex">glab</span> mr create <span class="at">--draft</span> <span class="at">--title</span> <span class="st">"&lt;title&gt;"</span> <span class="at">--description</span> <span class="st">"Closes #&lt;N&gt;</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="st">WIP — opened up front to claim the issue; implementing now."</span> <span class="at">--assignee</span> <span class="op">&lt;</span>your-gitlab-username<span class="op">&gt;</span>  <span class="co"># default: &lt;user&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Keep it a draft: a draft doesn’t trigger the <code>@claude</code> review bot, so no review round is wasted on an empty diff. Include <code>Closes #N</code> to auto-close the issue on merge <strong>only when this PR will finish the issue</strong>. If a later comment splits the issue into independent cases and this PR ships only one, file the leftover as its own issue <strong>before merge</strong> and rewrite the PR body so it does not <code>Closes</code> the parent (link both: this PR for the shipped slice, the new issue for the rest). Closing the parent on a partial ship drops the deferred half from the tracker (<a href="https://github.com/Morrison-Lab/gha/issues/373">gha#373</a> / <a href="https://github.com/Morrison-Lab/gha/pull/516">#516</a> / <a href="https://github.com/Morrison-Lab/gha/issues/517">#517</a>).</p>
 </section>
 <section id="implement" class="level3">
@@ -534,9 +549,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="push-and-mark-the-pr-ready-for-review" class="level3">
 <h3 class="anchored" data-anchor-id="push-and-mark-the-pr-ready-for-review">10. Push and mark the PR ready for review</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push origin fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span>   <span class="co"># PUSH — push the implementation onto the draft PR from step 8</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr ready <span class="op">&lt;</span>N<span class="op">&gt;</span>              <span class="co"># MARK_PR_READY — GitHub, flip draft → ready, which kicks off review</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab: glab mr update &lt;N&gt; --ready</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push origin fix/<span class="op">&lt;</span>slug<span class="op">&gt;</span>   <span class="co"># PUSH — push the implementation onto the draft PR from step 8</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr ready <span class="op">&lt;</span>N<span class="op">&gt;</span>              <span class="co"># MARK_PR_READY — GitHub, flip draft → ready, which kicks off review</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># GitLab: glab mr update &lt;N&gt; --ready</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The PR already exists (step 8), so there’s nothing new to create — pushing the implementation and marking it ready for review is what starts ARDI.</p>
 </section>
 <section id="ardi-to-clean" class="level3">
@@ -593,6 +608,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Opening an MR without running the repo’s standard checks first</li>
 <li>❌ Picking a huge issue that can’t be completed in one session without discussing scope with the user first</li>
 <li>❌ Implementing without understanding “done” criteria from the issue</li>
+<li>❌ Skipping triage labeling on candidate issues — apply classification labels to candidate issues inspected during triage so the backlog stays organized</li>
 <li>❌ Opening the PR only after implementing — open a draft PR up front (step 8) so the work is visible and a parallel session doesn’t grab the same issue</li>
 <li>❌ Forgetting <code>Closes #N</code> in the MR/PR description</li>
 <li>❌ Merging without re-checking that a concurrent session’s PR hasn’t already closed the issue (resolve a surprise merge conflict by reading the diff, not blindly)</li>

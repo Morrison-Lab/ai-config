@@ -2360,6 +2360,48 @@ def main() -> int:
               "- **[Defect]** `foo()` crash is still broken.\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (non-blocking) with 'must be fixed before merge' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **Critical**: security flaw must be fixed before merge.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'needs to be addressed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]**: memory leak needs to be addressed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'will be fixed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Major]**: crash will be fixed in a later PR.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'to be resolved' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Warning]**: missing validation to be resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (non-blocking) with 'should be fixed' item is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (non-blocking)\n\n"
+              "- **[Defect]**: race condition should be fixed.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings from prior rounds — now resolved with 'has been fixed' resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Defect]** `foo()` crash has been fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings from prior rounds — now resolved with 'is now resolved' resolves (#2781)",
+          checker._unresolved_finding_pattern(
+              "### Findings from prior rounds \u2014 now resolved\n\n"
+              "- **[Critical]** auth bypass is now resolved.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

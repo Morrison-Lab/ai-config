@@ -1433,10 +1433,22 @@ _SECTION_SEVERITY_TAG = re.compile(
     r"|\*\*Location:\*\*"
 )
 _LINE_RESOLUTION_WORDS = re.compile(
-    r"(?i)\b(?:resolved|addressed|fixed|no\s+longer\s+applies)\b"
+    r"(?i)\b(?:"
+    r"(?:is|are|was|were)\s+(?:now\s+|also\s+|already\s+|since\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected|cleared)"
+    r"|no\s+longer\s+applies"
+    r"|(?:fixed|resolved|addressed|cleared)\s+(?:in|by|via)\s+[a-z0-9_#.-]+"
+    r"|(?:now|already|previously)\s+(?:fixed|resolved|addressed|cleared)"
+    r")\b"
 )
 _LINE_UNRESOLVED_WORDS = re.compile(
-    r"(?i)\b(?:unresolved|unaddressed|still\s+(?:unresolved|broken|present|failing|reproducible|open)|not\s+(?:resolved|addressed|fixed))\b"
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|still\s+(?:unresolved|broken|present|failing|reproducible|open)"
+    r"|not\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|yet\s+to)\s+be\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
 

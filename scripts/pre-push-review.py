@@ -494,28 +494,20 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     else:
         is_clean = True
 
-    findings_matches = list(re.finditer(r"(?im)^#{2,3}\s+Critical Findings[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report, flags=re.DOTALL))
-    if not findings_matches:
-        return False, False, "Missing required section: Critical Findings"
-
-    for f_match in findings_matches:
-        findings_body = f_match.group(1).strip()
-        if not findings_body:
-            return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
-        is_clean_findings = bool(
-            re.match(
-                r"^\s*(?:none(?:\.|\b)|n/a|(?:zero|no)(?:\s+(?:critical|blocking))?(?:\s+(?:issues|findings|bugs|problems))?(?:\s+found)?\.?)\s*$",
-                findings_body,
-                flags=re.IGNORECASE,
-            )
+    if not critical_text or not critical_text.strip():
+        return False, False, "Critical Findings section cannot be empty; explicit statement (e.g. 'None.') is required."
+    is_clean_findings = bool(
+        re.match(
+            r"^\s*(?:none(?:\.|\b)|n/a|(?:zero|no)(?:\s+(?:critical|blocking))?(?:\s+(?:issues|findings|bugs|problems))?(?:\s+found)?\.?)\s*$",
+            critical_text.strip(),
+            flags=re.IGNORECASE,
         )
-        if is_clean and not is_clean_findings:
-            return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
+    )
+    if is_clean and not is_clean_findings:
+        return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
-
-    observations_match = re.search(r"(?im)^#{2,3}\s+Observations[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report, flags=re.DOTALL)
-    if is_clean and observations_match:
-        obs_body = observations_match.group(1).strip()
+    if is_clean and observations_text:
+        obs_body = observations_text.strip()
         if obs_body and not re.match(r"^\s*(?:none(?:\.|\b)|n/a)\s*$", obs_body, flags=re.IGNORECASE):
             # Check that ALL non-empty lines start with [P3], [P4], [INFO], or a list marker followed by them
             for line in obs_body.splitlines():

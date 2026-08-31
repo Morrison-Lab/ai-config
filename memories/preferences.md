@@ -12,7 +12,12 @@
 - **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
   see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
 - **Always hyperlink mentioned PRs and issues.**
-  Whenever mentioning pull requests or issues in chat responses, recaps, comments, reviews, or documentation, always format them as clickable markdown hyperlinks to their forge URLs (e.g. `[PR #2685](https://github.com/Morrison-Lab/ai-config/pull/2685)`, `[Issue #2691](https://github.com/Morrison-Lab/ai-config/issues/2691)`), never as bare unlinked `#1234` text. (User directive / CAI, 2026-08-30.)
+  Whenever mentioning pull requests or issues in chat responses, recaps,
+  comments, reviews, or documentation,
+  always format them as clickable markdown hyperlinks to their forge URLs
+  (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
+  never as bare unlinked `#123` text.
+  (User directive / CAI, 2026-08-30.)
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;

@@ -3332,6 +3332,50 @@ def main() -> int:
         "a backward re-raise before a fenced code block with blank lines refuses the strip",
         checker.classify_verdict(fenced_blank_line_backward_reraise) == "not-clean",
     )
+    multi_paragraph_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n\n"
+        "Just an intervening paragraph with nothing special in it.\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise across multiple intervening paragraphs refuses the strip",
+        checker.classify_verdict(multi_paragraph_forward_reraise) == "not-clean",
+    )
+    multi_paragraph_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "Just an intervening paragraph with nothing special in it.\n\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise across multiple intervening paragraphs refuses the strip",
+        checker.classify_verdict(multi_paragraph_backward_reraise) == "not-clean",
+    )
+    fenced_paragraph_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), noted.\n\n"
+        "```\ncode\n```\n\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise separated by a standalone fenced block paragraph refuses the strip",
+        checker.classify_verdict(fenced_paragraph_forward_reraise) == "not-clean",
+    )
+    fenced_paragraph_backward_reraise = (
+        "This is still unresolved.\n\n"
+        "```\ncode\n```\n\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise separated by a standalone fenced block paragraph refuses the strip",
+        checker.classify_verdict(fenced_paragraph_backward_reraise) == "not-clean",
+    )
     long_sentence_reraise = (
         "In response to [round 2](https://x) "
         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "

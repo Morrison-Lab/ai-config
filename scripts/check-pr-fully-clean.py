@@ -952,26 +952,15 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         )
 
     def _strip_posted_aside(m: "re.Match") -> str:
-        _p_idx = bisect.bisect_right(_paragraph_starts, m.start()) - 1
-        prev_p_start = _paragraph_starts[max(0, _p_idx - 1)]
         _h_idx_back = bisect.bisect_right(_heading_starts, m.start()) - 1
-        h_start = _heading_starts[_h_idx_back] if _h_idx_back >= 0 else 0
-        backward_start = max(prev_p_start, h_start)
+        backward_start = _heading_starts[_h_idx_back] if _h_idx_back >= 0 else 0
 
-        _idx_fwd = bisect.bisect_left(_paragraph_ends, m.end())
-        _target_p_idx = _idx_fwd + 1
-        p_bound = (
-            _paragraph_ends[_target_p_idx]
-            if _target_p_idx < len(_paragraph_ends)
-            else len(m.string)
-        )
         _h_idx_fwd = bisect.bisect_left(_heading_starts, m.end())
-        h_bound = (
+        forward_end = (
             _heading_starts[_h_idx_fwd]
             if _h_idx_fwd < len(_heading_starts)
             else len(m.string)
         )
-        forward_end = min(p_bound, h_bound)
 
         keep_end = m.start() + len(m.group("keep"))
         if _vocab_between(backward_start, keep_end) or _vocab_between(
@@ -1029,23 +1018,14 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # Testing membership by bisect over precomputed positions preserves
     # the semantics exactly, rather than approximating them with a
     # per-paragraph flag: the regions searched are the containing section's
-    # preceding and following paragraph bounds around the citation, with
-    # the aside itself still excluded so its own verdict text cannot
-    # self-veto.
+    # bounds around the citation, with the aside itself still excluded so
+    # its own verdict text cannot self-veto.
     _lines = text.split("\n")
     _line_starts = [0]
     for _l in _lines[:-1]:
         _line_starts.append(_line_starts[-1] + len(_l) + 1)
     _fenced_lines, _, _orphan_markers = find_fence_spans(text, swallow_unclosed=True)
     _ignored_lines = _fenced_lines | _orphan_markers
-
-    _paragraph_starts = [0]
-    _paragraph_ends = []
-    for _p in re.finditer(r"\n[ \t]*\n", text):
-        _lineno = bisect.bisect_right(_line_starts, _p.start() + 1) - 1
-        if _lineno not in _ignored_lines:
-            _paragraph_starts.append(_p.end())
-            _paragraph_ends.append(_p.start())
 
     _heading_starts = []
     for _h in re.finditer(r"(?m)^#{1,6}\s", text):

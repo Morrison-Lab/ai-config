@@ -724,14 +724,15 @@ def warning_payload(verdict):
             view_mcp=stems["view_mcp"],
             detail=_detail(verdict),
         )
-        system = SYS_MISSING.format(label=label)
-    return {
+    res = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": additional,
         },
-        "systemMessage": system,
     }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        res["systemMessage"] = system
+    return res
 
 
 def main():

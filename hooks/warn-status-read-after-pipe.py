@@ -879,17 +879,19 @@ def main():
     # No `permissionDecision` key at all: an absent decision defers to the
     # normal permission flow. Naming "allow" would suppress a prompt the user
     # would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(pipeline=pipeline, read=read),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"`{read}` reads the status of `{pipeline}`'s LAST stage, not the "
             "command's. Take the status before the pipe, or read "
             "${PIPESTATUS[0]}."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

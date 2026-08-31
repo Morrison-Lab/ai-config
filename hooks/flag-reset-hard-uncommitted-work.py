@@ -385,13 +385,15 @@ def main() -> int:
         summary = (f"`git {kind}` will discard {len(changed)} tracked "
                    "file(s) with uncommitted changes.")
 
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": summary,
-    }))
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = summary
+    print(json.dumps(out))
     return 0
 
 

@@ -713,16 +713,18 @@ def main() -> int:
         if len(undischarged) > 3:
             listed += f"\n  - ... and {len(undischarged) - 3} more"
 
-        print(json.dumps({
+        out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "additionalContext": NOTE.format(claims=listed),
             },
-            "systemMessage": (
+        }
+        if not os.environ.get("ANTIGRAVITY_AGENT"):
+            out["systemMessage"] = (
                 f"Brief asserts corpus state ({len(undischarged)} "
                 "underived claim(s)); verify or paste the deriving command."
-            ),
-        }))
+            )
+        print(json.dumps(out))
     except Exception:
         return 0
     return 0

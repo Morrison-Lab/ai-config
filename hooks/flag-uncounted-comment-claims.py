@@ -1292,17 +1292,19 @@ def main() -> int:
         if len(undischarged) > 3:
             listed += f"\n  - ... and {len(undischarged) - 3} more"
 
-        print(json.dumps({
+        out = {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "additionalContext": NOTE.format(claims=listed),
             },
-            "systemMessage": (
+        }
+        if not os.environ.get("ANTIGRAVITY_AGENT"):
+            out["systemMessage"] = (
                 f"Forge comment asserts a count/enumeration ({len(undischarged)} "
                 "unverified claim(s)); paste the deriving command or verify "
                 "first."
-            ),
-        }))
+            )
+        print(json.dumps(out))
     except Exception:
         return 0
     return 0

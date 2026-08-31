@@ -632,17 +632,18 @@ def main() -> int:
         return 0
 
     url_list = "\n".join(f"  - {u}" for u in urls)
-    note = NOTE.format(urls=url_list)
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"This rebuttal disputes a finding whose cited source "
             f"({urls[0]}) was never fetched in this transcript."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

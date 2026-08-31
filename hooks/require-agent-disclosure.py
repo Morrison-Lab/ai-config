@@ -817,20 +817,19 @@ def main() -> int:
         reason = verdict_mcp(tool_name, tool_input)
     if not reason:
         return 0
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": reason,
         },
-        # Surfaced to the USER as well, not only to the model: whether a comment
-        # posted under their account discloses its authorship is their call to
-        # see being made, and a model-only warning leaves them unaware it fired.
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             "This forge comment may not disclose that an agent posted it. "
             "Comments posted through `gh`/`glab` carry your own login and read "
             "as `type: User`. " + SEE
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

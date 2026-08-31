@@ -436,16 +436,18 @@ def main() -> int:
     # No `permissionDecision` key at all: an absent decision defers to the
     # normal permission flow, which is exactly the intent. Naming "allow" here
     # would suppress a prompt the user would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(switch=switch, mutation=mutation),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             "Unchained branch switch: `{switch}` is not joined by `&&` to the "
             "later `{mutation}`, which runs even if the switch fails."
-        ).format(switch=switch, mutation=mutation),
-    }))
+        ).format(switch=switch, mutation=mutation)
+    print(json.dumps(out))
     return 0
 
 

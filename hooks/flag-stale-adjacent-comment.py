@@ -436,17 +436,19 @@ def main() -> int:
     if not items:
         return 0
 
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(count=len(items),
                                              items=_format(items)),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"{len(items)} nearby comment(s) still assert a value this commit "
             "changed."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

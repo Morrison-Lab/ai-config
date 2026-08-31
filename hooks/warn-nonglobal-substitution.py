@@ -309,7 +309,7 @@ def main() -> int:
     cmd_word, segment, matched, flags = offenses[0]
     flags_display = flags if flags else "(none)"
 
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(
@@ -317,13 +317,15 @@ def main() -> int:
                 flags_display=flags_display, segment=segment,
             ),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"`{cmd_word} -i` runs a non-global substitution ({matched}); "
             "it changes only the first occurrence -- confirm that is what "
             "you meant, and print back the changed construct rather than "
             "trusting the file diff alone."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

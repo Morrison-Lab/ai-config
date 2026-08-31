@@ -172,19 +172,18 @@ def main() -> int:
 
     note = NOTE.format(subagent_type=subagent_type)
 
-    # No `permissionDecision` key at all: an absent decision defers to the
-    # normal permission flow, which is exactly the intent. Naming "allow" here
-    # would suppress a prompt the user would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"Agent launch without `isolation` (subagent_type: {subagent_type}). "
             "Assign a worktree or decide deliberately not to."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

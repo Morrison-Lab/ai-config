@@ -335,16 +335,18 @@ def main():
         f"    gh api -X DELETE repos/{repo}/git/refs/heads/{branch}\n\n"
         "This is a warning, not a refusal: proceed if you mean to."
     )
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"--delete-branch may close {listed}, which "
             f"{'use' if plural else 'uses'} `{branch}` as a base."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

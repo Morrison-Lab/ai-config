@@ -1031,9 +1031,6 @@ class TestPrePushReview(unittest.TestCase):
         self.assertIsNone(reviewer.run_antigravity_review(huge_prompt))
         self.assertIsNone(reviewer.run_cursor_review(huge_prompt))
 
-
-
-
     def test_verdict_clean_discussing_blocking_status(self):
         commit = "12345678abcdef00"
         report = "### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] No prior blocking findings were resolved.\n[INFO] The issue of the UI blocking the main thread was fixed.\n### Verification Steps\nNone\nReviewed-Commit: " + commit
@@ -1055,7 +1052,14 @@ class TestPrePushReview(unittest.TestCase):
 
     def test_verdict_no_blockers_found(self):
         commit = "12345678abcdef00"
-        for phrase in ("No blockers found.", "No known blockers remain outstanding.", "Zero blockers identified in this review.", "There are no blockers preventing merge."):
+        for phrase in (
+            "No blockers found.",
+            "No known blockers remain outstanding.",
+            "No previously known blockers remain.",
+            "No newly known blockers remain.",
+            "Zero blockers identified in this review.",
+            "There are no blockers preventing merge.",
+        ):
             report = f"### Summary Verdict\nVerdict: Ready for merge\n### Critical Findings\nNone.\n### Observations & Non-Blocking Suggestions\n[INFO] {phrase}\n### Verification Steps\nNone\nReviewed-Commit: {commit}"
             is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
             self.assertTrue(is_valid, f"Expected valid for '{phrase}', got: {reason}")

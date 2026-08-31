@@ -1341,6 +1341,11 @@ same weight as the other modularity checks above.
 <!-- Not yet shared with the lab manual; edit shared/coding/decompose-to-functions.md, not here. -->
 [shared/coding/decompose-to-functions.md](shared/coding/decompose-to-functions.md)
 
+## Coding: avoid catastrophic backtracking in regular expressions
+
+<!-- Not yet shared with the lab manual; edit shared/coding/regex-backtracking-pitfalls.md, not here. -->
+[`shared/coding/regex-backtracking-pitfalls.md`](shared/coding/regex-backtracking-pitfalls.md)
+
 ## Writing style: plain, direct prose
 
 <!-- Shared with the lab manual; edit shared/writing/plain-prose.md, not here. -->

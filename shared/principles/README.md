@@ -247,10 +247,13 @@ Operationalized by:
 [`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
 principle applied to shape rather than to errors, since a type-unstable
 call returns a plausible object of the wrong kind instead of failing ---
-and [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
 covers the shell case where `set -e` silently stops applying, so a script
 either aborts on an expected non-zero exit or fails to, depending on the
-call site.
+call site,
+and [`regex-backtracking-pitfalls`](../coding/regex-backtracking-pitfalls.md),
+which covers regular expressions that fail by backtracking exponentially
+on non-matching inputs, and prescribes linear scans by construction.
 
 ## Algorithmatize checks — instruments over judgment
 

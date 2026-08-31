@@ -922,8 +922,9 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"(?=[,;.!?]|$)",
         re.IGNORECASE,
     )
-    # The veto is the second gate, not the only one: it runs in code over
-    # the citation's WHOLE containing sentence, in both directions -- a
+    # The veto is the second gate, not the only one. It runs in code
+    # over the citation's containing sentence BACKWARD and its
+    # containing paragraph FORWARD -- a
     # forward-only lookahead window missed "The finding remains
     # unaddressed despite my response to it (posted ...)" and any
     # re-raise past its length bound. Sentence bounds use the glued-dot
@@ -953,6 +954,28 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     _sentence_starts = [0]
     for _end in _SENTENCE_END.finditer(text):
         _sentence_starts.append(_end.end())
+    # Paragraph ends and veto-word positions are likewise computed once.
+    # Slicing the tail per citation re-scans the rest of the body every
+    # time, which is quadratic in a body packed with them: 400 citations
+    # took 1.26s and each doubling quadrupled it. Only the BACKWARD half
+    # had been fixed; widening the forward scan to the paragraph
+    # reintroduced the trap on the other side.
+    #
+    # Testing membership by bisect over precomputed positions preserves
+    # the semantics exactly, rather than approximating them with a
+    # per-paragraph flag: the regions searched are still the sentence
+    # before the citation, the attribution link, and the paragraph after
+    # it, with the aside itself still excluded so its own verdict text
+    # cannot self-veto.
+    _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
+    _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
+
+    def _vocab_between(lo: int, hi: int) -> bool:
+        if hi <= lo:
+            return False
+        return bisect.bisect_left(_vocab_at, lo) < bisect.bisect_left(
+            _vocab_at, hi
+        )
 
     def _strip_posted_aside(m: "re.Match") -> str:
         sentence_start = _sentence_starts[
@@ -963,14 +986,15 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         # remains open."), which a sentence-bounded scan cannot see.
         # Widening the scan can only make the veto fire more often, so it
         # keeps more citations -- the fail-closed direction.
-        tail = m.string[m.end():]
-        paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", tail)
-        sentence_tail = paragraph.group(0) if paragraph else tail
-        context = " ".join(
-            (m.string[sentence_start:m.start()], m.group("keep"),
-             sentence_tail)
+        _idx = bisect.bisect_left(_paragraph_ends, m.end())
+        paragraph_end = (
+            _paragraph_ends[_idx] if _idx < len(_paragraph_ends)
+            else len(m.string)
         )
-        if _RERAISE_VOCAB.search(context):
+        keep_end = m.start() + len(m.group("keep"))
+        if _vocab_between(sentence_start, keep_end) or _vocab_between(
+            m.end(), paragraph_end
+        ):
             return m.group(0)
         return m.group("keep") + " "
 

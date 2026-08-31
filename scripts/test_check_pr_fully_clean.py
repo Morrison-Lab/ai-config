@@ -108,6 +108,27 @@ def wrapped_check_review_comments(pr_num, sha, repo, review_decision="", branch=
 checker.check_ci_runs = wrapped_check_ci_runs
 checker.check_review_comments = wrapped_check_review_comments
 
+def best_of_three(fn, *args):
+    """Fastest of three runs, with the last return value.
+
+    A timing check is about complexity, not about how busy the machine
+    is, so a single sample makes it flaky: one of these failed under
+    contention at 6.7x headroom while measuring 0.148s standalone.
+    Taking the minimum keeps the threshold tight enough to catch a
+    quadratic -- which misses by orders of magnitude, not by noise --
+    without failing on a loaded runner.
+    """
+    best = None
+    value = None
+    for _ in range(3):
+        start = time.time()
+        value = fn(*args)
+        elapsed = time.time() - start
+        if best is None or elapsed < best:
+            best = elapsed
+    return best, value
+
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 
@@ -3204,8 +3225,8 @@ def main() -> int:
         "a 'not been addressed' re-raise refuses the strip",
         checker.classify_verdict(not_been_addressed) == "not-clean",
     )
-    # The veto scans the citation's whole containing sentence in BOTH
-    # directions: a re-raise stated before the attribution still refuses
+    # The veto scans the containing sentence BACKWARD and the containing
+    # paragraph FORWARD: a re-raise stated before the attribution refuses
     # the strip, and one past any fixed window length does too.
     backward_reraise = (
         "The finding remains unaddressed despite my response to it "
@@ -3324,6 +3345,23 @@ def main() -> int:
             "the veto refuses the strip on " + label,
             checker.classify_verdict(body) == "not-clean",
         )
+    # The veto's regions are found by bisect over positions computed
+    # once, not by slicing the tail per citation. Slicing re-scanned the
+    # rest of the body every time: 400 citations took 1.26s and each
+    # doubling quadrupled it, so a cap-sized body of them ran for
+    # seconds inside a checker that runs this per review item.
+    _cite_unit = (
+        "In response to [round 2](https://example.com/x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), "
+        "resolved. "
+    )
+    _cite_body = "### Verdict\n**Ready for merge.** " + _cite_unit * 555
+    _cite_secs, _cite_verdict = best_of_three(
+        checker.classify_verdict, _cite_body)
+    check(
+        "a body packed with citations scans linearly",
+        _cite_verdict == "clean" and _cite_secs < 1,
+    )
     # A verdict heading inside a FENCE does not license the strip. The
     # gate runs before fences are removed, and a review of this file
     # quotes that heading in a code block.
@@ -3568,11 +3606,11 @@ def main() -> int:
     _cap_body = _cap_prefix + _cap_unit * (
         (65536 - len(_cap_prefix) - len(_cap_suffix)) // len(_cap_unit)
     ) + _cap_suffix
-    _t0 = time.time()
-    _cap_verdict = checker.classify_verdict(_cap_body)
+    _cap_secs, _cap_verdict = best_of_three(
+        checker.classify_verdict, _cap_body)
     check(
         "a max-length many-sentence body scans linearly and correctly",
-        _cap_verdict == "not-clean" and time.time() - _t0 < 5,
+        _cap_verdict == "not-clean" and _cap_secs < 5,
     )
     # A faked sentence end was reintroduced twice by fixing one
     # whitespace shape and breaking another, so the shapes are swept
@@ -3635,11 +3673,10 @@ def main() -> int:
     # 5.4s for this body before the two forward pointers replaced them.
     _nbsp = chr(0xa0)
     _dense = ("word" + _nbsp) * 40000 + "." + _nbsp
-    _t0 = time.time()
-    checker._sentence_start_before(_dense)
+    _dense_secs, _ = best_of_three(checker._sentence_start_before, _dense)
     check(
         "the sentence scan stays linear with no ascii break present",
-        time.time() - _t0 < 1,
+        _dense_secs < 1,
     )
     # The citation veto shares the same sentence scan, so a faked
     # sentence end there hides a re-raise instead of a negator, and

@@ -10,7 +10,10 @@ import importlib.util
 import io
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock, mock_open
 
@@ -1679,6 +1682,152 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(adapter.PRE_INVOCATION_MSG_BYTE_CAP, 10000)
         self.assertEqual(adapter.PRE_INVOCATION_TOTAL_BYTE_CAP, 30000)
         self.assertEqual(buf.getvalue(), "")
+
+    # -- Symlink invocation & repo_root resolution (Issue #2681) ---------
+
+    def test_symlink_invocation_resolves_repo_root_to_find_hooks_json(self):
+        """Under ~/.gemini/config/plugins/ai-config/... invocation (symlink),
+        __file__ must resolve via realpath so hooks/hooks.json is located in the
+        real repo checkout, not in the config directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_repo = os.path.join(tmpdir, "repo")
+            fake_config = os.path.join(tmpdir, "gemini_config")
+            
+            repo_plugins_dir = os.path.join(fake_repo, "plugins", "ai-config")
+            repo_hooks_dir = os.path.join(fake_repo, "hooks")
+            os.makedirs(repo_plugins_dir, exist_ok=True)
+            os.makedirs(repo_hooks_dir, exist_ok=True)
+
+            config_plugins_dir = os.path.join(fake_config, "plugins")
+            os.makedirs(config_plugins_dir, exist_ok=True)
+
+            # Copy actual adapter into fake_repo
+            fake_adapter_path = os.path.join(repo_plugins_dir, "claude-hook-adapter.py")
+            shutil.copy2(ADAPTER_SCRIPT, fake_adapter_path)
+
+            # Create mock hook script that denies
+            mock_deny_path = os.path.join(repo_hooks_dir, "mock-deny.py")
+            with open(mock_deny_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'hookSpecificOutput': {'permissionDecision': 'deny', 'permissionDecisionReason': 'blocked by real repo hook'}}))\n"
+                )
+
+            # Create mock hook script for stop that blocks
+            mock_stop_path = os.path.join(repo_hooks_dir, "mock-stop.py")
+            with open(mock_stop_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'decision': 'block', 'reason': 'unresolved obligations'}))\n"
+                )
+
+            # Create mock hook script for preinvocation
+            mock_preinv_path = os.path.join(repo_hooks_dir, "mock-preinv.py")
+            with open(mock_preinv_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'systemMessage': 'injected context from hook'}))\n"
+                )
+
+            # Write hooks.json in fake_repo referencing ${CLAUDE_PLUGIN_ROOT}
+            hooks_json_path = os.path.join(repo_hooks_dir, "hooks.json")
+            with open(hooks_json_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "hooks": {
+                        "PreToolUse": [
+                            {
+                                "matcher": "Bash",
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-deny.py\""
+                                    }
+                                ]
+                            }
+                        ],
+                        "Stop": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-stop.py\""
+                                    }
+                                ]
+                            }
+                        ],
+                        "UserPromptSubmit": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-preinv.py\""
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }, f)
+
+            # Create symlink: fake_config/plugins/ai-config -> fake_repo/plugins/ai-config
+            symlink_plugin_dir = os.path.join(config_plugins_dir, "ai-config")
+            os.symlink(repo_plugins_dir, symlink_plugin_dir)
+
+            symlink_adapter_path = os.path.join(symlink_plugin_dir, "claude-hook-adapter.py")
+
+            # 1. PreToolUse via symlink
+            payload_pretool = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push"}
+                }
+            }
+            proc = subprocess.run(
+                [sys.executable, symlink_adapter_path],
+                input=json.dumps(payload_pretool),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc.returncode, 0, f"Adapter PreToolUse failed: {proc.stderr}")
+            self.assertNotIn("hooks.json not found", proc.stderr)
+            out = json.loads(proc.stdout)
+            self.assertEqual(out.get("decision"), "deny")
+            self.assertIn("blocked by real repo hook", out.get("reason", ""))
+
+            # 2. Stop via symlink
+            payload_stop = {
+                "terminationReason": "model_stop"
+            }
+            proc_stop = subprocess.run(
+                [sys.executable, symlink_adapter_path],
+                input=json.dumps(payload_stop),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc_stop.returncode, 0, f"Adapter Stop failed: {proc_stop.stderr}")
+            self.assertNotIn("hooks.json not found", proc_stop.stderr)
+            out_stop = json.loads(proc_stop.stdout)
+            self.assertEqual(out_stop.get("decision"), "continue")
+            self.assertIn("unresolved obligations", out_stop.get("reason", ""))
+
+            # 3. PreInvocation via symlink
+            payload_preinv = {
+                "invocationNum": 1,
+                "prompt": "hello"
+            }
+            proc_preinv = subprocess.run(
+                [sys.executable, symlink_adapter_path],
+                input=json.dumps(payload_preinv),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc_preinv.returncode, 0, f"Adapter PreInvocation failed: {proc_preinv.stderr}")
+            self.assertNotIn("hooks.json not found", proc_preinv.stderr)
+            out_preinv = json.loads(proc_preinv.stdout)
+            self.assertIn("injectSteps", out_preinv)
+            self.assertTrue(any("injected context from hook" in step.get("ephemeralMessage", "") for step in out_preinv.get("injectSteps", [])))
 
 if __name__ == "__main__":
     unittest.main()

@@ -173,7 +173,7 @@ When evaluating a repository, issue, or task, follow these steps:
 | **Mechanical Refactor / Boilerplate Generation** | OpenCode CLI | Free Hosted Tier | OpenCode Free | Test Suite + Sonnet |
 | **Fast Syntax / Link / Triage Scans** | Claude Code | Direct Claude | Haiku 4.5 | Deterministic Lint |
 | **Restricted / Sensitive Data Analysis** | Claude Code | Local Session Only | Approved Model | Deterministic Scripts |
-| **Antigravity Plugin / Extension Integration** | Antigravity / Gemini CLI | DeepMind Ecosystem | Gemini 2.5 / Pro | Sonnet 4.6 |
+| **Antigravity Plugin / Extension Integration** | Antigravity / Gemini CLI | DeepMind Ecosystem | Gemini Pro | Sonnet 4.6 |
 
 ---
 

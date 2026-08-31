@@ -251,6 +251,23 @@ That one is the reason to **execute** both patterns rather than read both diffs.
 - **Do:** merge two independent fixes for one review round, whatever their parents, and **run** each side's version against the inputs at issue --- a diff shows what each side changed, and only executing it shows which of those changes did anything.
 - **Don't:** reset onto the other session's commit because the two rounds answered the same findings --- addressing the same list is not producing the same fix.
 
+**Third occurrence, 2026-08-30, with a posted claim comment already standing --- and this time the reconciliation itself was orphaned by the merge outracing it.**
+The two occurrences above both kept content from each side by pushing a merge that combined them.
+This one shows a third way to lose the race: the reconciling merge can be **correct and still never ship**, because the PR merges before it lands.
+
+On `ai-config#2668`, this session posted a claim comment ("Claude Code CLI ... is taking over this PR ... please hold off until I'm done", 17:48:33Z) and kept driving the branch.
+The claim did not stop a second driver: at 20:55:26 this session committed `c2153168`, continuing its own paragraph-window design for the re-raise veto, and at 21:00:55 a second identity's commit `1bea0e0b` ("scan entire containing section for reraise veto") landed as a structurally different design for the identical gap.
+This session then prepared a local merge, `b5794bc4`, reconciling the two --- its own message states plainly that "the `@claude` bot and this session fixed the same three findings concurrently" and gives the reason for taking the bot's design whole: "on the central one its design is strictly better: scanning the whole containing section ... is wider than a window of the containing paragraph plus one on each side, so it vetoes more and keeps more citations -- the safe direction."
+That reconciliation never entered history.
+`5dfcb6e7`, the commit that actually merged as the PR's squash, is byte-identical in its full tree to `1bea0e0b` --- the bot's commit taken as-is, with none of `b5794bc4`'s additions --- and it merged at `21:09:30`, six seconds **before** `b5794bc4` was authored at `21:09:36`.
+The reconciliation was correct (its rationale for preferring the wider scan holds, and the shipped code is the safe design either way), but it was already too late: the PR had merged while it was still being written, so its extra rationale comments were simply never pushed and are absent from `main` today.
+
+- **Do:** when two independent fixes turn out to be competing designs for the same gap rather than complementary ones, compare them **on the merits**, but re-check the PR's live state before trusting that comparison as the resolution --- a merge racing ahead of your own reconciliation is a distinct failure from the collision the reconciliation was meant to fix.
+- **Do:** treat a posted claim comment as a signal, not a lock;
+  keep checking `git ls-remote` before every push exactly as [`check-before-pushing`](check-before-pushing.md) already prescribes, claim or no claim.
+- **Don't:** assume a live claim comment stops a bot (or a second session) from pushing to the branch it names --- this is the same collision `check-before-pushing.md`'s "Ownership is what suppresses the check" section already lists, observed again with a claim already standing.
+- **Don't:** treat a local reconciliation commit as shipped just because it exists and is correct --- check the PR's actual merged head (`gh pr view <N> --json mergeCommit,mergedAt`) before crediting it with anything, since a merge that completes first ships the branch as it stood, not your unpushed fix-up on top of it.
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

@@ -1166,14 +1166,14 @@ _BARE_REJECTION = (
 RESOLVED_BLOCKING_SUFFIX = re.compile(
     r"^(?:(?!\b(?:and|but|while|although|however)\b)"
     r"(?:\([^()\n]{0,120}\)|[^,:;.!?()])){0,120}\b(?:"
-    r"(?:is|are|was|were)\s+(?:now\s+)?"
+    r"(?:is|are|was|were)\s+(?:(?:now|since|already|also|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|ha(?:s|ve)\s+(?:since\s+)?been\s+"
+    r"|ha(?:s|ve)\s+(?:(?:since|already|also)\s+)?been\s+(?:(?:now|fully|completely|satisfactorily|properly|cleanly|successfully)\s+)?"
     r"(?:fixed|resolved|addressed|closed|removed|corrected)"
     r"|no\s+longer\s+applies"
     r")\b"
-    r"(?:\s+(?:by|in|via)\s+this\s+round(?:['\u2019]s)?\s+"
-    r"(?:diff|push|commit|changes?|fixes?))?"
+    r"(?:\s+(?:(?!\b(?:and|but|while|although|however|yet|though)\b)"
+    r"(?:\([^()\n]{0,120}\)|[^;:,.!?()]|\.(?!\s|$))){1,180})?"
     r"(?:"
     r"\s+and\s+(?:confirmed\s+)?passing"
     r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
@@ -1307,8 +1307,7 @@ _NEGATOR_RE = re.compile(
 
 _PAST_STATE_RE = re.compile(
     r"(?:\bpreviously"
-    r"|\bprior(?:\s+(?:round|verdict)(?:['\u2019]s)?"
-    r"|\s+(?:finding|issue)s?)?"
+    r"|\bprior(?:\s+(?:round|verdict|finding|issue)s?(?:['\u2019]s?)?)?"
     r"|\bearlier"
     r"|\bround-\d+(?:['\u2019]s)?"
     r")(?:[-\s]+|\s+\*{1,2}|\s+(?:the\s+)?)$",

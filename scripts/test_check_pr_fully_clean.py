@@ -1872,6 +1872,57 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "
               "issue is resolved. I found no new issues in this review.\n", "")
           == "clean")
+    for resolution_suffix, label in (
+        ("was resolved by the latest commit", "resolution explained by commit"),
+        ("was resolved by adding tests", "resolution explained by adding tests"),
+        ("was resolved in PR #123", "resolution explained by PR reference"),
+        ("was resolved via commit abc1234", "resolution explained by commit sha"),
+        ("was resolved with the changes in main.py", "resolution explained by filename changes"),
+        ("was resolved as requested", "resolution explained by adverbial as-requested"),
+        ("was resolved per review comments", "resolution explained by per-suggestion"),
+        ("was resolved", "bare resolved phrase"),
+        ("has already been fixed", "adverb already before fixed"),
+        ("has since been addressed", "adverb since before addressed"),
+    ):
+        check(
+            f"classify_verdict: prior blocking finding {label} stays clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n",
+                "",
+            )
+            == "clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: prior blocking finding {label} has no finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n"
+            )
+            is None,
+        )
+    check(
+        "classify_verdict: bare 'prior blocking finding was resolved' stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** Prior blocking finding was resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive finding's blocking issue is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior finding's blocking issue is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive issue's blocking problem is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior issue's blocking problem is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

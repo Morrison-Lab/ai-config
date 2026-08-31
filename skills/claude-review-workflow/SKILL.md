@@ -78,12 +78,11 @@ the consumer repo automatically inherits:
 
 1. **History preservation**: Fresh review comment posted per run without deleting prior review history.
 2. **Inline comment prompt**: Pushes review findings toward line-anchored comments via `mcp__github_inline_comment__create_inline_comment`.
-3. **Structured review output**: Emits machine-readable `<!-- review-data: { ... } -->` JSON alongside human Markdown comments for deterministic ingestion by CI/CD gating scripts.
-4. **Dispatch and event-gating**: Handles both `pull_request` and `workflow_dispatch` triggers, with branch-anchored dispatch resolution.
-5. **Draft and fork guards**: Skips unready drafts, Dependabot PRs, and tokenless fork PRs while executing dispatched runs.
-6. **Concurrency & self-cancellation safety**: Concurrency group keyed per PR with `cancel-in-progress: true`.
-7. **Package customization**: Supports `apt-packages` and `pip-packages` (e.g. `maxima`, `sympy`) for CAS-driven mathematical verification when needed.
-8. **Prompt extensions**: Custom repo-level instructions passed via `prompt-addendum`.
+3. **Dispatch and event-gating**: Handles both `pull_request` and `workflow_dispatch` triggers, with branch-anchored dispatch resolution.
+4. **Draft and fork guards**: Skips unready drafts, Dependabot PRs, and tokenless fork PRs while executing dispatched runs.
+5. **Concurrency & self-cancellation safety**: Concurrency group keyed per PR with `cancel-in-progress: true`.
+6. **Package customization**: Supports `apt-packages` and `pip-packages` (e.g. `maxima`, `sympy`) for CAS-driven mathematical verification when needed.
+7. **Prompt extensions**: Custom repo-level instructions passed via `prompt-addendum`.
 
 ## Inputs and customization
 

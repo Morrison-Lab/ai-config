@@ -1902,7 +1902,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         structured = extract_structured_review(body)
         struct_sha = str(structured.get("commit_sha", "")).strip() if structured else ""
         is_struct_sha_match = bool(
-            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha or sha.startswith(struct_sha) or struct_sha.startswith(sha_short))
+            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha or sha.startswith(struct_sha))
         )
         is_sha_match = bool((oid and oid == sha) or is_struct_sha_match or sha_short in body or sha in body)
         if oid:

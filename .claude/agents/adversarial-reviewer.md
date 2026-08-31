@@ -83,6 +83,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 State the verdict on its own line in that exact form.
 Return the structured report as this call's own message,
 not as a pointer to a file.
+Emit nothing after the closing --> of the review-data comment.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as
 `Needs more work`, an optional heading, and spaces around the colon.

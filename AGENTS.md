@@ -98,7 +98,11 @@ Do not substitute a promise to return for a mechanism that will actually fire.
 ## Prefer optionality over removing functionality
 
 Never remove existing functionality entirely when you can add optionality instead.
-When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose. Instead, make the improved behavior the default and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter, environment variable, or configuration toggle.
+When changing default behavior, fixing an issue, or refactoring a workflow,
+do not delete an existing capability or code path outright if it served a legitimate purpose.
+Instead, make the improved behavior the default
+and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
+environment variable, or configuration toggle.
 See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
 
 ## Interpret instructions broadly and maximize safe progress

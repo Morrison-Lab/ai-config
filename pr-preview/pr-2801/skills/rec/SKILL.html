@@ -382,7 +382,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_question</code>).</li>
+<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_user_question</code> / <code>ask_question</code>).</li>
 <li><strong>Reactively</strong>:
 <ul>
 <li>Explicit invocation: <code>/rec</code>, <code>/recommend</code>, “recommend”, “rec”.</li>
@@ -399,7 +399,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="interactive-tools-format-put-recommendation-first" class="level3">
 <h3 class="anchored" data-anchor-id="interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</h3>
-<p>When using interactive question tools (<code>AskUserQuestion</code> or <code>ask_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
+<p>When using interactive question tools (<code>AskUserQuestion</code>, <code>ask_user_question</code>, or <code>ask_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
 </section>
 <section id="visual-tagging-in-chat-output" class="level3">
 <h3 class="anchored" data-anchor-id="visual-tagging-in-chat-output">3. Visual tagging in chat output</h3>
@@ -430,7 +430,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="step-3-present-the-recommendation">Step 3 — Present the recommendation</h3>
 <p>Present the question or decision with its structured recommendation:</p>
 <ul>
-<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code> / <code>ask_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
+<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code>, <code>ask_user_question</code>, or <code>ask_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
 <li><strong>For inline chat questions</strong>: State the context, outline the trade-offs, and attach the boxed recommendation:</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>❓ **QUESTION:** <span class="dt">&lt;</span><span class="kw">clear</span><span class="ot"> question</span><span class="dt">&gt;</span></span>

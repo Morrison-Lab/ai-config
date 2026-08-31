@@ -20,7 +20,7 @@ For each iteration:
 
 #### a. Invoke `gi` (Grab Issue)
 
-Run the full GI procedure: 1. List open issues, triage/prioritize 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean
+Run the full GI procedure: 1. List open issues, triage, label, and prioritize candidate issues 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean
 
 #### b. Record the result
 

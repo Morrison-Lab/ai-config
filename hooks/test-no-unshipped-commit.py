@@ -553,6 +553,68 @@ try:
     assert _fallback.endswith(subject.PUSH_REMEDY), _fallback
     assert "no later push or PR creation" in _fallback, _fallback
     assert subject.decide("", commit_and_push) == ""
+
+    # --- ai-config#2737: multi-worktree and branch-switch unshipped detection -
+    # A session commit made in another worktree (cross-checkout) or on a branch
+    # since checked out away was previously invisible to the single cwd check.
+    # decide() now inspects all linked worktrees and switched local branches.
+    wt_root, wt_bare, wt_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+    )
+    wt2 = tempfile.mkdtemp()
+    wt_run(f"git worktree add -q -b feat2 {wt2} main")
+    wt_run("git push -q -u origin feat2", cwd=wt2)
+    wt_run(HOOK, cwd=wt2)
+
+    sw_root, sw_bare, sw_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b feat-sw",
+        "git push -q -u origin feat-sw",
+        HOOK,
+        "git checkout -q main",
+    )
+
+    sw_dropped_root, sw_dropped_bare, sw_dropped_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b feat-drop",
+        "git push -q -u origin feat-drop",
+        HOOK,
+        "git reset --hard HEAD~1",
+        "git checkout -q main",
+    )
+
+    try:
+        # Cross-checkout: payload cwd is clean, but linked worktree wt2 has an unpushed commit.
+        _wt_reason = subject.decide(wt_root, commit_only)
+        assert _wt_reason and "worktree" in _wt_reason and "feat2" in _wt_reason, _wt_reason
+        assert _wt_reason.startswith("1 commit(s) on worktree"), _wt_reason
+
+        # Pushing wt2 discharges the multi-worktree debt.
+        wt_run("git push -q origin feat2", cwd=wt2)
+        assert subject.decide(wt_root, commit_only) == ""
+
+        # Branch switch: payload cwd is on clean main, but feat-sw has an unpushed commit.
+        _sw_reason = subject.decide(sw_root, commit_only)
+        assert _sw_reason and "branch 'feat-sw'" in _sw_reason, _sw_reason
+        assert _sw_reason.startswith("1 commit(s) on branch 'feat-sw'"), _sw_reason
+
+        # Dropped commit on switched branch: clean.
+        assert subject.decide(sw_dropped_root, commit_only) == ""
+
+        # Multiple unpushed worktrees: both wt_root and wt2 unpushed.
+        wt_run(HOOK, cwd=wt_root)
+        wt_run(HOOK, cwd=wt2)
+        _multi_reason = subject.decide(wt_root, commit_only)
+        assert "HEAD" in _multi_reason and "worktree" in _multi_reason and "are not on upstream" in _multi_reason, _multi_reason
+    finally:
+        for _p in (wt_root, wt_bare, wt2, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare):
+            shutil.rmtree(_p, ignore_errors=True)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
                   plain_push_root, scoped_root, behind_root, other,
@@ -568,3 +630,4 @@ print("PASS: the derived count names itself, and state outranks a transcript dis
 print("PASS: no-upstream falls back to the transcript, and staleness is not unshippedness")
 print("PASS: without a cwd the verdict falls back to the transcript scan")
 print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")
+print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")

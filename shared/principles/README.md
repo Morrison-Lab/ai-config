@@ -350,6 +350,22 @@ Operationalized by:
 [`specific-beats-general`](specific-beats-general.md),
 and the `clean` / `simplify` review passes.
 
+## Think outside the box --- distinguish real from artificial limitations
+
+Do not make unnecessary assumptions about structural limitations;
+consider which limitations are real (hard architectural, mathematical,
+security, or physical bounds) and which are artificial (inherited conventions,
+unexamined defaults, obsolete constraints, or local scoping traps).
+When a task or design becomes awkward or overly complex, test the assumed
+constraints empirically and reframe the problem or move the boundary
+rather than building intricate workarounds inside an unnecessary box.
+
+Full statement: [`think-outside-the-box`](think-outside-the-box.md).
+Operationalized by:
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md) (questioning the premise or mechanism),
+[`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md) (re-architecting workflow shapes),
+and the `simplify` / `tidy` skills.
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -436,6 +452,14 @@ while least-flexible-tool guides authoring new code without speculative flexibil
 and simplify/tidy prune dead or unreferenced code paths,
 prefer-optionality-over-removal protects active capabilities with legitimate callers
 from being deleted outright when a default behavior needs improvement.
+
+Think-outside-the-box operates on the problem space itself:
+while challenge-the-assignment questions what you are asked to do or told is true,
+think-outside-the-box inspects the structural and procedural limitations you assume
+bind the solution.
+It aids KISS by dissolving artificial boundaries that force complex workarounds,
+while respecting hard boundaries (security policies, permissions, and correctness invariants)
+that must not be circumvented.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

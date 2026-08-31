@@ -305,10 +305,10 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         matches = re.findall(pattern, text, re.DOTALL)
         return "\n\n".join(m.strip() for m in matches) if matches else None
 
-    summary_text = extract_section(unfenced_report, r"(?:Summary\s+)?Verdict")
-    critical_text = extract_section(unfenced_report, r"Critical Findings")
-    observations_text = extract_section(unfenced_report, r"Observations")
-    verification_text = extract_section(unfenced_report, r"Verification(?: Steps)?")
+    summary_text = extract_section(unfenced_report, r"(?:(?:Summary|Review)\s+)?Verdict[^\n]*")
+    critical_text = extract_section(unfenced_report, r"Critical Findings[^\n]*")
+    observations_text = extract_section(unfenced_report, r"Observations[^\n]*")
+    verification_text = extract_section(unfenced_report, r"Verification[^\n]*")
 
     # Two report contracts exist (ai-config#2309): this engine's own
     # (Summary Verdict / Critical Findings / Observations / Verification

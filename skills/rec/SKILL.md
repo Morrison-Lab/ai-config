@@ -20,7 +20,7 @@ or asks what the agent recommends after an unweighted question was asked.
 
 - **Proactively**: whenever presenting options for a genuine decision,
   asking a clarifying or architectural question,
-  or using interactive question modals (`AskUserQuestion` / `ask_user_question` / `ask_question`).
+  or using interactive question modals (`AskUserQuestion` / `ask_user_question`).
 - **Reactively**:
   - Explicit invocation: `/rec`, `/recommend`, "recommend", "rec".
   - The user asks "what do you recommend?", "what's your recommendation?",
@@ -38,7 +38,7 @@ State the specific recommendation clearly
 
 ### 2. Interactive tools format: put recommendation first
 
-When using interactive question tools (`AskUserQuestion`, `ask_user_question`, or `ask_question`):
+When using interactive question tools (`AskUserQuestion` or `ask_user_question`):
 - Place the recommended option **first** in the options array.
 - Prefix the label with `(Recommended)`
   (e.g., `(Recommended) Option A: ...`).
@@ -89,7 +89,7 @@ Select the single strongest path as the recommendation.
 
 Present the question or decision with its structured recommendation:
 
-- **For interactive GUI modals** (`AskUserQuestion`, `ask_user_question`, or `ask_question`):
+- **For interactive GUI modals** (`AskUserQuestion` or `ask_user_question`):
   List the recommended choice as option 1 with the `(Recommended)` prefix.
 - **For inline chat questions**:
   State the context, outline the trade-offs, and attach the boxed recommendation:

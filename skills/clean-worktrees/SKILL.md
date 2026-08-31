@@ -9,7 +9,7 @@ allowed-tools:
   - Write
 ---
 
-# Clean Worktrees (aka CW / prune-worktrees)
+# Clean Worktrees (aka CW)
 
 Sweep **dead git worktrees** out of the current repo. Agent isolation and the
 `session-lock` skill spin up worktrees under `.claude/worktrees/<name>/` (or
@@ -24,7 +24,7 @@ deletes the now-free branch (or this skill deletes it inline).
 
 ## When this fires
 
-- "clean worktrees", "cw", "prune worktrees", "prune-worktrees"
+- "clean worktrees", "cw", "prune worktrees"
 - "clean dead worktrees", "remove stale worktrees", "tidy up worktrees"
 - "which worktrees can I delete?"
 - After a batch of PRs merge and the `.claude/worktrees/` dir has grown.
@@ -387,7 +387,7 @@ git worktree prune -v               # clears any record left by the removals
 
 ## Relationship to other skills
 
-- **`session-lock` / `deconflict-sessions`** — *creates* the worktrees this
+- **`session-lock`** — *creates* the worktrees this
   skill cleans up; consult its registry (step 3d) so you never remove one a
   live session holds. Its own teardown is `git worktree remove` at session end;
   this skill is the bulk sweep for the ones that slipped through.

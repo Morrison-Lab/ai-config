@@ -1473,7 +1473,7 @@ _PREFIX_DISQUALIFY_RE = re.compile(
     r"should|would|could|might|may|must|ought\s+to|needs?\s+to|supposed\s+to|yet\s+to"
     r"|claims?|claiming|claimed|says?|saying|said|believes?|believed|thinks?|thought"
     r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
-    r"|apparently|seemingly|presumably|unconfirmed|unverified|reported"
+    r"|apparently|seemingly|presumably|unconfirmed|unverified|reportedly"
     r"|if|unless|whether|had|though|although"
     r"|seems?(?:\s+to(?:\s+have(?:\s+been)?)?)?|looks?\s+(?:like|to\s+be)"
     r"|hopes?|hoping|hoped|hopefully"
@@ -1485,7 +1485,6 @@ _PREFIX_DISQUALIFY_RE = re.compile(
     r"|as\s+far\s+as\s+(?:i|we|you|they|he|she)\s+(?:know|understand|recall|remember|can\s+tell)"
     r"|according\s+to"
     r"|from\s+(?:my|our|what\s+i|what\s+we)"
-    r"|my|our|your|his|her|their|i|we|you|he|she|it|they"
     r")\b"
 )
 _PREFIX_NON_RESOLUTION_SUBJECT = re.compile(

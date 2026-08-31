@@ -2552,6 +2552,24 @@ def main() -> int:
               "- to my knowledge this is fixed\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (resolved) with 'It is fixed in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- It is fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (resolved) with 'We fixed this in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- We fixed this in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
+    check("Findings (resolved) with 'The crash they reported is fixed in commit abc1234' resolves (#2781 positive)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- The crash they reported is fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

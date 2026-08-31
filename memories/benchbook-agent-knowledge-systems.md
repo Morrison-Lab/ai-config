@@ -20,7 +20,8 @@ When an LLM agent maintains a knowledge base, the failure mode flips to **bloat*
 - Eager agents duplicate narratives across multiple files, mirror task lists, and expand logs.
 - A rotting repository looks empty and unmaintained;
   a bloated repository looks deceptively productive while degrading retrieval precision and context efficiency.
-- *Core rule:* "Boredom was never the enemy. Enthusiasm was."
+- *Core rule:* "Boredom was never the enemy.
+  Enthusiasm was."
   System contracts must explicitly constrain agents to write less,
   in strictly designated single-source-of-truth locations.
 

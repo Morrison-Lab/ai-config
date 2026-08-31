@@ -649,7 +649,11 @@ def _citation_mask(text: str) -> bytearray:
             begin, finish = match.span()
             whole[begin:finish] = b"\x01" * (finish - begin)
 
-    mask = bytearray(a & b for a, b in zip(per_line, whole))
+    mask = bytearray(
+        (int.from_bytes(per_line, "big") & int.from_bytes(whole, "big")).to_bytes(
+            len(text), "big"
+        )
+    )
     for begin, finish in oversized:
         mask[begin:finish] = b"\x00" * (finish - begin)
     return mask
@@ -676,40 +680,44 @@ def _sub_with_mask(
     for match in pattern.finditer(text):
         begin, finish = match.span()
         out.append(text[prev:begin])
-        out_mask += mask[prev:begin]
+        out_mask.extend(mask[prev:begin])
         replacement = repl(match) if callable(repl) else repl
         if replacement == match.group(0):
-            out_mask += mask[begin:finish]
+            out_mask.extend(mask[begin:finish])
         else:
-            fill = 1 if finish > begin and all(mask[begin:finish]) else 0
-            out_mask += bytes([fill]) * len(replacement)
+            fill = 1 if finish > begin and (0 not in mask[begin:finish]) else 0
+            if fill:
+                out_mask.extend(b"\x01" * len(replacement))
+            else:
+                out_mask.extend(b"\x00" * len(replacement))
         out.append(replacement)
         prev = finish
     out.append(text[prev:])
-    out_mask += mask[prev:]
+    out_mask.extend(mask[prev:])
     return "".join(out), out_mask
 
 
 def _strip_fences_with_mask(
-    text: str, mask: bytearray
+    text: str, mask: bytearray, to_strip: Optional[set[int]] = None
 ) -> Tuple[str, bytearray]:
     """``strip_fences(text, replacement=" ")``, carrying the mask along."""
     lines = text.split("\n")
-    fenced, _, orphans = find_fence_spans(text)
-    to_strip = fenced | orphans
+    if to_strip is None:
+        fenced, _, orphans = find_fence_spans(text)
+        to_strip = fenced | orphans
     out: List[str] = []
     out_mask = bytearray()
     offset = 0
     for index, line in enumerate(lines):
         if index in to_strip:
             out.append(" ")
-            out_mask += bytes([0])
+            out_mask.append(0)
         else:
             out.append(line)
-            out_mask += mask[offset:offset + len(line)]
+            out_mask.extend(mask[offset:offset + len(line)])
         if index != len(lines) - 1:
             out.append("\n")
-            out_mask += bytes([0])
+            out_mask.append(0)
         offset += len(line) + 1
     return "".join(out), out_mask
 
@@ -723,7 +731,7 @@ def match_is_cited(mask: bytearray, start: int, end: int) -> bool:
     earlier attempt at this fix lost exactly that case by blanking text instead
     of filtering matches.
     """
-    return end > start and all(mask[start:end])
+    return end > start and (0 not in mask[start:end])
 
 
 def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
@@ -1063,10 +1071,15 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     _line_starts = [0]
     for _l in _lines[:-1]:
         _line_starts.append(_line_starts[-1] + len(_l) + 1)
-    # swallow_unclosed=True folds an unclosed fence's interior into
-    # fenced_lines and leaves orphan_markers empty by construction, so
-    # there is no second set to union in here.
-    _ignored_lines = find_fence_spans(text, swallow_unclosed=True)[0]
+    _fenced_lines, _unclosed_count, _orphans = find_fence_spans(
+        text, swallow_unclosed=False
+    )
+    _to_strip = _fenced_lines | _orphans
+    _ignored_lines = (
+        _fenced_lines
+        if _unclosed_count == 0
+        else find_fence_spans(text, swallow_unclosed=True)[0]
+    )
 
     _heading_starts = []
     for _h in re.finditer(r"(?m)^#{1,6}\s", text):
@@ -1076,12 +1089,23 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
 
     _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
 
-    _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))
-    if _VERDICT_HEADING_RE.search(_fence_free):
+    _has_verdict_heading = False
+    for _m in _VERDICT_HEADING_RE.finditer(text):
+        _pos = _m.start() + (1 if text[_m.start()] == "\n" else 0)
+        _lineno = bisect.bisect_right(_line_starts, _pos) - 1
+        if _lineno not in _to_strip:
+            _has_verdict_heading = True
+            break
+
+    if _has_verdict_heading:
+        text_before_posted = text
         text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)
+        if text != text_before_posted:
+            _to_strip = None
+
     mask = _citation_mask(text)
     # Fenced code blocks first, spanning lines.
-    text, mask = _strip_fences_with_mask(text, mask)
+    text, mask = _strip_fences_with_mask(text, mask, to_strip=_to_strip)
     # Inline code spans, within a line.
     text, mask = _sub_with_mask(_BASE_INLINE_SPAN, " ", text, mask)
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
@@ -1432,7 +1456,7 @@ VERDICT_CLEAN_PATTERNS = [
     r"Verdict:\s*(?:Clean|Approved|Ready)\b",
     r"\bApproved\s+for\s+merge\b",
     # Anthropic code-review plugin clean template (closes #2147).
-    r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+    r"^[ \t]*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 ]
 
 # The bare patterns above carry no verdict on their own: the phrase survives
@@ -1448,7 +1472,7 @@ VERDICT_CLEAN_PATTERNS = [
 BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
-    r"^\s*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+    r"^[ \t]*No\s+issues\s+found\.\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
 }
 BARE_NOT_CLEAN_PATTERNS = {
     _BARE_REJECTION,
@@ -1469,9 +1493,9 @@ FINDING_PATTERNS = [
     r"#+\s*Issues",
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
-    r"(?:^|\n)\s*\*\*Nits?\*\*",
+    r"(?:^|\n)[ \t]*\*\*Nits?\*\*",
     r"#+\s*Non-blocking\b",
-    r"(?:^|\n)\s*\*\*Non-blocking\*\*",
+    r"(?:^|\n)[ \t]*\*\*Non-blocking\*\*",
     r"\*\*Location:\*\*",
     r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
@@ -1490,9 +1514,9 @@ FINDING_HEADING_PATTERNS = {
     r"#+\s*Issues",
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
-    r"(?:^|\n)\s*\*\*Nits?\*\*",
+    r"(?:^|\n)[ \t]*\*\*Nits?\*\*",
     r"#+\s*Non-blocking\b",
-    r"(?:^|\n)\s*\*\*Non-blocking\*\*",
+    r"(?:^|\n)[ \t]*\*\*Non-blocking\*\*",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -1704,13 +1728,13 @@ def classify_verdict(body: str, state: str = "") -> str:
 # it is the dangerous direction.
 _SECTION_FINDING_ITEM = re.compile(
     r"(?im)"
-    r"^\s*(?:\*\*)?\[?"
+    r"^[ \t]*(?:\*\*)?\[?"
     r"(?:Defect|Factual\s+Error|Edge\s+Case|Convention|Nit|Non-blocking|"
     r"Suggestion|Note|Question|Warning|Blocking|Critical|Major|Minor|P[0-4])\b\]?"
-    r"|^\s*(?:\d+[.)]|[-*+])\s+\S"
+    r"|^[ \t]*(?:\d+[.)]|[-*+])\s+\S"
     r"|\*\*Location:\*\*"
-    r"|^\s*>\s*\S"
-    r"|^\s*\*\*(?!\s*$)"
+    r"|^[ \t]*>\s*\S"
+    r"|^[ \t]*\*\*(?!\s*$)"
 )
 
 

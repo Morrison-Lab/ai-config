@@ -346,7 +346,7 @@ Three distinct mechanisms produce a false zero from a sampling instrument:
    (such as an arm appended last in a generator subject to `--limit`)
    is cut off before any new cases execute.
 2. **Strided sampling skipping the arm.**
-   A sampling harness that selects every $k$-th item from a generated stream
+   A sampling harness that selects every k-th item from a generated stream
    can skip a small, concentrated batch of newly added cases entirely.
 3. **Earlier deciding branches.**
    An existing check that evaluates before the new mechanism
@@ -360,8 +360,9 @@ not that the code is correct.
 - **Do:** report and assert the reach count
   (e.g., "reached N times out of M")
   for each arm of a generator or sampling instrument.
-- **Do:** place new generator arms before sampling limits,
-  or evaluate them unconditionally after limits are applied.
+- **Do:** evaluate new generator arms unconditionally
+  or append them after sampling limits and strides are applied,
+  so no generated cases are skipped.
 - **Don't:** read "0 differences" or "0 widened" as evidence of correctness
   when the execution count for the new branch was zero.
 
@@ -469,12 +470,15 @@ A caller reading only the pass/fail bit sees no difference at all.
 - **Don't:** trust an anchored pattern to cover the unanchored case;
   `^marker` and `marker` agree on every example that starts with the marker.
 
-## A subsumption proof over raw text must account for every transformation
+### A subsumption proof over raw text must account for every transformation
 
 When deleting a structured extraction check or parser term on the grounds that
 it is "provably redundant" with a raw substring or regex match over the unparsed
 body,
 account for every transformation between raw text and parsed values.
+This extends the near-subsumption hazard in `### A misleading test label also licenses a DELETION`
+above from matching domains within one string to representations across decoding
+transformations.
 
 Decoders and parsers
 (such as `json.loads` resolving `\u0061` Unicode escapes,
@@ -1287,5 +1291,10 @@ commit `5dfd3883`:
 for `Reviewed-Commit:`;
 loosening one to accept bold and spaced formatting while replacing the other with
 a line scan caused `last_fp` to stay `None` on loosened inputs,
-raising an `AttributeError`.)
+raising an `AttributeError`.
+This is the single-constant counterpart to the sibling-audit rule in
+[What to check](#what-to-check) above
+("When one parser construct becomes tolerant of a condition, audit its siblings for the same condition"):
+where that rule prescribes sweeping distinct constructs that parse the same syntax class,
+this one prescribes eliminating duplicate literals for the exact same construct outright.)
 

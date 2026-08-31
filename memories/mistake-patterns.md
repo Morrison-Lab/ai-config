@@ -529,7 +529,7 @@ A clean automated review from every available provider evaluating the current HE
 
   2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with **no conflict at all** (359 lines from `main`, 109 from the branch);
   the only conflicted path in that merge was `memories/mistake-patterns.md` itself.
-  Yet the cleanly merged `scripts/check-pr-fully-clean.py` carried five fail-opens across the newly combined review-matching and disclosure-footer mechanisms (admitting all comments with Claude Code disclosure footers as automated reviews, first-payload-wins admitting quoted prompt templates with clean verdicts, unmasked code spans/blocks, unclosed details tags), discovered only during post-merge adversarial review.
+  Yet the post-merge adversarial review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and `scripts/pre-push-review.py`, commit `cea1a533`) returned twelve findings, five of them letting not-clean artifacts score clean across the newly combined review-matching, payload-extraction, and disclosure-footer mechanisms (admitting all comments with Claude Code disclosure footers as automated reviews, first-payload-wins admitting quoted prompt templates with clean verdicts, unmasked code spans/blocks, unclosed details tags, and stripped HTML comments ignoring NOT_CLEAN payloads).
 - **Canonical Rule**: [`batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s "Five silent failure modes arrive through a merge nothing flags" section establishes that defects arrive through cleanly-resolved merges and clean auto-merges;
   this pattern covers both the case where the conflict *was* seen and resolved, and the clean auto-merge where no conflict was raised.
   [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) covers verifying the implementation rather than trusting its green suite.
@@ -606,9 +606,9 @@ A clean automated review from every available provider evaluating the current HE
 - **Don't**: Accept a sampling instrument reporting "0 widened, 0 narrowed" as evidence of correctness when the new arm was never reached (e.g. truncated by `--limit`, skipped by strided sampling, bypassed by an earlier deciding branch, or missing from the corpus entirely).
 - **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) (`scripts/check-verdict-scan-parity.py`): Across rounds 2, 3, and 4, the instrument repeatedly reported 0 widened / 0 narrowed as a coverage statement rather than a verification:
   (1) round 2 yielded the payload arm last at index 241,920 where `--limit` truncated it before execution;
-  (2) yielding it first was still lost because `--limit` used strided sampling selecting only 1 of 57 bodies;
+  (2) yielding it first in round 2 was still lost because `--limit` used strided sampling selecting only 1 of 57 bodies;
   (3) in round 3 (`cfdedd9c`), generated payload bodies carried a prose `## Verdict:` line that decided before `payload_is_clean` was ever reached (reached 0 of 32 times), fixed in that round by generating payload-only bodies;
-  (4) in round 4 (`3a7648a7`), the arm still reported 0/0 because `--limit` truncated it before execution.
+  (4) in round 4 (`3a7648a7`), the arm still reported 0/0 because `--limit`'s strided sample skipped the first-yielded payload bodies.
   Fixed in round 5 (`fbf50a69`) by appending the arm after `--limit`, revealing 1 widening and 5 narrowings previously hidden.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A sampling instrument's zero is a coverage statement unless the new arm's reach is reported") and [`fail-fast.md`](../shared/principles/fail-fast.md).
 - **Fix**: Measure and report reach counts (e.g. "reached M of N times") on every arm of a sampling instrument, and ensure new arms are appended after sampling limits.
@@ -621,8 +621,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Do**: When modifying an invariant, data format, layout, or implementation across commits in a PR, grep across the entire repository (including tests, documentation, helper scripts, and sister modules) for comments and docstrings that assert the state or layout of the modified artifact.
 - **Don't**: Rely on adjacent-comment linters (e.g. 10-line single-file windows) or memory of modified files to catch stale assertions about other artifacts;
   comments asserting facts about *another* file expire when that other file changes.
-- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736) commit `c725c449`: Round 5 restored the structured `commit_sha` term in `scripts/check-pr-fully-clean.py` and changed prompt/persona rendering from 3-space indentation to flush-left.
-  Round 6 found two stale cross-artifact comments: (1) `scripts/test_check_pr_fully_clean.py` still contained a comment claiming `commit_sha` "was REMOVED as provably dead", pointing readers away from the test pinning it;
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736): Round 5 (`fbf50a69`) restored the structured `commit_sha` term in `scripts/check-pr-fully-clean.py` and changed prompt/persona rendering from 3-space indentation to flush-left.
+  Round 6 (`c725c449`) found two stale cross-artifact comments left behind by round 5's changes: (1) `scripts/test_check_pr_fully_clean.py` still contained a comment claiming `commit_sha` "was REMOVED as provably dead", pointing readers away from the test pinning it;
   (2) `scripts/lib/review_payload.py` still stated that prompts and personas render the payload 3 spaces in.
   Neither was in the diff or within 10 lines of the changed code in their respective files.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits").

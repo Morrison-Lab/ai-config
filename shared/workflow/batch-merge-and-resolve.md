@@ -533,9 +533,10 @@ The resulting file passes both suites while failing open on inputs neither
 side considered.
 (Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
 merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with zero conflicts
---- 359 lines from `main`, 109 from the branch --- yet the cleanly merged file
-carried five fail-opens across the newly combined review-matching and
-disclosure-footer mechanisms, discovered only during post-merge adversarial review.
+--- 359 lines from `main`, 109 from the branch --- yet the post-merge adversarial
+review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and
+`scripts/pre-push-review.py`, commit `cea1a533`) returned five fail-opens across the
+newly combined review-matching, payload-extraction, and disclosure-footer mechanisms.
 See Pattern 28 in [`mistake-patterns.md`](../../memories/mistake-patterns.md).)
 
 ### The instrument lesson, which is the transferable part

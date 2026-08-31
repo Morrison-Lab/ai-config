@@ -505,9 +505,9 @@ def run_claude_review(prompt: str, model: str = "", expected_commit_sha: str = "
     label_suffix = f" (model: {model})" if model else ""
     print(f"Running local adversarial review via Claude CLI (plan mode){label_suffix}...")
     try:
-        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=360)
+        res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
     except subprocess.TimeoutExpired:
-        print("Notice: Claude review timed out after 360s.", file=sys.stderr)
+        print("Notice: Claude review timed out after 600s.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"Notice: Claude execution failed: {e}", file=sys.stderr)

@@ -511,6 +511,10 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
     so a local version that differs from the one CI uses can produce a misleading diff.
     Install and verify the version recorded by the project's lockfile (or otherwise used by CI),
     regenerate, and inspect the resulting diff before pushing. (ucdavis/bcs#448, 2026-07-28.)
+  - **Avoid `@inheritParams` or `@inheritDotParams` from packages with dynamic/transitive documentation.**
+    Inheriting documentation from wrappers like `gtsummary::tbl_summary` pulls in transitive `cards::ard_tabulate` parameter descriptions whose text varies between upstream package versions.
+    When local and CI package versions differ, `roxygen2::roxygenise()` generates unexpected diffs that fail CI `docs_check`.
+    Write explicit `@param` tags (and document `#' @param ... Additional arguments passed to [pkg::fn]`) for wrapper functions instead of inheriting dynamic dot-params.
 - **Hand-editing `.Rd` is a genuine last resort, only when installing the
   toolchain truly fails** (offline / locked-down sandbox). If forced to it, keep
   the edit safe: roxygen copies `@format`/`@param`/`@return` prose verbatim into

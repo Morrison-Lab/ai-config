@@ -1829,5 +1829,276 @@ class TestAgyHookAdapter(unittest.TestCase):
             self.assertIn("injectSteps", out_preinv)
             self.assertTrue(any("injected context from hook" in step.get("ephemeralMessage", "") for step in out_preinv.get("injectSteps", [])))
 
+    # -- Staging runtime layout & source cleanliness (Issue #2673) ------
+
+    def test_find_repo_root_helper(self):
+        """Verify find_repo_root resolution strategies across various layouts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_dir = os.path.realpath(os.path.join(tmpdir, "my_repo"))
+            os.makedirs(os.path.join(repo_dir, "hooks"), exist_ok=True)
+            with open(os.path.join(repo_dir, "hooks", "hooks.json"), "w", encoding="utf-8") as f:
+                f.write("{}")
+
+            # 1. Standard layout: repo_dir/plugins/ai-config/claude-hook-adapter.py
+            plugin_dir = os.path.join(repo_dir, "plugins", "ai-config")
+            os.makedirs(plugin_dir, exist_ok=True)
+            adapter_path = os.path.join(plugin_dir, "claude-hook-adapter.py")
+            with open(adapter_path, "w", encoding="utf-8") as f:
+                f.write("# adapter")
+
+            self.assertEqual(self.adapter.find_repo_root(adapter_path), repo_dir)
+
+            # 2. Staged runtime layout: staging_dir has copied adapter and symlinked hooks/
+            staging_dir = os.path.join(tmpdir, "gemini_config", "plugins", "ai-config")
+            os.makedirs(staging_dir, exist_ok=True)
+            staged_adapter = os.path.join(staging_dir, "claude-hook-adapter.py")
+            shutil.copy2(adapter_path, staged_adapter)
+            os.symlink(os.path.join(repo_dir, "hooks"), os.path.join(staging_dir, "hooks"))
+
+            self.assertEqual(self.adapter.find_repo_root(staged_adapter), repo_dir)
+
+            # 3. Staged layout with .repo symlink
+            staging_dir2 = os.path.join(tmpdir, "gemini_config2", "plugins", "ai-config")
+            os.makedirs(staging_dir2, exist_ok=True)
+            staged_adapter2 = os.path.join(staging_dir2, "claude-hook-adapter.py")
+            shutil.copy2(adapter_path, staged_adapter2)
+            os.symlink(repo_dir, os.path.join(staging_dir2, ".repo"))
+
+            self.assertEqual(self.adapter.find_repo_root(staged_adapter2), repo_dir)
+
+            # 4. Environment override
+            with patch.dict(os.environ, {"AI_CONFIG_ROOT": repo_dir}):
+                self.assertEqual(self.adapter.find_repo_root("/nonexistent/path/adapter.py"), repo_dir)
+
+    def test_staging_runtime_layout_with_copied_adapter_and_symlinked_hooks(self):
+        """Under staging layout with copied adapter and symlinked hooks/,
+        find_repo_root finds hooks/hooks.json and dispatches PreToolUse, Stop,
+        and PreInvocation hooks without failing open."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_repo = os.path.join(tmpdir, "repo")
+            fake_staging = os.path.join(tmpdir, "gemini_config", "plugins", "ai-config")
+
+            repo_plugins_dir = os.path.join(fake_repo, "plugins", "ai-config")
+            repo_hooks_dir = os.path.join(fake_repo, "hooks")
+            repo_scripts_dir = os.path.join(fake_repo, "scripts")
+            os.makedirs(repo_plugins_dir, exist_ok=True)
+            os.makedirs(repo_hooks_dir, exist_ok=True)
+            os.makedirs(repo_scripts_dir, exist_ok=True)
+            os.makedirs(fake_staging, exist_ok=True)
+
+            # Create mock hook scripts in fake_repo
+            mock_deny_path = os.path.join(repo_hooks_dir, "mock-deny.py")
+            with open(mock_deny_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'hookSpecificOutput': {'permissionDecision': 'deny', 'permissionDecisionReason': 'blocked by staged repo hook'}}))\n"
+                )
+
+            mock_stop_path = os.path.join(repo_hooks_dir, "mock-stop.py")
+            with open(mock_stop_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'decision': 'block', 'reason': 'unresolved staging debt'}))\n"
+                )
+
+            mock_preinv_path = os.path.join(repo_hooks_dir, "mock-preinv.py")
+            with open(mock_preinv_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "import sys, json\n"
+                    "print(json.dumps({'systemMessage': 'injected context from staging hook'}))\n"
+                )
+
+            # Write canonical hooks.json in fake_repo
+            hooks_json_path = os.path.join(repo_hooks_dir, "hooks.json")
+            with open(hooks_json_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "hooks": {
+                        "PreToolUse": [
+                            {
+                                "matcher": "Bash",
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-deny.py\""
+                                    }
+                                ]
+                            }
+                        ],
+                        "Stop": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-stop.py\""
+                                    }
+                                ]
+                            }
+                        ],
+                        "UserPromptSubmit": [
+                            {
+                                "hooks": [
+                                    {
+                                        "type": "command",
+                                        "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/mock-preinv.py\""
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }, f)
+
+            # Populate staging layout as created by bootstrap.sh
+            # 1. Copied adapter (regular file)
+            staged_adapter_path = os.path.join(fake_staging, "claude-hook-adapter.py")
+            shutil.copy2(ADAPTER_SCRIPT, staged_adapter_path)
+
+            # 2. Symlinks to repo directories
+            os.symlink(repo_hooks_dir, os.path.join(fake_staging, "hooks"))
+            os.symlink(repo_scripts_dir, os.path.join(fake_staging, "scripts"))
+
+            # 1. PreToolUse via staged adapter
+            payload_pretool = {
+                "toolCall": {
+                    "name": "run_command",
+                    "args": {"CommandLine": "git push"}
+                }
+            }
+            proc = subprocess.run(
+                [sys.executable, staged_adapter_path],
+                input=json.dumps(payload_pretool),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc.returncode, 0, f"Adapter PreToolUse failed: {proc.stderr}")
+            self.assertNotIn("hooks.json not found", proc.stderr)
+            out = json.loads(proc.stdout)
+            self.assertEqual(out.get("decision"), "deny")
+            self.assertIn("blocked by staged repo hook", out.get("reason", ""))
+
+            # 2. Stop via staged adapter
+            payload_stop = {
+                "terminationReason": "model_stop"
+            }
+            proc_stop = subprocess.run(
+                [sys.executable, staged_adapter_path],
+                input=json.dumps(payload_stop),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc_stop.returncode, 0, f"Adapter Stop failed: {proc_stop.stderr}")
+            self.assertNotIn("hooks.json not found", proc_stop.stderr)
+            out_stop = json.loads(proc_stop.stdout)
+            self.assertEqual(out_stop.get("decision"), "continue")
+            self.assertIn("unresolved staging debt", out_stop.get("reason", ""))
+
+            # 3. PreInvocation via staged adapter
+            payload_preinv = {
+                "invocationNum": 1,
+                "prompt": "hello"
+            }
+            proc_preinv = subprocess.run(
+                [sys.executable, staged_adapter_path],
+                input=json.dumps(payload_preinv),
+                text=True,
+                capture_output=True,
+                check=False
+            )
+            self.assertEqual(proc_preinv.returncode, 0, f"Adapter PreInvocation failed: {proc_preinv.stderr}")
+            self.assertNotIn("hooks.json not found", proc_preinv.stderr)
+            out_preinv = json.loads(proc_preinv.stdout)
+            self.assertIn("injectSteps", out_preinv)
+            self.assertTrue(any("injected context from staging hook" in step.get("ephemeralMessage", "") for step in out_preinv.get("injectSteps", [])))
+
+    def test_staging_runtime_layout_loader_rewrites_preserve_checkout_cleanliness(self):
+        """Simulates Antigravity rewriting hooks.json in the staging runtime directory
+        and verifies that canonical git source in the checkout remains completely clean."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_repo = os.path.join(tmpdir, "repo")
+            fake_staging = os.path.join(tmpdir, "gemini_config", "plugins", "ai-config")
+
+            repo_plugins_dir = os.path.join(fake_repo, "plugins", "ai-config")
+            os.makedirs(repo_plugins_dir, exist_ok=True)
+            os.makedirs(fake_staging, exist_ok=True)
+
+            canonical_hooks_content = '{\n  "enforce-merge-control": {\n    "PreToolUse": [\n      {"matcher": "run_command", "hooks": [{"type": "command", "command": "python3 ${extensionPath}/claude-hook-adapter.py"}]}\n    ]\n  }\n}\n'
+            canonical_hooks_path = os.path.join(repo_plugins_dir, "hooks.json")
+            with open(canonical_hooks_path, "w", encoding="utf-8") as f:
+                f.write(canonical_hooks_content)
+
+            # Staging copy
+            staged_hooks_path = os.path.join(fake_staging, "hooks.json")
+            shutil.copy2(canonical_hooks_path, staged_hooks_path)
+
+            # Live Antigravity loader rewrites staged hooks.json to absolute machine paths
+            rewritten_content = canonical_hooks_content.replace(
+                "${extensionPath}",
+                "/Users/mockuser/.gemini/config/plugins/ai-config"
+            )
+            with open(staged_hooks_path, "w", encoding="utf-8") as f:
+                f.write(rewritten_content)
+
+            # Verify staged copy was rewritten
+            with open(staged_hooks_path, "r", encoding="utf-8") as f:
+                self.assertIn("/Users/mockuser/.gemini/config/plugins/ai-config", f.read())
+
+            # Verify canonical checkout copy remains 100% pristine and unmodified
+            with open(canonical_hooks_path, "r", encoding="utf-8") as f:
+                self.assertEqual(f.read(), canonical_hooks_content)
+                self.assertNotIn("/Users/mockuser", f.read())
+
+    def test_bootstrap_establishes_staging_runtime_layout_and_migrates_plugins_json(self):
+        """Verify bootstrap.sh creates a staged plugin layout and registers it in plugins.json."""
+        bootstrap_script = os.path.join(ROOT, "bootstrap.sh")
+        self.assertTrue(os.path.isfile(bootstrap_script), f"bootstrap.sh missing at {bootstrap_script}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = os.path.join(tmpdir, "config")
+            os.makedirs(config_dir, exist_ok=True)
+            env = dict(os.environ, GEMINI_HOME=tmpdir, GEMINI_CONFIG_HOME=config_dir, HOME=tmpdir)
+
+            # 1. Fresh bootstrap execution
+            proc = subprocess.run(["bash", bootstrap_script], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(proc.returncode, 0, f"bootstrap.sh failed: {proc.stderr}\nOutput: {proc.stdout}")
+
+            staging_dir = os.path.join(config_dir, "plugins", "ai-config")
+            self.assertTrue(os.path.isdir(staging_dir))
+            self.assertFalse(os.path.islink(staging_dir), "staging_dir must be a real directory, not a symlink")
+
+            # Verify files and symlinks inside staging layout
+            self.assertTrue(os.path.isfile(os.path.join(staging_dir, "plugin.json")))
+            self.assertFalse(os.path.islink(os.path.join(staging_dir, "plugin.json")))
+
+            self.assertTrue(os.path.isfile(os.path.join(staging_dir, "hooks.json")))
+            self.assertFalse(os.path.islink(os.path.join(staging_dir, "hooks.json")))
+
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "claude-hook-adapter.py")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "enforce-mwc-review-gate.py")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "hooks")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "scripts")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "skills")))
+            self.assertTrue(os.path.islink(os.path.join(staging_dir, "shared")))
+
+            plugins_json_path = os.path.join(config_dir, "plugins.json")
+            self.assertTrue(os.path.isfile(plugins_json_path))
+            with open(plugins_json_path, "r", encoding="utf-8") as f:
+                plugins_data = json.load(f)
+            registered_paths = [e.get("path") for e in plugins_data.get("entries", [])]
+            self.assertIn(staging_dir, registered_paths)
+
+            # 2. Test migration from old checkout path
+            with open(plugins_json_path, "w", encoding="utf-8") as f:
+                json.dump({"entries": [{"path": os.path.join(ROOT, "plugins", "ai-config")}]}, f)
+
+            proc_migrate = subprocess.run(["bash", bootstrap_script], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(proc_migrate.returncode, 0, f"bootstrap.sh migration failed: {proc_migrate.stderr}")
+
+            with open(plugins_json_path, "r", encoding="utf-8") as f:
+                migrated_data = json.load(f)
+            migrated_paths = [e.get("path") for e in migrated_data.get("entries", [])]
+            self.assertIn(staging_dir, migrated_paths)
+            self.assertNotIn(os.path.join(ROOT, "plugins", "ai-config"), migrated_paths)
+
 if __name__ == "__main__":
     unittest.main()

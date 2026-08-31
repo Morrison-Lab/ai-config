@@ -169,7 +169,9 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
-  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".)
+  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".
+  Recurred 2026-08-30 on Lacaedemon/sparta: session prompted confirmation for code review and track cleanup rather than deciding directly.
+  User corrected "/daytb; don't ask so many questions".)
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
@@ -192,7 +194,11 @@
   - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step. (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
   - **Don't:** un-draft a **deliberately draft-gated** dependent PR.
     That PR is review-ready by construction and sits in draft only to block the wrong merge order until its prerequisite merges, so `AGENTS.md`'s draft-status carve-out and this file's own blocking-dependency entry both reserve it --- this rule does not reach it.
-- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never finish or stop without stating whether or not a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
+- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
+  Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration.
+  Never finish or stop without stating whether or not a clean stopping point has been reached.
+  If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:

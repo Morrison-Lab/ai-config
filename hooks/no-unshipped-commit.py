@@ -235,7 +235,10 @@ def decide(cwd, path):
     if not saw_commit:
         return ""
     if not cwd:
-        return PUSH_REMEDY if pending else ""
+        if not pending:
+            return ""
+        return ("A commit was made with no later push or PR creation, and "
+                "repository state is unavailable to check. " + PUSH_REMEDY)
     count = unpushed_count(cwd)
     if count == 0:
         return ""

@@ -422,11 +422,19 @@ behind_root, behind_bare, run = gitrepo(
 
 # Advance origin/main beyond local HEAD from a second clone, then let the
 # subject repo learn about it: the branch is strictly behind, never ahead.
+# `-b main` is load-bearing: a bare repo's HEAD symref still points at git's
+# compiled-in default branch, which the first push never created there, so a
+# plain clone checks out an unborn branch and the later `push origin main`
+# fails with `src refspec main does not match any` (caught by this PR's own
+# CI). Cloning the known branch sidesteps the advertised HEAD entirely.
 other = tempfile.mkdtemp()
-clone_cmd = ("git clone -q " + behind_bare + " ."
+clone_cmd = ("git clone -q -b main " + behind_bare + " ."
              " && git config user.email t@t && git config user.name t"
              " && git commit --allow-empty -m ahead && git push -q origin main")
-subprocess.run(["bash", "-c", clone_cmd], cwd=other, check=True)
+subprocess.run(["bash", "-c", clone_cmd], cwd=other, check=True,
+               env=dict(os.environ,
+                        GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
+                        GIT_TERMINAL_PROMPT="0"))
 run("git fetch -q origin")
 
 no_commit = transcript(["echo hello", "git status"])
@@ -494,7 +502,9 @@ try:
     assert subject.unpushed_count(unpushed_root) is None
     # No cwd in the payload: repository state is unknowable, so the verdict
     # falls back to the transcript scan (the old behaviour, both directions).
-    assert subject.decide("", commit_only) == subject.PUSH_REMEDY
+    _fallback = subject.decide("", commit_only)
+    assert _fallback.endswith(subject.PUSH_REMEDY), _fallback
+    assert "no later push or PR creation" in _fallback, _fallback
     assert subject.decide("", commit_and_push) == ""
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,

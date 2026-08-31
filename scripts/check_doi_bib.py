@@ -231,9 +231,10 @@ def extract_first_author_surname(author_field: str | None) -> str:
 
     raw_trimmed = author_field.strip()
     # Check if the entire author field is wrapped in braces: institutional author
+    # (e.g. {Food and Drug Administration} or {World Health Organization})
     if raw_trimmed.startswith("{") and raw_trimmed.endswith("}"):
         inner = raw_trimmed[1:-1].strip()
-        if " and " not in inner.lower() and "," not in inner:
+        if "," not in inner:
             return clean_latex(inner)
 
     cleaned = clean_latex(author_field)
@@ -716,7 +717,7 @@ def fuzzy_match_title(
     # Sequence similarity ratio
     ratio = difflib.SequenceMatcher(None, norm_b, norm_r).ratio()
 
-    # Token overlap metrics
+    # Token overlap and length metrics
     tokens_b = set(norm_b.split())
     tokens_r = set(norm_r.split())
 
@@ -724,18 +725,22 @@ def fuzzy_match_title(
         return ratio >= threshold, ratio
 
     intersection = tokens_b & tokens_r
-    min_len = min(len(tokens_b), len(tokens_r))
-    overlap_coef = len(intersection) / min_len if min_len > 0 else 0.0
+    union = tokens_b | tokens_r
+    jaccard = len(intersection) / len(union) if union else 0.0
 
-    # Match if ratio exceeds threshold, or token overlap is very high
-    # (handling subtitle omission e.g. "Title" vs "Title: A Case Study")
+    len_min = min(len(norm_b), len(norm_r))
+    len_max = max(len(norm_b), len(norm_r))
+    len_ratio = len_min / len_max if len_max > 0 else 0.0
+
+    # Match if sequence ratio exceeds threshold, or token Jaccard is high with proportional length
+    # (handling word-order inversions and slight subtitle additions)
     is_match = (
         ratio >= threshold
-        or (overlap_coef >= 0.75 and len(intersection) >= 2)
-        or (overlap_coef == 1.0 and len(intersection) >= 1)
+        or (jaccard >= 0.60 and len_ratio >= 0.60)
+        or (jaccard >= 0.50 and ratio >= 0.65 and len_ratio >= 0.50)
     )
 
-    score = max(ratio, overlap_coef)
+    score = max(ratio, jaccard)
     return is_match, score
 
 

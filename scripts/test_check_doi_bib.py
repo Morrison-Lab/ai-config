@@ -93,6 +93,10 @@ def test_extract_first_author_surname() -> None:
         "author_surname: org in braces",
         cdb.extract_first_author_surname("{World Health Organization}") == "World Health Organization",
     )
+    check(
+        "author_surname: org with and in braces",
+        cdb.extract_first_author_surname("{Food and Drug Administration}") == "Food and Drug Administration",
+    )
 
 
 def test_parse_bib_entries() -> None:
@@ -193,6 +197,17 @@ def test_fuzzy_match_title() -> None:
         "Deep Reinforcement Learning for Robotics",
     )
     check("fuzzy_title: mismatch", not m, f"score: {s}")
+
+    # Short generic title contained inside a long unrelated review title
+    m, s = cdb.fuzzy_match_title(
+        "Causal Inference",
+        "A Review of Causal Inference Methods in Epidemiology and Public Health Policy",
+    )
+    check(
+        "fuzzy_title: short title subset of long unrelated title rejected",
+        not m,
+        f"score: {s}",
+    )
 
 
 def test_fuzzy_match_author() -> None:

@@ -638,8 +638,15 @@ A clean automated review from every available provider evaluating the current HE
   In round 5 (`fbf50a69`), this had to be restored: `json.loads` resolves Unicode escapes (e.g. `"commit_sha": "\u0061bc1234..."`), so a payload with escaped characters matches the parsed SHA while escaping the raw substring disjuncts.
 - **Canonical Rule**: [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md) ("A subsumption proof over raw text must account for every transformation before claiming a disjunct is dead").
 - **Fix**: Construct adversarial test fixtures with escaped, decoded, or transformed representations to test whether raw text matching and structured value matching can diverge before deleting extraction logic.
+## Pattern 35: Unbounded Subset Overlap in Fuzzy Matching Defeating Negative Controls
+- **Do**: When implementing fuzzy or token-overlap matching to tolerate subtitles or minor variations, enforce length and density proportionality (e.g. bounded character/token length ratio or Jaccard similarity threshold) alongside token containment.
+- **Don't**: Accept full subset containment (`overlap_coef == 1.0`) of a short needle in a long haystack without bounding the relative lengths or densities;
+  a short 2-token title (e.g. "Causal Inference") is a 100% token subset of an arbitrarily long, unrelated review title (e.g. "A Review of Causal Inference Methods in Epidemiology and Public Health Policy"), defeating the tool's fabrication-detection purpose.
+- **Example**: 2026-08-31, `Morrison-Lab/ai-config` PR [#2797](https://github.com/Morrison-Lab/ai-config/pull/2797) (`scripts/check_doi_bib.py`): Round 1 implemented `fuzzy_match_title` with an `(overlap_coef == 1.0 and len(intersection) >= 1)` branch intended for subtitle variations.
+  Review identified that for short generic titles (2 tokens), this branch matched completely unrelated long review papers with a 1.0 score and classified fabricated citations as `MATCH`.
+  Fixed in round 2 by replacing the raw overlap with bounded Jaccard similarity and length proportionality (`jaccard >= 0.60 and len_ratio >= 0.60`), and adding negative control tests for short title containment.
+- **Canonical Rule**: [`fixtures-are-not-evidence.md`](../shared/workflow/fixtures-are-not-evidence.md) and [`fact-check-code-logic.md`](../shared/coding/fact-check-code-logic.md).
+- **Fix**: Require length ratio constraints and bounded Jaccard thresholds for fuzzy matching, and always test negative controls with short generic strings contained in long unrelated targets.
 - **Algorithmatizable?**
-  Partially.
-  Mutation testing with encoded/escaped representations detects unhandled
-  transformation divergences.
+  Yes --- unit test suites asserting negative control rejection of short subset inputs against long distractor strings.
 

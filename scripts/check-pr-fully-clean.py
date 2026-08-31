@@ -923,14 +923,21 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         re.IGNORECASE,
     )
     # The veto is the second gate, not the only one. It runs in code
-    # over the citation's containing sentence BACKWARD and its
-    # containing paragraph FORWARD -- a
-    # forward-only lookahead window missed "The finding remains
-    # unaddressed despite my response to it (posted ...)" and any
-    # re-raise past its length bound. Sentence bounds use the glued-dot
-    # rule, so "utils.py" and decimals do not truncate the sentence. The
-    # matched aside itself is excluded from the scan (its own "verdict
-    # **Needs more work**" must not self-veto), while the kept
+    # over the citation's whole containing SECTION, heading to heading,
+    # in both directions.
+    #
+    # Every narrower bound tried first leaked. A forward-only lookahead
+    # window missed "The finding remains unaddressed despite my response
+    # to it (posted ...)" and any re-raise past its length bound.
+    # Bounding backward by the sentence and forward by the paragraph
+    # then missed a re-raise in the preceding sentence and one in the
+    # following paragraph -- which is where narration puts it, since the
+    # citation must end its own clause to match at all. The section is
+    # the bound that stopped leaking, and it needs no paragraph
+    # arithmetic, so a run of blank lines cannot mislead it.
+    #
+    # The matched aside itself is excluded from the scan (its own
+    # "verdict **Needs more work**" must not self-veto), while the kept
     # attribution link text is included.
     _RERAISE_VOCAB = re.compile(
         r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
@@ -942,7 +949,6 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
         r"(?:fixed|resolved|addressed|corrected))\b",
         re.IGNORECASE,
     )
-    _SENTENCE_END = _SENTENCE_END_RE
 
     def _vocab_between(lo: int, hi: int) -> bool:
         if hi <= lo:
@@ -1010,8 +1016,7 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # wrong offset and missed -- and missing the veto strips a live
     # not-clean, the dangerous direction. Positions and text must come
     # from the same revision of the string.
-    # Paragraph starts/ends, heading starts, and veto-word positions are
-    # likewise computed once. Slicing the tail per citation re-scans the
+    # Heading starts and veto-word positions are likewise computed once. Slicing the tail per citation re-scans the
     # rest of the body every time, which is quadratic in a body packed
     # with them: 400 citations took 1.26s and each doubling quadrupled it.
     #
@@ -1024,8 +1029,10 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     _line_starts = [0]
     for _l in _lines[:-1]:
         _line_starts.append(_line_starts[-1] + len(_l) + 1)
-    _fenced_lines, _, _orphan_markers = find_fence_spans(text, swallow_unclosed=True)
-    _ignored_lines = _fenced_lines | _orphan_markers
+    # swallow_unclosed=True folds an unclosed fence's interior into
+    # fenced_lines and leaves orphan_markers empty by construction, so
+    # there is no second set to union in here.
+    _ignored_lines = find_fence_spans(text, swallow_unclosed=True)[0]
 
     _heading_starts = []
     for _h in re.finditer(r"(?m)^#{1,6}\s", text):
@@ -1131,7 +1138,7 @@ AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
 )
 
 
-# Shared by the citation-aside veto and the negated-resolution guard: a
+# Used by the negated-resolution guard, its only caller: a
 # [.!?] ends a sentence only when whitespace or end-of-text follows, so a
 # filename ("tactics.qmd") or a decimal does not split one. A trailing
 # abbreviation dot does not either -- "e.g." mid-sentence otherwise
@@ -1215,7 +1222,8 @@ def _sentence_start_before(text: str) -> int:
         #
         # Both shapes are the same fail-open by different routes: a
         # faked sentence end narrows the caller's scan past the negator
-        # or the re-raise it was looking for.
+        # it was looking for. (The citation veto once shared this scan
+        # and no longer does, so only the negator guard is at stake.)
         token_end = end.start()
         while token_end > 0 and _is_gap(text[token_end - 1]):
             token_end -= 1

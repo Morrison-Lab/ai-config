@@ -18,6 +18,12 @@ from typing import List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
+from scripts.lib.review_payload import (
+    extract_structured_review,
+    payload_findings,
+    payload_is_blocking,
+    normalize_verdict,
+)
 
 
 def log_error(msg: str):
@@ -198,6 +204,40 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
+def _structured_contradiction(report: str) -> Optional[str]:
+    """Reason string when the report's structured payload blocks, else ``None``.
+
+    ``build_review_prompt`` asks the reviewer to append a machine-readable
+    ``<!-- review-data: {...} -->`` payload, and both verdict parsers below
+    strip HTML comments before every check -- so nothing read the field the
+    prompt requested, and the two consumers of one report disagreed.
+    Measured: a report with ``Verdict: Ready for merge``, ``Critical Findings:
+    None.`` and a trailing payload saying ``NOT_CLEAN`` with one finding parsed
+    as ``(True, True, 'Verdict: CLEAN')`` here, while
+    ``scripts/check-pr-fully-clean.py`` scored the same artifact blocking.
+
+    Read off the RAW report, before that strip, through the extractor both
+    scripts share (``scripts/lib/review_payload.py``).  Call this only on a
+    path about to report CLEAN: a payload that agrees with an already-not-clean
+    prose verdict adds nothing, and a payload that says CLEAN never overrides
+    prose findings -- prose wins that contradiction, matching
+    ``classify_verdict``'s ordering on the PR side.
+    """
+    structured = extract_structured_review(report)
+    if not payload_is_blocking(structured):
+        return None
+    findings = payload_findings(structured)
+    detail = (
+        f"{len(findings)} finding(s)"
+        if findings
+        else f"verdict {normalize_verdict(structured.get('verdict'))}"
+    )
+    return (
+        "Contradictory output: prose verdict is clean but the structured "
+        f"review-data payload reports {detail}."
+    )
+
+
 def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[bool, bool, str]:
     """Validate a persona-contract report (Summary / Findings / Verdict /
     Reviewed-Commit) via the hook's own parse_report() (ai-config#2309).
@@ -273,6 +313,9 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
             )
 
     if verdict == "clean":
+        contradiction = _structured_contradiction(report)
+        if contradiction:
+            return False, False, contradiction
         return True, True, "Clean (persona contract)"
     return True, False, "Needs work (persona contract)"
 
@@ -301,7 +344,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         return False, False, "Unterminated HTML comment detected."
 
     def extract_section(text, header_pattern):
-        pattern = r"(?im)^#{2,3}\s+(?:" + header_pattern + r")\s*(.*?)(?=^#{2,3}\s+|\Z)"
+        pattern = r"(?im)^#{1,6}\s*(?:" + header_pattern + r")\s*(.*?)(?=^#{1,6}\s+|\Z)"
         matches = re.findall(pattern, text, re.DOTALL)
         return "\n\n".join(m.strip() for m in matches) if matches else None
 
@@ -350,7 +393,17 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
         # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
-        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+|\s*))*\Z", unfenced_report):
+        # Every alternative must consume at least one NON-whitespace character.
+        # The first cut carried a trailing `|\s*` alternative inside the `*`
+        # quantifier: it matched empty, duplicating the group's own leading
+        # `\s*`, so a whitespace run before a non-matching trailing character
+        # could be partitioned exponentially many ways.  Measured on darwin:
+        # 1.26s at 12 whitespace characters, 21.4s at 14, roughly 3x per added
+        # character -- and `parse_review_verdict` runs in-process with no
+        # timeout, so the guard hung rather than failing.  It was redundant as
+        # well: `\s*\Z` below already reaches the same strings with zero
+        # iterations of the group.
+        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+))*\s*\Z", unfenced_report):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
@@ -447,6 +500,11 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         blocker_match = re.search(blocker_pattern, masked_report)
         if blocker_match:
             return False, False, f"Contradictory output: clean verdict but report contains blocking phrase '{blocker_match.group(0)}'."
+
+    if is_clean:
+        contradiction = _structured_contradiction(report)
+        if contradiction:
+            return False, False, contradiction
 
     refusal = _refusal_reason(report)
     if refusal:
@@ -911,6 +969,7 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         "   - ### Observations & Non-Blocking Suggestions",
         "     Every observation MUST be explicitly prefixed with a machine-readable non-blocking severity label: [INFO] or [MINOR]. Do not include conversational filler.",
         "   - ### Verification Steps",
+        "     (List the specific tests and validation steps you performed)",
         f"   Reviewed-Commit: {head_sha}",
         "   Append the machine-readable structured JSON review data directly after the fingerprint in an HTML comment:",
         "   <!-- review-data:",

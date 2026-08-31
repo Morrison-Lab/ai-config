@@ -43,12 +43,18 @@ project-type-specific; sections 4-6 apply to every project.
   cover every package actually loaded (`renv::dependencies()` diffed
   against the lockfile), not just the ones someone remembered to
   snapshot?
+  ```bash
+  Rscript -e 'renv::status()'
+  ```
 - **Captured `sessionInfo()`.** Does the repo (or its README/vignette)
   record the R version and platform a result was generated under? A
   lockfile pins package versions but not the R version itself.
 - **`DESCRIPTION` completeness.** Every `library()`/`::` call has a
   matching `Imports`/`Suggests` entry — grep `R/` and `vignettes/` for
-  `library(` and `::` and diff against `DESCRIPTION`.
+  `library(` and `::` and diff against `DESCRIPTION`:
+  ```bash
+  rg -no 'library\([a-zA-Z0-9.]+\)|[a-zA-Z0-9.]+::' R/ vignettes/ | sort -u
+  ```
 
 ### 2. Quarto book/site
 
@@ -58,6 +64,9 @@ project-type-specific; sections 4-6 apply to every project.
   scratch? (`reprexes`' R/Quarto specifics section already covers build
   artifacts as confounders for render bugs — this check is the
   whole-project version of that same concern.)
+  ```bash
+  quarto render --no-cache
+  ```
 - **Pinned Quarto/R versions.** Is the Quarto CLI version and R version
   used to render pinned somewhere (`_quarto.yml`, a CI workflow, a
   README badge), or does the render depend on whatever happens to be
@@ -70,7 +79,7 @@ project-type-specific; sections 4-6 apply to every project.
 
 - **Hardcoded absolute paths.** Grep for the tells: `/home/`, `/Users/`,
   `C:\`, `setwd(`, a bare drive letter, or any string that names a
-  specific machine's directory layout.
+  specific machine's directory layout:
   ```bash
   grep -rnE '(/home/[a-zA-Z0-9_.-]+|/Users/[a-zA-Z0-9_.-]+|[A-Za-z]:\\{1,2}|setwd\()' \
     --include='*.R' --include='*.py' --include='*.sh' --include='*.qmd' .
@@ -78,12 +87,18 @@ project-type-specific; sections 4-6 apply to every project.
 - **Undocumented env vars.** Grep for env-var reads (`Sys.getenv(`,
   `os.environ`, `os.getenv(`, `$VARNAME` in shell) and confirm each one
   is documented somewhere a new user would find it (README, `.env.example`,
-  a setup script) — not just referenced in code.
+  a setup script) — not just referenced in code:
+  ```bash
+  rg -n 'Sys\.getenv\(|os\.environ|os\.getenv\(' .
+  ```
 - **Undocumented prerequisites.** Does the repo state what has to be
   installed *before* the package manager runs — a system library, a
   specific interpreter version, a CLI tool the scripts shell out to?
   Grep for `system(`, `subprocess`, `shell_exec`, or backticked shell
-  calls and confirm each invoked binary is named as a prerequisite.
+  calls and confirm each invoked binary is named as a prerequisite:
+  ```bash
+  rg -n 'system\(|subprocess|shell_exec' .
+  ```
 
 ### 4. Output traceability (all project types)
 
@@ -99,7 +114,10 @@ script:line** that produced it? Check for:
   `np.random.seed(` or a `withr::with_seed()` call per the
   `prefer-packaged-functions` coding convention) — an unseeded
   random process makes a result strictly non-reproducible, not just hard
-  to trace.
+  to trace:
+  ```bash
+  rg -n 'set\.seed\(|random\.seed\(|np\.random\.seed\(|withr::with_seed\(' .
+  ```
 
 ### 5. Undocumented prerequisites and environment assumptions (all types)
 

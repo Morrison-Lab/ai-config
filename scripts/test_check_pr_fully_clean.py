@@ -4495,6 +4495,36 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_unresolved_finding_pattern: partial review triggers finding pattern",
           checker._unresolved_finding_pattern(truncated_review_sample) is not None)
 
+    # Timing regression tests on many small fenced blocks (#2719).
+    # Multiline \s* backtracking across thousands of stripped blank lines and
+    # redundant fence parsing caused quadratic scaling (over 8s at comment cap).
+    _small_fence_unit = "```\nx\n```\n"
+    _fenced_no_verdict = "Some prose\n" + _small_fence_unit * 6500
+    _fnv_secs, _fnv_verdict = best_of_three(
+        checker.classify_verdict, _fenced_no_verdict
+    )
+    check(
+        "classify_verdict on max-length body of small fenced blocks scales linearly (< 1s)",
+        _fnv_verdict == "" and _fnv_secs < 1.0,
+    )
+
+    _fenced_clean = "### Verdict\n**Ready for merge.**\n" + _small_fence_unit * 4000
+    _fc_secs, _fc_verdict = best_of_three(
+        checker.classify_verdict, _fenced_clean
+    )
+    check(
+        "classify_verdict clean on many small fenced blocks scales linearly (< 1s)",
+        _fc_verdict == "clean" and _fc_secs < 1.0,
+    )
+
+    _uf_secs, _uf_res = best_of_three(
+        checker._unresolved_finding_pattern, _fenced_no_verdict
+    )
+    check(
+        "_unresolved_finding_pattern on many small fenced blocks scales linearly (< 1s)",
+        _uf_res is None and _uf_secs < 1.0,
+    )
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

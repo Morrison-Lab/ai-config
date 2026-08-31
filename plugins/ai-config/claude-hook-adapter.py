@@ -345,8 +345,8 @@ def main():
                         hook_out = json.loads(result.stdout)
                         # systemMessage is a top-level field Claude Code hooks
                         # may return on every event, shown to the user rather
-                        # than fed back to the model; forward it regardless
-                        # of the deny/allow decision below.
+                        # than fed back to the model; surface it regardless
+                        # of the deny/allow decision below (via stderr or reason).
                         if hook_out.get("systemMessage"):
                             system_messages.append(str(hook_out.get("systemMessage")))
                         hso = hook_out.get("hookSpecificOutput", {})
@@ -355,7 +355,8 @@ def main():
                             reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
                             deny_response = {"decision": "deny", "reason": reason}
                             if system_messages:
-                                deny_response["systemMessage"] = "\n\n".join(system_messages)
+                                combined_msgs = "\n\n".join(system_messages)
+                                deny_response["reason"] = f"{reason}\n\n{combined_msgs}"
                             print(json.dumps(deny_response))
                             return
                         if hso.get("additionalContext"):
@@ -365,7 +366,7 @@ def main():
 
         allow_response = {"decision": "allow"}
         if system_messages:
-            allow_response["systemMessage"] = "\n\n".join(system_messages)
+            print(f"claude-hook-adapter [allow]: {' '.join(system_messages)}", file=sys.stderr)
         print(json.dumps(allow_response))
         return
 

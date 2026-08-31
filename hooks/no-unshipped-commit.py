@@ -477,7 +477,7 @@ def decide(cwd, path):
         is_touched_in_wt = False
         for p in touched_paths_real:
             try:
-                if os.path.commonpath([p, wt_path_real]) == wt_path_real or os.path.commonpath([p, wt_path_real]) == p:
+                if os.path.commonpath([p, wt_path_real]) == wt_path_real:
                     is_touched_in_wt = True
                     break
             except (ValueError, Exception):

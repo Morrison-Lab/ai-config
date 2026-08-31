@@ -647,6 +647,15 @@ try:
         subdir = os.path.join(wt_root, "nested", "sub")
         os.makedirs(subdir, exist_ok=True)
         assert subject.decide(subdir, commit_only) != "", "cwd in nested subdirectory inside worktree must be recognized as relevant"
+
+        # Touched ancestor directory (e.g. shared parent) must NOT falsely match an untouched sibling worktree.
+        parent_dir = os.path.dirname(wt2)
+        parent_transcript = transcript([f"cd {parent_dir}", "git commit -m hook", "git status"])
+        try:
+            assert subject.decide(wt_root, parent_transcript) != "", "wt_root unpushed should block"
+            assert "wt2" not in subject.decide(wt_root, parent_transcript), "untouched sibling wt2 must not match via parent dir"
+        finally:
+            os.unlink(parent_transcript)
     finally:
         for _p in (wt_root, wt_bare, wt2, abandoned_wt, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare,
                    unrelated_root, unrelated_bare):

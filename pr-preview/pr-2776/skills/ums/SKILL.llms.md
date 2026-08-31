@@ -16,119 +16,119 @@ Actively review recent session context and update all relevant memory files and 
 
 ## Procedure
 
-1.  **Scan recent context.** Review the conversation for:
+**Scan recent context.** Review the conversation for:
 
-    - Mistakes made and corrected (skill gaps)
-    - New preferences expressed by the user
-    - Tool quirks discovered
-    - Workflow steps that were missing or unclear in existing skills
-    - Debugging insights
-    - Codebase conventions discovered
+- Mistakes made and corrected (skill gaps)
+- New preferences expressed by the user
+- Tool quirks discovered
+- Workflow steps that were missing or unclear in existing skills
+- Debugging insights
+- Codebase conventions discovered
 
-2.  **Categorize each learning.** For each item, decide:
+**Categorize each learning.** For each item, decide:
 
-    - Is it a **skill update**? (workflow step missing, procedure unclear)
-    - Is it a **memory note**? (tool quirk, preference, debugging insight)
-    - Is it **both**? (general guidance → update skill AND preferences)
-    - Is it already recorded? (grep before writing – avoid duplicates)
-    - Is it **cross-project or project-specific**? (`memories/preferences.md`’s “Memory and skill storage” rule: cross-project lessons commit to `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own commits to *that* repo’s own agent docs instead — see the checklist item below for where. This changes step 4’s target, not just the content.)
+- Is it a **skill update**? (workflow step missing, procedure unclear)
+- Is it a **memory note**? (tool quirk, preference, debugging insight)
+- Is it **both**? (general guidance → update skill AND preferences)
+- Is it already recorded? (grep before writing – avoid duplicates)
+- Is it **cross-project or project-specific**? (`memories/preferences.md`’s “Memory and skill storage” rule: cross-project lessons commit to `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own commits to *that* repo’s own agent docs instead — see the checklist item below for where. This changes step 4’s target, not just the content.)
 
-3.  **Apply updates.** For each item:
+**Apply updates.** For each item:
 
-    - Read the target file first (skill or memory) to understand current state
+- Read the target file first (skill or memory) to understand current state
 
-    - **Grep that file for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep the whole `memories/` directory rather than one file – a fact can plausibly sit in either of two adjacent topical files. When one exists, extend it in place; don’t add a second bullet. (ai-config#689: a `list_workflow_runs` cost bullet went in next to the related `get_check_runs` guidance while an entry on the same tool already sat ~2000 lines below in the write-access cluster – caught by the review bot, not by the author.)
+- **Grep that file for the item’s specific subject** – the tool name, the API call, the error string – before appending anything. Reading the region you’re editing is not enough: a topical memory file runs to hundreds or a thousand-plus lines, so an existing entry on the same subject can sit far away in an unrelated cluster and never enter your view. Grep the whole `memories/` directory rather than one file – a fact can plausibly sit in either of two adjacent topical files. When one exists, extend it in place; don’t add a second bullet. (ai-config#689: a `list_workflow_runs` cost bullet went in next to the related `get_check_runs` guidance while an entry on the same tool already sat ~2000 lines below in the write-access cluster – caught by the review bot, not by the author.)
 
-    - **When the target memory file is already at the 1200-line cap**, recover lines (re-wrap or drop) or split the file. A fold has two shapes and neither escapes every gate: a new source line trips `scripts/test_check_memory_file_size.py`, while folding the sentence into an existing line leaves the count flat but makes that line a changed line the new-line-breaks gate can flag. A net-positive append fails `scripts/test_check_memory_file_size.py` even when every new sentence is a real lesson (3rd occurrence, 2026-08-25 on `memories/preferences.md` in ai-config#2262: `origin/main` was exactly 1200 lines, and a +5-line append reddened `validate`. Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291; `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
+- **When the target memory file is already at the 1200-line cap**, recover lines (re-wrap or drop) or split the file. A fold has two shapes and neither escapes every gate: a new source line trips `scripts/test_check_memory_file_size.py`, while folding the sentence into an existing line leaves the count flat but makes that line a changed line the new-line-breaks gate can flag. A net-positive append fails `scripts/test_check_memory_file_size.py` even when every new sentence is a real lesson (3rd occurrence, 2026-08-25 on `memories/preferences.md` in ai-config#2262: `origin/main` was exactly 1200 lines, and a +5-line append reddened `validate`. Prior: `shared/writing/semantic-line-breaks.md` ai-config#1291; `shared/workflow/review-verdict-pitfalls.md` ai-config#811).
 
-    - **When step 2 routed the item to a repo other than ai-config, grep the ai-config corpus too** – “the whole `memories/` directory” above means the *destination’s*, so a repo-local entry can duplicate or contradict a fragment nobody thought to search from that repo. See [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)’s “Searching the wrong corpus is the same error with no grep in it”.
+- **When step 2 routed the item to a repo other than ai-config, grep the ai-config corpus too** – “the whole `memories/` directory” above means the *destination’s*, so a repo-local entry can duplicate or contradict a fragment nobody thought to search from that repo. See [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)’s “Searching the wrong corpus is the same error with no grep in it”.
 
-    - **When that grep finds the corpus already covers this class, record the recurrence on the existing entry, not just the new fact.** The bullet above already says to extend in place rather than add a sibling; what is missing is the count. Write it on the entry – “3rd occurrence, 2026-08-16”, with a pointer to each prior record – so the entry carries evidence about whether the written rule is actually holding.
+- **When that grep finds the corpus already covers this class, record the recurrence on the existing entry, not just the new fact.** The bullet above already says to extend in place rather than add a sibling; what is missing is the count. Write it on the entry – “3rd occurrence, 2026-08-16”, with a pointer to each prior record – so the entry carries evidence about whether the written rule is actually holding.
 
-      The count has a consumer that already exists and currently has nothing to read. [`deterministic-tools`](../../shared/principles/deterministic-tools.md) names the third occurrence as the moment a recurring judgment task becomes a tool, and [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md) asks of every accepted finding whether it is algorithmatizable – but nothing in the corpus counts, so that trigger fires on recollection or not at all. A rule on its third recurrence is a rule demonstrably not holding, which is the argument for a hook or a check rather than for a sharper sentence.
+  The count has a consumer that already exists and currently has nothing to read. [`deterministic-tools`](../../shared/principles/deterministic-tools.md) names the third occurrence as the moment a recurring judgment task becomes a tool, and [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md) asks of every accepted finding whether it is algorithmatizable – but nothing in the corpus counts, so that trigger fires on recollection or not at all. A rule on its third recurrence is a rule demonstrably not holding, which is the argument for a hook or a check rather than for a sharper sentence.
 
-      A recurrence note is also a duplication signal for [`find-overlap`](../../skills/find-overlap/SKILL.llms.md) and [`consolidate-memory`](../../skills/consolidate-memory/SKILL.llms.md), since one class recorded twice under different wording is exactly the near-duplicate a phrase-similarity pass under-detects. The reverse reading – an entry that has never recurred and is never cited is a retirement candidate – has **no** consumer today, so treat it as a property the count makes available rather than as a step anything runs.
+  A recurrence note is also a duplication signal for [`find-overlap`](../../skills/find-overlap/SKILL.llms.md) and [`consolidate-memory`](../../skills/consolidate-memory/SKILL.llms.md), since one class recorded twice under different wording is exactly the near-duplicate a phrase-similarity pass under-detects. The reverse reading – an entry that has never recurred and is never cited is a retirement candidate – has **no** consumer today, so treat it as a property the count makes available rather than as a step anything runs.
 
-    - Make the edit — concise bullet points, not prose
+- Make the edit — concise bullet points, not prose
 
-    - If updating a skill: the change should be specific enough that following the skill next time would avoid the mistake
+- If updating a skill: the change should be specific enough that following the skill next time would avoid the mistake
 
-4.  **Commit and push — via a branch + PR, not direct to `main`, in whichever repo step 2 routed the item to.**
+**Commit and push — via a branch + PR, not direct to `main`, in whichever repo step 2 routed the item to.**
 
-    If the work will dispatch an expensive external action from a pinned commit (such as a release, deployment, or batch computation), create, push, and open the PR **before** dispatching it. The PR is the reviewable record of the exact SHA that performed the action; opening it afterward is too late.
+If the work will dispatch an expensive external action from a pinned commit (such as a release, deployment, or batch computation), create, push, and open the PR **before** dispatching it. The PR is the reviewable record of the exact SHA that performed the action; opening it afterward is too late.
 
-    **Do this in an isolated `git worktree`, not the shared ai-config checkout directly** – `memories/preferences.md`’s “Run a local session in an isolated git worktree by DEFAULT” rule applies here too. The shared checkout is routinely in concurrent use by other sessions also running UMS; a `git checkout <branch>` from another session mid-command can silently redirect *your* `git commit`/`git push` onto *their* branch (and vice versa), and a local `git status`/`git log` read moments later can already reflect a third session’s activity, not your own. Every code block below creates (or reuses) a worktree first, then runs every `git add`/`commit`/`push` from inside it – never `cd` straight into the shared checkout itself to make a change.
+**Do this in an isolated `git worktree`, not the shared ai-config checkout directly** – `memories/preferences.md`’s “Run a local session in an isolated git worktree by DEFAULT” rule applies here too. The shared checkout is routinely in concurrent use by other sessions also running UMS; a `git checkout <branch>` from another session mid-command can silently redirect *your* `git commit`/`git push` onto *their* branch (and vice versa), and a local `git status`/`git log` read moments later can already reflect a third session’s activity, not your own. Every code block below creates (or reuses) a worktree first, then runs every `git add`/`commit`/`push` from inside it – never `cd` straight into the shared checkout itself to make a change.
 
-    **If a push is rejected non-fast-forward:** fetch first and diff before assuming a real conflict – the branch may have picked up another session’s commit that needs separating out (`git revert <their-commit>`) rather than force-pushing over it. Verify the PR’s real, current content via `gh api repos/<owner>/<repo>/pulls/<N>/files` or `git ls-remote`/`git show origin/<branch>:<path>` (the GitHub-side truth), not the local checkout, which may have already moved again. (ai-config#748: a UMS commit collided with another concurrent session’s UMS commit on a shared branch name this way – both sessions’ content ended up interleaved on one branch before separating back out, resolved without data loss only because both sides fetched-before-pushing and diffed before force-acting.)
+**If a push is rejected non-fast-forward:** fetch first and diff before assuming a real conflict – the branch may have picked up another session’s commit that needs separating out (`git revert <their-commit>`) rather than force-pushing over it. Verify the PR’s real, current content via `gh api repos/<owner>/<repo>/pulls/<N>/files` or `git ls-remote`/`git show origin/<branch>:<path>` (the GitHub-side truth), not the local checkout, which may have already moved again. (ai-config#748: a UMS commit collided with another concurrent session’s UMS commit on a shared branch name this way – both sessions’ content ended up interleaved on one branch before separating back out, resolved without data loss only because both sides fetched-before-pushing and diffed before force-acting.)
 
-    **Cross-project items** (skills, cross-project memory notes): both live in the ai-config repo. Discover its path with `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent. `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills` directory (cloud/web sessions pre-populate it), so the parent itself isn’t a symlink into the repo and `git -C` there fails with “not a git repository”; a child like `…/skills/ums` follows the symlink into the repo. (Both beat the older `dirname "$(readlink …)"`, which resolves only one symlink hop.) Never leave ANY changes (skills, memories, etc.) as local-only uncommitted edits. Run **one** of the two paths below — not both:
+**Cross-project items** (skills, cross-project memory notes): both live in the ai-config repo. Discover its path with `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point `-C` at a **skill subdir** (any one), not the `~/.claude/skills` parent. `bootstrap.sh` may symlink skills *per-child* into a real `~/.claude/skills` directory (cloud/web sessions pre-populate it), so the parent itself isn’t a symlink into the repo and `git -C` there fails with “not a git repository”; a child like `…/skills/ums` follows the symlink into the repo. (Both beat the older `dirname "$(readlink …)"`, which resolves only one symlink hop.) Never leave ANY changes (skills, memories, etc.) as local-only uncommitted edits. Run **one** of the two paths below — not both:
 
-    **Stage only the files you actually edited — NEVER `git add -A`.** The working tree often holds unrelated in-flight edits (the user’s own UMS commits, another skill being drafted); `git add -A` sweeps those into your commit and onto your PR, where they bloat the review and extend the cycle. List the specific paths instead. Then **`git status` to confirm only your intended files are staged** — if something unexpected is there, the working tree had in-flight work; unstage it rather than bundling it. (Avoid `git add -p` here: it needs a terminal and hangs in non-interactive sessions.)
+**Stage only the files you actually edited — NEVER `git add -A`.** The working tree often holds unrelated in-flight edits (the user’s own UMS commits, another skill being drafted); `git add -A` sweeps those into your commit and onto your PR, where they bloat the review and extend the cycle. List the specific paths instead. Then **`git status` to confirm only your intended files are staged** — if something unexpected is there, the working tree had in-flight work; unstage it rather than bundling it. (Avoid `git add -p` here: it needs a terminal and hangs in non-interactive sessions.)
 
-    Every path below starts by resolving `$repo`, the shared checkout’s path (read-only – discovering the path doesn’t touch the shared working directory), then creates or reuses a **worktree** off it and does every write from inside that worktree instead.
+Every path below starts by resolving `$repo`, the shared checkout’s path (read-only – discovering the path doesn’t touch the shared working directory), then creates or reuses a **worktree** off it and does every write from inside that worktree instead.
 
-    *Already on the open PR’s branch* (e.g. mid-ARDI): reuse a worktree for it, creating one if this is the first push in the worktree-ified flow.
+*Already on the open PR’s branch* (e.g. mid-ARDI): reuse a worktree for it, creating one if this is the first push in the worktree-ified flow.
 
-    ``` bash
-    repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
-    wt="../ai-config-worktrees/<branch>"
-    git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
-    cd "$wt"
-    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
-    git commit -m "ums: <brief summary>"   # COMMIT
-    git push origin HEAD                   # PUSH
-    ```
+``` bash
+repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+wt="../ai-config-worktrees/<branch>"
+git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
+cd "$wt"
+git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
+git commit -m "ums: <brief summary>"   # COMMIT
+git push origin HEAD                   # PUSH
+```
 
-    *No PR yet:* branch off main first — a direct-to-main push is denied by auto-mode and bypasses review.
+*No PR yet:* branch off main first — a direct-to-main push is denied by auto-mode and bypasses review.
 
-    *Same-repo case* (this checkout’s `origin` IS the repo you’re targeting):
+*Same-repo case* (this checkout’s `origin` IS the repo you’re targeting):
 
-    ``` bash
-    repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
-    git -C "$repo" fetch origin main   # FETCH
-    git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
-    cd "../ai-config-worktrees/ums-<topic>"
-    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
-    git commit -m "ums: <brief summary>"   # COMMIT
-    git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
-    ```
+``` bash
+repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+git -C "$repo" fetch origin main   # FETCH
+git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
+cd "../ai-config-worktrees/ums-<topic>"
+git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
+git commit -m "ums: <brief summary>"   # COMMIT
+git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
+```
 
-    *Cross-fork case* (this checkout’s `origin` is your own fork, not the upstream repo you’re targeting): don’t branch from a bare `origin/main` here – the fork’s `main` can be stale relative to upstream’s default branch. Fetch the intended **upstream** repo explicitly (not just look up its default-branch name) and branch the worktree from that fetched ref:
+*Cross-fork case* (this checkout’s `origin` is your own fork, not the upstream repo you’re targeting): don’t branch from a bare `origin/main` here – the fork’s `main` can be stale relative to upstream’s default branch. Fetch the intended **upstream** repo explicitly (not just look up its default-branch name) and branch the worktree from that fetched ref:
 
-    ``` bash
-    repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
-    base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
-      && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
-      && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD
-    # chained with && on purpose -- a failed lookup or fetch must stop the
-    # worktree creation, or it silently reuses an older FETCH_HEAD from a
-    # prior fetch, recreating the stale-base problem this block exists to prevent
-    cd "../ai-config-worktrees/ums-<topic>"
-    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
-    git commit -m "ums: <brief summary>"   # COMMIT
-    git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
-    ```
+``` bash
+repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
+  && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
+  && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD
+# chained with && on purpose -- a failed lookup or fetch must stop the
+# worktree creation, or it silently reuses an older FETCH_HEAD from a
+# prior fetch, recreating the stale-base problem this block exists to prevent
+cd "../ai-config-worktrees/ums-<topic>"
+git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
+git commit -m "ums: <brief summary>"   # COMMIT
+git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
+```
 
-    **CAUTION:** if a compound `add && commit && push` is **denied**, *nothing* was committed — verify with `git status` / `git log` before any `git reset --hard`, or you’ll silently discard the still-uncommitted edits.
+**CAUTION:** if a compound `add && commit && push` is **denied**, *nothing* was committed — verify with `git status` / `git log` before any `git reset --hard`, or you’ll silently discard the still-uncommitted edits.
 
-    **After the PR merges**, remove the worktree so it doesn’t accumulate: `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the `post-merge` skill’s own tidy step does this automatically).
+**After the PR merges**, remove the worktree so it doesn’t accumulate: `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the `post-merge` skill’s own tidy step does this automatically).
 
-    **After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head, and only matches a bare branch name, even when a matching PR genuinely exists (verified directly: `gh pr list --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch, while `gh pr list --head ums-pr635-lessons` found it). Query the REST API instead, whose `head` filter does honor the owner-qualified form: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'` (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`). If no open PR exists and upstream is accessible, open it as a cross-fork PR immediately with an explicit title and body. Do not pause for draft approval: UMS updates are the durable record of a completed learning, and the PR supplies the reviewable handoff. Bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
+**After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head, and only matches a bare branch name, even when a matching PR genuinely exists (verified directly: `gh pr list --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch, while `gh pr list --head ums-pr635-lessons` found it). Query the REST API instead, whose `head` filter does honor the owner-qualified form: `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'` (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`). If no open PR exists and upstream is accessible, open it as a cross-fork PR immediately with an explicit title and body. Do not pause for draft approval: UMS updates are the durable record of a completed learning, and the PR supplies the reviewable handoff. Bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
 
-    ``` bash
-    gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
-      -q .defaultBranchRef.name   # discover the base -- don't hard-code main
-    gh pr create --repo "<upstream-owner>/<repo>" --base "<discovered-default-branch>" \
-      --head "<head-owner>:<current-branch>" \
-      --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
-      --reviewer <reviewer>
-    ```
+``` bash
+gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
+  -q .defaultBranchRef.name   # discover the base -- don't hard-code main
+gh pr create --repo "<upstream-owner>/<repo>" --base "<discovered-default-branch>" \
+  --head "<head-owner>:<current-branch>" \
+  --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
+  --reviewer <reviewer>
+```
 
-    If upstream is not accessible in-session, push and explicitly hand off that upstream PR creation is still required.
+If upstream is not accessible in-session, push and explicitly hand off that upstream PR creation is still required.
 
-    **Project-specific items** (a convention or gotcha tied to one repo we own): commit to *that* repo’s own agent docs (`CLAUDE.md`, `.github/agents/*.md`, `.github/instructions/*.md`, `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a branch + PR in that repo — not ai-config. Discover its path the same way, `cd`-ing into that repo’s own checkout instead of the ai-config one, then follow the same branch/commit/push/PR steps above, substituting that repo’s own default branch for every `main`/`origin main` reference above (don’t hard-code `main` – a project routed here may default to `master` or another name; discover it the same way: `gh repo view "<owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name`). If that repo has no agent-doc infrastructure yet, write to its local Claude project memory (`~/.claude/projects/<project-path>/memory/`) as short-lived staging only – this is not a durable destination; hand off that the project repo still needs agent-doc infrastructure added (via a PR) and the staged memory migrated there. See the checklist item below.
+**Project-specific items** (a convention or gotcha tied to one repo we own): commit to *that* repo’s own agent docs (`CLAUDE.md`, `.github/agents/*.md`, `.github/instructions/*.md`, `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a branch + PR in that repo — not ai-config. Discover its path the same way, `cd`-ing into that repo’s own checkout instead of the ai-config one, then follow the same branch/commit/push/PR steps above, substituting that repo’s own default branch for every `main`/`origin main` reference above (don’t hard-code `main` – a project routed here may default to `master` or another name; discover it the same way: `gh repo view "<owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name`). If that repo has no agent-doc infrastructure yet, write to its local Claude project memory (`~/.claude/projects/<project-path>/memory/`) as short-lived staging only – this is not a durable destination; hand off that the project repo still needs agent-doc infrastructure added (via a PR) and the staged memory migrated there. See the checklist item below.
 
-    **Operational checklist (run in order):**
+**Operational checklist (run in order):**
 
 **Preflight:** confirm branch + cleanliness (`git branch --show-current` / `git status --short`)
 
@@ -138,12 +138,12 @@ Actively review recent session context and update all relevant memory files and 
 
 **Recovery signature:** if shell logs `command not found` during a comment/create command, check whichever CLI the failing command actually invoked (`which gh` or `which glab` — not always `gh`). If `gh` is unavailable in this session (expected in remote/web sessions), fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI — `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead of retrying. If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body; re-run using a file-backed body and re-check posted content
 
-5.  **Report what was updated.** Provide a brief summary table:
+**Report what was updated.** Provide a brief summary table:
 
-    | What | Where | Change |
-    |----|----|----|
-    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
-    | glab has no –state flag | `/memories/gitlab.md` | New bullet |
+| What | Where | Change |
+|----|----|----|
+| Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
+| glab has no –state flag | `/memories/gitlab.md` | New bullet |
 
 ## What to look for (checklist)
 

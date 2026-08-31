@@ -426,7 +426,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
             return False, False, "Critical Findings section must contain an explicit clean statement (e.g. 'None.')."
 
 
-    observations_match = re.search(r"(?i)#{2,3}\s*Observations(?: & Non-Blocking Suggestions)?(.*?)(?:#{2,3}|$)", unfenced_report, re.DOTALL)
+    observations_match = re.search(r"(?im)^#{2,3}\s+Observations[^\n]*\n(.*?)(?=\n#{2,3}\s+|\Z)", unfenced_report, flags=re.DOTALL)
     if is_clean and observations_match:
         obs_body = observations_match.group(1).strip()
         if obs_body and not re.match(r"^\s*(?:none(?:\.|\b)|n/a)\s*$", obs_body, flags=re.IGNORECASE):

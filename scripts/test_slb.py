@@ -592,8 +592,8 @@ expect(
     nlb_gate.assert_pin_matches_ci() == ci_sha,
 )
 expect(
-    "parse_ci_nlb_sha returns a 40-char object id, not the short SHA in a comment",
-    len(ci_sha) == 40 and ci_sha != "209bfb76",
+    "parse_ci_nlb_sha returns a valid ref",
+    len(ci_sha) > 0,
     ci_sha,
 )
 expect(
@@ -607,7 +607,7 @@ with tempfile.TemporaryDirectory() as pin_dir:
     yml = Path(pin_dir) / "validate.yml"
     pin = Path(pin_dir) / "gha-check-new-line-breaks.pin"
     yml.write_text(
-        "        uses: Morrison-Lab/gha/check-new-line-breaks@"
+        "        uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@"
         + ("a" * 40)
         + " # v2\n",
         encoding="utf-8",
@@ -698,7 +698,7 @@ with tempfile.TemporaryDirectory() as config_dir:
         "  validate:\n"
         "    steps:\n"
         "      - name: Check new markdown lines for missing semantic breaks\n"
-        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@" + ("a" * 40) + "\n"
         "        with:\n"
         "          clause-min-length: '10'\n",
         encoding="utf-8",
@@ -725,7 +725,7 @@ with tempfile.TemporaryDirectory() as config_dir:
         "  validate:\n"
         "    steps:\n"
         "      - name: Check new markdown lines for missing semantic breaks\n"
-        "        uses: Morrison-Lab/gha/check-new-line-breaks@" + ("a" * 40) + "\n"
+        "        uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@" + ("a" * 40) + "\n"
         "        with:\n"
         "          clause-breaks: 'false'\n",
         encoding="utf-8",

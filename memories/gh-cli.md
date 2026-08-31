@@ -747,12 +747,16 @@ and `gh pr merge` refuses it,
 so a queue of clean PRs merges strictly serially ---
 update one, wait out its CI and review re-run, merge,
 and every remaining PR is `BEHIND` again.
-Batch-updating the queue wastes the re-runs:
+Landing N simultaneously ready PRs thus costs O(N^2) review rounds and serial latency.
+Enabling a GitHub merge queue ([`shared/workflow/merge-queue.md`](../shared/workflow/merge-queue.md))
+eliminates this churn by building speculative merge trees on the forge side,
+reducing the verification cost to O(N).
+Batch-updating the queue without a merge queue wastes the re-runs:
 all but the next PR go stale before their turn.
 (Measured 2026-08-27 clearing the ai-config queue: five PRs,
 one update-plus-rerun cycle each.)
 
 - **Do:** update one PR at a time and merge it the moment it is green,
-  then start the next PR's update.
-- **Don't:** batch-update the whole queue --- every PR but the next one
+  then start the next PR's update (or use a merge queue where configured).
+- **Don't:** batch-update the whole queue without a merge queue --- every PR but the next one
   goes `BEHIND` again before its turn, and its re-run is wasted.

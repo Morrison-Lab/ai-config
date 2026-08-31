@@ -1351,17 +1351,19 @@ class TestConfiguredPRReviewers(unittest.TestCase):
 class TestEnsureGitIdentity(unittest.TestCase):
     """Test ensure_git_identity helper and runner initialization."""
 
-    def test_ensure_git_identity_sets_defaults_when_unset(self):
+    def test_ensure_git_identity_sets_defaults_and_logs_warning_when_unset(self):
         keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
         saved = {k: os.environ.get(k) for k in keys}
         for k in keys:
             os.environ.pop(k, None)
         try:
-            ensure_git_identity(author_name="custom-author", author_email="custom@example.invalid")
+            with self.assertLogs("orchestrator", level="WARNING") as cm:
+                ensure_git_identity(author_name="custom-author", author_email="custom@example.invalid")
             self.assertEqual(os.environ.get("GIT_AUTHOR_NAME"), "custom-author")
             self.assertEqual(os.environ.get("GIT_AUTHOR_EMAIL"), "custom@example.invalid")
             self.assertEqual(os.environ.get("GIT_COMMITTER_NAME"), "custom-author")
             self.assertEqual(os.environ.get("GIT_COMMITTER_EMAIL"), "custom@example.invalid")
+            self.assertTrue(any("Ambient Git identity unset" in msg for msg in cm.output))
         finally:
             for k, v in saved.items():
                 if v is not None:
@@ -1369,7 +1371,7 @@ class TestEnsureGitIdentity(unittest.TestCase):
                 else:
                     os.environ.pop(k, None)
 
-    def test_ensure_git_identity_preserves_existing_environment(self):
+    def test_ensure_git_identity_preserves_existing_environment_without_warning(self):
         keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
         saved = {k: os.environ.get(k) for k in keys}
         try:
@@ -1389,7 +1391,7 @@ class TestEnsureGitIdentity(unittest.TestCase):
                 else:
                     os.environ.pop(k, None)
 
-    def test_engine_start_ensures_git_identity(self):
+    def test_engine_start_ensures_git_identity_and_logs(self):
         keys = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]
         saved = {k: os.environ.get(k) for k in keys}
         for k in keys:
@@ -1400,11 +1402,13 @@ class TestEnsureGitIdentity(unittest.TestCase):
                 db_path = os.path.join(tmpdir, "engine_id_test.db")
                 engine = OrchestratorEngine(db_path=db_path)
                 try:
-                    engine.start(run_in_background=True)
+                    with self.assertLogs("orchestrator", level="WARNING") as cm:
+                        engine.start(run_in_background=True)
                     self.assertEqual(os.environ.get("GIT_AUTHOR_NAME"), "ai-config orchestrator")
                     self.assertEqual(os.environ.get("GIT_AUTHOR_EMAIL"), "orchestrator@noreply.ai-config.local")
                     self.assertEqual(os.environ.get("GIT_COMMITTER_NAME"), "ai-config orchestrator")
                     self.assertEqual(os.environ.get("GIT_COMMITTER_EMAIL"), "orchestrator@noreply.ai-config.local")
+                    self.assertTrue(any("Ambient Git identity unset" in msg for msg in cm.output))
                 finally:
                     engine.stop()
         finally:

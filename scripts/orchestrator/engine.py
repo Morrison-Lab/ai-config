@@ -27,11 +27,24 @@ def ensure_git_identity(
 
     Guarantees that git commits executed by subagents or in isolated worktrees
     will not fail on fresh runners or containers lacking ambient git config.
+    Logs an observable warning when fallback identity is substituted.
     """
-    os.environ.setdefault("GIT_AUTHOR_NAME", author_name)
-    os.environ.setdefault("GIT_AUTHOR_EMAIL", author_email)
-    os.environ.setdefault("GIT_COMMITTER_NAME", author_name)
-    os.environ.setdefault("GIT_COMMITTER_EMAIL", author_email)
+    applied_fallbacks = []
+    for var, val in [
+        ("GIT_AUTHOR_NAME", author_name),
+        ("GIT_AUTHOR_EMAIL", author_email),
+        ("GIT_COMMITTER_NAME", author_name),
+        ("GIT_COMMITTER_EMAIL", author_email),
+    ]:
+        if var not in os.environ:
+            os.environ[var] = val
+            applied_fallbacks.append(f"{var}={val}")
+
+    if applied_fallbacks:
+        logger.warning(
+            "Ambient Git identity unset; configured fallback Git environment: %s",
+            ", ".join(applied_fallbacks),
+        )
 
 
 class OrchestratorEngine:

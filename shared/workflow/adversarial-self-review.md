@@ -43,7 +43,7 @@ the only configuration that also buys independence of blind spot.
 
 The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 **opencode**, **claude**, and `codex` wherever installed
-([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md)).
+([`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md), [`adv`](../../skills/adv/SKILL.md)).
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
@@ -51,6 +51,7 @@ Dispatch in independence-and-availability order ---
 `agy` CLI or `opencode` first, then `codex`, then `claude` ---
 where each entry qualifies only if both its model and harness
 differ from the authoring session.
+Use [`adv`](../../skills/adv/SKILL.md) / `pre-push-review.py` to rotate through available alternate local CLI engines (`--engine alternate`).
 This review order serves independence and measured availability,
 overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
 delegation order for general work.

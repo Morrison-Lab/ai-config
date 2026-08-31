@@ -219,6 +219,8 @@ jobs:
         # workstation subscription CLIs. Unit tests mock the CLI/subprocess boundaries
         # and verify diff extraction, fallback chains, and forge attribution.
         run: python3 scripts/test_pre_push_review.py
+      - name: Run review-payload library tests
+        run: python3 scripts/test_review_payload.py
       - name: Run adversarial-reviewer read-only hedge tests
         # The persona's declared restriction is not a Write-schema strip on
         # Cursor Cloud Task (ai-config#2281; measured 2026-08-25 PDT).

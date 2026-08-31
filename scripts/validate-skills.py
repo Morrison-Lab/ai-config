@@ -255,9 +255,6 @@ NON_OPERATION_TOKENS = {
     "GITLAB_TOKEN",
     "NOT_CRAN",
     "NOT_PLANNED",
-    # env var: names the ollama endpoint, which delegate-to-opencode cites as
-    # one way the ollama provider ends up pointing off-machine
-    "OLLAMA_HOST",
     # env var: one of the two auth routes delegate-to-opencode names for the
     # openrouter provider
     "OPENROUTER_API_KEY",

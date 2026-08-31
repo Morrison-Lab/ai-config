@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Recommend harness, provider, model, and engine for a repo or task.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#recm-recommend-harness-provider-model-and-engine" id="toc-recm-recommend-harness-provider-model-and-engine" class="nav-link active" data-scroll-target="#recm-recommend-harness-provider-model-and-engine">recm — Recommend Harness, Provider, Model, and Engine</a>
+  <ul class="collapse">
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#the-5-dimensions-of-recommendation" id="toc-the-5-dimensions-of-recommendation" class="nav-link" data-scroll-target="#the-5-dimensions-of-recommendation">The 5 Dimensions of Recommendation</a>
+  <ul class="collapse">
+  <li><a href="#dimension-1-harness-cli-selection" id="toc-dimension-1-harness-cli-selection" class="nav-link" data-scroll-target="#dimension-1-harness-cli-selection">Dimension 1: Harness &amp; CLI Selection</a></li>
+  <li><a href="#dimension-2-provider-tier-budget-ladder" id="toc-dimension-2-provider-tier-budget-ladder" class="nav-link" data-scroll-target="#dimension-2-provider-tier-budget-ladder">Dimension 2: Provider Tier &amp; Budget Ladder</a></li>
+  <li><a href="#dimension-3-model-capability-task-complexity" id="toc-dimension-3-model-capability-task-complexity" class="nav-link" data-scroll-target="#dimension-3-model-capability-task-complexity">Dimension 3: Model Capability &amp; Task Complexity</a></li>
+  <li><a href="#dimension-4-review-engine-selection" id="toc-dimension-4-review-engine-selection" class="nav-link" data-scroll-target="#dimension-4-review-engine-selection">Dimension 4: Review Engine Selection</a></li>
+  <li><a href="#dimension-5-governing-policy-constraints-overrides" id="toc-dimension-5-governing-policy-constraints-overrides" class="nav-link" data-scroll-target="#dimension-5-governing-policy-constraints-overrides">Dimension 5: Governing Policy Constraints &amp; Overrides</a></li>
+  </ul></li>
+  <li><a href="#step-by-step-decision-procedure" id="toc-step-by-step-decision-procedure" class="nav-link" data-scroll-target="#step-by-step-decision-procedure">Step-by-Step Decision Procedure</a>
+  <ul class="collapse">
+  <li><a href="#step-1-check-data-sensitivity-repository-boundaries" id="toc-step-1-check-data-sensitivity-repository-boundaries" class="nav-link" data-scroll-target="#step-1-check-data-sensitivity-repository-boundaries">Step 1: Check Data Sensitivity &amp; Repository Boundaries</a></li>
+  <li><a href="#step-2-check-deterministic-testability-task-shape" id="toc-step-2-check-deterministic-testability-task-shape" class="nav-link" data-scroll-target="#step-2-check-deterministic-testability-task-shape">Step 2: Check Deterministic Testability &amp; Task Shape</a></li>
+  <li><a href="#step-3-check-quota-metered-windows" id="toc-step-3-check-quota-metered-windows" class="nav-link" data-scroll-target="#step-3-check-quota-metered-windows">Step 3: Check Quota &amp; Metered Windows</a></li>
+  <li><a href="#step-4-select-adversarial-review-engine" id="toc-step-4-select-adversarial-review-engine" class="nav-link" data-scroll-target="#step-4-select-adversarial-review-engine">Step 4: Select Adversarial Review Engine</a></li>
+  </ul></li>
+  <li><a href="#quick-reference-matrix" id="toc-quick-reference-matrix" class="nav-link" data-scroll-target="#quick-reference-matrix">Quick Reference Matrix</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to Other Skills</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/recm/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/recm/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="recm-recommend-harness-provider-model-and-engine" class="level1">
+<h1>recm — Recommend Harness, Provider, Model, and Engine</h1>
+<p>Determine the optimal execution environment (harness CLI or IDE), billing provider tier, model capability, and review engine for a repository, issue, or task. Aliases: <a href="../../skills/rech/SKILL.html"><code>rech</code></a> (recommend harness), <a href="../../skills/rechme/SKILL.html"><code>rechme</code></a> (recommend harness/model/engine).</p>
+<p>This skill synthesizes task shape, token budget, tool requirements, deterministic testability, and data sensitivity into an actionable recommendation.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>“recommend a harness”, “recommend a model”, “recommend an engine”, “recm”, “rech”, “rechme”.</li>
+<li>When sizing a new repository, major feature, or complex issue to determine the most cost-effective and capable execution stack.</li>
+<li>Proactively before kicking off heavy tasks to decide between inline execution, subagent fan-out, sidecar CLI delegation, or multi-engine review.</li>
+</ul>
+</section>
+<section id="the-5-dimensions-of-recommendation" class="level2">
+<h2 class="anchored" data-anchor-id="the-5-dimensions-of-recommendation">The 5 Dimensions of Recommendation</h2>
+<p>Selecting the right stack requires evaluating five distinct axes:</p>
+<pre><code>                      ┌────────────────────────────────────────┐
+                      │             TASK / ISSUE               │
+                      └───────────────────┬────────────────────┘
+                                          │
+        ┌───────────────────┬─────────────┴───────┬────────────────────┐
+        ▼                   ▼                     ▼                    ▼
+ 1. Harness / CLI     2. Provider Tier     3. Model Tier        4. Review Engine
+(Claude Code, agy,    (Free Hosted,        (Tier 1 Conductor,   (Sonnet 4.6, adv,
+ Codex, OpenCode,     Subscription Window,  Tier 2 Worker,       Cross-family
+ Cursor, adv)         Prepaid, Claude)      Tier 3 Scan)         subagent)
+        ▲                   ▲                     ▲                    ▲
+        └───────────────────┴─────────────┬───────┴────────────────────┘
+                                          │
+                      ┌───────────────────┴────────────────────┐
+                      │    5. Governing Policy Guards          │
+                      │  - Ban on local/on-device inference    │
+                      │  - No LLM algorithmic thinking         │
+                      │  - Data sensitivity overrides          │
+                      └────────────────────────────────────────┘</code></pre>
+<hr>
+<section id="dimension-1-harness-cli-selection" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-1-harness-cli-selection">Dimension 1: Harness &amp; CLI Selection</h3>
+<p>Choose the primary interactive harness or non-interactive sidecar CLI based on repo integration and workflow needs:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Harness / CLI</th>
+<th>Primary Role</th>
+<th>Ideal Workload</th>
+<th>Key Invocation &amp; Nuance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Claude Code</strong></td>
+<td>Primary Orchestrator &amp; Conductor</td>
+<td>Multi-turn reasoning, project context closure, git workflows, subagent management</td>
+<td>Interactive terminal CLI; manages workflows and tool execution.</td>
+</tr>
+<tr class="even">
+<td><strong>Antigravity / Gemini CLI (<code>agy</code>)</strong></td>
+<td>DeepMind Ecosystem Harness &amp; Sidecar</td>
+<td>Antigravity plugins/skills discovery (<code>plugins/ai-config</code>), interactive UI, headless sidecar</td>
+<td>Headless: <code>agy --print "&lt;prompt&gt;"</code>. <strong>Note</strong>: API route retired; CLI available. Keep prompt immediately after <code>--print</code>.</td>
+</tr>
+<tr class="odd">
+<td><strong>Codex CLI (<code>codex</code>)</strong></td>
+<td>Mechanical Sidecar Executor</td>
+<td>Heavy parallelizable read/draft/verify, bounded implementation from clear specs</td>
+<td><code>codex exec -C &lt;repo&gt; -s read-only - &lt; prompt.txt</code>. Sunk ChatGPT plan (~5h window).</td>
+</tr>
+<tr class="even">
+<td><strong>OpenCode CLI (<code>opencode</code>)</strong></td>
+<td>Zero-Cost &amp; Multi-Provider Sidecar</td>
+<td>Mechanical edits with deterministic test suites, OpenRouter stealth previews</td>
+<td><code>opencode run --model &lt;id&gt;</code>. Free hosted tier (<code>opencode/*</code>) &amp; Zen, or <code>$10/mo</code> Go window.</td>
+</tr>
+<tr class="odd">
+<td><strong>Cursor / VS Code</strong></td>
+<td>Interactive Editor &amp; Visual IDE</td>
+<td>Interactive human editing, real-time typing autocomplete, visual diff navigation</td>
+<td>IDE harness; probe CLI automation before relying on headless runs.</td>
+</tr>
+<tr class="even">
+<td><strong><code>adv</code> / <code>pre-push-review.py</code></strong></td>
+<td>Multi-Engine Review Harness</td>
+<td>Adversarial self-review across diverse model families prior to pushing code</td>
+<td>Dedicated review dispatch runner (<code>adv</code> skill).</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="dimension-2-provider-tier-budget-ladder" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-2-provider-tier-budget-ladder">Dimension 2: Provider Tier &amp; Budget Ladder</h3>
+<p>Apply the standing quota optimization rule: <strong>spend CLI-reachable free tiers and subscription windows before consuming orchestrator/Claude budget.</strong></p>
+<ol type="1">
+<li><strong>Tier A: Hosted Free (<code>opencode/*</code> hosted-free &amp; Zen)</strong>
+<ul>
+<li><em>Cost</em>: $0, no usage window to exhaust.</li>
+<li><em>Best For</em>: Well-specified, mechanical edits and boilerplate where a deterministic test suite verifies correctness.</li>
+<li><em>Rule</em>: Goes ahead of metered subscription windows when capability and tooling suffice.</li>
+</ul></li>
+<li><strong>Tier B: Metered Subscription Windows (<code>codex</code>, <code>agy</code> CLI, <code>opencode-go/*</code>)</strong>
+<ul>
+<li><em>Cost</em>: Sunk cost within the current usage window (e.g.&nbsp;Codex ~5h window, OpenCode Go $10/mo window).</li>
+<li><em>Best For</em>: Heavy read fan-outs, multi-file auditing, drafting N artifacts, bounded implementation briefs.</li>
+<li><em>Rule</em>: Exhaust current subscription window before falling back to Claude tokens.</li>
+</ul></li>
+<li><strong>Tier C: Prepaid Credit Balance (<code>openrouter/*</code>)</strong>
+<ul>
+<li><em>Cost</em>: Pay-per-token draw on prepaid balance.</li>
+<li><em>Best For</em>: Frontier stealth previews and capable models when free and windowed tiers are exhausted.</li>
+</ul></li>
+<li><strong>Tier D: Orchestrator Claude Tiers (Haiku 4.5, Sonnet 4.6, Opus 4.8 / Fable 5)</strong>
+<ul>
+<li><em>Cost</em>: Direct API / session token quota.</li>
+<li><em>Best For</em>: Conductor orchestration, complex judgment, ambiguous design, adversarial review.</li>
+<li><em>Rule</em>: Conserve orchestrator budget by delegating bounded sub-tasks to Tiers A–B.</li>
+</ul></li>
+</ol>
+<hr>
+</section>
+<section id="dimension-3-model-capability-task-complexity" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-3-model-capability-task-complexity">Dimension 3: Model Capability &amp; Task Complexity</h3>
+<p>Match model intelligence to the intrinsic reasoning depth required:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model Tier</th>
+<th>Representative Models</th>
+<th>Reasoning Depth</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tier 1: Conductor &amp; Deep Reasoning</strong></td>
+<td>Claude Opus 4.8, Claude Fable 5</td>
+<td>Highest</td>
+<td>Orchestrator conductor, architectural design, subtle debugging, security audits, ambiguous spec decomposition.</td>
+</tr>
+<tr class="even">
+<td><strong>Tier 2: High-Velocity Execution &amp; Review</strong></td>
+<td>Claude Sonnet 4.6, GPT-5 / Codex</td>
+<td>Strong &amp; Fast</td>
+<td>Subagent worker implementation, bounded refactoring, test suite generation, adversarial code review.</td>
+</tr>
+<tr class="odd">
+<td><strong>Tier 3: Fast Scans &amp; Lightweight Verification</strong></td>
+<td>Claude Haiku 4.5, Nemotron Free</td>
+<td>Fast &amp; Focused</td>
+<td>Shallow triage, single-file regex/syntax checks, simple queries, boilerplate with mechanical verification.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="dimension-4-review-engine-selection" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-4-review-engine-selection">Dimension 4: Review Engine Selection</h3>
+<p>Adversarial self-review is governed by <strong>independence-first</strong>, not cost-first:</p>
+<ul>
+<li><strong>Primary Review Engine</strong>: Claude Sonnet 4.6 (or Opus 4.8 for critical security/architectural changes).</li>
+<li><strong>Cross-Family Verification</strong>: Codex or <code>agy</code> CLI pointing at Claude-generated diffs to eliminate shared blind spots.</li>
+<li><strong>Local Multi-Engine Review</strong>: Dispatch via <a href="../../skills/adv/SKILL.html"><code>adv</code></a> (<code>pre-push-review.py</code>).</li>
+</ul>
+<hr>
+</section>
+<section id="dimension-5-governing-policy-constraints-overrides" class="level3">
+<h3 class="anchored" data-anchor-id="dimension-5-governing-policy-constraints-overrides">Dimension 5: Governing Policy Constraints &amp; Overrides</h3>
+<p>Always enforce these strict repository principles:</p>
+<ol type="1">
+<li><strong>Local Inference Prohibited</strong>:
+<ul>
+<li><strong>Never</strong> run Ollama, LM Studio, llama.cpp, or on-device local models.</li>
+<li>Local inference can crash the user’s computer.</li>
+<li>“Local” strictly means <em>reachable through this computer’s CLI</em> (hosted/cloud models), not running on local hardware.</li>
+</ul></li>
+<li><strong>No LLM Algorithmic Thinking</strong>:
+<ul>
+<li><strong>Never</strong> rely on LLM probabilistic reasoning for counting, sorting, arithmetic, regex verification, math derivations, or AST linting.</li>
+<li>Always use validated deterministic software (e.g.&nbsp;Python scripts, <code>grep -c</code>, <code>wc -l</code>, SymPy, R, formal linters).</li>
+</ul></li>
+<li><strong>Data Sensitivity Overrides Cost</strong>:
+<ul>
+<li>Hosted CLIs (<code>codex</code>, <code>agy</code>, <code>opencode</code>) send payloads off-machine.</li>
+<li>When handling confidential, restricted, or unapproved data, keep work in the local orchestrator session using deterministic tools (a data trigger overrides cost ladder exceptions).</li>
+</ul></li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="step-by-step-decision-procedure" class="level2">
+<h2 class="anchored" data-anchor-id="step-by-step-decision-procedure">Step-by-Step Decision Procedure</h2>
+<p>When evaluating a repository, issue, or task, follow these steps:</p>
+<section id="step-1-check-data-sensitivity-repository-boundaries" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-check-data-sensitivity-repository-boundaries">Step 1: Check Data Sensitivity &amp; Repository Boundaries</h3>
+<ul>
+<li>Does the repository or task touch restricted, private, or sensitive data?
+<ul>
+<li><strong>YES</strong> → Keep work in the local orchestrator session; do not dispatch off-machine to third-party hosted CLIs unless explicitly approved. Use deterministic tools.</li>
+<li><strong>NO</strong> → Proceed to Step 2.</li>
+</ul></li>
+</ul>
+</section>
+<section id="step-2-check-deterministic-testability-task-shape" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-check-deterministic-testability-task-shape">Step 2: Check Deterministic Testability &amp; Task Shape</h3>
+<ul>
+<li>Is the task an algorithmic or deterministic calculation (counting lines, sorting, regex validation, math)?
+<ul>
+<li><strong>YES</strong> → Write and run a deterministic script (Python/Bash/R); do not delegate to an LLM.</li>
+</ul></li>
+<li>Is the task a heavy, parallelizable read / audit / draft of multiple files?
+<ul>
+<li><strong>YES</strong> → Route to sidecar CLI (<code>codex</code> or <code>opencode</code> free) via <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> or <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>.</li>
+</ul></li>
+<li>Is the task a bounded implementation from a clear spec with an automated test suite?
+<ul>
+<li><strong>YES</strong> → Route to <code>opencode</code> free hosted tier or <code>codex</code> window.</li>
+</ul></li>
+<li>Does the task require ambiguous requirements resolution, deep architecture, or orchestration?
+<ul>
+<li><strong>YES</strong> → Use Tier 1 / Tier 2 in Claude Code (Orchestrator).</li>
+</ul></li>
+</ul>
+</section>
+<section id="step-3-check-quota-metered-windows" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-check-quota-metered-windows">Step 3: Check Quota &amp; Metered Windows</h3>
+<ul>
+<li>Is <code>opencode</code> hosted-free tier suitable and verified? → Use <code>opencode</code> free.</li>
+<li>Is the <code>codex</code> ChatGPT plan window (~5h) available? → Delegate via <code>codex exec</code>.</li>
+<li>Is the <code>agy</code> CLI window available? → Delegate via <code>agy --print</code>.</li>
+<li>Are subscription windows exhausted? → Fall back to Claude Code (Haiku for scans, Sonnet for subagents, Opus for conductor).</li>
+</ul>
+</section>
+<section id="step-4-select-adversarial-review-engine" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-select-adversarial-review-engine">Step 4: Select Adversarial Review Engine</h3>
+<ul>
+<li>Use <a href="../../skills/adv/SKILL.html"><code>adv</code></a> / Sonnet 4.6 subagent for pre-push review against <code>git diff origin/&lt;default-branch&gt;...HEAD</code>.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="quick-reference-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="quick-reference-matrix">Quick Reference Matrix</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scenario / Task Type</th>
+<th>Recommended Harness</th>
+<th>Provider Tier</th>
+<th>Recommended Model</th>
+<th>Review Engine</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Orchestrator Conductor / Complex Architecture</strong></td>
+<td>Claude Code</td>
+<td>Direct Claude</td>
+<td>Opus 4.8 / Fable 5</td>
+<td>Sonnet 4.6 Subagent</td>
+</tr>
+<tr class="even">
+<td><strong>Bounded Code Implementation (with test suite)</strong></td>
+<td>Codex CLI / Claude Code</td>
+<td>ChatGPT Window / OpenCode Free</td>
+<td>Codex / Sonnet 4.6</td>
+<td><code>adv</code> / Sonnet 4.6</td>
+</tr>
+<tr class="odd">
+<td><strong>Heavy Fan-out File Audit / Backlog Scoping</strong></td>
+<td>Codex CLI / OpenCode</td>
+<td>Free Hosted / ChatGPT Window</td>
+<td>Nemotron Free / Codex</td>
+<td>Orchestrator Conductor</td>
+</tr>
+<tr class="even">
+<td><strong>Mechanical Refactor / Boilerplate Generation</strong></td>
+<td>OpenCode CLI</td>
+<td>Free Hosted Tier</td>
+<td>OpenCode Free</td>
+<td>Test Suite + Sonnet</td>
+</tr>
+<tr class="odd">
+<td><strong>Fast Syntax / Link / Triage Scans</strong></td>
+<td>Claude Code</td>
+<td>Direct Claude</td>
+<td>Haiku 4.5</td>
+<td>Deterministic Lint</td>
+</tr>
+<tr class="even">
+<td><strong>Restricted / Sensitive Data Analysis</strong></td>
+<td>Claude Code</td>
+<td>Local Session Only</td>
+<td>Approved Model</td>
+<td>Deterministic Scripts</td>
+</tr>
+<tr class="odd">
+<td><strong>Antigravity Plugin / Extension Integration</strong></td>
+<td>Antigravity / Gemini CLI</td>
+<td>DeepMind Ecosystem</td>
+<td>Gemini 2.5 / Pro</td>
+<td>Sonnet 4.6</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to Other Skills</h2>
+<ul>
+<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a></strong>: Focuses narrowly on choosing among Claude model tiers (Fable, Haiku, Sonnet, Opus).</li>
+<li><strong><a href="../../skills/assess-model-fit/SKILL.html"><code>assess-model-fit</code></a></strong>: Assesses whether the active model tier is struggling and warrants escalation.</li>
+<li><strong><a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> (<code>dtc</code>)</strong>: Operationalizes background dispatch, schema enforcement, and fallback mechanics for Codex.</li>
+<li><strong><a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a> (<code>dto</code>)</strong>: Operationalizes dispatch to OpenCode free, Go, and OpenRouter tiers.</li>
+<li><strong><a href="../../skills/adv/SKILL.html"><code>adv</code></a></strong>: Operationalizes multi-engine adversarial code review prior to pushing.</li>
+</ul>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/recm/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/recm/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

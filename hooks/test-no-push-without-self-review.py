@@ -281,6 +281,15 @@ CASES = [
      "a verdict for one repo does not authorize a push in another"),
     (f"cd {OTHER} && git push origin main", reviewed(), True,
      "a `cd` ahead of the push moves the repo the verdict must cover"),
+    (f"cd {OTHER} && git push origin main", reviewed(body(commit=OTHER_HEAD)), False,
+     "a push after `cd` to another repo succeeds under a clean verdict for that repo's HEAD"),
+    (f"cd -- {OTHER} && git push origin main", reviewed(body(commit=OTHER_HEAD)), False,
+     "`cd -- <dir>` parses option terminator and succeeds under a verdict for that repo's HEAD"),
+    (f"cd -P {OTHER} && git push origin main", reviewed(body(commit=OTHER_HEAD)), False,
+     "`cd -P <dir>` skips flags and succeeds under a verdict for that repo's HEAD"),
+    (f"cd {OTHER} && git commit --allow-empty -m 'fix' && git push origin main",
+     reviewed(body(commit=OTHER_HEAD)), False,
+     "a push after `cd` and an in-command commit succeeds under a verdict for that repo's HEAD"),
     (f"git -C {REPO}/nope push origin main", reviewed(), True,
      "a push in a path that is not a repo cannot be verified"),
 
@@ -1265,6 +1274,87 @@ def structured_payload_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def cd_tracking_cases() -> tuple[int, int]:
+    """Test cd parsing, options, relative path chaining, and subshell scoping."""
+    spec = importlib.util.spec_from_file_location("hook", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = ran = 0
+
+    def check(label, actual, expected=True):
+        nonlocal failures, ran
+        ran += 1
+        if actual == expected:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label} (expected {expected!r}, got {actual!r})")
+            failures += 1
+
+    # Chained relative directory tracking: cd dir1 && cd dir2
+    p = list(mod.iter_pushes("cd /dir1 && cd dir2 && git push origin main"))
+    check("chained cd with relative target resolves joined path",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1/dir2"))
+
+    # Chained relative directory tracking: cd /a/b && cd ..
+    p = list(mod.iter_pushes("cd /a/b && cd .. && git push origin main"))
+    check("chained cd with .. parent segment resolves normalized parent path",
+          len(p) == 1 and p[0][2] == os.path.normpath("/a"))
+
+    # cd combined with git -C (relative)
+    p = list(mod.iter_pushes("cd /dir1 && git -C sub push origin main"))
+    check("git -C with relative path resolves relative to cd hint",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1/sub"))
+
+    # cd combined with git -C (absolute)
+    p = list(mod.iter_pushes("cd /dir1 && git -C /other push origin main"))
+    check("git -C with absolute path overrides cd hint",
+          len(p) == 1 and p[0][2] == os.path.normpath("/other"))
+
+    # cd options: -P, -L, --
+    p = list(mod.iter_pushes("cd -P /dir1 && git push origin main"))
+    check("cd -P target resolves correctly",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
+
+    p = list(mod.iter_pushes("cd -L /dir1 && git push origin main"))
+    check("cd -L target resolves correctly",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
+
+    p = list(mod.iter_pushes("cd -- /dir1 && git push origin main"))
+    check("cd -- target resolves correctly",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
+
+    p = list(mod.iter_pushes("cd -P -- /dir1 && git push origin main"))
+    check("cd -P -- target resolves correctly",
+          len(p) == 1 and p[0][2] == os.path.normpath("/dir1"))
+
+    # cd - clears hint
+    p = list(mod.iter_pushes("cd /dir1 && cd - && git push origin main"))
+    check("cd - clears directory hint",
+          len(p) == 1 and p[0][2] is None)
+
+    # bare cd goes to HOME
+    p = list(mod.iter_pushes("cd && git push origin main"))
+    check("bare cd resolves to user home directory",
+          len(p) == 1 and p[0][2] == os.path.expanduser("~"))
+
+    # cd with $HOME
+    p = list(mod.iter_pushes("cd $HOME/foo && git push origin main"))
+    check("cd with $HOME resolves home prefix",
+          len(p) == 1 and p[0][2] == os.path.normpath(os.path.expanduser("~/foo")))
+
+    # cd with unresolvable variable
+    p = list(mod.iter_pushes("cd $UNKNOWN_VAR/foo && git push origin main"))
+    check("cd with unknown variable sets hint to None",
+          len(p) == 1 and p[0][2] is None)
+
+    # subshell scoping with multiple pushes
+    p = list(mod.iter_pushes("(cd /sub && git push origin main) && git push origin main"))
+    check("subshell cd scopes only to push inside subshell",
+          len(p) == 2 and p[0][2] == os.path.normpath("/sub") and p[1][2] is None)
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -1294,7 +1384,7 @@ def main():
         for fn in (raw_cases, orphan_cases, config_cases,
                    valueless_bool_cases, budget_cases,
                    fixture_branch_cases, windows_path_cases,
-                   structured_payload_cases):
+                   structured_payload_cases, cd_tracking_cases):
             f, r = fn()
             failed += f
             extra += r

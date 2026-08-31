@@ -518,6 +518,65 @@ def _blank_shell_redirections(command: str) -> str:
     return "".join(chars)
 
 
+def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
+    """Resolve the directory after a `cd` or `pushd` command relative to `cur_dir`.
+
+    Returns the new effective directory, or None if cleared / indeterminate.
+    """
+    cmd_name = rest[0]
+    if cmd_name == "popd":
+        # Without a full dirstack simulation across commands, popd clears the hint.
+        return None
+
+    # For `cd` and `pushd`: parse flags and positional directory target.
+    i = 1
+    target = None
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            # End of options; next token (if present) is the target directory.
+            if i + 1 < len(rest):
+                target = rest[i + 1]
+            break
+        if tok == "-":
+            # `cd -` switches to OLDPWD, which is indeterminate without shell state.
+            return None
+        if tok.startswith("-"):
+            # Flags like -P, -L, -e, -@ for cd, or -n for pushd
+            i += 1
+            continue
+        target = tok
+        break
+
+    if target is None:
+        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
+        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
+        if cmd_name == "pushd":
+            return None
+        target = "~"
+
+    # Expand ~ and ~user
+    if target == "~" or target.startswith("~/"):
+        target = os.path.expanduser(target)
+    elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
+        home = os.path.expanduser("~")
+        if target in ("$HOME", "${HOME}"):
+            target = home
+        elif target.startswith("$HOME/"):
+            target = os.path.join(home, target[len("$HOME/"):])
+        elif target.startswith("${HOME}/"):
+            target = os.path.join(home, target[len("${HOME}/"):])
+    elif "$" in target or "`" in target:
+        # Unexpanded shell variables/substitutions cannot be resolved statically.
+        return None
+
+    if os.path.isabs(target):
+        return os.path.normpath(target)
+    if cur_dir is not None:
+        return os.path.normpath(os.path.join(cur_dir, target))
+    return os.path.normpath(target)
+
+
 def _hints_by_position(command: str) -> list[str | None]:
     """One directory hint per push, in order, or [] when structure is unclear.
 
@@ -544,9 +603,7 @@ def _hints_by_position(command: str) -> list[str | None]:
         # so it is reachable by ordinary use rather than only adversarially.
         _, rest = _strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            arg = rest[1] if len(rest) > 1 else None
-            stack[depth] = arg if (arg and not arg.startswith("-")
-                                   and rest[0] != "popd") else None
+            stack[depth] = _resolve_cd_target(rest, stack[depth])
             continue
         if rest and _SIBLING and _SIBLING._argv_push(rest):
             hints.append(stack[depth])
@@ -709,7 +766,15 @@ def iter_pushes(command: str):
     if len(hints) != len(pushes):
         hints = [None] * len(pushes)
     for (env, rest, directory), hint in zip(pushes, hints):
-        yield env, rest, (directory or hint)
+        effective_dir = directory
+        if effective_dir is REDIRECTED:
+            yield env, rest, REDIRECTED
+            continue
+        if effective_dir is None:
+            effective_dir = hint
+        elif hint is not None and not os.path.isabs(effective_dir):
+            effective_dir = os.path.normpath(os.path.join(hint, effective_dir))
+        yield env, rest, effective_dir
 
 
 def has_allow_override(env: list[str]) -> bool:

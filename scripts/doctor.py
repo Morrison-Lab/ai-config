@@ -162,6 +162,105 @@ def check_context_closure() -> Dict[str, Any]:
     }
 
 
+def strip_jsonc_comments(text: str) -> str:
+    """Strip single-line (//) and multi-line (/* */) comments from JSONC text."""
+    out = []
+    i = 0
+    n = len(text)
+    in_string = False
+    escape = False
+
+    while i < n:
+        char = text[i]
+
+        if in_string:
+            out.append(char)
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            i += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            out.append(char)
+            i += 1
+            continue
+
+        if char == "/" and i + 1 < n:
+            next_char = text[i + 1]
+            if next_char == "/":
+                i += 2
+                while i < n and text[i] != "\n":
+                    i += 1
+                continue
+            elif next_char == "*":
+                i += 2
+                while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                    i += 1
+                i += 2
+                continue
+
+        out.append(char)
+        i += 1
+
+    return "".join(out)
+
+
+def check_jsonc_configs() -> Dict[str, Any]:
+    """Validate JSON and JSONC configuration files across repository and environment."""
+    candidate_paths: List[Path] = [
+        REPO_ROOT / "opencode.json",
+        REPO_ROOT / "hooks" / "hooks.json",
+        REPO_ROOT / "plugins" / "ai-config" / "plugin.json",
+        REPO_ROOT / "plugins" / "ai-config" / "hooks.json",
+        REPO_ROOT / "shared" / "vendored" / "MANIFEST.json",
+        REPO_ROOT / "skills" / "register-oaicopilot-models" / "models-template.jsonc",
+    ]
+
+    user_configs = [
+        Path(os.path.expanduser("~/.config/opencode/opencode.jsonc")),
+        Path(os.path.expanduser("~/.gemini/config/plugins.json")),
+    ]
+    for uc in user_configs:
+        if uc.is_file():
+            candidate_paths.append(uc)
+
+    checked = 0
+    failed: List[str] = []
+
+    for path in candidate_paths:
+        if not path.is_file():
+            continue
+        checked += 1
+        try:
+            raw = path.read_text(encoding="utf-8")
+            clean = strip_jsonc_comments(raw)
+            json.loads(clean)
+        except Exception as exc:
+            failed.append(f"{path.name} ({exc})")
+
+    if failed:
+        return {
+            "name": "jsonc_configs",
+            "ok": False,
+            "status": "FAIL",
+            "failed_files": failed,
+            "details": f"Invalid JSON/JSONC in {len(failed)} file(s): {'; '.join(failed)}",
+        }
+
+    return {
+        "name": "jsonc_configs",
+        "ok": True,
+        "status": "OK",
+        "checked_count": checked,
+        "details": f"Validated {checked} JSON/JSONC configuration file(s).",
+    }
+
+
 def run_doctor() -> Dict[str, Any]:
     """Execute all diagnostic health checks."""
     checks = [
@@ -170,6 +269,7 @@ def run_doctor() -> Dict[str, Any]:
         check_codex_wrappers(),
         check_hook_catalog(),
         check_context_closure(),
+        check_jsonc_configs(),
     ]
 
     all_ok = all(c["ok"] for c in checks)

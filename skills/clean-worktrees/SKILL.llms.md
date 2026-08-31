@@ -1,4 +1,4 @@
-# Clean Worktrees (aka CW / prune-worktrees)
+# Clean Worktrees (aka CW)
 
 Sweep **dead git worktrees** out of the current repo. Agent isolation and the `session-lock` skill spin up worktrees under `.claude/worktrees/<name>/` (or `<repo>.worktrees/<name>/`); after a PR merges or a session ends, the worktree lingers on disk with a merged or `[gone]` branch. This skill removes the dead ones safely and leaves everything live untouched.
 
@@ -6,7 +6,7 @@ This is the **worktree** counterpart to `clean-branches` (which sweeps *branches
 
 ## When this fires
 
-- “clean worktrees”, “cw”, “prune worktrees”, “prune-worktrees”
+- “clean worktrees”, “cw”, “prune worktrees”
 - “clean dead worktrees”, “remove stale worktrees”, “tidy up worktrees”
 - “which worktrees can I delete?”
 - After a batch of PRs merge and the `.claude/worktrees/` dir has grown.
@@ -241,7 +241,7 @@ git worktree prune -v               # clears any record left by the removals
 
 ## Relationship to other skills
 
-- **`session-lock` / `deconflict-sessions`** — *creates* the worktrees this skill cleans up; consult its registry (step 3d) so you never remove one a live session holds. Its own teardown is `git worktree remove` at session end; this skill is the bulk sweep for the ones that slipped through.
+- **`session-lock`** — *creates* the worktrees this skill cleans up; consult its registry (step 3d) so you never remove one a live session holds. Its own teardown is `git worktree remove` at session end; this skill is the bulk sweep for the ones that slipped through.
 - **`clean-branches` / `cb` / `prune`** — the **branch** counterpart. Run it after this skill (or let step 5 delete branches inline) so a removed worktree’s branch doesn’t linger. Same dry-run-then-confirm discipline.
 - **`clean-git`** — the combined sweep. It runs this skill and then `clean-branches`, behind one dry-run plan and one confirmation, and owns the ordering constraint that makes worktrees-first mandatory.
 - **`post-merge`** — after a PR merges, removing its worktree is part of the tidy-up (step 2 there); that skill can hand off here for a repo-wide sweep.

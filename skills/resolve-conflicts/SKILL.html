@@ -449,7 +449,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong><code>clean-branches</code></strong> — when rebasing a stale branch onto <code>main</code> hits a non-trivial conflict, resolve it here instead of skipping the branch.</li>
 <li><strong><code>gii</code> / <code>split-concerns</code></strong> — stacked or parallel MRs are the usual source of conflicts; this is how you clear them once they collide.</li>
 <li><strong><code>check-history</code></strong> — run <em>before</em> implementing to avoid creating avoidable conflicts/regressions in the first place; this skill cleans up the ones that still happen.</li>
-<li><strong><code>deconflict-sessions</code> / <code>session-lock</code></strong> — <strong>not</strong> this skill. Those are about two AI <em>sessions</em> clobbering one local checkout (a locking concern), not git <em>content</em> conflicts. Different sense of “conflict.”</li>
+<li><strong><code>session-lock</code></strong> — <strong>not</strong> this skill. It is about two AI <em>sessions</em> clobbering one local checkout (a locking concern), not git <em>content</em> conflicts. Different sense of “conflict.”</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">

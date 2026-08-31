@@ -103,7 +103,7 @@ Confirm which physical branch is “ours” before you reach for `--ours` / `--t
 - **`clean-branches`** — when rebasing a stale branch onto `main` hits a non-trivial conflict, resolve it here instead of skipping the branch.
 - **`gii` / `split-concerns`** — stacked or parallel MRs are the usual source of conflicts; this is how you clear them once they collide.
 - **`check-history`** — run *before* implementing to avoid creating avoidable conflicts/regressions in the first place; this skill cleans up the ones that still happen.
-- **`deconflict-sessions` / `session-lock`** — **not** this skill. Those are about two AI *sessions* clobbering one local checkout (a locking concern), not git *content* conflicts. Different sense of “conflict.”
+- **`session-lock`** — **not** this skill. It is about two AI *sessions* clobbering one local checkout (a locking concern), not git *content* conflicts. Different sense of “conflict.”
 
 ## Anti-patterns
 

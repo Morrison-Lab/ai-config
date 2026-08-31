@@ -137,7 +137,7 @@ After a successful push, if the branch has no PR yet, open one (ready for review
 ## Relationship to other skills
 
 - **`claim-pr`** — posts/removes the claim comment this skill reads in check \#3. `push` is the read side; `claim-pr` is the write side.
-- **`session-lock` / `deconflict-sessions`** — the local-checkout counterpart: it keeps parallel sessions on one machine from sharing a working tree. `push` guards the *remote* branch; `session-lock` guards the *local* tree.
+- **`session-lock`** — the local-checkout counterpart: it keeps parallel sessions on one machine from sharing a working tree. `push` guards the *remote* branch; `session-lock` guards the *local* tree.
 - **`sync-pr-branch` / `merge-main`** — when check \#2 fires because `main` (not the branch) moved ahead, sync the branch first, then push. `sync-pr-branch` ends in a push and should itself honor these checks.
 - **`ardi`** — its push step should run these checks; the “detect an active parallel session before pushing” note in `claim-pr` is the same guard.
 - **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** — the standing rule these checks implement, and the home of the immediacy argument and the `--force-if-includes` mechanism. `hooks/no-clobbering-push.py` is its instrument, and it runs on the `git push` itself rather than waiting to be invoked — so it covers the bare push in the middle of an ARDI round that never reaches this skill.

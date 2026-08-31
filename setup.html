@@ -435,7 +435,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="deconflicting-parallel-local-sessions" class="level2">
 <h2 class="anchored" data-anchor-id="deconflicting-parallel-local-sessions">Deconflicting parallel local sessions</h2>
-<p>When several AI sessions share one local checkout, they can clobber each other. The <code>session-lock</code> skill (alias <code>deconflict-sessions</code>) keeps a machine-local registry of active sessions under <code>.git/ai-sessions/</code>. Sessions can refuse to share a working tree and isolate into a <code>git worktree</code>. See <a href="https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md"><code>docs/local-session-deconfliction.md</code></a>.</p>
+<p>When several AI sessions share one local checkout, they can clobber each other. The <code>session-lock</code> skill keeps a machine-local registry of active sessions under <code>.git/ai-sessions/</code>. Sessions can refuse to share a working tree and isolate into a <code>git worktree</code>. See <a href="https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md"><code>docs/local-session-deconfliction.md</code></a>.</p>
 
 
 </section>

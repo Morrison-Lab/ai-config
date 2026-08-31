@@ -64,6 +64,6 @@ The bot that runs `claude-code-action` on this repo’s PRs reads skills from `.
 
 ## Deconflicting parallel local sessions
 
-When several AI sessions share one local checkout, they can clobber each other. The `session-lock` skill (alias `deconflict-sessions`) keeps a machine-local registry of active sessions under `.git/ai-sessions/`. Sessions can refuse to share a working tree and isolate into a `git worktree`. See [`docs/local-session-deconfliction.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md).
+When several AI sessions share one local checkout, they can clobber each other. The `session-lock` skill keeps a machine-local registry of active sessions under `.git/ai-sessions/`. Sessions can refuse to share a working tree and isolate into a `git worktree`. See [`docs/local-session-deconfliction.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md).
 
 Back to top

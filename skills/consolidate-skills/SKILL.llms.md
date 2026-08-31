@@ -14,7 +14,7 @@ It is the corpus-level complement to the single-skill tools: `skill-builder` *cr
 
 Most “overlap” is **not** a duplicate. Before merging anything, classify each cluster into exactly one of three buckets:
 
-1.  **Intentional alias family — LEAVE ALONE.** One canonical SKILL.md with real content; the rest are thin stubs that only redirect to it (e.g. `ard`/`adr`/`address-rebut-defer`, `cb`/`prune`/`clean-branches`, `sync-pr-branch`/`merge-main`/`resync-branch`). This is the *target* state, not a problem. Tell: the others’ bodies are ~5 lines ending in `→ **[<canonical>](../<canonical>/SKILL.md)**`.
+1.  **Intentional alias family — LEAVE ALONE.** One canonical SKILL.md with real content; the rest are thin stubs that only redirect to it (e.g. `ard`/`adr`, `cb`/`prune`/`clean-branches`, `sync-pr-branch`/`merge-main`/`resync-branch`). This is the *target* state, not a problem. Tell: the others’ bodies are ~5 lines ending in `→ **[<canonical>](../<canonical>/SKILL.md)**`.
 2.  **Adjacent-but-distinct — LEAVE ALONE (maybe cross-link).** Same theme, genuinely different procedure (e.g. `tidy` audits for refactors vs `simplify` prunes dead code; `split-concerns` splits a PR vs `defer-issue` files a follow-up). Merging these *loses* capability. If they should reference each other, hand off to `link-skills` — don’t consolidate.
 3.  **Genuine duplicate — CONSOLIDATE.** Two or more skills with **real bodies** that drive the same workflow to the same outcome. This is the only bucket this skill acts on.
 

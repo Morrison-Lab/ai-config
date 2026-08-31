@@ -346,7 +346,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#clean-worktrees-aka-cw-prune-worktrees" id="toc-clean-worktrees-aka-cw-prune-worktrees" class="nav-link active" data-scroll-target="#clean-worktrees-aka-cw-prune-worktrees">Clean Worktrees (aka CW / prune-worktrees)</a>
+  <li><a href="#clean-worktrees-aka-cw" id="toc-clean-worktrees-aka-cw" class="nav-link active" data-scroll-target="#clean-worktrees-aka-cw">Clean Worktrees (aka CW)</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#what-a-worktree-is-and-why-they-pile-up" id="toc-what-a-worktree-is-and-why-they-pile-up" class="nav-link" data-scroll-target="#what-a-worktree-is-and-why-they-pile-up">What a worktree is (and why they pile up)</a></li>
@@ -374,14 +374,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="clean-worktrees-aka-cw-prune-worktrees" class="level1">
-<h1>Clean Worktrees (aka CW / prune-worktrees)</h1>
+<section id="clean-worktrees-aka-cw" class="level1">
+<h1>Clean Worktrees (aka CW)</h1>
 <p>Sweep <strong>dead git worktrees</strong> out of the current repo. Agent isolation and the <code>session-lock</code> skill spin up worktrees under <code>.claude/worktrees/&lt;name&gt;/</code> (or <code>&lt;repo&gt;.worktrees/&lt;name&gt;/</code>); after a PR merges or a session ends, the worktree lingers on disk with a merged or <code>[gone]</code> branch. This skill removes the dead ones safely and leaves everything live untouched.</p>
 <p>This is the <strong>worktree</strong> counterpart to <code>clean-branches</code> (which sweeps <em>branches</em>). A worktree holds a branch checked out into its own directory, so the two are complementary: remove the dead worktree here, then <code>clean-branches</code> deletes the now-free branch (or this skill deletes it inline).</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>“clean worktrees”, “cw”, “prune worktrees”, “prune-worktrees”</li>
+<li>“clean worktrees”, “cw”, “prune worktrees”</li>
 <li>“clean dead worktrees”, “remove stale worktrees”, “tidy up worktrees”</li>
 <li>“which worktrees can I delete?”</li>
 <li>After a batch of PRs merge and the <code>.claude/worktrees/</code> dir has grown.</li>
@@ -593,7 +593,7 @@ Proceed? (or pick specific worktrees)</code></pre>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>session-lock</code> / <code>deconflict-sessions</code></strong> — <em>creates</em> the worktrees this skill cleans up; consult its registry (step 3d) so you never remove one a live session holds. Its own teardown is <code>git worktree remove</code> at session end; this skill is the bulk sweep for the ones that slipped through.</li>
+<li><strong><code>session-lock</code></strong> — <em>creates</em> the worktrees this skill cleans up; consult its registry (step 3d) so you never remove one a live session holds. Its own teardown is <code>git worktree remove</code> at session end; this skill is the bulk sweep for the ones that slipped through.</li>
 <li><strong><code>clean-branches</code> / <code>cb</code> / <code>prune</code></strong> — the <strong>branch</strong> counterpart. Run it after this skill (or let step 5 delete branches inline) so a removed worktree’s branch doesn’t linger. Same dry-run-then-confirm discipline.</li>
 <li><strong><code>clean-git</code></strong> — the combined sweep. It runs this skill and then <code>clean-branches</code>, behind one dry-run plan and one confirmation, and owns the ordering constraint that makes worktrees-first mandatory.</li>
 <li><strong><code>post-merge</code></strong> — after a PR merges, removing its worktree is part of the tidy-up (step 2 there); that skill can hand off here for a repo-wide sweep.</li>

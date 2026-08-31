@@ -47,6 +47,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
+from review_payload import (  # noqa: E402
+    extract_structured_review,
+    payload_findings,
+    payload_is_blocking,
+    payload_is_clean,
+    normalize_verdict,
+)
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -242,8 +249,17 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "verdict: block": "Jules",
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
-    "_posted by claude (ai agent)": "Claude",
-    "_posted by claude code (ai agent)": "Claude",
+    # Deliberately NOT here: the Claude Code disclosure footer
+    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # "Every comment you post to a forge says an agent posted it" mandates that
+    # footer on EVERY agent-posted comment -- claims, status updates, replies,
+    # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it
+    # here made each of those a quorum-eligible automated review with identity
+    # "Claude": measured, an owner comment ending in the footer superseded a
+    # real bot "Needs more work" and satisfied quorum on a PR carrying no
+    # automated review at all.  That reopens #2308's invariant, quoted below:
+    # approval authority comes from author identity and never from body text.
+    # A Claude review identifies itself by "**Claude finished" instead.
 }
 
 # Logins that are one reviewer, never shared. Claude and Antigravity both post
@@ -313,60 +329,6 @@ def has_review_body_marker(body: str) -> bool:
     """True when *body* carries a marker that makes it read as a review."""
     body_lower = body.lower()
     return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
-
-
-def extract_structured_review(body: str) -> Optional[Dict[str, Any]]:
-    """Extract structured review JSON from a comment body if present.
-
-    Looks for an embedded JSON payload inside:
-      1. An HTML comment: <!-- review-data: { ... } --> or <!-- review-json: { ... } -->
-      2. A <details> block containing a JSON code block.
-
-    Returns the parsed dict if valid and containing expected keys (e.g. verdict),
-    or None if no structured payload exists or if it fails validation/parsing.
-    """
-    if not body or not isinstance(body, str):
-        return None
-
-    try:
-        fenced, _, orphans = find_fence_spans(body)
-        fenced_lines = fenced | orphans
-    except Exception:
-        return None
-
-    comment_pattern = re.compile(
-        r"<!--\s*review-(?:data|json)\s*:\s*(\{[\s\S]*?\})\s*-->",
-        re.IGNORECASE,
-    )
-    for m in comment_pattern.finditer(body):
-        start_line = body[:m.start()].count("\n")
-        if start_line in fenced_lines:
-            continue
-        raw_json = m.group(1).strip()
-        try:
-            data = json.loads(raw_json)
-            if isinstance(data, dict) and "verdict" in data:
-                return data
-        except Exception:
-            continue
-
-    details_pattern = re.compile(
-        r"<details>[\s\S]*?```(?:json)?\s*(\{[\s\S]*?\})\s*```[\s\S]*?</details>",
-        re.IGNORECASE,
-    )
-    for m in details_pattern.finditer(body):
-        start_line = body[:m.start()].count("\n")
-        if start_line in fenced_lines:
-            continue
-        raw_json = m.group(1).strip()
-        try:
-            data = json.loads(raw_json)
-            if isinstance(data, dict) and "verdict" in data:
-                return data
-        except Exception:
-            continue
-
-    return None
 
 
 def _reviewer_identity(body: str, author: str = "") -> str:
@@ -1646,14 +1608,8 @@ def classify_verdict(body: str, state: str = "") -> str:
         return "not-clean"
 
     structured = extract_structured_review(body)
-    if structured:
-        v_raw = str(structured.get("verdict", "")).strip().upper()
-        findings = structured.get("findings", [])
-        has_blocking_findings = bool(
-            findings and isinstance(findings, list) and len(findings) > 0
-        )
-        if v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED") or has_blocking_findings:
-            return "not-clean"
+    if payload_is_blocking(structured):
+        return "not-clean"
 
     scan, cited = strip_cited_finding_vocab_with_mask(body)
 
@@ -1703,14 +1659,11 @@ def classify_verdict(body: str, state: str = "") -> str:
                 continue
             return "clean"
 
-    if structured:
-        v_raw = str(structured.get("verdict", "")).strip().upper()
-        findings = structured.get("findings", [])
-        has_blocking_findings = bool(
-            findings and isinstance(findings, list) and len(findings) > 0
-        )
-        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED") and not has_blocking_findings:
-            return "clean"
+    # Checked AFTER the prose scans above, deliberately: a reviewer that states
+    # findings in prose and then labels its payload clean is contradicting
+    # itself, and prose wins that contradiction (#2736 review round 2).
+    if payload_is_clean(structured):
+        return "clean"
 
     # A review from a known agent whose format the classifier cannot read is
     # the dangerous third state (#1524): it is NOT "no review" (which triggers
@@ -1819,16 +1772,16 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     because the same body also says Ready for merge (#2274).
     """
     structured = extract_structured_review(body)
-    if structured:
-        findings = structured.get("findings", [])
-        if isinstance(findings, list) and len(findings) > 0:
-            first = findings[0]
-            if isinstance(first, dict):
-                return f"structured finding in {first.get('file', 'unknown')}: {first.get('message', '')}"
-            return "structured finding"
-        v_raw = str(structured.get("verdict", "")).strip().upper()
-        if v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED"):
-            return f"structured blocking verdict ({v_raw})"
+    findings = payload_findings(structured)
+    if findings:
+        first = findings[0]
+        if isinstance(first, dict):
+            where = str(first.get("file") or "unknown")
+            what = str(first.get("message") or first.get("summary") or "")
+            return f"structured finding in {where}: {what}"
+        return "structured finding"
+    if payload_is_blocking(structured):
+        return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
 
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:

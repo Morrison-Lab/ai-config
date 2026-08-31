@@ -370,10 +370,21 @@ The gap is any other brief that asks something to act as an adversarial reviewer
 - **Don't:** file or accept a "the transcript lags the current turn" diagnosis for a refused push without first executing the parser against the actual transcript;
   the two failures produce an identical refusal message.
 
+(ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
+The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
+
+**A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
+`read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
+Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;
+pushing branch A afterward compares its shipped commit `X` against the held `Y`, fails the SHA match, and refuses citing an unreviewed commit --- even though branch A's own review was genuinely clean.
+
+- **Do:** review and push one branch before dispatching a review for a second branch in the same session, when driving more than one branch's push through this guard.
+- **Don't:** read that refusal as a defect in branch A's review;
+  the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
+
 ## Structured review data (JSON payload)
 
-Reviewers emit dual representations:
-human-readable Markdown followed by an embedded machine-readable JSON payload in an HTML comment block:
+Every reviewer emits two representations of one verdict: the human-readable Markdown report, then a machine-readable JSON payload in a trailing HTML comment.
 
 ```html
 Reviewed-Commit: <sha>
@@ -389,20 +400,23 @@ Reviewed-Commit: <sha>
 -->
 ```
 
-For not-clean verdicts, set `"verdict": "NOT_CLEAN"` and populate `"findings"` with an array of objects (`{"file": "...", "line": 0, "category": "...", "message": "..."}`).
-Downstream automated checkers (`scripts/check-pr-fully-clean.py`) parse this structured block directly, providing deterministic verdict and SHA evaluation while maintaining legacy Markdown parsing fallback.
+For a not-clean verdict, set `"verdict": "NOT_CLEAN"` and give `"findings"` one object per finding, each with the four keys `file`, `line`, `category`, and `message`.
+State those keys in any brief you write, rather than only asking for "finding objects" --- a reviewer that guesses the key names produces `structured finding in unknown: ` as the reported blocking reason.
 
-(ai-config#2444, 2026-08-27: filed on the lag diagnosis, which running `read_latest_review`/`parse_report` directly against the session transcript then refuted --- it returned the older `needs_work` verdict from a mid-session dispatch rather than a stale read of a same-turn one.
-The issue's body was rewritten afterwards to lead with the corrected diagnosis and keep the lag theory behind a marked `<details>` block, so read it as the corrected account rather than the filed one.)
+Three rules govern how the payload is read, and each exists because its absence inverted a verdict:
 
-**A separate, real constraint: the guard tracks one global latest verdict, not one per branch.**
-`read_latest_review` scans the whole transcript and keeps overwriting a single `(verdict, reviewed_commit)` pair with whatever it parses next, with no branch scoping at all.
-Reviewing branch A (clean, commit `X`) and then branch B (clean, commit `Y`) leaves `Y` as the global "latest" pair;
-pushing branch A afterward compares its shipped commit `X` against the held `Y`, fails the SHA match, and refuses citing an unreviewed commit --- even though branch A's own review was genuinely clean.
+- **The payload must be last, and the last one wins.**
+  The authoritative payload follows the verdict and the `Reviewed-Commit` fingerprint.
+  A reviewer who quotes the template above (it hardcodes `"verdict": "CLEAN"`) before writing its own would otherwise publish a `NOT_CLEAN` review that scored clean.
+- **A payload inside a code region does not count.**
+  Fences, inline code spans, and indented blocks are all excluded, so a comment that merely mentions the format is not a review of anything.
+  This is the same rule `check-pr-fully-clean.py` already applies to quoted *finding* vocabulary (ai-config#2449), applied to a *verdict*.
+- **Findings block regardless of the stated verdict.**
+  A payload that enumerates findings and then labels itself `CLEAN` is contradicting itself, and the safe reading of a contradiction is the blocking one.
 
-- **Do:** review and push one branch before dispatching a review for a second branch in the same session, when driving more than one branch's push through this guard.
-- **Don't:** read that refusal as a defect in branch A's review;
-  the guard has no notion of "branch" to be defective about, and the SHA comparison is doing exactly what it is built to do.
+Both consumers read the payload through one extractor, [`scripts/lib/review_payload.py`](../../scripts/lib/review_payload.py): [`scripts/check-pr-fully-clean.py`](../../scripts/check-pr-fully-clean.py) for a comment posted to a PR, and [`scripts/pre-push-review.py`](../../scripts/pre-push-review.py) for a report produced locally.
+They score the same artifact, so they must agree, and they did not: the local parser stripped HTML comments before every check, so a report whose payload said `NOT_CLEAN` parsed as `Verdict: CLEAN` locally while the PR-side consumer scored it blocking.
+Markdown parsing remains the fallback when no payload is present.
 
 ## The review gates the push, not the work --- and it is one round, not a loop
 

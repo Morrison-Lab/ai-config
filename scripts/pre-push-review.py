@@ -981,7 +981,15 @@ def build_review_prompt(diff: str, ref_name: str, guidelines: str, head_sha: str
         '     "findings": []',
         "   }",
         "   -->",
-        "   (For a not-clean verdict, set \"verdict\": \"NOT_CLEAN\" and list each finding object in \"findings\".)",
+        "   (For a not-clean verdict, set \"verdict\": \"NOT_CLEAN\" and give \"findings\" one object per",
+        "   finding, each with exactly these four keys: {\"file\": \"<repo-relative path>\", \"line\": <1-indexed int>,",
+        "   \"category\": \"<kebab-case slug>\", \"message\": \"<one sentence stating the defect>\"}.",
+        "   Use those key names literally -- a consumer that cannot find them reports the finding as",
+        "   \"structured finding in unknown: \", which names nothing.",
+        "   Any finding listed here blocks whatever the \"verdict\" string says, so a CLEAN payload requires",
+        "   an empty \"findings\" array.)",
+        "CRITICAL: The closing '-->' of the review-data comment MUST be the absolute final line of your output. Do NOT include any conversational filler, markdown formatting, or text after it.",
+        "CRITICAL: Emit the review-data comment as raw unfenced text. A payload inside a code fence, an inline code span, or an indented block is deliberately ignored, so a fenced payload authorizes nothing.",
     ]
 
     if guidelines:

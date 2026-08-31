@@ -567,4 +567,4 @@ A clean automated review from every available provider evaluating the current HE
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): "When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree.
   Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result."
 - **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit.
-  Complete the full chain (commit → self-review → push → PR → review request) in that same turn.
+  Complete the full chain (commit -> self-review -> push -> PR -> review request) in that same turn.

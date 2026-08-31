@@ -67,7 +67,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    }
    -->
 
-   (For a not-clean verdict, set "verdict": "NOT_CLEAN" and list each finding object in "findings".)
+   (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
+   Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
+   Any finding listed here blocks, whatever the "verdict" string says, so an empty "findings" array is required for a CLEAN payload.)
 
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
@@ -76,8 +78,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    Write the label plainly on its own line: emphasis around it is tolerated.
 
 State the verdict on its own line in that exact form.
-Return the structured report as this call's own message,
-not as a pointer to a file.
+Return the structured report as this call's own message, not as a pointer to a file.
 Emit nothing after the closing --> of the review-data comment.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as

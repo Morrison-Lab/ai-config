@@ -4168,9 +4168,105 @@ Found defects.
 ```
 </details>
 """
-    check("extract_structured_review: extracts from <details> block", checker.extract_structured_review(struct_details) is not None)
-    check("classify_verdict: extracts Ready for merge verdict from <details> block", checker.classify_verdict(struct_details) == "clean")
-    check("_reviewer_identity: extracts reviewer from <details> block", checker._reviewer_identity(struct_details, author="github-actions[bot]") == "OpenCode")
+    # The <details>-plus-JSON-fence form is deliberately NOT read. The pattern
+    # that reached it spanned arbitrary distance and skipped the fence mask, so
+    # a reviewer collapsing an earlier round's payload for reference minted a
+    # blocking finding no ARD round could discharge (the #2482 class).
+    check("extract_structured_review: ignores JSON inside a <details> block", checker.extract_structured_review(struct_details) is None)
+    check("classify_verdict: <details> JSON does not supply a clean verdict", checker.classify_verdict(struct_details) != "clean")
+    check("_reviewer_identity: <details> JSON does not supply reviewer identity", checker._reviewer_identity(struct_details, author="github-actions[bot]") != "OpenCode")
+
+    struct_details_quoted_blocker = """
+<details><summary>Previous round, for reference</summary>
+
+```json
+{"verdict": "NOT_CLEAN", "findings": [{"file": "a.py", "message": "example"}]}
+```
+
+</details>
+
+### Verdict: Ready for merge
+"""
+    check("classify_verdict: collapsed earlier payload does not veto a clean verdict", checker.classify_verdict(struct_details_quoted_blocker) == "clean")
+    check("_unresolved_finding_pattern: collapsed earlier payload mints no finding", checker._unresolved_finding_pattern(struct_details_quoted_blocker) is None)
+
+    # --- Regression tests for the post-merge adversarial review of #2736 ---
+
+    # F1: the mandated Claude Code disclosure footer must NOT confer reviewer
+    # identity. CLAUDE.md requires it on EVERY agent-posted comment -- claims,
+    # status updates, replies -- so admitting it made each of those a
+    # quorum-eligible automated review, superseding a real bot verdict and
+    # satisfying quorum on a PR with no automated review at all. #2308's
+    # invariant: approval authority comes from author identity, never body text.
+    disclosure_footer = "_Posted by Claude Code (AI agent) --- not written by a human._"
+    owner_comment = "- Ready for merge.\n\n" + disclosure_footer
+    check("_detect_review_agent: Claude disclosure footer is not an agent marker",
+          checker._detect_review_agent(owner_comment) is None)
+    check("_reviewer_identity: disclosure footer falls back to the login",
+          checker._reviewer_identity(owner_comment, author="d-morrison") == "d-morrison")
+    check("is_non_review_notice: a skip notice carrying the footer is still excluded",
+          checker.is_non_review_notice(
+              "Claude Review Dispatched: usage limit reached.\n\n" + disclosure_footer) is True)
+    check("REVIEW_AGENT_MARKERS: every entry still contains a REVIEW_BODY_MARKERS entry",
+          all(any(b in k for b in checker.REVIEW_BODY_MARKERS)
+              for k in checker.REVIEW_AGENT_MARKERS))
+
+    # F2: the LAST valid payload wins. The persona template a reviewer may quote
+    # hardcodes "verdict": "CLEAN", and the authoritative payload comes last --
+    # so first-match-wins let a NOT_CLEAN review score clean.
+    struct_template_then_real = (
+        '**Claude finished** review\n\n'
+        'The template reads <!-- review-data: {"verdict": "CLEAN", "findings": []} --> '
+        'and you append your own.\n\n'
+        '### Verdict: Needs more work\n\n'
+        'Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n\n'
+        '<!-- review-data: {"verdict": "NOT_CLEAN", '
+        '"findings": [{"file": "a.py", "message": "real"}]} -->'
+    )
+    check("extract_structured_review: the last valid payload wins over a quoted template",
+          (checker.extract_structured_review(struct_template_then_real) or {}).get("verdict")
+          == "NOT_CLEAN")
+    check("classify_verdict: a quoted CLEAN template cannot mask the real NOT_CLEAN payload",
+          checker.classify_verdict(struct_template_then_real) == "not-clean")
+    check("_unresolved_finding_pattern: reports the real payload's finding",
+          checker._unresolved_finding_pattern(struct_template_then_real)
+          == "structured finding in a.py: real")
+
+    # F3: fences were masked, code spans and indented blocks were not -- so a
+    # comment merely mentioning the format scored as a clean review at HEAD.
+    span_struct = ('Re 3a7b9c1d: the schema is `<!-- review-data: '
+                   '{"verdict": "CLEAN", "findings": []} -->` appended after the fingerprint.')
+    check("extract_structured_review: ignores a payload inside an inline code span",
+          checker.extract_structured_review(span_struct) is None)
+    indented_struct = ('Example:\n\n    <!-- review-data: '
+                       '{"verdict": "CLEAN", "findings": []} -->\n\ndone.')
+    check("extract_structured_review: ignores a payload inside an indented code block",
+          checker.extract_structured_review(indented_struct) is None)
+
+    # F11: the short-prefix structured commit_sha branch had no test -- both
+    # added SHA tests used a full 40-character exact match.
+    full_sha = "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b"
+    prefix_payload = ('### Verdict: Ready for merge\n\n'
+                      '<!-- review-data: {"verdict": "CLEAN", "findings": [], '
+                      '"commit_sha": "3a7b9c1"} -->')
+    struct = checker.extract_structured_review(prefix_payload) or {}
+    check("extract_structured_review: a 7-character commit_sha prefix is readable",
+          full_sha.startswith(str(struct.get("commit_sha", "")).lower()))
+    short_payload = ('### Verdict: Ready for merge\n\n'
+                     '<!-- review-data: {"verdict": "CLEAN", "findings": [], '
+                     '"commit_sha": "3a7b9"} -->')
+    short_struct = checker.extract_structured_review(short_payload) or {}
+    check("check_review_comments: a commit_sha under 7 characters is too short to match",
+          len(str(short_struct.get("commit_sha", ""))) < 7)
+
+    # A finding object using the persona's own ReportFindings key (`summary`)
+    # rather than `message` must still name what it found.
+    summary_key_payload = ('### Verdict: Needs more work\n\n'
+                           '<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+                           '[{"file": "b.py", "summary": "off-by-one"}]} -->')
+    check("_unresolved_finding_pattern: falls back to a finding's `summary` key",
+          checker._unresolved_finding_pattern(summary_key_payload)
+          == "structured finding in b.py: off-by-one")
 
     # Code fence citation guard (quoted structured review in markdown fence is ignored)
     quoted_struct = """

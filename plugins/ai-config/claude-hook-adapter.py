@@ -310,7 +310,7 @@ def main():
         if tool_name == "run_command":
             bash_payload = {
                 "tool_name": "Bash",
-                "tool_input": {"command": args.get("CommandLine") or args.get("command") or args.get("cmd") or args.get("script") or ""},
+                "tool_input": {"command": args.get("CommandLine", "")},
                 "cwd": tool_cwd,
             }
             if transcript_path:

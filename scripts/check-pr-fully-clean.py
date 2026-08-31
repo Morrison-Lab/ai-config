@@ -1034,7 +1034,19 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # self-veto.
     _paragraph_starts = [0] + [_p.end() for _p in re.finditer(r"\n[ \t]*\n", text)]
     _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
-    _heading_starts = [_h.start() for _h in re.finditer(r"(?m)^#{1,6}\s", text)]
+
+    _lines = text.split("\n")
+    _line_starts = [0]
+    for _l in _lines[:-1]:
+        _line_starts.append(_line_starts[-1] + len(_l) + 1)
+    _fenced_lines, _, _orphan_markers = find_fence_spans(text, swallow_unclosed=True)
+    _ignored_lines = _fenced_lines | _orphan_markers
+    _heading_starts = []
+    for _h in re.finditer(r"(?m)^#{1,6}\s", text):
+        _lineno = bisect.bisect_right(_line_starts, _h.start()) - 1
+        if _lineno not in _ignored_lines:
+            _heading_starts.append(_h.start())
+
     _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
 
     _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))

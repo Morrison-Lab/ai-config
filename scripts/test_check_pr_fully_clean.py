@@ -3287,6 +3287,29 @@ def main() -> int:
         "a re-raise in the following paragraph refuses the strip",
         checker.classify_verdict(following_paragraph_reraise) == "not-clean",
     )
+    fenced_code_comment_forward_reraise = (
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), "
+        "this was noted in the thread.\n"
+        "```\n### not a real heading, just quoted\n```\n"
+        "and still remains open.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a forward re-raise past a fenced code block with # comments refuses the strip",
+        checker.classify_verdict(fenced_code_comment_forward_reraise) == "not-clean",
+    )
+    fenced_code_comment_backward_reraise = (
+        "This is still unresolved.\n"
+        "```python\n# a plain code comment\n```\n"
+        "In response to [round 2](https://x) "
+        "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**), thanks.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a backward re-raise before a fenced code block with # comments refuses the strip",
+        checker.classify_verdict(fenced_code_comment_backward_reraise) == "not-clean",
+    )
     long_sentence_reraise = (
         "In response to [round 2](https://x) "
         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "

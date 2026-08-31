@@ -18,13 +18,12 @@ All three are relational checks, not existence checks — the reason this is one
 
 ## Pre-flight Readiness Gate (Hard Stop for Check C)
 
-Before evaluating Check C (Misleading / out-of-context information), check whether the repository’s local source corpus (`sources/` or equivalent) can actually support a fact check against external sources. **(Note: Checks A and B do not require a source corpus. If the target document contains zero citations to external works, skip this gate and evaluate only Checks A and B).**
+Before evaluating Check C (Misleading / out-of-context information), check whether the repository’s local source corpus (`sources/` or equivalent) actually contains the needed sources: **(Note: Checks A and B do not require a source corpus. If the target document contains zero citations to external works, skip this gate and proceed directly to evaluate Check C).**
 
-1.  **Does a per-source Markdown corpus exist?** (Are there `.md` files corresponding to the citations?)
-2.  **Are there unconverted raw files?** (Do `.pdf`, `.docx`, or `.epub` files sit unconverted alongside the Markdown corpus?)
-3.  **Is coverage sufficient?** Compute a ratio: (matched source files) / (cited non-background works). Is it below roughly two-thirds (66%)?
+1.  **Are required sources missing from the local corpus?**
+2.  **Are required sources present but unconverted?** (e.g., `.pdf`, `.docx`, or `.epub` files without corresponding Markdown conversions)
 
-If **any** of these three conditions hold, **refuse to run Check C**. - Do NOT silently narrow scope (rescoped only on explicit user request). - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.
+If **either** of these conditions hold, **refuse to run Check C**. - Do NOT partially check Check C by evaluating only the sources that are present (rescoped only on explicit user request). - Do NOT fall back to memory or the open web for the missing sources. - If you discover during verification that a local source is incomplete (e.g. missing a chapter), abort Check C and return **`Pre-flight: NOT READY`**.
 
 For Check C, return **`Pre-flight: NOT READY`** instead of a report, and print remediation instructions (e.g., “Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally.”). You must still execute Checks A and B.
 

@@ -9,20 +9,6 @@ Prose review usually stops at style. This skill goes further: it checks whether 
 
 ## Procedure
 
-### Pre-flight Readiness Gate (Hard Stop)
-
-Before doing any work, check whether the repository’s local source corpus (`sources/` or equivalent) can actually support a fact check. **(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 1).**
-
-1.  **Does a per-source Markdown corpus exist?** (Are there `.md` files corresponding to the citations?)
-2.  **Are there unconverted raw files?** (Do `.pdf`, `.docx`, or `.epub` files sit unconverted alongside the Markdown corpus?)
-3.  **Is coverage sufficient?** Compute a ratio: (matched source files) / (cited non-background works). Is it below roughly two-thirds (66%)?
-
-If **any** of these three conditions hold, **refuse to run**. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.
-
-Return **`Pre-flight: NOT READY`** instead of a report, and print remediation instructions (e.g., “Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally.”).
-
-Only proceed to Step 1 if the gate passes.
-
 ### 1. Identify the target and extract checkable units
 
 A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text. Read the changed prose and pull out three kinds of units to check:
@@ -31,21 +17,35 @@ A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text. Re
 - **Undefended claims** — a factual claim with no internal reasoning and no citation backing it, even if it turns out to be accurate. Flag it separately from an accuracy check (below) — a claim can pass accuracy and still fail this one.
 - **Reasoning chains** — an argument the document makes, not just its individual facts. This includes **formal mathematical reasoning** (derivations, proofs, algebraic manipulations — check every step follows from the last, check dimensional/unit consistency, check edge cases) and **informal reasoning** (X therefore Y, a causal claim, a design justification).
 - **Computed/rendered values** — a number, table entry, or figure the prose describes as the output of code, a model fit, or a render.
+- **Citations to external works** — identify all sources cited that will need to be checked.
 
-### 2. Check factual claims
+### 2. Pre-flight Readiness Gate (Hard Stop)
 
-For each factual claim, check it against domain knowledge first. Where it’s checkable against an external source — a package’s own docs, a spec, a paper, a dataset’s documentation — fetch that source **from the local `sources/` corpus**. Do **not** fall back to the open web (`WebFetch`/`WebSearch`) if the local source is missing or incomplete; the readiness gate above forbids this escape. Confirm or refute the claim against the local source, not against a secondhand summary. Don’t wave a plausible-sounding claim through unchecked — see [`challenge-ambiguous-terminology`](../../shared/workflow/challenge-ambiguous-terminology.md) for the sibling rule on ambiguous phrasing specifically.
+Before evaluating the extracted claims against external sources, check whether the repository’s local source corpus (`sources/` or equivalent) actually contains the needed sources: **(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).**
+
+1.  **Are required sources missing from the local corpus?**
+2.  **Are required sources present but unconverted?** (e.g., `.pdf`, `.docx`, or `.epub` files without corresponding Markdown conversions)
+
+If **either** of these conditions hold, **refuse to run**. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.
+
+Return **`Pre-flight: NOT READY`** instead of a report, and print remediation instructions (e.g., “Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally.”).
+
+Only proceed to Step 3 if the gate passes.
+
+### 3. Check factual claims
+
+For each factual claim, check it against domain knowledge first. Where it’s checkable against an external source — a package’s own docs, a spec, a paper, a dataset’s documentation — fetch that source **from the local `sources/` corpus**. Do **not** fall back to the open web (`WebFetch`) if the local source is missing. If you discover during verification that a local source is incomplete (e.g. missing a chapter), abort and return **`Pre-flight: NOT READY`**. Confirm or refute the claim against the local source, not against a secondhand summary. Don’t wave a plausible-sounding claim through unchecked — see [`challenge-ambiguous-terminology`](../../shared/workflow/challenge-ambiguous-terminology.md) for the sibling rule on ambiguous phrasing specifically.
 
 Separately from accuracy, check that the claim is **defended**: does the surrounding text give reasoning for it, or does it carry a citation? A claim can be accurate and still undefended — flag both kinds of gap, not just outright inaccuracy.
 
-### 3. Verify document-internal reasoning
+### 4. Verify document-internal reasoning
 
 Walk each reasoning chain step by step:
 
 - **Formal math** — re-derive or spot-check each step; confirm dimensions and units are consistent at every operation; check boundary/edge cases the claim implies; confirm a cited theorem’s hypotheses actually hold in this application (e.g. don’t apply a result that requires independence to correlated data without noting it).
 - **Informal arguments** — does the stated reasoning actually support the conclusion drawn, or is there a gap (an unstated assumption doing the real work, a non sequitur, an overgeneralization from one example)?
 
-### 4. Cross-check computed values and figures against the rendered output
+### 5. Cross-check computed values and figures against the rendered output
 
 Don’t trust the source prose’s own description of a computed value — verify it against what was actually produced:
 
@@ -54,7 +54,7 @@ Don’t trust the source prose’s own description of a computed value — verif
 3.  If no preview covers the changed page yet, fall back to the project’s render command (e.g. `quarto render <chapter.qmd> --to html` in an R/ Quarto repo) and check the local render instead of skipping the check.
 4.  Compare what’s rendered against what the prose claims. A mismatch is a finding even if the prose “sounds” right — the rendered output is ground truth, not the sentence describing it.
 
-### 5. Report
+### 6. Report
 
 For every unit checked:
 
@@ -67,7 +67,7 @@ For every unit checked:
 
 Then, separately, list **additional citations/references worth adding** — proactively, anywhere a pointer to a source would help a reader, not only where a claim is currently flagged as uncited.
 
-### 6. Offer to apply corrections
+### 7. Offer to apply corrections
 
 On request, fix the flagged inaccuracies and reasoning gaps in place with `Edit`, preserving the author’s intent and voice — same posture as `find-ai-tells`’s apply step. Don’t silently rewrite without being asked; report first.
 

@@ -316,13 +316,13 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#pre-flight-readiness-gate-hard-stop" id="toc-pre-flight-readiness-gate-hard-stop" class="nav-link" data-scroll-target="#pre-flight-readiness-gate-hard-stop">Pre-flight Readiness Gate (Hard Stop)</a></li>
   <li><a href="#identify-the-target-and-extract-checkable-units" id="toc-identify-the-target-and-extract-checkable-units" class="nav-link" data-scroll-target="#identify-the-target-and-extract-checkable-units">1. Identify the target and extract checkable units</a></li>
-  <li><a href="#check-factual-claims" id="toc-check-factual-claims" class="nav-link" data-scroll-target="#check-factual-claims">2. Check factual claims</a></li>
-  <li><a href="#verify-document-internal-reasoning" id="toc-verify-document-internal-reasoning" class="nav-link" data-scroll-target="#verify-document-internal-reasoning">3. Verify document-internal reasoning</a></li>
-  <li><a href="#cross-check-computed-values-and-figures-against-the-rendered-output" id="toc-cross-check-computed-values-and-figures-against-the-rendered-output" class="nav-link" data-scroll-target="#cross-check-computed-values-and-figures-against-the-rendered-output">4. Cross-check computed values and figures against the rendered output</a></li>
-  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">5. Report</a></li>
-  <li><a href="#offer-to-apply-corrections" id="toc-offer-to-apply-corrections" class="nav-link" data-scroll-target="#offer-to-apply-corrections">6. Offer to apply corrections</a></li>
+  <li><a href="#pre-flight-readiness-gate-hard-stop" id="toc-pre-flight-readiness-gate-hard-stop" class="nav-link" data-scroll-target="#pre-flight-readiness-gate-hard-stop">2. Pre-flight Readiness Gate (Hard Stop)</a></li>
+  <li><a href="#check-factual-claims" id="toc-check-factual-claims" class="nav-link" data-scroll-target="#check-factual-claims">3. Check factual claims</a></li>
+  <li><a href="#verify-document-internal-reasoning" id="toc-verify-document-internal-reasoning" class="nav-link" data-scroll-target="#verify-document-internal-reasoning">4. Verify document-internal reasoning</a></li>
+  <li><a href="#cross-check-computed-values-and-figures-against-the-rendered-output" id="toc-cross-check-computed-values-and-figures-against-the-rendered-output" class="nav-link" data-scroll-target="#cross-check-computed-values-and-figures-against-the-rendered-output">5. Cross-check computed values and figures against the rendered output</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">6. Report</a></li>
+  <li><a href="#offer-to-apply-corrections" id="toc-offer-to-apply-corrections" class="nav-link" data-scroll-target="#offer-to-apply-corrections">7. Offer to apply corrections</a></li>
   </ul></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
@@ -349,18 +349,6 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="pre-flight-readiness-gate-hard-stop" class="level3">
-<h3 class="anchored" data-anchor-id="pre-flight-readiness-gate-hard-stop">Pre-flight Readiness Gate (Hard Stop)</h3>
-<p>Before doing any work, check whether the repository’s local source corpus (<code>sources/</code> or equivalent) can actually support a fact check. <strong>(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 1).</strong></p>
-<ol type="1">
-<li><strong>Does a per-source Markdown corpus exist?</strong> (Are there <code>.md</code> files corresponding to the citations?)</li>
-<li><strong>Are there unconverted raw files?</strong> (Do <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> files sit unconverted alongside the Markdown corpus?)</li>
-<li><strong>Is coverage sufficient?</strong> Compute a ratio: (matched source files) / (cited non-background works). Is it below roughly two-thirds (66%)?</li>
-</ol>
-<p>If <strong>any</strong> of these three conditions hold, <strong>refuse to run</strong>. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.</p>
-<p>Return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions (e.g., “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.”).</p>
-<p>Only proceed to Step 1 if the gate passes.</p>
-</section>
 <section id="identify-the-target-and-extract-checkable-units" class="level3">
 <h3 class="anchored" data-anchor-id="identify-the-target-and-extract-checkable-units">1. Identify the target and extract checkable units</h3>
 <p>A PR/MR diff (<code>gh pr diff &lt;N&gt;</code> / <code>glab mr diff &lt;N&gt;</code>), a file, or pasted text. Read the changed prose and pull out three kinds of units to check:</p>
@@ -369,15 +357,27 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>Undefended claims</strong> — a factual claim with no internal reasoning and no citation backing it, even if it turns out to be accurate. Flag it separately from an accuracy check (below) — a claim can pass accuracy and still fail this one.</li>
 <li><strong>Reasoning chains</strong> — an argument the document makes, not just its individual facts. This includes <strong>formal mathematical reasoning</strong> (derivations, proofs, algebraic manipulations — check every step follows from the last, check dimensional/unit consistency, check edge cases) and <strong>informal reasoning</strong> (X therefore Y, a causal claim, a design justification).</li>
 <li><strong>Computed/rendered values</strong> — a number, table entry, or figure the prose describes as the output of code, a model fit, or a render.</li>
+<li><strong>Citations to external works</strong> — identify all sources cited that will need to be checked.</li>
 </ul>
 </section>
+<section id="pre-flight-readiness-gate-hard-stop" class="level3">
+<h3 class="anchored" data-anchor-id="pre-flight-readiness-gate-hard-stop">2. Pre-flight Readiness Gate (Hard Stop)</h3>
+<p>Before evaluating the extracted claims against external sources, check whether the repository’s local source corpus (<code>sources/</code> or equivalent) actually contains the needed sources: <strong>(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).</strong></p>
+<ol type="1">
+<li><strong>Are required sources missing from the local corpus?</strong></li>
+<li><strong>Are required sources present but unconverted?</strong> (e.g., <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> files without corresponding Markdown conversions)</li>
+</ol>
+<p>If <strong>either</strong> of these conditions hold, <strong>refuse to run</strong>. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.</p>
+<p>Return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions (e.g., “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.”).</p>
+<p>Only proceed to Step 3 if the gate passes.</p>
+</section>
 <section id="check-factual-claims" class="level3">
-<h3 class="anchored" data-anchor-id="check-factual-claims">2. Check factual claims</h3>
-<p>For each factual claim, check it against domain knowledge first. Where it’s checkable against an external source — a package’s own docs, a spec, a paper, a dataset’s documentation — fetch that source <strong>from the local <code>sources/</code> corpus</strong>. Do <strong>not</strong> fall back to the open web (<code>WebFetch</code>/<code>WebSearch</code>) if the local source is missing or incomplete; the readiness gate above forbids this escape. Confirm or refute the claim against the local source, not against a secondhand summary. Don’t wave a plausible-sounding claim through unchecked — see <a href="../../shared/workflow/challenge-ambiguous-terminology.md"><code>challenge-ambiguous-terminology</code></a> for the sibling rule on ambiguous phrasing specifically.</p>
+<h3 class="anchored" data-anchor-id="check-factual-claims">3. Check factual claims</h3>
+<p>For each factual claim, check it against domain knowledge first. Where it’s checkable against an external source — a package’s own docs, a spec, a paper, a dataset’s documentation — fetch that source <strong>from the local <code>sources/</code> corpus</strong>. Do <strong>not</strong> fall back to the open web (<code>WebFetch</code>) if the local source is missing. If you discover during verification that a local source is incomplete (e.g.&nbsp;missing a chapter), abort and return <strong><code>Pre-flight: NOT READY</code></strong>. Confirm or refute the claim against the local source, not against a secondhand summary. Don’t wave a plausible-sounding claim through unchecked — see <a href="../../shared/workflow/challenge-ambiguous-terminology.md"><code>challenge-ambiguous-terminology</code></a> for the sibling rule on ambiguous phrasing specifically.</p>
 <p>Separately from accuracy, check that the claim is <strong>defended</strong>: does the surrounding text give reasoning for it, or does it carry a citation? A claim can be accurate and still undefended — flag both kinds of gap, not just outright inaccuracy.</p>
 </section>
 <section id="verify-document-internal-reasoning" class="level3">
-<h3 class="anchored" data-anchor-id="verify-document-internal-reasoning">3. Verify document-internal reasoning</h3>
+<h3 class="anchored" data-anchor-id="verify-document-internal-reasoning">4. Verify document-internal reasoning</h3>
 <p>Walk each reasoning chain step by step:</p>
 <ul>
 <li><strong>Formal math</strong> — re-derive or spot-check each step; confirm dimensions and units are consistent at every operation; check boundary/edge cases the claim implies; confirm a cited theorem’s hypotheses actually hold in this application (e.g.&nbsp;don’t apply a result that requires independence to correlated data without noting it).</li>
@@ -385,7 +385,7 @@ ul.task-list li input[type="checkbox"] {
 </ul>
 </section>
 <section id="cross-check-computed-values-and-figures-against-the-rendered-output" class="level3">
-<h3 class="anchored" data-anchor-id="cross-check-computed-values-and-figures-against-the-rendered-output">4. Cross-check computed values and figures against the rendered output</h3>
+<h3 class="anchored" data-anchor-id="cross-check-computed-values-and-figures-against-the-rendered-output">5. Cross-check computed values and figures against the rendered output</h3>
 <p>Don’t trust the source prose’s own description of a computed value — verify it against what was actually produced:</p>
 <ol type="1">
 <li>Check whether the project has a <strong>PR-preview deploy</strong>. Look for a sticky preview-link comment on the PR, or check the project’s <code>CLAUDE.md</code> / <code>.github/workflows/</code> for a preview workflow (e.g.&nbsp;<code>preview.yml</code> + <code>preview-deploy.yml</code> built on <code>rossjrw/pr-preview-action</code>, common in this lab’s Quarto repos — those deploy to a <code>gh-pages</code> branch under <code>pr-preview/pr-&lt;N&gt;/&lt;path&gt;</code>).</li>
@@ -395,7 +395,7 @@ ul.task-list li input[type="checkbox"] {
 </ol>
 </section>
 <section id="report" class="level3">
-<h3 class="anchored" data-anchor-id="report">5. Report</h3>
+<h3 class="anchored" data-anchor-id="report">6. Report</h3>
 <p>For every unit checked:</p>
 <pre><code>| Claim/step | Verdict | Basis (source checked) |
 |------------|---------|-------------------------|
@@ -406,7 +406,7 @@ ul.task-list li input[type="checkbox"] {
 <p>Then, separately, list <strong>additional citations/references worth adding</strong> — proactively, anywhere a pointer to a source would help a reader, not only where a claim is currently flagged as uncited.</p>
 </section>
 <section id="offer-to-apply-corrections" class="level3">
-<h3 class="anchored" data-anchor-id="offer-to-apply-corrections">6. Offer to apply corrections</h3>
+<h3 class="anchored" data-anchor-id="offer-to-apply-corrections">7. Offer to apply corrections</h3>
 <p>On request, fix the flagged inaccuracies and reasoning gaps in place with <code>Edit</code>, preserving the author’s intent and voice — same posture as <code>find-ai-tells</code>’s apply step. Don’t silently rewrite without being asked; report first.</p>
 </section>
 </section>

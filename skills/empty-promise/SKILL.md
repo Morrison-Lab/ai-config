@@ -93,7 +93,8 @@ logs:
 
 ```bash
 # Check recent transcript entries if accessible across harnesses
-grep -E "going forward|from now on|I'll always|I will always|won't do that again|owed by me|I owe|still owe|an owed"   ~/.claude/projects/*/logs/transcript*.jsonl ~/.gemini/antigravity/brain/*/logs/transcript*.jsonl 2>/dev/null | tail -n 20 || true
+grep -E "going forward|from now on|I'll always|I will always|won't do that again|owed by me|I owe|still owe|an owed" \
+  ~/.claude/projects/*/*.jsonl ~/.gemini/antigravity/brain/*/.system_generated/logs/transcript*.jsonl 2>/dev/null | tail -n 20 || true
 ```
 
 Scan for signal phrases:

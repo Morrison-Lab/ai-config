@@ -143,7 +143,8 @@ In every session --- at session start, and again periodically during long sessio
    A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref --- the discarded commits stay recoverable via `git reflog` regardless.
 4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry --- not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this).
    **If the repository uses ai-config (or another tool) as both a native plugin and a submodule, remove the submodule rather than bumping it.**
-   Native plugin integration supersedes the submodule; keeping both causes drift, double-loading, and maintenance friction.
+   Native plugin integration supersedes the submodule;
+   keeping both causes drift, double-loading, and maintenance friction.
    See [`remove-redundant-plugin-submodules.md`](remove-redundant-plugin-submodules.md).
    Where a repo legitimately relies on the submodule (e.g. an environment lacking plugin support):
    Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.

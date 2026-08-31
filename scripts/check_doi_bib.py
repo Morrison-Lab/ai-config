@@ -1055,8 +1055,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "target",
         nargs="?",
-        default=".",
-        help="Path to .bib file, LaTeX/Quarto document, or project directory (default: .)",
+        default=None,
+        help="Path to .bib file, LaTeX/Quarto document, or project directory",
     )
     parser.add_argument(
         "--bib",
@@ -1110,9 +1110,16 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    target_path = Path(args.target).resolve()
-    bib_files: list[Path] = []
     project_root = args.root.resolve() if args.root else None
+
+    if args.target is not None:
+        target_path = Path(args.target).resolve()
+    elif project_root is not None:
+        target_path = project_root
+    else:
+        target_path = Path(".").resolve()
+
+    bib_files: list[Path] = []
 
     if args.bib:
         bib_path = args.bib.resolve()
@@ -1123,12 +1130,16 @@ def main(argv: list[str] | None = None) -> int:
     elif target_path.is_file():
         if target_path.suffix.lower() == ".bib":
             bib_files.append(target_path)
+            if not project_root:
+                project_root = target_path.parent
         else:
             # Source file provided, scan for .bib in same dir
-            project_root = target_path.parent
+            if not project_root:
+                project_root = target_path.parent
             bib_files.extend(target_path.parent.glob("*.bib"))
     elif target_path.is_dir():
-        project_root = target_path
+        if not project_root:
+            project_root = target_path
         bib_files.extend(target_path.glob("**/*.bib"))
     else:
         print(f"error: target path not found: {target_path}", file=sys.stderr)

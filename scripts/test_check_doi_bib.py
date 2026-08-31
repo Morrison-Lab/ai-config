@@ -361,6 +361,47 @@ def test_cli_execution() -> None:
         )
         check("cli: missing file exit 2", res_missing.returncode == 2)
 
+        # --root <dir> --cited-only invocation from an external cwd
+        project_dir = tmp_path / "my_project"
+        project_dir.mkdir()
+        (project_dir / "refs.bib").write_text(
+            """
+            @article{cited_entry,
+              title = {A Cited Paper},
+              author = {Doe, Jane},
+              year = {2021}
+            }
+            @article{uncited_entry,
+              title = {An Uncited Paper},
+              author = {Smith, John},
+              year = {2022}
+            }
+            """,
+            encoding="utf-8",
+        )
+        (project_dir / "paper.qmd").write_text(
+            "See @cited_entry for details.",
+            encoding="utf-8",
+        )
+
+        # Run from an unrelated directory
+        unrelated_cwd = tmp_path / "unrelated_elsewhere"
+        unrelated_cwd.mkdir()
+
+        res_root = subprocess.run(
+            [sys.executable, str(script_path), "--root", str(project_dir), "--cited-only", "--json"],
+            cwd=str(unrelated_cwd),
+            capture_output=True,
+            text=True,
+        )
+        check("cli: --root --cited-only from external cwd exit 0", res_root.returncode == 0, f"err: {res_root.stderr}")
+        if res_root.returncode == 0:
+            root_data = json.loads(res_root.stdout)
+            check(
+                "cli: --root --cited-only scoped correctly",
+                root_data["total_entries"] == 2 and root_data["skipped"] == 1 and root_data["no_doi"] == 1,
+            )
+
 
 def main() -> int:
     test_clean_latex()

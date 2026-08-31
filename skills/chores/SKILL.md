@@ -86,6 +86,7 @@ leading number:
 - **submodule** (`chore(submodule):`) — no semver; it tracks a moving branch by
   design. Treat a green submodule bump as **safe** (auto-advancing the pointer
   is the whole point), unless the diff is unexpectedly large.
+  If the repository has migrated to a native plugin for the vendored tool (e.g. `ai-config` as a plugin), close the bump PR and remove the redundant submodule instead per [`remove-redundant-plugin-submodules.md`](../../shared/workflow/remove-redundant-plugin-submodules.md).
 
 When the title has no parseable version (some Renovate digests), fall back to
 the PR body's update table or treat it as **review**.

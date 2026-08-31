@@ -8,11 +8,11 @@ at the 1200-line gate.
 
 ## Wiring ai-config skills/memories into a consumer repo's `claude` bots
 
-`bootstrap.sh` only reaches local CLI sessions --- a consumer repo's
-`claude`/`claude-code-review` bots (running via `Morrison-Lab/gha`'s reusable
-workflows and `anthropics/claude-code-action`) get nothing from it.
-The pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
-and `ucdavis/epi204#360`:
+The modern standard is native plugin installation: `Morrison-Lab/gha`'s reusable workflows (like `run-claude-review-attempt` and `claude-code-review.yml`) install the `ai-config` plugin automatically for bot runs, and local sessions load it via plugin marketplaces or `.agents/plugins.json`.
+
+If a repository uses `ai-config` (or any other tool) as both a native plugin and a git submodule, **remove the submodule** per [`remove-redundant-plugin-submodules.md`](../shared/workflow/remove-redundant-plugin-submodules.md).
+
+Historically (prior to native plugins), consumer repos vendored ai-config as a submodule with a committed `.claude/skills` symlink (e.g. `d-morrison/rme#982`, later migrated off the submodule in `d-morrison/rme#1074`):
 
 1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`
    in the consumer repo.
@@ -21,7 +21,7 @@ and `ucdavis/epi204#360`:
    with a **committed symlink** `.claude/skills -> ../.ai-config/skills`, so
    all of ai-config's skills become discoverable, not just the one that was
    hand-copied.
-`.claude/commands/` was left as-is in both repos --- those
+   `.claude/commands/` was left as-is in both repos --- those
    were genuinely project-specific, not ai-config duplicates.
 3. Check `.gitignore` for a blanket `.claude/*` ignore (rme had one, with an
    existing `!.claude/commands` exception already carved out for the same

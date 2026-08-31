@@ -112,6 +112,10 @@ git submodule status
 git -C <submodule-path> fetch && git -C <submodule-path> log HEAD..FETCH_HEAD --oneline
 ```
 
+**Check for plugin redundancy before recommending a bump:**
+If the repository uses a dependency as both a native plugin (e.g. Claude Code/Cursor plugin manifest, Antigravity `.agents/plugins.json`, or `Morrison-Lab/gha` workflow) and a git submodule (e.g. `.ai-config`), do NOT recommend a submodule pin bump.
+Recommend removing the submodule entirely per [`remove-redundant-plugin-submodules.md`](../../shared/workflow/remove-redundant-plugin-submodules.md) --- native plugins supersede the submodule.
+
 ### 6. Other manifests, if present
 
 - `DESCRIPTION` version floors (`Imports:` / `Remotes:`) — usually covered by

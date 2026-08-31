@@ -441,7 +441,13 @@
   ```
   `current_user_can_bypass` is one of `always`, `pull_requests_only`, `never`.
   `bypass_actors` can be **absent from the response entirely** rather than an empty array, so test for the key rather than for a length.
-  (Measured 2026-08-31 against `Morrison-Lab/ai-config` ruleset 17712474, which is the only ruleset this observation comes from: `current_user_can_bypass: "never"` and no `bypass_actors` key at all.)
+  (Measured 2026-08-31 against two rulesets, both reporting
+  `current_user_can_bypass: "never"` and no `bypass_actors` key at all:
+  `Morrison-Lab/ai-config` ruleset 17712474 and `UCD-SERG/shigella` ruleset 6339629.
+  The second is worth its own mention because it is how the trap was met:
+  a reader who tests the value rather than the key sees `None` from
+  `dict.get`, reports it as `bypass_actors: null`, and has recorded a field
+  that is not in the response.)
   These are plain REST endpoints, so `curl` with `GH_TOKEN` reaches every one of them in a session with no `gh` on `PATH` and no ruleset MCP tool.
   Do not read the absence of such a tool as the settings being unreadable, per
   [`growth-mindset`](../shared/workflow/growth-mindset.md)'s "A limitation you never tested leaves no error to diagnose" (UCD-SERG/shigella#46, 2026-08-31).

@@ -197,18 +197,22 @@ STALE_FILE = """\
 """
 
 
-def _run_hook(repo, command):
+def _run_hook(repo, command, extra_env=None):
     payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+    env = {k: v for k, v in os.environ.items() if k != "ANTIGRAVITY_AGENT"}
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         [sys.executable, SUBJECT], input=json.dumps(payload),
-        capture_output=True, text=True, cwd=repo)
+        capture_output=True, text=True, cwd=repo, env=env)
     return proc.stdout.strip()
 
 
 def _scratch_repo(cap_before, cap_after):
     repo = tempfile.mkdtemp(prefix="stale-comment-")
-    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x",
-           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x"}
+    env = {k: v for k, v in os.environ.items() if k != "ANTIGRAVITY_AGENT"}
+    env.update({"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x",
+                "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x"})
     def git(*args):
         subprocess.run(["git", *args], cwd=repo, env=env,
                        capture_output=True, check=True)
@@ -226,17 +230,20 @@ def _scratch_repo(cap_before, cap_after):
 
 
 def end_to_end_results():
-    """(stale_out, clean_out, non_commit_out) -- raw hook stdout for each."""
+    """(stale_out, clean_out, non_commit_out, stale_antigravity_out) -- raw hook stdout for each."""
     stale_repo = _scratch_repo("6", "20")
     clean_repo = _scratch_repo("6", "6\n#SBATCH --time=01:00:00")
     try:
         stale = _run_hook(stale_repo, "git commit -m 'raise the cap'")
         non_commit = _run_hook(stale_repo, "git status --porcelain")
         clean = _run_hook(clean_repo, "git commit -m 'add a time limit'")
+        stale_antigravity = _run_hook(
+            stale_repo, "git commit -m 'raise the cap'",
+            extra_env={"ANTIGRAVITY_AGENT": "1"})
     finally:
         shutil.rmtree(stale_repo, ignore_errors=True)
         shutil.rmtree(clean_repo, ignore_errors=True)
-    return stale, clean, non_commit
+    return stale, clean, non_commit, stale_antigravity
 
 
 # --------------------------------------------------------------------------
@@ -335,7 +342,7 @@ def main():
     else:
         print("PASS: incident does not report the unchanged '32'")
 
-    stale, clean, non_commit = end_to_end_results()
+    stale, clean, non_commit, stale_antigravity = end_to_end_results()
     if not stale:
         print("FAIL: end-to-end stale commit produced no hook output")
         failures += 1
@@ -357,6 +364,31 @@ def main():
         else:
             print("PASS: end-to-end stale commit warns via "
                   "additionalContext + systemMessage")
+
+    if not stale_antigravity:
+        print("FAIL: end-to-end stale commit under ANTIGRAVITY_AGENT produced no hook output")
+        failures += 1
+    else:
+        try:
+            payload = json.loads(stale_antigravity)
+        except ValueError:
+            print("FAIL: end-to-end ANTIGRAVITY_AGENT output is not JSON")
+            failures += 1
+            payload = {}
+        ctx = (payload.get("hookSpecificOutput") or {}).get("additionalContext")
+        if not ctx:
+            print("FAIL: ANTIGRAVITY_AGENT output must carry additionalContext")
+            failures += 1
+        elif "systemMessage" in payload:
+            print("FAIL: ANTIGRAVITY_AGENT output must not carry systemMessage")
+            failures += 1
+        elif "permissionDecision" in json.dumps(payload):
+            print("FAIL: ANTIGRAVITY_AGENT output emitted a permissionDecision")
+            failures += 1
+        else:
+            print("PASS: end-to-end stale commit under ANTIGRAVITY_AGENT "
+                  "warns via additionalContext without systemMessage")
+
     if clean:
         print(f"FAIL: end-to-end clean commit produced output: {clean[:120]}")
         failures += 1
@@ -370,9 +402,9 @@ def main():
 
     failures += run_mutations(baseline)
 
-    # +5: 2 incident-literal checks and 3 end-to-end checks. Was +6, which
-    # reported 20 while printing 19 PASS lines.
-    total = len(CASES) + len(MUTATIONS) + 5
+    # +6: 2 incident-literal checks and 4 end-to-end checks (stale, stale_antigravity,
+    # clean, non_commit).
+    total = len(CASES) + len(MUTATIONS) + 6
     if failures:
         print(f"{failures} failure(s) across {total} checks")
         return 1

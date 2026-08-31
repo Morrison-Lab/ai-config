@@ -895,8 +895,9 @@ def main() -> int:
     tool_name = payload.get("tool_name") or ""
     hit = None
 
-    if tool_name == "Bash":
-        command = (payload.get("tool_input") or {}).get("command") or ""
+    if tool_name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        inp = payload.get("tool_input") or {}
+        command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         hit = offending(command, payload)
     elif is_mcp_merge_tool(tool_name):
         hit = check_mcp_merge(payload)

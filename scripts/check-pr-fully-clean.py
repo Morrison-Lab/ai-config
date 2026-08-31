@@ -725,7 +725,7 @@ def match_is_cited(mask: bytearray, start: int, end: int) -> bool:
 
 def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     """Blank out spans where finding-indicator vocabulary appears as a *citation*
-    rather than as a raised finding, so ``finding_patterns`` keys on genuine
+    rather than as a raised finding, so the finding and verdict scans key on genuine
     findings.
 
     A clean verdict body routinely quotes finding vocabulary -- especially on PRs

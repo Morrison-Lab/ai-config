@@ -79,6 +79,7 @@ Fails OPEN on any parse trouble. A guard that breaks every agent launch when
 its input is malformed costs more than the omission it reports.
 """
 import json
+import os
 import sys
 
 # The harness declares Explore and Plan as read-only ROLES; that contract, not
@@ -114,12 +115,34 @@ NOTE = (
 
 def unassigned(payload):
     """Return the subagent_type to warn about, or None to stay silent."""
-    if payload.get("tool_name") != "Agent":
+    tname = payload.get("tool_name")
+    if tname not in ("Agent", "invoke_subagent"):
         return None
 
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return None
+
+    if tname == "invoke_subagent":
+        subagents = tool_input.get("Subagents")
+        if isinstance(subagents, list) and subagents:
+            for sa in subagents:
+                if isinstance(sa, dict):
+                    ws = sa.get("Workspace")
+                    if ws in ("branch", "share") or sa.get("isolation"):
+                        continue
+                    stype = sa.get("TypeName") or sa.get("Role") or sa.get("subagent_type")
+                    if stype in READ_ONLY:
+                        continue
+                    return stype or "(unspecified, defaults to write-capable)"
+            return None
+        ws = tool_input.get("Workspace")
+        if ws in ("branch", "share") or tool_input.get("isolation"):
+            return None
+        stype = tool_input.get("TypeName") or tool_input.get("Role") or tool_input.get("subagent_type")
+        if stype in READ_ONLY:
+            return None
+        return stype or "(unspecified, defaults to write-capable)"
 
     if tool_input.get("isolation"):
         return None
@@ -150,19 +173,18 @@ def main() -> int:
 
     note = NOTE.format(subagent_type=subagent_type)
 
-    # No `permissionDecision` key at all: an absent decision defers to the
-    # normal permission flow, which is exactly the intent. Naming "allow" here
-    # would suppress a prompt the user would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"Agent launch without `isolation` (subagent_type: {subagent_type}). "
             "Assign a worktree or decide deliberately not to."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

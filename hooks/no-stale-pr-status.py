@@ -180,40 +180,61 @@ def scan(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            role = m.get("type")
+            role = m.get("type") or m.get("role")
             blocks = (m.get("message") or {}).get("content")
             if blocks is None:
                 blocks = m.get("content") or []
-            if not isinstance(blocks, list):
-                continue
-            for b in blocks:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "tool_use":
-                    tool_name = (b.get("name") or "").lower()
-                    if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+
+            # Antigravity tool calls
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL" or "tool_calls" in m:
+                for tc in m.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        tool_name = (tc.get("name") or (tc.get("function") or {}).get("name") or "").lower()
+                        if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                            continue
+                        args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        blob = tool_name + " " + json.dumps(args)
+                        tool_id = tc.get("id") or str(id(tc))
+                        if RX_PUSH.search(blob):
+                            last_push = i
+                        if RX_QUERY.search(blob):
+                            last_query = i
+                            if tool_id:
+                                query_tool_use_ids.add(tool_id)
+
+            # Antigravity text content
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                raw_content = m.get("content")
+                if isinstance(raw_content, str) and raw_content.strip():
+                    text = raw_content
+
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if not isinstance(b, dict):
                         continue
-                    # The name matters as much as the input: an MCP write names
-                    # its verb only there (mcp__github__push_files), while the
-                    # MCP read names its own in a `method` input parameter.
-                    blob = tool_name + " " + json.dumps(
-                        b.get("input") or {})
-                    tool_id = b.get("id") or b.get("tool_use_id") or ""
-                    if RX_PUSH.search(blob):
-                        last_push = i
-                    if RX_QUERY.search(blob):
-                        last_query = i
-                        if tool_id:
-                            query_tool_use_ids.add(tool_id)
-                elif b.get("type") == "tool_result":
-                    tool_id = b.get("tool_use_id") or b.get("id") or ""
-                    if tool_id and query_tool_use_ids and tool_id in query_tool_use_ids:
-                        content_text = json.dumps(b.get("content") or b.get("text") or "")
-                        if RX_FAIL_QUERY.search(content_text):
-                            last_failing_query = i
-                elif b.get("type") == "text" and role == "assistant":
-                    if b.get("text", "").strip():
-                        text = b["text"]
+                    if b.get("type") == "tool_use":
+                        tool_name = (b.get("name") or "").lower()
+                        if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                            continue
+                        blob = tool_name + " " + json.dumps(b.get("input") or {})
+                        tool_id = b.get("id") or b.get("tool_use_id") or ""
+                        if RX_PUSH.search(blob):
+                            last_push = i
+                        if RX_QUERY.search(blob):
+                            last_query = i
+                            if tool_id:
+                                query_tool_use_ids.add(tool_id)
+                    elif b.get("type") == "tool_result":
+                        tool_id = b.get("tool_use_id") or b.get("id") or ""
+                        if tool_id and query_tool_use_ids and tool_id in query_tool_use_ids:
+                            content_text = json.dumps(b.get("content") or b.get("text") or "")
+                            if RX_FAIL_QUERY.search(content_text):
+                                last_failing_query = i
+                    elif b.get("type") == "text" and role == "assistant":
+                        if b.get("text", "").strip():
+                            text = b["text"]
+            elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
+                text = blocks
     return last_push, last_query, last_failing_query, text
 
 

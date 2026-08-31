@@ -69,6 +69,7 @@ misfires is worse than a missing one" -- no `permissionDecision`, ever.
 Fails OPEN on any parse trouble, same as every guard here.
 """
 import json
+import os
 import re
 import shlex
 import sys
@@ -286,13 +287,13 @@ def main() -> int:
               file=sys.stderr)
         return 0
 
-    if not isinstance(payload, dict) or payload.get("tool_name") != "Bash":
+    if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    command = tool_input.get("command")
+    command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
         return 0
 
@@ -309,7 +310,7 @@ def main() -> int:
     cmd_word, segment, matched, flags = offenses[0]
     flags_display = flags if flags else "(none)"
 
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(
@@ -317,13 +318,15 @@ def main() -> int:
                 flags_display=flags_display, segment=segment,
             ),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"`{cmd_word} -i` runs a non-global substitution ({matched}); "
             "it changes only the first occurrence -- confirm that is what "
             "you meant, and print back the changed construct rather than "
             "trusting the file diff alone."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

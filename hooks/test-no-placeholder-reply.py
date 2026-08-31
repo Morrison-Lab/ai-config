@@ -68,6 +68,16 @@ CASES = [
     ([TOOL, say("Merged #1578; branch re-cut from main at 0b7b6a6c.")], False,
      "an ordinary short recap does not block"),
     ([TOOL], False, "a turn with no assistant prose does not block"),
+
+    # Antigravity format cases
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "git status"}}]},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "No response requested."}
+    ], True, "antigravity placeholder blocks"),
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "git status"}}]},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Merged #1578; branch re-cut from main at 0b7b6a6c."}
+    ], False, "antigravity non-placeholder does not block"),
 ]
 
 

@@ -792,7 +792,7 @@ def open_ident(cmd):
 # other tool's serialized input is the documentation/heredoc false positive
 # README.md:265-271 warns about -- self-demonstrating here, since these very
 # hook files contain the strings `gh pr create` and `requested_reviewers`.
-SHELL_TOOLS = {"Bash", "bash", "run_command"}
+SHELL_TOOLS = {"Bash", "bash", "run_command", "execute_command", "terminal", "shell"}
 
 # Structured PR tools, matched on the tool NAME with arguments read as fields.
 OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
@@ -1227,9 +1227,31 @@ def scan(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
-                continue
+            blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+            if isinstance(blocks, str):
+                blocks = [{"type": "text", "text": blocks}]
+            elif not isinstance(blocks, list):
+                blocks = []
+            else:
+                blocks = list(blocks)
+
+            if "tool_calls" in m and isinstance(m["tool_calls"], list):
+                for tc in m["tool_calls"]:
+                    if isinstance(tc, dict):
+                        tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                        targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        if isinstance(targs, str):
+                            try:
+                                targs = json.loads(targs)
+                            except Exception:
+                                targs = {"command": targs}
+                        tid = tc.get("id") or str(id(tc))
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tid,
+                            "name": tname,
+                            "input": targs if isinstance(targs, dict) else {},
+                        })
             # Which PRs THIS turn drafts or retires, computed over the whole
             # turn before any of its blocks are read -- a sibling call is
             # invisible to the push's own command, in either block order. Only
@@ -1546,7 +1568,7 @@ def scan(path):
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
-                cmd_raw = inp.get("command") or ""
+                cmd_raw = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
                 # DETECTION (is this an open/draft?) blanks EVERY quote, since
                 # `gh pr create`/`ready` is always a leading command word and a
                 # quoted example must not forge an obligation. IDENTITY (which

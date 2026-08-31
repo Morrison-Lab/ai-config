@@ -600,21 +600,32 @@ def _mcp_is_issue_search(name, payload):
 def _tool_uses(entry):
     """Yield (name, payload_dict) for each tool_use in a transcript entry."""
     message = entry.get("message")
-    if not isinstance(message, dict):
-        return
-    content = message.get("content")
-    if not isinstance(content, list):
-        return
-    for block in content:
-        if not isinstance(block, dict) or block.get("type") != "tool_use":
-            continue
-        name = block.get("name")
-        if not isinstance(name, str):
-            name = ""
-        payload = block.get("input")
-        if not isinstance(payload, dict):
-            payload = {}
-        yield name, payload
+    content = message.get("content") if isinstance(message, dict) else entry.get("content")
+    if isinstance(content, list):
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            name = block.get("name")
+            if not isinstance(name, str):
+                name = ""
+            payload = block.get("input")
+            if not isinstance(payload, dict):
+                payload = {}
+            yield name, payload
+
+    if "tool_calls" in entry and isinstance(entry["tool_calls"], list):
+        for tc in entry["tool_calls"]:
+            if isinstance(tc, dict):
+                name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                payload = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except Exception:
+                        payload = {"command": payload}
+                if not isinstance(payload, dict):
+                    payload = {}
+                yield name, payload
 
 
 def _payload_commands(payload):
@@ -731,7 +742,7 @@ def main():
             _emit(ISSUE_NOTE)
             return 0
 
-        if tool_name not in ("Bash", "bash", "run_command"):
+        if tool_name not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
             return 0
 
         command = (tool_input.get("command")

@@ -93,6 +93,7 @@ Fails OPEN on any parse trouble. A guard that breaks every Bash call when its
 input is malformed costs more than the omission it reports.
 """
 import json
+import os
 import re
 import sys
 
@@ -382,14 +383,14 @@ def _nearest_switch(records, j):
 def unchained(payload):
     """Return (switch_text, mutation_text) to warn about, or None."""
     # C1
-    if payload.get("tool_name") != "Bash":
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return None
 
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return None
 
-    command = tool_input.get("command")
+    command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
         return None
 
@@ -436,16 +437,18 @@ def main() -> int:
     # No `permissionDecision` key at all: an absent decision defers to the
     # normal permission flow, which is exactly the intent. Naming "allow" here
     # would suppress a prompt the user would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(switch=switch, mutation=mutation),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             "Unchained branch switch: `{switch}` is not joined by `&&` to the "
             "later `{mutation}`, which runs even if the switch fails."
-        ).format(switch=switch, mutation=mutation),
-    }))
+        ).format(switch=switch, mutation=mutation)
+    print(json.dumps(out))
     return 0
 
 

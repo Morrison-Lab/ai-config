@@ -201,6 +201,7 @@ return 0 with nothing on stdout. A reminder that cannot establish its own
 precondition must not fire --- see `fail-fast.md` on bounding a fallback.
 """
 import json
+import os
 import re
 import sys
 
@@ -344,7 +345,7 @@ def main():
     if not isinstance(payload, dict):
         return 0  # fail open: the harness always sends an object
 
-    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
     tool_input = payload.get("tool_input")
@@ -372,18 +373,20 @@ def main():
     # No `permissionDecision` key at all: an absent decision defers to the
     # normal permission flow. Naming "allow" would suppress a prompt the user
     # would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(
                 check=check_text, create=create_text, kind=kind),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"`{check_text}` and `{create_text}` are in one Bash call, so the "
             "check runs at the same instant as the create and gates nothing. "
             "Run the query in its own call and read the result first."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

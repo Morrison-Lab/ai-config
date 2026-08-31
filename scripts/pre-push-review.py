@@ -384,7 +384,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     # Verify Reviewed-Commit fingerprint if expected SHA provided
     if expected_commit_sha:
-        all_shas = re.findall(r"(?i)Reviewed-Commit:\s*([a-f0-9A-F]+)", unfenced_report)
+        all_shas = re.findall(r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*([a-f0-9A-F]+)", unfenced_report)
         if not all_shas:
             return False, False, f"Missing required 'Reviewed-Commit: {expected_commit_sha[:8]}' fingerprint."
         exp_sha = expected_commit_sha.lower()
@@ -403,7 +403,10 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         # timeout, so the guard hung rather than failing.  It was redundant as
         # well: `\s*\Z` below already reaches the same strings with zero
         # iterations of the group.
-        if not re.search(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+))*\s*\Z", unfenced_report):
+        if not re.search(
+            r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+))*\s*\Z",
+            unfenced_report,
+        ):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)

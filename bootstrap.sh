@@ -59,26 +59,75 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
   printf '\n--- Antigravity plugins ---\n'
   mkdir -p "$GEMINI_CONFIG_DIR"
   PLUGINS_JSON="$GEMINI_CONFIG_DIR/plugins.json"
-  
-  # Create a symlink so that hooks.json has a stable path that doesn't depend on CWD or unsupported interpolation.
-  mkdir -p "$GEMINI_CONFIG_DIR/plugins"
-  ln -sfn "$SCRIPT_DIR/plugins/ai-config" "$GEMINI_CONFIG_DIR/plugins/ai-config"
+  PLUGIN_STAGING_DIR="$GEMINI_CONFIG_DIR/plugins/ai-config"
+
+  # Establish a staging directory so Antigravity runtime rewrites do not dirty
+  # the canonical git checkout.
+  if [ -L "$PLUGIN_STAGING_DIR" ]; then
+    rm -f "$PLUGIN_STAGING_DIR"
+  fi
+  mkdir -p "$PLUGIN_STAGING_DIR"
+
+  # Copy canonical plugin manifest and hooks.json to staging runtime directory
+  cp -f "$SCRIPT_DIR/plugins/ai-config/plugin.json" "$PLUGIN_STAGING_DIR/plugin.json"
+  cp -f "$SCRIPT_DIR/plugins/ai-config/hooks.json" "$PLUGIN_STAGING_DIR/hooks.json"
+
+  # Symlink executable scripts and repository directories
+  ln -sfn "$SCRIPT_DIR/plugins/ai-config/claude-hook-adapter.py" "$PLUGIN_STAGING_DIR/claude-hook-adapter.py"
+  ln -sfn "$SCRIPT_DIR/plugins/ai-config/enforce-mwc-review-gate.py" "$PLUGIN_STAGING_DIR/enforce-mwc-review-gate.py"
+  ln -sfn "$SCRIPT_DIR/hooks" "$PLUGIN_STAGING_DIR/hooks"
+  ln -sfn "$SCRIPT_DIR/scripts" "$PLUGIN_STAGING_DIR/scripts"
+  ln -sfn "$SCRIPT_DIR/skills" "$PLUGIN_STAGING_DIR/skills"
+  ln -sfn "$SCRIPT_DIR/shared" "$PLUGIN_STAGING_DIR/shared"
 
   if [ ! -f "$PLUGINS_JSON" ]; then
     cat <<EOF > "$PLUGINS_JSON"
 {
   "entries": [
-    { "path": "$SCRIPT_DIR/plugins/ai-config" }
+    { "path": "$PLUGIN_STAGING_DIR" }
   ]
 }
 EOF
-    printf 'write plugins.json (%s) -> %s/plugins/ai-config\n' "$PLUGINS_JSON" "$SCRIPT_DIR"
+    printf 'write plugins.json (%s) -> %s\n' "$PLUGINS_JSON" "$PLUGIN_STAGING_DIR"
+  elif grep -q "$PLUGIN_STAGING_DIR" "$PLUGINS_JSON" 2>/dev/null; then
+    printf 'ok    plugins.json (%s already registered)\n' "$PLUGIN_STAGING_DIR"
   elif grep -q "$SCRIPT_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
-    printf 'ok    plugins.json (%s/plugins/ai-config already registered)\n' "$SCRIPT_DIR"
-  elif grep -q "$GEMINI_CONFIG_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
-    printf 'skip  plugins.json (%s still names the old %s/plugins/ai-config symlink destination -- delete it and rerun to migrate to the checkout path)\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
+    python3 -c "
+import json, sys
+p = '$PLUGINS_JSON'
+try:
+    with open(p, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    entries = d.get('entries', [])
+    updated = False
+    for e in entries:
+        if e.get('path') == '$SCRIPT_DIR/plugins/ai-config':
+            e['path'] = '$PLUGIN_STAGING_DIR'
+            updated = True
+    if not updated:
+        entries.append({'path': '$PLUGIN_STAGING_DIR'})
+    d['entries'] = entries
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(d, f, indent=2)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null && printf 'migrated plugins.json (%s checkout path -> %s staging path)\n' "$SCRIPT_DIR" "$PLUGIN_STAGING_DIR" || printf 'skip  plugins.json (%s exists but could not migrate)\n' "$PLUGINS_JSON"
   else
-    printf 'skip  plugins.json (%s exists but does not register %s/plugins/ai-config)\n' "$PLUGINS_JSON" "$SCRIPT_DIR"
+    python3 -c "
+import json, sys
+p = '$PLUGINS_JSON'
+try:
+    with open(p, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    entries = d.get('entries', [])
+    if not any(e.get('path') == '$PLUGIN_STAGING_DIR' for e in entries):
+        entries.append({'path': '$PLUGIN_STAGING_DIR'})
+        d['entries'] = entries
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump(d, f, indent=2)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null && printf 'updated plugins.json (registered %s)\n' "$PLUGIN_STAGING_DIR" || printf 'skip  plugins.json (%s exists)\n' "$PLUGINS_JSON"
   fi
 fi
 

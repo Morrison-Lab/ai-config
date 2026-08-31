@@ -1428,16 +1428,43 @@ _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
     r"(?i)\b(?:unresolved|unaddressed|not\s+resolved|not\s+addressed|partially\s+resolved|partially\s+addressed|still\s+unresolved)\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
+_SECTION_SEVERITY_TAG = re.compile(
+    r"(?i)^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:Critical|Defect|Blocking|Major|Warning|P[0-2])\b\]?"
+    r"|\*\*Location:\*\*"
+)
+_LINE_RESOLUTION_WORDS = re.compile(
+    r"(?i)\b(?:resolved|addressed|fixed|no\s+longer\s+applies)\b"
+)
+_LINE_UNRESOLVED_WORDS = re.compile(
+    r"(?i)\b(?:unresolved|unaddressed|still\s+(?:unresolved|broken|present|failing|reproducible|open)|not\s+(?:resolved|addressed|fixed))\b"
+    r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+
+
+def _section_has_unresolved_blocking_items(section: str) -> bool:
+    """True when the section contains unresolved severity-tagged or blocking items."""
+    for line in section.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _LINE_UNRESOLVED_WORDS.search(line):
+            return True
+        if _SECTION_SEVERITY_TAG.search(line):
+            if not _LINE_RESOLUTION_WORDS.search(line):
+                return True
+    return False
 
 
 def _is_exempt_findings_heading(
     scan_body: str, match_start: int, match_end: int
 ) -> bool:
-    """True when a Findings heading indicates non-blocking or resolved findings.
+    """True when a Findings heading indicates non-blocking or resolved findings,
+    AND the section body underneath it contains no unresolved severity-tagged or blocking items.
 
     Exempts headings like '### Findings (non-blocking)', '### Findings (resolved)',
     '### Findings from prior rounds — now resolved', '### Findings (addressed)', etc.
-    Does not exempt headings with unaddressed/unresolved or blocking signals.
+    Does not exempt headings with unaddressed/unresolved or blocking signals, or
+    sections containing unresolved blocking/severity-tagged items.
     """
     line_start = scan_body.rfind("\n", 0, match_start) + 1
     line_end = scan_body.find("\n", match_end)
@@ -1447,11 +1474,21 @@ def _is_exempt_findings_heading(
 
     if _FINDINGS_HEADING_NOT_EXEMPT.search(heading_line):
         return False
-    if _EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line):
-        return True
-    if _EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line):
-        return True
-    return False
+    if not (_EXEMPT_FINDINGS_HEADING_NON_BLOCKING.search(heading_line) or
+            _EXEMPT_FINDINGS_HEADING_RESOLVED.search(heading_line)):
+        return False
+
+    section_start = line_end + 1
+    next_heading = re.search(r"(?m)^#{1,6}\s", scan_body[section_start:])
+    section = (
+        scan_body[section_start:section_start + next_heading.start()]
+        if next_heading
+        else scan_body[section_start:]
+    )
+    if _section_has_unresolved_blocking_items(section):
+        return False
+
+    return True
 
 VERDICT_NOT_CLEAN_PATTERNS = [
     # Intervening words allowed, because the adjacent forms are not the only

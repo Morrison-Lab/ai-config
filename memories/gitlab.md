@@ -26,6 +26,10 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   other platforms use their own config-dir convention.
 - **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with `Unknown flag: --jq`.
   Pipe the raw JSON to `jq` separately instead: `glab api "projects/<id>" | jq '.default_branch'`.
+- **Use the paginated MR notes endpoint as the authoritative unresolved-inline-comment sweep.**
+  `GET /projects/:id/merge_requests/:iid/notes` can return resolvable unresolved `DiffNote`s that a Discussions API sweep does not expose as an unresolved discussion.
+  Filter every page on `.resolvable == true and .resolved == false`, then use the Discussions API only to locate and resolve the corresponding thread.
+  Do not infer that there are no inline findings from an empty discussion-level timestamp filter.
 - **A self-hosted GitLab instance on an institutional internal network may only resolve while on that network's VPN.**
   A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with ordinary internet DNS resolving fine otherwise, points at needing the VPN rather than a broader outage or sandbox restriction: `nslookup <host>` before and after connecting confirms it.
 - Key commands:

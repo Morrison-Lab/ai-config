@@ -658,6 +658,43 @@ CASES = [
      "an exhausted budget refuses rather than allowing an unverified push",
      "ran out of time", {"NPWSR_BUDGET_SECONDS": "0"}),
 
+    # --- structured review data payload ---
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->'),
+     True, "a structured NOT_CLEAN payload overrides a clean prose verdict",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", '
+        '"findings": [{"file": "a.py", "line": 1, "category": "bug", "message": "msg"}]} -->'),
+     True, "a payload with findings overrides a clean prose verdict",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": "malformed"} -->'),
+     True, "a payload with malformed findings overrides a clean prose verdict",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'),
+     False, "a matching clean payload allows the push"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '```text\n<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->\n```'),
+     False, "a fenced NOT_CLEAN payload is ignored as an example"),
+    (PUSH, reviewed(
+        f"### Verdict: Needs more work\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'),
+     True, "a clean payload does not override blocking prose",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nReviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->\n\n'
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->'),
+     True, "the last payload wins over a preceding clean template",
+     "returned a blocking verdict"),
+
     # --- which tool spoke ---
     (PUSH, [{"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": "x1", "name": "Read",
@@ -1169,6 +1206,65 @@ def windows_path_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def structured_payload_cases() -> tuple[int, int]:
+    """Test parse_report integration with structured review payloads directly."""
+    failures = 0
+    ran = 0
+    mod = _load_subject()
+
+    def check(label, verdict, sha, exp_verdict, exp_sha):
+        nonlocal failures, ran
+        ran += 1
+        if verdict == exp_verdict and sha == exp_sha:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label} (got verdict={verdict!r}, sha={sha!r}; expected verdict={exp_verdict!r}, sha={exp_sha!r})")
+            failures += 1
+
+    # 1. Clean prose + blocking NOT_CLEAN payload
+    r1 = (
+        "### Summary\nChanges look fine.\n\n"
+        "### Findings\nNone.\n\n"
+        "### Verdict: Ready for merge\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->'
+    )
+    v, s = mod.parse_report(r1)
+    check("parse_report: NOT_CLEAN payload flips clean prose to needs_work", v, s, "needs_work", HEAD.lower())
+
+    # 2. Clean prose + clean payload with blocking findings
+    r2 = (
+        "### Verdict: Ready for merge\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", '
+        '"findings": [{"file": "x.py", "line": 10, "category": "bug", "message": "error"}]} -->'
+    )
+    v, s = mod.parse_report(r2)
+    check("parse_report: findings list flips clean prose to needs_work", v, s, "needs_work", HEAD.lower())
+
+    # 3. Clean prose + clean payload
+    r3 = (
+        "### Verdict: Ready for merge\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", "findings": []} -->'
+    )
+    v, s = mod.parse_report(r3)
+    check("parse_report: CLEAN payload with empty findings retains clean verdict", v, s, "clean", HEAD.lower())
+
+    # 4. Fenced NOT_CLEAN payload
+    r4 = (
+        "### Verdict: Ready for merge\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "```json\n"
+        '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->\n'
+        "```"
+    )
+    v, s = mod.parse_report(r4)
+    check("parse_report: fenced NOT_CLEAN payload is ignored and retains clean verdict", v, s, "clean", HEAD.lower())
+
+    return failures, ran
+
+
 def main():
     failed = 0
     extra = 0
@@ -1197,7 +1293,8 @@ def main():
                 print(f"PASS: {label}")
         for fn in (raw_cases, orphan_cases, config_cases,
                    valueless_bool_cases, budget_cases,
-                   fixture_branch_cases, windows_path_cases):
+                   fixture_branch_cases, windows_path_cases,
+                   structured_payload_cases):
             f, r = fn()
             failed += f
             extra += r

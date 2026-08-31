@@ -6,13 +6,11 @@ machine-readable payload after its human-readable report::
 
     <!-- review-data: {"schema_version": "1.0", "verdict": "CLEAN", ...} -->
 
-Two scripts consume that payload -- ``scripts/check-pr-fully-clean.py`` for a
-comment posted to a PR, and ``scripts/pre-push-review.py`` for a report
-produced locally -- and they must agree, because they score the same artifact.
-They did not: the local parser stripped HTML comments before every check, so a
-report whose payload said ``NOT_CLEAN`` parsed as ``Verdict: CLEAN`` locally
-while the PR-side consumer scored it blocking.  One extractor, imported by
-both, is what keeps that from recurring.
+Two scripts and one hook consume that payload -- ``scripts/check-pr-fully-clean.py``
+for a comment posted to a PR, ``scripts/pre-push-review.py`` for a report
+produced locally, and ``hooks/no-push-without-self-review.py`` for the pre-push
+guard -- and they must agree, because they score the same artifact.  One
+extractor, imported by all three, is what keeps them in agreement.
 """
 from __future__ import annotations
 
@@ -230,3 +228,6 @@ def payload_is_clean(payload: Optional[Dict[str, Any]]) -> bool:
     if payload["findings"]:
         return False
     return normalize_verdict(payload.get("verdict")) in CLEAN_VERDICTS
+
+
+extract_review_payload = extract_structured_review

@@ -45,15 +45,28 @@ def last_assistant_text(path):
                     m = json.loads(line)
                 except Exception:
                     continue
-                if m.get("type") != "assistant":
-                    continue
-                blocks = (m.get("message") or {}).get("content") or []
-                txt = "".join(
-                    b.get("text", "") for b in blocks
-                    if isinstance(b, dict) and b.get("type") == "text"
-                )
-                if txt.strip():
-                    last = txt
+                if m.get("type") == "assistant" or m.get("role") == "assistant":
+                    blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+                    if isinstance(blocks, list):
+                        txt = "".join(
+                            b.get("text", "") for b in blocks
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if txt.strip():
+                            last = txt
+                    elif isinstance(blocks, str) and blocks.strip():
+                        last = blocks
+                elif m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                    content = m.get("content")
+                    if isinstance(content, str) and content.strip():
+                        last = content
+                    elif isinstance(content, list):
+                        txt = "".join(
+                            (b.get("text", "") if isinstance(b, dict) else str(b))
+                            for b in content
+                        )
+                        if txt.strip():
+                            last = txt
     except Exception:
         return ""
     return last

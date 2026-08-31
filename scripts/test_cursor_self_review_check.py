@@ -200,7 +200,7 @@ with tempfile.TemporaryDirectory() as tmp:
         return subprocess.run(["git", *a], cwd=cwd, env=env,
                               capture_output=True, text=True, check=False)
 
-    subprocess.run(["git", "clone", "-q", str(remote), str(work)],
+    subprocess.run(["git", "clone", "-q", str(remote), str(work)],  # unpinned ok
                    env=env, check=True)
     (work / "f.txt").write_text("one\n")
     git("add", "f.txt")
@@ -258,7 +258,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # local main is rejected: the CLI must name the rejection, not read it
     # as an output-shape change.
     work2 = Path(tmp) / "work2"
-    subprocess.run(["git", "clone", "-q", str(remote), str(work2)],
+    subprocess.run(["git", "clone", "-q", str(remote), str(work2)],  # unpinned ok
                    env=env, check=True)
     (work2 / "f.txt").write_text("three\n")
     git("commit", "-q", "-am", "remote moved", cwd=str(work2))

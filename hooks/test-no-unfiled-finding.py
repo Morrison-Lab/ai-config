@@ -142,6 +142,16 @@ CASES = [
     # Ordering: a filing BEFORE the assertion does not discharge a later one.
     ([FILE_CLI, say("Also, that other gap is worth its own issue.")], True,
      "a filing preceding the assertion does not count"),
+
+    # Antigravity format cases
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "FLAG -- a mechanism bug worth its own issue. Moving on."}
+    ], True, "antigravity declarative unfiled finding blocks"),
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Worth its own issue."},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh issue create --title x --body y"}}]},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Filed it."}
+    ], False, "antigravity filing after assertion does not block"),
 ]
 
 

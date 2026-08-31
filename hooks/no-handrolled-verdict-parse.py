@@ -147,7 +147,7 @@ import sys
 # the correct anchors -- a search for THOSE is the same hand-rolled parse.
 VERDICT_PHRASE = re.compile(
     r"Ready for merge|Needs more work|Needs minor changes|Needs one fix|"
-    r"Needs work|###\s*Verdict|\*\*Claude finished",
+    r"Needs work|Partial review|###\s*Verdict|\*\*Claude finished",
     re.I,
 )
 
@@ -346,8 +346,31 @@ def checked_prs(path):
                 blocks = msg.get("content") or []
             if isinstance(blocks, dict):
                 blocks = [blocks]
-            if not isinstance(blocks, list):
-                continue
+            elif isinstance(blocks, str):
+                blocks = [{"type": "text", "text": blocks}]
+            elif not isinstance(blocks, list):
+                blocks = []
+            else:
+                blocks = list(blocks)
+
+            if "tool_calls" in msg and isinstance(msg["tool_calls"], list):
+                for tc in msg["tool_calls"]:
+                    if isinstance(tc, dict):
+                        tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                        targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        if isinstance(targs, str):
+                            try:
+                                targs = json.loads(targs)
+                            except Exception:
+                                targs = {"command": targs}
+                        tid = tc.get("id") or str(id(tc))
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tid,
+                            "name": tname,
+                            "input": targs if isinstance(targs, dict) else {},
+                        })
+
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -397,9 +420,10 @@ def checked_prs(path):
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        if (payload.get("tool_name") or "") != "Bash":
+        if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
             return 0
-        cmd = (payload.get("tool_input") or {}).get("command") or ""
+        inp = payload.get("tool_input") or {}
+        cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
             return 0
 

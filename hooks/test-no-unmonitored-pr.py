@@ -21,9 +21,28 @@ def transcript(blocks):
 
 opened = transcript([{"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}}])
 scheduled = transcript([{"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}}, {"type": "tool_use", "name": "ScheduleWakeup", "input": {"after": "2m"}}])
+
+# Antigravity transcript
+def antigravity_transcript(records_list):
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        for rec in records_list:
+            stream.write(json.dumps(rec) + "\n")
+    return path
+
+ag_opened = antigravity_transcript([
+    {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh pr create"}}]}
+])
+ag_scheduled = antigravity_transcript([
+    {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh pr create"}}]},
+    {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "schedule", "args": {"DurationSeconds": 120}}]}
+])
+
 try:
     assert subject.pending(opened)
     assert not subject.pending(scheduled)
+    assert subject.pending(ag_opened)
+    assert not subject.pending(ag_scheduled)
     assert subject.monitor_path("https://github.com/o/r/pull/1") == subject.monitor_path("https://github.com/o/r/pull/1")
     assert subject.monitor_path("https://github.com/o/r/pull/1") != subject.monitor_path("https://github.com/o/r/pull/2")
 
@@ -37,11 +56,20 @@ try:
         {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create --title 'B'"}},
         {"type": "tool_result", "content": "https://github.com/o/r/pull/20"}
     ])
+    ag_multi_pr = antigravity_transcript([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh pr create --title 'A'"}}]},
+        {"source": "MODEL", "type": "GENERIC", "content": "https://github.com/o/r/pull/30"},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh pr create --title 'B'"}}]},
+        {"source": "MODEL", "type": "GENERIC", "content": "https://github.com/o/r/pull/40"}
+    ])
     try:
         urls = subject.extract_pr_urls(multi_pr)
         assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"], f"Got {urls}"
+        ag_urls = subject.extract_pr_urls(ag_multi_pr)
+        assert ag_urls == ["https://github.com/o/r/pull/30", "https://github.com/o/r/pull/40"], f"Got {ag_urls}"
     finally:
         os.unlink(multi_pr)
+        os.unlink(ag_multi_pr)
 
     # Verify start_monitor_for_url early return when already alive
     orig_state_dir = subject.STATE_DIR
@@ -61,23 +89,6 @@ try:
 finally:
     os.unlink(opened)
     os.unlink(scheduled)
-
-def antigravity_transcript(tool_calls):
-    handle, path = tempfile.mkstemp()
-    with os.fdopen(handle, "w") as stream:
-        stream.write(json.dumps({"type": "PLANNER_RESPONSE", "tool_calls": tool_calls}) + "\n")
-    return path
-
-ag_opened = antigravity_transcript([{"name": "run_command", "args": {"CommandLine": "gh pr create"}}])
-ag_scheduled = antigravity_transcript([
-    {"name": "run_command", "args": {"CommandLine": "gh pr create"}},
-    {"name": "schedule", "args": {"DurationSeconds": 120, "Prompt": "Wake up"}}
-])
-
-try:
-    assert subject.pending(ag_opened)
-    assert not subject.pending(ag_scheduled)
-finally:
     os.unlink(ag_opened)
     os.unlink(ag_scheduled)
 

@@ -28,7 +28,8 @@ so.
 
 - **Factual claims.** Check each claim against the AI's own domain knowledge
   and, where the claim is checkable against an external source (a paper, a
-  spec, a package's documentation, a dataset), fetch and check it there too.
+  spec, a package's documentation, a dataset), fetch and check it against the local `sources/` corpus.
+  Do **not** fall back to the open web (`WebFetch`/`WebSearch`) if the local source is missing or incomplete.
   Don't accept a plausible-sounding claim without checking it.
 - **Claims inherited from the tracking issue or upstream discussion.** Prose
   copied or paraphrased from the issue body, review thread, or proposal that

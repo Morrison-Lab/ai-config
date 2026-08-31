@@ -93,6 +93,7 @@ Fails OPEN on any parse trouble, on `git status`/`git rev-parse` failing or
 timing out, and outside a git repository.
 """
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -346,10 +347,11 @@ def main() -> int:
               f"({exc})", file=sys.stderr)
         return 0
 
-    if payload.get("tool_name") != "Bash":
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
-    command = (payload.get("tool_input") or {}).get("command")
+    inp = payload.get("tool_input") or {}
+    command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
         return 0
 
@@ -384,13 +386,15 @@ def main() -> int:
         summary = (f"`git {kind}` will discard {len(changed)} tracked "
                    "file(s) with uncommitted changes.")
 
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": summary,
-    }))
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = summary
+    print(json.dumps(out))
     return 0
 
 

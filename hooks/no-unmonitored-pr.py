@@ -52,17 +52,25 @@ def pending(path):
     opened = armed = False
     for record in records(path):
         blobs = []
-        if record.get("type") == "assistant":
-            for block in (record.get("message") or {}).get("content") or []:
+        if record.get("type") == "assistant" or record.get("role") == "assistant":
+            for block in (record.get("message") or {}).get("content") or record.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
-        elif record.get("type") == "PLANNER_RESPONSE":
+        if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for block in (record.get("tool_calls") or []):
                 if isinstance(block, dict):
-                    args = block.get("args") or {}
+                    name = block.get("name") or (block.get("function") or {}).get("name") or ""
+                    args = block.get("args") or block.get("input") or (block.get("function") or {}).get("arguments") or {}
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except Exception:
+                            args = {"command": args}
+                    if not isinstance(args, dict):
+                        args = {}
                     cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
                     cmd = unwrap_command(cmd)
-                    blobs.append(block.get("name", "") + " " + json.dumps({"command": cmd}))
+                    blobs.append(name + " " + json.dumps({**args, "command": cmd}))
         for blob in blobs:
             if OPEN.search(blob):
                 opened, armed = True, False
@@ -93,6 +101,29 @@ def extract_pr_urls(path):
             content_items.extend(record["message"]["content"])
         elif isinstance(record.get("message"), list):
             content_items.extend(record["message"])
+
+        # Antigravity tool calls
+        if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+            for tc in record.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
+                    if OPEN.search(blob):
+                        pending_open = True
+                        for match in PR_URL.finditer(blob):
+                            u = match.group(0)
+                            if u not in urls:
+                                urls.append(u)
+
+        # Antigravity tool result or generic output text
+        if pending_open and (record.get("source") in {"MODEL", "SYSTEM"} or record.get("type") in {"GENERIC", "USER_INPUT"}):
+            raw_content = record.get("content")
+            if isinstance(raw_content, str):
+                for match in PR_URL.finditer(raw_content):
+                    u = match.group(0)
+                    if u not in urls:
+                        urls.append(u)
+                if not record.get("tool_calls"):
+                    pending_open = False
 
         for block in content_items:
             if not isinstance(block, dict):

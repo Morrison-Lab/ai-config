@@ -165,20 +165,29 @@ def scan_transcript(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                commands = []
-                if record.get("type") == "assistant":
-                    for block in (record.get("message") or {}).get("content") or []:
-                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in {"Bash", "bash", "run_command"}:
-                            cmd = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
-                            commands.append(cmd)
-                elif record.get("type") == "PLANNER_RESPONSE":
-                    for block in (record.get("tool_calls") or []):
-                        if isinstance(block, dict) and block.get("name") in {"Bash", "bash", "run_command"}:
-                            args = block.get("args") or {}
-                            cmd = str(args.get("CommandLine") or args.get("command") or args.get("cmd") or "")
-                            cmd = unwrap_command(cmd)
-                            commands.append(cmd)
-                for command in commands:
+                tool_calls = []
+                if record.get("type") == "assistant" or record.get("role") == "assistant":
+                    blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+                    if isinstance(blocks, list):
+                        for block in blocks:
+                            if isinstance(block, dict) and block.get("type") == "tool_use":
+                                tool_calls.append((block.get("name") or "", block.get("input") or {}))
+                if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+                    for tc in record.get("tool_calls") or []:
+                        if isinstance(tc, dict):
+                            name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                            args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                            if isinstance(args, str):
+                                try:
+                                    args = json.loads(args)
+                                except Exception:
+                                    args = {"command": args}
+                            tool_calls.append((name, args if isinstance(args, dict) else {}))
+                for name, inp in tool_calls:
+                    if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
+                        continue
+                    command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
+                    command = unwrap_command(command)
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
                         saw = True
@@ -264,18 +273,28 @@ def last_assistant_text(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                text = ""
-                if record.get("type") == "assistant":
-                    blocks = (record.get("message") or {}).get("content") or []
-                    text = "".join(
-                        b.get("text", "") for b in blocks
-                        if isinstance(b, dict) and b.get("type") == "text"
-                    )
-                elif record.get("type") == "PLANNER_RESPONSE":
-                    text = str(record.get("content") or "")
-
-                if text.strip():
-                    last = text
+                if record.get("type") == "assistant" or record.get("role") == "assistant":
+                    blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+                    if isinstance(blocks, list):
+                        text = "".join(
+                            b.get("text", "") for b in blocks
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if text.strip():
+                            last = text
+                    elif isinstance(blocks, str) and blocks.strip():
+                        last = blocks
+                if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL":
+                    content = record.get("content")
+                    if isinstance(content, str) and content.strip():
+                        last = content
+                    elif isinstance(content, list):
+                        text = "".join(
+                            (b.get("text", "") if isinstance(b, dict) else str(b))
+                            for b in content
+                        )
+                        if text.strip():
+                            last = text
     except Exception:
         return ""
     return last

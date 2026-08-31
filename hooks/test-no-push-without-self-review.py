@@ -1047,7 +1047,7 @@ def fixture_branch_cases() -> tuple[int, int]:
         env = _isolated_git_env(default)
         d = tempfile.mkdtemp(prefix="npwsr-")
         try:
-            _git(d, "init", "-q", env=env)
+            _git(d, "init", "-q", env=env)  # unpinned ok
             _git(d, "checkout", "-q", "-b", "main", env=env)
             with open(os.path.join(d, "one.txt"), "w") as f:
                 f.write("one")

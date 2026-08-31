@@ -304,15 +304,15 @@ def tool_blob(name, inp):
     """
     if not isinstance(inp, dict):
         return ""
-    if name == "Bash":
-        return str(inp.get("command", ""))
-    if name in ("Write", "Edit", "NotebookEdit"):
+    if name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        return str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or "")
+    if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
         return " ".join(
             str(inp.get(k, "")) for k in
-            ("file_path", "content", "new_string", "new_source")
+            ("file_path", "path", "TargetFile", "target_file", "filePath", "content", "new_string", "new_source", "CodeContent", "ReplacementContent")
         )
-    if name in ("Task", "Agent"):
-        return str(inp.get("prompt", "")) + " " + str(inp.get("description", ""))
+    if name in ("Task", "Agent", "invoke_subagent"):
+        return str(inp.get("prompt") or inp.get("Prompt") or "") + " " + str(inp.get("description") or "")
     # Anything else: serialize the whole input rather than guess its schema.
     try:
         return json.dumps(inp)
@@ -366,28 +366,54 @@ def scan(path):
         # A subagent's own turns are not my outgoing message.
         if m.get("isSidechain"):
             continue
-        if m.get("type") != "assistant":
-            continue
-        blocks = (m.get("message") or {}).get("content") or []
-        if not isinstance(blocks, list):
-            continue
 
-        for b in blocks:
-            if not isinstance(b, dict):
+        tool_calls = []
+        text_blocks = []
+
+        is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, list):
+            for b in blocks:
+                if isinstance(b, dict):
+                    if b.get("type") == "tool_use":
+                        tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                    elif b.get("type") == "text" and is_assistant:
+                        text_blocks.append(b.get("text") or "")
+        elif isinstance(blocks, str) and is_assistant:
+            text_blocks.append(blocks)
+
+        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            content = m.get("content")
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text_blocks.append(b.get("text") or "")
+                    elif isinstance(b, str):
+                        text_blocks.append(b)
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+        for raw_text in text_blocks:
+            hit = ESCALATION.search(visible_prose(raw_text))
+            if not hit:
                 continue
+            for p in ARTIFACT_PATH.findall(raw_text):
+                escalated.append((p, hit.group(0).strip(), i))
 
-            if b.get("type") == "text":
-                raw = b.get("text", "")
-                hit = ESCALATION.search(visible_prose(raw))
-                if not hit:
-                    continue
-                for p in ARTIFACT_PATH.findall(raw):
-                    escalated.append((p, hit.group(0).strip(), i))
-
-            elif b.get("type") == "tool_use":
-                blob = tool_blob(b.get("name") or "", b.get("input") or {})
-                if blob:
-                    blobs.append(blob)
+        for name, inp in tool_calls:
+            blob = tool_blob(name, inp)
+            if blob:
+                blobs.append(blob)
 
     return escalated, blobs
 

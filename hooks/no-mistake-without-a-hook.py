@@ -108,26 +108,51 @@ def scan(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
-                continue
-            for b in blocks:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "tool_use":
-                    blob = (b.get("name") or "") + " " + json.dumps(
-                        b.get("input") or {})
-                    if HOOK_WORK.search(blob):
-                        done_at = i
-                elif b.get("type") == "text" and m.get("type") == "assistant":
-                    txt = b.get("text") or ""
-                    if not txt.strip():
-                        continue
-                    prose = visible_prose(txt)
+            role = m.get("type") or m.get("role")
+            blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+
+            # Antigravity tool calls
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL" or "tool_calls" in m:
+                for tc in m.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
+                        if HOOK_WORK.search(blob):
+                            done_at = i
+
+            # Antigravity text content
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                raw_content = m.get("content")
+                if isinstance(raw_content, str) and raw_content.strip():
+                    prose = visible_prose(raw_content)
                     if ADMISSION is not None and ADMISSION.search(prose):
                         admit_txt, admit_at = ADMISSION.search(prose).group(0), i
                     if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
                         done_at = i
+
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "tool_use":
+                        blob = (b.get("name") or "") + " " + json.dumps(
+                            b.get("input") or {})
+                        if HOOK_WORK.search(blob):
+                            done_at = i
+                    elif b.get("type") == "text" and (role == "assistant" or m.get("type") == "assistant"):
+                        txt = b.get("text") or ""
+                        if not txt.strip():
+                            continue
+                        prose = visible_prose(txt)
+                        if ADMISSION is not None and ADMISSION.search(prose):
+                            admit_txt, admit_at = ADMISSION.search(prose).group(0), i
+                        if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
+                            done_at = i
+            elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
+                prose = visible_prose(blocks)
+                if ADMISSION is not None and ADMISSION.search(prose):
+                    admit_txt, admit_at = ADMISSION.search(prose).group(0), i
+                if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
+                    done_at = i
     return admit_txt, admit_at, done_at
 
 

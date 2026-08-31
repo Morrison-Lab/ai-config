@@ -424,10 +424,32 @@ def find_cited_urls(records, owner, repo, number):
     pending = {}  # tool_use_id -> matched number (or None if unresolved)
     result = []
     for idx, m in enumerate(records):
-        message = m.get("message")
-        blocks = message.get("content") if isinstance(message, dict) else m.get("content")
-        if not isinstance(blocks, list):
-            continue
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, str):
+            blocks = [{"type": "text", "text": blocks}]
+        elif not isinstance(blocks, list):
+            blocks = []
+        else:
+            blocks = list(blocks)
+
+        if "tool_calls" in m and isinstance(m["tool_calls"], list):
+            for tc in m["tool_calls"]:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tid = tc.get("id") or str(id(tc))
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tid,
+                        "name": tname,
+                        "input": targs if isinstance(targs, dict) else {},
+                    })
+
         for b in blocks:
             if not isinstance(b, dict):
                 continue
@@ -437,7 +459,7 @@ def find_cited_urls(records, owner, repo, number):
                 inp = b.get("input") or {}
                 if not isinstance(inp, dict):
                     inp = {}
-                command = inp.get("command")
+                command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd")
                 if isinstance(command, str) and command.strip():
                     fetch = _is_bash_fetch(command)
                 else:
@@ -486,10 +508,32 @@ def urls_were_fetched(records, urls):
             targets.add(domain)
 
     for m in records:
-        message = m.get("message")
-        blocks = message.get("content") if isinstance(message, dict) else m.get("content")
-        if not isinstance(blocks, list):
-            continue
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, str):
+            blocks = [{"type": "text", "text": blocks}]
+        elif not isinstance(blocks, list):
+            blocks = []
+        else:
+            blocks = list(blocks)
+
+        if "tool_calls" in m and isinstance(m["tool_calls"], list):
+            for tc in m["tool_calls"]:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tid = tc.get("id") or str(id(tc))
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tid,
+                        "name": tname,
+                        "input": targs if isinstance(targs, dict) else {},
+                    })
+
         for b in blocks:
             if not isinstance(b, dict) or b.get("type") != "tool_use":
                 continue
@@ -497,12 +541,12 @@ def urls_were_fetched(records, urls):
             inp = b.get("input") or {}
             if not isinstance(inp, dict):
                 continue
-            if name == "WebFetch":
-                fetched = str(inp.get("url") or "")
+            if name in ("WebFetch", "read_url_content", "fetch_web_page"):
+                fetched = str(inp.get("url") or inp.get("Url") or "")
                 if any(t and (t in fetched or fetched in t) for t in targets):
                     return True
-            elif name == "WebSearch":
-                query = str(inp.get("query") or "")
+            elif name in ("WebSearch", "search_web", "google_search"):
+                query = str(inp.get("query") or inp.get("Query") or "")
                 if any(t and t in query for t in targets):
                     return True
     return False
@@ -545,12 +589,12 @@ def main() -> int:
               file=sys.stderr)
         return 0
 
-    if not isinstance(payload, dict) or payload.get("tool_name") != "Bash":
+    if not isinstance(payload, dict) or payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    command = tool_input.get("command")
+    command = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script")
     if not isinstance(command, str) or not command.strip():
         return 0
 
@@ -589,16 +633,18 @@ def main() -> int:
 
     url_list = "\n".join(f"  - {u}" for u in urls)
     note = NOTE.format(urls=url_list)
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"This rebuttal disputes a finding whose cited source "
             f"({urls[0]}) was never fetched in this transcript."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

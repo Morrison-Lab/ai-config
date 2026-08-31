@@ -32,6 +32,8 @@ Exit codes:
    from 1, so "you invoked this incorrectly" is never read as "the PR is not
    clean" (shared/principles/fail-fast.md).
 """
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -45,7 +47,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
-from typing import Dict, List, Optional, Tuple
+from review_payload import (  # noqa: E402
+    extract_structured_review,
+    payload_findings,
+    payload_findings_malformed,
+    payload_is_blocking,
+    payload_is_clean,
+    normalize_verdict,
+)
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
 # cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
@@ -240,6 +250,17 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "verdict: block": "Jules",
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
+    # Deliberately NOT here: the Claude Code disclosure footer
+    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # "Every comment you post to a forge says an agent posted it" mandates that
+    # footer on EVERY agent-posted comment -- claims, status updates, replies,
+    # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it
+    # here made each of those a quorum-eligible automated review with identity
+    # "Claude": measured, an owner comment ending in the footer superseded a
+    # real bot "Needs more work" and satisfied quorum on a PR carrying no
+    # automated review at all.  That reopens #2308's invariant, quoted below:
+    # approval authority comes from author identity and never from body text.
+    # A Claude review identifies itself by "**Claude finished" instead.
 }
 
 # Logins that are one reviewer, never shared. Claude and Antigravity both post
@@ -300,6 +321,7 @@ REVIEW_BODY_MARKERS = (
     "_posted by codex (ai agent)",
     "_posted by opencode (ai agent)",
     "verdict:",
+    "review-data:",
 )
 
 
@@ -343,6 +365,18 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
     if agent:
         return agent
+
+    # The payload's own `reviewer` field deliberately does NOT feed identity,
+    # even from a bot login.  It is body text a reviewer writes about itself,
+    # so trusting it is the inverse of #2308's invariant restated in
+    # REVIEW_AGENT_MARKERS above -- and it is load-bearing for quorum, not
+    # merely stylistic: measured, two clean comments from the single login
+    # `github-actions[bot]` whose payloads named different reviewers satisfied
+    # `--quorum 2`.  A quorum above 1 is the ordinary case rather than a corner
+    # -- `shared/workflow/fully-clean.md` prescribes
+    # `--quorum <number-of-reachable-providers>` and pins a three-provider
+    # quorum for this repo.  Identity comes from the marker on the first or
+    # last line, or from the login.
     if login:
         return login
     return "unknown"
@@ -1094,7 +1128,8 @@ def strip_cited_finding_vocab(text: str) -> str:
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
     r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
-    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
+    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings"
+    r"|Partial\s+review)\b"
 )
 
 # The clause scan admits a parenthesized aside as a single unit, because a
@@ -1344,11 +1379,13 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 ]
 
 # Applies to EVERY not-clean pattern, not to one named member.
@@ -1415,7 +1452,9 @@ BARE_CLEAN_PATTERNS = {
 }
 BARE_NOT_CLEAN_PATTERNS = {
     _BARE_REJECTION,
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 }
 
 # Criterion 3 (HEAD) and criterion 4 (per-reviewer latest) share this list.
@@ -1434,12 +1473,14 @@ FINDING_PATTERNS = [
     r"#+\s*Non-blocking\b",
     r"(?:^|\n)\s*\*\*Non-blocking\*\*",
     r"\*\*Location:\*\*",
-    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 ]
 FINDING_HEADING_PATTERNS = {
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
@@ -1578,6 +1619,10 @@ def classify_verdict(body: str, state: str = "") -> str:
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
+    structured = extract_structured_review(body)
+    if payload_is_blocking(structured):
+        return "not-clean"
+
     scan, cited = strip_cited_finding_vocab_with_mask(body)
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
@@ -1625,6 +1670,12 @@ def classify_verdict(body: str, state: str = "") -> str:
             if CLEAN_QUALIFIER.search(_sentence_remainder(scan, match.end())):
                 continue
             return "clean"
+
+    # Checked AFTER the prose scans above, deliberately: a reviewer that states
+    # findings in prose and then labels its payload clean is contradicting
+    # itself, and prose wins that contradiction (#2736 review round 2).
+    if payload_is_clean(structured):
+        return "clean"
 
     # A review from a known agent whose format the classifier cannot read is
     # the dangerous third state (#1524): it is NOT "no review" (which triggers
@@ -1732,6 +1783,28 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
     real items is a finding even when ``classify_verdict`` returns clean
     because the same body also says Ready for merge (#2274).
     """
+    structured = extract_structured_review(body)
+    findings = payload_findings(structured)
+    if findings:
+        first = findings[0]
+        if isinstance(first, dict):
+            where = str(first.get("file") or "unknown")
+            what = str(first.get("message") or first.get("summary") or "")
+            return f"structured finding in {where}: {what}"
+        return "structured finding"
+    if payload_findings_malformed(structured):
+        # Checked BEFORE the verdict branch, for the reason
+        # `pre-push-review.py`'s `_structured_contradiction` states: a malformed
+        # field folds to `[]`, so the verdict branch would print the payload's
+        # own `CLEAN` string as the reason it blocked -- self-contradictory, and
+        # reading as a parser bug to whoever has to disposition it.
+        return (
+            "structured payload has a `findings` field that is present but is "
+            f"not a list ({type(structured.get('findings')).__name__})"
+        )
+    if payload_is_blocking(structured):
+        return f"structured blocking verdict ({normalize_verdict(structured.get('verdict'))})"
+
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)
     for pat in FINDING_PATTERNS:
         for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
@@ -1835,8 +1908,8 @@ def _is_expired_driver_ledger(
 
 
 def check_latest_verdict(
-    all_items: List[tuple],
-    approved_authors: Optional[set] = None,
+    all_items: List[Tuple[Any, ...]],
+    approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
@@ -1983,7 +2056,7 @@ def check_latest_verdict(
 
 
 _REVIEW_STRUCTURE_HEADING = re.compile(
-    r"(?im)^#{1,6}\s*(?:Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
+    r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
 )
 
 
@@ -2157,7 +2230,32 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         body_lower = body.lower()
         oid = item[3]
 
-        is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
+        # The structured `commit_sha` term IS live, though it is subsumed for
+        # every ORDINARY payload: `sha_short` is the target sha's own
+        # 7-character prefix, so a payload naming a >= 7-character prefix of the
+        # target contains `sha_short` verbatim, and the `sha_short in
+        # body_lower` disjunct below already matches it.
+        #
+        # What that argument misses -- and what an earlier cut deleted the term
+        # over, calling it "provably" inert -- is that `json.loads` resolves
+        # escapes, so the DECODED value need not appear in the raw body at all.
+        # A payload carrying `"commit_sha": "abc\u0031234..."` decodes to a
+        # match while the literal text reads `abc\u00312...`, which neither
+        # substring disjunct sees.  Dropping the term made that case fail
+        # closed (a real review stops counting as evaluating HEAD, reported as
+        # "no review posted"), which is safe and still wrong.
+        structured = extract_structured_review(body)
+        struct_sha = str(structured.get("commit_sha", "")).strip().lower() if structured else ""
+        sha_lower = sha.lower()
+        is_struct_sha_match = bool(
+            struct_sha and len(struct_sha) >= 7 and sha_lower.startswith(struct_sha)
+        )
+        # No `oid` term here either: `is_sha_match` is read only in the `else:`
+        # arm below, where `oid` is falsy by construction, so an `oid`
+        # comparison can never contribute -- and writing one reads as having
+        # made formal-review OID matching case-insensitive, which
+        # `is_match = (oid == sha)` in the `if oid:` arm is not.
+        is_sha_match = bool(is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

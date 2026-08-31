@@ -197,6 +197,8 @@ _DEBT_SRC = r"""(
       \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
     | \b """ + _SUBJ + _MODAL + r"""\s+wait\s+(?:right\s+)?here\b
+    | \b(?:scheduled|next)\s+check(?:[- ]?in)?\s+(?:is\s+)?at\b
+      (?![^.!?\n]{0,120}\b(?:already|earlier|fired|completed|done|finished|ran|reported|confirmed|showed|found|passed|concluded|was|were|has\s+been)\b)
     )"""
 
 # A statement that CI or a reviewer WILL perform a future action makes the
@@ -308,6 +310,7 @@ SCHEDULER_TOOL = re.compile(
     r"|(?:create|update)_scheduled_task"
     r"|(?:create|update)_trigger"
     r"|send_later"
+    r"|schedule"
     r")$",
     re.I,
 )
@@ -459,6 +462,7 @@ def _poller_executed(command, depth=0):
 WRITE_TOOLS = {
     "write", "edit", "multiedit", "notebookedit",
     "create", "update", "str_replace_editor", "apply_patch",
+    "write_to_file", "replace_file_content", "edit_file", "strreplace", "create_file",
 }
 
 # What makes a shell command a write rather than a read.
@@ -574,7 +578,7 @@ def scan(path):
         if m.get("isSidechain"):
             continue
 
-        if kind == "user":
+        if kind == "user" or m.get("source") == "USER_EXPLICIT" or kind == "USER_INPUT":
             # A tool_result arrives as a `user` record; a real prompt does not.
             is_tool_result = isinstance(blocks, list) and any(
                 isinstance(b, dict) and b.get("type") == "tool_result"
@@ -592,34 +596,62 @@ def scan(path):
                 failed.clear()
             continue
 
-        if kind != "assistant" or not isinstance(blocks, list):
-            continue
+        tool_calls = []
+        text_blocks = []
 
-        for b in blocks:
-            if not isinstance(b, dict):
+        if kind == "assistant" or m.get("role") == "assistant":
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if isinstance(b, dict):
+                        if b.get("type") == "text":
+                            text_blocks.append(b.get("text") or "")
+                        elif b.get("type") == "tool_use":
+                            tool_calls.append((b.get("name") or "", b.get("input") or {}, b.get("id")))
+            elif isinstance(blocks, str):
+                text_blocks.append(blocks)
+
+        if kind in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            content = m.get("content")
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text_blocks.append(b.get("text") or "")
+                    elif isinstance(b, str):
+                        text_blocks.append(b)
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tid = tc.get("id") or str(id(tc))
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}, tid))
+
+        for raw in text_blocks:
+            if not raw.strip():
                 continue
+            prose = visible_prose(raw)
+            hit = RULE.search(prose)
+            if hit:
+                rule_txt = hit.group(0).strip()
+            hit = DEBT.search(prose)
+            if hit:
+                debt_txt = hit.group(0).strip()
+            hit = AUTOMATION.search(prose)
+            if hit:
+                automation_txt = hit.group(0).strip()
 
-            if b.get("type") == "text":
-                raw = b.get("text") or ""
-                if not raw.strip():
-                    continue
-                prose = visible_prose(raw)
-                hit = RULE.search(prose)
-                if hit:
-                    rule_txt = hit.group(0).strip()
-                hit = DEBT.search(prose)
-                if hit:
-                    debt_txt = hit.group(0).strip()
-                hit = AUTOMATION.search(prose)
-                if hit:
-                    automation_txt = hit.group(0).strip()
-
-            elif b.get("type") == "tool_use":
-                kind_of = discharges(b.get("name") or "", b.get("input") or {})
-                if kind_of:
-                    pending[kind_of].add(b.get("id"))
-                if arms_automation_monitor(b.get("name") or "", b.get("input") or {}):
-                    pending["monitored"].add(b.get("id"))
+        for tname, tinp, tid in tool_calls:
+            kind_of = discharges(tname, tinp)
+            if kind_of:
+                pending[kind_of].add(tid)
+            if arms_automation_monitor(tname, tinp):
+                pending["monitored"].add(tid)
 
     # A call with no result at all still counts: the Stop hook can fire before
     # the result lands, and withholding discharge there would block a turn that
@@ -715,12 +747,12 @@ def discharges(name, inp):
 
     if low in WRITE_TOOLS:
         target = " ".join(
-            str(inp.get(k, "")) for k in ("file_path", "path", "notebook_path")
+            str(inp.get(k, "")) for k in ("file_path", "path", "notebook_path", "TargetFile", "target_file", "filePath")
         )
         return "durable" if MECHANISM_PATH.search(target) else None
 
-    if low == "bash":
-        cmd = str(inp.get("command", ""))
+    if low in {"bash", "run_command", "terminal", "execute_command", "shell"}:
+        cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
         if FILING_CMD.search(cmd):
             return "durable"
         # A shell write needs BOTH a rule surface and something that writes to
@@ -743,7 +775,7 @@ def discharges(name, inp):
             return "scheduled"
         return None
 
-    if low in ("task", "agent", "skill"):
+    if low in ("task", "agent", "skill", "invoke_subagent"):
         # ONLY an action word. A brief naming a path is not evidence about
         # what the agent will do with it, and no reading of the wording can
         # make it one: "read hooks/x.py", "summarize the latest edit to

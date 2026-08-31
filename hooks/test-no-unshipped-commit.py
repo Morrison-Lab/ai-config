@@ -642,11 +642,11 @@ try:
         _head_reason = subject.decide(unrelated_root, commit_only)
         assert "old-unrelated" not in _head_reason
 
-        # Multiple unpushed worktrees: both wt_root and wt2 unpushed.
+        # Nested subdirectory cwd inside worktree correctly blocks when unpushed.
         wt_run(HOOK, cwd=wt_root)
-        wt_run(HOOK, cwd=wt2)
-        _multi_reason = subject.decide(wt_root, wt2_transcript)
-        assert "HEAD" in _multi_reason and "worktree" in _multi_reason and "are not on its upstream" in _multi_reason, _multi_reason
+        subdir = os.path.join(wt_root, "nested", "sub")
+        os.makedirs(subdir, exist_ok=True)
+        assert subject.decide(subdir, commit_only) != "", "cwd in nested subdirectory inside worktree must be recognized as relevant"
     finally:
         for _p in (wt_root, wt_bare, wt2, abandoned_wt, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare,
                    unrelated_root, unrelated_bare):

@@ -467,7 +467,25 @@ def decide(cwd, path):
         wt_branch = wt.get("branch")
 
         # Only check checkouts active in this session (cwd, touched paths, or touched branches)
-        is_relevant = (wt_path_real == cwd_real) or (wt_path_real in touched_paths_real) or (wt_path in touched_paths) or (wt_branch and wt_branch in touched_branches)
+        # cwd or touched paths may be nested subdirectories inside the worktree root
+        is_cwd_in_wt = False
+        try:
+            is_cwd_in_wt = (os.path.commonpath([cwd_real, wt_path_real]) == wt_path_real)
+        except (ValueError, Exception):
+            is_cwd_in_wt = (cwd_real == wt_path_real)
+
+        is_touched_in_wt = False
+        for p in touched_paths_real:
+            try:
+                if os.path.commonpath([p, wt_path_real]) == wt_path_real or os.path.commonpath([p, wt_path_real]) == p:
+                    is_touched_in_wt = True
+                    break
+            except (ValueError, Exception):
+                if p == wt_path_real:
+                    is_touched_in_wt = True
+                    break
+
+        is_relevant = is_cwd_in_wt or is_touched_in_wt or (wt_branch and wt_branch in touched_branches)
         if not is_relevant:
             continue
 

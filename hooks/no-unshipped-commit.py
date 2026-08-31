@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -15,6 +16,17 @@ import tempfile
 # the session blocked on a fully-pushed branch (ai-config#1963, measured while
 # driving #1947). `git commit-graph write` is the second instance, and the one
 # people actually run.
+#
+# ai-config#2727 moved the DECISION to repository state. The transcript scan
+# kept needing one clause per gap (the two above, plus #1806's heredocs and
+# #2365's env prefixes), and the gap class was open-ended: a commit dropped
+# on review advice -- `git reset --hard HEAD~1`, a rebase that drops it --
+# leaves `pending` set with no commit left to push, so every later Stop
+# blocked on a fully-pushed branch, three times consecutively in the measured
+# session. The transcript scan now only decides WHETHER to look (a real
+# `git commit` ran this session); the ANSWER is `git rev-list --count
+# @{u}..HEAD`, which is immune to every reconstruction gap at once and needs
+# no new clause per gap, per shared/workflow/algorithmatize-checks.md.
 #
 # PUSH carries the same guard for symmetry rather than as a second repair:
 # `git push` has no hyphenated plumbing sibling today, so that half prevents
@@ -134,8 +146,15 @@ def unwrap_command(cmd):
             return cmd.replace('\\n', '\n').replace('\\"', '"')
     return cmd
 
-def pending_commit(path):
-    pending = None
+def scan_transcript(path):
+    """Return (saw_commit, pending) from the transcript scan.
+
+    `saw_commit` is whether a real `git commit` ran at all --- the gate that
+    decides whether repository state is worth consulting, so a session that
+    never committed is not blocked for commits it did not make. `pending` is
+    the last committed-but-never-discharged command, by the same scan.
+    """
+    saw, pending = False, None
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             for line in stream:
@@ -162,12 +181,72 @@ def pending_commit(path):
                 for command in commands:
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
+                        saw = True
                         pending = command
                     if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:
+        return saw, pending
+    return saw, pending
+
+
+def pending_commit(path):
+    return scan_transcript(path)[1]
+
+
+def unpushed_count(cwd):
+    """Commits on HEAD that its upstream lacks, or None when git cannot say.
+
+    `@{u}..HEAD` is ahead-only, so a branch behind its upstream counts 0 ---
+    staleness is not unshippedness. No upstream, a detached HEAD, and a gone
+    upstream branch all exit non-zero and return None: the count is
+    undefined there, and the caller falls back to the transcript verdict.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "@{u}..HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=10)
+    except Exception:
         return None
-    return pending
+    if result.returncode != 0:
+        return None
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return None
+
+
+PUSH_REMEDY = ("Push the branch, open or verify its PR, then report status. "
+               "The standing rule is executable work, not a handoff item.")
+
+
+def decide(cwd, path):
+    """The Stop verdict: the block reason, or "" to allow the stop.
+
+    The transcript scan gates whether to look; `git rev-list --count
+    @{u}..HEAD` answers (ai-config#2727). The count is the payload `cwd`'s
+    own branch's answer and nothing wider: a session commit made in another
+    checkout's workdir, or on a branch since checked out away, is off this
+    HEAD and counts 0. Without a `cwd` in the hook payload, repository
+    state is unknowable, so the verdict falls back to the transcript scan
+    --- the old behaviour, fail-safe rather than blind.
+    """
+    saw_commit, pending = scan_transcript(path)
+    if not saw_commit:
+        return ""
+    if not cwd:
+        return PUSH_REMEDY if pending else ""
+    count = unpushed_count(cwd)
+    if count == 0:
+        return ""
+    if count is None:
+        if not pending:
+            return ""
+        return ("The unshipped count for this branch is undefined --- no "
+                "upstream is configured, or git failed to answer --- and the "
+                "transcript shows a commit with no later push or PR "
+                "creation. " + PUSH_REMEDY)
+    return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
 
 
 def last_assistant_text(path):
@@ -201,19 +280,22 @@ def last_assistant_text(path):
 
 def main():
     try:
-        path = json.load(sys.stdin).get("transcript_path") or ""
+        payload = json.load(sys.stdin)
     except Exception:
         return
-    command = pending_commit(path)
-    if not command:
+    path = payload.get("transcript_path") or ""
+    if not path:
+        return
+    reason = decide(payload.get("cwd") or "", path)
+    if not reason:
         return
     text = last_assistant_text(path)
-    key = hashlib.sha256((path + command + text).encode()).hexdigest()[:16]
+    key = hashlib.sha256((path + reason + text).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unshipped-commit-{key}")
     if os.path.exists(sentinel):
         return
     open(sentinel, "w").close()
-    print(json.dumps({"decision": "block", "reason": "A commit was made without a later push or PR creation. Push the branch, open or verify its PR, then report status. The standing rule is executable work, not a handoff item."}))
+    print(json.dumps({"decision": "block", "reason": reason}))
 
 
 if __name__ == "__main__":

@@ -344,7 +344,7 @@ def main():
     if not isinstance(payload, dict):
         return 0  # fail open: the harness always sends an object
 
-    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
     tool_input = payload.get("tool_input")

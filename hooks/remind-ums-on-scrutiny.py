@@ -145,12 +145,34 @@ def records(path):
 
 
 def _blocks(m):
-    content = (m.get("message") or {}).get("content")
+    content = (m.get("message") or {}).get("content") or m.get("content")
+    blocks = []
     if isinstance(content, str):
-        return [{"type": "text", "text": content}]
-    if isinstance(content, list):
-        return content
-    return []
+        blocks.append({"type": "text", "text": content})
+    elif isinstance(content, list):
+        for b in content:
+            if isinstance(b, str):
+                blocks.append({"type": "text", "text": b})
+            elif isinstance(b, dict):
+                blocks.append(b)
+    if "tool_calls" in m and isinstance(m["tool_calls"], list):
+        for tc in m["tool_calls"]:
+            if isinstance(tc, dict):
+                tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                if isinstance(targs, str):
+                    try:
+                        targs = json.loads(targs)
+                    except Exception:
+                        targs = {"command": targs}
+                tid = tc.get("id") or str(id(tc))
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tid,
+                    "name": tname,
+                    "input": targs if isinstance(targs, dict) else {},
+                })
+    return blocks
 
 
 def _text_of(blocks):
@@ -179,12 +201,7 @@ def _is_correction(prose):
 
 
 def scan(path):
-    """Return (kind, quote, event_at, ums_at).
-
-    kind is 'questioned-wrong' or 'review-read' or None.
-    event_at is the index of the unpaid trigger; ums_at is the last explicit
-    UMS action, or -1.
-    """
+    """Return (kind, quote, event_at, ums_at)."""
     ums_at = -1
     last_review_at = -1
     last_question_at = -1
@@ -198,7 +215,11 @@ def scan(path):
             continue
 
         blocks = _blocks(m)
-        rec_type = m.get("type")
+        rec_type = m.get("type") or m.get("role")
+        if m.get("source") == "USER_EXPLICIT" or rec_type == "USER_INPUT":
+            rec_type = "user"
+        elif m.get("source") == "MODEL" or rec_type in {"PLANNER_RESPONSE", "GENERIC"}:
+            rec_type = "assistant"
 
         if rec_type == "user":
             raw = _text_of(blocks)
@@ -243,16 +264,16 @@ def scan(path):
                 # Searching them treats authoring the rule as reading a review.
                 # Paste markers are also omitted from this blob search so a
                 # Grep or reviewer brief that names `### Verdict` stays silent.
-                if name not in ("Write", "Edit", "NotebookEdit"):
+                if name not in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
                     if REVIEW_FETCH.search(blob):
                         last_review_at = i
-                if name in ("Task", "Agent"):
+                if name in ("Task", "Agent", "invoke_subagent"):
                     ums_blob = (
-                        str(inp.get("prompt", ""))
-                        + str(inp.get("description", ""))
+                        str(inp.get("prompt") or inp.get("Prompt") or "")
+                        + str(inp.get("description") or "")
                     )
-                elif name == "Bash":
-                    ums_blob = str(inp.get("command", ""))
+                elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+                    ums_blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
                 elif name == "Skill":
                     ums_blob = (
                         str(inp.get("skill", "")) + str(inp.get("args", ""))

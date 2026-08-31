@@ -22,11 +22,55 @@ def transcript(commands):
     return path
 
 
+def antigravity_transcript(commands, assistant_text=""):
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        for command in commands:
+            record = {
+                "source": "MODEL",
+                "type": "PLANNER_RESPONSE",
+                "status": "DONE",
+                "tool_calls": [{"name": "run_command", "args": {"CommandLine": command}}],
+            }
+            stream.write(json.dumps(record) + "\n")
+        if assistant_text:
+            text_record = {
+                "source": "MODEL",
+                "type": "PLANNER_RESPONSE",
+                "status": "DONE",
+                "content": assistant_text,
+            }
+            stream.write(json.dumps(text_record) + "\n")
+    return path
+
+
+def openai_transcript(commands):
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        for command in commands:
+            record = {
+                "role": "assistant",
+                "tool_calls": [{
+                    "type": "function",
+                    "function": {"name": "execute_command", "arguments": json.dumps({"command": command})}
+                }]
+            }
+            stream.write(json.dumps(record) + "\n")
+    return path
+
+
 unshipped = transcript(["git commit -m hook"])
 pushed = transcript(["git commit -m hook", "git push origin branch"])
 pr_opened = transcript(["git commit -m hook", "gh pr create --fill"])
 multiline_unshipped = transcript(["git add -A\ngit commit -m hook"])
 multiline_pushed = transcript(["git commit -m hook", "git add .\ngit push origin branch"])
+
+antigravity_unshipped = antigravity_transcript(["git commit -m hook"])
+antigravity_pushed = antigravity_transcript(["git commit -m hook", "git push origin branch"])
+antigravity_text = antigravity_transcript(["git commit -m x"], assistant_text="Antigravity done.")
+
+openai_unshipped = openai_transcript(["git commit -m hook"])
+openai_pushed = openai_transcript(["git commit -m hook", "git push origin branch"])
 
 # Test malformed line resilience
 handle, malformed_path = tempfile.mkstemp()
@@ -257,12 +301,22 @@ try:
     assert subject.pending_commit(real_commit) is not None, "a plain git commit must still arm"
     assert subject.pending_commit(plumbing_then_real) is not None, "plumbing must not hide a real commit beside it"
     assert subject.pending_commit(push_sibling) is not None, "a hyphenated push sibling must not discharge"
+    assert subject.pending_commit(antigravity_unshipped) == "git commit -m hook", "antigravity unshipped commit must arm"
+    assert subject.pending_commit(antigravity_pushed) is None, "antigravity push must discharge"
+    assert subject.last_assistant_text(antigravity_text) == "Antigravity done."
+    assert subject.pending_commit(openai_unshipped) == "git commit -m hook", "openai unshipped commit must arm"
+    assert subject.pending_commit(openai_pushed) is None, "openai push must discharge"
 finally:
     os.unlink(unshipped)
     os.unlink(pushed)
     os.unlink(pr_opened)
     os.unlink(multiline_unshipped)
     os.unlink(multiline_pushed)
+    os.unlink(antigravity_unshipped)
+    os.unlink(antigravity_pushed)
+    os.unlink(antigravity_text)
+    os.unlink(openai_unshipped)
+    os.unlink(openai_pushed)
     os.unlink(malformed_path)
     os.unlink(text_path)
     os.unlink(quoted_example)
@@ -296,3 +350,4 @@ print("PASS: WRITER and REDIRECT are scoped to the segment that owns the heredoc
 print("PASS: a <<< herestring is not mistaken for a heredoc")
 print("PASS: commit-tree and commit-graph are not commits, while a plain commit still arms")
 print("PASS: an env-prefixed push discharges; an env-prefixed commit still arms")
+print("PASS: Antigravity and OpenAI/Codex transcript records are recognized")

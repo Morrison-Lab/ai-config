@@ -530,11 +530,34 @@ def transcript_derivations(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
-                continue
+            blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+            if isinstance(blocks, str):
+                blocks = [{"type": "text", "text": blocks}]
+            elif not isinstance(blocks, list):
+                blocks = []
+            else:
+                blocks = list(blocks)
 
-            if m.get("type") == "assistant":
+            if "tool_calls" in m and isinstance(m["tool_calls"], list):
+                for tc in m["tool_calls"]:
+                    if isinstance(tc, dict):
+                        tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                        targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        if isinstance(targs, str):
+                            try:
+                                targs = json.loads(targs)
+                            except Exception:
+                                targs = {"command": targs}
+                        tid = tc.get("id") or str(id(tc))
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tid,
+                            "name": tname,
+                            "input": targs if isinstance(targs, dict) else {},
+                        })
+
+            is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant" or m.get("source") == "MODEL" or m.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
+            if is_assistant:
                 if m.get("isSidechain"):
                     continue
                 for b in blocks:
@@ -543,15 +566,17 @@ def transcript_derivations(path):
                     inp = b.get("input") or {}
                     if not isinstance(inp, dict):
                         continue
-                    if b.get("name") == "Bash":
-                        pending[b.get("id")] = str(inp.get("command", ""))
-                    elif b.get("name") in ("Read", "Grep", "Glob"):
+                    bname = b.get("name") or ""
+                    if bname in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+                        cmd_str = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+                        pending[b.get("id")] = cmd_str
+                    elif bname in ("Read", "Grep", "Glob", "view_file", "read_file", "grep_search", "find_by_name"):
                         # A Read shows the file; it never yields a count.
-                        blob = str(inp.get("file_path") or inp.get("path") or "")
+                        blob = str(inp.get("file_path") or inp.get("path") or inp.get("AbsolutePath") or inp.get("SearchPath") or "")
                         for pm in PATH_IN_CMD.finditer(blob):
                             any_p.add(key_for(pm.group(1)))
 
-            elif m.get("type") == "user":
+            elif m.get("type") == "user" or m.get("source") == "USER_EXPLICIT":
                 for b in blocks:
                     if not isinstance(b, dict) or b.get("type") != "tool_result":
                         continue
@@ -621,10 +646,14 @@ def evaluate(prompt, tpath=""):
 # The payload field carrying the brief, per tool.
 #
 # `Agent`/`Task` put it in `prompt`; `SendMessage` puts it in `message`.
-# Deriving this from each tool's own schema rather than assuming a shared name
-# is the point -- assuming `prompt` here would have silently covered nothing,
-# which is the failure this table exists to end.
-BRIEF_TOOLS = {"Agent": "prompt", "Task": "prompt", "SendMessage": "message"}
+# Antigravity uses `invoke_subagent` (Prompt) and `send_message` (Message).
+BRIEF_TOOLS = {
+    "Agent": "prompt",
+    "Task": "prompt",
+    "SendMessage": "message",
+    "invoke_subagent": "Prompt",
+    "send_message": "Message",
+}
 
 
 def main() -> int:
@@ -641,13 +670,23 @@ def main() -> int:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    prompt = tool_input.get(BRIEF_TOOLS[tool_name])
-    # `SendMessage`'s `message` is a union: plain text, or a protocol dict
-    # (`shutdown_request` and friends). A dict carries no brief, so the
-    # isinstance check is the gate rather than a formality -- without it a
-    # protocol message would reach `evaluate` as a stringified dict.
-    if not isinstance(prompt, str) or not prompt.strip():
+
+    prompts = []
+    if tool_name == "invoke_subagent" and isinstance(tool_input.get("Subagents"), list):
+        for sa in tool_input["Subagents"]:
+            if isinstance(sa, dict) and isinstance(sa.get("Prompt"), str):
+                prompts.append(sa["Prompt"])
+    else:
+        field = BRIEF_TOOLS[tool_name]
+        p = tool_input.get(field) or tool_input.get(field.lower()) or tool_input.get(field.capitalize())
+        if isinstance(p, str):
+            prompts.append(p)
+
+    prompts = [p for p in prompts if p.strip()]
+    if not prompts:
         return 0
+
+    prompt = "\n\n".join(prompts)
 
     try:
         tpath = payload.get("transcript_path") or ""

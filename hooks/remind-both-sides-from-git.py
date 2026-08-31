@@ -318,15 +318,15 @@ def tool_blob(name, inp):
     """
     if not isinstance(inp, dict):
         return ""
-    if name == "Bash":
-        return str(inp.get("command", ""))
-    if name in ("Write", "Edit", "NotebookEdit"):
+    if name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        return str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or "")
+    if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
         return " ".join(
             str(inp.get(k, ""))
-            for k in ("file_path", "content", "new_string", "new_source")
+            for k in ("file_path", "path", "TargetFile", "target_file", "filePath", "content", "new_string", "new_source", "CodeContent", "ReplacementContent")
         )
-    if name in ("Task", "Agent"):
-        return str(inp.get("prompt", "")) + " " + str(inp.get("description", ""))
+    if name in ("Task", "Agent", "invoke_subagent"):
+        return str(inp.get("prompt") or inp.get("Prompt") or "") + " " + str(inp.get("description") or "")
     try:
         return json.dumps(inp)
     except Exception:
@@ -354,15 +354,27 @@ def scan(transcript):
     extractions, blobs = [], []
 
     for i, m in enumerate(records(transcript)):
-        if m.get("type") != "assistant":
-            continue
-        content = (m.get("message") or {}).get("content") or []
-        if not isinstance(content, list):
-            continue
-        for b in content:
-            if not isinstance(b, dict) or b.get("type") != "tool_use":
-                continue
-            blob = tool_blob(b.get("name") or "", b.get("input") or {})
+        tool_calls = []
+        if m.get("type") == "assistant" or m.get("role") == "assistant":
+            content = (m.get("message") or {}).get("content") or m.get("content") or []
+            if isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "tool_use":
+                        tool_calls.append((b.get("name") or "", b.get("input") or {}))
+        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+        for name, inp in tool_calls:
+            blob = tool_blob(name, inp)
             if not blob:
                 continue
             blobs.append((i, blob))

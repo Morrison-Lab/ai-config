@@ -16,7 +16,7 @@ import tempfile
 import time
 
 OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|schedule", re.I)
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
@@ -36,12 +36,26 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        if record.get("type") != "assistant":
-            continue
-        for block in (record.get("message") or {}).get("content") or []:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
+        tool_calls = []
+        if record.get("type") == "assistant" or record.get("role") == "assistant":
+            blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+            if isinstance(blocks, list):
+                for block in blocks:
+                    if isinstance(block, dict) and block.get("type") == "tool_use":
+                        tool_calls.append((block.get("name") or "", block.get("input") or {}))
+        if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+            for tc in record.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except Exception:
+                            args = {"command": args}
+                    tool_calls.append((name, args if isinstance(args, dict) else {}))
+        for name, inp in tool_calls:
+            blob = name + " " + json.dumps(inp)
             if OPEN.search(blob):
                 opened, armed = True, False
             if opened and SCHEDULE.search(blob):
@@ -70,6 +84,29 @@ def extract_pr_urls(path):
             content_items.extend(record["message"]["content"])
         elif isinstance(record.get("message"), list):
             content_items.extend(record["message"])
+
+        # Antigravity tool calls
+        if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+            for tc in record.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
+                    if OPEN.search(blob):
+                        pending_open = True
+                        for match in PR_URL.finditer(blob):
+                            u = match.group(0)
+                            if u not in urls:
+                                urls.append(u)
+
+        # Antigravity tool result or generic output text
+        if pending_open and (record.get("source") in {"MODEL", "SYSTEM"} or record.get("type") in {"GENERIC", "USER_INPUT"}):
+            raw_content = record.get("content")
+            if isinstance(raw_content, str):
+                for match in PR_URL.finditer(raw_content):
+                    u = match.group(0)
+                    if u not in urls:
+                        urls.append(u)
+                if not record.get("tool_calls"):
+                    pending_open = False
 
         for block in content_items:
             if not isinstance(block, dict):

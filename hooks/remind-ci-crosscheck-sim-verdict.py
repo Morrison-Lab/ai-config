@@ -265,36 +265,62 @@ def scan(path):
         # A subagent's own turns are not my outgoing message.
         if m.get("isSidechain"):
             continue
-        if m.get("type") != "assistant":
-            continue
-        blocks = (m.get("message") or {}).get("content") or []
-        if not isinstance(blocks, list):
-            continue
 
-        for b in blocks:
-            if not isinstance(b, dict):
+        tool_calls = []
+        text_blocks = []
+
+        is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, list):
+            for b in blocks:
+                if isinstance(b, dict):
+                    if b.get("type") == "tool_use":
+                        tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                    elif b.get("type") == "text" and is_assistant:
+                        text_blocks.append(b.get("text") or "")
+        elif isinstance(blocks, str) and is_assistant:
+            text_blocks.append(blocks)
+
+        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            content = m.get("content")
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text_blocks.append(b.get("text") or "")
+                    elif isinstance(b, str):
+                        text_blocks.append(b)
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+        for name, inp in tool_calls:
+            if name not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                 continue
+            if not isinstance(inp, dict):
+                continue
+            cmd_str = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+            is_local, is_ci = classify(cmd_str)
+            if is_local:
+                local_at = i
+            if is_ci:
+                ci_at = i
 
-            if b.get("type") == "text":
-                # Only a claim that FOLLOWS a local run is this hook's business.
-                if local_at < 0:
-                    continue
-                hit = VERDICT_CLAIM.search(visible_prose(b.get("text", "")))
-                if hit:
-                    claim_txt, claim_at = hit.group(0).strip(), i
-                    claim_local, claim_ci = local_at, ci_at
-
-            elif b.get("type") == "tool_use":
-                if (b.get("name") or "") != "Bash":
-                    continue
-                inp = b.get("input") or {}
-                if not isinstance(inp, dict):
-                    continue
-                is_local, is_ci = classify(str(inp.get("command", "")))
-                if is_local:
-                    local_at = i
-                if is_ci:
-                    ci_at = i
+        for raw_text in text_blocks:
+            if local_at < 0:
+                continue
+            hit = VERDICT_CLAIM.search(visible_prose(raw_text))
+            if hit:
+                claim_txt, claim_at = hit.group(0).strip(), i
+                claim_local, claim_ci = local_at, ci_at
 
     return claim_txt, claim_at, claim_local, claim_ci
 

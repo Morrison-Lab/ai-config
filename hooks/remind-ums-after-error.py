@@ -199,40 +199,64 @@ def scan(path):
         # inlined into the parent transcript again as they once were.
         if m.get("isSidechain"):
             continue
-        if m.get("type") != "assistant":
-            continue
-        blocks = (m.get("message") or {}).get("content") or []
-        if not isinstance(blocks, list):
-            continue
+        tool_calls = []
+        text_blocks = []
 
-        for b in blocks:
-            if not isinstance(b, dict):
+        is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
+        blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if isinstance(blocks, list):
+            for b in blocks:
+                if isinstance(b, dict):
+                    if b.get("type") == "tool_use":
+                        tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                    elif b.get("type") == "text" and is_assistant:
+                        text_blocks.append(b.get("text") or "")
+        elif isinstance(blocks, str) and is_assistant:
+            text_blocks.append(blocks)
+
+        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            content = m.get("content")
+            if isinstance(content, str):
+                text_blocks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        text_blocks.append(b.get("text") or "")
+                    elif isinstance(b, str):
+                        text_blocks.append(b)
+            for tc in m.get("tool_calls") or []:
+                if isinstance(tc, dict):
+                    tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                    targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                    if isinstance(targs, str):
+                        try:
+                            targs = json.loads(targs)
+                        except Exception:
+                            targs = {"command": targs}
+                    tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+        for raw_text in text_blocks:
+            hit = ADMISSION.search(visible_prose(raw_text))
+            if hit:
+                admit_txt, admit_at = hit.group(0).strip(), i
+
+        for name, inp in tool_calls:
+            if not isinstance(inp, dict):
                 continue
-
-            if b.get("type") == "text":
-                hit = ADMISSION.search(visible_prose(b.get("text", "")))
-                if hit:
-                    admit_txt, admit_at = hit.group(0).strip(), i
-
-            elif b.get("type") == "tool_use":
-                name = b.get("name") or ""
-                inp = b.get("input") or {}
-                if not isinstance(inp, dict):
-                    continue
-                blob = ""
-                if name in ("Write", "Edit", "NotebookEdit"):
-                    blob = str(inp.get("file_path", ""))
-                    if UMS_PATH.search(blob):
-                        ums_at = i
-                    continue
-                if name in ("Task", "Agent"):
-                    blob = str(inp.get("prompt", "")) + str(inp.get("description", ""))
-                elif name == "Bash":
-                    blob = str(inp.get("command", ""))
-                elif name == "Skill":
-                    blob = str(inp.get("skill", ""))
-                if blob and UMS_WORD.search(blob):
+            blob = ""
+            if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
+                blob = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or inp.get("target_file") or "")
+                if UMS_PATH.search(blob):
                     ums_at = i
+                continue
+            if name in ("Task", "Agent", "invoke_subagent"):
+                blob = str(inp.get("prompt") or inp.get("Prompt") or "") + str(inp.get("description") or "")
+            elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+                blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+            elif name == "Skill":
+                blob = str(inp.get("skill", ""))
+            if blob and UMS_WORD.search(blob):
+                ums_at = i
 
     return admit_txt, admit_at, ums_at
 

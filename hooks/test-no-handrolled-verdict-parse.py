@@ -253,7 +253,7 @@ SAVED = "jq -r '.body|test(\"Ready for merge\")' /tmp/review-body.json"
 
 MUTANTS = [
     ("the Bash-only gate",
-     'if (payload.get("tool_name") or "") != "Bash":\n            return 0',
+     'if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):\n            return 0',
      'pass',
      None, [], False, True),
 

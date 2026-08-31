@@ -131,14 +131,28 @@ def pending_commit(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                if record.get("type") != "assistant":
-                    continue
-                for block in (record.get("message") or {}).get("content") or []:
-                    if not isinstance(block, dict) or block.get("type") != "tool_use":
+                tool_calls = []
+                if record.get("type") == "assistant" or record.get("role") == "assistant":
+                    blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+                    if isinstance(blocks, list):
+                        for block in blocks:
+                            if isinstance(block, dict) and block.get("type") == "tool_use":
+                                tool_calls.append((block.get("name") or "", block.get("input") or {}))
+                if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
+                    for tc in record.get("tool_calls") or []:
+                        if isinstance(tc, dict):
+                            name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                            args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                            if isinstance(args, str):
+                                try:
+                                    args = json.loads(args)
+                                except Exception:
+                                    args = {"command": args}
+                            tool_calls.append((name, args if isinstance(args, dict) else {}))
+                for name, inp in tool_calls:
+                    if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
                         continue
-                    if block.get("name") not in {"Bash", "bash", "run_command"}:
-                        continue
-                    command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
+                    command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
                         pending = command
@@ -161,15 +175,28 @@ def last_assistant_text(path):
                     record = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
                     continue
-                if record.get("type") != "assistant":
-                    continue
-                blocks = (record.get("message") or {}).get("content") or []
-                text = "".join(
-                    b.get("text", "") for b in blocks
-                    if isinstance(b, dict) and b.get("type") == "text"
-                )
-                if text.strip():
-                    last = text
+                if record.get("type") == "assistant" or record.get("role") == "assistant":
+                    blocks = (record.get("message") or {}).get("content") or record.get("content") or []
+                    if isinstance(blocks, list):
+                        text = "".join(
+                            b.get("text", "") for b in blocks
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if text.strip():
+                            last = text
+                    elif isinstance(blocks, str) and blocks.strip():
+                        last = blocks
+                if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL":
+                    content = record.get("content")
+                    if isinstance(content, str) and content.strip():
+                        last = content
+                    elif isinstance(content, list):
+                        text = "".join(
+                            (b.get("text", "") if isinstance(b, dict) else str(b))
+                            for b in content
+                        )
+                        if text.strip():
+                            last = text
     except Exception:
         return ""
     return last

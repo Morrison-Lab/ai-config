@@ -93,6 +93,9 @@ MAPPINGS_PATH = os.path.join(ROOT, "tool-mappings.yml")
 WRITE_TOOLS = frozenset({
     "Write", "Edit", "NotebookEdit",
     "StrReplace", "EditNotebook",  # Cursor names, if the adapter is skipped
+    "write_to_file", "replace_file_content", "write", "edit", "multiedit",
+    "notebookedit", "create", "update", "str_replace_editor", "apply_patch",
+    "edit_file", "strreplace", "create_file",
 })
 
 # Latest user-prose issue reference, in this order.
@@ -357,19 +360,39 @@ def issue_label(issue):
 
 def _content_blocks(entry):
     message = entry.get("message")
-    if not isinstance(message, dict):
-        return []
-    content = message.get("content")
+    content = message.get("content") if isinstance(message, dict) else entry.get("content")
+    blocks = []
     if isinstance(content, str):
-        return [{"type": "text", "text": content}]
-    if isinstance(content, list):
-        return [block for block in content if isinstance(block, dict)]
-    return []
+        blocks.append({"type": "text", "text": content})
+    elif isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                blocks.append(block)
+            elif isinstance(block, str):
+                blocks.append({"type": "text", "text": block})
+    if "tool_calls" in entry and isinstance(entry["tool_calls"], list):
+        for tc in entry["tool_calls"]:
+            if isinstance(tc, dict):
+                tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                if isinstance(targs, str):
+                    try:
+                        targs = json.loads(targs)
+                    except Exception:
+                        targs = {"command": targs}
+                tid = tc.get("id") or str(id(tc))
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tid,
+                    "name": tname,
+                    "input": targs if isinstance(targs, dict) else {},
+                })
+    return blocks
 
 
 def is_user_prose(entry):
-    kind = entry.get("type") or entry.get("role")
-    if kind != "user":
+    kind = entry.get("type") or entry.get("role") or entry.get("source")
+    if kind not in ("user", "USER_EXPLICIT", "USER_INPUT"):
         return False
     blocks = _content_blocks(entry)
     if not blocks:

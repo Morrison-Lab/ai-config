@@ -197,7 +197,7 @@ print(f"\n{total - wrong}/{total} correct"
 MUTATIONS = {
     "C1": (
         "the tool is Bash",
-        [('    if payload.get("tool_name") != "Bash":\n        return None',
+        [('    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):\n        return None',
           '    if False:\n        return None')],
         {"S10"},
     ),

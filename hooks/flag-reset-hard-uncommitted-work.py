@@ -346,10 +346,11 @@ def main() -> int:
               f"({exc})", file=sys.stderr)
         return 0
 
-    if payload.get("tool_name") != "Bash":
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
-    command = (payload.get("tool_input") or {}).get("command")
+    inp = payload.get("tool_input") or {}
+    command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script")
     if not isinstance(command, str) or not command.strip():
         return 0
 

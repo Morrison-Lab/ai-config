@@ -851,7 +851,7 @@ def main():
               file=sys.stderr)
         return 0
 
-    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
     tool_input = payload.get("tool_input")

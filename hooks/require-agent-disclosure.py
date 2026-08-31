@@ -810,8 +810,9 @@ def main() -> int:
     tool_input = payload.get("tool_input") or {}
     if not isinstance(tool_input, dict):
         return 0
-    if tool_name == "Bash":
-        reason = verdict_bash(tool_input.get("command") or "")
+    if tool_name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
+        cmd_str = tool_input.get("command") or tool_input.get("CommandLine") or tool_input.get("cmd") or tool_input.get("script") or ""
+        reason = verdict_bash(cmd_str)
     else:
         reason = verdict_mcp(tool_name, tool_input)
     if not reason:

@@ -77,6 +77,24 @@ CASES = [
         "standard completion report does not block",
     ),
     ([TOOL], False, "turn with no text does not block"),
+
+    # Antigravity format cases
+    (
+        [
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "git status"}}]},
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Want me to file an issue for this?"}
+        ],
+        True,
+        "antigravity format offer blocks",
+    ),
+    (
+        [
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "git status"}}]},
+            {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Filed as [#1948](https://github.com/Morrison-Lab/ai-config/issues/1948)."}
+        ],
+        False,
+        "antigravity format non-offer does not block",
+    ),
 ]
 
 

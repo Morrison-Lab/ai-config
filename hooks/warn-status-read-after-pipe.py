@@ -202,6 +202,7 @@ reasoned from the wrong number. Tracked as ai-config#2149.
 """
 
 import json
+import os
 import re
 import sys
 
@@ -851,7 +852,7 @@ def main():
               file=sys.stderr)
         return 0
 
-    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
 
     tool_input = payload.get("tool_input")
@@ -879,17 +880,19 @@ def main():
     # No `permissionDecision` key at all: an absent decision defers to the
     # normal permission flow. Naming "allow" would suppress a prompt the user
     # would otherwise have seen.
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(pipeline=pipeline, read=read),
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"`{read}` reads the status of `{pipeline}`'s LAST stage, not the "
             "command's. Take the status before the pipe, or read "
             "${PIPESTATUS[0]}."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

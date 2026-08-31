@@ -89,6 +89,16 @@ CASES = [
      "no partial reading in play, so there is nothing to warn about"),
     ([PARTIAL, say("Merged and tidied up.")], False,
      "no clean declaration at all"),
+
+    # Antigravity format cases
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "gh pr checks 651 -R ucdavis/bcs"}}]},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "#651 is fully clean at a5f4f3f2."}
+    ], True, "antigravity format declared fully clean off gh pr checks blocks"),
+    ([
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"}}]},
+        {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "#651 is fully clean."}
+    ], False, "antigravity format with complete check allows"),
 ]
 
 

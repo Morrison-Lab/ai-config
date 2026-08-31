@@ -1092,6 +1092,21 @@ def _iter_blocks(record: dict):
     for b in blocks:
         if isinstance(b, dict):
             yield b
+    if "tool_calls" in record and isinstance(record["tool_calls"], list):
+        for tc in record["tool_calls"]:
+            if isinstance(tc, dict):
+                args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except Exception:
+                        args = {}
+                yield {
+                    "type": "tool_use",
+                    "id": tc.get("id") or str(id(tc)),
+                    "name": tc.get("name") or (tc.get("function") or {}).get("name") or "",
+                    "input": args if isinstance(args, dict) else {},
+                }
 
 
 def _blank_quoted_regions(text: str) -> tuple[str, bool]:
@@ -1230,13 +1245,17 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bo
                     if (b.get("name") or "").lower() not in AGENT_TOOLS:
                         continue
                     inp = b.get("input") or {}
-                    sub_type = str(
-                        inp.get("subagent_type")
-                        or inp.get("subagentType")
-                        or inp.get("agent_type")
-                        or ""
-                    )
-                    if ADVERSARIAL_AGENT_NAME.match(sub_type):
+                    sub_types = []
+                    for k in ("subagent_type", "subagentType", "agent_type", "TypeName", "name", "Role"):
+                        if inp.get(k):
+                            sub_types.append(str(inp.get(k)))
+                    if isinstance(inp.get("Subagents"), list):
+                        for sa in inp["Subagents"]:
+                            if isinstance(sa, dict):
+                                for k in ("TypeName", "Role", "name"):
+                                    if sa.get(k):
+                                        sub_types.append(str(sa.get(k)))
+                    if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
                         saw_reviewer_call = True
                         call_id = b.get("id")
                         if isinstance(call_id, str) and call_id:
@@ -1354,10 +1373,11 @@ def deny(reason: str) -> None:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        if (payload.get("tool_name") or "") != "Bash":
+        if (payload.get("tool_name") or "") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
             return 0
 
-        cmd = (payload.get("tool_input") or {}).get("command") or ""
+        inp = payload.get("tool_input") or {}
+        cmd = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
         if not cmd:
             return 0
 

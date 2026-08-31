@@ -120,24 +120,39 @@ def scan(path):
                 m = json.loads(line)
             except Exception:
                 continue
-            role = m.get("type")
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
-                continue
-            for b in blocks:
-                if not isinstance(b, dict):
-                    continue
-                if b.get("type") == "tool_use":
-                    # The harness tool names its verb only in `name`; a CLI
-                    # call carries it in the command string.
-                    blob = (b.get("name") or "") + " " + json.dumps(
-                        b.get("input") or {})
-                    if RX_FILE.search(blob):
-                        last_file = i
-                elif b.get("type") == "text" and role == "assistant":
-                    if b.get("text", "").strip():
-                        text = b["text"]
-                        last_say = i
+            role = m.get("type") or m.get("role")
+            blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+            
+            # Antigravity tool calls
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL" or "tool_calls" in m:
+                for tc in m.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
+                        if RX_FILE.search(blob):
+                            last_file = i
+
+            # Antigravity text content
+            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                raw_content = m.get("content")
+                if isinstance(raw_content, str) and raw_content.strip():
+                    text = raw_content
+                    last_say = i
+
+            if isinstance(blocks, list):
+                for b in blocks:
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "tool_use":
+                        blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
+                        if RX_FILE.search(blob):
+                            last_file = i
+                    elif b.get("type") == "text" and role == "assistant":
+                        if b.get("text", "").strip():
+                            text = b["text"]
+                            last_say = i
+            elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
+                text = blocks
+                last_say = i
     return last_file, last_say, text
 
 

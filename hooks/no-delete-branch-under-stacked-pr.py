@@ -100,6 +100,7 @@ cases --- the guard never blocks and never raises, because a `PreToolUse`
 hook that raises is an outage on a tidy-up flag.
 """
 import json
+import os
 import re
 import shlex
 import shutil
@@ -274,9 +275,10 @@ def main():
     except Exception:
         return 0
 
-    if payload.get("tool_name") != "Bash":
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         return 0
-    command = (payload.get("tool_input") or {}).get("command") or ""
+    inp = payload.get("tool_input") or {}
+    command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
     argvs = _simple_commands(command)
     if not argvs:
@@ -334,16 +336,18 @@ def main():
         f"    gh api -X DELETE repos/{repo}/git/refs/heads/{branch}\n\n"
         "This is a warning, not a refusal: proceed if you mean to."
     )
-    print(json.dumps({
+    out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": note,
         },
-        "systemMessage": (
+    }
+    if not os.environ.get("ANTIGRAVITY_AGENT"):
+        out["systemMessage"] = (
             f"--delete-branch may close {listed}, which "
             f"{'use' if plural else 'uses'} `{branch}` as a base."
-        ),
-    }))
+        )
+    print(json.dumps(out))
     return 0
 
 

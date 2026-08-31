@@ -108,7 +108,7 @@ ADMISSION = re.compile(
     # Omission admissions & flawed query/scan explanations (ai-config#2775).
     # Catching "my prior query missed it because...", "you are right ... missed",
     # and first-person query/scan filter flaws.
-    | \b(?:(?:my|our)(?:\s+(?:prior|previous|earlier|last))?|the\s+(?:prior|previous|earlier|last))\s+
+    | \b(?:my|our)\s+(?:(?:prior|previous|earlier|last)\s+)?
         (?:query|scan|check|search|attempt|pass|run|filter|script)\s+
         missed\s+(?!(?:nothing|none|zero|no)\b)
     | \b(?:you\s+are|you""" + _APOS + r"""re)\s+right\b[^\n]*?\b(?:i\s+(?:missed|overlooked)|(?:my|our)\s+\w+\s+missed)\b

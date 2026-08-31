@@ -64,7 +64,7 @@ explains the flaw in the filter,
 and transitions directly to fixing the code
 leaves the flawed query unrecorded.
 `hooks/remind-ums-after-error.py` catches this admission form
-(`(?:my|our|the) (?:prior|previous|earlier|last) (?:query|scan|check|search|attempt|pass|run|filter|script) missed`,
+(`(?:my|our) (?:prior|previous|earlier|last) (?:query|scan|check|search|attempt|pass|run|filter|script) missed`,
 `you are right ... missed`,
 and `filtered ... rather than`),
 ensuring the query failure mode is recorded

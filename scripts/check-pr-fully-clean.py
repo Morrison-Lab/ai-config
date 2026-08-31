@@ -951,25 +951,6 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # with citations, against 0.007s for origin/main. That is the same
     # trap _sentence_start_before's own two-pointer scan exists to
     # avoid, reintroduced at its other call site.
-    _sentence_starts = [0]
-    for _end in _SENTENCE_END.finditer(text):
-        _sentence_starts.append(_end.end())
-    # Paragraph ends and veto-word positions are likewise computed once.
-    # Slicing the tail per citation re-scans the rest of the body every
-    # time, which is quadratic in a body packed with them: 400 citations
-    # took 1.26s and each doubling quadrupled it. Only the BACKWARD half
-    # had been fixed; widening the forward scan to the paragraph
-    # reintroduced the trap on the other side.
-    #
-    # Testing membership by bisect over precomputed positions preserves
-    # the semantics exactly, rather than approximating them with a
-    # per-paragraph flag: the regions searched are still the sentence
-    # before the citation, the attribution link, and the paragraph after
-    # it, with the aside itself still excluded so its own verdict text
-    # cannot self-veto.
-    _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
-    _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
-
     def _vocab_between(lo: int, hi: int) -> bool:
         if hi <= lo:
             return False
@@ -1023,6 +1004,33 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # before the fences are removed, so a "### Verdict" inside a code
     # block would otherwise license the strip -- and a review OF this
     # file quotes exactly that heading in a fence.
+    # Computed AFTER _SHA_CITATION.sub above, because that substitution
+    # replaces a variable-length match with one space and therefore
+    # SHIFTS every position after it. Building these against the raw
+    # argument left them describing a string that no longer existed, so
+    # a veto word sitting right beside a citation was looked for at the
+    # wrong offset and missed -- and missing the veto strips a live
+    # not-clean, the dangerous direction. Positions and text must come
+    # from the same revision of the string.
+    _sentence_starts = [0]
+    for _end in _SENTENCE_END.finditer(text):
+        _sentence_starts.append(_end.end())
+    # Paragraph ends and veto-word positions are likewise computed once.
+    # Slicing the tail per citation re-scans the rest of the body every
+    # time, which is quadratic in a body packed with them: 400 citations
+    # took 1.26s and each doubling quadrupled it. Only the BACKWARD half
+    # had been fixed; widening the forward scan to the paragraph
+    # reintroduced the trap on the other side.
+    #
+    # Testing membership by bisect over precomputed positions preserves
+    # the semantics exactly, rather than approximating them with a
+    # per-paragraph flag: the regions searched are still the sentence
+    # before the citation, the attribution link, and the paragraph after
+    # it, with the aside itself still excluded so its own verdict text
+    # cannot self-veto.
+    _paragraph_ends = [_p.start() for _p in re.finditer(r"\n[ \t]*\n", text)]
+    _vocab_at = [_v.start() for _v in _RERAISE_VOCAB.finditer(text)]
+
     _fence_free, _ = _strip_fences_with_mask(text, bytearray(len(text)))
     if _VERDICT_HEADING_RE.search(_fence_free):
         text = _POSTED_VERDICT_CITATION.sub(_strip_posted_aside, text)

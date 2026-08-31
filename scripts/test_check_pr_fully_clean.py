@@ -3362,6 +3362,28 @@ def main() -> int:
         "a body packed with citations scans linearly",
         _cite_verdict == "clean" and _cite_secs < 1,
     )
+    # Both citation kinds in one body. _SHA_CITATION.sub runs first and
+    # replaces a variable-length match with a single space, shifting
+    # every position after it -- so the veto's precomputed positions must
+    # be built from the post-substitution text. Built from the raw
+    # argument, they described a string that no longer existed, and the
+    # veto looked for "Still"/"remains unresolved" at the wrong offsets
+    # and missed them, stripping a live not-clean.
+    both_citations = (
+        "**Round 5 review**\n\n"
+        "**[Defect] Retry loop does not release the connection-pool lock "
+        "on timeout, so a stuck request starves every later request** "
+        "reviewed at `a1b2c3d4e5f6789012345678901234567890abcd` is now "
+        "Addressed.\n\n"
+        "Still, per [round 6's finding](https://x/pull/1#c-2) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), the "
+        "race condition in the retry loop remains unresolved.\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a sha citation before a posted citation does not shift the veto",
+        checker.classify_verdict(both_citations) == "not-clean",
+    )
     # A verdict heading inside a FENCE does not license the strip. The
     # gate runs before fences are removed, and a review of this file
     # quotes that heading in a code block.
@@ -3608,9 +3630,14 @@ def main() -> int:
     ) + _cap_suffix
     _cap_secs, _cap_verdict = best_of_three(
         checker.classify_verdict, _cap_body)
+    # 2s, not 5s: the quadratic this guards against measured 4.4-4.8s on
+    # this exact body, so a 5s bar caught it by 5-12% and would stop
+    # catching it on a faster machine. The linear implementation
+    # measures under 0.1s, so 2s still leaves more than an order of
+    # magnitude of headroom.
     check(
         "a max-length many-sentence body scans linearly and correctly",
-        _cap_verdict == "not-clean" and _cap_secs < 5,
+        _cap_verdict == "not-clean" and _cap_secs < 2,
     )
     # A faked sentence end was reintroduced twice by fixing one
     # whitespace shape and breaking another, so the shapes are swept

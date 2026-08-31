@@ -53,10 +53,13 @@ gh api repos/{owner}/{repo}/pulls/<N>/comments       # READ_PR_REVIEW_COMMENTS �
 
 ``` bash
 glab mr view <N> --comments                          # discussion notes
-glab api "projects/:id/merge_requests/<N>/discussions"   # inline threads
+glab api --paginate "projects/:id/merge_requests/<N>/notes?per_page=100"  # authoritative unresolved DiffNote sweep
+glab api "projects/:id/merge_requests/<N>/discussions"                    # thread identifiers for replies/resolution
 ```
 
 Bots often post the same finding twice — once inline and once in the summary comment. Collect the **union and dedupe** before numbering, so one issue doesn’t get two rows (or two conflicting dispositions). Then number 1..n; every number must end up with a row in the summary.
+
+Filter the paginated notes response for `.resolvable == true and .resolved == false`; GitLab can return unresolved `DiffNote`s there even when a discussion-level timestamp filter finds no recent unresolved thread. The Discussions endpoint still owns the reply and resolution actions once the note has been identified.
 
 A PR can also carry **more than one review surface from different reviewers**: an inline code-review bot, a separate *agent* post-step that posts its own top-level summary, and Copilot are each distinct. `gh pr view <N> --comments` returns every top-level comment, so disposition each reviewer’s findings — not just the inline review or the most recent comment. A whole review summary left un-dispositioned reads as ignored even when every inline thread was handled.
 

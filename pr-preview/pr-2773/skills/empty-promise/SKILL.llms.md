@@ -49,9 +49,9 @@ Claims that external systems will complete work later — *“GitHub Actions wil
 Inspect recent assistant turns in the conversation context or review transcript logs:
 
 ``` bash
-# Check recent transcript entries if accessible across harnesses
+# Check recent Claude transcript entries if accessible
 grep -E "going forward|from now on|I'll always|I will always|won't do that again|owed by me|I owe|still owe|an owed" \
-  ~/.claude/projects/*/*.jsonl ~/.gemini/antigravity/brain/*/.system_generated/logs/transcript*.jsonl 2>/dev/null | tail -n 20 || true
+  ~/.claude/projects/*/*.jsonl 2>/dev/null | tail -n 20 || true
 ```
 
 Scan for signal phrases: - **Rule modals**: `going forward`, `from now on`, `I will always`, `I'll always`, `I won't`, `won't do that again`, `in future sessions`, `next time I'll`. - **Debt language**: `owed by me`, `I owe`, `I still owe`, `an owed pass`, `debt is owed`. - **Unverified automation**: `CI will finish`, `bot will review`, `pipeline will run`.

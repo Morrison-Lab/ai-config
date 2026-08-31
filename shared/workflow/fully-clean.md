@@ -7,7 +7,9 @@ For a GitLab MR, establish the same criteria from GitLab's current-head pipeline
 It can be true while a reviewer has left resolvable findings open.
 Do not report a PR/MR fully clean, ready to merge, or merge it until the review thread sweep is also clear.
 
-- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/discussions` and confirm that every resolvable note with an actionable finding is resolved before reporting it fully clean.
+- **Do:** for a GitLab MR, page through `projects/<project>/merge_requests/<iid>/notes` and confirm that every resolvable, actionable `DiffNote` is resolved before reporting it fully clean.
+  The notes endpoint is authoritative because it can expose unresolved diff notes absent from a discussion-level sweep;
+  use `discussions` to resolve the thread after finding it.
 - **Do:** for a GitLab MR, obtain the current head SHA and page through every pipeline on that SHA;
   confirm each has completed successfully or was skipped.
 - **Do:** accept a GitLab review verdict as current-head evidence only when its body names that SHA or its diff discussion has `position.head_sha` equal to it;

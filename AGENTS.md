@@ -95,6 +95,16 @@ no reliable timer.
 A verified clean stopping point needs no timer because no work remains to resume.
 Do not substitute a promise to return for a mechanism that will actually fire.
 
+## Prefer optionality over removing functionality
+
+Never remove existing functionality entirely when you can add optionality instead.
+When changing default behavior, fixing an issue, or refactoring a workflow,
+do not delete an existing capability or code path outright if it served a legitimate purpose.
+Instead, make the improved behavior the default
+and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter,
+environment variable, or configuration toggle.
+See [`shared/principles/prefer-optionality-over-removal.md`](shared/principles/prefer-optionality-over-removal.md).
+
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its
@@ -197,6 +207,17 @@ In every session --- at session start, and again periodically during long sessio
    Ensure `bootstrap.sh` has run so the Gemini/Antigravity registration files (`skills.json` and `plugins.json`, which point at this checkout's `skills/` and staged `plugins/ai-config` paths) stay current.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
+## Remove redundant submodules when using native plugins
+
+When a repository configures ai-config (or any other tool) as a native plugin
+(via Claude Code, Cursor, Antigravity, or CI workflows), remove any redundant
+git submodule for that same tool (such as `.ai-config`).
+Native plugins provide direct integration, making redundant submodules
+unnecessary and prone to drift.
+De-initialize and remove the submodule, clean `.gitmodules`, remove legacy
+symlinks (such as `.claude/skills -> ../.ai-config/skills`), and update CI
+checkout settings.
+See [`shared/workflow/remove-redundant-plugin-submodules.md`](shared/workflow/remove-redundant-plugin-submodules.md).
 
 ## Verify changes before pushing
 

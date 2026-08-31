@@ -553,6 +553,115 @@ try:
     assert _fallback.endswith(subject.PUSH_REMEDY), _fallback
     assert "no later push or PR creation" in _fallback, _fallback
     assert subject.decide("", commit_and_push) == ""
+
+    # --- ai-config#2737: multi-worktree and branch-switch unshipped detection -
+    # A session commit made in another worktree (cross-checkout) or on a branch
+    # since checked out away was previously invisible to the single cwd check.
+    # decide() now inspects linked worktrees and switched local branches
+    # touched in the session, ignoring abandoned/unrelated worktrees and branches.
+    wt_root, wt_bare, wt_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+    )
+    wt2 = tempfile.mkdtemp()
+    wt_run(f"git worktree add -q -b feat2 {wt2} main")
+    wt_run("git push -q -u origin feat2", cwd=wt2)
+    wt_run(HOOK, cwd=wt2)
+
+    # An abandoned/leftover worktree from a prior session with unpushed commits
+    abandoned_wt = tempfile.mkdtemp()
+    wt_run(f"git worktree add -q -b abandoned {abandoned_wt} main")
+    wt_run("git commit --allow-empty -m abandoned_commit", cwd=abandoned_wt)
+
+    sw_root, sw_bare, sw_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b feat-sw",
+        "git push -q -u origin feat-sw",
+        HOOK,
+        "git checkout -q main",
+    )
+
+    sw_dropped_root, sw_dropped_bare, sw_dropped_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b feat-drop",
+        "git push -q -u origin feat-drop",
+        HOOK,
+        "git reset --hard HEAD~1",
+        "git checkout -q main",
+    )
+
+    # Repository with an old, unrelated local branch holding unpushed commits
+    unrelated_root, unrelated_bare, unrelated_run = gitrepo(
+        BASE,
+        "git remote add origin BARE",
+        "git push -q -u origin main",
+        "git checkout -q -b old-unrelated",
+        "git push -q -u origin old-unrelated",
+        HOOK,
+        "git checkout -q main",
+    )
+
+    wt2_transcript = transcript([f"git worktree add -b feat2 {wt2} main", f"git -C {wt2} commit -m hook"])
+    wt_clean_transcript = transcript(["git commit -m hook", "git push origin main"])
+    sw_transcript = transcript(["git checkout -b feat-sw", "git commit -m hook", "git checkout main"])
+    sw_dropped_transcript = transcript(["git checkout -b feat-drop", "git commit -m hook", "git checkout main"])
+    unrelated_pushed_transcript = transcript(["git commit -m hook", "git push origin main"])
+
+    try:
+        # Cross-checkout: payload cwd is clean, but linked worktree wt2 was touched and has unpushed commit.
+        _wt_reason = subject.decide(wt_root, wt2_transcript)
+        assert _wt_reason and "worktree" in _wt_reason and "feat2" in _wt_reason, _wt_reason
+        assert _wt_reason.startswith("1 commit(s) on worktree"), _wt_reason
+
+        # An abandoned worktree not touched in this session must not block.
+        assert subject.decide(wt_root, wt_clean_transcript) == "", \
+            "an abandoned worktree not touched in the session must not block"
+
+        # Pushing wt2 discharges the multi-worktree debt.
+        wt_run("git push -q origin feat2", cwd=wt2)
+        assert subject.decide(wt_root, wt2_transcript) == ""
+
+        # Branch switch: payload cwd is on clean main, but feat-sw was touched and has unpushed commits.
+        _sw_reason = subject.decide(sw_root, sw_transcript)
+        assert _sw_reason and "branch 'feat-sw'" in _sw_reason, _sw_reason
+        assert _sw_reason.startswith("1 commit(s) on branch 'feat-sw'"), _sw_reason
+
+        # Dropped commit on switched branch: clean.
+        assert subject.decide(sw_dropped_root, sw_dropped_transcript) == ""
+
+        # Old unrelated branch with unpushed commits is ignored if session never touched it.
+        assert subject.decide(unrelated_root, unrelated_pushed_transcript) == "", \
+            "an old unrelated branch must not block a session that never touched it"
+
+        # If current session has unpushed commits on HEAD, only HEAD is named, not the unrelated branch.
+        _head_reason = subject.decide(unrelated_root, commit_only)
+        assert "old-unrelated" not in _head_reason
+
+        # Nested subdirectory cwd inside worktree correctly blocks when unpushed.
+        wt_run(HOOK, cwd=wt_root)
+        subdir = os.path.join(wt_root, "nested", "sub")
+        os.makedirs(subdir, exist_ok=True)
+        assert subject.decide(subdir, commit_only) != "", "cwd in nested subdirectory inside worktree must be recognized as relevant"
+
+        # Touched ancestor directory (e.g. shared parent) must NOT falsely match an untouched sibling worktree.
+        parent_dir = os.path.dirname(wt2)
+        parent_transcript = transcript([f"cd {parent_dir}", "git commit -m hook", "git status"])
+        try:
+            assert subject.decide(wt_root, parent_transcript) != "", "wt_root unpushed should block"
+            assert "wt2" not in subject.decide(wt_root, parent_transcript), "untouched sibling wt2 must not match via parent dir"
+        finally:
+            os.unlink(parent_transcript)
+    finally:
+        for _p in (wt_root, wt_bare, wt2, abandoned_wt, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare,
+                   unrelated_root, unrelated_bare):
+            shutil.rmtree(_p, ignore_errors=True)
+        for _p in (wt2_transcript, wt_clean_transcript, sw_transcript, sw_dropped_transcript, unrelated_pushed_transcript):
+            os.unlink(_p)
 finally:
     for _root in (dropped_root, unpushed_root, pushed_root, no_upstream_root,
                   plain_push_root, scoped_root, behind_root, other,
@@ -568,3 +677,4 @@ print("PASS: the derived count names itself, and state outranks a transcript dis
 print("PASS: no-upstream falls back to the transcript, and staleness is not unshippedness")
 print("PASS: without a cwd the verdict falls back to the transcript scan")
 print("PASS: main() blocks on the payload cwd's state once, then the sentinel holds")
+print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")

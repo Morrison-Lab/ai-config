@@ -278,21 +278,21 @@ committed pass.
    `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the
    `post-merge` skill's own tidy step does this automatically).
 
-   **After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns
-   empty for an owner-qualified head — it only matches a bare branch name,
-   even when a matching PR genuinely exists (verified directly: `gh pr list
-   --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR
-   on that exact branch, while `gh pr list --head ums-pr635-lessons` found
-   it). Query the REST API instead, whose `head` filter does honor the
-   owner-qualified form:
+   **After every push in UMS, verify PR state for the current branch in the intended base repo.**
+   `gh pr list --head <owner>:<branch>` silently returns empty for an owner-qualified head ---
+   it only matches a bare branch name, even when a matching PR genuinely exists
+   (verified directly: `gh pr list --head <owner>:ums-pr635-lessons` returned `[]` against a real open PR on that exact branch,
+   while `gh pr list --head ums-pr635-lessons` found it).
+   Query the REST API instead, whose `head` filter does honor the owner-qualified form:
    `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'`
    (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`).
-   If no open PR exists and upstream is accessible, open it as a cross-fork
-   PR: prepare explicit title and body first, show the draft for approval
-   (per the "always show the draft before posting" rule in
-   `memories/preferences.md`), then create non-interactively -- bare
-   `gh pr create` without `--fill`/`--title`/`--body` prompts interactively
-   and can hang a headless session:
+   If no open PR exists and upstream is accessible,
+   open it as a cross-fork PR immediately with an explicit title and body.
+   Do not pause for draft approval:
+   UMS updates are the durable record of a completed learning,
+   and the PR supplies the reviewable handoff.
+   Bare `gh pr create` without `--fill`/`--title`/`--body` prompts interactively and can hang a headless session:
+
    ```bash
    gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef \
      -q .defaultBranchRef.name   # discover the base -- don't hard-code main
@@ -301,6 +301,7 @@ committed pass.
      --title "ums: <summary>" --body-file /tmp/ums-pr-body.md \
      --reviewer <reviewer>
    ```
+
    If upstream is not accessible in-session, push and explicitly hand off that
    upstream PR creation is still required.
 
@@ -308,24 +309,35 @@ committed pass.
    own): commit to *that* repo's own agent docs (`CLAUDE.md`,
    `.github/agents/*.md`, `.github/instructions/*.md`,
    `.github/copilot-instructions.md`, or checked-in `.claude/memories/`) via a branch + PR in
-   that repo — not ai-config. Discover its path the same way, `cd`-ing into
-   that repo's own checkout instead of the ai-config one, then follow the
-   same branch/commit/push/PR steps above, substituting that repo's own
-   default branch for every `main`/`origin main` reference above (don't
-   hard-code `main` -- a project routed here may default to `master` or
-   another name; discover it the same way: `gh repo view "<owner>/<repo>"
-   --json defaultBranchRef -q .defaultBranchRef.name`). If that repo has no
-   agent-doc infrastructure yet, write to its local Claude project memory
+   that repo --- not ai-config.
+   Discover its path the same way,
+   `cd`-ing into that repo's own checkout instead of the ai-config one,
+   then follow the same branch/commit/push/PR steps above,
+   substituting that repo's own default branch for every `main`/`origin main` reference above
+   (don't hard-code `main` --- a project routed here may default to `master` or another name;
+   discover it the same way:
+   `gh repo view "<owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name`).
+   If that repo has no agent-doc infrastructure yet,
+   write to its local Claude project memory
    (`~/.claude/projects/<project-path>/memory/`) as short-lived staging
-   only -- this is not a durable destination; hand off that the project
-   repo still needs agent-doc infrastructure added (via a PR) and the
-   staged memory migrated there. See the checklist item below.
+   only --- this is not a durable destination;
+   hand off that the project repo still needs agent-doc infrastructure added (via a PR)
+   and the staged memory migrated there.
+   See the checklist item below.
 
    **Operational checklist (run in order):**
+
    - [ ] **Preflight:** confirm branch + cleanliness (`git branch --show-current` / `git status --short`)
    - [ ] **Safe write form:** for any external post with markdown/backticks, use file-backed bodies (`--body-file` or `-F "body=@<file>"`), never inline double-quoted body strings
-   - [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` — not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
-   - [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command, check whichever CLI the failing command actually invoked (`which gh` or `which glab` — not always `gh`). If `gh` is unavailable in this session (expected in remote/web sessions), fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI — `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead of retrying. If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body; re-run using a file-backed body and re-check posted content
+   - [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` --- not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
+   - [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command,
+     check whichever CLI the failing command actually invoked (`which gh` or `which glab` --- not always `gh`).
+     If `gh` is unavailable in this session (expected in remote/web sessions),
+     fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI ---
+     `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback;
+     hand off or block instead of retrying.
+     If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body;
+     re-run using a file-backed body and re-check posted content
 
 5. **Report what was updated.** Provide a brief summary table:
 

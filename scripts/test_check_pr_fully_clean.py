@@ -2492,6 +2492,12 @@ def main() -> int:
               "- the fix was removed during a later rebase, bug is back\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings -- not fully resolved yet heading is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings -- not fully resolved yet\n\n"
+              "- **[Critical]** crash was fixed in commit abc1234.\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

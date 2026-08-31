@@ -1425,7 +1425,18 @@ _EXEMPT_FINDINGS_HEADING_RESOLVED = re.compile(
     r")"
 )
 _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
-    r"(?i)\b(?:unresolved|unaddressed|not\s+resolved|not\s+addressed|partially\s+resolved|partially\s+addressed|still\s+unresolved)\b"
+    r"(?i)\b(?:"
+    r"unresolved|unaddressed|unfixed|remaining|still|open|persisting"
+    r"|partially\s+(?:resolved|addressed|fixed|closed|cleared)?"
+    r"|partly\s+(?:resolved|addressed|fixed|closed|cleared)?"
+    r"|not\s+(?:fully\s+|completely\s+|entirely\s+|quite\s+|yet\s+)?(?:resolved|addressed|fixed|closed|cleared)?"
+    r"|never\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|hardly\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|scarcely\s+(?:resolved|addressed|fixed|closed|cleared)"
+    r"|without\s+(?:a\s+)?fix"
+    r"|yet\s+to\s+be\s+(?:resolved|addressed|fixed)"
+    r"|to\s+be\s+(?:resolved|addressed|fixed)"
+    r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
 _LINE_RESOLUTION_WORDS = re.compile(

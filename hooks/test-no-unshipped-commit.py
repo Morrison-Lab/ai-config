@@ -646,7 +646,7 @@ try:
         wt_run(HOOK, cwd=wt_root)
         wt_run(HOOK, cwd=wt2)
         _multi_reason = subject.decide(wt_root, wt2_transcript)
-        assert "HEAD" in _multi_reason and "worktree" in _multi_reason and "are not on upstream" in _multi_reason, _multi_reason
+        assert "HEAD" in _multi_reason and "worktree" in _multi_reason and "are not on its upstream" in _multi_reason, _multi_reason
     finally:
         for _p in (wt_root, wt_bare, wt2, abandoned_wt, sw_root, sw_bare, sw_dropped_root, sw_dropped_bare,
                    unrelated_root, unrelated_bare):

@@ -496,8 +496,8 @@ def decide(cwd, path):
                 if b_count is not None and b_count > 0:
                     unpushed_branches.append((branch, b_count))
 
-    if unpushed_wts or unpushed_branches:
-        if len(unpushed_wts) == 1 and not unpushed_branches:
+    if unpushed_wts or unpushed_branches or (pending and undefined_wts):
+        if len(unpushed_wts) == 1 and not unpushed_branches and not (pending and undefined_wts):
             wt, count = unpushed_wts[0]
             wt_real = os.path.realpath(wt["path"]) if os.path.exists(wt["path"]) else wt["path"]
             if wt_real == cwd_real:
@@ -505,9 +505,21 @@ def decide(cwd, path):
             else:
                 branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else " (detached HEAD)"
                 return f"{count} commit(s) on worktree '{wt['path']}'{branch_info} are not on its upstream. {PUSH_REMEDY}"
-        elif not unpushed_wts and len(unpushed_branches) == 1:
+        elif not unpushed_wts and len(unpushed_branches) == 1 and not (pending and undefined_wts):
             branch, count = unpushed_branches[0]
             return f"{count} commit(s) on branch '{branch}' are not on its upstream. {PUSH_REMEDY}"
+        elif not unpushed_wts and not unpushed_branches and len(undefined_wts) == 1:
+            wt = undefined_wts[0]
+            wt_real = os.path.realpath(wt["path"]) if os.path.exists(wt["path"]) else wt["path"]
+            if wt_real == cwd_real or len(worktrees) == 1:
+                return ("The unshipped count for this branch is undefined --- no "
+                        "upstream is set and unpushed commits cannot be verified. "
+                        "Set an upstream or push before ending the turn.")
+            else:
+                branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else ""
+                return (f"The unshipped count for worktree '{wt['path']}'{branch_info} is undefined --- no "
+                        "upstream is set and unpushed commits cannot be verified. "
+                        "Set an upstream or push before ending the turn.")
         else:
             items = []
             for wt, count in unpushed_wts:
@@ -517,10 +529,14 @@ def decide(cwd, path):
                 else:
                     branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else " (detached HEAD)"
                     loc = f"worktree '{wt['path']}'{branch_info}"
-                items.append(f"{count} commit(s) on {loc}")
+                items.append(f"{count} commit(s) on {loc} are not on its upstream")
             for branch, count in unpushed_branches:
-                items.append(f"{count} commit(s) on branch '{branch}'")
-            return f"{'; '.join(items)} are not on upstream. {PUSH_REMEDY}"
+                items.append(f"{count} commit(s) on branch '{branch}' are not on its upstream")
+            if pending:
+                for wt in undefined_wts:
+                    branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else ""
+                    items.append(f"worktree '{wt['path']}'{branch_info} has undefined unshipped count (no upstream set)")
+            return f"{'; '.join(items)}. {PUSH_REMEDY}"
 
     if not undefined_wts:
         return ""

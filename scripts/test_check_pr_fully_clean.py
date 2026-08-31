@@ -3158,10 +3158,12 @@ def main() -> int:
         checker.classify_verdict(unattributed_citation) == "not-clean",
     )
 
-    # The strip requires a positive attribution signal (a preceding markdown
-    # link or an "in response to" phrase), so the link-attributed narration
-    # from ai-config#2662 is stripped even though no resolution wording
-    # follows it.
+    # The strip requires a positive attribution signal, and a markdown
+    # link naming the round is the only one accepted -- an "in response
+    # to" phrase was once accepted in its place and was removed, because
+    # it matched any prose containing those words. So the link-attributed
+    # narration from ai-config#2662 is stripped even though no resolution
+    # wording follows it.
     linked_citation = (
         "This is the author's direct response to "
         "[round 6's finding](https://github.com/x/y/pull/1#issuecomment-2) "
@@ -3173,7 +3175,7 @@ def main() -> int:
         checker.classify_verdict(linked_citation) == "clean"
         and checker._unresolved_finding_pattern(linked_citation) is None,
     )
-    # Without a link or attribution phrase, the same parenthesized shape is
+    # Without a round-naming link, the same parenthesized shape is
     # NOT stripped -- an unattributed cited verdict may be a live one.
     bare_paren_citation = (
         "The finding (posted 2026-08-25T10:00:00Z, verdict "

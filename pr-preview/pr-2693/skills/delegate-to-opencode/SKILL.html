@@ -418,12 +418,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="a-third-destination-openrouter-for-models-neither-tier-carries">A third destination: OpenRouter, for models neither tier carries</h2>
 <p><code>opencode</code> reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter’s <strong>stealth</strong> previews — anonymized frontier models trialled under codenames, free while they last. <code>stealth/ox-alpha</code> (“Ox Alpha”, a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was the roster’s one entry on 2026-08-23.</p>
 <p>The provider is carried by the models.dev registry opencode resolves models from — stealth ids included — but it stays <strong>inactive until the config or the auth store references it</strong>, which is why a machine with no openrouter entry lists no <code>openrouter/*</code> ids at all. Any reference activates it: adding the entry below to the existing <code>provider</code> block of <code>opencode.jsonc</code> took this machine’s <code>opencode models</code> from zero <code>openrouter/*</code> ids to 360 — the full registry roster, including <code>stealth/ox-alpha</code> (which the registry already carried) and 359 ids the entry never named (measured 2026-08-23 on opencode 1.18.21). An empty <code>"openrouter": {}</code> therefore activates the same roster; a <code>models</code> entry earns its lines only by setting a display name, or by reaching an id the registry does not carry yet:</p>
-<pre class="jsonc"><code>// merged into the existing "provider" block of opencode.jsonc --- ensure commas separate provider entries and top-level properties
-"provider": {
-  "openrouter": {
-    "models": {
-      "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }
-    }
+<pre class="jsonc"><code>// Insert inside the existing "provider" object in ~/.config/opencode/opencode.jsonc
+// (add a comma after the preceding sibling entry):
+"openrouter": {
+  "models": {
+    "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }
   }
 }</code></pre>
 <p>The unauthenticated smoke test failed cleanly with <code>OpenRouter API key is missing</code> (same measurement). Auth is the <code>OPENROUTER_API_KEY</code> environment variable, and the key is the user’s to enter, never the agent’s. The interactive route is broken as of 1.18.21: <code>opencode auth login &lt;provider&gt;</code> failed with <code>Failed to load auth provider metadata ... fetch() URL is invalid</code> for every provider tried, with or without a config entry. Measured 2026-08-23, tracked in <a href="https://github.com/Morrison-Lab/ai-config/issues/2058">ai-config#2058</a> — so have the user set the env var (<code>setx OPENROUTER_API_KEY &lt;key&gt;</code> on Windows) instead. A rejected key answers <code>User not found</code>, and one measured cause (2026-08-23) is a paste that doubles the <code>sk-or-v1-</code> prefix — the shape check that catches the paste error without exposing the value is length, 82 characters against a real key’s 73 (<code>sk-or-v1-</code> is 9 characters plus 64 hex, matching OpenRouter’s current key format). The current stealth roster is one query, no key needed:</p>

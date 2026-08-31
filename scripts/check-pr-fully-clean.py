@@ -1446,13 +1446,22 @@ _LINE_UNRESOLVED_WORDS = re.compile(
     r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?)"
     r"|not\s+(?:resolved|addressed|fixed|closed|cleared|fully|completely|yet)"
     r"|(?:is|are|was|were|currently)\s+being\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
-    r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|yet\s+to)\s+be\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
+    r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|would|could|might|may|supposed\s+to|yet\s+to)\s+(?:have\s+been\s+|be\s+)?(?:fixed|resolved|addressed|closed|corrected|cleared)"
     r"|(?:fixed|resolved|addressed)\s+only\s+(?:in|for|on|partially)"
     r"|only\s+(?:fixed|resolved|addressed)\s+(?:in|for|on|partially)"
     r"|(?:later\s+|was\s+|since\s+)?reverted"
     r"|(?:in|for|via)\s+(?:a\s+)?(?:follow-?up|later|future|next|subsequent|separate)\s+(?:pr|commit|branch|release|issue|round)"
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
+)
+_PREFIX_DISQUALIFY_RE = re.compile(
+    r"(?i)\b(?:"
+    r"should|would|could|might|may|must|ought\s+to|needs?\s+to|supposed\s+to|yet\s+to"
+    r"|claims?|claiming|claimed|says?|saying|said|believes?|believed|thinks?|thought"
+    r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
+    r"|apparently|seemingly|presumably|unconfirmed|unverified|reported"
+    r"|if|unless|whether|had"
+    r")\b"
 )
 
 # A line that reads as a finding ITEM. Severity/class tags and Location
@@ -1482,6 +1491,11 @@ def _item_is_resolved(line: str) -> bool:
         return False
     res_match = _LINE_RESOLUTION_WORDS.search(line)
     if not res_match:
+        return False
+    before_res = line[:res_match.start()]
+    if _NEGATOR_RE.search(before_res):
+        return False
+    if _PREFIX_DISQUALIFY_RE.search(before_res):
         return False
     after_res = line[res_match.end():]
     if re.search(r"(?i)^[ \t]*(?:in|by|via)\s+(?!commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round)", after_res):

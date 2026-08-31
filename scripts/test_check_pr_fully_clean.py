@@ -2456,6 +2456,24 @@ def main() -> int:
               "- Suggestion: add type hints.\n\n"
               "### Verdict\nReady for merge\n")
           is None)
+    check("Findings (resolved) with modal-perfect 'should have been fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this should have been fixed already\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with conditional 'would have been fixed had...' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- this would have been fixed had the patch applied\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with attribution 'the author says this is fixed' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the author says this is fixed\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

@@ -309,10 +309,10 @@ committed pass.
    staged memory migrated there. See the checklist item below.
 
    **Operational checklist (run in order):**
-   - [ ] **Preflight:** confirm branch + cleanliness (`git branch --show-current` / `git status --short`)
-   - [ ] **Safe write form:** for any external post with markdown/backticks, use file-backed bodies (`--body-file` or `-F "body=@<file>"`), never inline double-quoted body strings
-   - [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` — not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
-   - [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command, check whichever CLI the failing command actually invoked (`which gh` or `which glab` — not always `gh`). If `gh` is unavailable in this session (expected in remote/web sessions), fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI — `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead of retrying. If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body; re-run using a file-backed body and re-check posted content
+- [ ] **Preflight:** confirm branch + cleanliness (`git branch --show-current` / `git status --short`)
+- [ ] **Safe write form:** for any external post with markdown/backticks, use file-backed bodies (`--body-file` or `-F "body=@<file>"`), never inline double-quoted body strings
+- [ ] **Postcondition:** after push, verify open PR exists in the intended base repo for the head owner/branch (`gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<branch>" -f "state=open" --jq '.[] | {number, url, state}'` --- not `gh pr list --head <owner>:<branch>`, which silently returns empty for an owner-qualified head)
+- [ ] **Recovery signature:** if shell logs `command not found` during a comment/create command, check whichever CLI the failing command actually invoked (`which gh` or `which glab` --- not always `gh`). If `gh` is unavailable in this session (expected in remote/web sessions), fall back to the MCP tool mapping in `tool-mappings.md` instead of retrying the CLI --- `tool-mappings.yml` has no `glab` operations, so a missing `glab` has no MCP fallback; hand off or block instead of retrying. If the CLI that failed *is* installed, the likely cause is backtick substitution mangling the body; re-run using a file-backed body and re-check posted content
 
 5. **Report what was updated.** Provide a brief summary table:
 

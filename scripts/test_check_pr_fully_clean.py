@@ -3114,13 +3114,27 @@ def main() -> int:
     )
 
     posted_verdict_citation = (
-        "This is in response to finding (posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
+        "This is in response to finding [round 3](https://x) "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
         "### Verdict\n**Ready for merge**"
     )
     check(
         "a posted timestamp verdict citation does not count as a finding or block clean verdict",
         checker.classify_verdict(posted_verdict_citation) == "clean"
         and checker._unresolved_finding_pattern(posted_verdict_citation) is None,
+    )
+    # ... and the SAME sentence without a round-naming link is kept. A
+    # bare "in response to" filler was accepted as attribution, which
+    # made any unrelated link or phrase into a licence to delete a live
+    # verdict.
+    unattributed_citation = (
+        "This is in response to finding "
+        "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**).\n\n"
+        "### Verdict\n**Ready for merge**"
+    )
+    check(
+        "a citation with no round-naming link is NOT stripped",
+        checker.classify_verdict(unattributed_citation) == "not-clean",
     )
 
     # The strip requires a positive attribution signal (a preceding markdown
@@ -3226,32 +3240,51 @@ def main() -> int:
             "the re-raise vocabulary covers '" + phrase + "'",
             checker.classify_verdict(vocab_reraise) == "not-clean",
         )
-    # The positive gate recognizes natural narration inflections, a
-    # semantic line break after the link tail, and an intervening
-    # parenthetical in the attribution filler.
+    # The gate recognizes the round-naming link in its several written
+    # forms, including a semantic line break after the link tail.
     for label, narration in (
-        ("'responds to'",
-         "This comment responds to round 6's review "
+        ("a possessive round reference",
+         "This comment responds to [round 6's review](https://x/pull/1#c-2) "
          "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
          "which has since been addressed."),
-        ("'replied to'",
-         "I replied to round 6's review "
-         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**) "
-         "with fixes for every item."),
+        ("a hyphenated round reference",
+         "I replied to [round-6 review](https://x/pull/1#c-2) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**)."),
         ("a line break after the link",
          "This is the author's direct response to\n"
          "[round 6's finding](https://x/pull/1#c-2)\n"
          "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**),\n"
          "per the ARD protocol."),
-        ("an intervening parenthetical",
-         "In response to round 6's review (comment 12345) "
-         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**), "
-         "all items are addressed."),
     ):
         body = narration + "\n\n### Verdict\n**Ready for merge**"
         check(
             "narration with " + label + " is stripped",
             checker.classify_verdict(body) == "clean",
+        )
+    # The adversarial direction for the same gate: a real citation with
+    # a live requirement riding behind it, and an unrelated link standing
+    # in for the attribution. Both classified clean while origin/main
+    # classified them not-clean, which is the fail-open this mechanism
+    # must never produce.
+    for label, live in (
+        ("a requirement clause after a real citation",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+         "which should be fixed before merge."),
+        ("a blocker clause after a real citation",
+         "In response to [round 2](https://x) "
+         "(posted 2026-08-25T10:00:00Z, verdict **Needs more work**) "
+         "which is a blocker."),
+        ("an unrelated link as the attribution",
+         "Confirmed this violates the style guide "
+         "[docs](https://example.com/guide) "
+         "(posted 2026-08-30T05:22:14Z, verdict **Needs more work**) "
+         "so please fix it before merging."),
+    ):
+        body = live + "\n\n### Verdict\n**Ready for merge**"
+        check(
+            "a live verdict behind " + label + " is NOT stripped",
+            checker.classify_verdict(body) == "not-clean",
         )
 
     # A LIVE verdict phrased with the same "posted <ts>, verdict **X**"

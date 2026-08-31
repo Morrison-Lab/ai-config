@@ -35,6 +35,7 @@ Exit codes:
 import argparse
 import json
 import re
+import bisect
 import subprocess
 import sys
 import unicodedata
@@ -892,43 +893,73 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # alone entirely: stripping a live not-clean is the dangerous
     # direction, and a veto list alone cannot enumerate every re-raise
     # phrasing.
+    # The link TEXT must name the cited round, and the aside must end
+    # the clause. Both are needed, and neither is cosmetic.
+    #
+    # Accepting any "](url)" made an unrelated link into an attribution
+    # signal, so "violates the style guide [docs](url) (posted ...,
+    # verdict **Needs more work**) so please fix it" was stripped. And
+    # accepting any following text let a live requirement ride behind a
+    # real citation -- "[round 2](url) (posted ...) which should be
+    # fixed before merge". Both classified clean while origin/main
+    # classified them not-clean, which is the fail-open this whole
+    # mechanism must not produce.
+    #
+    # So the shape is the machine-generated narration this exists for,
+    # and nothing wider: a link whose text says which round, the aside,
+    # then the end of the clause. Human prose falls outside it and is
+    # kept, which over-flags rather than merging over a live rejection.
     _POSTED_VERDICT_CITATION = re.compile(
-        r"(?P<keep>\]\([^()\s]{1,400}\)[ \t\n]*"
-        r"|\b(?:in\s+)?"
-        r"(?:respon(?:se|ds|ded|ding)|repl(?:y|ies|ied|ying))\s+to\s+"
-        r"(?:\([^()\n]{0,80}\)|[^.!?\n()]){0,80})"
+        r"(?P<keep>\[[^\]\n]{0,120}\bround[ \t]*[-#]?[ \t]*\d+"
+        r"[^\]\n]{0,120}\]\([^()\s]{1,400}\)[ \t\n]*)"
         r"\(posted\s+[0-9]{4}-[0-9]{2}-[0-9]{2}"
         r"T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?Z?"
-        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)",
+        r"\s*,\s*verdict\s+\*\*[^*\n]+\*\*\)"
+        r"(?=[,;.!?]|$)",
         re.IGNORECASE,
     )
-    # The veto runs in code over the citation's WHOLE containing sentence,
-    # in both directions -- a forward-only lookahead window missed "The
-    # finding remains unaddressed despite my response to it (posted ...)"
-    # and any re-raise past its length bound. Sentence bounds use the
-    # glued-dot rule: [.!?] ends a sentence only when whitespace or
-    # end-of-text follows, so "utils.py" and decimals do not truncate it.
-    # The matched aside itself is excluded from the scan (its own "verdict
-    # **Needs more work**" must not self-veto), while the kept attribution
-    # filler is included.
+    # The veto is the second gate, not the only one: it runs in code over
+    # the citation's WHOLE containing sentence, in both directions -- a
+    # forward-only lookahead window missed "The finding remains
+    # unaddressed despite my response to it (posted ...)" and any
+    # re-raise past its length bound. Sentence bounds use the glued-dot
+    # rule, so "utils.py" and decimals do not truncate the sentence. The
+    # matched aside itself is excluded from the scan (its own "verdict
+    # **Needs more work**" must not self-veto), while the kept
+    # attribution link text is included.
     _RERAISE_VOCAB = re.compile(
         r"\b(?:still|remain(?:s|ed)?|open|unaddressed|unresolved|unfixed"
         r"|outstanding|ignored|reopen(?:s|ed)?|recurs?|persists?|stands?"
-        r"|must\s+be|needs\s+to\s+be|appl(?:y|ies|ied)"
+        r"|must\s+be|needs?\s+to\s+be|should\s+be|has\s+to\s+be"
+        r"|blocks?|blocking|blocker|before\s+merg(?:e|ing)"
+        r"|appl(?:y|ies|ied)|valid"
         r"|(?:not|never)\s+(?:yet\s+)?(?:been\s+)?"
-        r"(?:fixed|resolved|addressed))\b",
+        r"(?:fixed|resolved|addressed|corrected))\b",
         re.IGNORECASE,
     )
     _SENTENCE_END = _SENTENCE_END_RE
 
+    # Sentence starts are computed ONCE for the whole body and then
+    # looked up per match. Recomputing them inside the callback rebuilds
+    # the entire prefix on every citation, which is quadratic in the
+    # body -- 6.8s on a comment at GitHub's 65536-character cap packed
+    # with citations, against 0.007s for origin/main. That is the same
+    # trap _sentence_start_before's own two-pointer scan exists to
+    # avoid, reintroduced at its other call site.
+    _sentence_starts = [0]
+    for _end in _SENTENCE_END.finditer(text):
+        _sentence_starts.append(_end.end())
+
     def _strip_posted_aside(m: "re.Match") -> str:
-        head = m.string[:m.start()]
+        sentence_start = _sentence_starts[
+            bisect.bisect_right(_sentence_starts, m.start()) - 1
+        ]
         tail = m.string[m.end():]
-        sentence_start = _sentence_start_before(head)
         forward = _SENTENCE_END.search(tail)
         sentence_tail = tail[:forward.end()] if forward else tail
         context = " ".join(
-            (head[sentence_start:], m.group("keep"), sentence_tail)
+            (m.string[sentence_start:m.start()], m.group("keep"),
+             sentence_tail)
         )
         if _RERAISE_VOCAB.search(context):
             return m.group(0)
@@ -1114,7 +1145,7 @@ def _sentence_start_before(text: str) -> int:
                 last_break = scanned
             elif text[scanned] == "/" or (
                 scanned + 4 <= token_end
-                and text.startswith("www.", scanned)
+                and text[scanned:scanned + 4].lower() == "www."
             ):
                 # The bound matters: startswith reads the global text, so
                 # without it a token ending in "www" glued to the
@@ -1155,45 +1186,36 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     # resolved only because the negator sits BEFORE the past-state marker,
     # outside the suffix scan.
     #
-    # Two narrower shapes were tried first and both failed OPEN, which is
-    # the dangerous direction here. A fixed glue whitelist ("of the ...")
-    # let a count or modifier through ("None of the TWO earlier ..."). A
-    # bounded run of bare words then let anything longer than the bound
-    # through ("None of the several very recently identified earlier
-    # ..."), and its premise -- that punctuation ends a negator's scope --
-    # is false when the punctuation sits INSIDE the negated noun phrase
-    # ("None of the many previously-identified, still-outstanding earlier
-    # ...").
-    #
-    # So the rule is the blunt one: ANY negator earlier in the same
-    # sentence defeats the exemption, with no attempt to judge what it
-    # quantifies.
-    #
     # Three narrower rules were tried and each failed OPEN, which is the
-    # dangerous direction, so this is a deliberate retreat rather than a
-    # first guess. Deciding whether a negator scopes over the resolution
-    # is a parsing problem, and every lexical proxy for it admitted a new
-    # shape: a glue whitelist let a count through ("None of the TWO
-    # earlier ..."), a bounded word run let a longer run and
-    # punctuation-inside-the-noun-phrase through ("None of the many
-    # previously-identified, still-outstanding earlier ..."), and testing
-    # the negator's apparent grammatical role let a governor word
-    # prepended to the target phrasing through ("WITH none of the
+    # dangerous direction, so the blunt rule below is a deliberate
+    # retreat rather than a first guess. Deciding whether a negator
+    # scopes over the resolution is a parsing problem, and every lexical
+    # proxy for it admitted a new shape: a glue whitelist let a count
+    # through ("None of the TWO earlier ..."), a bounded word run let a
+    # longer run through ("None of the several very recently identified
+    # earlier ...") and rested on the false premise that punctuation
+    # ends a negator's scope, which fails when the punctuation sits
+    # INSIDE the negated noun phrase ("None of the many
+    # previously-identified, still-outstanding earlier ..."), and
+    # testing the negator's apparent grammatical role let a governor
+    # word prepended to the target phrasing through ("WITH none of the
     # previously blocking findings were resolved"), including when a
-    # required clause boundary was also present but sat inside the
-    # negated noun phrase ("With none of the recently reported,
-    # previously blocking ...").
+    # required clause boundary was present but sat inside that same noun
+    # phrase.
     #
-    # What the blunt rule costs is one over-flag: a genuinely resolved
-    # narration whose sentence happens to open with an unrelated negated
-    # clause ("With no new issues, both round-2 blocking findings ... are
-    # resolved") stays blocking. That is a false NOT-clean, which stalls a
-    # merge until a human looks, whereas every rule above bought that case
-    # by risking a false clean, which merges over a live rejection. The
-    # asymmetry is this file's stated policy, so the trade is not close.
-    # A negator AFTER the mention is unaffected, so the common trailing
-    # form ("... are resolved, with no new issues introduced") still
-    # reads as resolved.
+    # So: ANY negator earlier in the same sentence defeats the
+    # exemption, with no attempt to judge what it quantifies.
+    #
+    # What that costs is one over-flag: a genuinely resolved narration
+    # whose sentence happens to open with an unrelated negated clause
+    # ("With no new issues, both round-2 blocking findings ... are
+    # resolved") stays blocking. That is a false NOT-clean, which stalls
+    # a merge until a human looks, whereas every rule above bought that
+    # case by risking a false clean, which merges over a live rejection.
+    # The asymmetry is this file's stated policy, so the trade is not
+    # close. A negator AFTER the mention is unaffected, so the common
+    # trailing form ("... are resolved, with no new issues introduced")
+    # still reads as resolved.
     sentence_start = _sentence_start_before(scan[:match.start()])
     if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
         return False

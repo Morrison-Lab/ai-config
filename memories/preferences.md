@@ -169,7 +169,8 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
-  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".)
+  Recurred 2026-08-23 --- the user answered "always yes --- remember that" to yet another offer-to-ask, and the grant is now encoded agent-universally in `AGENTS.md`'s "Default to action without asking".
+  Recurred 2026-08-30 on Lacaedemon/sparta: session prompted confirmation for code review and track cleanup rather than deciding directly; user corrected "/daytb; don't ask so many questions".)
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.

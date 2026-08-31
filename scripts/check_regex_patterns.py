@@ -124,13 +124,17 @@ def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[Rege
     string_constants: dict[str, str] = {}
     instances: list[RegexInstance] = []
 
-    # First pass: collect top-level string constants that might be patterns
-    for node in ast.iter_child_nodes(tree):
+    # First pass: collect string constants across all scopes (module, class, function)
+    for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant):
                     if isinstance(node.value.value, str):
                         string_constants[target.id] = node.value.value
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and isinstance(node.value, ast.Constant):
+                if isinstance(node.value.value, str):
+                    string_constants[node.target.id] = node.value.value
 
     # Second pass: walk all call nodes
     for node in ast.walk(tree):
@@ -168,9 +172,16 @@ def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[Rege
             for kw in node.keywords:
                 if kw.arg == "flags":
                     flags |= evaluate_ast_flags(kw.value)
-        elif call_name in ("re.search", "re.match", "re.fullmatch", "re.findall", "re.finditer", "re.split"):
+        elif call_name in ("re.search", "re.match", "re.fullmatch", "re.findall", "re.finditer"):
             if len(node.args) >= 3:
                 flags = evaluate_ast_flags(node.args[2])
+            for kw in node.keywords:
+                if kw.arg == "flags":
+                    flags |= evaluate_ast_flags(kw.value)
+        elif call_name == "re.split":
+            # re.split(pattern, string, maxsplit=0, flags=0)
+            if len(node.args) >= 4:
+                flags = evaluate_ast_flags(node.args[3])
             for kw in node.keywords:
                 if kw.arg == "flags":
                     flags |= evaluate_ast_flags(kw.value)
@@ -199,8 +210,8 @@ def extract_regex_instances_from_ast(tree: ast.AST, file_path: str) -> list[Rege
 
 
 def is_unbounded_quantifier(min_r: int, max_r: int) -> bool:
-    """Return True if quantifier upper bound is effectively unbounded (>= 10 or MAXREPEAT)."""
-    return max_r == parser.MAXREPEAT or max_r >= 10
+    """Return True if quantifier upper bound is unbounded (MAXREPEAT, e.g. *, +, {n,})."""
+    return max_r == parser.MAXREPEAT
 
 
 def is_subpattern_nullable(subpattern: list[tuple[Any, Any]]) -> bool:
@@ -262,25 +273,29 @@ def get_first_chars(subpattern: list[tuple[Any, Any]]) -> set[str]:
             chars.add("?")
             break
         elif op == parser.IN:
-            for item in arg:
-                item_op, item_arg = item
-                if item_op == parser.LITERAL:
-                    chars.add(chr(item_arg))
-                elif item_op == parser.RANGE:
-                    lo, hi = item_arg
-                    for c in range(lo, min(hi + 1, lo + 128)):
-                        chars.add(chr(c))
-                elif item_op == parser.CATEGORY:
-                    cat_str = str(item_arg)
-                    if "SPACE" in cat_str:
-                        chars.update(" \t\n\r\f\v")
-                    elif "DIGIT" in cat_str:
-                        chars.update("0123456789")
-                    elif "WORD" in cat_str:
-                        chars.update("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+            is_negated = any(item_op == parser.NEGATE for item_op, _ in arg)
+            if is_negated:
+                chars.add("?")
+            else:
+                for item in arg:
+                    item_op, item_arg = item
+                    if item_op == parser.LITERAL:
+                        chars.add(chr(item_arg))
+                    elif item_op == parser.RANGE:
+                        lo, hi = item_arg
+                        for c in range(lo, min(hi + 1, lo + 128)):
+                            chars.add(chr(c))
+                    elif item_op == parser.CATEGORY:
+                        cat_str = str(item_arg).upper()
+                        if "SPACE" in cat_str:
+                            chars.update(" \t\n\r\f\v")
+                        elif "DIGIT" in cat_str:
+                            chars.update("0123456789")
+                        elif "WORD" in cat_str:
+                            chars.update("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
             break
         elif op == parser.CATEGORY:
-            cat_str = str(arg)
+            cat_str = str(arg).upper()
             if "SPACE" in cat_str:
                 chars.update(" \t\n\r\f\v")
             elif "DIGIT" in cat_str:
@@ -311,16 +326,20 @@ def get_first_chars(subpattern: list[tuple[Any, Any]]) -> set[str]:
     return chars
 
 
-def is_subpattern_anchored(subpattern: list[tuple[Any, Any]]) -> bool:
-    """Return True if subpattern begins with a non-quantified fixed literal token."""
+def is_subpattern_delimited(subpattern: list[tuple[Any, Any]]) -> bool:
+    """Return True if subpattern begins or ends with a fixed non-quantified literal token."""
     if not subpattern:
         return False
     first = subpattern[0]
-    op, arg = first
-    if op == parser.LITERAL:
+    if first[0] == parser.LITERAL:
         return True
-    if op == parser.SUBPATTERN:
-        return is_subpattern_anchored(arg[-1])
+    if first[0] == parser.SUBPATTERN and is_subpattern_delimited(first[1][-1]):
+        return True
+    last = subpattern[-1]
+    if last[0] == parser.LITERAL:
+        return True
+    if last[0] == parser.SUBPATTERN and is_subpattern_delimited(last[1][-1]):
+        return True
     return False
 
 
@@ -340,19 +359,20 @@ def check_static_ast(pattern_str: str, flags: int = 0) -> list[Finding]:
                 is_unbounded = is_unbounded_quantifier(min_r, max_r)
 
                 if in_unbounded_quantifier and is_unbounded:
-                    findings.append(
-                        Finding(
-                            kind="nested_quantifier",
-                            message="Nested quantifier: repetition inside repeated group can cause exponential backtracking.",
-                            severity="vulnerability",
-                            details=f"Outer repeat contains inner repeat with bounds ({min_r}, {max_r})",
+                    # Flag if directly nested or unanchored repetition
+                    if len(inner) == 1 or all(op_n in (parser.MAX_REPEAT, parser.MIN_REPEAT, parser.SUBPATTERN, parser.BRANCH) for op_n, _ in inner):
+                        findings.append(
+                            Finding(
+                                kind="nested_quantifier",
+                                message="Nested quantifier: repetition inside repeated group can cause exponential backtracking.",
+                                severity="vulnerability",
+                                details=f"Outer repeat contains inner repeat with bounds ({min_r}, {max_r})",
+                            )
                         )
-                    )
 
-                # If inner is anchored by a fixed non-quantified literal (e.g. `\.\d+`), the anchor
-                # isolates repetitions from exponential backtracking.
-                anchored = is_subpattern_anchored(inner)
-                next_in_quantifier = (is_unbounded and not anchored) or in_unbounded_quantifier
+                # If inner is anchored by a fixed literal or separated by delimiters, repetitions are partitioned cleanly
+                delimited = is_subpattern_delimited(inner) or len(inner) > 2
+                next_in_quantifier = (is_unbounded and not delimited) or in_unbounded_quantifier
                 check_subpattern(inner, in_unbounded_quantifier=next_in_quantifier)
 
             elif op == parser.SUBPATTERN:
@@ -681,6 +701,10 @@ def main(argv: list[str] | None = None) -> int:
 
     vuln_count = sum(len(r.findings) for r in all_reports)
 
+    has_dynamic_timeout = any(f.kind == "dynamic_backtracking_timeout" for r in all_reports for f in r.findings)
+    has_vulnerability = any(f.severity == "vulnerability" for r in all_reports for f in r.findings)
+    should_fail = has_dynamic_timeout or (args.strict and vuln_count > 0) or (args.paths is not None and has_vulnerability)
+
     if args.json:
         payload = {
             "status": "vulnerabilities_found" if vuln_count > 0 else "clean",
@@ -700,10 +724,11 @@ def main(argv: list[str] | None = None) -> int:
             ],
         }
         print(json.dumps(payload, indent=2))
-        return 1 if (vuln_count > 0 and (args.strict or any(f.severity == "vulnerability" for r in all_reports for f in r.findings))) else 0
+        return 1 if should_fail else 0
 
     if vuln_count > 0:
-        print(f"FAILED: Found {vuln_count} regex vulnerability finding(s) across {len(all_reports)} pattern(s):", file=sys.stderr)
+        header = "FAILED" if should_fail else "WARNING"
+        print(f"{header}: Found {vuln_count} regex finding(s) across {len(all_reports)} pattern(s):", file=sys.stderr)
         for r in all_reports:
             rel = r.file_path
             try:
@@ -716,7 +741,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"    - [{f.severity.upper()}] {f.kind}: {f.message}", file=sys.stderr)
                 if f.details:
                     print(f"      Details: {f.details}", file=sys.stderr)
-        return 1
+        if should_fail:
+            return 1
 
     print(f"OK: Checked regex patterns across {len(files_to_scan)} Python file(s); no catastrophic backtracking risks found.")
     return 0

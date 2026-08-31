@@ -161,14 +161,18 @@ def test_synthetic_files() -> None:
             'import re\n'
             'RX_VALID = re.compile(r"^[a-zA-Z0-9_-]+$")\n'
             'def match_it(text):\n'
-            '    return re.search(r"\\bhello\\s+world\\b", text, flags=re.I)\n',
+            '    local_pat = r"\\bhello\\s+world\\b"\n'
+            '    parts = re.split(r"\\s+", text, 1, re.IGNORECASE)\n'
+            '    return re.search(local_pat, text, flags=re.I)\n',
             encoding="utf-8",
         )
 
         vuln_file = tmp_path / "vuln.py"
         vuln_file.write_text(
             'import re\n'
-            'RX_BAD = re.compile(r"(a+)+")\n',
+            'def bad():\n'
+            '    local_vuln = r"(a+)+"\n'
+            '    return re.search(local_vuln, "text")\n',
             encoding="utf-8",
         )
 
@@ -188,10 +192,10 @@ def test_synthetic_files() -> None:
             f"out={out!r}",
         )
 
-        # Test vulnerable file
+        # Test vulnerable file with scoped pattern
         rc, out, err = run_script(["--paths", str(vuln_file)])
         check(
-            "vulnerable file exits 1",
+            "vulnerable file with scoped pattern exits 1",
             rc == 1 and "FAILED: Found" in err,
             f"rc={rc} out={out!r} err={err!r}",
         )

@@ -714,7 +714,6 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         "dto": (run_opencode_review, "OpenCode"),
         "opencode-claude": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "anthropic/claude-3.7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via OpenCode"),
         "opencode-zen": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "zen/free", expected_commit_sha=expected_commit_sha), "OpenCode Zen"),
-        "ollama": (lambda p, model="", expected_commit_sha="": run_opencode_review(p, model=model or "ollama/deepseek-r1:latest", expected_commit_sha=expected_commit_sha), "Local Ollama"),
         "antigravity": (run_antigravity_review, "Google Antigravity"),
         "agy": (run_antigravity_review, "Google Antigravity"),
         "agy-claude": (lambda p, model="", expected_commit_sha="": run_antigravity_review(p, model=model or "claude-3-7-sonnet", expected_commit_sha=expected_commit_sha), "Claude via Antigravity"),
@@ -943,7 +942,7 @@ def main():
         "--engine",
         choices=[
             "auto", "alternate", "round-robin", "claude", "cursor", "codex", "dtc",
-            "opencode", "dto", "opencode-claude", "opencode-zen", "ollama",
+            "opencode", "dto", "opencode-claude", "opencode-zen",
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",

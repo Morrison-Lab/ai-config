@@ -2474,6 +2474,24 @@ def main() -> int:
               "- the author says this is fixed\n\n"
               "### Verdict\nReady for merge\n")
           is not None)
+    check("Findings (resolved) with contrasting clause 'was fixed, though...' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- was fixed, though the underlying design flaw remains\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'vulnerable PR was closed without a fix' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the vulnerable PR was closed without a fix; bug remains in main\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
+    check("Findings (resolved) with 'fix was removed during a later rebase' is NOT swallowed (#2781 regression)",
+          checker._unresolved_finding_pattern(
+              "### Findings (resolved)\n\n"
+              "- the fix was removed during a later rebase, bug is back\n\n"
+              "### Verdict\nReady for merge\n")
+          is not None)
 
     # --- ai-config#2402: a structured non-bot clean supersedes that same
     # identity's earlier not-clean, and never counts toward quorum. ---------

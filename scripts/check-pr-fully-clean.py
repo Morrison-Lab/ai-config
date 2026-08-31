@@ -1443,7 +1443,7 @@ _LINE_RESOLUTION_WORDS = re.compile(
 _LINE_UNRESOLVED_WORDS = re.compile(
     r"(?i)\b(?:"
     r"unresolved|unaddressed|partially\s+(?:resolved|addressed|fixed)"
-    r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?)"
+    r"|still\s+(?:unresolved|broken|present|failing|reproducible|open|leaks?|crashes?|fails?|in\s+main|remains)"
     r"|not\s+(?:resolved|addressed|fixed|closed|cleared|fully|completely|yet)"
     r"|(?:is|are|was|were|currently)\s+being\s+(?:fixed|resolved|addressed|closed|corrected|cleared)"
     r"|(?:must|needs?\s+to|should|ought\s+to|has\s+to|remains?\s+to|will|would|could|might|may|supposed\s+to|yet\s+to)\s+(?:have\s+been\s+|be\s+)?(?:fixed|resolved|addressed|closed|corrected|cleared)"
@@ -1451,6 +1451,8 @@ _LINE_UNRESOLVED_WORDS = re.compile(
     r"|only\s+(?:fixed|resolved|addressed)\s+(?:in|for|on|partially)"
     r"|(?:later\s+|was\s+|since\s+)?reverted"
     r"|(?:in|for|via)\s+(?:a\s+)?(?:follow-?up|later|future|next|subsequent|separate)\s+(?:pr|commit|branch|release|issue|round)"
+    r"|remains?\b|is\s+back\b|comes\s+back\b|persists?\b"
+    r"|without\s+(?:a\s+)?fix\b"
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
@@ -1460,8 +1462,24 @@ _PREFIX_DISQUALIFY_RE = re.compile(
     r"|claims?|claiming|claimed|says?|saying|said|believes?|believed|thinks?|thought"
     r"|assumes?|assumed|purports?|purported|alleges?|alleged|supposedly|allegedly"
     r"|apparently|seemingly|presumably|unconfirmed|unverified|reported"
-    r"|if|unless|whether|had"
+    r"|if|unless|whether|had|though|although"
     r")\b"
+)
+_PREFIX_NON_RESOLUTION_SUBJECT = re.compile(
+    r"(?i)\b(?:fix|fixes|patch|patches|pr|pull\s+request|branch|workaround|revert)\b"
+)
+_AFFIRMATIVE_RESOLUTION_SUFFIX = re.compile(
+    r"^(?:"
+    r"\s*(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
+    r")?"
+    r"(?:"
+    r"\s*(?:and|,?\s*and)\s+(?:confirmed\s+|now\s+)?(?:passing|clean|verified|resolved|tested|closed|cleared)"
+    r")?"
+    r"(?:"
+    r"\s*,?\s*with\s+no\s+new\s+(?:issues?|findings?)(?:\s+(?:introduced|found|added|identified))?"
+    r")?"
+    r"[.,!?:;\s\)\"'\`]*$",
+    re.IGNORECASE,
 )
 
 # A line that reads as a finding ITEM. Severity/class tags and Location
@@ -1497,10 +1515,12 @@ def _item_is_resolved(line: str) -> bool:
         return False
     if _PREFIX_DISQUALIFY_RE.search(before_res):
         return False
+    matched_verb = res_match.group(0).lower()
+    if any(w in matched_verb for w in ("removed", "closed")):
+        if _PREFIX_NON_RESOLUTION_SUBJECT.search(before_res):
+            return False
     after_res = line[res_match.end():]
-    if re.search(r"(?i)^[ \t]*(?:in|by|via)\s+(?!commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round)", after_res):
-        return False
-    if re.search(r"(?i)\b(?:but|however|although|except|yet|reverted|partially|only)\b", after_res):
+    if not _AFFIRMATIVE_RESOLUTION_SUFFIX.match(after_res):
         return False
     return True
 

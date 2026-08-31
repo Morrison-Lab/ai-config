@@ -698,6 +698,7 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(self.adapter.extract_cwd({}, {"Cwd": "/path/from/tool_args"}), "/path/from/tool_args")
         self.assertEqual(self.adapter.extract_cwd({}, {"cwd": "/path/from/tool_args_lower"}), "/path/from/tool_args_lower")
         self.assertEqual(self.adapter.extract_cwd({}, {"Cwd": "file:///path/from/tool_args_uri"}), "/path/from/tool_args_uri")
+        self.assertEqual(self.adapter.extract_cwd({}, {"Cwd": "file:///path/with%20space/tool_args"}), "/path/with space/tool_args")
 
         # 2. payload direct cwd fields
         self.assertEqual(self.adapter.extract_cwd({"cwd": "/path/from/payload_cwd"}), "/path/from/payload_cwd")
@@ -705,18 +706,24 @@ class TestAgyHookAdapter(unittest.TestCase):
         self.assertEqual(self.adapter.extract_cwd({"workingDirectory": "/path/from/wd"}), "/path/from/wd")
         self.assertEqual(self.adapter.extract_cwd({"workspacePath": "/path/from/wspath"}), "/path/from/wspath")
         self.assertEqual(self.adapter.extract_cwd({"workspace": "file:///path/from/ws_uri"}), "/path/from/ws_uri")
+        self.assertEqual(self.adapter.extract_cwd({"cwd": "file:///path/with%20space/payload"}), "/path/with space/payload")
 
         # 3. payload workspacePaths / workspaces list or string
         self.assertEqual(self.adapter.extract_cwd({"workspacePaths": "/single/ws/string"}), "/single/ws/string")
         self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["/first/ws/path", "/second/ws/path"]}), "/first/ws/path")
         self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["file:///uri/ws/path"]}), "/uri/ws/path")
+        self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["file:///uri/with%20space/path"]}), "/uri/with space/path")
         self.assertEqual(self.adapter.extract_cwd({"workspaces": [{"path": "/dict/ws/path"}]}), "/dict/ws/path")
         self.assertEqual(self.adapter.extract_cwd({"workspaces": [{"uri": "file:///dict/uri/path"}]}), "/dict/uri/path")
+        self.assertEqual(self.adapter.extract_cwd({"workspaces": [{"uri": "file:///dict/with%20space/path"}]}), "/dict/with space/path")
 
-        # 4. Fallback to os.getcwd()
+        # 4. Fallback to os.getcwd() on empty / whitespace / degenerate inputs
         with patch('os.getcwd', return_value='/tmp/fallback-process-cwd'):
             self.assertEqual(self.adapter.extract_cwd({}), "/tmp/fallback-process-cwd")
             self.assertEqual(self.adapter.extract_cwd({"workspacePaths": []}), "/tmp/fallback-process-cwd")
+            self.assertEqual(self.adapter.extract_cwd({"cwd": "file://"}), "/tmp/fallback-process-cwd")
+            self.assertEqual(self.adapter.extract_cwd({"cwd": "   "}), "/tmp/fallback-process-cwd")
+            self.assertEqual(self.adapter.extract_cwd({"workspacePaths": ["file://", "  "]}), "/tmp/fallback-process-cwd")
 
     def test_extract_hook_list_supports_script_key(self):
         item = [{"script": "python3 /path/to/script.py"}]

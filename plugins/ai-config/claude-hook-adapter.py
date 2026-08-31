@@ -4,6 +4,7 @@ import subprocess
 import os
 import re
 import traceback
+import urllib.parse
 
 def _int_env(name, default):
     """Read an integer config value from the environment, falling back to
@@ -133,6 +134,16 @@ def resolve_cmd_and_timeout(hook, repo_root):
         timeout_val = DEFAULT_HOOK_TIMEOUT
     return cmd, timeout_val
 
+def _clean_path(raw):
+    """Normalize a candidate path string, decoding file:// URIs and stripping
+    whitespace, or returning None if empty or invalid."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    p = raw.strip()
+    if p.startswith("file://"):
+        p = urllib.parse.unquote(p[7:]).strip()
+    return p if p else None
+
 def extract_cwd(payload, tool_args=None):
     """Resolve the working directory from tool arguments, Antigravity payload
     fields (cwd, workspacePaths, workspace), or fall back to os.getcwd().
@@ -146,41 +157,30 @@ def extract_cwd(payload, tool_args=None):
     heuristics or evaluates the wrong repository.
     """
     if isinstance(tool_args, dict):
-        tool_cwd = tool_args.get("Cwd") or tool_args.get("cwd")
-        if isinstance(tool_cwd, str) and tool_cwd.strip():
-            p = tool_cwd.strip()
-            if p.startswith("file://"):
-                p = p[7:]
+        p = _clean_path(tool_args.get("Cwd") or tool_args.get("cwd"))
+        if p:
             return p
 
     if isinstance(payload, dict):
         for key in ("cwd", "Cwd", "workingDirectory", "currentWorkingDirectory", "workspacePath", "workspace"):
-            val = payload.get(key)
-            if isinstance(val, str) and val.strip():
-                p = val.strip()
-                if p.startswith("file://"):
-                    p = p[7:]
+            p = _clean_path(payload.get(key))
+            if p:
                 return p
 
         ws_paths = payload.get("workspacePaths") or payload.get("workspaces")
-        if isinstance(ws_paths, str) and ws_paths.strip():
-            p = ws_paths.strip()
-            if p.startswith("file://"):
-                p = p[7:]
-            return p
+        if isinstance(ws_paths, str):
+            p = _clean_path(ws_paths)
+            if p:
+                return p
         elif isinstance(ws_paths, list):
             for item in ws_paths:
-                if isinstance(item, str) and item.strip():
-                    p = item.strip()
-                    if p.startswith("file://"):
-                        p = p[7:]
-                    return p
+                if isinstance(item, str):
+                    p = _clean_path(item)
+                    if p:
+                        return p
                 elif isinstance(item, dict):
-                    p = item.get("path") or item.get("uri")
-                    if isinstance(p, str) and p.strip():
-                        p = p.strip()
-                        if p.startswith("file://"):
-                            p = p[7:]
+                    p = _clean_path(item.get("path") or item.get("uri"))
+                    if p:
                         return p
 
     return os.getcwd()

@@ -332,6 +332,46 @@ retire all three.
 Tracked as
 [#1519](https://github.com/Morrison-Lab/ai-config/issues/1519).)
 
+### A sampling instrument's zero is a coverage statement unless the new arm's reach is reported
+
+When a verification tool or change-time test
+(such as a corpus-sampling parity diff or generator-based checker)
+reports "0 regressions" or "0 widened, 0 narrowed",
+confirm that the new code path or arm was actually **reached** during the run.
+
+Three distinct mechanisms produce a false zero from a sampling instrument:
+
+1. **Truncation before reaching the arm.**
+   A generator that yields new cases after a truncation limit
+   (such as an arm appended last in a generator subject to `--limit`)
+   is cut off before any new cases execute.
+2. **Strided sampling skipping the arm.**
+   A sampling harness that selects every $k$-th item from a generated stream
+   can skip a small, concentrated batch of newly added cases entirely.
+3. **Earlier deciding branches.**
+   An existing check that evaluates before the new mechanism
+   (such as a prose verdict line preceding a structured payload)
+   can resolve the case before control reaches the new branch.
+
+In all three cases,
+the resulting zero reports that the check did not run,
+not that the code is correct.
+
+- **Do:** report and assert the reach count
+  (e.g., "reached N times out of M")
+  for each arm of a generator or sampling instrument.
+- **Do:** place new generator arms before sampling limits,
+  or evaluate them unconditionally after limits are applied.
+- **Don't:** read "0 differences" or "0 widened" as evidence of correctness
+  when the execution count for the new branch was zero.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+`scripts/check-verdict-scan-parity.py` reported 0 widened across multiple review rounds
+because the structured payload arm was placed at index 241,920 where `--limit` truncated it,
+skipped by strided sampling,
+and bypassed by prose verdict checks,
+hiding 1 accepted widening and 5 fail-closed narrowings.)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.
@@ -428,6 +468,38 @@ A caller reading only the pass/fail bit sees no difference at all.
   rather than for a deletion.
 - **Don't:** trust an anchored pattern to cover the unanchored case;
   `^marker` and `marker` agree on every example that starts with the marker.
+
+### A subsumption proof over raw text must account for every transformation
+
+When deleting a structured extraction check or parser term on the grounds that
+it is "provably redundant" with a raw substring or regex match over the unparsed
+body,
+account for every transformation between raw text and parsed values.
+
+Decoders and parsers
+(such as `json.loads` resolving `\u0061` Unicode escapes,
+URL decoders resolving `%20`,
+HTML/XML entity unescaping,
+or case/whitespace normalizations)
+convert raw representations into values that do not appear byte-for-byte in the
+unparsed text.
+A structured equality check `payload.get("commit_sha") == head_sha`
+matches an escaped JSON string `"commit_sha": "\u0061bc1234..."`,
+while raw substring checks on `head_sha` in the unparsed body fail to find it.
+Deleting the structured check causes escaped or encoded payloads to fail closed.
+
+- **Do:** construct adversarial test fixtures with escapes, encodings,
+  and entity references before concluding a parsed-value check is subsumed
+  by raw text search.
+- **Do:** test decoded/escaped representations against the full verification
+  pipeline.
+- **Don't:** treat raw text and decoded structured values as interchangeable
+  in redundancy proofs.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+deleting a structured `commit_sha` check as "provably dead" made escaped JSON
+review payloads fail closed as "no review posted" because raw substring
+disjuncts could not see the escaped SHA.)
 
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 
@@ -754,6 +826,40 @@ Confirming it is deliberately historical discharges the warning.
 The four comment lines directly above went untouched, so they still said 6, their stated 192G total was now wrong by more than a factor of three, and they still recorded the incident that had motivated the cap --- an unbounded array previously drained a node with an unkillable process stuck on network I/O.
 Only the directive line was ever read.
 An AI reviewer returned "Needs more work" on the contradiction.)
+
+## A comment asserting the state of ANOTHER artifact is a claim with an expiry across commits
+
+A comment asserting facts about *another* file, prompt format, or test expectation
+(such as "prompts render the payload 3 spaces in",
+"this field was removed as provably dead in helper X")
+is a cross-artifact claim.
+In a multi-commit PR where designs iterate across review rounds,
+modifying the referenced file immediately expires the comment in the other file.
+
+Because the comment is in a different file from the code change,
+single-file adjacent-comment linters (e.g. `hooks/flag-stale-adjacent-comment.py`,
+which checks a 10-line window in the modified file)
+cannot flag it,
+and the diff of the modifying commit does not contain it.
+Worse,
+a stale test comment pointing readers away from the test pinning a restored feature
+actively misleads reviewers.
+
+- **Do:** grep for cross-artifact references, format descriptions,
+  and justification comments across the repository when updating a shared data
+  format or reversing a prior round's deletion.
+- **Do:** audit explanatory comments in test files when restoring logic
+  that an earlier commit removed.
+- **Don't:** rely on 10-line adjacent-comment hooks to catch stale claims about
+  other files.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736)
+commit `c725c449`:
+after restoring `commit_sha` in `scripts/check-pr-fully-clean.py`
+and making reviewer payloads flush-left,
+comments in `scripts/test_check_pr_fully_clean.py`
+and `scripts/lib/review_payload.py`
+still asserted the old, opposite states.)
 
 ## Matching values is not matching roles
 
@@ -1159,3 +1265,27 @@ The question is answerable by execution: run both over a corpus that includes ma
 (Measured 2026-08-28 on [ai-config#2539](https://github.com/Morrison-Lab/ai-config/pull/2539).
 The generalization was itself the fix for a prior fail-open, and it shipped with the four names checked and the boundary unexamined.
 It became the tenth certification fail-open of that PR, and the reviewer's reproducer was one line: a tag opener with no closing bracket anywhere in the block.)
+
+## Two literals for one concept drift apart inside a single session
+
+When two separate regexes, literals, or parsers match the same syntax or concept
+(such as harvesting a token at one site and scanning for trailing content
+after that token at another),
+modifying one site in response to a review finding causes them to drift apart.
+
+A relaxed matcher accepts an input that the second matcher rejects,
+causing unexpected `None` dereferences, missed checks, or silent inconsistencies.
+
+- **Do:** hoist duplicate literals or regexes for the same concept into a single
+  shared constant or helper, or assert their identity.
+- **Don't:** maintain two separate regex literals for the same concept across
+  multiple checks in the same file.
+
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736)
+commit `5dfd3883`:
+`parse_review_verdict` in `scripts/pre-push-review.py` used two separate regexes
+for `Reviewed-Commit:`;
+loosening one to accept bold and spaced formatting while replacing the other with
+a line scan caused `last_fp` to stay `None` on loosened inputs,
+raising an `AttributeError`.)
+

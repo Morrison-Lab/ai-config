@@ -39,7 +39,7 @@ check.
 Claim **type** can, because it is observable in the sentence you are about to
 write:
 
-The five are worth keeping as a list rather than collapsing into "check your
+They are worth keeping as a list rather than collapsing into "check your
 claims", because each names a different *repair*, and the repair is the part
 that is easy to skip.
 

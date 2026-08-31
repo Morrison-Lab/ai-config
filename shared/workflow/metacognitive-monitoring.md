@@ -1079,8 +1079,9 @@ write the thing that can be wrong.
 
 ## Do and don't
 
-- **Do:** classify each assertion as state, scope, cause, inference, or default
-  before it goes out, and re-measure any that is not from this turn.
+- **Do:** classify each assertion as state, capability, scope, cause,
+  inference, or default before it goes out, and re-measure any that is not
+  from this turn.
 - **Do:** name the falsifying command beside a claim, and run it when it is
   cheap.
 - **Do:** treat a fluent, undeliberated answer as owing an alternative you can

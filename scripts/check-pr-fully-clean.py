@@ -922,12 +922,25 @@ _BARE_REJECTION = (
 )
 
 RESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"^(?:(?![.!?])[\s\S]){0,120}\b(?:fixed|resolved|addressed|closed|removed|corrected)\b",
+    r"^(?:(?!\b(?:and|but|while|although|however)\b)[^,:;.!?]){0,120}\b(?:"
+    r"(?:is|was)\s+(?:now\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|has\s+(?:since\s+)?been\s+"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r"|no\s+longer\s+applies"
+    r")\b"
+    r"(?:"
+    r"\s+and\s+(?:confirmed\s+)?passing"
+    r"|,?\s+and\s+(?:(?![.!?])[\s\S]){1,180}\b"
+    r"(?:is|are|was|were)\s+(?:also\s+)?"
+    r"(?:fixed|resolved|addressed|closed|removed|corrected)"
+    r")?\s*[.!?]?\s*$",
     re.IGNORECASE,
 )
-UNRESOLVED_BLOCKING_SUFFIX = re.compile(
-    r"\b(?:not\s+(?:yet\s+)?(?:fixed|resolved|addressed|closed|removed|corrected)"
-    r"|remain(?:s)?\s+(?:open|unresolved|unfixed|unaddressed))\b",
+AFFIRMATIVE_RESOLUTION_FOLLOWUP = re.compile(
+    r"^\s*(?:I\s+found\s+no\s+new\s+(?:issues|findings)"
+    r"(?:\s+in\s+(?:this|the)\s+(?:round|review|pass)[^.!?]*)?"
+    r"[.!?]?)?\s*$",
     re.IGNORECASE,
 )
 
@@ -936,13 +949,26 @@ def _is_resolved_blocking_mention(scan: str, match: re.Match) -> bool:
     """True for a past blocking state explicitly resolved in the same sentence."""
     if match.group(0).lower() != "blocking":
         return False
-    prefix = scan[max(0, match.start() - 14):match.start()]
-    if not re.search(r"\bpreviously(?:[-\s]+|\s+\*{1,2})$", prefix, re.IGNORECASE):
+    prefix = scan[max(0, match.start() - 40):match.start()]
+    past_state = re.search(
+        r"(?:\bpreviously(?:[-\s]+|\s+\*{1,2})"
+        r"|\bprior\s+(?:verdict(?:['\u2019]s)?|(?:finding|issue)s?)\s+)$",
+        prefix,
+        re.IGNORECASE,
+    )
+    if past_state is None:
         return False
-    suffix = scan[match.end():match.end() + 160]
+    suffix = scan[match.end():]
+    sentence = re.match(r"^[^.!?]*[.!?]?", suffix)
+    if sentence is None:
+        return False
+    paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
+    if paragraph is None:
+        return False
+    following = paragraph.group(0)[sentence.end():]
     return (
-        RESOLVED_BLOCKING_SUFFIX.search(suffix) is not None
-        and UNRESOLVED_BLOCKING_SUFFIX.search(suffix) is None
+        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
+        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
     )
 
 # The findings-heading pattern is likewise built once: the two list copies

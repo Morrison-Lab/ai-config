@@ -175,6 +175,12 @@ ATTRIBUTION = [
     ("The pull request has 11 pass.",
      "asserts a PR's check state",
      "so does the spelled-out form"),
+    ("MR checks: 11 pass, 0 fail.",
+     "asserts a PR's check state",
+     "the MR abbreviation counts as a nearby reference (#2667)"),
+    ("The merge request !47 has 11 pass.",
+     "asserts a PR's check state",
+     "the spelled-out merge request and !N counts as a nearby reference (#2667)"),
 ]
 
 # The REST check-runs endpoint must count as a status query. `fully-clean.md`
@@ -187,6 +193,13 @@ QUERY_FORMS = [
      "the paginated REST check-runs endpoint"),
     ("gh api repos/o/r/commits/abc1234/status", "the legacy commit-status endpoint"),
     ("gh pr view 1922 --json statusCheckRollup", "the rollup field"),
+    ("glab ci status -R group/project", "GitLab glab ci status (#2667)"),
+    ("glab ci list -R group/project", "GitLab glab ci list (#2667)"),
+    ("glab ci view -R group/project", "GitLab glab ci view (#2667)"),
+    ("glab mr view 47 -R group/project", "GitLab glab mr view (#2667)"),
+    ("glab pipeline view 1234 -R group/project", "GitLab glab pipeline view (#2667)"),
+    ("glab api projects/123/pipelines/456/jobs", "GitLab REST pipelines endpoint (#2667)"),
+    ("glab api projects/group%2Fproject/merge_requests/47", "GitLab REST merge_requests endpoint (#2667)"),
 ]
 
 

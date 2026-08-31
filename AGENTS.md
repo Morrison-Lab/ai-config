@@ -102,6 +102,24 @@ obvious objective and complete every safe, authorized, relevant step. Do not
 reduce an instruction to the smallest literal action when its context makes a
 larger in-scope outcome clear.
 
+## Always give recommendations with questions
+
+Whenever asking the user a question or presenting options for a genuine decision,
+always provide a clear, specific recommendation.
+Soft open-ended prompts (such as "Let me know if ...") that present choices
+count as decision points and must include a concrete recommendation on what to do next.
+
+This governs genuine questions and decisions,
+not already-authorized actions:
+if an action is already in-scope or authorized under standing rules,
+do the work and report in past tense per [`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)
+rather than offering to do it.
+
+- **Do:** state your specific recommendation alongside every question or choice presented to the user (e.g. "Recommendation: Proceed with Option A because...").
+- **Do:** treat soft open-ended prompts ("Let me know if...") that pose genuine choices as decision points and attach a concrete recommendation.
+- **Don't:** ask questions or present choices without declaring your recommended path.
+- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it ([`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)).
+
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it,

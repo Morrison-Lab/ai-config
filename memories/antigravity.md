@@ -76,3 +76,38 @@ Because an incomplete adapter simply returns `{"decision": "allow"}` when it mis
   When prompting reasoning/thinking models (such as Claude Thinking models or reasoning Gemini models) non-interactively without tool access, enforce immediate output in the prompt (e.g., "Provide your full review immediately in this response.
   Do not use tools or acknowledge with a conversational promise.").
   Otherwise, tool-using models may output an initial conversational acknowledgment expecting a subsequent tool-use turn.
+
+## The merge gate is client-side only, and client hooks fail open --- server rules are the only enforcement that survives a delivery failure
+
+Measured 2026-08-30 (Morrison-Lab/ai-config#2676): agy merged Lacaedemon/sparta#1427 over a "Needs more work" verdict.
+Replaying the exact command against `plugins/ai-config/enforce-mwc-review-gate.py` returned deny, so the gate's deny never took effect in the merging session --- either the hook was not launched (this file's own fail-open section: a hook that fails to launch is skipped silently) or its deny was discarded by an adapter gap, and no artifact distinguishes the two.
+Three layers had to fail together, and each is worth checking separately when auditing a bad merge:
+
+1. **Client hook delivery.**
+   No artifact records whether a hook ran;
+   absence of a deny is not evidence of an allow decision.
+2. **Gate logic.**
+   Fix and 61 hermetic test cases are in ai-config#2678 (open as of 2026-08-30);
+   the pre-rewrite gate allowed any PR carrying at least one formal review, whatever the verdict said.
+3. **Server rules.**
+   `require-review` (gha) is delivery-only by design --- it greens when a review ran and posted, saying nothing about the verdict (its own header comment states this).
+   A ruleset with no required status checks (sparta's `main` at the time) blocks nothing.
+   Opt-in verdict gating is proposed as Morrison-Lab/gha#767;
+   sparta's required checks as Lacaedemon/sparta#1432.
+
+- **Do:** treat required status checks in the ruleset as the enforcement layer, and the client hook as UX that catches the mistake earlier.
+- **Don't:** read a green `require-review` as a clean verdict, or a quiet client hook as having allowed the merge.
+
+## Forensics: agy conversations are sqlite DBs, and plugins.json points at the live checkout
+
+- IDE sessions: `~/.gemini/antigravity/conversations/*.db`; CLI sessions: `~/.gemini/antigravity-cli/conversations/*.db`, with prompts in `~/.gemini/antigravity-cli/history.jsonl`.
+  `strings <db> | grep <needle>` recovers commands and hook decisions without a sqlite client;
+  mtimes bracket the session window.
+- Two path layers decide which hook code agy actually runs, and they moved in opposite directions overnight 2026-08-29/30 PT (symlink swapped for a copy 2026-08-29 22:56 PT;
+  ai-config#2664 merged 2026-08-30 00:34 PT).
+  `~/.gemini/config/plugins.json` registers the plugin by absolute path into the **live ai-config checkout** (`.../Documents/GitHub/ai-config/plugins/ai-config`), so `hooks.json` itself is read from whatever branch that checkout is parked on.
+  But since ai-config#2664, `hooks.json`'s `command` entries invoke the scripts via `~/.gemini/config/plugins/ai-config/...` --- and on this machine that path is a **static copy** (the previous symlink into the checkout was renamed to `ai-config.backup-<epoch>`), while `bootstrap.sh` creates it as a symlink on a fresh install.
+  So a gate or adapter fix merged to main reaches agy only when that copy is refreshed (or the symlink restored);
+  diff the copy against the checkout before trusting that a fix is live.
+
+(Measured 2026-08-30 while diagnosing ai-config#2676.)

@@ -120,6 +120,12 @@ TRANSCRIPT_NOISE = [
 ]
 
 
+def iso_clock(stamp, date="2026-08-21"):
+    """The injected reading from an ISO format string."""
+    return {"type": "user", "content":
+            f"The current local time is: {date}T{stamp}-07:00."}
+
+
 # (events, should_fire, label)
 CASES = [
     # --- ai-config#1917, part two: the injected reading is an ATTACHMENT ---
@@ -234,6 +240,41 @@ CASES = [
      "`apt-get update` is NOT a clock read -- the word boundary must not match it"),
     ([DATE, say("18:30 PDT in the same turn as the read")], False,
      "read and claim in one turn, with no previous assistant message"),
+
+    # --- historical timestamps and artifact conversions (#2661) ---
+    ([say("earlier"),
+      say("PR #1131 merged at 2026-07-27 21:51:49 UTC (14:51 PT), landing as 39f94d73.")], False,
+     "#2661: UTC conversion in historical PR merge report does not fire"),
+    ([say("earlier"),
+      say("PR #1141 merged (2026-07-28 06:14 UTC / 23:14 PT)")], False,
+     "#2661: parenthesized UTC conversion does not fire"),
+    ([say("earlier"),
+      say("committed at 18:19 PDT per the git log")], False,
+     "#2661: past action verb 'committed at' before PDT does not fire"),
+    ([iso_clock("18:55:51"),
+      say("Recap: as of 18:55 PDT")], False,
+     "#2661: ISO local time injection discharges"),
+    ([say("earlier"),
+      say("PR #1131 merged at 2026-07-27 21:51:49 UTC (14:51 PT)\n\nRecap: as of 19:24 PDT")], True,
+     "#2661: mixed message with past event and unmeasured recap still catches recap"),
+     ([say("earlier"),
+      say("All tests passed. Stopping Point: 18:30 PDT")], True,
+     "#2661: action verb before stopping point does not silence unmeasured recap"),
+    ([say("earlier"),
+      say("Branch pushed. Recap: 18:30 PDT")], True,
+     "#2661: action verb before recap does not silence unmeasured recap"),
+    ([say("earlier"),
+      say("Stopping Point: non-clean, as of 19:24 PDT\nScheduled timer to check back at 19:34 PDT")], True,
+     "#2661: mixed recap and timer still catches unmeasured recap"),
+    ([say("earlier"),
+      say("Status: PR #123 closed at 14:51 PT after the fix landed.")], False,
+     "#2661: status header followed by past action verb does not fire"),
+    ([say("earlier"),
+      say("I'm continuing this work now. For context, the earlier build finished at 14:51 PT yesterday.")], False,
+     "#2661: 'now' in earlier sentence followed by past action does not fire"),
+    ([{"type": "assistant", "content": "The current local time is: 2026-08-21T18:55:51-07:00 according to my check."},
+      say("Recap: as of 23:59 PDT")], True,
+     "#2661: assistant message containing ISO time string does not discharge guard for unmeasured claim"),
 ]
 
 

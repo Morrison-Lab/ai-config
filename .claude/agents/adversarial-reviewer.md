@@ -54,23 +54,40 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      You must append a machine-readable block at the end of the findings section (as a bare line, not inside a fence or backticks): [FINDINGS_COUNT: <N>] where <N> is the integer number of findings.
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
-6. **Fingerprint what you read**
+6. **Fingerprint what you read and include structured data**
 
    End the report, after the verdict, with the commit you reviewed
    as a bare line, not inside a fence:
 
    Reviewed-Commit: <full sha from `git rev-parse HEAD`>
 
+   Append the machine-readable structured review payload immediately after in an HTML comment, as raw unfenced text -- never wrapped in markdown backticks or code fences.
+   Write it FLUSH LEFT, at column zero, not indented like this instruction block: four or more leading spaces make it a Markdown indented code block, and a payload inside one is ignored.
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "adversarial-reviewer",
+  "commit_sha": "<full sha from git rev-parse HEAD>",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+
+   (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
+   Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
+   Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.
+   The pre-push guard itself reads only your prose verdict, not this payload (ai-config#2749), so state the prose verdict truthfully rather than relying on the payload to correct it.)
+
    Read that sha yourself rather than taking it from the brief.
    On Claude Code, the pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
-   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it last.
+   `parse_report` (Claude Code's pre-push guard, and the Cursor Cloud recovery gate) reads the first fingerprint AFTER your verdict, so put it right after the verdict.
    A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
    Write the label plainly on its own line: emphasis around it is tolerated.
 
 State the verdict on its own line in that exact form.
-Return the structured report as this call's own message,
-not as a pointer to a file.
-Emit nothing after the fingerprint.
+Return the structured report as this call's own message, not as a pointer to a file.
+Emit nothing after the closing --> of the review-data comment.
 `parse_report()` (Claude Code's pre-push guard, and the
 Cursor Cloud recovery gate) accepts `Needs work` as well as
 `Needs more work`, an optional heading, and spaces around the colon.

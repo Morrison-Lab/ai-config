@@ -1,0 +1,307 @@
+#!/usr/bin/env python3
+"""Unit tests for scripts/lib/review_payload.py."""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from scripts.lib.review_payload import (
+    CLEAN_VERDICTS,
+    NOT_CLEAN_VERDICTS,
+    code_region_mask,
+    extract_structured_review,
+    normalize_verdict,
+    payload_findings,
+    payload_findings_malformed,
+    payload_is_blocking,
+    payload_is_clean,
+)
+
+
+class TestReviewPayload(unittest.TestCase):
+    """Test suite for structured review-data payload helper."""
+
+    def test_normalize_verdict(self):
+        self.assertEqual(normalize_verdict("clean"), "CLEAN")
+        self.assertEqual(normalize_verdict("Ready for merge"), "READY_FOR_MERGE")
+        self.assertEqual(normalize_verdict("NOT-CLEAN"), "NOT_CLEAN")
+        self.assertEqual(normalize_verdict("Needs more work"), "NEEDS_MORE_WORK")
+        self.assertEqual(normalize_verdict(""), "")
+        self.assertEqual(normalize_verdict(None), "")
+
+    def test_extract_structured_review_clean(self):
+        body = """
+### Summary Verdict
+Verdict: Ready for merge
+
+Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "Claude",
+  "commit_sha": "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+"""
+        payload = extract_structured_review(body)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("verdict"), "CLEAN")
+        self.assertEqual(payload.get("reviewer"), "Claude")
+        self.assertTrue(payload_is_clean(payload))
+        self.assertFalse(payload_is_blocking(payload))
+
+    def test_extract_structured_review_not_clean(self):
+        body = """
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "adversarial-reviewer",
+  "commit_sha": "3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b",
+  "verdict": "NOT_CLEAN",
+  "findings": [
+    {
+      "file": "foo.py",
+      "line": 10,
+      "message": "Syntax error"
+    }
+  ]
+}
+-->
+"""
+        payload = extract_structured_review(body)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("verdict"), "NOT_CLEAN")
+        self.assertFalse(payload_is_clean(payload))
+        self.assertTrue(payload_is_blocking(payload))
+        findings = payload_findings(payload)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["file"], "foo.py")
+
+    def test_findings_override_clean_verdict(self):
+        payload = {
+            "verdict": "CLEAN",
+            "findings": [{"file": "bar.py", "message": "Memory leak"}],
+        }
+        self.assertTrue(payload_is_blocking(payload))
+        self.assertFalse(payload_is_clean(payload))
+
+    def test_code_region_mask_ignores_quoted_examples(self):
+        quoted = """
+Here is how to structure review output:
+```html
+<!-- review-data:
+{
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+```
+
+Actual report follows:
+<!-- review-data:
+{
+  "verdict": "NOT_CLEAN",
+  "findings": [{"file": "main.py", "message": "Bug"}]
+}
+-->
+"""
+        payload = extract_structured_review(quoted)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("verdict"), "NOT_CLEAN")
+
+    def test_inline_code_span_ignored(self):
+        span = "Check `<!-- review-data: {\"verdict\": \"CLEAN\"} -->` for example."
+        self.assertIsNone(extract_structured_review(span))
+
+    def test_indented_code_block_ignored(self):
+        indented = "    <!-- review-data: {\"verdict\": \"CLEAN\"} -->"
+        self.assertIsNone(extract_structured_review(indented))
+
+    def test_last_valid_payload_wins(self):
+        body = """
+<!-- review-data:
+{
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+
+<!-- review-data:
+{
+  "verdict": "NOT_CLEAN",
+  "findings": [{"file": "a.py", "message": "Err"}]
+}
+-->
+"""
+        payload = extract_structured_review(body)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("verdict"), "NOT_CLEAN")
+
+    def test_code_region_mask_marks_each_region_and_nothing_else(self):
+        """`code_region_mask` had no direct test -- it was exercised only
+        through `extract_structured_review`, which cannot show WHICH region
+        kind the mask attributed a character to.
+        """
+        body = "plain\n```\nfenced\n```\n    indented\nsee `span` here\n"
+        mask = code_region_mask(body)
+        self.assertEqual(len(mask), len(body))
+
+        def masked(fragment):
+            start = body.index(fragment)
+            return set(mask[start:start + len(fragment)])
+
+        self.assertEqual(masked("plain"), {0})
+        self.assertEqual(masked("fenced"), {1})
+        self.assertEqual(masked("indented"), {1})
+        self.assertEqual(masked("`span`"), {1})
+        self.assertEqual(masked("see "), {0})
+
+    def test_code_region_mask_offset_arithmetic_edge_cases(self):
+        for label, body in {
+            "empty": "",
+            "no trailing newline": "    indented",
+            "CRLF": "a\r\n    indented\r\nb",
+            "tab indent": "\tindented\n",
+            "multi-byte": "caf\u00e9\n    indented\n",
+        }.items():
+            with self.subTest(body=label):
+                self.assertEqual(len(code_region_mask(body)), len(body))
+
+    def test_verdict_vocabularies_are_disjoint(self):
+        """A string in both sets would make `payload_is_blocking` and
+        `payload_is_clean` true at once, and the two callers order those
+        checks differently.
+        """
+        self.assertFalse(CLEAN_VERDICTS & NOT_CLEAN_VERDICTS)
+        for verdict in CLEAN_VERDICTS | NOT_CLEAN_VERDICTS:
+            with self.subTest(verdict=verdict):
+                self.assertEqual(normalize_verdict(verdict), verdict,
+                                 "set members must already be in normalized form")
+
+    def test_malformed_findings_block_rather_than_clear(self):
+        """A present-but-non-list `findings` must never CLEAR, only block.
+
+        Folding it to `[]` made a type deviation do what an empty array does,
+        so a payload reading `"findings": "3 defects listed above"` satisfied
+        quorum and the PR gate reported fully clean.
+        """
+        for label, value in {
+            "string": '"3 defects listed above"',
+            "object": '{"a": 1}',
+            "number": "3",
+            "null": "null",
+        }.items():
+            with self.subTest(findings=label):
+                body = ('<!-- review-data: {"verdict": "CLEAN", "findings": '
+                        + value + "} -->")
+                payload = extract_structured_review(body)
+                self.assertIsNotNone(payload)
+                self.assertTrue(payload_findings_malformed(payload))
+                self.assertTrue(payload_is_blocking(payload))
+                self.assertFalse(payload_is_clean(payload))
+                self.assertEqual(payload_findings(payload), [])
+
+    def test_an_absent_findings_key_never_clears(self):
+        """An omitted required key is a commoner model failure than a
+        wrong-typed one, so it gets the same treatment: it cannot clear.
+        A not-clean verdict still blocks on its own.
+        """
+        clean = extract_structured_review('<!-- review-data: {"verdict": "CLEAN"} -->')
+        self.assertFalse(payload_findings_malformed(clean),
+                         "an absent key is not the same as a malformed one")
+        self.assertFalse(payload_is_clean(clean))
+        self.assertFalse(payload_is_blocking(clean))
+        blocking = extract_structured_review('<!-- review-data: {"verdict": "NOT_CLEAN"} -->')
+        self.assertTrue(payload_is_blocking(blocking))
+        self.assertFalse(payload_is_clean(blocking))
+
+    def test_only_whitespace_may_precede_a_payload_on_its_line(self):
+        """Masking code regions is not enough on its own, and column zero is
+        too strict.
+
+        A payload written mid-sentence in ordinary prose, or behind a `> `
+        blockquote marker (what GitHub's Quote reply emits), sits in no code
+        region -- and was read as the comment's authoritative verdict, giving a
+        false CLEAN in one direction and an undischargeable finding in the
+        other.  But requiring column zero then dropped the three-space-indented
+        layout `build_review_prompt` and both persona files render, so a
+        reviewer following the prompt shipped a NOT_CLEAN payload that the
+        guard reported clean.  One leading space was enough.
+
+        Whitespace-only is the rule, and it meets `code_region_mask` exactly at
+        the CommonMark boundary: three spaces is readable, four is an indented
+        code block and is not.
+        """
+        clean = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
+        blocking = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+                    '[{"file": "x.py", "message": "old"}]} -->')
+        for label, body in {
+            "mid-sentence": f"Reviewers must end with {clean} so the gate can read it.",
+            "blockquote": f"> {clean}",
+            "list item": f"- {clean}",
+            "narrated earlier round": f"Round 1 emitted {blocking} which is now fixed.",
+            "four spaces (indented code block)": f"    {clean}",
+            "tab (indented code block)": f"\t{clean}",
+        }.items():
+            with self.subTest(placement=label):
+                self.assertIsNone(extract_structured_review(body))
+
+        for label, body in {
+            "alone": clean,
+            "one space": f" {clean}",
+            "three spaces (the prompt's own layout)": f"   {clean}",
+            "after a blank line": f"### Verdict: Ready for merge\n\n{clean}",
+            "after CRLF": f"prose\r\n{clean}",
+            "after a closing fence": f"```\nx\n```\n{clean}",
+        }.items():
+            with self.subTest(placement=label):
+                self.assertIsNotNone(
+                    extract_structured_review(body),
+                    "a payload the prompt's own layout produces must be read")
+
+    def test_a_clean_payload_needs_an_explicit_empty_findings_list(self):
+        """Both persona files and build_review_prompt say a CLEAN payload
+        requires an empty `findings` array; nothing enforced it, so a payload
+        that simply omitted the key cleared.
+        """
+        omitted = extract_structured_review('<!-- review-data: {"verdict": "CLEAN"} -->')
+        self.assertIsNotNone(omitted)
+        self.assertFalse(payload_is_clean(omitted))
+        explicit = extract_structured_review(
+            '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->')
+        self.assertTrue(payload_is_clean(explicit))
+
+    def test_fence_span_failure_is_not_swallowed(self):
+        """`except Exception: fenced_lines = set()` disabled fence masking
+        entirely on any failure -- the UNDER-masking direction, silently.
+        """
+        import scripts.lib.review_payload as module
+        original = module.find_fence_spans
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("fence scan failed")
+
+        module.find_fence_spans = boom
+        try:
+            with self.assertRaises(RuntimeError):
+                code_region_mask("```\nx\n```\n")
+        finally:
+            module.find_fence_spans = original
+
+    def test_empty_or_none_inputs(self):
+        self.assertIsNone(extract_structured_review(""))
+        self.assertIsNone(extract_structured_review(None))
+        self.assertFalse(payload_is_blocking(None))
+        self.assertFalse(payload_is_clean(None))
+        self.assertEqual(payload_findings(None), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

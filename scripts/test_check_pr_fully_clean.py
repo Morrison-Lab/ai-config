@@ -3220,9 +3220,28 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("classify_verdict: structured clean review returns clean", checker.classify_verdict(struct_clean) == "clean")
     check("_reviewer_identity: reads reviewer from structured payload for bot login", checker._reviewer_identity(struct_clean, author="github-actions[bot]") == "Claude")
     check("_reviewer_identity: does not escalate unauthenticated member comment to bot identity", checker._reviewer_identity(struct_clean, author="human_member") == "human_member")
-    check("_reviewer_identity: accepts structured reviewer when agent marker is present on member comment", checker._reviewer_identity(struct_clean + "\n_posted by claude (ai agent)", author="human_member") == "Claude")
+    check("_reviewer_identity: agent marker takes precedence over structured reviewer field", checker._reviewer_identity("**claude finished review**\n" + struct_clean.replace('"Claude"', '"adversarial-reviewer"'), author="github-actions[bot]") == "Claude")
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
     check("_is_structured_review_body: structured review is recognized as structured body", checker._is_structured_review_body(struct_clean))
+
+    # Conflicting representations: prose says Needs work with findings, but JSON says CLEAN
+    conflicting_body = """
+### Findings
+1. [Defect] SQL injection in auth handler.
+
+### Verdict: Needs more work
+
+<!-- review-data:
+{
+  "schema_version": "1.0",
+  "reviewer": "Claude",
+  "verdict": "CLEAN",
+  "findings": []
+}
+-->
+"""
+    check("classify_verdict: prose not-clean overrides structured clean", checker.classify_verdict(conflicting_body) == "not-clean")
+    check("_unresolved_finding_pattern: prose findings detected despite structured clean", checker._unresolved_finding_pattern(conflicting_body) is not None)
 
     struct_not_clean = """
 ## Review Summary

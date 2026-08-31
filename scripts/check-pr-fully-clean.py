@@ -399,15 +399,15 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     first_line = lines[0] if lines else ""
     last_line = lines[-1] if lines else ""
     agent = _detect_review_agent(first_line) or _detect_review_agent(last_line)
+    if agent:
+        return agent
 
     structured = extract_structured_review(body or "")
     if structured and structured.get("reviewer"):
         rev = str(structured["reviewer"]).strip()
-        if rev and (_is_bot_author(login) or agent):
+        if rev and _is_bot_author(login):
             return rev
 
-    if agent:
-        return agent
     if login:
         return login
     return "unknown"
@@ -1299,9 +1299,7 @@ def classify_verdict(body: str, state: str = "") -> str:
         has_blocking_findings = bool(
             findings and isinstance(findings, list) and len(findings) > 0
         )
-        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED") and not has_blocking_findings:
-            return "clean"
-        elif v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED") or has_blocking_findings:
+        if v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED") or has_blocking_findings:
             return "not-clean"
 
     scan, cited = strip_cited_finding_vocab_with_mask(body)
@@ -1350,6 +1348,15 @@ def classify_verdict(body: str, state: str = "") -> str:
             # of what precedes the phrase and says nothing about what follows.
             if CLEAN_QUALIFIER.search(_sentence_remainder(scan, match.end())):
                 continue
+            return "clean"
+
+    if structured:
+        v_raw = str(structured.get("verdict", "")).strip().upper()
+        findings = structured.get("findings", [])
+        has_blocking_findings = bool(
+            findings and isinstance(findings, list) and len(findings) > 0
+        )
+        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED") and not has_blocking_findings:
             return "clean"
 
     # A review from a known agent whose format the classifier cannot read is
@@ -1467,9 +1474,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 return f"structured finding in {first.get('file', 'unknown')}: {first.get('message', '')}"
             return "structured finding"
         v_raw = str(structured.get("verdict", "")).strip().upper()
-        if v_raw in ("CLEAN", "READY FOR MERGE", "READY_FOR_MERGE", "APPROVED"):
-            return None
-        elif v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED"):
+        if v_raw in ("NOT-CLEAN", "NOT_CLEAN", "NEEDS MORE WORK", "NEEDS_MORE_WORK", "CHANGES_REQUESTED", "BLOCK", "BLOCKED"):
             return f"structured blocking verdict ({v_raw})"
 
     scan_body, cited = strip_cited_finding_vocab_with_mask(body)

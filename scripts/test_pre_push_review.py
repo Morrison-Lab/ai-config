@@ -137,6 +137,26 @@ class TestPrePushReview(unittest.TestCase):
                 self.assertFalse(is_valid, f"{label} should be rejected after the fingerprint")
                 self.assertIn("must be at the very end", reason)
 
+    def test_fingerprint_anchor_is_linear_on_the_tools_own_separator(self):
+        """Two successive regex cuts each backtracked exponentially and each looked fixed.
+
+        First a `\\s*` alternative that matched empty; then, after removing it,
+        the `={3,}` alternative, self-ambiguous under the outer `*` because a run
+        of `=` splits into chunks of size >= 3 exponentially many ways.  Measured
+        on this tool's own `"=" * 60` report banner followed by non-matching
+        text: 0.50s at 36 `=`, 4.01s at 42, 14.18s at 45.
+        """
+        import time
+        commit = "12345678abcdef00"
+        report = self._clean_report(
+            commit, tail="\n\n" + ("=" * 200) + "\nStatus: green\nThanks for reading!")
+        start = time.perf_counter()
+        is_valid, _, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        elapsed = time.perf_counter() - start
+        self.assertLess(elapsed, 2.0, f"anchor check took {elapsed:.1f}s -- backtracking regressed")
+        self.assertFalse(is_valid)
+        self.assertIn("must be at the very end", reason)
+
     def test_structured_payload_blocks_a_clean_prose_verdict(self):
         """HTML comments are stripped before every check, so the payload the prompt
         asks for was never validated -- the local parser and

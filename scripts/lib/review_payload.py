@@ -42,8 +42,11 @@ NOT_CLEAN_VERDICTS = frozenset(
 # Verdict strings that clear, under the same normalization.
 CLEAN_VERDICTS = frozenset({"CLEAN", "READY_FOR_MERGE", "APPROVED", "APPROVE"})
 
+# One accepted spelling only.  `review-json` was accepted here and in
+# REVIEW_BODY_MARKERS while nothing in the corpus emitted or documented it --
+# a second verdict-bearing input spelling with no producer, bought for nothing.
 _PAYLOAD_RE = re.compile(
-    r"<!--\s*review-(?:data|json)\s*:\s*(\{[\s\S]*?\})\s*-->",
+    r"<!--\s*review-data\s*:\s*(\{[\s\S]*?\})\s*-->",
     re.IGNORECASE,
 )
 
@@ -66,7 +69,13 @@ def code_region_mask(body: str) -> bytearray:
     """
     mask = bytearray(len(body))
     try:
-        fenced, _, orphans = find_fence_spans(body)
+        # swallow_unclosed=True, matching check-pr-fully-clean.py's own call:
+        # the default records only an unclosed fence's OPENER line and leaves
+        # its interior live, which breaks this function in both directions --
+        # a truncated review's quoted CLEAN template counts as a real verdict,
+        # and a quoted NOT_CLEAN payload mints a finding no ARD round can
+        # discharge (the ai-config#2482 class).
+        fenced, _, orphans = find_fence_spans(body, swallow_unclosed=True)
         fenced_lines = set(fenced) | set(orphans)
     except Exception:
         fenced_lines = set()

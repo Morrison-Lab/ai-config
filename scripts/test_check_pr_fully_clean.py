@@ -4091,7 +4091,12 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     data = checker.extract_structured_review(struct_clean)
     check("extract_structured_review: extracts valid comment payload", data is not None and data.get("verdict") == "CLEAN")
     check("classify_verdict: structured clean review returns clean", checker.classify_verdict(struct_clean) == "clean")
-    check("_reviewer_identity: reads reviewer from structured payload for bot login", checker._reviewer_identity(struct_clean, author="github-actions[bot]") == "Claude")
+    # The payload's self-declared `reviewer` must NOT confer identity: it is
+    # body text the reviewer writes about itself, and two comments from the one
+    # `github-actions[bot]` login naming different reviewers otherwise satisfied
+    # `--quorum 2`, which shared/workflow/fully-clean.md makes the normal
+    # invocation. #2308: approval authority comes from author identity.
+    check("_reviewer_identity: a payload's reviewer field does not override the login", checker._reviewer_identity(struct_clean, author="github-actions[bot]") == "github-actions[bot]")
     check("_reviewer_identity: does not escalate unauthenticated member comment to bot identity", checker._reviewer_identity(struct_clean, author="human_member") == "human_member")
     check("_reviewer_identity: agent marker takes precedence over structured reviewer field", checker._reviewer_identity("**claude finished review**\n" + struct_clean.replace('"Claude"', '"adversarial-reviewer"'), author="github-actions[bot]") == "Claude")
     check("_unresolved_finding_pattern: clean structured review has no findings", checker._unresolved_finding_pattern(struct_clean) is None)
@@ -4138,7 +4143,7 @@ Found defects.
 -->
 """
     check("classify_verdict: structured not-clean review returns not-clean", checker.classify_verdict(struct_not_clean) == "not-clean")
-    check("_reviewer_identity: reads reviewer from structured not-clean payload", checker._reviewer_identity(struct_not_clean, author="github-actions[bot]") == "Codex")
+    check("_reviewer_identity: a not-clean payload's reviewer field does not override the login", checker._reviewer_identity(struct_not_clean, author="github-actions[bot]") == "github-actions[bot]")
     check("_unresolved_finding_pattern: not-clean structured review returns finding pattern", checker._unresolved_finding_pattern(struct_not_clean) is not None)
 
     # Findings override clean verdict in structured JSON
@@ -4267,6 +4272,44 @@ Found defects.
     check("_unresolved_finding_pattern: falls back to a finding's `summary` key",
           checker._unresolved_finding_pattern(summary_key_payload)
           == "structured finding in b.py: off-by-one")
+
+    # --- Regression tests for review round 2 of #2736 ---
+
+    payload_clean = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
+    payload_block = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+                     '[{"file": "a.py", "message": "old"}]} -->')
+
+    # F2: find_fence_spans defaults to swallow_unclosed=False, which records
+    # only an UNCLOSED fence's opener line and leaves its interior live. That
+    # broke the mask in both directions.
+    unclosed_clean = ("**Claude finished** review\n\nReviewers must append:\n\n```json\n"
+                      + payload_clean)
+    check("extract_structured_review: an unclosed fence's interior is masked too",
+          checker.extract_structured_review(unclosed_clean) is None)
+    check("classify_verdict: a truncated review quoting a CLEAN template is not clean",
+          checker.classify_verdict(unclosed_clean) != "clean")
+    unclosed_block = ("### Verdict: Ready for merge\n\n"
+                      "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n\n"
+                      "Prior round, for reference:\n\n```json\n" + payload_block)
+    check("classify_verdict: a payload quoted in an unclosed fence mints no veto",
+          checker.classify_verdict(unclosed_block) == "clean")
+    check("_unresolved_finding_pattern: a payload quoted in an unclosed fence mints no finding",
+          checker._unresolved_finding_pattern(unclosed_block) is None)
+
+    # F6: `review-json` was a second accepted spelling with no producer.
+    check("extract_structured_review: the review-json spelling is not accepted",
+          checker.extract_structured_review(
+              '<!-- review-json: {"verdict": "CLEAN", "findings": []} -->') is None)
+    check("REVIEW_BODY_MARKERS: carries no review-json entry",
+          "review-json:" not in checker.REVIEW_BODY_MARKERS)
+
+    # A real trailing payload must still be read -- the guards above must not
+    # have cost the feature they guard.
+    real_block = ("### Verdict: Needs more work\n\n"
+                  "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n\n"
+                  + payload_block)
+    check("classify_verdict: an unfenced trailing payload is still authoritative",
+          checker.classify_verdict(real_block) == "not-clean")
 
     # Code fence citation guard (quoted structured review in markdown fence is ignored)
     quoted_struct = """

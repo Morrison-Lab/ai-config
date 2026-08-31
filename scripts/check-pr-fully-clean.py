@@ -321,7 +321,6 @@ REVIEW_BODY_MARKERS = (
     "_posted by opencode (ai agent)",
     "verdict:",
     "review-data:",
-    "review-json:",
 )
 
 
@@ -366,12 +365,15 @@ def _reviewer_identity(body: str, author: str = "") -> str:
     if agent:
         return agent
 
-    structured = extract_structured_review(body or "")
-    if structured and structured.get("reviewer"):
-        rev = str(structured["reviewer"]).strip()
-        if rev and _is_bot_author(login):
-            return rev
-
+    # The payload's own `reviewer` field deliberately does NOT feed identity,
+    # even from a bot login.  It is body text a reviewer writes about itself,
+    # so trusting it is the inverse of #2308's invariant restated in
+    # REVIEW_AGENT_MARKERS above -- and it is load-bearing for quorum, not
+    # merely stylistic: measured, two clean comments from the single login
+    # `github-actions[bot]` whose payloads named different reviewers satisfied
+    # `--quorum 2`, which `shared/workflow/fully-clean.md` makes the normal
+    # invocation.  Identity comes from the marker on the first or last line, or
+    # from the login.
     if login:
         return login
     return "unknown"
@@ -2214,7 +2216,12 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         is_struct_sha_match = bool(
             struct_sha and len(struct_sha) >= 7 and (struct_sha == sha_lower or sha_lower.startswith(struct_sha))
         )
-        is_sha_match = bool((oid and oid.lower() == sha_lower) or is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
+        # No `oid` term here: `is_sha_match` is read only in the `else:` arm
+        # below, where `oid` is falsy by construction, so an `oid` comparison
+        # can never contribute -- and writing one reads as having made formal-
+        # review OID matching case-insensitive, which `is_match = (oid == sha)`
+        # in the `if oid:` arm is not.
+        is_sha_match = bool(is_struct_sha_match or sha_short.lower() in body_lower or sha_lower in body_lower)
         if oid:
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)

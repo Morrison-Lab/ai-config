@@ -108,9 +108,63 @@ LEAD = ["", "No ", 'The body says "', "## Nits ", "The previously-blocking ",
 FILLER_EXTRA = ["-", "#", ">", "_", "+", "a.py:10", "**Location:**", "[Defect]"]
 
 
+# Structured `review-data` payload bodies (ai-config#2736).  A SEPARATE,
+# bounded arm rather than new entries in the lists above, because those are
+# crossed with every other list and one more entry roughly doubles the sweep
+# (the runtime cost VOCAB's own comment already records, tracked as #2702).
+#
+# The corpus carried no payload fragment when #2736 first ran this tool, so its
+# "0 widened" was a coverage statement -- the same failure VOCAB's comment
+# records for #2668.  These bodies cross the three axes a payload can be wrong
+# on: WHERE it sits (bare, fenced, unclosed-fence, code span, indented block),
+# WHICH of several payloads is authoritative (a quoted template before the real
+# one), and whether its verdict and its findings AGREE.
+_P_CLEAN = '<!-- review-data: {"verdict": "CLEAN", "findings": []} -->'
+_P_BLOCK = ('<!-- review-data: {"verdict": "NOT_CLEAN", "findings": '
+            '[{"file": "a.py", "message": "boom"}]} -->')
+_P_CONTRADICT = ('<!-- review-data: {"verdict": "CLEAN", "findings": '
+                 '[{"file": "a.py", "message": "boom"}]} -->')
+
+PAYLOAD_PLACEMENTS = {
+    "bare": "{p}",
+    "fenced": "```json\n{p}\n```",
+    "unclosed-fence": "```json\n{p}",
+    "code-span": "the schema is `{p}` appended last",
+    "indented": "    {p}",
+}
+
+
+def payload_bodies():
+    """Bodies exercising the structured-payload path, in every placement."""
+    for payload in (_P_CLEAN, _P_BLOCK, _P_CONTRADICT):
+        for placement in PAYLOAD_PLACEMENTS.values():
+            rendered = placement.format(p=payload)
+            for verdict_line in ("## Verdict: Ready for merge",
+                                 "## Verdict: Needs more work"):
+                yield (f"**Claude finished** review\n\n{verdict_line}\n\n"
+                       f"Reviewed-Commit: abc1234\n\n{rendered}\n")
+    # A quoted template BEFORE the reviewer's own payload: the authoritative
+    # one is last, so first-match-wins inverts the verdict.
+    for real in (_P_BLOCK, _P_CLEAN):
+        yield ("**Claude finished** review\n\n"
+               f"The template reads {_P_CLEAN} and you append your own.\n\n"
+               "## Verdict: Needs more work\n\nReviewed-Commit: abc1234\n\n"
+               f"{real}\n")
+
+
 def generated_bodies(exhaustive=False):
     seen = set()
-    
+
+    # FIRST, deliberately. `--limit N` truncates this generator and the full
+    # product is ~242k bodies, so an arm yielded last is unreachable at any
+    # limit anyone runs by hand -- reporting a zero that is a coverage
+    # statement, which is the exact trap this arm exists to close. Measured:
+    # yielded last, the first payload body sat at index 241,920.
+    for body in payload_bodies():
+        if body not in seen:
+            seen.add(body)
+            yield body
+
     if exhaustive:
         leads, vocabs, negs = LEAD, VOCAB, NEGATION
     else:

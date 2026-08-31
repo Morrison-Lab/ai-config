@@ -204,6 +204,17 @@ def _load_hook_module():
     return _HOOK_MODULE
 
 
+# Lines tolerated AFTER the final `Reviewed-Commit:` fingerprint.  Each must
+# start with a known marker: a status banner, a rule line, a disclosure footer,
+# a stopping-point declaration, or a restated verdict.  Anything else -- a
+# chatty sign-off, a smuggled "actually final verdict" line -- means the
+# fingerprint is not last, which is what the check exists to establish.
+_TRAILING_AFTER_FINGERPRINT = re.compile(
+    r"(?i)^\s*(?:_?Posted by\b.*|={3,}\s*|Status:.*|\*\*Stopping Point\*\*:.*"
+    r"|(?:###\s*)?(?:Summary\s+)?Verdict:.*)$"
+)
+
+
 def _structured_contradiction(report: str) -> Optional[str]:
     """Reason string when the report's structured payload blocks, else ``None``.
 
@@ -393,19 +404,24 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
                 return False, False, f"Fingerprint SHA mismatch: found {found_sha_raw!r}, expected {expected_commit_sha!r}."
 
         # Also ensure the final fingerprint is anchored at the end of the report (allowing optional trailing status/disclosure footer)
-        # Every alternative must consume at least one NON-whitespace character.
-        # The first cut carried a trailing `|\s*` alternative inside the `*`
-        # quantifier: it matched empty, duplicating the group's own leading
-        # `\s*`, so a whitespace run before a non-matching trailing character
-        # could be partitioned exponentially many ways.  Measured on darwin:
-        # 1.26s at 12 whitespace characters, 21.4s at 14, roughly 3x per added
-        # character -- and `parse_review_verdict` runs in-process with no
-        # timeout, so the guard hung rather than failing.  It was redundant as
-        # well: `\s*\Z` below already reaches the same strings with zero
-        # iterations of the group.
-        if not re.search(
-            r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:[ \t]*[a-f0-9A-F]+(?:\s*(?:_?Posted by[^\n]+|={3,}|Status:[^\n]+|\*\*Stopping Point\*\*:[^\n]+|(?:###\s*)?(?:Summary\s+)?Verdict:[^\n]+))*\s*\Z",
-            unfenced_report,
+        # A LINE SCAN, not a nested-quantifier regex.  Two successive regex
+        # cuts each backtracked exponentially and each looked fixed: first a
+        # `\s*` alternative that matched empty, then -- after removing it --
+        # the `={3,}` alternative, which is self-ambiguous under the outer `*`
+        # because a run of `=` splits into chunks of size >= 3 in exponentially
+        # many ways.  Measured on the tool's OWN `"=" * 60` banner
+        # (`log_error`/report separator) followed by any non-matching text:
+        # 0.50s at 36 `=`, 4.01s at 42, 14.18s at 45.  `parse_review_verdict`
+        # runs in-process with no timeout, so the guard hung rather than
+        # failing.  Matching each trailing line independently is linear by
+        # construction, and no further alternative can reintroduce the class.
+        last_fp = None
+        for fp_match in re.finditer(r"(?i)Reviewed-Commit:\s*[a-f0-9A-F]+", unfenced_report):
+            last_fp = fp_match
+        tail_lines = unfenced_report[last_fp.end():].split("\n")
+        if not all(
+            not line.strip() or _TRAILING_AFTER_FINGERPRINT.match(line)
+            for line in tail_lines
         ):
             return False, False, "Reviewed-Commit fingerprint must be at the very end of the report."
 

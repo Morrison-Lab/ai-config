@@ -1,6 +1,6 @@
 # delegate-to-opencode — run sidecar work on OpenCode or OpenRouter models
 
-The `opencode` CLI reaches an active OpenCode Go (\$10/mo subscription), hosted free (`opencode Zen`), and local (`ollama`) tiers, plus OpenRouter as an activated provider for frontier and stealth models. The free and local tiers cost no quota at all, so work small enough for them should not spend Claude’s budget, Codex’s window, or OpenRouter credits. The local tier also keeps payloads strictly on the machine when loopback routing, local-only mode, and on-device model residency are verified.
+The `opencode` CLI reaches an active OpenCode Go (\$10/mo subscription), hosted free (`opencode Zen`), and OpenRouter tiers. Use only hosted providers. Never invoke an `ollama/*` model or another local inference runtime because local inference can crash the user’s computer.
 
 Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in `memories/delegation.md`.
 
@@ -10,41 +10,31 @@ The `Agent` tool’s `model` parameter is an enum of Claude aliases, and `.claud
 
 ## When this fires
 
-- “delegate to opencode”, “use opencode”, “run this on opencode”, “run this on a local model”, “use a free model”, “keep this local”, “dto”
+- “delegate to opencode”, “use opencode”, “run this on opencode”, “use a free model”, “dto”
 - Proactively, before any **mechanical, bounded** read/extract/reformat pass — a grep-and-summarize sweep, a bulk reformat, a first-pass triage of many files — that would otherwise spend a metered budget.
-- Whenever the work reads data that must not leave the machine, which routes to the local tier rather than the hosted one.
+- Do not use this skill when data must not leave the machine. Keep that work in the authoring session and use deterministic tools instead of model delegation.
 
 ## When NOT to delegate
 
-- **The task needs strong reasoning, judgment, or long-context synthesis — unless explicitly routed to a frontier model.** Free models hosted via Zen and local Ollama models are small, unbenchmarked ids where a wrong answer costs more to detect than the quota saved. When delegating judgment-bearing work, route explicitly to OpenRouter stealth/frontier models or capable OpenCode Go tiers.
+- **The task needs strong reasoning, judgment, or long-context synthesis — unless explicitly routed to a frontier model.** Free models hosted via Zen are small, unbenchmarked ids where a wrong answer costs more to detect than the quota saved. When delegating judgment-bearing work, route explicitly to OpenRouter stealth/frontier models or capable OpenCode Go tiers.
 - **The critical-path edit the rest of the work waits on.** Do it inline, in this session, so progress does not block on a round-trip.
 - **The result must conform to a schema and you have no cheap validator.** `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
-- **The destination tier is unavailable or exhausted.** OpenCode Go operates on windowed **dollar** caps rather than request counts: \$12 per 5 hours, \$30 per week, \$60 per month (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-08-25). When exhausted, fall back to Codex or OpenRouter per the ladder. Zen free tier rate-limiting and Ollama daemon reachability are availability states rather than window exhaustion.
+- **The destination tier is unavailable or exhausted.** OpenCode Go operates on windowed **dollar** caps rather than request counts: \$12 per 5 hours, \$30 per week, \$60 per month (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-08-25). When exhausted, fall back to Codex or OpenRouter per the ladder. Zen free tier rate-limiting is an availability state rather than window exhaustion.
 
-The first two transfer from `delegate-to-codex`, but for a reason that skill does not have. There, work shape and model capability were independent. Here they point the same way: authoring and judgment work is exactly what the free and local tiers are worst at.
+The first two transfer from `delegate-to-codex`, but for a reason that skill does not have. There, work shape and model capability were independent. Here they point the same way: authoring and judgment work is exactly what the free tier is worst at.
 
-## Hosted-free versus local: the routing rule
+## Hosted-only routing rule
 
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md)’s “Data sensitivity is a second trigger” section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.
 
-That trigger does not transfer to opencode. It **splits**, because opencode is more than one destination, and the destinations differ in the only property the trigger cares about.
+`opencode/*` (hosted Zen gateway) and `opencode-go/*` (OpenCode Go subscription) are hosted destinations. The payload leaves the machine exactly as it does for any other hosted model. Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go. OpenRouter is hosted too. A data trigger therefore forbids all OpenCode and OpenRouter model dispatch unless the consuming repository explicitly approves that hosted destination.
 
-**The split.** `opencode/*` (hosted Zen gateway) and `opencode-go/*` (OpenCode Go subscription) are hosted destinations: the payload leaves the machine exactly as it does for any other hosted model. Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go. `ollama/*` is the only id on the whole ladder that *can* keep the payload on the machine — not Claude, not Codex, not `agy`, and not `opencode/*` or `opencode-go/*`.
-
-**Locality requires three conditions: loopback resolution, local-only mode, and local model residency.** `ollama` is a user-authored provider entry in the opencode config, and its `options.baseURL` is an ordinary field in it. Pointing that field at a LAN GPU box or a remote `OLLAMA_HOST` is ordinary usage rather than an edge case, and the id still reads `ollama/*` when it happens. Furthermore, resolving `baseURL` to loopback only verifies the initial connection hop: if Ollama Cloud offloading is enabled or cloud models are targeted, payloads can be forwarded off-machine through the local daemon. Locality is therefore licensed only when three conditions hold: 1. The endpoint check in step 1 resolves `baseURL` strictly to loopback (`127.0.0.1` or `::1`). 2. The running daemon confirms local-only mode live, via `GET /api/status` (`cloud.disabled: true`) — not a static config flag such as `OLLAMA_NO_CLOUD=1`, which the daemon can ignore or the config can omit. 3. The targeted model is verified as locally resident on-device via `GET /api/tags`, refusing any remote-backed, cloud, or absent model — not `ollama list`, which `check-ollama-locality.py` never shells out to. Run these checks before sending data-triggered work, and record the verified endpoint and residency. Measured 2026-08-19 on this machine: `http://localhost:11434/v1`, resolving to `127.0.0.1` and `::1`.
-
-So a data trigger routes to `ollama/*` and forbids `opencode/*` and `opencode-go/*`, where under codex the same trigger simply said “delegate”. Read a repo’s approval as naming a **destination**, not as naming delegation in general: a `CLAUDE.md` rule permitting codex for restricted data says nothing about a hosted free tier nobody has cleared.
-
-**The discriminator is the provider prefix, not the `-free` suffix.** `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider. The suffix answers a pricing question. The prefix answers which tier a job goes to, which is the routing question. It does not answer where that tier’s endpoint points, which is what step 1’s endpoint and residency checks settle.
-
-**The fallback inverts differently than it does for codex.** There, the inversion was “wait for the window instead of falling back to Claude”. Local has no window, so there is nothing to wait for, and the move that must be blocked is a **tier** fallback rather than a vendor one: re-running a slow or failed `ollama/*` job on `opencode/*` or `opencode-go/*` because the hosted tier is faster. That retry is one flag value away and reads as ordinary troubleshooting, which is why it needs naming rather than leaving to judgment. When the local tier cannot do a data-triggered job, fall back only to whatever the repo’s own rule already permits — which may be doing the work by hand.
+**The discriminator is the provider prefix, not the `-free` suffix.** `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider. The suffix answers a pricing question. The prefix answers which hosted tier a job goes to, which is the routing question.
 
 As in the codex skill, do not infer a data trigger from a repo merely holding sensitive data. It applies where the consuming repo has written the rule down, and that repo owns the path list.
 
-- **Do:** run step 1’s endpoint and local-residency check before data-triggered work, and record the endpoint it printed beside the model id so the destination is auditable afterwards.
-- **Do:** send data-triggered work to an `ollama/*` id, and stop rather than re-route when the daemon is unavailable or the check refuses.
-- **Don’t:** retry a failed or slow local run on a hosted model.
-- **Don’t:** treat the `ollama/` prefix as the locality guarantee — it names a provider entry whose endpoint is user-configurable and whose daemon can offload to cloud.
+- **Do:** keep data-triggered work in the authoring session and use deterministic tools when no hosted destination is approved.
+- **Don’t:** start or invoke Ollama, LM Studio, llama.cpp, or another local model.
 - **Don’t:** read a `-free` suffix, or its absence, as evidence about where the payload goes.
 
 ## A third destination: OpenRouter, for models neither tier carries
@@ -85,7 +75,7 @@ Two routing consequences:
 
 ## Where opencode sits in the budget ladder
 
-`memories/delegation.md`’s “Delegate heavy work to another CLI first” section holds the order across `codex`, `agy`, `opencode`, and `openrouter` — including where OpenCode’s own three cost tiers (free/local, the `opencode-go/*` subscription, and OpenRouter’s prepaid balance) sit relative to `codex` and `agy`’s usage windows. Read it there rather than re-deriving it here.
+`memories/delegation.md`’s “Delegate heavy work to another CLI first” section holds the order across `codex`, `agy`, `opencode`, and `openrouter` — including where OpenCode’s hosted cost tiers (free Zen, the `opencode-go/*` subscription, and OpenRouter’s prepaid balance) sit relative to `codex` and `agy`’s usage windows. Read it there rather than re-deriving it here.
 
 ## Procedure
 
@@ -102,31 +92,14 @@ opencode models
 - **Do:** export the npm directory onto the current session’s `PATH` after the User `Path` edit, before retrying.
 - **Don’t:** read the desktop app’s presence as the CLI being installed — they are separate artifacts with separate install routes.
 
-`opencode models` prints ids as `provider/model`, which is the routing signal from the section above. A malformed config fails here rather than mid-run — see Troubleshooting. The gemma/granite ollama entries that section describes were measured 2026-08-19 and are no longer in this machine’s config, which was since rewritten around the opencode-quota plugin — the schema constraint stands, the specific entries do not.
-
-An `ollama/*` id appearing in that list only says the config declares it, not that the daemon is up, so smoke-test the exact id you intend to use:
+`opencode models` prints ids as `provider/model`, which is the routing signal from the section above. A malformed config fails here rather than mid-run — see Troubleshooting. Smoke-test the exact hosted tier you intend to use:
 
 ``` bash
-opencode run -m ollama/qwen2.5-coder:3b "Reply with exactly the word: PONG"
 opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PONG"
 opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 ```
 
-Measured 2026-08-19 on opencode 1.18.15: the `ollama/*` and `opencode/*` smoke-tests above returned `PONG` in 13.3s local and 7.9s hosted. The OpenCode Go **subscription’s activation** was verified 2026-08-25; that check confirmed the subscription is active, not that the smoke test above ran — the `opencode-go/*` line is the recipe for that test, and its output was not observed in this session.
-
-Run `check-ollama-locality.py` (available in repository `scripts/` and packaged under `skills/delegate-to-opencode/scripts/`) against the **exact** model you intend to send data to, not a fixed example — a pass for one `ollama/*` id says nothing about a different one:
-
-``` bash
-# In ai-config workspace:
-python3 scripts/check-ollama-locality.py "<target-model>"
-
-# In consumer repository sessions (using installed skill bundle):
-python3 ~/.claude/skills/delegate-to-opencode/scripts/check-ollama-locality.py "<target-model>"
-```
-
-It exits 0 and prints the confirmation only when: 1. Every address `options.baseURL` resolves to is loopback (`127.0.0.1` or `::1`). 2. Live daemon local-only mode is verified directly from the running daemon via `GET /api/status` (`cloud.disabled: true`). 3. The specified target model is strictly locally resident in `/api/tags` (refusing any remote-backed, cloud, or absent models).
-
-Every other outcome refuses: missing target model argument, unreadable config, missing `ollama` provider or `baseURL`, off-machine endpoint, unverified or unreachable live daemon status, active cloud offloading, unreachable tags API, zero resident models, remote-backed models, or an uninstalled target model. Refusing on an unreadable config or unverified model is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md). This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
+Measured 2026-08-19 on opencode 1.18.15, the hosted-free smoke test returned `PONG` in 7.9s. The OpenCode Go **subscription’s activation** was verified 2026-08-25; that check confirmed the subscription is active, not that the smoke test above ran — the `opencode-go/*` line is the recipe for that test, and its output was not observed in this session.
 
 ### 2. Prepare the prompt
 
@@ -158,7 +131,7 @@ For a long or multi-item run, borrow the background-runner-plus-DONE-marker *sha
 
 Capture stdout and gate on the exit status instead, per step 4.
 
-**`MAXPAR` is the fifth, and it half-transfers: it applies to the hosted tier and not to the local one.** Local runs share one machine’s GPU and memory, so raising parallelism against a single ollama daemon contends for the same hardware instead of fanning out. The crossover point is unmeasured here, so treat local work as serial until somebody measures it.
+**`MAXPAR` is the fifth, and it needs a provider-aware bound.** Hosted providers enforce their own rate and concurrency limits. Start with the provider’s documented limit and reduce parallelism when responses report throttling.
 
 ### 4. Detect failure
 
@@ -178,12 +151,12 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 
 **A total, immediate hosted-free-tier failure is per-model availability, not a tier-wide outage — retry the identical prompt on a different `opencode/*-free` id before escalating.** Measured 2026-08-28 on opencode CLI 1.18.15 (macOS), during a Morrison-Lab/gha#682 delegated multi-file R refactor: `opencode/deepseek-v4-flash-free` failed a dispatch with `UnknownError: "Unexpected server error. Check server logs for details."` (carrying an `err_...` reference), exit 1, before doing any work — zero edits. Retrying the exact same prompt on `opencode/nemotron-3-ultra-free`, a different id on the same hosted-free tier, completed the task.
 
-This is a different failure from the config error above: it happens mid-dispatch on an otherwise-working config, and the fix is a same-tier model swap rather than an edit to `opencode.jsonc`. It is also distinct from the standing rule against retrying a failed local `ollama/*` run on the hosted tier — that rule guards data-triggered work escalating out of the local tier, where the destination itself is restricted. This is a same-tier, cross-model retry with no such restriction in play.
+This is a different failure from the config error above: it happens mid-dispatch on an otherwise-working config, and the fix is a same-tier model swap rather than an edit to `opencode.jsonc`. This is a same-tier, cross-model retry among hosted providers.
 
 - **Do:** on a total, immediate `UnknownError` from one `opencode/*-free` model, retry the identical prompt on a different free-tier model id before falling back to a metered CLI.
 - **Do:** treat a per-model server error as availability noise for that model, not as proof the hosted-free tier itself is down.
 - **Don’t:** read one free-tier model’s `UnknownError` as exhausting the hosted-free tier — a sibling free model completed the identical prompt immediately afterward.
-- **Don’t:** conflate this with the ollama-to-hosted retry prohibition above — that rule blocks escalating a restricted-data job out of the local tier; this is a same-tier swap between two unrestricted hosted-free ids.
+- **Don’t:** use this retry rule for restricted data unless the repository explicitly approves the hosted destination.
 
 ## Relationship to other skills
 
@@ -195,11 +168,9 @@ This is a different failure from the config error above: it happens mid-dispatch
 ## Anti-patterns
 
 - ❌ Sending data-triggered work to an `opencode/*`, `opencode-go/*`, or `openrouter/*` model because it is free or subscription-covered — billing facts say nothing about data leaving the machine.
-- ❌ Retrying a failed or slow `ollama/*` run on the hosted tier.
 - ❌ Passing `--auto` to widen a delegate’s permissions instead of scoping the config (repo root `opencode.json` uses a blanket-allow config intentionally as the scoped equivalent — see above — prefer that over `--auto` per-run).
-- ❌ Pointing a codex-style `MAXPAR` fan-out at one ollama daemon and expecting hosted-style throughput.
 - ❌ Quoting a count, a line number, or a citation a free model returned without re-deriving it.
-- ❌ Skipping OpenCode free/local tiers for small mechanical work because Codex is stronger — Codex has a window to conserve while OpenCode Zen and Ollama consume no quota.
-- ❌ Handing a free or local model the authoring or judgment task that needed Claude’s own context.
+- ❌ Skipping OpenCode’s hosted-free tier for small mechanical work because Codex is stronger — Codex has a window to conserve while OpenCode Zen consumes no quota.
+- ❌ Handing a free hosted model the authoring or judgment task that needed Claude’s own context.
 
 Back to top

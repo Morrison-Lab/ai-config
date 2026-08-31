@@ -36,7 +36,7 @@ backed by a symlink created in `bootstrap.sh`.
   - `send_message` maps to `SendMessage`.
   - `define_subagent` maps to `Task`.
   - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).
-    The adapter forwards it on both the deny and the allow path rather than dropping it.
+    Antigravity's `PreToolUse` schema does not support this top-level field, so the adapter never forwards it directly: on deny it is concatenated into `reason`; on allow it is logged to stderr only.
 - **`Stop`**: Fired on termination attempt (`{"terminationReason": "model_stop", "transcriptPath": "..."}`).
   - In Antigravity's `hooks.json`, `Stop` handlers are **flat** (a direct list of `{ "type": "command", "command": "..." }` objects without `matcher`/`hooks` wrappers), per Antigravity hook specifications.
   - To prevent termination (e.g. when unfulfilled obligations or unreviewed commits exist), Antigravity expects `{"decision": "continue", "reason": "..."}`.

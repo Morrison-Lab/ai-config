@@ -345,8 +345,8 @@ def main():
                         hook_out = json.loads(result.stdout)
                         # systemMessage is a top-level field Claude Code hooks
                         # may return on every event, shown to the user rather
-                        # than fed back to the model; forward it regardless
-                        # of the deny/allow decision below.
+                        # than fed back to the model; surface it regardless
+                        # of the deny/allow decision below (via stderr or reason).
                         if hook_out.get("systemMessage"):
                             system_messages.append(str(hook_out.get("systemMessage")))
                         hso = hook_out.get("hookSpecificOutput", {})

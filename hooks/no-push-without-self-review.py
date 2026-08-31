@@ -568,7 +568,7 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
             return None
         target = "~"
 
-    # Expand ~ and ~user
+    # Expand ~ and ~/path
     if target == "~" or target.startswith("~/"):
         target = os.path.expanduser(target)
     elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
@@ -697,9 +697,10 @@ def _posixize_windows_paths(command: str) -> str:
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
-    `directory` is the push's own `-C`, else the directory a `cd`/`pushd` put it
-    in (subshell scoping respected), else None -- meaning the hook's own cwd.
-    Both were previously read off the FIRST git command in the chain, so
+    `directory` is the push's own absolute `-C`, else the push's relative `-C`
+    resolved within the directory a `cd`/`pushd` put it in (subshell scoping
+    respected), else the `cd`/`pushd` directory, else None -- meaning the hook's
+    own cwd. Both were previously read off the FIRST git command in the chain, so
     `git -C a status && git -C b push` graded the wrong repository.
 
     The sibling stays authoritative on WHETHER a command is a push. The
@@ -786,6 +787,8 @@ def iter_pushes(command: str):
         if effective_dir is None:
             effective_dir = hint
         elif hint is not None and not os.path.isabs(effective_dir):
+            # When -C is relative and an in-command cd/pushd established a working
+            # directory, git applies -C relative to that directory.
             effective_dir = os.path.normpath(os.path.join(hint, effective_dir))
         yield env, rest, effective_dir
 

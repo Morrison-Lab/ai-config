@@ -461,7 +461,8 @@ initially read as the ai-config answer.)
 
 **Confirm that a request belongs to the active session before acting on it.**
 An unrelated repository, pull request, file, or feature name can be pasted
-into a session by mistake. Before searching, editing, or reporting on it,
+into a session by mistake.
+Before searching, editing, or reporting on it,
 compare the request with the active workspace and task; when the mismatch is
 complete, ask whether the user intended a different session or repository.
 

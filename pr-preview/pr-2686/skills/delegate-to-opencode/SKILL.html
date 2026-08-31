@@ -418,7 +418,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="a-third-destination-openrouter-for-models-neither-tier-carries">A third destination: OpenRouter, for models neither tier carries</h2>
 <p><code>opencode</code> reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter’s <strong>stealth</strong> previews — anonymized frontier models trialled under codenames, free while they last. <code>stealth/ox-alpha</code> (“Ox Alpha”, a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was the roster’s one entry on 2026-08-23.</p>
 <p>The provider is carried by the models.dev registry opencode resolves models from — stealth ids included — but it stays <strong>inactive until the config or the auth store references it</strong>, which is why a machine with no openrouter entry lists no <code>openrouter/*</code> ids at all. Any reference activates it: adding the entry below to the existing <code>provider</code> block of <code>opencode.jsonc</code> took this machine’s <code>opencode models</code> from zero <code>openrouter/*</code> ids to 360 — the full registry roster, including <code>stealth/ox-alpha</code> (which the registry already carried) and 359 ids the entry never named (measured 2026-08-23 on opencode 1.18.21). An empty <code>"openrouter": {}</code> therefore activates the same roster; a <code>models</code> entry earns its lines only by setting a display name, or by reaching an id the registry does not carry yet:</p>
-<pre class="jsonc"><code>// merged into the existing "provider" block of opencode.jsonc --- not a standalone file
+<pre class="jsonc"><code>// Insert inside the existing "provider" object in ~/.config/opencode/opencode.jsonc
+// (add a comma after the preceding sibling entry):
 "openrouter": {
   "models": {
     "stealth/ox-alpha": { "name": "Ox Alpha (stealth, 1M context)" }

@@ -453,10 +453,10 @@ direction --- see
 [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md), which owns that
 fact.
 
-## Four silent failure modes arrive through a merge nothing flags
+## Five silent failure modes arrive through a merge nothing flags
 
 The reason "no conflict" is not an all-clear.
-All four landed through merges that left nothing in the PR diff to point at and no check turning red --- three through merges git resolved cleanly, and one through a marked conflict resolved the wrong way.
+All five landed through merges that left nothing in the PR diff to point at and no check turning red --- four through merges git resolved cleanly, and one through a marked conflict resolved the wrong way.
 
 **Version parity.**
 A clean merge of `main` can leave an R package's `DESCRIPTION` `Version:` at
@@ -523,6 +523,22 @@ What the capped-file case adds is that the signal is not merely absent but
 **misdirecting**: a second step enforces the same threshold, so the advisory
 label is accurate about its own step and false about the job.
 
+**Clean auto-merge of independently grown logic (fail-open union).**
+A merge uniting two independently developed versions of a file can be resolved
+cleanly by git with zero textual conflicts, yet combine mechanisms that interact
+pathologically or open silent loopholes.
+Because git merges non-overlapping regions automatically, neither side's test
+suite tests the cross-terms or combinations of both feature sets.
+The resulting file passes both suites while failing open on inputs neither
+side considered.
+(Measured on PR [#2736](https://github.com/Morrison-Lab/ai-config/pull/2736):
+merge `80398b90` auto-merged `scripts/check-pr-fully-clean.py` with zero conflicts
+--- 359 lines from `main`, 109 from the branch --- yet the post-merge adversarial
+review of the cleanly merged files (`scripts/check-pr-fully-clean.py` and
+`scripts/pre-push-review.py`, commit `cea1a533`) returned five fail-opens across the
+newly combined review-matching, payload-extraction, and disclosure-footer mechanisms.
+See Pattern 28 in [`mistake-patterns.md`](../../memories/mistake-patterns.md).)
+
 ### The instrument lesson, which is the transferable part
 
 A check keyed on **added lines** is blind to the splice by construction.
@@ -567,6 +583,8 @@ predicate runs on both sides.
 
 - **Do:** re-check version parity and run a splice-count delta after any merge
   that git resolved without conflict.
+- **Do:** write adversarial tests against the union of independently grown logic
+  even when git auto-merges with zero conflicts.
 - **Do:** convert a noisy absolute-count check into a before/after delta rather
   than discarding it.
 - **Do:** project a capped quantity as `a + b - base` across every pair of open

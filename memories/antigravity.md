@@ -19,7 +19,7 @@ or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
 (Empirical finding verified on macOS 2026-08-29: Antigravity expands `~` when launching the command).
 For example, `ai-config` uses
 `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
-backed by a symlink created in `bootstrap.sh`.
+backed by a staging directory created in `bootstrap.sh`.
 
 ### Lifecycle events & payload mapping
 - **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
@@ -105,14 +105,12 @@ Three layers had to fail together, and each is worth checking separately when au
 - IDE sessions: `~/.gemini/antigravity/conversations/*.db`; CLI sessions: `~/.gemini/antigravity-cli/conversations/*.db`, with prompts in `~/.gemini/antigravity-cli/history.jsonl`.
   `strings <db> | grep <needle>` recovers commands and hook decisions without a sqlite client;
   mtimes bracket the session window.
-- Two path layers decide which hook code agy actually runs, and they moved in opposite directions overnight 2026-08-29/30 PT (symlink swapped for a copy 2026-08-29 22:56 PT;
-  ai-config#2664 merged 2026-08-30 00:34 PT).
-  `~/.gemini/config/plugins.json` registers the plugin by absolute path into the **live ai-config checkout** (`.../Documents/GitHub/ai-config/plugins/ai-config`), so `hooks.json` itself is read from whatever branch that checkout is parked on.
-  But since ai-config#2664, `hooks.json`'s `command` entries invoke the scripts via `~/.gemini/config/plugins/ai-config/...` --- and on this machine that path is a **static copy** (the previous symlink into the checkout was renamed to `ai-config.backup-<epoch>`), while `bootstrap.sh` creates it as a symlink on a fresh install.
-  So a gate or adapter fix merged to main reaches agy only when that copy is refreshed (or the symlink restored);
-  diff the copy against the checkout before trusting that a fix is live.
-
-(Measured 2026-08-30 while diagnosing ai-config#2676.)
+- Two path layers decide which hook code agy actually runs:
+  `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
+  where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`) are symlinked from the checkout into the staging directory,
+  so adapter and gate updates take effect live while canonical source remains pristine.
+  (Updated 2026-08-31 for Issue #2673).
 
 ## Reactive wakeup vs background task polling
 

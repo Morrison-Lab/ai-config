@@ -302,7 +302,7 @@ exists to prevent.
 The same session had applied that carve-out in its own dispatch, choosing the
 default branch as the ref precisely because the PR edited workflow YAML, and
 then wrote the unconditional form into the guidance anyway.
-An [`adversarial-reviewer`](../workflow/adversarial-self-review.md) subagent
+An [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent
 found it.)
 
 ## An edit made for precision can assert what the loose version never did

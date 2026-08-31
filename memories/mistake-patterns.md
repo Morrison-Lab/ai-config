@@ -99,6 +99,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 5g: Dropping Background PR Check Timers While PRs Are In-Flight
 - **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
 - **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
+  - 2nd occurrence: 2026-08-30 session (Conductor setup in `Morrison-Lab/gha`): promised to "monitor their progress" for CI/review after pushing a PR, but ended the turn without using the schedule tool, prompting an "empty promise" correction.
 - **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
 - **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer before concluding any turn, and report what was armed and its firing time.
   When actively waiting on fast CI jobs, use short intervals (1--2 minutes);

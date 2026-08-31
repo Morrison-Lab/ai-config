@@ -646,7 +646,7 @@ It has four, verified by grepping `gh workflow run` over that file at
 `838011e`, so the proposed input would have left the fourth dispatching, and
 the issue's own "Why it matters now" section promised an on-request-only
 reviewer that its proposed fix could not deliver.
-An [`adversarial-reviewer`](adversarial-self-review.md) subagent found it;
+An [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent found it;
 the author had already read the same file twice without finding it.)
 
 ## Relationship to neighbouring rules

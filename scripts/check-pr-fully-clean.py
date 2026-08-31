@@ -32,6 +32,8 @@ Exit codes:
    from 1, so "you invoked this incorrectly" is never read as "the PR is not
    clean" (shared/principles/fail-fast.md).
 """
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -43,7 +45,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import CODE_SPAN_RE, find_fence_spans  # noqa: E402
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
 # cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
@@ -1878,7 +1880,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         structured = extract_structured_review(body)
         struct_sha = str(structured.get("commit_sha", "")).strip() if structured else ""
         is_struct_sha_match = bool(
-            struct_sha and (struct_sha == sha or sha.startswith(struct_sha) or struct_sha.startswith(sha_short))
+            struct_sha and len(struct_sha) >= 7 and (struct_sha == sha or sha.startswith(struct_sha) or struct_sha.startswith(sha_short))
         )
         is_sha_match = bool((oid and oid == sha) or is_struct_sha_match or sha_short in body or sha in body)
         if oid:

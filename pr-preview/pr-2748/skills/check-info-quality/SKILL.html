@@ -361,10 +361,10 @@ ul.task-list li input[type="checkbox"] {
 <p>Before evaluating Check C (Misleading / out-of-context information), check whether the repository’s local source corpus (<code>sources/</code> or equivalent) actually contains the needed sources: <strong>(Note: Checks A and B do not require a source corpus. If the target document contains zero citations to external works, skip this gate and proceed directly to evaluate Check C).</strong></p>
 <ol type="1">
 <li><strong>Are required sources missing from the local corpus?</strong></li>
-<li><strong>Are required sources present but unconverted?</strong> (e.g., <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> files without corresponding Markdown conversions)</li>
+<li><strong>Is the required source present but unconverted?</strong> For example, a <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> file without a corresponding Markdown conversion.</li>
 </ol>
 <p>If <strong>either</strong> of these conditions hold, <strong>refuse to run Check C</strong>. - Do NOT partially check Check C by evaluating only the sources that are present (rescoped only on explicit user request). - Do NOT fall back to memory or the open web for the missing sources. - If you discover during verification that a local source is incomplete (e.g.&nbsp;missing a chapter), abort Check C and return <strong><code>Pre-flight: NOT READY</code></strong>.</p>
-<p>For Check C, return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions (e.g., “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.”). You must still execute Checks A and B.</p>
+<p>For Check C, return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions. For example, “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.” You must still execute Checks A and B.</p>
 </section>
 <section id="step-1-resolve-the-target-and-its-context" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-resolve-the-target-and-its-context">Step 1 — Resolve the target and its context</h2>

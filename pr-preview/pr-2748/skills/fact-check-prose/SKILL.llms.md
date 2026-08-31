@@ -21,14 +21,14 @@ A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text. Re
 
 ### 2. Pre-flight Readiness Gate (Hard Stop)
 
-Before evaluating the extracted claims against external sources, check whether the repository’s local source corpus (`sources/` or equivalent) actually contains the needed sources: **(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).**
+Before evaluating any claim against an external source, check whether the repository’s local source corpus (`sources/` or equivalent) actually contains the needed sources: **(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).**
 
 1.  **Are required sources missing from the local corpus?**
-2.  **Are required sources present but unconverted?** (e.g., `.pdf`, `.docx`, or `.epub` files without corresponding Markdown conversions)
+2.  **Is the required source present but unconverted?** For example, a `.pdf`, `.docx`, or `.epub` file without a corresponding Markdown conversion.
 
 If **either** of these conditions hold, **refuse to run**. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.
 
-Return **`Pre-flight: NOT READY`** instead of a report, and print remediation instructions (e.g., “Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally.”).
+Return **`Pre-flight: NOT READY`** instead of a report, and print remediation instructions. For example, “Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally.”
 
 Only proceed to Step 3 if the gate passes.
 

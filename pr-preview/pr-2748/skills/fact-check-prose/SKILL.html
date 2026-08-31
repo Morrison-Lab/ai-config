@@ -362,13 +362,13 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="pre-flight-readiness-gate-hard-stop" class="level3">
 <h3 class="anchored" data-anchor-id="pre-flight-readiness-gate-hard-stop">2. Pre-flight Readiness Gate (Hard Stop)</h3>
-<p>Before evaluating the extracted claims against external sources, check whether the repository’s local source corpus (<code>sources/</code> or equivalent) actually contains the needed sources: <strong>(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).</strong></p>
+<p>Before evaluating any claim against an external source, check whether the repository’s local source corpus (<code>sources/</code> or equivalent) actually contains the needed sources: <strong>(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).</strong></p>
 <ol type="1">
 <li><strong>Are required sources missing from the local corpus?</strong></li>
-<li><strong>Are required sources present but unconverted?</strong> (e.g., <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> files without corresponding Markdown conversions)</li>
+<li><strong>Is the required source present but unconverted?</strong> For example, a <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> file without a corresponding Markdown conversion.</li>
 </ol>
 <p>If <strong>either</strong> of these conditions hold, <strong>refuse to run</strong>. - Do NOT silently narrow scope. - Do NOT partially check around the gap. - Do NOT fall back to memory or the open web for the missing sources.</p>
-<p>Return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions (e.g., “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.”).</p>
+<p>Return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions. For example, “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.”</p>
 <p>Only proceed to Step 3 if the gate passes.</p>
 </section>
 <section id="check-factual-claims" class="level3">

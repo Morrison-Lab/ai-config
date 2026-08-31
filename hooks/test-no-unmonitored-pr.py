@@ -91,4 +91,5 @@ finally:
     os.unlink(scheduled)
     os.unlink(ag_opened)
     os.unlink(ag_scheduled)
+
 print("PASS: detects an unmonitored PR and gives each PR a stable timer state file")

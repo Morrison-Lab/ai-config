@@ -351,3 +351,37 @@ print("PASS: a <<< herestring is not mistaken for a heredoc")
 print("PASS: commit-tree and commit-graph are not commits, while a plain commit still arms")
 print("PASS: an env-prefixed push discharges; an env-prefixed commit still arms")
 print("PASS: Antigravity and OpenAI/Codex transcript records are recognized")
+
+
+def antigravity_transcript(tool_calls):
+    handle, path = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as stream:
+        stream.write(json.dumps({"type": "PLANNER_RESPONSE", "tool_calls": tool_calls}) + "\n")
+    return path
+
+def combine_transcripts(paths):
+    handle, outpath = tempfile.mkstemp()
+    with os.fdopen(handle, "w") as out:
+        for p in paths:
+            with open(p) as inc:
+                out.write(inc.read())
+    return outpath
+
+ag_commit = antigravity_transcript([{"name": "run_command", "args": {"CommandLine": "git commit -m \"fix\""}}])
+ag_commit_truncated = antigravity_transcript([{"name": "run_command", "args": {"CommandLine": "\"git commit -m \\\"fix\\\"\\n"}}])
+ag_push = antigravity_transcript([{"name": "run_command", "args": {"CommandLine": "git push origin main"}}])
+
+try:
+    assert subject.pending_commit(ag_commit) == "git commit -m \"fix\""
+    assert subject.pending_commit(ag_commit_truncated) == 'git commit -m "fix"\n'
+    combined = combine_transcripts([ag_commit_truncated, ag_push])
+    try:
+        assert subject.pending_commit(combined) is None
+    finally:
+        os.unlink(combined)
+finally:
+    os.unlink(ag_commit)
+    os.unlink(ag_commit_truncated)
+    os.unlink(ag_push)
+
+print("PASS: Antigravity PLANNER_RESPONSE parses and correctly discharges")

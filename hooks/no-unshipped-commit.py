@@ -119,6 +119,21 @@ def strip_quoted(command):
     return "\n".join(kept)
 
 
+
+def unwrap_command(cmd):
+    if not isinstance(cmd, str):
+        return ""
+    if cmd.startswith('"'):
+        try:
+            return json.loads(cmd)
+        except Exception:
+            # Handle truncated JSON strings by unescaping manually
+            cmd = cmd[1:]
+            if cmd.endswith('"'):
+                cmd = cmd[:-1]
+            return cmd.replace('\\n', '\n').replace('\\"', '"')
+    return cmd
+
 def pending_commit(path):
     pending = None
     try:
@@ -153,6 +168,7 @@ def pending_commit(path):
                     if name not in {"Bash", "bash", "run_command", "terminal", "execute_command", "shell"}:
                         continue
                     command = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
+                    command = unwrap_command(command)
                     scanned = strip_quoted(command)
                     if COMMIT.search(scanned):
                         pending = command

@@ -16,10 +16,25 @@ import tempfile
 import time
 
 OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|schedule", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|^schedule\b", re.I)
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
+
+
+def unwrap_command(cmd):
+    if not isinstance(cmd, str):
+        return ""
+    if cmd.startswith('"'):
+        try:
+            return json.loads(cmd)
+        except Exception:
+            # Handle truncated JSON strings by unescaping manually
+            cmd = cmd[1:]
+            if cmd.endswith('"'):
+                cmd = cmd[:-1]
+            return cmd.replace('\\n', '\n').replace('\\"', '"')
+    return cmd
 
 def records(path):
     try:
@@ -36,26 +51,27 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        tool_calls = []
+        blobs = []
         if record.get("type") == "assistant" or record.get("role") == "assistant":
-            blocks = (record.get("message") or {}).get("content") or record.get("content") or []
-            if isinstance(blocks, list):
-                for block in blocks:
-                    if isinstance(block, dict) and block.get("type") == "tool_use":
-                        tool_calls.append((block.get("name") or "", block.get("input") or {}))
+            for block in (record.get("message") or {}).get("content") or record.get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
-            for tc in record.get("tool_calls") or []:
-                if isinstance(tc, dict):
-                    name = tc.get("name") or (tc.get("function") or {}).get("name") or ""
-                    args = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+            for block in (record.get("tool_calls") or []):
+                if isinstance(block, dict):
+                    name = block.get("name") or (block.get("function") or {}).get("name") or ""
+                    args = block.get("args") or block.get("input") or (block.get("function") or {}).get("arguments") or {}
                     if isinstance(args, str):
                         try:
                             args = json.loads(args)
                         except Exception:
                             args = {"command": args}
-                    tool_calls.append((name, args if isinstance(args, dict) else {}))
-        for name, inp in tool_calls:
-            blob = name + " " + json.dumps(inp)
+                    if not isinstance(args, dict):
+                        args = {}
+                    cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
+                    cmd = unwrap_command(cmd)
+                    blobs.append(name + " " + json.dumps({**args, "command": cmd}))
+        for blob in blobs:
             if OPEN.search(blob):
                 opened, armed = True, False
             if opened and SCHEDULE.search(blob):
@@ -80,6 +96,7 @@ def extract_pr_urls(path):
         content_items = []
         if isinstance(record.get("content"), list):
             content_items.extend(record.get("content"))
+
         if isinstance((record.get("message") or {}).get("content"), list):
             content_items.extend(record["message"]["content"])
         elif isinstance(record.get("message"), list):

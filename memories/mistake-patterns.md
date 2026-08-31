@@ -38,7 +38,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): wrote content, committed, but stopped before pushing/opening a PR.
   AGENTS.md line 63-72 already mandated the full delivery cycle.
   The fix was recorded verbally but not persisted.
-  Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts`): formatted Statistical Analysis Plan, ran tests and verified renders, generated walkthrough artifact, but presented summary recap to the user instead of automatically completing the delivery cycle (issue creation, commit, adversarial review subagent, push, and opening PR). Corrected by user with `cai: you should have pushed a PR without me having to tell you`.
+  Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts`): formatted Statistical Analysis Plan, ran tests and verified renders, generated walkthrough artifact, but presented summary recap to the user instead of automatically completing the delivery cycle (issue creation, commit, adversarial review subagent, push, and opening PR).
+  Corrected by user with `cai: you should have pushed a PR without me having to tell you`.
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
 - **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply.
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
@@ -58,6 +59,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   the defect was resting a terminal claim on it.
   An earlier Fix in this pattern recommended those short rollups ---
   that was the wrong instrument for a terminal claim.
+  Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)):
+  reported PR as "MERGEABLE" in status recap based on GitHub's git conflict field (`mergeable: MERGEABLE`) while CI checks were red (failing changelog, spellcheck, version check) and external review was not clean. Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
+  Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness; explicitly report CI check status and review verdict.
 - **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`

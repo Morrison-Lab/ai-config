@@ -98,7 +98,7 @@ class BacklogSweeper:
             pr_number = claim_info.get("pr_number")
             pr_url = claim_info.get("pr_url")
 
-        # Stage 1: Triage & Research (Ollama / Opencode Free / Local)
+        # Stage 1: Triage & Research (hosted low-cost tier)
         triage_task = Task(
             title=f"#{issue_num}: Triage & Research - {issue_title[:50]}",
             role="researcher",

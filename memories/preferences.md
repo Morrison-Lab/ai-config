@@ -26,7 +26,7 @@
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.
   Local inference can crash the user's computer. (User directive, 2026-08-30.)
-- **Never use LLMs for algorithmic thinking; use validated algorithmic software**:
+- **Never use LLMs for algorithmic thinking --- use validated algorithmic software**:
   Do not rely on probabilistic language model reasoning in-context for arithmetic, counting, algebra, derivatives, integrals, linear algebra, sorting, or mathematical proof verification.
   Use validated deterministic tools (e.g. `wc -l`, `grep -c`, Python `len()`/`math`, SymPy, NumPy, R, Computer Algebra Systems, or formal proof assistants).
   When no off-the-shelf software exists, write and validate the algorithmic software yourself before consuming its output.

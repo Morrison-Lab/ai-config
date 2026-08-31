@@ -1,4 +1,4 @@
-Never use LLMs for algorithmic thinking; use validated algorithmic software instead.
+Never use LLMs for algorithmic thinking --- use validated algorithmic software instead.
 When an operation is algorithmic --- counting, arithmetic, algebra,
 derivatives, integrals, linear algebra, sorting, or mathematical proof verification ---
 delegate the computation to validated, deterministic software rather than

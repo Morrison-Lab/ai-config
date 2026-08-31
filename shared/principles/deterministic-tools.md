@@ -44,7 +44,8 @@ reasoning for arithmetic, algebra, calculus, sorting, and proof steps.
 Read them first; this principle extends them on two axes rather than
 restating them.
 
-**Scope.** The check rule governs *verification*: never spend reasoning on a
+**Scope.**
+The check rule governs *verification*: never spend reasoning on a
 check an algorithm can decide.
 The algorithmic-thinking rule governs *computation*: never spend probabilistic
 tokens on an algorithmic result software can compute.

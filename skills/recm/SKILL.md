@@ -63,7 +63,7 @@ Choose the primary interactive harness or non-interactive sidecar CLI based on r
 | **Claude Code** | Primary Orchestrator & Conductor | Multi-turn reasoning, project context closure, git workflows, subagent management | Interactive terminal CLI; manages workflows and tool execution. |
 | **Antigravity / Gemini CLI (`agy`)** | DeepMind Ecosystem Harness & Sidecar | Antigravity plugins/skills discovery (`plugins/ai-config`), interactive UI, headless sidecar | Headless: `agy --print "<prompt>"`. **Note**: API route retired; CLI available. Keep prompt immediately after `--print`. |
 | **Codex CLI (`codex`)** | Mechanical Sidecar Executor | Heavy parallelizable read/draft/verify, bounded implementation from clear specs | `codex exec -C <repo> -s read-only - < prompt.txt`. Sunk ChatGPT plan (~5h window). |
-| **OpenCode CLI (`opencode`)** | Zero-Cost & Multi-Provider Sidecar | Mechanical edits with deterministic test suites, OpenRouter stealth previews | `opencode run --model <id>`. Free hosted tier (`opencode/*`) & Zen, or `$10/mo` Go window. |
+| **OpenCode CLI (`opencode`)** | Zero-Cost & Multi-Provider Sidecar | Mechanical edits with deterministic test suites, OpenRouter stealth previews | `opencode run -m <id>`. Free hosted tier (`opencode/*`) & Zen, or `$10/mo` Go window. |
 | **Cursor / VS Code** | Interactive Editor & Visual IDE | Interactive human editing, real-time typing autocomplete, visual diff navigation | IDE harness; probe CLI automation before relying on headless runs. |
 | **`adv` / `pre-push-review.py`** | Multi-Engine Review Harness | Adversarial self-review across diverse model families prior to pushing code | Dedicated review dispatch runner (`adv` skill). |
 
@@ -136,12 +136,15 @@ When evaluating a repository, issue, or task, follow these steps:
 
 ### Step 1: Check Data Sensitivity & Repository Boundaries
 - Does the repository or task touch restricted, private, or sensitive data?
-  - **YES** → Keep work in the local orchestrator session; do not dispatch off-machine to third-party hosted CLIs unless explicitly approved. Use deterministic tools.
+  - **YES** → Keep work in the local orchestrator session;
+    do not dispatch off-machine to third-party hosted CLIs unless explicitly approved.
+    Use deterministic tools.
   - **NO** → Proceed to Step 2.
 
 ### Step 2: Check Deterministic Testability & Task Shape
 - Is the task an algorithmic or deterministic calculation (counting lines, sorting, regex validation, math)?
-  - **YES** → Write and run a deterministic script (Python/Bash/R); do not delegate to an LLM.
+  - **YES** → Write and run a deterministic script (Python/Bash/R);
+    do not delegate to an LLM.
 - Is the task a heavy, parallelizable read / audit / draft of multiple files?
   - **YES** → Route to sidecar CLI (`codex` or `opencode` free) via [`delegate-to-codex`](../delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md).
 - Is the task a bounded implementation from a clear spec with an automated test suite?

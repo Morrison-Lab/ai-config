@@ -314,6 +314,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#check-info-quality-flag-stale-irrelevant-and-misleading-content" id="toc-check-info-quality-flag-stale-irrelevant-and-misleading-content" class="nav-link active" data-scroll-target="#check-info-quality-flag-stale-irrelevant-and-misleading-content">check-info-quality — flag stale, irrelevant, and misleading content</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#pre-flight-readiness-gate-hard-stop-for-check-c" id="toc-pre-flight-readiness-gate-hard-stop-for-check-c" class="nav-link" data-scroll-target="#pre-flight-readiness-gate-hard-stop-for-check-c">Pre-flight Readiness Gate (Hard Stop for Check C)</a></li>
   <li><a href="#step-1-resolve-the-target-and-its-context" id="toc-step-1-resolve-the-target-and-its-context" class="nav-link" data-scroll-target="#step-1-resolve-the-target-and-its-context">Step 1 — Resolve the target and its context</a></li>
   <li><a href="#step-2-run-the-three-checks" id="toc-step-2-run-the-three-checks" class="nav-link" data-scroll-target="#step-2-run-the-three-checks">Step 2 — Run the three checks</a>
   <ul class="collapse">
@@ -354,6 +355,16 @@ ul.task-list li input[type="checkbox"] {
 <li>“is this misleading”, “is this out of context”, “check this citation supports the claim”, “does this quote/citation actually say that”</li>
 <li>Proactively, as part of a thorough content review (PR review, <code>ardi</code> cycle on documentation, or a <code>grade-work</code> pass) — fold in a pass of this catalog alongside <code>find-ai-tells</code> and <code>purge-hallucinations</code>.</li>
 </ul>
+</section>
+<section id="pre-flight-readiness-gate-hard-stop-for-check-c" class="level2">
+<h2 class="anchored" data-anchor-id="pre-flight-readiness-gate-hard-stop-for-check-c">Pre-flight Readiness Gate (Hard Stop for Check C)</h2>
+<p>Before evaluating Check C (Misleading / out-of-context information), check whether the repository’s local source corpus (<code>sources/</code> or equivalent) actually contains the needed sources: <strong>(Note: Checks A and B do not require a source corpus. If the target document contains zero citations to external works, skip this gate and proceed directly to evaluate Check C).</strong></p>
+<ol type="1">
+<li><strong>Are required sources missing from the local corpus?</strong></li>
+<li><strong>Is the required source present but unconverted?</strong> For example, a <code>.pdf</code>, <code>.docx</code>, or <code>.epub</code> file without a corresponding Markdown conversion.</li>
+</ol>
+<p>If <strong>either</strong> of these conditions hold, <strong>refuse to run Check C</strong>. - Do NOT partially check Check C by evaluating only the sources that are present (rescoped only on explicit user request). - Do NOT fall back to memory or the open web for the missing sources. - If you discover during verification that a local source is incomplete (e.g.&nbsp;missing a chapter), abort Check C and return <strong><code>Pre-flight: NOT READY</code></strong>.</p>
+<p>For Check C, return <strong><code>Pre-flight: NOT READY</code></strong> instead of a report, and print remediation instructions. For example, “Populate the <code>sources/</code> directory with Markdown conversions of the cited works so they can be verified locally.” You must still execute Checks A and B.</p>
 </section>
 <section id="step-1-resolve-the-target-and-its-context" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-resolve-the-target-and-its-context">Step 1 — Resolve the target and its context</h2>

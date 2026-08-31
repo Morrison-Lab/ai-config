@@ -178,6 +178,9 @@ jobs:
       - name: Run Antigravity hook adapter tests
         # Tests the Antigravity lifecycle adapter and manifest translation in hermetic isolation.
         run: python3 scripts/test_agy_hook_adapter.py
+      - name: Run Aider hook adapter tests
+        # Tests Aider markdown history parsing, JSONL generation, and hook translation (ai-config#2659).
+        run: python3 scripts/test_aider_hook_adapter.py
       - name: Run Antigravity merge-gate tests
         # Verdict-parsing and merge-command gating for the Antigravity plugin's
         # enforce-mwc-review-gate.py, incl. the sparta#1427 regression (#2676).

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Provide recommendations for choices.">
+<meta name="description" content="→ cut-tools.">
 
 <title>skill – ai-config</title>
 <style>
@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -346,27 +311,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#rec-provide-recommendations-for-choices-and-questions" id="toc-rec-provide-recommendations-for-choices-and-questions" class="nav-link active" data-scroll-target="#rec-provide-recommendations-for-choices-and-questions">rec — provide recommendations for choices and questions</a>
-  <ul class="collapse">
-  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#core-rules" id="toc-core-rules" class="nav-link" data-scroll-target="#core-rules">Core Rules</a>
-  <ul class="collapse">
-  <li><a href="#always-include-a-concrete-recommendation" id="toc-always-include-a-concrete-recommendation" class="nav-link" data-scroll-target="#always-include-a-concrete-recommendation">1. Always include a concrete recommendation</a></li>
-  <li><a href="#interactive-tools-format-put-recommendation-first" id="toc-interactive-tools-format-put-recommendation-first" class="nav-link" data-scroll-target="#interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</a></li>
-  <li><a href="#visual-tagging-in-chat-output" id="toc-visual-tagging-in-chat-output" class="nav-link" data-scroll-target="#visual-tagging-in-chat-output">3. Visual tagging in chat output</a></li>
-  <li><a href="#do-not-offer-authorized-work-as-an-optional-choice" id="toc-do-not-offer-authorized-work-as-an-optional-choice" class="nav-link" data-scroll-target="#do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</a></li>
-  </ul></li>
-  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
-  <ul class="collapse">
-  <li><a href="#step-1-identify-the-choice-or-question" id="toc-step-1-identify-the-choice-or-question" class="nav-link" data-scroll-target="#step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</a></li>
-  <li><a href="#step-2-evaluate-trade-offs" id="toc-step-2-evaluate-trade-offs" class="nav-link" data-scroll-target="#step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</a></li>
-  <li><a href="#step-3-present-the-recommendation" id="toc-step-3-present-the-recommendation" class="nav-link" data-scroll-target="#step-3-present-the-recommendation">Step 3 — Present the recommendation</a></li>
-  </ul></li>
-  <li><a href="#relationship-to-other-skills-and-rules" id="toc-relationship-to-other-skills-and-rules" class="nav-link" data-scroll-target="#relationship-to-other-skills-and-rules">Relationship to other skills and rules</a></li>
-  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
-  </ul></li>
+  <li><a href="#ct-alias-for-cut-tools" id="toc-ct-alias-for-cut-tools" class="nav-link active" data-scroll-target="#ct-alias-for-cut-tools">ct (alias for <code>cut-tools</code>)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ct/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ct/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -375,92 +322,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="rec-provide-recommendations-for-choices-and-questions" class="level1">
-<h1>rec — provide recommendations for choices and questions</h1>
-<p>Whenever posing a choice or asking a question to the user, always provide a clear, specific, and grounded recommendation. Never present an unweighted list of options or ask “what should I do?” without declaring your own recommended path.</p>
-<p>This skill is invoked proactively before presenting decisions or questions, or reactively when the user invokes <code>/rec</code>, <code>/recommend</code>, or asks what the agent recommends after an unweighted question was asked.</p>
-<section id="when-this-fires" class="level2">
-<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
-<ul>
-<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_user_question</code>).</li>
-<li><strong>Reactively</strong>:
-<ul>
-<li>Explicit invocation: <code>/rec</code>, <code>/recommend</code>, “recommend”, “rec”.</li>
-<li>The user asks “what do you recommend?”, “what’s your recommendation?”, “which one should we pick?”, or “give me a recommendation”.</li>
-<li>The agent previously asked a question without a recommendation and needs to supply one now.</li>
-</ul></li>
-</ul>
-</section>
-<section id="core-rules" class="level2">
-<h2 class="anchored" data-anchor-id="core-rules">Core Rules</h2>
-<section id="always-include-a-concrete-recommendation" class="level3">
-<h3 class="anchored" data-anchor-id="always-include-a-concrete-recommendation">1. Always include a concrete recommendation</h3>
-<p>Never leave a decision or question open-ended without a recommended option. State the specific recommendation clearly (e.g., “Recommendation: Proceed with Option A because…”).</p>
-</section>
-<section id="interactive-tools-format-put-recommendation-first" class="level3">
-<h3 class="anchored" data-anchor-id="interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</h3>
-<p>When using interactive question tools (<code>AskUserQuestion</code> or <code>ask_user_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
-</section>
-<section id="visual-tagging-in-chat-output" class="level3">
-<h3 class="anchored" data-anchor-id="visual-tagging-in-chat-output">3. Visual tagging in chat output</h3>
-<p>In conversational responses, format recommendations using the standard category box:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** <span class="dt">&lt;</span><span class="kw">action</span><span class="dt">&gt;</span>. <span class="dt">&lt;</span><span class="kw">concise</span><span class="ot"> rationale</span><span class="dt">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Lead with the specific action, followed by the trade-off rationale.</p>
-</section>
-<section id="do-not-offer-authorized-work-as-an-optional-choice" class="level3">
-<h3 class="anchored" data-anchor-id="do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</h3>
-<p>Distinguish genuine decisions from authorized or standard workflow steps: - If an action is already in scope or required by standing rules (e.g., running tests, fixing lints, ARDI loops, drafting issues), perform the work and report in the past tense rather than asking “Let me know if you want me to do X”. - Reserve recommendations for genuine forks in design, architecture, scope trade-offs, or external intent.</p>
-</section>
-</section>
-<section id="procedure" class="level2">
-<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="step-1-identify-the-choice-or-question" class="level3">
-<h3 class="anchored" data-anchor-id="step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</h3>
-<ul>
-<li><strong>Proactive</strong>: State the decision point, the context that makes it necessary, and the distinct feasible options.</li>
-<li><strong>Reactive</strong> (<code>/rec</code> / <code>/recommend</code>): Scan back through recent conversation turns to locate the latest question or unresolved decision point, restating the options if context is needed.</li>
-</ul>
-</section>
-<section id="step-2-evaluate-trade-offs" class="level3">
-<h3 class="anchored" data-anchor-id="step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</h3>
-<p>Weigh the alternatives across: - <strong>Simplicity and minimal blast radius</strong>: least complex change that solves the issue. - <strong>Project conventions</strong>: alignment with existing codebase patterns and rules. - <strong>Safety and reversibility</strong>: lower operational and maintenance risk. - <strong>Token and execution efficiency</strong>: avoiding unnecessary overhead.</p>
-<p>Select the single strongest path as the recommendation.</p>
-</section>
-<section id="step-3-present-the-recommendation" class="level3">
-<h3 class="anchored" data-anchor-id="step-3-present-the-recommendation">Step 3 — Present the recommendation</h3>
-<p>Present the question or decision with its structured recommendation:</p>
-<ul>
-<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code> or <code>ask_user_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
-<li><strong>For inline chat questions</strong>: State the context, outline the trade-offs, and attach the boxed recommendation:</li>
-</ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>❓ **QUESTION:** <span class="dt">&lt;</span><span class="kw">clear</span><span class="ot"> question</span><span class="dt">&gt;</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option A**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option A and trade-offs</span><span class="dt">&gt;</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option B**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option B and trade-offs</span><span class="dt">&gt;</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** Proceed with Option A because <span class="dt">&lt;</span><span class="kw">rationale</span><span class="dt">&gt;</span>.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-</section>
-<section id="relationship-to-other-skills-and-rules" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills-and-rules">Relationship to other skills and rules</h2>
-<ul>
-<li><strong><code>AGENTS.md</code> (“Always give recommendations with questions”)</strong>: Universal baseline rule requiring recommendations on all questions.</li>
-<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/pm/SKILL.html"><code>pm</code></a></strong>: Surfaces pending questions; pair with <code>rec</code> if a surfaced question lacked a recommendation.</li>
-<li><strong><a href="../../skills/pending-decisions/SKILL.html"><code>pending-decisions</code></a> / <a href="../../skills/pd/SKILL.html"><code>pd</code></a></strong>: Presents tracker-level decisions sequentially, with recommendations.</li>
-<li><strong><a href="../../skills/brainstorm/SKILL.html"><code>brainstorm</code></a></strong>: Interactive Socratic planning loop before implementation; uses <code>rec</code> principles to guide trade-offs.</li>
-</ul>
-</section>
-<section id="anti-patterns" class="level2">
-<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
-<ul>
-<li>❌ Asking “Which option do you prefer?” or “Should I do A or B?” without declaring a recommendation.</li>
-<li>❌ Using “Let me know if…” to pose authorized work as a choice instead of performing it.</li>
-<li>❌ Providing an ambiguous or fence-sitting recommendation (“Either A or B is fine”).</li>
-<li>❌ Placing the recommended option anywhere other than first in interactive choice lists.</li>
-</ul>
+<section id="ct-alias-for-cut-tools" class="level1">
+<h1>ct (alias for <code>cut-tools</code>)</h1>
+<p>This is a short alias. Read and follow the canonical skill:</p>
+<p>→ <strong><a href="../../skills/cut-tools/SKILL.html">cut-tools</a></strong></p>
 
 
-</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -887,7 +754,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/ct/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/ct/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

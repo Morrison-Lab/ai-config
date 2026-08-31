@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Provide recommendations for choices.">
+<meta name="description" content="Audit and disable unneeded MCP tools.">
 
 <title>skill – ai-config</title>
 <style>
@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -346,27 +311,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#rec-provide-recommendations-for-choices-and-questions" id="toc-rec-provide-recommendations-for-choices-and-questions" class="nav-link active" data-scroll-target="#rec-provide-recommendations-for-choices-and-questions">rec — provide recommendations for choices and questions</a>
+  <li><a href="#cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" id="toc-cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" class="nav-link active" data-scroll-target="#cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets">cut-tools — audit and disable unneeded MCP servers and toolsets</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#core-rules" id="toc-core-rules" class="nav-link" data-scroll-target="#core-rules">Core Rules</a>
-  <ul class="collapse">
-  <li><a href="#always-include-a-concrete-recommendation" id="toc-always-include-a-concrete-recommendation" class="nav-link" data-scroll-target="#always-include-a-concrete-recommendation">1. Always include a concrete recommendation</a></li>
-  <li><a href="#interactive-tools-format-put-recommendation-first" id="toc-interactive-tools-format-put-recommendation-first" class="nav-link" data-scroll-target="#interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</a></li>
-  <li><a href="#visual-tagging-in-chat-output" id="toc-visual-tagging-in-chat-output" class="nav-link" data-scroll-target="#visual-tagging-in-chat-output">3. Visual tagging in chat output</a></li>
-  <li><a href="#do-not-offer-authorized-work-as-an-optional-choice" id="toc-do-not-offer-authorized-work-as-an-optional-choice" class="nav-link" data-scroll-target="#do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</a></li>
-  </ul></li>
+  <li><a href="#core-principle" id="toc-core-principle" class="nav-link" data-scroll-target="#core-principle">Core principle</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#step-1-identify-the-choice-or-question" id="toc-step-1-identify-the-choice-or-question" class="nav-link" data-scroll-target="#step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</a></li>
-  <li><a href="#step-2-evaluate-trade-offs" id="toc-step-2-evaluate-trade-offs" class="nav-link" data-scroll-target="#step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</a></li>
-  <li><a href="#step-3-present-the-recommendation" id="toc-step-3-present-the-recommendation" class="nav-link" data-scroll-target="#step-3-present-the-recommendation">Step 3 — Present the recommendation</a></li>
+  <li><a href="#audit-active-tools-and-mcp-servers" id="toc-audit-active-tools-and-mcp-servers" class="nav-link" data-scroll-target="#audit-active-tools-and-mcp-servers">1. Audit active tools and MCP servers</a></li>
+  <li><a href="#identify-unused-or-redundant-toolsets" id="toc-identify-unused-or-redundant-toolsets" class="nav-link" data-scroll-target="#identify-unused-or-redundant-toolsets">2. Identify unused or redundant toolsets</a></li>
+  <li><a href="#disable-unneeded-toolsets" id="toc-disable-unneeded-toolsets" class="nav-link" data-scroll-target="#disable-unneeded-toolsets">3. Disable unneeded toolsets</a></li>
+  <li><a href="#verify-and-confirm" id="toc-verify-and-confirm" class="nav-link" data-scroll-target="#verify-and-confirm">4. Verify and confirm</a></li>
   </ul></li>
-  <li><a href="#relationship-to-other-skills-and-rules" id="toc-relationship-to-other-skills-and-rules" class="nav-link" data-scroll-target="#relationship-to-other-skills-and-rules">Relationship to other skills and rules</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -375,88 +335,76 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="rec-provide-recommendations-for-choices-and-questions" class="level1">
-<h1>rec — provide recommendations for choices and questions</h1>
-<p>Whenever posing a choice or asking a question to the user, always provide a clear, specific, and grounded recommendation. Never present an unweighted list of options or ask “what should I do?” without declaring your own recommended path.</p>
-<p>This skill is invoked proactively before presenting decisions or questions, or reactively when the user invokes <code>/rec</code>, <code>/recommend</code>, or asks what the agent recommends after an unweighted question was asked.</p>
+<section id="cut-tools-audit-and-disable-unneeded-mcp-servers-and-toolsets" class="level1">
+<h1>cut-tools — audit and disable unneeded MCP servers and toolsets</h1>
+<p>Every active tool and MCP server injects parameter schemas and descriptions into the model’s base prompt on every interaction. Disabling unused MCP servers and tool sets directly buys context window space, reduces per-turn latency, costs no quota, and requires no permanent code changes.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li><strong>Proactively</strong>: whenever presenting options for a genuine decision, asking a clarifying or architectural question, or using interactive question modals (<code>AskUserQuestion</code> / <code>ask_user_question</code>).</li>
-<li><strong>Reactively</strong>:
-<ul>
-<li>Explicit invocation: <code>/rec</code>, <code>/recommend</code>, “recommend”, “rec”.</li>
-<li>The user asks “what do you recommend?”, “what’s your recommendation?”, “which one should we pick?”, or “give me a recommendation”.</li>
-<li>The agent previously asked a question without a recommendation and needs to supply one now.</li>
-</ul></li>
+<li>“cut tools”, “cut tool definitions”, “disable unused MCP servers”, “audit active tools”, “free up context from tools”, “disable unneeded extensions”, “prune tool definitions”</li>
+<li>Proactively when context is constrained or before long, multi-step sessions</li>
+<li>When starting work in a repository that only requires local editing and CLI tools, but has extensive external MCP servers or plugins enabled</li>
 </ul>
 </section>
-<section id="core-rules" class="level2">
-<h2 class="anchored" data-anchor-id="core-rules">Core Rules</h2>
-<section id="always-include-a-concrete-recommendation" class="level3">
-<h3 class="anchored" data-anchor-id="always-include-a-concrete-recommendation">1. Always include a concrete recommendation</h3>
-<p>Never leave a decision or question open-ended without a recommended option. State the specific recommendation clearly (e.g., “Recommendation: Proceed with Option A because…”).</p>
-</section>
-<section id="interactive-tools-format-put-recommendation-first" class="level3">
-<h3 class="anchored" data-anchor-id="interactive-tools-format-put-recommendation-first">2. Interactive tools format: put recommendation first</h3>
-<p>When using interactive question tools (<code>AskUserQuestion</code> or <code>ask_user_question</code>): - Place the recommended option <strong>first</strong> in the options array. - Prefix the label with <code>(Recommended)</code> (e.g., <code>(Recommended) Option A: ...</code>).</p>
-</section>
-<section id="visual-tagging-in-chat-output" class="level3">
-<h3 class="anchored" data-anchor-id="visual-tagging-in-chat-output">3. Visual tagging in chat output</h3>
-<p>In conversational responses, format recommendations using the standard category box:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** <span class="dt">&lt;</span><span class="kw">action</span><span class="dt">&gt;</span>. <span class="dt">&lt;</span><span class="kw">concise</span><span class="ot"> rationale</span><span class="dt">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Lead with the specific action, followed by the trade-off rationale.</p>
-</section>
-<section id="do-not-offer-authorized-work-as-an-optional-choice" class="level3">
-<h3 class="anchored" data-anchor-id="do-not-offer-authorized-work-as-an-optional-choice">4. Do not offer authorized work as an optional choice</h3>
-<p>Distinguish genuine decisions from authorized or standard workflow steps: - If an action is already in scope or required by standing rules (e.g., running tests, fixing lints, ARDI loops, drafting issues), perform the work and report in the past tense rather than asking “Let me know if you want me to do X”. - Reserve recommendations for genuine forks in design, architecture, scope trade-offs, or external intent.</p>
-</section>
+<section id="core-principle" class="level2">
+<h2 class="anchored" data-anchor-id="core-principle">Core principle</h2>
+<p>Tool definitions consume fixed context overhead on every single prompt turn before any conversation history or workspace files are read. An environment configured with multiple heavyweight MCP servers (such as GitHub, database, cloud infrastructure, browser automation, or search servers) can spend thousands of tokens purely on tool parameter schemas.</p>
+<p>Cutting unneeded tool definitions: 1. <strong>Directly recovers context budget</strong> for code, diffs, and reasoning. 2. <strong>Costs zero quota</strong> — reducing system prompt size saves tokens on every turn. 3. <strong>Eliminates tool selection ambiguity</strong> — reduces hallucinated or misrouted tool calls by presenting only relevant capabilities.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="step-1-identify-the-choice-or-question" class="level3">
-<h3 class="anchored" data-anchor-id="step-1-identify-the-choice-or-question">Step 1 — Identify the choice or question</h3>
+<section id="audit-active-tools-and-mcp-servers" class="level3">
+<h3 class="anchored" data-anchor-id="audit-active-tools-and-mcp-servers">1. Audit active tools and MCP servers</h3>
+<p>Inspect which tools, plugins, and MCP servers are currently registered and active in the session across project and user configuration:</p>
 <ul>
-<li><strong>Proactive</strong>: State the decision point, the context that makes it necessary, and the distinct feasible options.</li>
-<li><strong>Reactive</strong> (<code>/rec</code> / <code>/recommend</code>): Scan back through recent conversation turns to locate the latest question or unresolved decision point, restating the options if context is needed.</li>
+<li><strong>Claude Code:</strong> Run <code>claude mcp list</code> or inspect <code>~/.claude.json</code>, <code>.claude/settings.json</code>, and <code>.mcp.json</code>.</li>
+<li><strong>Cursor:</strong> Check <code>.cursor/mcp.json</code> and Cursor Settings -&gt; Features -&gt; MCP.</li>
+<li><strong>Antigravity / Gemini CLI:</strong> Check <code>.agents/plugins.json</code>, <code>.agents/skills.json</code>, and <code>~/.gemini/config/plugins.json</code>.</li>
+<li><strong>Codex / OpenCode:</strong> Check active tool configurations and CLI flags.</li>
 </ul>
 </section>
-<section id="step-2-evaluate-trade-offs" class="level3">
-<h3 class="anchored" data-anchor-id="step-2-evaluate-trade-offs">Step 2 — Evaluate trade-offs</h3>
-<p>Weigh the alternatives across: - <strong>Simplicity and minimal blast radius</strong>: least complex change that solves the issue. - <strong>Project conventions</strong>: alignment with existing codebase patterns and rules. - <strong>Safety and reversibility</strong>: lower operational and maintenance risk. - <strong>Token and execution efficiency</strong>: avoiding unnecessary overhead.</p>
-<p>Select the single strongest path as the recommendation.</p>
-</section>
-<section id="step-3-present-the-recommendation" class="level3">
-<h3 class="anchored" data-anchor-id="step-3-present-the-recommendation">Step 3 — Present the recommendation</h3>
-<p>Present the question or decision with its structured recommendation:</p>
+<section id="identify-unused-or-redundant-toolsets" class="level3">
+<h3 class="anchored" data-anchor-id="identify-unused-or-redundant-toolsets">2. Identify unused or redundant toolsets</h3>
+<p>Evaluate active tools against the repository and current task:</p>
 <ul>
-<li><strong>For interactive GUI modals</strong> (<code>AskUserQuestion</code> or <code>ask_user_question</code>): List the recommended choice as option 1 with the <code>(Recommended)</code> prefix.</li>
-<li><strong>For inline chat questions</strong>: State the context, outline the trade-offs, and attach the boxed recommendation:</li>
+<li><strong>CLI redundancy:</strong> If <code>gh</code> and <code>git</code> CLI tools are available in Bash, heavyweight GitHub MCP servers (which define dozens of PR, issue, and repo management schemas) may be redundant.</li>
+<li><strong>Domain irrelevance:</strong> Database (Postgres, SQLite), cloud (AWS, Kubernetes), or communication (Slack) servers are unneeded for local code refactoring or documentation work.</li>
+<li><strong>Unused browser/search tools:</strong> Web automation servers (Playwright, Puppeteer) when working entirely on offline or local unit tasks.</li>
+<li><strong>Dormant workspace plugins:</strong> Repository or user plugins whose skills or tools are not applicable to the current project.</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>❓ **QUESTION:** <span class="dt">&lt;</span><span class="kw">clear</span><span class="ot"> question</span><span class="dt">&gt;</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option A**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option A and trade-offs</span><span class="dt">&gt;</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Option B**: <span class="dt">&lt;</span><span class="kw">summary</span><span class="ot"> of option B and trade-offs</span><span class="dt">&gt;</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>🧭 **RECOMMENDATION:** Proceed with Option A because <span class="dt">&lt;</span><span class="kw">rationale</span><span class="dt">&gt;</span>.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-</section>
-<section id="relationship-to-other-skills-and-rules" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills-and-rules">Relationship to other skills and rules</h2>
+<section id="disable-unneeded-toolsets" class="level3">
+<h3 class="anchored" data-anchor-id="disable-unneeded-toolsets">3. Disable unneeded toolsets</h3>
+<p>Disable identified servers at the workspace or project level where possible:</p>
 <ul>
-<li><strong><code>AGENTS.md</code> (“Always give recommendations with questions”)</strong>: Universal baseline rule requiring recommendations on all questions.</li>
-<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/pm/SKILL.html"><code>pm</code></a></strong>: Surfaces pending questions; pair with <code>rec</code> if a surfaced question lacked a recommendation.</li>
-<li><strong><a href="../../skills/pending-decisions/SKILL.html"><code>pending-decisions</code></a> / <a href="../../skills/pd/SKILL.html"><code>pd</code></a></strong>: Presents tracker-level decisions sequentially, with recommendations.</li>
-<li><strong><a href="../../skills/brainstorm/SKILL.html"><code>brainstorm</code></a></strong>: Interactive Socratic planning loop before implementation; uses <code>rec</code> principles to guide trade-offs.</li>
+<li><strong>Claude Code:</strong> Disable or remove unneeded servers for the project (<code>claude mcp remove &lt;name&gt;</code>, configure <code>disabledMcpServers</code> in settings, or scope <code>.mcp.json</code>).</li>
+<li><strong>Cursor:</strong> Disable unneeded MCP servers in workspace settings or <code>.cursor/mcp.json</code>.</li>
+<li><strong>Antigravity / Gemini CLI:</strong> Remove or comment out unneeded plugins/servers in <code>.agents/plugins.json</code> or workspace configurations.</li>
+</ul>
+</section>
+<section id="verify-and-confirm" class="level3">
+<h3 class="anchored" data-anchor-id="verify-and-confirm">4. Verify and confirm</h3>
+<ul>
+<li>Confirm that essential core tools remain active.</li>
+<li>Report the disabled tools and the approximate context space recovered.</li>
+</ul>
+</section>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
+<ul>
+<li><strong><a href="../../skills/compress-session/SKILL.html"><code>compress-session</code></a> / <a href="../../skills/checkpoint/SKILL.html"><code>checkpoint</code></a> / <a href="../../skills/memorize/SKILL.html"><code>memorize</code></a>:</strong> Manage conversation and memory context; <code>cut-tools</code> manages the <em>fixed base system prompt</em> and tool schema overhead.</li>
+<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a>:</strong> Optimizes model tier; <code>cut-tools</code> optimizes prompt payload size.</li>
+<li><strong><a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> / <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>:</strong> Offloads bounded work to separate CLIs with their own tool configurations.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li>❌ Asking “Which option do you prefer?” or “Should I do A or B?” without declaring a recommendation.</li>
-<li>❌ Using “Let me know if…” to pose authorized work as a choice instead of performing it.</li>
-<li>❌ Providing an ambiguous or fence-sitting recommendation (“Either A or B is fine”).</li>
-<li>❌ Placing the recommended option anywhere other than first in interactive choice lists.</li>
+<li>❌ Disabling core development tools (<code>Bash</code>, <code>Read</code>, <code>Edit</code>, <code>Write</code>, <code>Grep</code>, <code>Glob</code>) required for baseline editing and verification.</li>
+<li>❌ Disabling MCP servers globally when they are actively needed in other concurrent workspaces (prefer project/workspace scoping).</li>
+<li>❌ Guessing which tools are active without auditing first.</li>
+<li>❌ Keeping all external MCP servers enabled by default “just in case” during large, context-heavy refactors.</li>
 </ul>
 
 
@@ -887,7 +835,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/rec/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/rec/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/cut-tools/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

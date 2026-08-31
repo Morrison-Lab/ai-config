@@ -367,6 +367,32 @@ CI, which compares a clean checkout against itself, was what caught it.
 Re-pointed at the function the scans actually call, the control fires as it should: measured 2026-08-28, it produces 120 divergences within the first 8,000 generated bodies, the first at index 485.
 That is what a control catching something looks like, and it is the reading the dead one had been imitating.)
 
+## A baseline verdict is a detection only when the disputed construct alone produces it
+
+The section above audits whether a control's wiring still reaches real code.
+This audits something upstream of wiring: whether the control's own positive result, the one a comparison is trusting as ground truth, was actually produced by the thing under test.
+
+A comparison against `origin/<default-branch>` is a negative control in the ordinary case: the baseline should classify a construct the same way the branch does, and a difference reads as a regression the branch introduced.
+That reading assumes the baseline's classification is itself correct, which a bare pass/fail comparison never checks on its own.
+
+Isolate the disputed construct and re-run the baseline alone before trusting a "the branch is worse than main" finding.
+If the baseline's flag survives with every unrelated confound removed, it is earned, and the branch is regressing a real detection.
+If the flag depends on something else entirely --- a citation, an adjacent construct, a different span of the same input --- the baseline was never detecting the disputed construct in the first place, and the branch is not losing anything the baseline earned.
+
+- **Do:** before reading "worse than baseline" as a regression, isolate the disputed construct and confirm the baseline flags it alone, with whatever might be producing the flag by coincidence removed.
+- **Do:** treat a baseline verdict that depends on an unrelated span (a citation, a comment, a different sentence) as unearned, whatever the raw pass/fail comparison reports.
+- **Don't:** trust a baseline comparison's verdict as ground truth without checking what actually produced it --- a coincidental over-flag is not a detection, however cleanly it lines up with the disputed input.
+- **Don't:** conflate this with the negative-control check above: that one asks whether the control still executes real code, and this one asks whether a control that IS executing and IS flagging is flagging for the right reason.
+
+(Measured 2026-08-30 on [ai-config#2668](https://github.com/Morrison-Lab/ai-config/pull/2668), the same module as the case above;
+reproduced directly against `origin/main`'s `scripts/check-pr-fully-clean.py` via `classify_verdict`, not taken on report.
+A body ending in a correct `### Verdict` / `**Ready for merge**` heading, with no citation anywhere in it, classifies `clean`.
+The same body with one addition --- a narration line citing a past round, `(posted 2026-08-30T05:22:14Z, verdict **Needs more work**)` --- classifies `not-clean` on `origin/main`.
+Remove only that citation and keep the same clean heading: `clean` again.
+So main's not-clean flag on the cited body was never a detection of anything the body's own current verdict says;
+it was produced entirely by the literal bolded phrase inside the citation, matched exactly as if it were a live statement --- the exact false positive the PR exists to remove.
+A comparison that read the branch's `clean` on this body as "worse than main" would have had it backwards: the branch was not losing a detection main had earned, it was correctly declining to make the one main was making by accident, and isolating the citation is what showed that rather than another vocabulary patch on the branch's own scan.)
+
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
 The section above ends where the control finally catches something.

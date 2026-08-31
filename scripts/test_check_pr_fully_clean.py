@@ -59,8 +59,15 @@ class CmdRecorder:
         return " ".join(" ".join(c) for c in self.calls)
 
 
+seen_check_names = set()
+
 def check(name: str, condition: bool):
     global passes, failures
+    if name in seen_check_names:
+        print(f"FAIL: duplicated check name: {name}")
+        failures += 1
+        return
+    seen_check_names.add(name)
     if condition:
         print(f"PASS: {name}")
         passes += 1
@@ -1932,9 +1939,7 @@ def main() -> int:
               == "not-clean")
     for unresolved in (
         "hasn\u2019t been fixed",
-        "hasn" + chr(0x2019) + "t been fixed",
         "isn\u2019t fixed",
-        "isn" + chr(0x2019) + "t fixed",
         "has not actually been fixed",
         "has yet to be fixed",
         "cannot be fixed",

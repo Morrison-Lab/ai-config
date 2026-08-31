@@ -91,7 +91,8 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 5f: Declaring a PR "Fully Clean" Without Verified Automated Review Approval on HEAD
 - **Mistake**: Reporting a PR as "fully clean" based solely on passing CI checks and an internal self-review fallback, while an external automated review had unaddressed findings or had not yet evaluated the exact current HEAD SHA.
 - **Example**: 2026-08-25 session (`gha#668`, `ai-config#2226`): declared PRs fully clean because CI was green and subagent self-reviews passed, despite outstanding "Needs more work" findings from Cursor Grok 4.6 on previous SHAs and unevaluated latest SHAs.
-  - 2nd occurrence: 2026-08-31 session: declared PR ready for merge without up-to-date code review covering HEAD. Corrected by user with `cai: it's not ready for merge if it doesn't have an up-to-date review`.
+  - 2nd occurrence: 2026-08-31 session: declared PR ready for merge without up-to-date code review covering HEAD.
+    Corrected by user with `cai: it's not ready for merge if it doesn't have an up-to-date review`.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md) and [`AGENTS.md`](../AGENTS.md) ("Strict Merge Control Policy").
   A fallback self-review or reviewer skip notice does NOT grant approval or satisfy `mwc`.
 - **Fix**: Run `scripts/check-pr-fully-clean.py` (or verify all its criteria) before ever declaring a PR fully clean.

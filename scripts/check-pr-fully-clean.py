@@ -944,13 +944,6 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     )
     _SENTENCE_END = _SENTENCE_END_RE
 
-    # Sentence starts are computed ONCE for the whole body and then
-    # looked up per match. Recomputing them inside the callback rebuilds
-    # the entire prefix on every citation, which is quadratic in the
-    # body -- 6.8s on a comment at GitHub's 65536-character cap packed
-    # with citations, against 0.007s for origin/main. That is the same
-    # trap _sentence_start_before's own two-pointer scan exists to
-    # avoid, reintroduced at its other call site.
     def _vocab_between(lo: int, hi: int) -> bool:
         if hi <= lo:
             return False
@@ -1004,7 +997,15 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # before the fences are removed, so a "### Verdict" inside a code
     # block would otherwise license the strip -- and a review OF this
     # file quotes exactly that heading in a fence.
-    # Computed AFTER _SHA_CITATION.sub above, because that substitution
+    # Computed ONCE for the whole body and looked up per match.
+    # Recomputing inside the callback rebuilds the entire prefix on every
+    # citation, which is quadratic in the body -- 6.8s on a comment at
+    # GitHub's 65536-character cap packed with citations, against 0.007s
+    # for origin/main. That is the same trap _sentence_start_before's
+    # own two-pointer scan exists to avoid, reintroduced at its other
+    # call site.
+    #
+    # And computed AFTER _SHA_CITATION.sub above, because that substitution
     # replaces a variable-length match with one space and therefore
     # SHIFTS every position after it. Building these against the raw
     # argument left them describing a string that no longer existed, so

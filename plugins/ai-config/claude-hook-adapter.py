@@ -4,6 +4,7 @@ import subprocess
 import os
 import re
 import traceback
+import urllib.parse
 
 def _int_env(name, default):
     """Read an integer config value from the environment, falling back to
@@ -133,6 +134,57 @@ def resolve_cmd_and_timeout(hook, repo_root):
         timeout_val = DEFAULT_HOOK_TIMEOUT
     return cmd, timeout_val
 
+def _clean_path(raw):
+    """Normalize a candidate path string, decoding file:// URIs and stripping
+    whitespace, or returning None if empty or invalid."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    p = raw.strip()
+    if p.startswith("file://"):
+        p = urllib.parse.unquote(p[7:]).strip()
+    return p if p else None
+
+def extract_cwd(payload, tool_args=None):
+    """Resolve the working directory from tool arguments, Antigravity payload
+    fields (cwd, workspacePaths, workspace), or fall back to os.getcwd().
+    
+    The hook subprocess's cwd and the payload's own `cwd` field must be the
+    caller's working directory, never repo_root (which is ai-config's own
+    checkout location, used only to locate hooks.json and hook scripts).
+    A guard hook (e.g. hooks/no-unshipped-commit.py or
+    hooks/no-clobbering-push.py) reads `payload.get("cwd")` or evaluates git
+    state in its working directory, so omitting cwd forces hooks onto fallback
+    heuristics or evaluates the wrong repository.
+    """
+    if isinstance(tool_args, dict):
+        p = _clean_path(tool_args.get("Cwd") or tool_args.get("cwd"))
+        if p:
+            return p
+
+    if isinstance(payload, dict):
+        for key in ("cwd", "Cwd", "workingDirectory", "currentWorkingDirectory", "workspacePath", "workspace"):
+            p = _clean_path(payload.get(key))
+            if p:
+                return p
+
+        ws_paths = payload.get("workspacePaths") or payload.get("workspaces")
+        if isinstance(ws_paths, str):
+            p = _clean_path(ws_paths)
+            if p:
+                return p
+        elif isinstance(ws_paths, list):
+            for item in ws_paths:
+                if isinstance(item, str):
+                    p = _clean_path(item)
+                    if p:
+                        return p
+                elif isinstance(item, dict):
+                    p = _clean_path(item.get("path") or item.get("uri"))
+                    if p:
+                        return p
+
+    return os.getcwd()
+
 def extract_hook_list(groups_or_hooks):
     """Support grouped ({'hooks': [...]}), flat ([{'command': ...}]), and single group dicts."""
     if isinstance(groups_or_hooks, dict):
@@ -206,17 +258,7 @@ def main():
         tool_call = payload.get("toolCall") or {}
         tool_name = tool_call.get("name", "")
         args = tool_call.get("args") or {}
-        # The hook subprocess's cwd should be the caller's working
-        # directory, never repo_root: repo_root here is ai-config's own
-        # checkout location, used below only to locate hooks.json/scripts.
-        # A guard hook (e.g. hooks/no-clobbering-push.py) inherits this cwd
-        # to evaluate the user's project's own git state, so pointing it at
-        # ai-config's checkout instead makes it evaluate the wrong
-        # repository. The os.getcwd() fallback is best-effort: per
-        # memories/antigravity.md, Antigravity can launch the adapter with
-        # cwd defaulting to $HOME regardless of the open project, so the
-        # fallback is only as good as the launcher's own cwd.
-        tool_cwd = args.get("Cwd") or os.getcwd()
+        tool_cwd = extract_cwd(payload, args)
         
         pre_tool_groups = hooks_def.get("hooks", {}).get("PreToolUse", [])
         tasks_to_run = []
@@ -224,7 +266,8 @@ def main():
         if tool_name == "run_command":
             bash_payload = {
                 "tool_name": "Bash",
-                "tool_input": {"command": args.get("CommandLine", "")}
+                "tool_input": {"command": args.get("CommandLine", "")},
+                "cwd": tool_cwd,
             }
             if transcript_path:
                 bash_payload["transcript_path"] = transcript_path
@@ -282,7 +325,8 @@ def main():
                         # the Claude Code enum field.
                         "workspace": raw_workspace,
                         "prompt": sub.get("Prompt") or sub.get("prompt")
-                    }
+                    },
+                    "cwd": tool_cwd,
                 }
                 if transcript_path:
                     agent_payload["transcript_path"] = transcript_path
@@ -296,7 +340,8 @@ def main():
                 "tool_input": {
                     "recipient": args.get("Recipient") or args.get("recipient"),
                     "message": args.get("Message") or args.get("message")
-                }
+                },
+                "cwd": tool_cwd,
             }
             if transcript_path:
                 send_payload["transcript_path"] = transcript_path
@@ -311,7 +356,8 @@ def main():
                     "name": args.get("name") or args.get("Name"),
                     "description": args.get("description") or args.get("Description"),
                     "system_prompt": args.get("system_prompt") or args.get("systemPrompt") or args.get("SystemPrompt")
-                }
+                },
+                "cwd": tool_cwd,
             }
             if transcript_path:
                 task_payload["transcript_path"] = transcript_path
@@ -322,7 +368,8 @@ def main():
         else:
             generic_payload = {
                 "tool_name": tool_name,
-                "tool_input": args
+                "tool_input": args,
+                "cwd": tool_cwd,
             }
             if transcript_path:
                 generic_payload["transcript_path"] = transcript_path
@@ -372,10 +419,12 @@ def main():
 
     elif event_type == "Stop":
         stop_groups = hooks_def.get("hooks", {}).get("Stop", [])
+        stop_cwd = extract_cwd(payload)
         stop_payload = {
             "termination_reason": payload.get("terminationReason"),
             "fully_idle": payload.get("fullyIdle"),
-            "error": payload.get("error")
+            "error": payload.get("error"),
+            "cwd": stop_cwd,
         }
         if transcript_path:
             stop_payload["transcript_path"] = transcript_path
@@ -388,7 +437,7 @@ def main():
                 continue
             cmd, timeout_val = resolved
 
-            result = run_hook_command(cmd, stop_payload, os.getcwd(), timeout_val)
+            result = run_hook_command(cmd, stop_payload, stop_cwd, timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 try:
                     hook_out = json.loads(result.stdout)
@@ -445,10 +494,12 @@ def main():
         elif not isinstance(prompt_val, str):
             prompt_val = str(prompt_val)
 
+        inv_cwd = extract_cwd(payload)
         ups_payload = {
             "prompt": prompt_val,
             "invocation_num": payload.get("invocationNum"),
-            "initial_num_steps": payload.get("initialNumSteps")
+            "initial_num_steps": payload.get("initialNumSteps"),
+            "cwd": inv_cwd,
         }
         if transcript_path:
             ups_payload["transcript_path"] = transcript_path
@@ -464,7 +515,7 @@ def main():
                 continue
             cmd, timeout_val = resolved
 
-            result = run_hook_command(cmd, ups_payload, os.getcwd(), timeout_val)
+            result = run_hook_command(cmd, ups_payload, inv_cwd, timeout_val)
             if result and result.returncode == 0 and result.stdout:
                 text_out = result.stdout.strip()
                 if text_out:

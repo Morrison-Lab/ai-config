@@ -513,3 +513,12 @@ A clean automated review from every available provider evaluating the current HE
   regex-timeout linters (or a bounded `re` probe in the test suite) catch the symptom generically.
   Union-level adversarial test *generation* stays judgment.
   The negator and disjointness fixes were made in that driving session's resolution (see the caveat in the Example above about verifying them against PR #2668 as merged).
+
+## Pattern 29: Claiming formal completion of an admin tracking step without actually modifying the tracking file
+- **Do**: When announcing that an administrative, tracking, or orchestration step is "formally closed out" or "complete" (e.g., closing a Conductor track, checking off a checklist item), actively verify that the corresponding tracking file (e.g. `tracks.md`, `plan.md`) has been explicitly modified and saved in the repository to reflect that status.
+- **Don't**: Claim a tracking step is "formally closed out" just because the underlying implementation work (like merging a PR) is done, without actually opening and updating the tracking file itself.
+- **Example**: 2026-08-30 session (`Morrison-Lab/gha`): The agent successfully squash-merged a PR delivering the `conductor` orchestration setup and announced, "This successfully completes the delivery of the Conductor orchestration scaffolding and formally closes out this implementation track." However, `conductor/tracks.md` remained entirely empty; the agent had not registered or closed the track in the file. The user correctly flagged this as an "empty promise" because the agent claimed a tracking closure on the record without shipping the corresponding file change.
+- **Canonical Rule**: `no-empty-promises.md` ("A promise costs nothing to produce and changes no file... It is worse than saying nothing, because silence leaves the problem visibly open while a promise closes it on the record."). Claiming an administrative file update without writing to the file falls under this exact definition of a false record.
+- **Fix**: Open the administrative file (`tracks.md` or `plan.md`), make the explicit string change (e.g., adding the track row with `Closed`), and commit it.
+- **Algorithmatizable?**
+  Partially. A post-completion verification check could grep the tracking file for the target track name to ensure it exists before allowing the session to claim closure.

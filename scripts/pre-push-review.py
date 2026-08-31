@@ -344,14 +344,14 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
         return False, False, "Unterminated HTML comment detected."
 
     def extract_section(text, header_pattern):
-        pattern = r"(?im)^#{1,6}\s*(?:" + header_pattern + r")\s*(.*?)(?=^#{1,6}\s+|\Z)"
+        pattern = r"(?im)^#{1,6}\s*(?:" + header_pattern + r")\b[^\n]*\n(.*?)(?=^#{1,6}\s+|\Z)"
         matches = re.findall(pattern, text, re.DOTALL)
         return "\n\n".join(m.strip() for m in matches) if matches else None
 
-    summary_text = extract_section(unfenced_report, r"(?:(?:Summary|Review)\s+)?Verdict[^\n]*")
-    critical_text = extract_section(unfenced_report, r"Critical Findings[^\n]*")
-    observations_text = extract_section(unfenced_report, r"Observations[^\n]*")
-    verification_text = extract_section(unfenced_report, r"Verification[^\n]*")
+    summary_text = extract_section(unfenced_report, r"(?:Summary\s+)?Verdict")
+    critical_text = extract_section(unfenced_report, r"Critical\s+Findings")
+    observations_text = extract_section(unfenced_report, r"Observations")
+    verification_text = extract_section(unfenced_report, r"Verification")
 
     # Two report contracts exist (ai-config#2309): this engine's own
     # (Summary Verdict / Critical Findings / Observations / Verification

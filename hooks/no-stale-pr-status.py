@@ -92,7 +92,8 @@ RX_QUERY = re.compile(
 )
 
 RX_FAIL_QUERY = re.compile(
-    r"\\u274c|\u274c|\bNOT fully clean\b|contains findings|conclusion.*failure|status.*in_progress|No review comment has been posted",
+    r"\\u274c|\u274c|\bNOT fully clean\b|contains findings|conclusion.*failure|status.*in_progress|"
+    r"No review comment has been posted|\bPartial review\b|\bdiff was truncated\b|\bomitted region was not assessed\b",
     re.I,
 )
 

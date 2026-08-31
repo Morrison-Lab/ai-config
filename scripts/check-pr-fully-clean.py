@@ -1128,7 +1128,8 @@ def strip_cited_finding_vocab(text: str) -> str:
 _BARE_REJECTION = (
     r"\b(?:Rejected|Unapproved|"
     r"(?<!non-)(?<!non\s)Block(?:ed|ing)?"
-    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings)\b"
+    r"|Impasse|Deadlock|Changes\s+requested|Actionable\s+findings"
+    r"|Partial\s+review)\b"
 )
 
 # The clause scan admits a parenthesized aside as a single unit, because a
@@ -1378,11 +1379,13 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 ]
 
 # Applies to EVERY not-clean pattern, not to one named member.
@@ -1449,7 +1452,9 @@ BARE_CLEAN_PATTERNS = {
 }
 BARE_NOT_CLEAN_PATTERNS = {
     _BARE_REJECTION,
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 }
 
 # Criterion 3 (HEAD) and criterion 4 (per-reviewer latest) share this list.
@@ -1468,12 +1473,14 @@ FINDING_PATTERNS = [
     r"#+\s*Non-blocking\b",
     r"(?:^|\n)\s*\*\*Non-blocking\*\*",
     r"\*\*Location:\*\*",
-    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock)",
+    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm)\b",
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
+    r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
+    r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
 ]
 FINDING_HEADING_PATTERNS = {
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",

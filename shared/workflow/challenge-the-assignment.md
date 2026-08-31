@@ -654,7 +654,7 @@ the author had already read the same file twice without finding it.)
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
   stated as background fact, and the claims you generate yourself.
   This governs the instruction, which asserts nothing and so trips none of its
-  five claim types.
+  claim types.
   Its stripping pass is the nearest authoring-side rule, and the section above
   says why it does not reach a load-bearing premise.
 - [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to

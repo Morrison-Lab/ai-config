@@ -669,10 +669,9 @@ def _sub_with_mask(
     group. Today's callers pass ``" "`` or a callable, and no expansion is
     wanted; the difference is named so a later caller does not assume it.
 
-    A replaced region takes mask 1 when it replaces a span (or when the
-    matched region was masked); a ``repl`` callable that returns the match
-    unchanged keeps that region's original mask, which is what lets
-    ``_blank_quote``'s preserve path survive.
+    A replaced region takes mask 1 when it replaces a span; a ``repl``
+    callable that returns the match unchanged keeps that region's original mask,
+    which is what lets ``_blank_quote``'s preserve path survive.
     """
     out: List[str] = []
     out_mask = bytearray()
@@ -1396,20 +1395,9 @@ def _is_resolved_blocking_mention(
     sentence_start = _sentence_start_before(scan[:match.start()])
     if _NEGATOR_RE.search(scan[sentence_start:match.start()]):
         return False
-    suffix = scan[match.end():]
-    sentence = re.match(r"^(?:(?![.!?](?:\s|$))[\s\S])*[.!?]?", suffix)
-    if sentence is None:
-        return False
     if cited is not None and 1 in cited[sentence_start:match.start()]:
         return False
-    paragraph = re.match(r"^(?:(?!\n[ \t]*\n)[\s\S])*", suffix)
-    if paragraph is None:
-        return False
-    following = paragraph.group(0)[sentence.end():]
-    return (
-        RESOLVED_BLOCKING_SUFFIX.fullmatch(sentence.group(0)) is not None
-        and AFFIRMATIVE_RESOLUTION_FOLLOWUP.fullmatch(following) is not None
-    )
+    return _has_resolution_suffix(scan, match)
 
 # The findings-heading pattern is likewise built once: the two list copies
 # below and the section-resolution wiring in _unresolved_finding_pattern

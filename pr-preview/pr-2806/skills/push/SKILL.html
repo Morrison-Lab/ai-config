@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Pre-push check for active sessions.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#push" id="toc-push" class="nav-link active" data-scroll-target="#push">push</a>
+  <ul class="collapse">
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#pre-push-checks" id="toc-pre-push-checks" class="nav-link" data-scroll-target="#pre-push-checks">Pre-push checks</a>
+  <ul class="collapse">
+  <li><a href="#a-separate-subagent-reviewed-this-diff-and-cleared-it" id="toc-a-separate-subagent-reviewed-this-diff-and-cleared-it" class="nav-link" data-scroll-target="#a-separate-subagent-reviewed-this-diff-and-cleared-it">0. A separate subagent reviewed this diff and cleared it</a></li>
+  <li><a href="#protected-branch" id="toc-protected-branch" class="nav-link" data-scroll-target="#protected-branch">1. Protected branch</a></li>
+  <li><a href="#remote-head-advanced-past-your-last-commit" id="toc-remote-head-advanced-past-your-last-commit" class="nav-link" data-scroll-target="#remote-head-advanced-past-your-last-commit">2. Remote HEAD advanced past your last commit</a></li>
+  <li><a href="#claim-comment-by-someone-else" id="toc-claim-comment-by-someone-else" class="nav-link" data-scroll-target="#claim-comment-by-someone-else">3. Claim comment by someone else</a></li>
+  <li><a href="#hold-block-labels" id="toc-hold-block-labels" class="nav-link" data-scroll-target="#hold-block-labels">4. Hold / block labels</a></li>
+  <li><a href="#claude-agent-run-in-flight" id="toc-claude-agent-run-in-flight" class="nav-link" data-scroll-target="#claude-agent-run-in-flight">5. <code>@claude</code> agent run in flight</a></li>
+  <li><a href="#the-pushs-own-form" id="toc-the-pushs-own-form" class="nav-link" data-scroll-target="#the-pushs-own-form">6. The push’s own form</a></li>
+  </ul></li>
+  <li><a href="#asking-for-guidance" id="toc-asking-for-guidance" class="nav-link" data-scroll-target="#asking-for-guidance">Asking for guidance</a></li>
+  <li><a href="#pushing-checks-clean" id="toc-pushing-checks-clean" class="nav-link" data-scroll-target="#pushing-checks-clean">Pushing (checks clean)</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#proactive-hook-compliance" id="toc-proactive-hook-compliance" class="nav-link" data-scroll-target="#proactive-hook-compliance">Proactive hook compliance</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/push/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/push/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="push" class="level1">
+<h1>push</h1>
+<p>A guard you run <strong>right before <code>git push</code></strong>. Other sessions, reviewers, and the <code>@claude</code> CI bot can all be working the same branch. Pushing blind risks clobbering their work or shoving commits onto a branch someone explicitly held. This skill runs a short pre-push check, and if anything looks off it <strong>stops and asks you</strong> rather than pushing.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>The user says “push”, “push this”, “push my changes”, or <code>/push</code>.</li>
+<li>Any time you’re about to push commits to a <strong>shared</strong> branch (one with an open PR, or one another session may be driving).</li>
+</ul>
+<p>It does <strong>not</strong> need to fire for a brand-new branch that has never been pushed and has no PR — there’s nothing to collide with. Still run the protected-branch check in that case.</p>
+</section>
+<section id="pre-push-checks" class="level2">
+<h2 class="anchored" data-anchor-id="pre-push-checks">Pre-push checks</h2>
+<p>Run these in order. Stop at the first one that fires and ask the user (see <a href="#asking-for-guidance">Asking for guidance</a>).</p>
+<section id="a-separate-subagent-reviewed-this-diff-and-cleared-it" class="level3">
+<h3 class="anchored" data-anchor-id="a-separate-subagent-reviewed-this-diff-and-cleared-it">0. A separate subagent reviewed this diff and cleared it</h3>
+<p>Before pushing, dispatch the <a href="../../.claude/agents/adversarial-reviewer.md"><code>adversarial-reviewer</code></a> subagent against <code>git diff origin/&lt;default-branch&gt;...HEAD</code> and wait for its verdict. Dispatch it in the <strong>foreground</strong> — a background dispatch returns an agent id rather than a report, and you are waiting on the answer anyway. Brief it with the base ref, the paths, and the standards that apply. Never brief it with your rationale for the change, per <a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a>.</p>
+<p>Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.</p>
+<p><code>hooks/no-push-without-self-review.py</code> gates this on Claude Code. Morrison-Lab/ai-config’s Cursor adapter skips that script until <a href="https://github.com/Morrison-Lab/ai-config/issues/2241">#2241</a> (<a href="../../memories/cursor.md"><code>memories/cursor.md</code></a>). On Cursor Cloud, when <code>Task</code> lists <code>adversarial-reviewer</code>, call <code>parse_report()</code> from the worktree’s <a href="../../hooks/no-push-without-self-review.py"><code>hooks/no-push-without-self-review.py</code></a> on the report recovered from the child’s transcript when the worktree hook script exists (see <a href="../../memories/cursor.md"><code>memories/cursor.md</code></a>). Do not import <code>~/.claude/hooks/</code>: it is a different revision from the branch under review. When the three-dot diff includes <code>hooks/no-push-without-self-review.py</code>, also parse with <code>origin/&lt;default-branch&gt;</code>’s copy, or obtain a CLI review. If the worktree script is missing, obtain a CLI review (see <a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a>). If the verdict is not <code>clean</code>, or there is no fingerprint, or the fingerprint does not prefix-match HEAD, do not push. If there is no fingerprint (including a stale-registered persona), obtain a CLI review, write that reviewer’s report to a file under <code>/tmp</code>, and call <code>parse_report()</code> on that file. On Claude Code the guard admits a verdict only from that subagent’s own call result, only when the verdict is a verdict <em>line</em> rather than a sentence quoting one, and only when the report names the commit it read (<code>Reviewed-Commit: &lt;sha&gt;</code>, after the verdict) and that commit is what the push would actually ship — refspec resolved, so <code>push origin some-other-branch</code> is not covered by a verdict for <code>HEAD</code>. So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard’s own denial message, and a verdict for an earlier commit all fail to satisfy it. Review after committing, therefore, not before.</p>
+<p>Override by prefixing the push itself with <code>ALLOW_UNREVIEWED_PUSH=1</code> when no verdict can exist for the guard to check — and say in your reply that you used it and why:</p>
+<ul>
+<li>the initial empty PR branch under <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a>, which carries nothing to review;</li>
+<li>a review delivered by a separate CLI rather than a subagent, whose verdict never becomes an <code>Agent</code> call’s result;</li>
+<li>a session where the reviewer agent is unregistered (<a href="https://github.com/Morrison-Lab/ai-config/issues/1921">ai-config#1921</a>) or registered from a stale definition, which is the case on any rollout of a change to the persona itself;</li>
+<li>an emergency.</li>
+</ul>
+<p>On a session whose pushes go through Morrison-Lab/ai-config’s Cursor adapter, default: do not prefix. The prefix is inert for the adapter until <a href="https://github.com/Morrison-Lab/ai-config/issues/2241">#2241</a> makes the adapter run that guard (the skip and the <code>parse_report</code> gate are earlier in this step). If a native <code>PreToolUse</code> deny from <code>no-push-without-self-review</code> is observed on the push, prefix for that native guard. The empty <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> <code>--allow-empty</code> branch has no report to parse: do not invent one, do not refuse that push for lack of a verdict, and say in the reply that the carve-out was used. The carve-out is <code>git rev-list --count origin/&lt;default-branch&gt;..HEAD</code> equal to 1 and <code>git diff --quiet HEAD^ HEAD</code> exit 0 in the checkout whose push follows. Exit 1 means a diff; exit 128 means the command failed. Both conditions passing is the <code>--allow-empty</code> pr-on-claim commit. <code>git diff origin/&lt;default-branch&gt;...HEAD</code> empty is tree equality, not “this branch carries nothing”. A net-zero tree of other commits is not the carve-out. After <a href="https://github.com/Morrison-Lab/ai-config/issues/2241">#2241</a> makes the adapter run that guard, the prefix is the documented escape when the guard cannot see a verdict. The adapter skip makes the prefix inert for the adapter only. Do not pair the project adapter with native Claude hooks (desktop Cursor with third-party Claude hooks plus this project adapter; see <a href="../../memories/cursor.md"><code>memories/cursor.md</code></a>).</p>
+<p>The prefix has to be on the pushing command, not merely somewhere on the line: an override the guard accepted from anywhere was how a commit message quoting this very paragraph disarmed it.</p>
+</section>
+<section id="protected-branch" class="level3">
+<h3 class="anchored" data-anchor-id="protected-branch">1. Protected branch</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> rev-parse <span class="at">--abbrev-ref</span> HEAD</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If the current branch is <code>main</code> (or <code>master</code> / the repo’s default branch), <strong>do not push.</strong> Pushing to the default branch is almost never intended — surface it and ask whether to branch first.</p>
+</section>
+<section id="remote-head-advanced-past-your-last-commit" class="level3">
+<h3 class="anchored" data-anchor-id="remote-head-advanced-past-your-last-commit">2. Remote HEAD advanced past your last commit</h3>
+<p>Another session or the author may have pushed since your last fetch.</p>
+<p><strong>Take this reading immediately before the push</strong>, not at the start of the round and not when you last synced. A fetch from earlier in the session is a measurement of a moment that has passed, and it stopped being evidence the instant somebody else pushed — see <a href="../../shared/workflow/check-before-pushing.md"><code>check-before-pushing</code></a>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="va">BRANCH</span><span class="op">=</span><span class="va">$(</span><span class="fu">git</span> rev-parse <span class="at">--abbrev-ref</span> HEAD<span class="va">)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> ls-remote <span class="at">--heads</span> origin <span class="st">"</span><span class="va">$BRANCH</span><span class="st">"</span>   <span class="co"># read-only; updates no ref</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If the tip it reports is not an ancestor of the ref you are <strong>pushing</strong> (<code>git merge-base --is-ancestor &lt;tip&gt; &lt;source&gt;</code>), <strong>back off</strong> — another session (or the author) is driving this branch right now. <code>&lt;source&gt;</code> is <code>HEAD</code> only when the refspec says so: <code>git push origin feature-x</code> from <code>main</code> pushes local <code>feature-x</code>, and comparing against <code>HEAD</code> there reads a divergence as a fast-forward. Do not push (a plain push will be rejected anyway, and you must not force-push over their work). Ask the user.</p>
+<p>Fetch to see <em>what</em> they pushed, once you already know something is there:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin <span class="st">"</span><span class="va">$BRANCH</span><span class="st">"</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null   <span class="co"># FETCH</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> log <span class="at">--oneline</span> HEAD..<span class="st">"origin/</span><span class="va">$BRANCH</span><span class="st">"</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>An object you cannot resolve locally is the <strong>stronger</strong> signal, not the milder one: the remote moved after your last fetch and you cannot see what is there.</p>
+</section>
+<section id="claim-comment-by-someone-else" class="level3">
+<h3 class="anchored" data-anchor-id="claim-comment-by-someone-else">3. Claim comment by someone else</h3>
+<p>Look at the open PR for this branch for a claim comment posted by <strong>another</strong> session or person. (Your own most-recent “I’m working on this” comment is fine — that’s your claim.)</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="va">PR</span><span class="op">=</span><span class="va">$(</span><span class="ex">gh</span> pr view <span class="at">--json</span> number,headRefName <span class="at">-q</span> .number <span class="dv">2</span><span class="op">&gt;</span>/dev/null<span class="va">)</span>   <span class="co"># VIEW_PR</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="st">"</span><span class="va">$PR</span><span class="st">"</span> <span class="at">--json</span> comments <span class="dt">\</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-q</span> <span class="st">'.comments[] | select(.body | test("hold off|paws off|back off|unclaim|released|PR is free|now mergeable"; "i")) | "\(.author.login): \(.body)"'</span>   <span class="co"># READ_PR_COMMENTS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The alternation is deliberate, and it covers RELEASES as well as claims. Claims posted before 2026-08-24 say “paws off”, and a claim stays live on activity rather than on age, so an old-wording claim can be live right now. The release terms matter because the old wording made them free: <code>paws off released</code> contains <code>paws off</code>, so one grep surfaced both sides of the exchange. <code>claim released</code> contains neither claim term, so a claim-only query returns the claim and not its release — and this check asks whether the claim “hasn’t been unclaimed”, which a claim-only output cannot answer. A released PR would read as live-claimed, and this skill would refuse a legitimate push. Derive the release terms rather than copying this list, which is a snapshot of what the corpus posts today: <code>grep -rn "unclaim\|released\|PR is free\|now mergeable" skills/ commands/</code>. A matcher narrowed to the new phrase returns nothing on such a thread, which reads exactly like an unclaimed one — see <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>.</p>
+<p>The query returns the whole claim/release exchange, newest last, so read its <strong>last</strong> member: if that is a <em>claim</em> rather than a release, and it is from someone <strong>other than you</strong>, and it is still live — the PR shows a push or comment within the last 2 hours, per <a href="../../shared/workflow/claim-pr.md"><code>claim-pr</code></a>’s expiration rule — <strong>do not push.</strong> Ask the user. An expired claim (over 2 idle hours) no longer blocks on its own, but take it over with a fresh claim comment and run this skill’s other checks (branch-head advance, <code>@claude</code> run in flight) before pushing.</p>
+</section>
+<section id="hold-block-labels" class="level3">
+<h3 class="anchored" data-anchor-id="hold-block-labels">4. Hold / block labels</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="st">"</span><span class="va">$PR</span><span class="st">"</span> <span class="at">--json</span> labels <span class="at">-q</span> <span class="st">'.labels[].name'</span>   <span class="co"># VIEW_PR</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If any label signals a hold — case-insensitive matches on <code>do-not-merge</code>, <code>do not merge</code>, <code>WIP</code>, <code>hold</code>, <code>blocked</code>, <code>on hold</code>, <code>dont-merge</code> — <strong>do not push.</strong> Ask the user.</p>
+</section>
+<section id="claude-agent-run-in-flight" class="level3">
+<h3 class="anchored" data-anchor-id="claude-agent-run-in-flight">5. <code>@claude</code> agent run in flight</h3>
+<p>Don’t push while the bot is mid-session on the branch — your push can collide with its commits or trigger a redundant re-run.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> run list <span class="at">--branch</span> <span class="st">"</span><span class="va">$BRANCH</span><span class="st">"</span> <span class="at">--json</span> status,name <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-q</span> <span class="st">'.[] | select(.status=="in_progress" or .status=="queued") | .name'</span>   <span class="co"># LIST_WORKFLOW_RUNS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If a <code>@claude</code> / review workflow is <code>in_progress</code> or <code>queued</code>, wait for it to finish, then re-check. If it’s stuck, ask the user.</p>
+</section>
+<section id="the-pushs-own-form" class="level3">
+<h3 class="anchored" data-anchor-id="the-pushs-own-form">6. The push’s own form</h3>
+<p>Never <code>git push --force</code> / <code>-f</code>. It overwrites the remote tip unconditionally, including commits another agent pushed since you last looked.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">--force-with-lease</span> <span class="at">--force-if-includes</span>   <span class="co"># PUSH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>--force-if-includes</code> (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: <code>--force-with-lease</code> compares against your <em>remote-tracking ref</em>, so any background fetch — a poller, another tool in the same checkout, a <code>--recurse-submodules</code> fetch — silently refreshes that ref and the lease then passes over the very commits it existed to protect. <code>--force-if-includes</code> closes that by checking the remote-tracking tip against the local branch’s reflog. It is an <em>ancillary</em> option, so it only does anything alongside a bare <code>--force-with-lease</code>.</p>
+<p>A <code>stale info</code> refusal is <strong>not</strong> a reason to force, and reaching for one there is the reflex <code>memories/git-branches.md</code> exists to stop: the lease is unsatisfiable rather than violated, so <code>--force</code> is unnecessary. Whether there is anything to <em>race</em> is a separate question the refusal does not answer — a deleted branch leaves nothing to race, a peer’s push leaves everything. <code>git ls-remote --heads origin &lt;branch&gt;</code> settles existence — empty output means the next push <em>creates</em> the branch. Query <code>gh pr list --state all --head &lt;branch&gt;</code> first: MERGED means auto-delete, not a first publish, so do not recreate (see <a href="../../shared/workflow/use-existing-pr-branch.md"><code>use-existing-pr-branch</code></a> and <a href="../../shared/workflow/check-before-pushing.md"><code>check-before-pushing</code></a>). Otherwise a plain push is the fix (or <code>git fetch --prune</code> and a retry). <code>ALLOW_FORCE_PUSH=1</code> is an escape valve for a case the guard did not foresee. Say what the lease refused and why forcing is right when you use it.</p>
+<p><code>hooks/no-clobbering-push.py</code> enforces this half mechanically — it refuses a bare force push and warns on a divergence — so it fires whether or not this skill was invoked.</p>
+</section>
+</section>
+<section id="asking-for-guidance" class="level2">
+<h2 class="anchored" data-anchor-id="asking-for-guidance">Asking for guidance</h2>
+<p>When a check fires, <strong>do not push.</strong> Use <code>AskUserQuestion</code> to surface exactly what fired and let the user decide. Give concrete options, e.g.:</p>
+<ul>
+<li><strong>Wait / re-check</strong> — back off and re-run the checks shortly (HEAD-advanced or <code>@claude</code>-in-flight cases).</li>
+<li><strong>Push anyway</strong> — the user knows the signal is stale (e.g.&nbsp;their own old hold label, a resolved claim).</li>
+<li><strong>Branch first</strong> — for the protected-branch case, create a feature branch and push that instead.</li>
+<li><strong>Skip the push</strong> — leave the commits local for now.</li>
+</ul>
+<p>Include the specifics in the question (which label, whose claim, how many commits ahead) so the user can answer without digging.</p>
+</section>
+<section id="pushing-checks-clean" class="level2">
+<h2 class="anchored" data-anchor-id="pushing-checks-clean">Pushing (checks clean)</h2>
+<p>Once every check passes, push with the standard upstream + retry backoff:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> push <span class="at">-u</span> origin HEAD   <span class="co"># PUSH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>HEAD</code> rather than <code>"$BRANCH"</code>, deliberately: a shell variable reaches the pre-push guard unexpanded, so it cannot resolve which commits the push would ship and refuses. <code>-u origin HEAD</code> sets the upstream to the current branch just the same.</p>
+<p>If the push fails on a <strong>network</strong> error, retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s). Do <strong>not</strong> retry — and do <strong>not</strong> force-push — if it fails because the remote rejected a non-fast-forward (that’s check #2 surfacing late: fetch, reconcile, re-run the checks).</p>
+<p>After a successful push, if the branch has no PR yet, open one (ready for review, not a draft).</p>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
+<ul>
+<li><strong><code>claim-pr</code></strong> — posts/removes the claim comment this skill reads in check #3. <code>push</code> is the read side; <code>claim-pr</code> is the write side.</li>
+<li><strong><code>session-lock</code></strong> — the local-checkout counterpart: it keeps parallel sessions on one machine from sharing a working tree. <code>push</code> guards the <em>remote</em> branch; <code>session-lock</code> guards the <em>local</em> tree.</li>
+<li><strong><code>sync-pr-branch</code> / <code>merge-main</code></strong> — when check #2 fires because <code>main</code> (not the branch) moved ahead, sync the branch first, then push. <code>sync-pr-branch</code> ends in a push and should itself honor these checks.</li>
+<li><strong><code>ardi</code></strong> — its push step should run these checks; the “detect an active parallel session before pushing” note in <code>claim-pr</code> is the same guard.</li>
+<li><strong><a href="../../shared/workflow/check-before-pushing.md"><code>check-before-pushing</code></a></strong> — the standing rule these checks implement, and the home of the immediacy argument and the <code>--force-if-includes</code> mechanism. <code>hooks/no-clobbering-push.py</code> is its instrument, and it runs on the <code>git push</code> itself rather than waiting to be invoked — so it covers the bare push in the middle of an ARDI round that never reaches this skill.</li>
+</ul>
+</section>
+<section id="proactive-hook-compliance" class="level2">
+<h2 class="anchored" data-anchor-id="proactive-hook-compliance">Proactive hook compliance</h2>
+<p>Active hooks guard push operations (see <a href="../../memories/hooks.md"><code>memories/hooks.md</code></a>): - <strong><code>no-push-without-self-review.py</code></strong>: Blocks <code>git push</code> unless an adversarial self-review subagent produced a clean verdict for the exact commit being pushed (<code>Reviewed-Commit: &lt;HEAD_SHA&gt;</code>). Dispatch the reviewer in the foreground and resolve all findings before pushing. Use <code>ALLOW_UNREVIEWED_PUSH=1</code> only for the empty <code>pr-on-claim</code> commit or documented exceptions. - <strong><code>no-clobbering-push.py</code></strong>: Denies bare <code>git push -f</code>/<code>--force</code> and warns if remote tip has diverged. Always run <code>git ls-remote --heads origin &lt;branch&gt;</code> immediately before pushing, and use <code>--force-with-lease --force-if-includes</code>. - <strong><code>no-unshipped-commit.py</code></strong>: Stop guard that blocks turn completion when unpushed commits remain on the branch.</p>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<ul>
+<li>❌ Force-pushing over commits another session added (check #2)</li>
+<li>❌ Bare <code>git push --force</code> instead of <code>--force-with-lease --force-if-includes</code> (check #6)</li>
+<li>❌ Reusing an earlier fetch as the check — the reading has to be taken immediately before the push (check #2)</li>
+<li>❌ Pushing past a fresh claim comment from someone else (check #3)</li>
+<li>❌ Pushing onto a <code>do-not-merge</code> / <code>hold</code> PR without asking (check #4)</li>
+<li>❌ Pushing while a <code>@claude</code> run is mid-session on the branch (check #5)</li>
+<li>❌ Pushing directly to <code>main</code> / the default branch (check #1)</li>
+<li>❌ Reporting “pushed” when a check stopped you — say what fired and that you’re waiting on the user</li>
+</ul>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/push/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/push/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

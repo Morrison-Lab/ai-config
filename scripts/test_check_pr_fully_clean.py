@@ -1872,6 +1872,154 @@ def main() -> int:
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "
               "issue is resolved. I found no new issues in this review.\n", "")
           == "clean")
+    for resolution_suffix, label in (
+        ("was resolved by the latest commit", "resolution explained by commit"),
+        ("was resolved by adding tests", "resolution explained by adding tests"),
+        ("was resolved in PR #123", "resolution explained by PR reference"),
+        ("was resolved via commit abc1234", "resolution explained by commit sha"),
+        ("was resolved with the changes in main.py", "resolution explained by filename changes"),
+        ("was resolved as requested", "resolution explained by adverbial as-requested"),
+        ("was resolved per review comments", "resolution explained by per-suggestion"),
+        ("was resolved by removing the deprecated function", "removing non-detector object"),
+        ("was resolved by disabling the deprecated feature flag", "disabling non-detector object"),
+        ("was resolved by muting a noisy third-party dependency log", "muting non-detector object"),
+        ("was resolved by weakening the coupling between the two modules", "weakening non-detector object"),
+        ("was resolved by bypassing the cache to always fetch fresh data", "bypassing non-detector object"),
+        ("was resolved", "bare resolved phrase"),
+        ("has already been fixed", "adverb already before fixed"),
+        ("has since been addressed", "adverb since before addressed"),
+    ):
+        check(
+            f"classify_verdict: prior blocking finding {label} stays clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n",
+                "",
+            )
+            == "clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: prior blocking finding {label} has no finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {resolution_suffix}.\n"
+            )
+            is None,
+        )
+    check(
+        "classify_verdict: bare 'prior blocking finding was resolved' stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** Prior blocking finding was resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive finding's blocking issue is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior finding's blocking issue is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "classify_verdict: possessive issue's blocking problem is resolved stays clean (#2774)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge.** The prior issue's blocking problem is resolved.\n",
+            "",
+        )
+        == "clean",
+    )
+    for hedged_suffix in (
+        "was resolved by ignoring it entirely without actually fixing anything",
+        "was resolved by a partial patch that does not cover the edge case",
+        "was resolved without fixing the bug",
+        "was resolved except for the edge cases",
+        "was resolved by a patch that fails under load",
+        "was resolved by not doing anything",
+        "was resolved by skipping tests",
+        "was resolved by a patch that remains open",
+        "was resolved by code that is broken",
+        "was resolved by removing the test that caught it",
+        "was resolved by deleting the assertion",
+        "was resolved by muting the linter warning",
+        "was resolved by reverting the check that flagged it",
+        "was resolved by suppressing the error",
+        "was resolved by disabling the test",
+        "was resolved by commenting out the check",
+        "was resolved by weakening the assertion",
+        "was resolved by bypassing the check",
+        "was resolved by deleting tests",
+        "was resolved by removing tests",
+        "was resolved by disabling checks",
+        "was resolved by commenting out tests",
+        "was resolved by muting warnings",
+        "was resolved by suppressing errors",
+        "was resolved by disabling all checks",
+        "was resolved by deleting these tests",
+        "was resolved by deleting unit tests",
+        "was resolved by a patch that ignores tests",
+        "was resolved by code that skips the assertion",
+        "was resolved by silencing the test",
+    ):
+        check(
+            f"classify_verdict: hedged resolution '{hedged_suffix}' stays not-clean (#2774)",
+            checker.classify_verdict(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n",
+                "",
+            )
+            == "not-clean",
+        )
+        check(
+            f"_unresolved_finding_pattern: hedged resolution '{hedged_suffix}' returns finding (#2774)",
+            checker._unresolved_finding_pattern(
+                f"### Verdict\n**Ready for merge.** The prior blocking finding {hedged_suffix}.\n"
+            )
+            is not None,
+        )
+
+    check(
+        "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
+        checker.classify_verdict(
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n",
+            "",
+        )
+        == "clean",
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with no new issues produces no finding",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\nNo new issues.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Findings (non-blocking)' with real finding item blocks",
+        checker._unresolved_finding_pattern(
+            "### Findings (non-blocking)\n- **scripts/foo.py:42** SQL concatenation bug\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Nits' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Nits\nnon-blocking: rename variable x for clarity.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "_unresolved_finding_pattern: '### Issues' with non-blocking item stays not-clean",
+        checker._unresolved_finding_pattern(
+            "### Issues\nnon-blocking: there is an off-by-one bug in the loop.\n\n### Verdict\n**Ready for merge.**\n"
+        )
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work' with non-blocking trailer stays not-clean",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: non-blocking issue, please rename variable x.\n",
+            "",
+        )
+        == "not-clean",
+    )
     check("unrelated unresolved wording in a later paragraph does not poison resolution",
           checker.classify_verdict(
               "### Verdict\n**Ready for merge.** The prior verdict's blocking "

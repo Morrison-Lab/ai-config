@@ -548,9 +548,8 @@ A clean automated review from every available provider evaluating the current HE
   because the agent claimed a tracking closure on the record
   without shipping the corresponding file change.
 - **Canonical Rule**: [`no-empty-promises.md`](../shared/workflow/no-empty-promises.md)
-  ("A promise costs nothing to produce and changes no file...
-  It is worse than saying nothing, because silence leaves the problem visibly open
-  while a promise closes it on the record.").
+  establishes that a promise leaves a problem addressed *on the record*
+  without changing any files, concealing the unaddressed state.
   Claiming an administrative file update without writing to the file
   falls under this exact definition of a false record.
 - **Fix**: Open the administrative file (`tracks.md` or `plan.md`),

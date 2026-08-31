@@ -998,3 +998,10 @@ exclude them in `lychee.toml` rather than treating the check failure as a broken
 Use `formatC(..., format="d", big.mark=",")` (or `prettyNum(..., scientific=FALSE)`)
 so derived figures like `192,000` render with commas in Quarto inline R.
 Hit on wai#128 (byok ITPM/budget figures).
+
+## Statistical Analysis Plans (SAPs) and reporting documents
+
+- **Audience scope**: An SAP is a formal statistical design document for stakeholders, investigators, and reviewers. Maintain statistical rigor in the narrative (estimands, modeling assumptions, variance estimation, operating characteristics) and avoid implementation/tutorial commentary or discussing internal code/function names in the narrative body.
+- **Don't Reinvent the Wheel (DRW)**: Do not define custom utility operators (such as `%||%`) when standard packages already imported or suggested (`rlang::%||%`) provide them.
+- **Place document formatting functions in `R/`**: Table formatting functions used across reports/vignettes should be standard package functions in `R/` with full roxygen2 documentation and unit test coverage in `tests/testthat/`, rather than orphan vignette scripts.
+

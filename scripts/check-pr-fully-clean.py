@@ -883,18 +883,22 @@ def strip_cited_finding_vocab_with_mask(text: str) -> Tuple[str, bytearray]:
     # "This is the author's direct response to [round 6's finding](<url>)
     # (posted 2026-08-30T05:22:14Z, verdict **Needs more work**), per ..."
     # (ai-config#2662). Like _SHA_CITATION above, the strip requires a
-    # POSITIVE context signal, not just the parenthesized shape: the aside
-    # must sit right after a markdown link to the cited round (a semantic
-    # line break after the link is allowed), or follow an attribution
-    # phrase ("in response to", "responds to", "replied to"), whose filler
-    # may carry one parenthesized aside of its own. The filler's branches
-    # are disjoint on "(" so a failing scan stays linear. An unattributed
-    # "posted <ts>, verdict **X**" -- parenthesized or not -- is left
-    # alone entirely: stripping a live not-clean is the dangerous
-    # direction, and a veto list alone cannot enumerate every re-raise
-    # phrasing.
-    # The link TEXT must name the cited round, and the aside must end
-    # the clause. Both are needed, and neither is cosmetic.
+    # POSITIVE context signal rather than just the parenthesized shape,
+    # and here that signal is a markdown link whose TEXT names the cited
+    # round, sitting immediately before the aside -- a semantic line
+    # break between them is allowed. An unattributed "posted <ts>,
+    # verdict **X**", parenthesized or not, is left alone entirely:
+    # stripping a live not-clean is the dangerous direction, and a veto
+    # list alone cannot enumerate every re-raise phrasing.
+    #
+    # An attribution PHRASE ("in response to", "responds to", "replied
+    # to") was once accepted in the link's place. It is not, and must not
+    # be: it matched any prose containing those words, which is what let
+    # an unrelated link and a live requirement through. The link is now
+    # the only accepted signal.
+    #
+    # The link text naming the round, and the aside ending the clause,
+    # are both required, and neither is cosmetic.
     #
     # Accepting any "](url)" made an unrelated link into an attribution
     # signal, so "violates the style guide [docs](url) (posted ...,
